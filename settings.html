@@ -242,7 +242,7 @@
 			<div class="mb-4">
 				<h6 class="fw-bold mb-2"><i class="fas fa-box me-2" style="color:#e87e2a;"></i>Import Materials</h6>
 				<p class="text-muted small">Upload a .txt file with materials grouped by category (Name | Unit | Price)</p>
-				<input type type="file" id="importMaterialsFileSettings" accept=".txt" class="form-control mb-2">
+				<input type="file" id="importMaterialsFileSettings" accept=".txt" class="form-control mb-2">
 				<button class="btn btn-outline-primary btn-sm" onclick="importMaterialsFromFileSettings()">
 					<i class="fas fa-upload me-1"></i>Import Materials
 				</button>
@@ -489,8 +489,8 @@
 			var reader = new FileReader();
 			reader.onload = function(e) {
 				var lines = e.target.result.split('\n');
+				// Always start fresh to avoid old bad data
 				var clients = {};
-				try { clients = JSON.parse(localStorage.getItem('ald_clients') || '{}'); } catch(err) {}
 				var added = 0;
 				lines.forEach(function(line) {
 					line = line.trim();
@@ -510,7 +510,8 @@
 					added++;
 				});
 				localStorage.setItem('ald_clients', JSON.stringify(clients));
-				resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>' + added + ' clients imported!</span>';
+				resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>' + added + ' clients imported! Reloading...</span>';
+				setTimeout(function() { location.reload(); }, 1200);
 			};
 			reader.readAsText(file);
 		}
@@ -544,7 +545,8 @@
 					}
 				}
 				localStorage.setItem('ald_custom_items', JSON.stringify(items));
-				resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>' + added + ' materials imported!</span>';
+				resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>' + added + ' materials imported! Reloading...</span>';
+				setTimeout(function() { location.reload(); }, 1200);
 			};
 			reader.readAsText(file);
 		}
