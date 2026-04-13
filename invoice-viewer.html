@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice - QuoteDr</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background-color: #f8f9fa; }
+
+        .invoice-header {
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 3px solid #111;
+        }
+
+        .invoice-badge {
+            background: linear-gradient(135deg, #2d2d2d 0%, #111111 100%);
+            color: white;
+            padding: 6px 20px;
+            border-radius: 4px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+        }
+
+        .room-card { margin-bottom: 1.5rem; }
+        .room-card .card-header { color: white; }
+
+        .item-row {
+            padding: 10px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .item-row:last-child { border-bottom: none; }
+
+        .item-name { font-weight: 600; }
+        .item-desc { font-size: 0.88rem; color: #666; margin-top: 2px; }
+        .item-upgraded-badge {
+            display: inline-block;
+            background: #fff3cd;
+            color: #856404;
+            font-size: 0.72rem;
+            padding: 1px 7px;
+            border-radius: 10px;
+            margin-left: 6px;
+            font-weight: 600;
+        }
+
+        .totals-section {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            padding: 1.5rem 2rem;
+            margin-top: 2rem;
+        }
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 1rem;
+        }
+        .total-row.grand {
+            border-top: 2px solid #111;
+            margin-top: 8px;
+            padding-top: 12px;
+            font-size: 1.5rem;
+            font-weight: 800;
+        }
+
+        .terms-section { margin-top: 2rem; }
+
+        /* Warranty Badge */
+        .warranty-section {
+            margin-top: 2rem;
+            background: linear-gradient(135deg, #1a1a2e 0%, #2d2d2d 100%);
+            border-radius: 12px;
+            padding: 1.5rem 2rem;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+        .warranty-section::before {
+            content: '\2605';
+            position: absolute;
+            right: -10px;
+            top: -20px;
+            font-size: 120px;
+            opacity: 0.04;
+            color: white;
+        }
+        .warranty-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        @media (min-width: 640px) {
+            .warranty-grid { grid-template-columns: repeat(4, 1fr); }
+        }
+        .warranty-item {
+            text-align: center;
+            padding: 0.75rem;
+            background: rgba(255,255,255,0.07);
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.12);
+        }
+        .warranty-item .icon {
+            font-size: 1.8rem;
+            margin-bottom: 0.4rem;
+        }
+        .warranty-item .label {
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #f0ad4e;
+        }
+        .warranty-item .sublabel {
+            font-size: 0.72rem;
+            opacity: 0.75;
+            margin-top: 2px;
+        }
+
+        @media print {
+            body { background: white; }
+            .no-print { display: none !important; }
+            .totals-section { box-shadow: none; border: 1px solid #dee2e6; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-4" style="max-width: 860px;">
+
+        <!-- Print / Save button -->
+        <div class="text-end mb-3 no-print">
+            <button onclick="window.print()" class="btn btn-outline-dark btn-sm">
+                <i class="fas fa-print"></i> Print / Save PDF
+            </button>
+        </div>
+
+        <!-- Header -->
+        <div class="invoice-header">
+            <div class="row align-items-center">
+                <div class="col-8">
+                    <div class="d-flex align-items-center gap-3">
+                        <img id="businessLogoImg" src="quotedr-logo.svg" alt="Company Logo" style="height: 120px; width: auto; max-width: 340px;">
+                        <div>
+                            <h3 id="companyNameDisplay" class="mb-0" style="color:#2c3e50;"></h3>
+                            <p id="companyTaglineDisplay" class="text-muted mb-0">Professional Renovation Services</p>
+                            <div class="mt-2" id="businessInfoDisplay" style="font-size:0.8rem; color:#555; line-height:1.7;"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-4 text-end">
+                    <div class="invoice-badge mb-2">Invoice</div>
+                    <div id="invoiceNumberDisplay" class="text-muted small"></div>
+                    <div id="invoiceDateDisplay" class="text-muted small"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Client + Project Info -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-2 text-uppercase" style="font-size:0.75rem; letter-spacing:1px;">Bill To</h6>
+                        <div id="clientNameDisplay" class="fw-bold fs-5"></div>
+                        <div id="clientAddressDisplay" class="text-muted"></div>
+                        <div id="clientEmailDisplay" class="text-muted small"></div>
+                        <div id="clientPhoneDisplay" class="text-muted small"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-2 text-uppercase" style="font-size:0.75rem; letter-spacing:1px;">Project</h6>
+                        <div id="projectAddressDisplay" class="fw-bold"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rooms + Line Items -->
+        <div id="invoiceContainer"></div>
+
+        <!-- Totals -->
+        <div class="totals-section">
+            <div class="total-row">
+                <span>Subtotal</span>
+                <span id="subtotalDisplay">$0.00</span>
+            </div>
+            <div class="total-row">
+                <span>HST (13%)</span>
+                <span id="taxDisplay">$0.00</span>
+            </div>
+            <div class="total-row grand">
+                <span>Total Due</span>
+                <span id="grandTotalDisplay">$0.00</span>
+            </div>
+        </div>
+
+        <!-- Terms -->
+        <div class="terms-section">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0"><i class="fas fa-file-contract"></i> Terms & Conditions</h6>
+                </div>
+                <div class="card-body" id="termsDisplay">
+                    <p class="text-muted mb-0">No terms specified.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Warranty Badge -->
+        <div class="warranty-section">
+            <div class="text-center mb-2">
+                <span style="font-size:1.1rem; font-weight:800; letter-spacing:1px;">&#9733; OUR COMMITMENT TO YOU &#9733;</span>
+            </div>
+            <div class="warranty-grid">
+                <div class="warranty-item">
+                    <div class="icon">🛡️</div>
+                    <div class="label">1-Year Warranty</div>
+                    <div class="sublabel">Workmanship guaranteed for 12 months from project completion</div>
+                </div>
+                <div class="warranty-item">
+                    <div class="icon">🏭</div>
+                    <div class="label">Manufacturer Warranty</div>
+                    <div class="sublabel">All materials carry full manufacturer warranty — passed directly to you</div>
+                </div>
+                <div class="warranty-item">
+                    <div class="icon">✅</div>
+                    <div class="label">Fully Insured</div>
+                    <div class="sublabel">Liability insurance coverage on all work performed</div>
+                </div>
+                <div class="warranty-item">
+                    <div class="icon">🤝</div>
+                    <div class="label">Satisfaction Promise</div>
+                    <div class="sublabel">Any concerns addressed promptly — your satisfaction is our priority</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center text-muted mt-4 mb-2" style="font-size:0.85rem;">
+            Thank you for your business!
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const ROOM_COLORS = [
+            'linear-gradient(135deg,#2d2d2d 0%,#111111 100%)',
+            'linear-gradient(135deg,#1e3a5f 0%,#0a1a2e 100%)',
+            'linear-gradient(135deg,#1a5c38 0%,#0a2e1a 100%)',
+            'linear-gradient(135deg,#6b1a2a 0%,#300a12 100%)',
+            'linear-gradient(135deg,#4a5568 0%,#1a202c 100%)',
+            'linear-gradient(135deg,#0652DD 0%,#023e8a 100%)',
+            'linear-gradient(135deg,#00796b 0%,#004d40 100%)',
+            'linear-gradient(135deg,#6a1b9a 0%,#2e003e 100%)',
+            'linear-gradient(135deg,#b87333 0%,#7c4a00 100%)',
+            'linear-gradient(135deg,#546e7a 0%,#263238 100%)',
+            'linear-gradient(135deg,#c0747a 0%,#7a3540 100%)',
+            'linear-gradient(135deg,#1a1a2e 0%,#000000 100%)'
+        ];
+
+        let invoiceData = {};
+
+        const CATEGORY_ORDER = [
+            'Demolition','Asbestos / Hazmat','Concrete & Masonry','Waterproofing',
+            'Rough Framing','Windows & Exterior Doors','Rough Plumbing','Rough Electrical',
+            'HVAC / Ductwork','Insulation','Drywall','Tile & Stone','Flooring',
+            'Interior Doors','Trim & Millwork','Cabinets & Vanities',
+            'Finish Plumbing','Finish Electrical','Carpentry & Baseboards',
+            'Painting','Cleaning & Disposal','Miscellaneous'
+        ];
+        const CATEGORY_ALIASES = {
+            'Framing':'Rough Framing','Electrical':'Finish Electrical',
+            'Plumbing':'Finish Plumbing','HVAC':'HVAC / Ductwork',
+            'Doors & Trim':'Trim & Millwork','Tiling':'Tile & Stone',
+            'Carpentry':'Carpentry & Baseboards','Subflooring':'Flooring'
+        };
+        function canonicalCat(cat) { return CATEGORY_ALIASES[cat] || cat || 'Miscellaneous'; }
+        function sortItemsByCategory(items) {
+            return [...items].sort((a, b) => {
+                let ai = CATEGORY_ORDER.indexOf(canonicalCat(a.category));
+                let bi = CATEGORY_ORDER.indexOf(canonicalCat(b.category));
+                if (ai === -1) ai = CATEGORY_ORDER.length - 2;
+                if (bi === -1) bi = CATEGORY_ORDER.length - 2;
+                return ai - bi;
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Load user's uploaded logo
+            var savedLogo = localStorage.getItem('ald_logo');
+            if (savedLogo) {
+                var logoEl = document.getElementById('businessLogoImg');
+                if (logoEl) logoEl.src = savedLogo;
+            }
+            // Load company name + tagline
+            var bizProfile = JSON.parse(localStorage.getItem('ald_business_profile') || '{}');
+            var nameEl = document.getElementById('companyNameDisplay');
+            var tagEl = document.getElementById('companyTaglineDisplay');
+            if (nameEl && bizProfile.business_name) nameEl.textContent = bizProfile.business_name;
+            if (tagEl && bizProfile.tagline) tagEl.textContent = bizProfile.tagline;
+            else if (tagEl && !bizProfile.tagline) tagEl.style.display = 'none';
+            loadInvoice();
+            renderInvoice();
+            renderTerms();
+        });
+
+        function loadInvoice() {
+            const params = new URLSearchParams(window.location.search);
+            var invoiceId = params.get('invoice');
+            if (!invoiceId) invoiceId = localStorage.getItem('ald_last_preview_invoice');
+            if (!invoiceId) { alert('Invalid invoice link.'); return; }
+            const stored = localStorage.getItem(invoiceId);
+            if (!stored) { alert('Invoice not found. The link may have expired.'); return; }
+            invoiceData = JSON.parse(stored);
+        }
+
+        function renderInvoice() {
+            // Header info
+            const date = new Date().toLocaleDateString('en-CA', { year:'numeric', month:'long', day:'numeric' });
+            document.getElementById('invoiceDateDisplay').textContent = date;
+            if (invoiceData.quoteNumber) {
+                document.getElementById('invoiceNumberDisplay').textContent = '#' + invoiceData.quoteNumber;
+            }
+
+            // Client info
+            document.getElementById('clientNameDisplay').textContent = invoiceData.clientName || '';
+            document.getElementById('clientAddressDisplay').textContent = invoiceData.projectAddress || '';
+            document.getElementById('projectAddressDisplay').textContent = invoiceData.projectAddress || '';
+            if (invoiceData.email) document.getElementById('clientEmailDisplay').textContent = invoiceData.email;
+            if (invoiceData.phone) document.getElementById('clientPhoneDisplay').textContent = invoiceData.phone;
+
+            // Business info — load from Supabase if available
+            if (typeof getBusinessProfile === 'function') {
+                getBusinessProfile().then(function(result) {
+                    var bizEl = document.getElementById('businessInfoDisplay');
+                    if (bizEl && result.data) {
+                        var b = result.data;
+                        var lines = [];
+                        if (b.address) lines.push(b.address);
+                        if (b.city) lines.push(b.city + (b.province ? ', ' + b.province : '') + (b.postal_code ? ' ' + b.postal_code : ''));
+                        if (b.phone) lines.push('Phone: ' + b.phone);
+                        if (b.hst_number) lines.push('HST: ' + b.hst_number);
+                        bizEl.innerHTML = lines.map(function(l) { return '<div>' + l + '</div>'; }).join('');
+                    }
+                });
+            } else if (invoiceData.businessProfile) {
+                const b = invoiceData.businessProfile;
+                const bizEl = document.getElementById('businessInfoDisplay');
+                if (bizEl) bizEl.innerHTML = [b.address, b.city + (b.province ? ', ' + b.province : '') + (b.postal_code ? ' ' + b.postal_code : ''), b.phone ? 'Phone: ' + b.phone : '', b.hst_number ? 'HST: ' + b.hst_number : ''].filter(Boolean).map(l => '<div>' + l + '</div>').join('');
+            }
+
+            if (!invoiceData.rooms || !invoiceData.rooms.length) {
+                document.getElementById('invoiceContainer').innerHTML = '<div class="alert alert-warning">No invoice data.</div>';
+                return;
+            }
+
+            let subtotal = 0;
+            let html = '';
+
+            invoiceData.rooms.forEach(room => {
+                const headerBg = ROOM_COLORS[room.colorIndex ?? 0] || ROOM_COLORS[0];
+                const roomTotal = room.items.reduce((sum, item) => {
+                    const rate = item.upgraded && item.upgrade ? item.upgrade.rate : item.rate;
+                    return sum + item.quantity * rate;
+                }, 0);
+                subtotal += roomTotal;
+
+                html += `
+                <div class="card room-card">
+                    <div class="card-header" style="background:${headerBg};">
+                        <strong><i class="fas fa-door-open"></i> ${room.name}</strong>
+                    </div>
+                    <div class="card-body p-0">
+                        <table class="table table-sm mb-0" style="table-layout:fixed;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width:45%">Description</th>
+                                    <th style="width:18%; text-align:center;">Qty / Unit</th>
+                                    <th style="width:18%; text-align:right;">Unit Price</th>
+                                    <th style="width:19%; text-align:right;">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
+
+                // Group items by trade category order
+                const catGroupOrder = [];
+                const catGroups = {};
+                sortItemsByCategory(room.items).forEach(item => {
+                    const cat = item.category || 'Miscellaneous';
+                    if (!catGroups[cat]) { catGroups[cat] = []; catGroupOrder.push(cat); }
+                    catGroups[cat].push(item);
+                });
+                // Apply per-room custom order if saved
+                const orderedCats = room.categoryOrder
+                    ? [...room.categoryOrder.filter(c => catGroups[c]), ...catGroupOrder.filter(c => !room.categoryOrder.includes(c))]
+                    : catGroupOrder;
+
+                orderedCats.filter(c => catGroups[c]).forEach(catName => {
+                    const catItems = catGroups[catName];
+                    html += `<tr><td colspan="4" style="background:#f0f4ff; padding:4px 8px; font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:#495057;"><i class="fas fa-tag me-1" style="color:#6c757d;"></i>${canonicalCat(catName)}</td></tr>`;
+
+                    catItems.forEach(item => {
+                    const isUpgraded = !!item.upgraded;
+                    const activeRate = isUpgraded && item.upgrade ? item.upgrade.rate : item.rate;
+                    const itemTotal = item.quantity * activeRate;
+                    const displayName = isUpgraded && item.upgrade ? item.upgrade.name : item.description;
+                    const displayDesc = isUpgraded && item.upgrade?.description
+                        ? item.upgrade.description
+                        : (item.itemDescription || '');
+
+                    html += `
+                            <tr>
+                                <td>
+                                    <span class="item-name">${displayName}</span>
+                                    ${isUpgraded ? '<span class="item-upgraded-badge">⬆ Upgraded</span>' : ''}
+                                    ${displayDesc ? `<div class="item-desc">${displayDesc}</div>` : ''}
+                                    ${item.notes ? `<div class="item-desc"><i class="fas fa-info-circle"></i> ${item.notes}</div>` : ''}
+                                </td>
+                                <td style="text-align:center; vertical-align:top; padding-top:10px;">${item.quantity} ${item.unitType}</td>
+                                <td style="text-align:right; vertical-align:top; padding-top:10px;">$${activeRate.toFixed(2)}</td>
+                                <td style="text-align:right; vertical-align:top; padding-top:10px; font-weight:600;">$${itemTotal.toFixed(2)}</td>
+                            </tr>`;
+                    }); // end catItems
+                }); // end catGroups
+
+                html += `
+                            </tbody>
+                            <tfoot>
+                                <tr class="table-light">
+                                    <td colspan="3" class="text-end fw-bold">Room Total:</td>
+                                    <td class="text-end fw-bold text-success">$${roomTotal.toFixed(2)}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>`;
+            });
+
+            document.getElementById('invoiceContainer').innerHTML = html;
+
+            // Totals
+            const tax = subtotal * 0.13;
+            const total = subtotal + tax;
+            document.getElementById('subtotalDisplay').textContent = '$' + subtotal.toFixed(2);
+            document.getElementById('taxDisplay').textContent = '$' + tax.toFixed(2);
+            document.getElementById('grandTotalDisplay').textContent = '$' + total.toFixed(2);
+        }
+
+        function renderTerms() {
+            const el = document.getElementById('termsDisplay');
+            if (!invoiceData.terms || !invoiceData.terms.length) return;
+            let html = '<ul class="list-group list-group-flush">';
+            invoiceData.terms.forEach(t => {
+                html += `<li class="list-group-item"><i class="fas fa-check-circle text-success"></i> ${t}</li>`;
+            });
+            html += '</ul>';
+            el.innerHTML = html;
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase.js"></script>
+</body>
+</html>

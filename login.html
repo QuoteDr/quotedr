@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuoteDr - Login</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #1a56a0 0%, #0f3460 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-card {
+            background: white;
+            border-radius: 16px;
+            padding: 0 2.5rem 2.5rem 2.5rem;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+            width: 100%;
+            max-width: 420px;
+        }
+        .logo-area {
+            text-align: center;
+            margin-bottom: 0.5rem;
+            overflow: hidden;
+        }
+        .logo-area h1 {
+            font-size: 2rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #1a56a0, #0f3460);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .logo-area p { color: #666; margin: 0; font-size: 0.9rem; }
+        .btn-primary {
+            background: linear-gradient(135deg, #1a56a0, #0f3460);
+            border: none;
+            padding: 0.75rem;
+            font-weight: 600;
+        }
+        .btn-primary:hover { background: linear-gradient(135deg, #154a8a, #0d2d50); }
+        .tab-nav {
+            display: flex;
+            margin-bottom: 1.5rem;
+            border-bottom: 2px solid #eee;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 0.75rem;
+            border: none;
+            background: none;
+            font-weight: 600;
+            color: #999;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .tab-btn.active {
+            color: #1a56a0;
+            border-bottom: 2px solid #1a56a0;
+            margin-bottom: -2px;
+        }
+        .alert { margin-top: 1rem; }
+        .input-group .btn-outline-secondary { border-color: #dee2e6; color: #666; }
+        .input-group .btn-outline-secondary:hover { background: #f8f9fa; color: #333; }
+        .form-control:focus { border-color: #1a56a0; box-shadow: 0 0 0 0.2rem rgba(26,86,160,0.25); }
+        a { color: #1a56a0; }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <div class="logo-area">
+            <img src="quotedr-logo.svg" alt="QuoteDr" style="width: 110%; max-width: 380px; height: auto; display: block; margin: -12% auto -39% auto;">
+            <p id="loginTagline"></p>
+            <script>
+                const taglines = [
+                    "Dr. Quotes will see you now 🩺",
+                    "No waiting room. No co-pay. Just quotes.",
+                    "Second opinion? Our quotes speak for themselves.",
+                    "Prescribing profitable quotes since day one",
+                    "The doctor is in. Your quote is ready.",
+                    "Side effects may include: getting paid faster",
+                    "Because napkin math wasn't cutting it anymore",
+                    "Measure twice, quote once",
+                    "Your foreman said get organized. Here you go.",
+                    "Finally, software that doesn't require a PhD to operate",
+                    "Less time quoting, more time on the tools",
+                    "Built for people who actually build things",
+                    "We handle the paperwork. You handle the drywall.",
+                    "Your accountant will love you. Your competition won't.",
+                    "No hard hat required 🦺",
+                    "Turns out you CAN teach a contractor new tricks",
+                    "Send a quote before they change their mind",
+                    "Professional quotes. Professional prices. Professional you.",
+                    "Look more legit than your competition in 5 minutes",
+                    "Clients pay faster when the quote looks this good",
+                    "Stop leaving money on the table (it's a job site, there is no table)"
+                ];
+                // Load or create shuffled order
+                var order = JSON.parse(localStorage.getItem('ald_tagline_order') || 'null');
+                if (!order || order.length !== taglines.length) {
+                    // Fisher-Yates shuffle
+                    order = taglines.map(function(_,i){ return i; });
+                    for (var i = order.length - 1; i > 0; i--) {
+                        var j = Math.floor(Math.random() * (i + 1));
+                        var tmp = order[i]; order[i] = order[j]; order[j] = tmp;
+                    }
+                    localStorage.setItem('ald_tagline_order', JSON.stringify(order));
+                }
+                var idx = parseInt(localStorage.getItem('ald_tagline_idx') || '0');
+                document.getElementById('loginTagline').textContent = taglines[order[idx]];
+                var nextIdx = idx + 1;
+                if (nextIdx >= taglines.length) {
+                    // Reshuffle for next cycle
+                    nextIdx = 0;
+                    localStorage.removeItem('ald_tagline_order');
+                }
+                localStorage.setItem('ald_tagline_idx', nextIdx);
+            </script>
+        </div>
+
+        <div class="tab-nav">
+            <button type="button" class="tab-btn active" id="tabSignin" onclick="showTab('signin')">Sign In</button>
+            <button type="button" class="tab-btn" id="tabSignup" onclick="showTab('signup')">Sign Up</button>
+        </div>
+
+        <!-- Sign In Form -->
+        <div id="signinForm">
+            <div class="mb-3">
+                <label class="form-label">Email</label>
+                <input type="email" class="form-control" id="signinEmail" placeholder="you@example.com">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Password</label>
+                <div class="input-group">
+                    <input type="password" class="form-control" id="signinPassword" placeholder="Enter your password">
+                    <button type="button" class="btn btn-outline-secondary" onclick="togglePassword('signinPassword', this)" tabindex="-1">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="text-end mb-3">
+                <a href="#" onclick="handleForgotPassword(); return false;" style="font-size:0.85rem; text-decoration:none;">Forgot password?</a>
+            </div>
+            <div class="mb-3 d-flex align-items-center gap-2">
+                <input class="form-check-input" type="checkbox" id="rememberMe" style="cursor:pointer;">
+                <label class="form-check-label text-muted" for="rememberMe" style="font-size:0.9rem;">Remember me</label>
+            </div>
+            <button type="button" class="btn btn-primary w-100" id="signinBtn" onclick="handleSignIn()">Sign In</button>
+            <div id="signinMessage"></div>
+        </div>
+
+        <!-- Sign Up Form -->
+        <div id="signupForm" style="display:none">
+            <div class="mb-3">
+                <label class="form-label">Email</label>
+                <input type="email" class="form-control" id="signupEmail" placeholder="you@example.com">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Password</label>
+                <div class="input-group">
+                    <input type="password" class="form-control" id="signupPassword" placeholder="Min 6 characters" oninput="updateStrength(this.value)">
+                    <button type="button" class="btn btn-outline-secondary" onclick="togglePassword('signupPassword', this)" tabindex="-1">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+                <div class="mt-1" style="height:4px; border-radius:2px; background:#eee; overflow:hidden;">
+                    <div id="strengthFill" style="height:100%; width:0%; transition:all 0.3s;"></div>
+                </div>
+                <small id="strengthLabel" class="text-muted"></small>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Confirm Password</label>
+                <div class="input-group">
+                    <input type="password" class="form-control" id="signupConfirm" placeholder="Confirm password">
+                    <button type="button" class="btn btn-outline-secondary" onclick="togglePassword('signupConfirm', this)" tabindex="-1">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+            </div>
+            <button type="button" class="btn btn-primary w-100" id="signupBtn" onclick="handleSignUp()">Create Account</button>
+            <div id="signupMessage"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        const SUPABASE_URL = 'https://axmoffknvblluibuitrq.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso';
+        const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // Only auto-redirect if URL has ?redirect=1 (i.e. came here intentionally, not directly)
+        const urlParams = new URLSearchParams(window.location.search);
+        if (!urlParams.has('noredirect')) {
+            _supabase.auth.getSession().then(({ data: { session } }) => {
+                if (session) {
+                    if (!localStorage.getItem('ald_onboarding_complete')) {
+                        window.location.href = 'onboarding.html';
+                    } else {
+                        window.location.href = 'quote-builder.html';
+                    }
+                }
+            });
+        }
+
+        function showTab(tab) {
+            document.getElementById('signinForm').style.display = tab === 'signin' ? 'block' : 'none';
+            document.getElementById('signupForm').style.display = tab === 'signup' ? 'block' : 'none';
+            document.getElementById('tabSignin').classList.toggle('active', tab === 'signin');
+            document.getElementById('tabSignup').classList.toggle('active', tab === 'signup');
+        }
+
+        function showMessage(elId, msg, type) {
+            document.getElementById(elId).innerHTML = '<div class="alert alert-' + (type || 'danger') + '">' + msg + '</div>';
+        }
+
+        function togglePassword(inputId, btn) {
+            var input = document.getElementById(inputId);
+            var icon = btn.querySelector('i');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        }
+
+        function updateStrength(val) {
+            var fill = document.getElementById('strengthFill');
+            var label = document.getElementById('strengthLabel');
+            if (!fill || !label) return;
+            var score = 0;
+            if (val.length >= 6) score++;
+            if (val.length >= 10) score++;
+            if (/[A-Z]/.test(val)) score++;
+            if (/[0-9]/.test(val)) score++;
+            if (/[^A-Za-z0-9]/.test(val)) score++;
+            var levels = [
+                { pct: '0%',   color: '#eee',     text: '' },
+                { pct: '25%',  color: '#dc3545',  text: 'Weak' },
+                { pct: '50%',  color: '#fd7e14',  text: 'Fair' },
+                { pct: '75%',  color: '#ffc107',  text: 'Good' },
+                { pct: '100%', color: '#198754',  text: 'Strong' },
+                { pct: '100%', color: '#198754',  text: 'Strong' }
+            ];
+            var l = levels[score] || levels[0];
+            fill.style.width = l.pct;
+            fill.style.background = l.color;
+            label.textContent = l.text;
+            label.style.color = l.color;
+        }
+
+        function setLoading(btnId, loading) {
+            var btn = document.getElementById(btnId);
+            if (!btn) return;
+            btn.disabled = loading;
+            btn.innerHTML = loading
+                ? '<span class="spinner-border spinner-border-sm me-2"></span>Please wait...'
+                : (btnId === 'signinBtn' ? 'Sign In' : 'Create Account');
+        }
+
+        async function handleSignIn() {
+            var email = document.getElementById('signinEmail').value.trim();
+            var password = document.getElementById('signinPassword').value;
+            if (!email || !password) { showMessage('signinMessage', 'Please fill in all fields.'); return; }
+            
+            // Save credentials if remember me is checked
+            var rememberMe = document.getElementById('rememberMe');
+            if (rememberMe && rememberMe.checked) {
+                localStorage.setItem('ald_remembered_email', email);
+                localStorage.setItem('ald_remember_me', 'true');
+            } else {
+                localStorage.removeItem('ald_remembered_email');
+                localStorage.removeItem('ald_remember_me');
+            }
+            
+            setLoading('signinBtn', true);
+            var result = await _supabase.auth.signInWithPassword({ email: email, password: password });
+            setLoading('signinBtn', false);
+            if (result.error) { showMessage('signinMessage', result.error.message); return; }
+            if (!localStorage.getItem('ald_onboarding_complete')) {
+                window.location.href = 'onboarding.html';
+            } else {
+                window.location.href = 'quote-builder.html';
+            }
+        }
+
+        async function handleSignUp() {
+            var email = document.getElementById('signupEmail').value.trim();
+            var password = document.getElementById('signupPassword').value;
+            var confirm = document.getElementById('signupConfirm').value;
+            if (!email || !password) { showMessage('signupMessage', 'Please fill in all fields.'); return; }
+            if (password !== confirm) { showMessage('signupMessage', 'Passwords do not match.'); return; }
+            if (password.length < 6) { showMessage('signupMessage', 'Password must be at least 6 characters.'); return; }
+            setLoading('signupBtn', true);
+            var result = await _supabase.auth.signUp({ email: email, password: password });
+            setLoading('signupBtn', false);
+            if (result.error) { showMessage('signupMessage', result.error.message); return; }
+            showMessage('signupMessage', 'Account created! Check your email to verify, then sign in.', 'success');
+        }
+
+        async function handleForgotPassword() {
+            var email = document.getElementById('signinEmail').value.trim();
+            if (!email) { showMessage('signinMessage', 'Enter your email above first, then click Forgot password.', 'warning'); return; }
+            var result = await _supabase.auth.resetPasswordForEmail(email);
+            if (result.error) { showMessage('signinMessage', result.error.message); return; }
+            showMessage('signinMessage', 'Password reset email sent! Check your inbox.', 'success');
+        }
+
+        // Pre-fill remembered email
+        if (localStorage.getItem('ald_remember_me') === 'true') {
+            var rememberedEmail = localStorage.getItem('ald_remembered_email');
+            if (rememberedEmail) {
+                var emailEl = document.getElementById('signinEmail');
+                if (emailEl) emailEl.value = rememberedEmail;
+            }
+            var rememberEl = document.getElementById('rememberMe');
+            if (rememberEl) rememberEl.checked = true;
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                var signinVisible = document.getElementById('signinForm').style.display !== 'none';
+                if (signinVisible) handleSignIn(); else handleSignUp();
+            }
+        });
+    </script>
+</body>
+</html>

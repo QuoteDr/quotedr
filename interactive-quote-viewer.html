@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Quote - QuoteDr</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background-color: #f8f9fa; }
+
+        /* Warranty Badge */
+        .warranty-section {
+            margin-top: 2rem;
+            background: linear-gradient(135deg, #1a1a2e 0%, #2d2d2d 100%);
+            border-radius: 12px;
+            padding: 1.5rem 2rem;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+        .warranty-section::before {
+            content: '\2605';
+            position: absolute;
+            right: -10px;
+            top: -20px;
+            font-size: 120px;
+            opacity: 0.04;
+            color: white;
+        }
+        .warranty-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        @media (min-width: 640px) {
+            .warranty-grid { grid-template-columns: repeat(4, 1fr); }
+        }
+        .warranty-item {
+            text-align: center;
+            padding: 0.75rem;
+            background: rgba(255,255,255,0.07);
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.12);
+        }
+        .warranty-item .icon { font-size: 1.8rem; margin-bottom: 0.4rem; }
+        .warranty-item .label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #f0ad4e; }
+        .warranty-item .sublabel { font-size: 0.72rem; opacity: 0.75; margin-top: 2px; }
+
+        .quote-header { 
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid #dee2e6;
+        }
+        .upgrade-card { 
+            background: white;
+            border-left: 4px solid #667eea;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .upgrade-option { 
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 6px;
+            margin-top: 0.5rem;
+        }
+        .upgrade-option input[type="checkbox"] { 
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+        }
+        .price-tag { 
+            font-weight: bold;
+            color: #28a745;
+            margin-left: auto;
+        }
+        .total-section {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-top: 2rem;
+        }
+        .grand-total {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .submit-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            padding: 1rem 2rem;
+            font-size: 1.1rem;
+            margin-top: 1.5rem;
+        }
+        .submit-btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        /* Approval & Signature */
+        .approval-section { margin-top: 2rem; }
+        @keyframes approvalPulse {
+            0%   { box-shadow: 0 0 0 0 rgba(40,167,69,0.55); }
+            70%  { box-shadow: 0 0 0 14px rgba(40,167,69,0); }
+            100% { box-shadow: 0 0 0 0 rgba(40,167,69,0); }
+        }
+        .btn-approve-pulse {
+            animation: approvalPulse 2s ease-in-out infinite;
+        }
+        .changes-notice {
+            display: none;
+            background: #fff8e1;
+            border: 1px solid #ffe082;
+            border-radius: 8px;
+            padding: 0.85rem 1.1rem;
+            margin-bottom: 0.85rem;
+            font-size: 0.92rem;
+            color: #6d4c00;
+        }
+        .changes-notice.visible { display: block; }
+        .sig-modal-overlay {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+        }
+        .sig-modal-overlay.active { display: flex; }
+        .sig-modal {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            width: 100%;
+            max-width: 540px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+        }
+        #signatureCanvas {
+            border: 2px dashed #adb5bd;
+            border-radius: 8px;
+            cursor: crosshair;
+            touch-action: none;
+            width: 100%;
+            height: 160px;
+            display: block;
+        }
+        #signatureCanvas.signed { border-color: #28a745; border-style: solid; }
+        .approval-banner {
+            display: none;
+            background: linear-gradient(135deg, #d4edda, #c3e6cb);
+            border: 2px solid #28a745;
+            border-radius: 10px;
+            padding: 1.2rem 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .approval-banner.visible { display: block; }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <!-- Header -->
+        <div class="quote-header">
+            <div class="row align-items-center">
+                <div class="col-md-7 col-12 mb-2 mb-md-0">
+                    <div class="d-flex align-items-center gap-3">
+                        <img id="businessLogoImg" src="quotedr-logo.svg" alt="Company Logo" style="height: 165px; width: auto; max-width: 340px; display: block;">
+                        <div>
+                            <h2 id="companyNameDisplay" class="mb-0" style="color: #2c3e50;"></h2>
+                            <p id="companyTaglineDisplay" class="text-muted mb-0">Professional Renovation Services</p>
+                            <div class="mt-2" id="businessInfoDisplay" style="font-size:0.82rem; color:#555; line-height:1.7;"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-5 text-end">
+                    <h5 class="mb-1" style="color: #2c3e50;" id="quoteHeadingDisplay">Your Renovation Quote</h5>
+                    <div id="quoteNumberDisplay" class="fw-bold" style="font-size:1.05rem; color:#2c3e50;"></div>
+                    <div id="clientNameDisplay" class="text-muted"></div>
+                    <div class="text-muted small mt-2" id="quoteDateDisplay"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Project Info -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5><i class="fas fa-map-marker-alt"></i> Project Address</h5>
+                <p id="projectAddressDisplay" class="mb-0 text-muted"></p>
+            </div>
+        </div>
+
+        <!-- Quote Summary -->
+        <h4 class="mb-3"><i class="fas fa-list"></i> Your Quote Breakdown</h4>
+        
+        <div id="quoteContainer">
+            <!-- Rooms and items will be loaded here -->
+        </div>
+
+        <!-- Total Section -->
+        <div class="total-section text-center">
+            <h4><i class="fas fa-calculator"></i> Updated Quote Total</h4>
+            <p id="originalTotalDisplay" class="text-muted"></p>
+            <div id="upgradesTotalDisplay" style="color: #667eea;"></div>
+            <div class="grand-total" id="newGrandTotal">$0.00</div>
+        </div>
+
+        <!-- Terms & Conditions Section -->
+        <div class="card mb-4 mt-5">
+            <div class="card-header bg-light">
+                <h6><i class="fas fa-file-contract"></i> Terms & Conditions</h6>
+            </div>
+            <div class="card-body" id="termsDisplay">
+                <!-- Terms will be loaded here -->
+            </div>
+        </div>
+
+        <!-- Warranty Badge -->
+        <div class="warranty-section">
+            <div class="text-center mb-2">
+                <span style="font-size:1.1rem; font-weight:800; letter-spacing:1px;">&#9733; OUR COMMITMENT TO YOU &#9733;</span>
+            </div>
+            <div class="warranty-grid">
+                <div class="warranty-item">
+                    <div class="icon">🛡️</div>
+                    <div class="label">1-Year Warranty</div>
+                    <div class="sublabel">Workmanship guaranteed for 12 months from project completion</div>
+                </div>
+                <div class="warranty-item">
+                    <div class="icon">🏭</div>
+                    <div class="label">Manufacturer Warranty</div>
+                    <div class="sublabel">All materials carry full manufacturer warranty &mdash; passed directly to you</div>
+                </div>
+                <div class="warranty-item">
+                    <div class="icon">✅</div>
+                    <div class="label">Fully Insured</div>
+                    <div class="sublabel">Liability insurance coverage on all work performed</div>
+                </div>
+                <div class="warranty-item">
+                    <div class="icon">🤝</div>
+                    <div class="label">Satisfaction Promise</div>
+                    <div class="sublabel">Any concerns addressed promptly &mdash; your satisfaction is our priority</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Approval Banner (shown after signing) -->
+        <div class="approval-banner" id="approvalBanner">
+            <div class="d-flex align-items-center gap-3">
+                <img id="approvalSigPreview" src="" style="height:48px; border:1px solid #28a745; border-radius:4px; background:white; padding:2px;">
+                <div>
+                    <div class="fw-bold text-success"><i class="fas fa-check-circle"></i> Quote Approved</div>
+                    <div class="text-muted small" id="approvalMeta"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Smart Action Section -->
+        <div class="approval-section" id="approveSection">
+            <!-- Notice shown when client has notes -->
+            <div class="changes-notice" id="changesNotice">
+                <i class="fas fa-info-circle"></i> <strong>You've added notes to this quote.</strong> Adam will review your requests and send you an updated version.
+            </div>
+
+            <!-- Single smart button — changes based on notes -->
+            <button type="button" class="btn btn-success btn-approve-pulse w-100" id="mainActionBtn"
+                style="font-size:1.15rem; font-weight:700; padding:1rem; border-radius:10px; letter-spacing:0.3px;"
+                onclick="handleMainAction()">
+                <i class="fas fa-pen-nib"></i> Review &amp; Approve This Quote
+            </button>
+        </div>
+
+        <!-- Hidden Formspree form (submitted programmatically) -->
+        <form action="https://formspree.io/f/xlgokven" method="POST" id="upgradeForm" onsubmit="submitUpgrades(event)" style="display:none;">
+            <input type="hidden" name="quoteId" id="quoteId">
+            <input type="hidden" name="termsAccepted" id="termsAccepted">
+            <input type="hidden" name="clientSignature" id="clientSignature">
+            <input type="hidden" name="approvedBy" id="approvedBy">
+            <input type="hidden" name="approvedAt" id="approvedAt">
+            <button type="submit" id="hiddenSubmitBtn"></button>
+        </form>
+
+        <!-- Signature Modal -->
+        <div class="sig-modal-overlay" id="sigModalOverlay">
+            <div class="sig-modal">
+                <h5 class="mb-3"><i class="fas fa-pen-nib"></i> Approve This Quote</h5>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Your Full Name <span class="text-danger">*</span></label>
+                    <input type="text" id="signerName" class="form-control" placeholder="e.g. Jane Smith">
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Draw Your Signature</label>
+                    <canvas id="signatureCanvas" width="500" height="160"></canvas>
+                    <div class="d-flex justify-content-end mt-1">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearSignature()">
+                            <i class="fas fa-undo"></i> Clear
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="termsCheck">
+                    <label class="form-check-label" for="termsCheck">
+                        I have read and agree to the terms and conditions outlined in this quote.
+                    </label>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-success flex-grow-1" onclick="confirmApproval()">
+                        <i class="fas fa-check-circle"></i> Sign &amp; Approve
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="closeSignatureModal()">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Success Message (hidden initially) -->
+        <div id="successMessage" style="display: none;" class="alert alert-success mt-4 text-center">
+            <h5><i class="fas fa-check-circle"></i> Thank You!</h5>
+            <p>Your upgrade selections have been submitted. We'll review and get back to you shortly!</p>
+        </div>
+
+        <!-- Formspree Success Redirect (optional) -->
+        <!-- Uncomment below if you want custom redirect after submission -->
+        <!-- 
+        <meta http-equiv="refresh" content="3;url=https://ald-direct.com/thank-you">
+        -->
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase.js"></script>
+    
+    <script>
+        let quoteData = {};
+
+        const CATEGORY_ORDER = [
+            'Demolition','Asbestos / Hazmat','Concrete & Masonry','Waterproofing',
+            'Rough Framing','Windows & Exterior Doors','Rough Plumbing','Rough Electrical',
+            'HVAC / Ductwork','Insulation','Drywall','Tile & Stone','Flooring',
+            'Interior Doors','Trim & Millwork','Cabinets & Vanities',
+            'Finish Plumbing','Finish Electrical','Carpentry & Baseboards',
+            'Painting','Cleaning & Disposal','Miscellaneous'
+        ];
+        const CATEGORY_ALIASES = {
+            'Framing':'Rough Framing','Electrical':'Finish Electrical',
+            'Plumbing':'Finish Plumbing','HVAC':'HVAC / Ductwork',
+            'Doors & Trim':'Trim & Millwork','Tiling':'Tile & Stone',
+            'Carpentry':'Carpentry & Baseboards','Subflooring':'Flooring'
+        };
+        function canonicalCat(cat) { return CATEGORY_ALIASES[cat] || cat || 'Miscellaneous'; }
+        function sortItemsByCategory(items) {
+            return items.map((item, i) => ({ item, i })).sort((a, b) => {
+                let ai = CATEGORY_ORDER.indexOf(canonicalCat(a.item.category));
+                let bi = CATEGORY_ORDER.indexOf(canonicalCat(b.item.category));
+                if (ai === -1) ai = CATEGORY_ORDER.length - 2;
+                if (bi === -1) bi = CATEGORY_ORDER.length - 2;
+                return ai - bi;
+            });
+        }
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load user's uploaded logo
+            var savedLogo = localStorage.getItem('ald_logo');
+            if (savedLogo) {
+                var logoEl = document.getElementById('businessLogoImg');
+                if (logoEl) logoEl.src = savedLogo;
+            }
+            // Load company name + tagline
+            var bizProfile = JSON.parse(localStorage.getItem('ald_business_profile') || '{}');
+            var nameEl = document.getElementById('companyNameDisplay');
+            var tagEl = document.getElementById('companyTaglineDisplay');
+            if (nameEl && bizProfile.business_name) nameEl.textContent = bizProfile.business_name;
+            if (tagEl && bizProfile.tagline) tagEl.textContent = bizProfile.tagline;
+            else if (tagEl && !bizProfile.tagline) tagEl.style.display = 'none';
+            loadQuoteFromURL();
+            // Apply quote style theme (only targets total bar and terms section)
+            if (quoteData && quoteData.style) {
+                var accent = quoteData.style.accent || '#ffffff';
+                var bg = quoteData.style.bg || '#ffffff';
+                var styleTag = document.createElement('style');
+                var accentCSS = (accent && accent !== '#ffffff')
+                    ? '.total-section { background: ' + accent + ' !important; color: white !important; }' +
+                      '.total-section h4, .total-section p, .total-section div { color: white !important; }' +
+                      '.grand-total { color: white !important; }' +
+                      '.card-header.bg-light { background: ' + accent + ' !important; color: white !important; }' +
+                      '.card-header.bg-light h6, .card-header.bg-light i { color: white !important; }'
+                    : '';
+                styleTag.textContent = 'body { background: ' + bg + ' !important; }' + accentCSS;
+                document.head.appendChild(styleTag);
+            }
+            // Apply quote preferences
+            var prefs = JSON.parse(localStorage.getItem('ald_quote_prefs') || '{}');
+            var headingEl = document.getElementById('quoteHeadingDisplay');
+            var numEl = document.getElementById('quoteNumberDisplay');
+            if (headingEl && prefs.heading) headingEl.textContent = prefs.heading;
+            if (numEl && quoteData && quoteData.quoteNumber) {
+                var qNum = quoteData.quoteNumber;
+                numEl.textContent = (prefs.showPrefix !== false && prefs.prefix)
+                    ? 'Quote #' + prefs.prefix + '-' + qNum
+                    : 'Quote #' + qNum;
+            }
+            
+            renderQuote();
+            displayTerms();
+            updateTotal();
+        });
+
+        function loadQuoteFromURL() {
+            const params = new URLSearchParams(window.location.search);
+            let quoteId = params.get('quote');
+
+            // Fallback: file:// protocol in Chrome strips query params
+            if (!quoteId) {
+                quoteId = localStorage.getItem('ald_last_preview_quote');
+            }
+
+            if (!quoteId) {
+                alert('Invalid or missing quote ID. Please check the link you were sent.');
+                return;
+            }
+
+            // Load from localStorage
+            const storedQuote = localStorage.getItem(quoteId);
+
+            if (storedQuote) {
+                quoteData = JSON.parse(storedQuote);
+                console.log('Loaded quote:', quoteData);
+            } else {
+                alert('Quote not found. The link may be expired or invalid.');
+            }
+        }
+
+        function renderQuote() {
+            // Populate header fields
+            if (quoteData.clientName) {
+                document.getElementById('clientNameDisplay').textContent = 'Prepared for: ' + quoteData.clientName;
+            }
+            if (quoteData.projectAddress) {
+                document.getElementById('projectAddressDisplay').textContent = quoteData.projectAddress;
+            }
+            const quoteDateEl = document.getElementById('quoteDateDisplay');
+            if (quoteDateEl) quoteDateEl.textContent = new Date().toLocaleDateString('en-CA', { year:'numeric', month:'long', day:'numeric' });
+            const quoteNumEl = document.getElementById('quoteNumberDisplay');
+            if (quoteNumEl && quoteData.quoteNumber) {
+                var qNum = quoteData.quoteNumber;
+                quoteNumEl.textContent = 'Quote #' + qNum;
+            }
+
+            // Load business profile from Supabase
+            if (typeof getBusinessProfile === 'function') {
+                getBusinessProfile().then(function(result) {
+                    var bizEl = document.getElementById('businessInfoDisplay');
+                    if (bizEl && result.data) {
+                        var b = result.data;
+                        var hidden = JSON.parse(localStorage.getItem('ald_hidden_profile_fields') || '[]');
+                        var lines = [];
+                        if (!hidden.includes('businessName') && b.business_name) lines.push('<strong>' + b.business_name + '</strong>');
+                        if (!hidden.includes('ownerName') && b.owner_name) lines.push(b.owner_name);
+                        if (!hidden.includes('address') && b.address) lines.push(b.address);
+                        if (!hidden.includes('cityRow') && b.city) lines.push(b.city + (b.province ? ', ' + b.province : '') + (b.postal_code ? ' ' + b.postal_code : ''));
+                        if (!hidden.includes('phone') && b.phone) lines.push('Phone: ' + b.phone);
+                        if (!hidden.includes('email') && b.email) lines.push(b.email);
+                        if (!hidden.includes('hst') && b.hst_number) lines.push('HST: ' + b.hst_number);
+                        bizEl.innerHTML = lines.map(function(l) { return '<div>' + l + '</div>'; }).join('');
+                    }
+                });
+            }
+
+            const container = document.getElementById('quoteContainer');
+
+            if (!quoteData.rooms || quoteData.rooms.length === 0) {
+                container.innerHTML = '<div class="alert alert-warning">No quote data found.</div>';
+                return;
+            }
+
+            // Show original total
+            const originalTotal = quoteData.grandTotal || 0;
+            document.getElementById('originalTotalDisplay').textContent = 'Base Quote Total: $' + originalTotal.toFixed(2);
+            document.getElementById('newGrandTotal').textContent = '$' + originalTotal.toFixed(2);
+
+            // Set hidden form fields
+            document.getElementById('quoteId').value = quoteData.id || '';
+
+            let html = '';
+            
+            // Match color presets from quote builder
+            const ROOM_COLORS = [
+                'linear-gradient(135deg,#2d2d2d 0%,#111111 100%)',
+                'linear-gradient(135deg,#1e3a5f 0%,#0a1a2e 100%)',
+                'linear-gradient(135deg,#1a5c38 0%,#0a2e1a 100%)',
+                'linear-gradient(135deg,#6b1a2a 0%,#300a12 100%)',
+                'linear-gradient(135deg,#4a5568 0%,#1a202c 100%)',
+                'linear-gradient(135deg,#0652DD 0%,#023e8a 100%)',
+                'linear-gradient(135deg,#00796b 0%,#004d40 100%)',
+                'linear-gradient(135deg,#6a1b9a 0%,#2e003e 100%)',
+                'linear-gradient(135deg,#b87333 0%,#7c4a00 100%)',
+                'linear-gradient(135deg,#546e7a 0%,#263238 100%)',
+                'linear-gradient(135deg,#c0747a 0%,#7a3540 100%)',
+                'linear-gradient(135deg,#1a1a2e 0%,#000000 100%)'
+            ];
+
+            quoteData.rooms.forEach((room, roomIdx) => {
+                const roomTotal = room.items.reduce((sum, item) => sum + (item.quantity * item.rate), 0);
+                const headerBg = ROOM_COLORS[room.colorIndex ?? 0] || ROOM_COLORS[0];
+                
+                html += `
+                    <div class="card mb-3">
+                        <div class="card-header" style="background: ${headerBg}; color: white;">
+                            <h5 class="mb-0"><i class="fas fa-th"></i> ${room.name}</h5>
+                        </div>
+                        <div class="card-body">
+                `;
+                
+                // Sort items by trade category order, preserving original indexes
+                const sortedEntries = sortItemsByCategory(room.items);
+                // Group into category buckets
+                const catGroupOrder = [];
+                const catGroups = {};
+                sortedEntries.forEach(({ item, i: itemIndex }) => {
+                    const cat = item.category || 'Miscellaneous';
+                    if (!catGroups[cat]) { catGroups[cat] = []; catGroupOrder.push(cat); }
+                    catGroups[cat].push({ item, itemIndex });
+                });
+                // Apply per-room custom order if saved
+                const orderedCats = room.categoryOrder
+                    ? [...room.categoryOrder.filter(c => catGroups[c]), ...catGroupOrder.filter(c => !room.categoryOrder.includes(c))]
+                    : catGroupOrder;
+
+                orderedCats.filter(c => catGroups[c]).forEach(catName => {
+                    const catEntries = catGroups[catName];
+                    const catDisplay = canonicalCat(catName);
+                    html += `<div class="text-uppercase fw-bold mt-3 mb-1" style="font-size:0.72rem; letter-spacing:0.8px; color:#6c757d; border-bottom:1px solid #dee2e6; padding-bottom:3px;"><i class="fas fa-tag me-1"></i>${catDisplay}</div>`;
+
+                    catEntries.forEach(({ item, itemIndex }) => {
+                    // Ensure item has description field
+                    if (!item.hasOwnProperty('itemDescription')) item.itemDescription = '';
+
+                    const isUpgraded = !!item.upgraded;
+                    const activeRate = isUpgraded && item.upgrade ? item.upgrade.rate : item.rate;
+                    const itemTotal = item.quantity * activeRate;
+                    const hasUpgrade = !!(item.upgrade && item.upgrade.name);
+                    const upgradeDiff = hasUpgrade ? ((item.upgrade.rate - item.rate) * item.quantity) : 0;
+                    // Store item description for later use if needed
+                    item._itemDescription = item.itemDescription || '';
+
+                    // Item description: use upgrade description if upgraded, else itemDescription from database
+                    const displayDesc = isUpgraded && item.upgrade?.description
+                        ? item.upgrade.description
+                        : (item.itemDescription || '');
+                    const isOptional = !!item.optional;
+                    const isRemoved = !!item._removed;
+
+                    if (isRemoved) {
+                        html += `
+                        <div class="py-2 border-bottom" id="item_${roomIdx}_${itemIndex}" style="opacity:0.45; background:#f8f9fa;">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="text-muted"><s>${isUpgraded && item.upgrade ? item.upgrade.name : item.description}</s> <small class="badge bg-secondary">Removed</small></span>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="restoreViewerItem(${roomIdx}, ${itemIndex})" style="font-size:0.8rem;">
+                                    <i class="fas fa-undo"></i> Undo
+                                </button>
+                            </div>
+                        </div>`;
+                    } else {
+                        html += `
+                        <div class="py-2 border-bottom" id="item_${roomIdx}_${itemIndex}" ${isOptional ? 'style="border-left:3px dashed #0dcaf0; padding-left:8px;"' : ''}>
+                            <div class="d-flex justify-content-between align-items-baseline mb-1">
+                                <div style="flex:1;">
+                                    <strong>${isUpgraded && item.upgrade ? item.upgrade.name : item.description}</strong>
+                                    ${isOptional ? '<span class="badge bg-info ms-2" style="font-size:0.65em;">Optional</span>' : ''}
+                                </div>
+                                <div style="text-align:right; min-width:140px; padding-left:16px;">
+                                    <div><strong>$${itemTotal.toFixed(2)}</strong></div>
+                                    <small class="text-muted">${item.quantity} ${item.unitType} @ $${activeRate.toFixed(2)}</small>
+                                </div>
+                            </div>
+                            ${displayDesc ? `<div class="text-muted mb-1" style="font-size:0.88rem;">${displayDesc}</div>` : ''}
+                            ${item.notes ? `<div class="text-muted mb-1"><small><i class="fas fa-info-circle"></i> ${item.notes}</small></div>` : ''}
+                            <div class="d-flex gap-2 mt-1 flex-wrap">
+                                ${hasUpgrade ? `
+                                <div>
+                                    ${!isUpgraded ? `<div class="text-muted mb-1" style="font-size:0.88rem;"><i class="fas fa-arrow-up" style="color:#f0ad4e;"></i> <strong>Upgrade available:</strong> ${item.upgrade.name}</div>` : ''}
+                                    <button class="btn btn-sm ${isUpgraded ? 'btn-warning' : 'btn-outline-warning'}" onclick="toggleViewerUpgrade(${roomIdx}, ${itemIndex})" style="font-size:0.85rem;">
+                                        <i class="fas fa-arrow-up"></i> ${isUpgraded ? 'Upgraded ✓' : 'Upgrade: ' + item.upgrade.name}
+                                    </button>
+                                </div>` : ''}
+                                ${isOptional ? `<button class="btn btn-sm btn-outline-danger" onclick="removeViewerItem(${roomIdx}, ${itemIndex})" style="font-size:0.82rem;">
+                                    <i class="fas fa-times"></i> Remove this item
+                                </button>` : ''}
+                            </div>
+                        </div>`;
+                    }
+                    }); // end catEntries.forEach
+                }); // end catGroups Object.entries
+
+                const roomNoteKey = `room_note_${roomIdx}`;
+                const savedNote = quoteData._roomNotes?.[roomIdx] || '';
+                html += `
+                            <hr>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <strong>Room Total:</strong>
+                                <span class="room-total" style="font-size: 1.2rem; font-weight: bold; color: #28a745;">$${roomTotal.toFixed(2)}</span>
+                            </div>
+                            <div class="room-note-section">
+                                <button class="btn btn-sm btn-outline-secondary w-100 text-start" type="button"
+                                    onclick="toggleRoomNote(${roomIdx})" id="roomNoteToggle_${roomIdx}">
+                                    <i class="fas fa-${savedNote ? 'comment-dots text-primary' : 'comment'}"></i>
+                                    ${savedNote ? '&#9998; Edit note for this room' : '&#43; Add a note for this room'}
+                                </button>
+                                <div id="roomNoteBox_${roomIdx}" style="display:${savedNote ? 'block' : 'none'}; margin-top:0.5rem;">
+                                    <textarea class="form-control" rows="3"
+                                        placeholder="e.g. Can we also add pot lights in here? Or any other requests or questions for Adam..."
+                                        oninput="saveRoomNote(${roomIdx}, this.value)"
+                                        style="font-size:0.9rem; border: 1px dashed #0d6efd; border-radius:6px;">${savedNote}</textarea>
+                                    <div class="text-muted mt-1" style="font-size:0.75rem;"><i class="fas fa-info-circle"></i> This note will be sent to Adam with your submission.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+            updateActionButton();
+        }
+
+        function toggleRoomNote(roomIdx) {
+            const box = document.getElementById('roomNoteBox_' + roomIdx);
+            const btn = document.getElementById('roomNoteToggle_' + roomIdx);
+            const isVisible = box.style.display !== 'none';
+            box.style.display = isVisible ? 'none' : 'block';
+            if (!isVisible) box.querySelector('textarea').focus();
+        }
+
+        function saveRoomNote(roomIdx, value) {
+            if (!quoteData._roomNotes) quoteData._roomNotes = {};
+            quoteData._roomNotes[roomIdx] = value;
+            // Update toggle button icon/text live
+            const btn = document.getElementById('roomNoteToggle_' + roomIdx);
+            if (btn) {
+                btn.innerHTML = value.trim()
+                    ? '<i class="fas fa-comment-dots text-primary"></i> &#9998; Edit note for this room'
+                    : '<i class="fas fa-comment"></i> &#43; Add a note for this room';
+            }
+            updateActionButton();
+        }
+
+        function removeViewerItem(roomIdx, itemIdx) {
+            quoteData.rooms[roomIdx].items[itemIdx]._removed = true;
+            renderQuote();
+            updateTotal();
+        }
+
+        function restoreViewerItem(roomIdx, itemIdx) {
+            quoteData.rooms[roomIdx].items[itemIdx]._removed = false;
+            renderQuote();
+            updateTotal();
+        }
+
+        function toggleViewerUpgrade(roomIdx, itemIdx) {
+            const item = quoteData.rooms[roomIdx]?.items[itemIdx];
+            if (!item || !item.upgrade) return;
+            item.upgraded = !item.upgraded;
+            if (item.upgraded) {
+                item._baseRate = item.rate;
+                item.rate = item.upgrade.rate;
+            } else {
+                item.rate = item._baseRate || item.rate;
+            }
+            item.total = item.quantity * item.rate;
+            renderQuote();
+            updateTotal();
+        }
+
+        function updateTotal() {
+            // Recalculate from live quoteData (respects upgrades)
+            let subtotal = 0;
+            let upgradesTotal = 0;
+            if (quoteData.rooms) {
+                quoteData.rooms.forEach(room => {
+                    room.items.forEach(item => {
+                        if (item._removed) return; // skip removed items
+                        const activeRate = (item.upgraded && item.upgrade) ? item.upgrade.rate : (item._baseRate || item.rate);
+                        const baseTotal = item.quantity * (item._baseRate || item.rate);
+                        const activeTotal = item.quantity * activeRate;
+                        subtotal += activeTotal;
+                        if (item.upgraded) upgradesTotal += (activeTotal - baseTotal);
+                    });
+                });
+            }
+            const tax = subtotal * 0.13;
+            const total = subtotal + tax;
+            
+            document.getElementById('upgradesTotalDisplay').innerHTML = 
+                upgradesTotal > 0 ? `Upgrades: <strong>+$${upgradesTotal.toFixed(2)}</strong>` : '';
+            document.getElementById('newGrandTotal').textContent = `$${total.toFixed(2)}`;
+        }
+
+        function hasClientNotes() {
+            if (!quoteData._roomNotes) return false;
+            return Object.values(quoteData._roomNotes).some(n => n && n.trim().length > 0);
+        }
+
+        function updateActionButton() {
+            const btn = document.getElementById('mainActionBtn');
+            const notice = document.getElementById('changesNotice');
+            const section = document.getElementById('approveSection');
+            if (!btn || !section || section.style.display === 'none') return;
+            if (hasClientNotes()) {
+                btn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit Requested Changes';
+                btn.classList.remove('btn-success', 'btn-approve-pulse');
+                btn.classList.add('btn-warning');
+                if (notice) notice.classList.add('visible');
+            } else {
+                btn.innerHTML = '<i class="fas fa-pen-nib"></i> Review &amp; Approve This Quote';
+                btn.classList.remove('btn-warning');
+                btn.classList.add('btn-success', 'btn-approve-pulse');
+                if (notice) notice.classList.remove('visible');
+            }
+        }
+
+        function handleMainAction() {
+            if (hasClientNotes()) {
+                // No signature needed — just submit with notes
+                submitUpgrades();
+                document.getElementById('hiddenSubmitBtn').click();
+            } else {
+                // Open signature/approval modal
+                openSignatureModal();
+            }
+        }
+
+        // --- Signature Pad ---
+        let sigCanvas, sigCtx, sigDrawing = false, sigHasStrokes = false;
+
+        function openSignatureModal() {
+            document.getElementById('sigModalOverlay').classList.add('active');
+            if (!sigCanvas) initSignaturePad();
+        }
+        function closeSignatureModal() {
+            document.getElementById('sigModalOverlay').classList.remove('active');
+        }
+        function initSignaturePad() {
+            sigCanvas = document.getElementById('signatureCanvas');
+            sigCtx = sigCanvas.getContext('2d');
+            sigCtx.strokeStyle = '#111';
+            sigCtx.lineWidth = 2.2;
+            sigCtx.lineCap = 'round';
+            sigCtx.lineJoin = 'round';
+
+            function pos(e) {
+                const r = sigCanvas.getBoundingClientRect();
+                const src = e.touches ? e.touches[0] : e;
+                return { x: (src.clientX - r.left) * (sigCanvas.width / r.width), y: (src.clientY - r.top) * (sigCanvas.height / r.height) };
+            }
+            function start(e) { e.preventDefault(); sigDrawing = true; const p = pos(e); sigCtx.beginPath(); sigCtx.moveTo(p.x, p.y); }
+            function draw(e)  { e.preventDefault(); if (!sigDrawing) return; const p = pos(e); sigCtx.lineTo(p.x, p.y); sigCtx.stroke(); sigHasStrokes = true; }
+            function end(e)   { e.preventDefault(); sigDrawing = false; if (sigHasStrokes) sigCanvas.classList.add('signed'); }
+
+            sigCanvas.addEventListener('mousedown',  start);
+            sigCanvas.addEventListener('mousemove',  draw);
+            sigCanvas.addEventListener('mouseup',    end);
+            sigCanvas.addEventListener('mouseleave', end);
+            sigCanvas.addEventListener('touchstart', start, { passive: false });
+            sigCanvas.addEventListener('touchmove',  draw,  { passive: false });
+            sigCanvas.addEventListener('touchend',   end,   { passive: false });
+        }
+        function clearSignature() {
+            if (!sigCanvas) return;
+            sigCtx.clearRect(0, 0, sigCanvas.width, sigCanvas.height);
+            sigCanvas.classList.remove('signed');
+            sigHasStrokes = false;
+        }
+        function confirmApproval() {
+            const name = document.getElementById('signerName').value.trim();
+            if (!name) { alert('Please enter your full name.'); return; }
+            if (!sigHasStrokes) { alert('Please draw your signature.'); return; }
+            if (!document.getElementById('termsCheck').checked) { alert('Please agree to the terms and conditions.'); return; }
+
+            const sigDataUrl = sigCanvas.toDataURL('image/png');
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('en-CA', { year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit' });
+
+            // Store in hidden fields for form submission
+            document.getElementById('clientSignature').value = sigDataUrl;
+            document.getElementById('approvedBy').value = name;
+            document.getElementById('approvedAt').value = now.toISOString();
+
+            // Show approval banner
+            document.getElementById('approvalSigPreview').src = sigDataUrl;
+            document.getElementById('approvalMeta').textContent = 'Signed by ' + name + ' on ' + dateStr;
+            document.getElementById('approvalBanner').classList.add('visible');
+
+            // Hide approve section and auto-submit
+            document.getElementById('approveSection').style.display = 'none';
+            closeSignatureModal();
+            submitUpgrades();
+            document.getElementById('hiddenSubmitBtn').click();
+        }
+
+        function submitUpgrades(event) {
+            // Clear any previously injected hidden fields
+            document.querySelectorAll('#upgradeForm .dynamic-field').forEach(el => el.remove());
+
+            const form = document.getElementById('upgradeForm');
+
+            // Helper to add a hidden textarea field
+            function addField(name, value) {
+                const el = document.createElement('textarea');
+                el.name = name;
+                el.value = value;
+                el.className = 'dynamic-field';
+                el.style.display = 'none';
+                form.appendChild(el);
+            }
+
+            // Upgrades selected
+            const upgradeLines = [];
+            (quoteData.rooms || []).forEach(room => {
+                room.items.forEach(item => {
+                    if (item.upgraded && item.upgrade) {
+                        upgradeLines.push(`${room.name} → ${item.upgrade.name} (+$${((item.upgrade.rate - (item._baseRate || item.rate)) * item.quantity).toFixed(2)})`);
+                    }
+                });
+            });
+            addField('upgrades_selected', upgradeLines.length ? upgradeLines.join('\n') : 'No upgrades selected');
+
+            // Removed items
+            const removedLines = [];
+            (quoteData.rooms || []).forEach(room => {
+                room.items.forEach(item => {
+                    if (item._removed) removedLines.push(`${room.name} → ${item.description}`);
+                });
+            });
+            if (removedLines.length) addField('removed_items', removedLines.join('\n'));
+
+            // Room notes
+            const noteLines = [];
+            if (quoteData._roomNotes) {
+                Object.entries(quoteData._roomNotes).forEach(([idx, note]) => {
+                    if (note && note.trim()) {
+                        const roomName = quoteData.rooms[idx]?.name || ('Room ' + idx);
+                        noteLines.push(`${roomName}:\n${note.trim()}`);
+                    }
+                });
+            }
+            if (noteLines.length) addField('client_notes', noteLines.join('\n\n'));
+        }
+
+        function displayTerms() {
+            const termsContainer = document.getElementById('termsDisplay');
+            
+            if (!quoteData.terms || quoteData.terms.length === 0) {
+                termsContainer.innerHTML = '<p class="text-muted">No specific terms included in this quote.</p>';
+                return;
+            }
+            
+            let html = '<ul class="list-group list-group-flush">';
+            quoteData.terms.forEach(term => {
+                html += `<li class="list-group-item"><i class="fas fa-check-circle text-success"></i> ${term}</li>`;
+            });
+            html += '</ul>';
+            
+            termsContainer.innerHTML = html;
+        }
+    </script>
+</body>
+</html>

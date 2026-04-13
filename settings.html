@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>QuoteDr - Settings</title>
+	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+	<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+	<style>
+		body {
+			background: #eef4fb;
+		}
+		.navbar {
+			background: #f0f4fa; border-bottom: 2px solid #d0dff0;
+			overflow: visible;
+		}
+		.settings-card {
+			background: white;
+			border-radius: 12px;
+			padding: 2rem;
+			box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+			margin-bottom: 1.5rem;
+		}
+		.settings-card h5 {
+			font-weight: 700;
+			margin-bottom: 1.5rem;
+			color: #333;
+		}
+		.btn-save {
+			background: linear-gradient(135deg, #1a56a0, #0f3460);
+			border: none;
+			font-weight: 600;
+			padding: 0.6rem 2rem;
+		}
+		.btn-save:hover {
+			background: linear-gradient(135deg, #154a8a, #0d2d50);
+		}
+		.form-control:focus {
+			border-color: #1a56a0;
+			box-shadow: 0 0 0 0.2rem rgba(26,86,160,0.25);
+		}
+		.saved-badge {
+			display: none;
+			color: #198754;
+			font-size: 0.9rem;
+		}
+	</style>
+</head>
+<body>
+	<nav class="navbar navbar-light px-4 py-2" style="position: relative; min-height: 64px;">
+		<div class="d-flex align-items-center gap-3">
+			<a href="dashboard.html" class="btn btn-outline-secondary btn-sm">
+				<i class="fas fa-arrow-left"></i> Back
+			</a>
+		</div>
+		<!-- Centered logo -->
+		<div style="position: absolute; left: 50%; transform: translateX(-50%); top: 50%; margin-top: -96px;">
+			<img src="quotedr-logo.svg" alt="QuoteDr" style="height: 192px; width: auto;">
+		</div>
+		<button type="button" class="btn btn-outline-secondary btn-sm" onclick="signOut()">
+			<i class="fas fa-sign-out-alt"></i> Sign Out
+		</button>
+	</nav>
+
+	<div class="container py-4" style="max-width: 680px;">
+		<!-- Business Profile -->
+		<div class="settings-card">
+			<h5><i class="fas fa-building me-2" style="color:#1a56a0"></i>Business Profile</h5>
+			<div class="row g-3">
+				<div class="col-12">
+					<div class="d-flex justify-content-between align-items-center mb-1">
+						<label class="form-label mb-0">Business Name</label>
+						<div class="form-check form-check-inline mb-0">
+							<input class="form-check-input" type="checkbox" id="hide_businessName">
+							<label class="form-check-label text-muted small" for="hide_businessName">Hide from client</label>
+						</div>
+					</div>
+					<input type="text" class="form-control" id="businessName" placeholder="ALD Direct Inc.">
+				</div>
+				<div class="col-12">
+					<label class="form-label mb-0">Company Tagline <span class="text-muted small">(optional)</span></label>
+					<input type="text" class="form-control" id="bizTagline" placeholder="e.g. Professional Renovation Services">
+					<div class="form-text">Appears below your company name on quotes and invoices.</div>
+				</div>
+				<div class="col-12">
+					<div class="d-flex justify-content-between align-items-center mb-1">
+						<label class="form-label mb-0">Owner Name</label>
+						<div class="form-check form-check-inline mb-0">
+							<input class="form-check-input" type="checkbox" id="hide_ownerName">
+							<label class="form-check-label text-muted small" for="hide_ownerName">Hide from client</label>
+						</div>
+					</div>
+					<input type="text" class="form-control" id="ownerName" placeholder="Adam">
+				</div>
+				<div class="col-12">
+					<div class="d-flex justify-content-between align-items-center mb-1">
+						<label class="form-label mb-0">Street Address</label>
+						<div class="form-check form-check-inline mb-0">
+							<input class="form-check-input" type="checkbox" id="hide_address">
+							<label class="form-check-label text-muted small" for="hide_address">Hide from client</label>
+						</div>
+					</div>
+					<input type="text" class="form-control" id="bizAddress" placeholder="123 Main Street">
+				</div>
+				<div class="col-12">
+					<div class="d-flex justify-content-between align-items-center mb-1">
+						<label class="form-label mb-0">City / Province / Postal</label>
+						<div class="form-check form-check-inline mb-0">
+							<input class="form-check-input" type="checkbox" id="hide_cityRow">
+							<label class="form-check-label text-muted small" for="hide_cityRow">Hide from client</label>
+						</div>
+					</div>
+				</div>
+				<div class="col-md-6">
+					<input type="text" class="form-control" id="bizCity" placeholder="Burlington">
+				</div>
+				<div class="col-md-3">
+					<input type="text" class="form-control" id="bizProvince" placeholder="Ontario" value="Ontario">
+				</div>
+				<div class="col-md-3">
+					<input type="text" class="form-control" id="bizPostal" placeholder="L7R 1Z2">
+				</div>
+				<div class="col-md-6">
+					<div class="d-flex justify-content-between align-items-center mb-1">
+						<label class="form-label mb-0">Phone</label>
+						<div class="form-check form-check-inline mb-0">
+							<input class="form-check-input" type="checkbox" id="hide_phone">
+							<label class="form-check-label text-muted small" for="hide_phone">Hide from client</label>
+						</div>
+					</div>
+					<input type="tel" class="form-control" id="bizPhone" placeholder="(905) 467-6882">
+				</div>
+				<div class="col-md-6">
+					<div class="d-flex justify-content-between align-items-center mb-1">
+						<label class="form-label mb-0">Email</label>
+						<div class="form-check form-check-inline mb-0">
+							<input class="form-check-input" type="checkbox" id="hide_email">
+							<label class="form-check-label text-muted small" for="hide_email">Hide from client</label>
+						</div>
+					</div>
+					<input type="email" class="form-control" id="bizEmail" placeholder="you@example.com">
+				</div>
+				<div class="col-12">
+					<div class="d-flex justify-content-between align-items-center mb-1">
+						<label class="form-label mb-0">HST Number</label>
+						<div class="form-check form-check-inline mb-0">
+							<input class="form-check-input" type="checkbox" id="hide_hst">
+							<label class="form-check-label text-muted small" for="hide_hst">Hide from client</label>
+						</div>
+					</div>
+					<input type="text" class="form-control" id="bizHst" placeholder="123456789 RC0001">
+				</div>
+			</div>
+			<div class="mt-3 d-flex align-items-center gap-3">
+				<button type="button" class="btn btn-save btn-primary" onclick="saveProfile()">
+					<i class="fas fa-save me-1"></i> Save Profile
+				</button>
+				<span class="saved-badge" id="profileSaved"><i class="fas fa-check-circle me-1"></i>Saved!</span>
+			</div>
+		</div>
+
+		<!-- Quote Preferences -->
+		<div class="settings-card">
+			<h5><i class="fas fa-file-invoice me-2" style="color:#1a56a0"></i>Quote Preferences</h5>
+			<div class="row g-3">
+				<div class="col-12">
+					<label class="form-label mb-0">Quote Heading</label>
+					<input type="text" class="form-control" id="quoteHeading" placeholder="Your Renovation Quote">
+				</div>
+				<div class="col-12">
+					<label class="form-label mb-0">Quote Prefix</label>
+					<input type="text" class="form-control" id="quotePrefix" placeholder="ALD">
+				</div>
+				<div class="col-12">
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" id="showPrefix" checked>
+						<label class="form-check-label" for="showPrefix">Show prefix in quotes</label>
+					</div>
+				</div>
+			</div>
+			<div class="mt-3 d-flex align-items-center gap-3">
+				<button type="button" class="btn btn-save btn-primary" onclick="saveQuotePrefs()">
+					<i class="fas fa-save me-1"></i> Save Preferences
+				</button>
+				<span class="saved-badge" id="prefsSaved"><i class="fas fa-check-circle me-1"></i>Saved!</span>
+			</div>
+		</div>
+
+		<!-- Terms & Conditions -->
+		<div class="settings-card">
+			<h5><i class="fas fa-file-contract me-2" style="color:#1a56a0"></i>Terms & Conditions</h5>
+			<p class="text-muted small">Customize the default terms that appear on your quotes.</p>
+			<div class="mb-3">
+				<button type="button" class="btn btn-outline-primary btn-sm" onclick="addTerm()">
+					<i class="fas fa-plus me-1"></i> Add Term
+				</button>
+			</div>
+			<div id="termsList">
+				<!-- Terms will be rendered here -->
+			</div>
+			<div class="mt-3 d-flex align-items-center gap-3">
+				<button type="button" class="btn btn-save btn-primary" onclick="saveTerms()">
+					<i class="fas fa-save me-1"></i> Save Terms
+				</button>
+				<span class="saved-badge" id="termsSaved"><i class="fas fa-check-circle me-1"></i>Saved!</span>
+			</div>
+		</div>
+
+		<!-- Custom Materials -->
+		<div class="settings-card">
+			<h5><i class="fas fa-boxes me-2" style="color:#1a56a0"></i>Custom Materials</h5>
+			<p class="text-muted small">Add materials to your quote builder.</p>
+			<div class="mb-3">
+				<button type="button" class="btn btn-outline-primary btn-sm" onclick="addCustomItem()">
+					<i class="fas fa-plus me-1"></i> Add Material
+				</button>
+			</div>
+			<div id="customItemsList">
+				<!-- Custom items will be rendered here -->
+			</div>
+			<div class="mt-3 d-flex align-items-center gap-3">
+				<button type="button" class="btn btn-save btn-primary" onclick="saveCustomItems()">
+					<i class="fas fa-save me-1"></i> Save Materials
+				</button>
+				<span class="saved-badge" id="itemsSaved"><i class="fas fa-check-circle me-1"></i>Saved!</span>
+			</div>
+		</div>
+
+		<!-- Import Data Section -->
+		<div class="settings-card">
+			<h5><i class="fas fa-upload me-2" style="color:#1a56a0"></i>Import Data</h5>
+			<div class="mb-4">
+				<h6 class="fw-bold mb-2"><i class="fas fa-users me-2" style="color:#1a56a0;"></i>Import Clients</h6>
+				<p class="text-muted small">Upload a .txt file with one client per line: Name Phone Email Address</p>
+				<input type="file" id="importClientsFileSettings" accept=".txt" class="form-control mb-2">
+				<button class="btn btn-outline-primary btn-sm" onclick="importClientsFromFileSettings()">
+					<i class="fas fa-upload me-1"></i>Import Clients
+				</button>
+				<div id="importClientsResultSettings" class="mt-2 small"></div>
+			</div>
+			
+			<div class="mb-4">
+				<h6 class="fw-bold mb-2"><i class="fas fa-box me-2" style="color:#e87e2a;"></i>Import Materials</h6>
+				<p class="text-muted small">Upload a .txt file with materials grouped by category (Name | Unit | Price)</p>
+				<input type type="file" id="importMaterialsFileSettings" accept=".txt" class="form-control mb-2">
+				<button class="btn btn-outline-primary btn-sm" onclick="importMaterialsFromFileSettings()">
+					<i class="fas fa-upload me-1"></i>Import Materials
+				</button>
+				<div id="importMaterialsResultSettings" class="mt-2 small"></div>
+			</div>
+		</div>
+
+		<!-- Footer -->
+		<div class="text-center text-muted small mt-4">
+			<p>QuoteDr.io &copy; 2024 - All Rights Reserved</p>
+		</div>
+	</div>
+
+	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+	<script>
+		// Initialize settings
+		document.addEventListener('DOMContentLoaded', function() {
+			// Load saved values
+			const savedProfile = JSON.parse(localStorage.getItem('ald_business_profile') || '{}');
+			if (savedProfile.business_name) document.getElementById('businessName').value = savedProfile.business_name;
+			if (savedProfile.owner_name) document.getElementById('ownerName').value = savedProfile.owner_name;
+			if (savedProfile.address) document.getElementById('bizAddress').value = savedProfile.address;
+			if (savedProfile.city) document.getElementById('bizCity').value = savedProfile.city;
+			if (savedProfile.province) document.getElementById('bizProvince').value = savedProfile.province;
+			if (savedProfile.postal_code) document.getElementById('bizPostal').value = savedProfile.postal_code;
+			if (savedProfile.phone) document.getElementById('bizPhone').value = savedProfile.phone;
+			if (savedProfile.email) document.getElementById('bizEmail').value = savedProfile.email;
+			if (savedProfile.hst_number) document.getElementById('bizHst').value = savedProfile.hst_number;
+			if (savedProfile.tagline) document.getElementById('bizTagline').value = savedProfile.tagline;
+
+			// Load terms
+			const savedTerms = JSON.parse(localStorage.getItem('ald_custom_terms') || '[]');
+			renderTermsEditor();
+
+			// Load custom items
+			const savedItems = JSON.parse(localStorage.getItem('ald_custom_items') || '[]');
+			renderCustomItems();
+
+			// Load quote prefs
+			const savedPrefs = JSON.parse(localStorage.getItem('ald_quote_prefs') || '{}');
+			if (document.getElementById('quoteHeading')) document.getElementById('quoteHeading').value = savedPrefs.heading || 'Your Renovation Quote';
+			if (document.getElementById('quotePrefix')) document.getElementById('quotePrefix').value = savedPrefs.prefix || 'ALD';
+			if (document.getElementById('showPrefix') && savedPrefs.showPrefix === false) document.getElementById('showPrefix').checked = false;
+		});
+
+		async function saveProfile() {
+			var profile = {
+				business_name: document.getElementById('businessName').value.trim(),
+				owner_name: document.getElementById('ownerName').value.trim(),
+				address: document.getElementById('bizAddress').value.trim(),
+				city: document.getElementById('bizCity').value.trim(),
+				province: document.getElementById('bizProvince').value.trim(),
+				postal_code: document.getElementById('bizPostal').value.trim(),
+				phone: document.getElementById('bizPhone').value.trim(),
+				email: document.getElementById('bizEmail').value.trim(),
+				hst_number: document.getElementById('bizHst').value.trim(),
+				tagline: document.getElementById('bizTagline').value.trim()
+			};
+
+			var btn = document.querySelector('.btn-save');
+			btn.disabled = true;
+			btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+
+			var result;
+			try {
+				result = await saveBusinessProfile(profile);
+				if (result.error) {
+					// Fallback: save to localStorage
+					localStorage.setItem('ald_business_profile', JSON.stringify(profile));
+					var badge = document.getElementById('profileSaved');
+					badge.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i>Saved locally (cloud sync unavailable)';
+					badge.style.display = 'inline';
+					setTimeout(function() { badge.style.display = 'none'; badge.innerHTML = '<i class="fas fa-check-circle me-1"></i>Saved!'; }, 4000);
+				} else {
+					var badge = document.getElementById('profileSaved');
+					badge.innerHTML = '<i class="fas fa-check-circle me-1"></i>Saved!';
+					badge.style.display = 'inline';
+					setTimeout(function() { badge.style.display = 'none'; }, 3000);
+				}
+			} catch(e) {
+				// Network/exception fallback
+				localStorage.setItem('ald_business_profile', JSON.stringify(profile));
+				var badge = document.getElementById('profileSaved');
+				badge.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i>Saved locally (cloud sync unavailable)';
+				badge.style.display = 'inline';
+				setTimeout(function() { badge.style.display = 'none'; badge.innerHTML = '<i class="fas fa-check-circle me-1"></i>Saved!'; }, 4000);
+			} finally {
+				btn.disabled = false;
+				btn.innerHTML = '<i class="fas fa-save me-1"></i> Save Profile';
+			}
+		}
+
+		// Category visibility functions
+		const CATEGORIES = [
+			'Demolition',
+			'Asbestos / Hazmat',
+			'Concrete & Masonry',
+			'Waterproofing',
+			'Rough Framing',
+			'Windows & Exterior Doors',
+			'Rough Plumbing',
+			'Rough Electrical',
+			'HVAC / Ductwork',
+			'Insulation',
+			'Drywall',
+			'Tile & Stone',
+			'Flooring',
+			'Interior Doors',
+			'Trim & Millwork',
+			'Cabinets & Vanities',
+			'Finish Plumbing',
+			'Finish Electrical',
+			'Painting',
+			'Finishing',
+			'General'
+		];
+
+		// Terms editor
+		var terms = JSON.parse(localStorage.getItem('ald_custom_terms') || '[]');
+		function renderTermsEditor() {
+			var el = document.getElementById('termsList');
+			if (!el) return;
+			el.innerHTML = terms.map(function(t, i) {
+				return '<div class="card mb-2">' +
+					'<div class="card-body p-3">' +
+						'<div class="d-flex gap-2 align-items-center mb-2">' +
+							'<input type="text" class="form-control form-control-sm" value="' + t.label.replace(/"/g, '&quot;') + '" onchange="terms[' + i + '].label=this.value" placeholder="Term label" style="max-width:200px;">' +
+							'<div class="form-check mb-0">' +
+								'<input class="form-check-input" type="checkbox"' + (t.defaultOn ? ' checked' : '') + ' onchange="terms[' + i + '].defaultOn=this.checked">' +
+								'<label class="form-check-label small">Default on</label>' +
+							'</div>' +
+							'<button class="btn btn-sm btn-outline-danger" onclick="terms.splice(' + i + ',1);renderTermsEditor();"><i class="fas fa-trash"></i></button>' +
+						'</div>' +
+						'<textarea class="form-control form-control-sm" rows="3" onchange="terms[' + i + '].text=this.value" placeholder="Enter the full term text here...">' + t.text.replace(/"/g, '&quot;') + '</textarea>' +
+					'</div>' +
+				'</div>';
+			}).join('');
+		}
+		function addTerm() {
+			terms.push({ id: 't' + Date.now(), label: 'New Term', text: '', defaultOn: false });
+			renderTermsEditor();
+		}
+
+		async function saveTerms() {
+			var btn = document.querySelector('.btn-save');
+			btn.disabled = true;
+			btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+
+			localStorage.setItem('ald_custom_terms', JSON.stringify(terms));
+
+			try {
+				await saveTermsToCloud(terms);
+				var badge = document.getElementById('termsSaved');
+				badge.innerHTML = '<i class="fas fa-check-circle me-1"></i>Saved!';
+				badge.style.display = 'inline';
+				setTimeout(function() { badge.style.display = 'none'; }, 3000);
+			} catch(e) {
+				var badge = document.getElementById('termsSaved');
+				badge.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i>Saved locally (cloud sync unavailable)';
+				badge.style.display = 'inline';
+				setTimeout(function() { badge.style.display = 'none'; badge.innerHTML = '<i class="fas fa-check-circle me-1"></i>Saved!'; }, 4000);
+			} finally {
+				btn.disabled = false;
+				btn.innerHTML = '<i class="fas fa-save me-1"></i> Save Terms';
+			}
+		}
+
+		// Custom items editor
+		var customItems = JSON.parse(localStorage.getItem('ald_custom_items') || '[]');
+		function renderCustomItems() {
+			var el = document.getElementById('customItemsList');
+			if (!el) return;
+			el.innerHTML = customItems.map(function(item, i) {
+				return '<div class="card mb-2">' +
+					'<div class="card-body p-3">' +
+						'<div class="d-flex gap-2 align-items-center mb-2">' +
+							'<input type="text" class="form-control form-control-sm" value="' + item.name.replace(/"/g, '&quot;') + '" onchange="customItems[' + i + '].name=this.value" placeholder="Item name" style="max-width:150px;">' +
+							'<input type="text" class="form-control form-control-sm" value="' + item.unit.replace(/"/g, '&quot;') + '" onchange="customItems[' + i + '].unit=this.value" placeholder="Unit (e.g. LF, sq.ft., sheet)" style="max-width:100px;">' +
+							'<input type="number" class="form-control form-control-sm" value="' + item.price + '" onchange="customItems[' + i + '].price=parseFloat(this.value) || 0" placeholder="Price" style="max-width:100px;">' +
+							'<select class="form-select form-select-sm" onchange="customItems[' + i + '].category=this.value">' +
+								CATEGORIES.map(function(cat) {
+									return '<option value="' + cat + '"' + (item.category === cat ? ' selected' : '') + '>' + cat + '</option>';
+								}).join('') +
+							'</select>' +
+							'<button class="btn btn-sm btn-outline-danger" onclick="customItems.splice(' + i + ',1);renderCustomItems();"><i class="fas fa-trash"></i></button>' +
+						'</div>' +
+					'</div>' +
+				'</div>';
+			}).join('');
+		}
+		function addCustomItem() {
+			customItems.push({ name: '', unit: '', price: 0, category: 'General' });
+			renderCustomItems();
+		}
+
+		async function saveCustomItems() {
+			var btn = document.querySelector('.btn-save');
+			btn.disabled = true;
+			btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+
+			localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
+
+			try {
+				await saveItemsToCloud(customItems);
+				var badge = document.getElementById('itemsSaved');
+				badge.innerHTML = '<i class="fas fa-check-circle me-1"></i>Saved!';
+				badge.style.display = 'inline';
+				setTimeout(function() { badge.style.display = 'none'; }, 3000);
+			} catch(e) {
+				var badge = document.getElementById('itemsSaved');
+				badge.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i>Saved locally (cloud sync unavailable)';
+				badge.style.display = 'inline';
+				setTimeout(function() { badge.style.display = 'none'; badge.innerHTML = '<i class="fas fa-check-circle me-1"></i>Saved!'; }, 4000);
+			} finally {
+				btn.disabled = false;
+				btn.innerHTML = '<i class="fas fa-save me-1"></i> Save Materials';
+			}
+		}
+
+		function saveQuotePrefs() {
+			var prefs = {
+				heading: document.getElementById('quoteHeading').value.trim() || 'Your Renovation Quote',
+				prefix: document.getElementById('quotePrefix').value.trim() || 'ALD',
+				showPrefix: document.getElementById('showPrefix').checked
+			};
+			localStorage.setItem('ald_quote_prefs', JSON.stringify(prefs));
+			
+			var badge = document.getElementById('prefsSaved');
+			badge.innerHTML = '<i class="fas fa-check-circle me-1"></i>Saved!';
+			badge.style.display = 'inline';
+			setTimeout(function() { badge.style.display = 'none'; }, 3000);
+		}
+
+		function signOut() {
+			localStorage.clear();
+			window.location.href = 'index.html';
+		}
+
+		// Import functions for settings
+		function importClientsFromFileSettings() {
+			var file = document.getElementById('importClientsFileSettings').files[0];
+			var resultEl = document.getElementById('importClientsResultSettings');
+			if (!file) { resultEl.innerHTML = '<span class="text-danger">Please select a file first.</span>'; return; }
+			var reader = new FileReader();
+			reader.onload = function(e) {
+				var lines = e.target.result.split('\n');
+				var clients = {};
+				try { clients = JSON.parse(localStorage.getItem('ald_clients') || '{}'); } catch(err) {}
+				var added = 0;
+				lines.forEach(function(line) {
+					line = line.trim();
+					if (!line) return;
+					var phoneMatch = line.match(/(\d{3}[\s\-]\d{3}[\s\-]\d{4})/);
+					var emailMatch = line.match(/([^\s]+@[^\s]+)/);
+					if (!phoneMatch && !emailMatch) return;
+					var phone = phoneMatch ? phoneMatch[1] : '';
+					var email = emailMatch ? emailMatch[1] : '';
+					var name = '';
+					if (phoneMatch) name = line.substring(0, line.indexOf(phoneMatch[1])).trim();
+					else if (emailMatch) name = line.substring(0, line.indexOf(emailMatch[1])).trim();
+					if (!name) return;
+					var address = '';
+					if (emailMatch) address = line.substring(line.indexOf(emailMatch[1]) + emailMatch[1].length).trim();
+					clients[name] = { name: name, phone: phone, email: email, address: address };
+					added++;
+				});
+				localStorage.setItem('ald_clients', JSON.stringify(clients));
+				resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>' + added + ' clients imported!</span>';
+			};
+			reader.readAsText(file);
+		}
+
+		function importMaterialsFromFileSettings() {
+			var file = document.getElementById('importMaterialsFileSettings').files[0];
+			var resultEl = document.getElementById('importMaterialsResultSettings');
+			if (!file) { resultEl.innerHTML = '<span class="text-danger">Please select a file first.</span>'; return; }
+			var reader = new FileReader();
+			reader.onload = function(e) {
+				var lines = e.target.result.split('\n');
+				var items = {};
+				try { items = JSON.parse(localStorage.getItem('ald_custom_items') || '{}'); } catch(err) {}
+				var currentCategory = 'General';
+				var added = 0;
+				for (var i = 0; i < lines.length; i++) {
+					var line = lines[i].trim();
+					if (!line || line.match(/^-+$/)) continue;
+					if (line === line.toUpperCase() && line.length > 2 && !line.includes('|')) {
+						currentCategory = line.charAt(0) + line.slice(1).toLowerCase();
+						continue;
+					}
+					if (line.includes(' | ')) {
+						var parts = line.split(' | ');
+						if (parts.length >= 3) {
+							var price = parseFloat(parts[2].replace(/[$,]/g, '')) || 0;
+							if (!items[currentCategory]) items[currentCategory] = [];
+							items[currentCategory].push({ name: parts[0].trim(), unit: parts[1].trim(), price: price, materialCost: 0, supplierUrl: '' });
+							added++;
+						}
+					}
+				}
+				localStorage.setItem('ald_custom_items', JSON.stringify(items));
+				resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>' + added + ' materials imported!</span>';
+			};
+			reader.readAsText(file);
+		}
+	</script>
+</body>
+</html>

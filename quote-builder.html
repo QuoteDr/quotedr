@@ -1,0 +1,3436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuoteDr - Quote Builder</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background-color: #eef4fb; }
+        .room-header { 
+            background: linear-gradient(135deg, #2d2d2d 0%, #111111 100%);
+            color: white;
+            padding: 1rem;
+            margin-top: 1.5rem;
+            border-radius: 8px;
+        }
+        .room-header h3 { margin: 0; font-weight: bold; }
+        .line-item { 
+            background: white;
+            border-left: 4px solid #1a56a0;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            border-radius: 4px;
+        }
+        .room-total { 
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #28a745;
+        }
+        .grand-total {
+            background: #343a40;
+            color: white;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+        .profit-positive { color: #198754; }
+        .profit-negative { color: #dc3545; }
+
+        /* Sticky toolbar */
+        #stickyToolbar {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 1050;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            background: rgba(255,255,255,0.95);
+            border: 1px solid #dee2e6;
+            border-radius: 40px;
+            padding: 10px 18px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.18);
+            transition: opacity 0.25s ease, transform 0.25s ease;
+            opacity: 0;
+            transform: translateY(16px);
+            pointer-events: none;
+        }
+        #stickyToolbar.visible {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: all;
+        }
+        @keyframes revealPulse {
+            0%   { box-shadow: 0 4px 20px rgba(26,86,160,0.35); transform: scale(1) rotate(0deg); }
+            20%  { transform: scale(1.08) rotate(-4deg); }
+            40%  { transform: scale(1.08) rotate(4deg); }
+            60%  { transform: scale(1.08) rotate(-3deg); }
+            80%  { transform: scale(1.04) rotate(2deg); }
+            90%  { box-shadow: 0 0 18px 6px rgba(26,86,160,0.55); }
+            100% { box-shadow: 0 4px 20px rgba(26,86,160,0.35); transform: scale(1) rotate(0deg); }
+        }
+        #stickyToolbarReveal.wiggling {
+            animation: revealPulse 1.6s ease-in-out infinite;
+        }
+        #stickyToolbar .btn {
+            border-radius: 30px;
+            font-weight: 600;
+            padding: 7px 18px;
+        }
+
+        /* Room header color picker */
+        .color-picker-swatches { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+        .color-swatch {
+            width: 22px; height: 22px; border-radius: 50%; cursor: pointer;
+            border: 2px solid rgba(255,255,255,0.4);
+            transition: transform 0.15s, border-color 0.15s;
+            flex-shrink: 0;
+        }
+        .color-swatch:hover { transform: scale(1.25); border-color: white; }
+        .color-swatch.active { border-color: white; border-width: 3px; transform: scale(1.15); }
+
+        /* Sticky total bar */
+        #stickyTotalBar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1040;
+            background: linear-gradient(135deg, #0652DD 0%, #74b9ff 100%);
+            color: white;
+            padding: 10px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.2);
+            transform: translateY(-100%);
+            transition: transform 0.3s ease;
+        }
+        #stickyTotalBar.visible {
+            transform: translateY(0);
+        }
+        #stickyTotalBar .total-label { font-size: 0.85rem; opacity: 0.85; }
+        #stickyTotalBar .total-amount { font-size: 1.6rem; font-weight: 800; }
+        #stickyTotalBar .total-sub { font-size: 0.8rem; opacity: 0.8; }
+        .drag-handle {
+            cursor: grab;
+            font-size: 1.2rem;
+            padding: 0 8px 0 0;
+            opacity: 0.7;
+            user-select: none;
+            flex-shrink: 0;
+        }
+        .drag-handle:hover { opacity: 1; }
+        .room-card.sortable-ghost { opacity: 0.4; }
+        .cat-drag-handle {
+            cursor: grab;
+            font-size: 0.9rem;
+            padding: 0 6px 0 0;
+            opacity: 0.45;
+            user-select: none;
+            display: inline-block;
+        }
+        .cat-drag-handle:hover { opacity: 1; }
+        .cat-group-header { user-select: none; }
+        .cat-group-block.sortable-ghost { opacity: 0.3; background: #e8eeff; }
+        /* Hide markup controls when printing for client view */
+        @media print {
+            .room-header > div:not(:first-child) {
+                display: none !important;
+            }
+            [id^="markupControls_"] {
+                display: none !important;
+            }
+        }
+        .style-swatch { width:36px;height:36px;border-radius:50%;cursor:pointer;border:3px solid transparent;transition:all 0.15s; }
+        .style-swatch.selected { border-color:#333;transform:scale(1.15); }
+        .style-swatch:hover { transform:scale(1.1); }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase.js"></script>
+</head>
+<body>
+    <div class="container-fluid py-4">
+        <!-- Professional Header -->
+        <div class="d-flex align-items-center justify-content-between mb-2" style="height: 110px; overflow: visible; padding-top: 15px; padding-bottom: 23px;">
+            <!-- User logo left -->
+            <div style="flex: 0 0 220px; display: flex; align-items: center;">
+                <img id="userLogoImg" src="" alt="Your Logo" style="height: 118px; width: auto; max-width: 200px; display: none;">
+            </div>
+            <!-- QuoteDr logo center -->
+            <div style="flex: 1; display: flex; justify-content: center; align-items: center;">
+                <img src="quotedr-logo.svg" alt="QuoteDr" style="height: 360px; width: auto; margin-top: -130px; margin-bottom: -130px;">
+            </div>
+            <!-- Toolbar right -->
+            <div style="flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+                <div class="d-flex flex-wrap justify-content-end gap-1">
+                    <button onclick="newQuote()" class="btn btn-sm shadow-sm" style="background:#e87e2a; color:#fff; border-color:#e87e2a;" title="Start a fresh new quote">
+                        <i class="fas fa-plus"></i> New
+                    </button>
+                    <button onclick="saveQuote()" class="btn btn-warning btn-sm shadow-sm" title="Save quote (Ctrl+S)">
+                        <i class="fas fa-save"></i> Save
+                    </button>
+                    <button onclick="loadQuoteFromFile()" class="btn btn-secondary btn-sm shadow-sm" title="Open a saved quote">
+                        <i class="fas fa-folder-open"></i> Open
+                    </button>
+                    <button onclick="exportToPDF()" class="btn btn-success btn-sm shadow-sm">
+                        <i class="fas fa-download"></i> PDF
+                    </button>
+                    <button onclick="generateInteractiveLink()" class="btn btn-primary btn-sm shadow-sm">
+                        <i class="fas fa-share-square"></i> Send Quote
+                    </button>
+                    <button onclick="generateInvoiceLink()" class="btn btn-danger btn-sm shadow-sm">
+                        <i class="fas fa-file-invoice-dollar"></i> Send Invoice
+                    </button>
+                    <a href="dashboard.html" class="btn btn-outline-secondary btn-sm shadow-sm" title="Dashboard" onclick="if(unsavedChanges && !confirm('You have unsaved changes. Leave anyway?')) return false; saveSessionQuote();">
+                        <i class="fas fa-th-large"></i>
+                    </a>
+                    <a href="settings.html" class="btn btn-outline-secondary btn-sm shadow-sm" title="Settings" onclick="if(unsavedChanges && !confirm('You have unsaved changes. Leave anyway?')) return false; saveSessionQuote();">
+                        <i class="fas fa-cog"></i>
+                    </a>
+                    <button onclick="if(unsavedChanges && !confirm('You have unsaved changes. Leave anyway?')) return; signOut();" class="btn btn-outline-danger btn-sm shadow-sm" title="Sign out">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <div id="saveStatus" class="text-muted small" style="min-height: 1.2em;"></div>
+                    <div class="form-check form-switch mb-0 ms-2" style="font-size:0.78rem;" title="Auto-save writes your file instantly when you make changes. Turning this off is not recommended.">
+                        <input class="form-check-input" type="checkbox" id="autoSaveToggle" style="cursor:pointer;">
+                        <label class="form-check-label text-muted" for="autoSaveToggle">Auto-save</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    <!-- Draft warning banner -->
+    <div id="draftWarningBanner" style="display:none; background:#fd7e14; color:#fff; text-align:center; padding:6px 12px; font-size:0.85rem; font-weight:600;">
+        <i class="fas fa-exclamation-triangle me-2"></i>
+        Your work is only saved in browser storage — not to a file. Browser data can be lost.
+        <button onclick="saveQuote()" class="btn btn-sm btn-light ms-3" style="font-size:0.8rem; padding:2px 10px; font-weight:600;">
+            <i class="fas fa-save me-1"></i>Save to File Now
+        </button>
+    </div>
+
+        <!-- Client Info -->
+        <div class="card mb-4">
+            <div class="card-header"><i class="fas fa-user"></i> Client Information</div>
+            <div class="card-body">
+                <div class="row">
+                    <!-- Quote Number -->
+                    <div class="col-md-12 mb-3">
+                        <div class="d-flex align-items-center gap-3">
+                            <label class="mb-0"><strong>Quote #:</strong></label>
+                            <input type="text" id="quoteNumber" class="form-control" style="max-width: 200px; font-weight: bold; font-size: 1.1rem;" placeholder="2026-001" id="quoteNumber" oninput="checkQuoteNumberDuplicate()">
+                            <button onclick="randomizeQuoteNumber()" class="btn btn-sm btn-outline-secondary" title="Generate a random unused quote number">
+                                <i class="fas fa-random"></i> Randomize
+                            </button>
+                            <button onclick="nextQuoteNumber()" class="btn btn-sm btn-outline-primary" title="Use the next number in sequence after your highest sent quote">
+                                <i class="fas fa-sort-numeric-up"></i> Next
+                            </button>
+                            <span id="quoteNumWarning" style="display:none; color:#dc3545; font-size:0.85rem;"><i class="fas fa-exclamation-triangle"></i> Already used!</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Client Information Section -->
+                    <div class="col-md-12 autocomplete-container">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label class="mb-0"><strong>Client Name (Type to search):</strong></label>
+                            <div class="d-flex gap-2">
+                                <button onclick="saveCurrentClient()" class="btn btn-sm btn-outline-success" title="Save current client info to database">
+                                    <i class="fas fa-user-plus"></i> Save Client
+                                </button>
+                                <button onclick="openManageClientsModal()" class="btn btn-sm btn-outline-secondary" title="View and edit saved clients">
+                                    <i class="fas fa-address-book"></i> Manage Clients
+                                </button>
+                            </div>
+                        </div>
+                        <input type="text" id="clientName" class="form-control" spellcheck="true" placeholder="Start typing client name..."
+                               onkeyup="showClientSuggestions()" onblur="hideClientDropdown()">
+                        <div id="clientDropdown" class="autocomplete-dropdown"></div>
+                    </div>
+                    
+                    <div class="col-md-6 mt-3">
+                        <label><strong>Project Address:</strong></label>
+                        <input type="text" id="projectAddress" class="form-control" spellcheck="true" placeholder="123 Main St, Toronto">
+                    </div>
+                    
+                    <div class="col-md-6 mt-3">
+                        <label><strong>Phone Number:</strong></label>
+                        <input type="tel" id="clientPhone" class="form-control" spellcheck="true" placeholder="(416) 555-0123">
+                    </div>
+                    
+                    <div class="col-md-12 mt-3">
+                        <label><strong>Email Address:</strong></label>
+                        <input type="email" id="clientEmail" class="form-control" spellcheck="true" placeholder="client@email.com">
+                    </div>
+
+                    <!-- Terms & Conditions Section -->
+                    <div class="col-md-12 mt-3">
+                        <label><strong>Terms & Conditions:</strong></label>
+                        <div id="termsCheckboxes">
+                            <!-- Populated dynamically from ald_custom_terms -->
+                        </div>
+                        <div class="mt-2">
+                            <a href="settings.html" class="text-muted small" style="font-size:0.8rem;"><i class="fas fa-cog me-1"></i>Manage terms in Settings</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Room Breaks Section -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-th-large"></i> Quote by Room/Area</span>
+                <div class="btn-group" role="group">
+                    <button onclick="addRoom()" class="btn btn-sm btn-light text-dark">
+                        <i class="fas fa-plus"></i> Add Room
+                    </button>
+                    <button onclick="saveTemplate()" class="btn btn-sm btn-info text-white" title="Save current rooms as a template">
+                        <i class="fas fa-save"></i> Save Template
+                    </button>
+                    <button onclick="openTemplatesMenu(this)" class="btn btn-sm btn-warning" title="Load existing templates">
+                        <i class="fas fa-folder-open"></i> Templates
+                    </button>
+                    <button id="toggleTimelinesBtn" onclick="toggleTimelines()" class="btn btn-sm btn-secondary" title="Show/hide timeline estimates">
+                        <i class="fas fa-eye-slash"></i> Hide Timelines
+                    </button>
+                    <button onclick="applyGlobalMarkup()" class="btn btn-sm btn-success text-white" title="Apply markup to all rooms">
+                        <i class="fas fa-percent"></i> Markup All
+                    </button>
+                    <button onclick="openManageItemsModal()" class="btn btn-sm btn-dark" title="Add custom line items to the pricing database">
+                        <i class="fas fa-database"></i> Manage Items
+                    </button>
+                    <button id="toggleTotalBarBtn" onclick="toggleStickyTotal()" class="btn btn-sm btn-outline-dark" title="Show/hide floating quote total">
+                        <i class="fas fa-dollar-sign"></i> Total
+                    </button>
+                </div>
+            </div>
+            <div class="card-body" id="roomsContainer">
+                <!-- Rooms will be added here dynamically -->
+            </div>
+        </div>
+
+        <!-- Draft & Recent Quotes Section -->
+        <div id="draftSectionContainer" style="display: none;" class="card mb-4">
+            <div class="card-header bg-light">
+                <span><i class="fas fa-file-medical"></i> Your Work</span>
+            </div>
+            <div class="card-body">
+                <button onclick="saveCurrentQuoteAsDraft()" class="btn btn-sm btn-success me-2">
+                    <i class="fas fa-save"></i> Save Current Quote
+                </button>
+                <button onclick="loadRecentQuotes()" class="btn btn-sm btn-primary">
+                    <i class="fas fa-history"></i> Load Recent Quotes
+                </button>
+            </div>
+        </div>
+
+        <!-- Pricing Summary -->
+        <div class="row">
+            <div class="col-md-6 col-12">
+                <div class="grand-total text-center">
+                    <h4><i class="fas fa-calculator"></i> Quote Total</h4>
+                    <div id="subtotalDisplay" style="font-size: 1.5rem;">Subtotal: $0.00</div>
+                    <div id="taxDisplay" style="font-size: 1.2rem;">HST (13%): $0.00</div>
+                    <!-- Deposit Calculator -->
+                    <div class="deposit-section mb-3 p-2 bg-light rounded" style="display:none;" id="depositSection">
+                        <label><strong>Deposit:</strong></label>
+                        <div class="input-group input-group-sm" style="max-width: 200px;">
+                            <span class="input-group-text">%</span>
+                            <input type="number" id="depositPercentInput" class="form-control text-center" value="50" min="0" max="100" onchange="updateDepositPercentage()" onkeyup="if(event.key === 'Enter') this.blur();">
+                        </div>
+                        <div class="mt-2"><strong>Deposit Amount:</strong> $<span id="depositAmountDisplay">0.00</span></div>
+                        <div><strong>Remaining Balance:</strong> $<span id="remainingBalanceDisplay">0.00</span></div>
+                    </div>
+                    
+                    <button onclick="toggleDepositSection()" class="btn btn-sm btn-outline-primary mb-2" style="display:none;" id="depositToggleBtn">
+                        <i class="fas fa-calculator"></i> Deposit Calculator
+                    </button>
+                    
+                    <div id="grandTotalDisplay" style="font-size: 2rem; font-weight: bold; margin-top: 0.5rem;">TOTAL: $0.00</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Room Modal -->
+    <div class="modal fade" id="addRoomModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Room/Area Break</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <label><strong>Room Name:</strong></label>
+                    <input type="text" id="newRoomName" class="form-control mb-3" placeholder="e.g., Basement, Kitchen, Bathroom">
+                    <small class="text-muted">Common examples: Basement, Kitchen, Bathroom, Master Bedroom, Garage</small>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="confirmAddRoom()">Add Room Break</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Line Item Modal -->
+    <div class="modal fade" id="addLineModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Line Item</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="currentRoomId">
+
+                    <!-- Quick search across all items -->
+                    <div class="mb-3 position-relative">
+                        <label><strong>Quick Search:</strong> <small class="text-muted">type to find any service instantly</small></label>
+                        <input type="text" id="itemQuickSearch" class="form-control" placeholder="e.g., drywall, tile, baseboard..." oninput="showItemSearchResults()" onblur="hideItemSearchDropdown()" autocomplete="off">
+                        <div id="itemSearchDropdown" style="display:none; position:absolute; left:0; right:0; z-index:2000; background:white; border:1px solid #dee2e6; border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.15); max-height:220px; overflow-y:auto;"></div>
+                    </div>
+
+                    <label><strong>Description:</strong></label>
+                    <input type="text" id="lineDescription" class="form-control mb-3" placeholder="e.g., 2x4 Wall Framing, Drywall Hang & Finish" spellcheck="true">
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label><strong>Category:</strong></label>
+                            <select id="lineCategory" class="form-select" onchange="updatePricingOptions()">
+                                <!-- Populated dynamically from pricingDatabase -->
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label><strong>Service:</strong></label>
+                            <select id="lineService" class="form-select" onchange="autoFillPricing()">
+                                <!-- Options will populate based on category -->
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label><strong>Unit Type:</strong></label>
+                            <input type="text" id="lineUnitType" class="form-control" placeholder="LF, sq ft, each, hourly">
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label><strong>Quantity:</strong></label>
+                            <input type="number" id="lineQuantity" class="form-control" value="1" step="0.01">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label><strong>Rate ($):</strong></label>
+                            <input type="number" id="lineRate" class="form-control" value="0" step="0.01">
+                        </div>
+                    </div>
+
+                    <!-- Material Costs Section -->
+                    <div class="mb-3">
+                        <button class="btn btn-link text-decoration-none p-0" type="button" data-bs-toggle="collapse" data-bs-target="#materialCostCollapse" aria-expanded="false" aria-controls="materialCostCollapse">
+                            <i class="fas fa-chevron-down"></i> Material Costs (Optional)
+                        </button>
+                        <div class="collapse mt-2" id="materialCostCollapse">
+                            <div class="row g-2 align-items-center bg-light p-3 rounded">
+                                <div class="col-md-6">
+                                    <label><strong>Material Cost ($):</strong></label>
+                                    <div class="input-group">
+                                        <input type="number" id="lineMaterialCost" class="form-control" value="0" step="0.01" placeholder="per unit"
+                                               oninput="calculateMaterialTotal()">
+                                        <a id="supplierLinkBtn" href="#" target="_blank" class="btn btn-outline-secondary" title="Open supplier page" style="display:none;">
+                                            <i class="fas fa-external-link-alt"></i>
+                                        </a>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 text-end">
+                                    <label><strong>Total Material Cost:</strong></label>
+                                    <div id="materialTotalDisplay" class="fw-bold text-primary">$0.00</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <label><strong>Notes (Optional):</strong></label>
+                    <textarea id="lineNotes" class="form-control mb-3" rows="2" placeholder="Additional details..."></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="confirmAddLine()">Add Line Item</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manage Line Items Modal -->
+    <div class="modal fade" id="manageItemsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-database"></i> Manage Line Items</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <h6 class="fw-bold mb-3"><i class="fas fa-plus-circle text-primary"></i> Add New Item</h6>
+                    <div class="row g-2 mb-3 align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label"><strong>Category</strong></label>
+                            <div class="d-flex gap-2">
+                                <select id="newItemCategory" class="form-select" onchange="handleCategoryChange()"></select>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="addNewCategory()" title="Add a new category">➕</button>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label"><strong>Item Name</strong></label>
+                            <input type="text" id="newItemName" class="form-control" placeholder="e.g., Custom Trim Work" spellcheck="true">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label"><strong>Unit Type</strong></label>
+                            <div class="d-flex gap-2">
+                                <input type="text" id="newItemUnit" class="form-control" list="unitTypeOptions" placeholder="sq ft">
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="addNewUnitType()" title="Add a new unit type">➕</button>
+                            </div>
+                            <datalist id="unitTypeOptions">
+                                <option value="sq ft">
+                                <option value="LF">
+                                <option value="each">
+                                <option value="hourly">
+                                <option value="sheet">
+                                <option value="minimum">
+                            </datalist>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label"><strong>Rate ($)</strong></label>
+                            <input type="number" id="newItemRate" class="form-control" step="0.01" min="0" placeholder="0.00">
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-12">
+                            <label class="form-label"><strong>Description</strong> <span class="text-muted small">(optional — shown to clients on interactive quote)</span></label>
+                            <textarea id="newItemDescription" class="form-control" rows="2" placeholder="e.g., Complete drywall installation including hanging, mudding, taping, sanding and priming. Professional finish ready for paint." spellcheck="true"></textarea>
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-3 align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label"><strong>Material Cost ($/unit)</strong> <span class="text-muted small">(optional)</span></label>
+                            <input type="number" id="newItemMaterialCost" class="form-control" step="0.01" min="0" placeholder="0.00">
+                        </div>
+                        <div class="col-md-7">
+                            <label class="form-label"><strong>Supplier URL</strong> <span class="text-muted small">(optional — paste product link)</span></label>
+                            <input type="url" id="newItemSupplierUrl" class="form-control" placeholder="https://www.homedepot.ca/...">
+                        </div>
+                        <div class="col-md-2">
+                            <button onclick="addCustomItem()" class="btn btn-primary w-100">
+                                <i class="fas fa-plus"></i> Add
+                            </button>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="fw-bold mb-0"><i class="fas fa-list-alt text-secondary"></i> All Items — edit fields, then hit 💾 to save each row</h6>
+                        <div class="d-flex align-items-center gap-2">
+                            <span id="pricingUnsavedIndicator" class="badge bg-warning text-dark" style="display:none;">⚠️ Unsaved changes</span>
+                            <button onclick="saveAllPricingRows()" class="btn btn-sm btn-success"><i class="fas fa-save"></i> Save All</button>
+                        </div>
+                    </div>
+
+                    <!-- Search + jump bar -->
+                    <div class="d-flex gap-2 mb-2 align-items-center" id="itemListTopAnchor">
+                        <div class="flex-grow-1">
+                            <input type="text" id="itemSearchFilter" class="form-control form-control-sm" placeholder="🔍 Search items by name..." oninput="filterItemsList()">
+                        </div>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="whizzScroll('customItemsList', 'top')" title="Jump to top">
+                            <i class="fas fa-arrow-up"></i> Top
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="whizzScroll('customItemsList', 'bottom')" title="Jump to bottom">
+                            <i class="fas fa-arrow-down"></i> Bottom
+                        </button>
+                    </div>
+
+                    <div id="customItemsList" style="max-height:460px; overflow-y:auto;">
+                        <!-- Populated dynamically -->
+                    </div>
+                    <div id="itemListBottomAnchor"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-success" onclick="saveAllPricingRows()"><i class="fas fa-save"></i> Save All Changes</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeManageItemsModal()">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manage Clients Modal -->
+    <div class="modal fade" id="manageClientsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-address-book"></i> Client Database</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <h6 class="fw-bold mb-3"><i class="fas fa-user-plus text-success"></i> Add / Edit Client</h6>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label"><strong>Full Name</strong></label>
+                            <input type="text" id="newClientName" class="form-control" placeholder="e.g., John Smith">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><strong>Phone</strong></label>
+                            <input type="tel" id="newClientPhone" class="form-control" placeholder="(416) 555-0123">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><strong>Email</strong></label>
+                            <input type="email" id="newClientEmail" class="form-control" placeholder="client@email.com">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><strong>Address</strong></label>
+                            <input type="text" id="newClientAddress" class="form-control" placeholder="123 Main St, Toronto, ON">
+                        </div>
+                        <div class="col-12">
+                            <button onclick="saveClientFromModal()" class="btn btn-success">
+                                <i class="fas fa-save"></i> Save Client
+                            </button>
+                            <button onclick="clearClientForm()" class="btn btn-outline-secondary ms-2">
+                                <i class="fas fa-times"></i> Clear
+                            </button>
+                        </div>
+                    </div>
+                    <hr>
+                    <h6 class="fw-bold mb-2"><i class="fas fa-users text-secondary"></i> All Clients</h6>
+                    <input type="text" id="clientSearchFilter" class="form-control form-control-sm mb-2" placeholder="Filter clients..." oninput="renderClientsList()">
+                    <div id="clientsList" style="max-height:400px; overflow-y:auto;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Pricing Database - Adam's Rates (ALD Direct Inc. 2026)
+        // pricingDatabase is now empty — all services live in localStorage (ald_custom_items)
+        // Adam's services were migrated on first load via migrateLegacyPricing()
+        const pricingDatabase = {};
+
+        // Legacy pricing to migrate on first run
+        const LEGACY_PRICING = {};
+
+        function migrateLegacyPricing() {
+            // Merge legacy pricing into localStorage — skip items that already exist by name
+            let existing = {};
+            try { existing = JSON.parse(localStorage.getItem('ald_custom_items') || '{}'); } catch(e) {}
+            let changed = false;
+            Object.entries(LEGACY_PRICING).forEach(([cat, items]) => {
+                if (!existing[cat]) { existing[cat] = []; }
+                items.forEach(item => {
+                    if (!existing[cat].find(e => e.name === item.name)) {
+                        existing[cat].push({ ...item, materialCost: 0, supplierUrl: '' });
+                        changed = true;
+                    }
+                });
+            });
+            if (changed) localStorage.setItem('ald_custom_items', JSON.stringify(existing));
+        }
+
+        let rooms = [];
+        let roomCounter = 0;
+        let customItems = {};
+
+        // Timeline feature - show/hide toggle
+        let showTimelines = true;
+        
+        function editRoomName(roomId) {
+            const room = rooms.find(r => r.id === roomId);
+            if (!room) return;
+            const newName = prompt('Edit room name:', room.name);
+            if (newName && newName.trim()) {
+                room.name = newName.trim();
+                renderRooms();
+            }
+        }
+
+        function addRoom() {
+            const modal = new bootstrap.Modal(document.getElementById('addRoomModal'));
+            document.getElementById('newRoomName').value = '';
+            modal.show();
+        }
+
+        function confirmAddRoom() {
+            const name = document.getElementById('newRoomName').value.trim();
+            if (!name) return;
+            
+            roomCounter++;
+            rooms.push({
+                id: roomCounter,
+                name: name,
+                items: []
+            });
+            
+            renderRooms();
+            
+            // Close modal
+            const modalEl = document.getElementById('addRoomModal');
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            modal.hide();
+        }
+
+        function showItemSearchResults() {
+            const q = (document.getElementById('itemQuickSearch')?.value || '').toLowerCase().trim();
+            const dropdown = document.getElementById('itemSearchDropdown');
+            if (!q || q.length < 2) { dropdown.style.display = 'none'; return; }
+
+            const matches = [];
+            Object.entries(pricingDatabase).forEach(([cat, items]) => {
+                items.forEach(item => {
+                    if (item.name.toLowerCase().includes(q) || cat.toLowerCase().includes(q)) {
+                        matches.push({ cat, item });
+                    }
+                });
+            });
+
+            if (!matches.length) {
+                dropdown.innerHTML = '<div style="padding:10px 14px; color:#888;">No items found</div>';
+                dropdown.style.display = 'block';
+                return;
+            }
+
+            dropdown.innerHTML = matches.slice(0, 12).map(({ cat, item }) => `
+                <div class="item-search-result" data-cat="${cat.replace(/"/g,'&quot;')}" data-name="${item.name.replace(/"/g,'&quot;')}" 
+                     style="padding:8px 14px; cursor:pointer; border-bottom:1px solid #f0f0f0; display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <strong>${item.name}</strong>
+                        <small style="color:#888; margin-left:6px;">${cat}</small>
+                    </div>
+                    <small style="color:#0652DD;">$${parseFloat(item.rate).toFixed(2)}/${item.unitType}</small>
+                </div>`).join('');
+            dropdown.style.display = 'block';
+
+            dropdown.querySelectorAll('.item-search-result').forEach(el => {
+                el.addEventListener('mousedown', () => {
+                    selectItemFromSearch(el.dataset.cat, el.dataset.name);
+                });
+                el.addEventListener('mouseenter', () => el.style.background = '#f0f4ff');
+                el.addEventListener('mouseleave', () => el.style.background = '');
+            });
+        }
+
+        function selectItemFromSearch(cat, name) {
+            const item = pricingDatabase[cat]?.find(i => i.name === name);
+            if (!item) return;
+            // Set category and repopulate service dropdown
+            populateCategoryDropdown(cat);
+            updatePricingOptions();
+            // Select the matching service
+            const serviceSelect = document.getElementById('lineService');
+            for (let opt of serviceSelect.options) {
+                if (opt.value === name) { opt.selected = true; break; }
+            }
+            autoFillPricing();
+            // Clear search
+            document.getElementById('itemQuickSearch').value = '';
+            document.getElementById('itemSearchDropdown').style.display = 'none';
+        }
+
+        function hideItemSearchDropdown() {
+            setTimeout(() => {
+                const d = document.getElementById('itemSearchDropdown');
+                if (d) d.style.display = 'none';
+            }, 150);
+        }
+
+        function populateCategoryDropdown(selectedCat) {
+            const sel = document.getElementById('lineCategory');
+            const cats = Object.keys(pricingDatabase);
+            const hiddenCategories = JSON.parse(localStorage.getItem('ald_hidden_categories') || '[]');
+            sel.innerHTML = '';
+            if (cats.length === 0) {
+                const opt = document.createElement('option');
+                opt.value = 'General'; opt.text = 'General';
+                sel.appendChild(opt);
+            } else {
+                cats.forEach(cat => {
+                    if (hiddenCategories.indexOf(cat) !== -1) return; // skip hidden
+                    const opt = document.createElement('option');
+                    opt.value = cat; opt.text = cat;
+                    if (cat === selectedCat) opt.selected = true;
+                    sel.appendChild(opt);
+                });
+            }
+        }
+
+        function addLine(roomId) {
+            document.getElementById('currentRoomId').value = roomId;
+            const modal = new bootstrap.Modal(document.getElementById('addLineModal'));
+            
+            // Reset form fields
+            document.getElementById('lineDescription').value = '';
+            document.getElementById('lineQuantity').value = '1';
+            document.getElementById('lineRate').value = '0';
+            document.getElementById('lineNotes').value = '';
+            document.getElementById('lineMaterialCost').value = '0';
+            document.getElementById('materialTotalDisplay').textContent = '$0.00';
+            const linkBtn = document.getElementById('supplierLinkBtn');
+            if (linkBtn) linkBtn.style.display = 'none';
+            const qs = document.getElementById('itemQuickSearch');
+            if (qs) { qs.value = ''; }
+            const qd = document.getElementById('itemSearchDropdown');
+            if (qd) qd.style.display = 'none';
+
+            // Populate category dropdown dynamically
+            populateCategoryDropdown(Object.keys(pricingDatabase)[0] || 'General');
+            updatePricingOptions();
+            
+            modal.show();
+        }
+
+        function updatePricingOptions() {
+            const category = document.getElementById('lineCategory').value;
+            const serviceSelect = document.getElementById('lineService');
+            
+            // Clear existing options
+            serviceSelect.innerHTML = '';
+            
+            // Get services for this category
+            const services = pricingDatabase[category] || [];
+            
+            if (services.length === 0) {
+                // No predefined services, add a generic option
+                const option = document.createElement('option');
+                option.value = 'custom';
+                option.text = 'Custom Service';
+                serviceSelect.appendChild(option);
+            } else {
+                // Add all services from database
+                services.forEach(service => {
+                    const option = document.createElement('option');
+                    option.value = service.name;
+                    option.text = service.name;
+                    option.dataset.unitType = service.unitType;
+                    option.dataset.rate = service.rate;
+                    if (service.note) option.dataset.note = service.note;
+                    if (service.materialCost) option.dataset.materialCost = service.materialCost;
+                    if (service.supplierUrl) option.dataset.supplierUrl = service.supplierUrl;
+                    serviceSelect.appendChild(option);
+                });
+            }
+            
+            // Auto-fill if first service selected
+            if (services.length > 0) {
+                autoFillPricing();
+            }
+        }
+
+        function autoFillPricing() {
+            const serviceSelect = document.getElementById('lineService');
+            const selectedOption = serviceSelect.options[serviceSelect.selectedIndex];
+            
+            if (selectedOption && selectedOption.dataset.unitType) {
+                document.getElementById('lineUnitType').value = selectedOption.dataset.unitType;
+                document.getElementById('lineRate').value = selectedOption.dataset.rate;
+                if (selectedOption.value !== 'custom') {
+                    document.getElementById('lineDescription').value = selectedOption.text;
+                }
+                // Pre-fill material cost if saved
+                const matCost = selectedOption.dataset.materialCost || 0;
+                document.getElementById('lineMaterialCost').value = matCost;
+                calculateMaterialTotal();
+                // Update supplier link button
+                const supplierUrl = selectedOption.dataset.supplierUrl || '';
+                const linkBtn = document.getElementById('supplierLinkBtn');
+                if (linkBtn) {
+                    linkBtn.href = supplierUrl || '#';
+                    linkBtn.style.display = supplierUrl ? 'inline-block' : 'none';
+                }
+            }
+        }
+
+        // Global variables for deposit calculator
+        let depositPercentage = 50; // Default 50% deposit
+        
+        function getUsedQuoteNumbers() {
+            return JSON.parse(localStorage.getItem('ald_used_quote_numbers') || '[]');
+        }
+
+        function markQuoteNumberUsed(num) {
+            if (!num) return;
+            var used = getUsedQuoteNumbers();
+            if (!used.includes(num)) {
+                used.push(num);
+                localStorage.setItem('ald_used_quote_numbers', JSON.stringify(used));
+            }
+        }
+
+        function generateQuoteNumber() {
+            return nextQuoteNumberValue();
+        }
+
+        function nextQuoteNumberValue() {
+            var prefs = JSON.parse(localStorage.getItem('ald_quote_prefs') || '{}');
+            var year = new Date().getFullYear();
+            var used = getUsedQuoteNumbers();
+            // Extract numeric parts from used numbers for this year
+            var usedNums = used.map(function(n) {
+                var m = String(n).match(/(\d+)$/);
+                return m ? parseInt(m[1]) : 0;
+            });
+            var max = usedNums.length > 0 ? Math.max.apply(null, usedNums) : 0;
+            var next = max + 1;
+            var num = year + '-' + String(next).padStart(3, '0');
+            if (prefs.showPrefix !== false && prefs.prefix) return prefs.prefix + '-' + num;
+            return num;
+        }
+
+        function nextQuoteNumber() {
+            document.getElementById('quoteNumber').value = nextQuoteNumberValue();
+            checkQuoteNumberDuplicate();
+        }
+
+        function randomizeQuoteNumber() {
+            var prefs = JSON.parse(localStorage.getItem('ald_quote_prefs') || '{}');
+            var year = new Date().getFullYear();
+            var used = getUsedQuoteNumbers();
+            var candidate, attempts = 0;
+            do {
+                var rand = Math.floor(Math.random() * 9000) + 1000;
+                var num = year + '-' + rand;
+                candidate = (prefs.showPrefix !== false && prefs.prefix) ? prefs.prefix + '-' + num : num;
+                attempts++;
+            } while (used.includes(candidate) && attempts < 500);
+            document.getElementById('quoteNumber').value = candidate;
+            checkQuoteNumberDuplicate();
+        }
+
+        function checkQuoteNumberDuplicate() {
+            var val = document.getElementById('quoteNumber').value.trim();
+            var used = getUsedQuoteNumbers();
+            var warning = document.getElementById('quoteNumWarning');
+            if (warning) warning.style.display = (val && used.includes(val)) ? 'inline' : 'none';
+        }
+        
+        // Room header color presets (label, gradient)
+        // Trade category display order — from start of job to end
+        const CATEGORY_ORDER = [
+            'Demolition',
+            'Asbestos / Hazmat',
+            'Concrete & Masonry',
+            'Waterproofing',
+            'Rough Framing',
+            'Windows & Exterior Doors',
+            'Rough Plumbing',
+            'Rough Electrical',
+            'HVAC / Ductwork',
+            'Insulation',
+            'Drywall',
+            'Tile & Stone',
+            'Flooring',
+            'Interior Doors',
+            'Trim & Millwork',
+            'Cabinets & Vanities',
+            'Finish Plumbing',
+            'Finish Electrical',
+            'Carpentry & Baseboards',
+            'Painting',
+            'Cleaning & Disposal',
+            'Miscellaneous'
+        ];
+
+        // Map legacy category names to canonical CATEGORY_ORDER names
+        const CATEGORY_ALIASES = {
+            'Framing': 'Rough Framing',
+            'Electrical': 'Finish Electrical',
+            'Rough Electrical': 'Rough Electrical',
+            'Finish Electrical': 'Finish Electrical',
+            'Plumbing': 'Finish Plumbing',
+            'Rough Plumbing': 'Rough Plumbing',
+            'Finish Plumbing': 'Finish Plumbing',
+            'HVAC': 'HVAC / Ductwork',
+            'Doors & Trim': 'Trim & Millwork',
+            'Tiling': 'Tile & Stone',
+            'Carpentry': 'Carpentry & Baseboards',
+            'Subflooring': 'Flooring'
+        };
+        function canonicalCat(cat) {
+            return CATEGORY_ALIASES[cat] || cat || 'Miscellaneous';
+        }
+
+        // Sort items by CATEGORY_ORDER, unknowns go before Miscellaneous
+        function sortItemsByCategory(items) {
+            return [...items].sort((a, b) => {
+                let ai = CATEGORY_ORDER.indexOf(canonicalCat(a.category));
+                let bi = CATEGORY_ORDER.indexOf(canonicalCat(b.category));
+                if (ai === -1) ai = CATEGORY_ORDER.length - 2; // before Misc
+                if (bi === -1) bi = CATEGORY_ORDER.length - 2;
+                return ai - bi;
+            });
+        }
+
+        const ROOM_COLORS = [
+            { label: 'Charcoal',   gradient: 'linear-gradient(135deg,#2d2d2d 0%,#111111 100%)' },
+            { label: 'Navy',       gradient: 'linear-gradient(135deg,#1e3a5f 0%,#0a1a2e 100%)' },
+            { label: 'Forest',     gradient: 'linear-gradient(135deg,#1a5c38 0%,#0a2e1a 100%)' },
+            { label: 'Burgundy',   gradient: 'linear-gradient(135deg,#6b1a2a 0%,#300a12 100%)' },
+            { label: 'Slate',      gradient: 'linear-gradient(135deg,#4a5568 0%,#1a202c 100%)' },
+            { label: 'Ocean',      gradient: 'linear-gradient(135deg,#0652DD 0%,#023e8a 100%)' },
+            { label: 'Teal',       gradient: 'linear-gradient(135deg,#00796b 0%,#004d40 100%)' },
+            { label: 'Purple',     gradient: 'linear-gradient(135deg,#6a1b9a 0%,#2e003e 100%)' },
+            { label: 'Copper',     gradient: 'linear-gradient(135deg,#b87333 0%,#7c4a00 100%)' },
+            { label: 'Steel',      gradient: 'linear-gradient(135deg,#546e7a 0%,#263238 100%)' },
+            { label: 'Rose Gold',  gradient: 'linear-gradient(135deg,#c0747a 0%,#7a3540 100%)' },
+            { label: 'Midnight',   gradient: 'linear-gradient(135deg,#1a1a2e 0%,#000000 100%)' },
+        ];
+        // Swatch fill colours (mid-point of each gradient for display)
+        const SWATCH_COLORS = ['#2d2d2d','#1e3a5f','#1a5c38','#6b1a2a','#4a5568','#0652DD','#00796b','#6a1b9a','#b87333','#546e7a','#c0747a','#1a1a2e'];
+
+        function setRoomColor(roomId, colorIndex) {
+            const room = rooms.find(r => r.id === roomId);
+            if (!room) return;
+            room.colorIndex = colorIndex;
+            // Update header background live without full re-render
+            const header = document.querySelector('.room-card[data-room-id="' + roomId + '"] .room-header');
+            if (header) {
+                header.style.background = ROOM_COLORS[colorIndex].gradient;
+                // Update active swatch
+                header.querySelectorAll('.color-swatch').forEach((s, i) => {
+                    s.classList.toggle('active', i === colorIndex);
+                });
+            }
+        }
+
+        // Global variable to track if we're editing an existing item
+        let editingItemIndex = null;
+
+        function editLineItem(roomId, itemIndex) {
+            const room = rooms.find(r => r.id === roomId);
+            if (!room || !room.items[itemIndex]) return;
+            
+            const item = room.items[itemIndex];
+            
+            // Populate form with existing data
+            document.getElementById('currentRoomId').value = roomId;
+            document.getElementById('lineDescription').value = item.description;
+            populateCategoryDropdown(item.category);
+            updatePricingOptions();
+            
+            // Find and select matching service
+            const services = pricingDatabase[item.category];
+            if (services) {
+                const matchedService = services.find(s => s.name === item.serviceName);
+                if (matchedService) {
+                    document.getElementById('lineService').value = matchedService.name;
+                }
+            }
+            
+            document.getElementById('lineUnitType').value = item.unitType;
+            document.getElementById('lineQuantity').value = item.quantity;
+            document.getElementById('lineRate').value = item.rate;
+            document.getElementById('lineNotes').value = item.notes || '';
+            document.getElementById('lineMaterialCost').value = item.materialCost || 0;
+            calculateMaterialTotal();
+            const linkBtn = document.getElementById('supplierLinkBtn');
+            if (linkBtn && item.supplierUrl) {
+                linkBtn.href = item.supplierUrl;
+                linkBtn.style.display = 'inline-block';
+            } else if (linkBtn) {
+                linkBtn.style.display = 'none';
+            }
+            
+            // Change modal title and button text
+            const modalTitle = document.querySelector('#addLineModal .modal-title');
+            if (modalTitle) {
+                modalTitle.textContent = 'Edit Line Item';
+            }
+            const saveBtn = document.querySelector('#addLineModal button[onclick="confirmAddLine()"]');
+            if (saveBtn) {
+                saveBtn.textContent = 'Save Changes';
+            }
+            
+            // Set editing flag
+            editingItemIndex = itemIndex;
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('addLineModal'));
+            modal.show();
+        }
+
+        function confirmAddLine() {
+            const roomId = parseInt(document.getElementById('currentRoomId').value);
+            const description = document.getElementById('lineDescription').value.trim();
+            const category = document.getElementById('lineCategory').value;
+            const unitType = document.getElementById('lineUnitType').value.trim();
+            const quantity = parseFloat(document.getElementById('lineQuantity').value) || 0;
+            const rate = parseFloat(document.getElementById('lineRate').value) || 0;
+            const notes = document.getElementById('lineNotes').value.trim();
+            const materialCost = parseFloat(document.getElementById('lineMaterialCost').value) || 0;
+            
+            if (!description) return;
+            
+            const roomIndex = rooms.findIndex(r => r.id === roomId);
+            if (roomIndex !== -1) {
+                // If editing existing item, update it; otherwise add new
+                if (editingItemIndex !== null && room[roomIndex].items[editingItemIndex]) {
+                    const item = room[roomIndex].items[editingItemIndex];
+                    item.description = description;
+                    item.category = category;
+                    item.serviceName = document.getElementById('lineService').value;
+                    item.unitType = unitType;
+                    item.quantity = quantity;
+                    item.rate = rate;
+                    item.notes = notes;
+                    item.materialCost = materialCost;
+                    item.supplierUrl = document.getElementById('supplierLinkBtn')?.href !== '#' ? document.getElementById('supplierLinkBtn')?.href : '';
+                    item.total = quantity * rate;
+                } else {
+                    // Carry upgrade option from pricing database if available
+                    const svcName = document.getElementById('lineService').value;
+                    const dbItem = pricingDatabase[category]?.find(i => i.name === svcName);
+                    const sLinkBtn = document.getElementById('supplierLinkBtn');
+                    const supplierUrl = (sLinkBtn && sLinkBtn.style.display !== 'none' && sLinkBtn.href !== '#') ? sLinkBtn.href : '';
+                    rooms[roomIndex].items.push({
+                        description,
+                        category,
+                        serviceName: svcName,
+                        unitType,
+                        quantity,
+                        rate,
+                        notes,
+                        materialCost,
+                        supplierUrl,
+                        upgrade: dbItem?.upgrade || null,
+                        upgraded: false,
+                        optional: false,
+                        itemDescription: dbItem?.itemDescription || '',
+                        total: quantity * rate
+                    });
+                }
+                
+                // Reset editing state
+                editingItemIndex = null;
+                const modalTitle = document.querySelector('#addLineModal .modal-title');
+                if (modalTitle) {
+                    modalTitle.textContent = 'Add Line Item';
+                }
+                const saveBtn = document.querySelector('#addLineModal button[onclick="confirmAddLine()"]');
+                if (saveBtn) {
+                    saveBtn.textContent = 'Add Line Item';
+                }
+                
+                renderRooms();
+                
+                // Close modal
+                const modalEl = document.getElementById('addLineModal');
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                modal.hide();
+            }
+        }
+
+        function toggleDepositSection() {
+            const section = document.getElementById('depositSection');
+            const btn = document.getElementById('depositToggleBtn');
+            if (section.style.display === 'none') {
+                section.style.display = 'block';
+                btn.innerHTML = '<i class="fas fa-calculator"></i> Hide Deposit';
+            } else {
+                section.style.display = 'none';
+                btn.innerHTML = '<i class="fas fa-calculator"></i> Deposit Calculator';
+            }
+        }
+
+        function updateDepositPercentage() {
+            const input = document.getElementById('depositPercentInput');
+            depositPercentage = parseFloat(input.value) || 50;
+            calculateTotals();
+        }
+
+        function deleteRoom(roomId) {
+            if (confirm('Delete this room? All items will be lost.')) {
+                rooms = rooms.filter(r => r.id !== roomId);
+                renderRooms();
+            }
+        }
+
+        function toggleItemOptional(roomId, itemIndex) {
+            const room = rooms.find(r => r.id === roomId);
+            if (!room || !room.items[itemIndex]) return;
+            room.items[itemIndex].optional = !room.items[itemIndex].optional;
+            renderRooms();
+        }
+
+        function toggleItemUpgrade(roomId, itemIndex) {
+            const room = rooms.find(r => r.id === roomId);
+            if (!room || !room.items[itemIndex]) return;
+            const item = room.items[itemIndex];
+            if (!item.upgrade || !item.upgrade.name) return;
+            item.upgraded = !item.upgraded;
+            // Swap rate and total to reflect upgrade
+            if (item.upgraded) {
+                item._baseRate = item.rate;
+                item.rate = item.upgrade.rate;
+            } else {
+                item.rate = item._baseRate || item.rate;
+            }
+            item.total = item.quantity * item.rate;
+            renderRooms();
+            calculateTotals();
+        }
+
+        function deleteItem(roomId, itemIndex) {
+            const room = rooms.find(r => r.id === roomId);
+            if (room) {
+                room.items.splice(itemIndex, 1);
+                renderRooms();
+            }
+        }
+
+        function calculateTotals() {
+            let subtotal = 0;
+
+            rooms.forEach(room => {
+                const baseTotal = room.items.reduce((sum, item) => sum + item.total, 0);
+                const markup = room.markup || 0;
+                const roomTotal = baseTotal * (1 + markup / 100);
+                room.roomTotal = roomTotal;
+                subtotal += roomTotal;
+            });
+
+            const tax = subtotal * 0.13;
+            const total = subtotal + tax;
+
+            document.getElementById('subtotalDisplay').textContent = 'Subtotal: $' + subtotal.toFixed(2);
+            document.getElementById('taxDisplay').textContent = 'HST (13%): $' + tax.toFixed(2);
+            document.getElementById('grandTotalDisplay').textContent = 'TOTAL: $' + total.toFixed(2);
+
+            // Keep sticky total bar in sync
+            const stickyAmt = document.getElementById('stickyTotalAmount');
+            const stickySub = document.getElementById('stickySubtotal');
+            const stickyTax = document.getElementById('stickyTax');
+            if (stickyAmt) stickyAmt.textContent = '$' + total.toFixed(2);
+            if (stickySub) stickySub.textContent = 'Subtotal: $' + subtotal.toFixed(2);
+            if (stickyTax) stickyTax.textContent = 'HST: $' + tax.toFixed(2);
+
+            // Update deposit calculator
+            const depositBtn = document.getElementById('depositToggleBtn');
+            if (depositBtn) depositBtn.style.display = total > 0 ? 'inline-block' : 'none';
+            const depositAmt = total * (depositPercentage / 100);
+            const remaining = total - depositAmt;
+            const depositAmtEl = document.getElementById('depositAmountDisplay');
+            const remainingEl = document.getElementById('remainingBalanceDisplay');
+            if (depositAmtEl) depositAmtEl.textContent = depositAmt.toFixed(2);
+            if (remainingEl) remainingEl.textContent = remaining.toFixed(2);
+        }
+
+        function calculateMaterialTotal() {
+            const quantity = parseFloat(document.getElementById('lineQuantity').value) || 0;
+            const materialCost = parseFloat(document.getElementById('lineMaterialCost').value) || 0;
+            const totalMaterialCost = quantity * materialCost;
+            document.getElementById('materialTotalDisplay').textContent = '$' + totalMaterialCost.toFixed(2);
+        }
+
+        function renderRooms() {
+            const container = document.getElementById('roomsContainer');
+            
+            if (rooms.length === 0) {
+                container.innerHTML = `
+                <div class="text-center py-5" style="color:#adb5bd">
+                    <div style="font-size:4rem; margin-bottom:1rem;">🏠</div>
+                    <h4 style="color:#6c757d; font-weight:700;">No rooms yet</h4>
+                    <p class="mb-4" style="max-width:360px; margin:0 auto 1.5rem;">Break your quote into rooms or areas — Kitchen, Basement, Bathroom — to keep things organized and easy to read.</p>
+                    <button onclick="addRoom()" class="btn btn-primary btn-lg px-5 shadow-sm" style="border-radius:30px;">
+                        <i class="fas fa-plus"></i> Add Your First Room
+                    </button>
+                </div>`;
+                calculateTotals();
+                return;
+            }
+            
+            let html = '';
+            
+            rooms.forEach(room => {
+                // Apply room markup if set
+                const roomMarkup = room.markup || 0;
+                let roomTotal = room.items.reduce((sum, item) => sum + item.total, 0);
+                if (roomMarkup > 0) {
+                    roomTotal = roomTotal * (1 + roomMarkup / 100);
+                }
+                
+                const colorIdx = (room.colorIndex !== undefined) ? room.colorIndex : 0;
+                const headerBg = ROOM_COLORS[colorIdx].gradient;
+                html += '<div class="room-card" data-room-id="' + room.id + '">';
+                html += '<div class="room-header" style="background:' + headerBg + '">';
+                html += '<div class="d-flex justify-content-between align-items-start">';
+                html += '<div>';
+                html += '<h3><span class="drag-handle" title="Drag to reorder">&#8801;</span><i class="fas fa-door-open"></i> <span id="roomName_' + room.id + '" class="room-name-display" onclick="editRoomName(' + room.id + ')" style="cursor:pointer; text-decoration:underline dotted; padding:2px 4px;" title="Click to edit">' + room.name + '</span></h3>';
+                html += '<p class="mb-0">' + room.items.length + ' items | Total: $' + roomTotal.toFixed(2) + '</p>';
+                html += '</div>';
+                // Color swatches
+                html += '<div class="color-picker-swatches mt-1">';
+                SWATCH_COLORS.forEach(function(color, i) {
+                    html += '<div class="color-swatch' + (i === colorIdx ? ' active' : '') + '" style="background:' + color + '" onclick="setRoomColor(' + room.id + ',' + i + ')" title="' + ROOM_COLORS[i].label + '"></div>';
+                });
+                html += '</div>';
+                html += '</div>'; // end flex row
+                
+                // Timeline input field (shown when showTimelines is true)
+                if (showTimelines) {
+                    const timelineValue = room.timeline || '';
+                    html += '<div class="mt-2"><label><small>Timeline Estimate:</small></label><input type="text" id="timeline_' + room.id + '" class="form-control form-control-sm" value="' + timelineValue + '" placeholder="e.g., 1-2 weeks"></div>';
+                }
+                // Markup controls (hidden from client view)
+                html += '<div class="mt-2 d-flex align-items-center gap-2" id="markupControls_' + room.id + '">';
+                html += '<small><strong>Markup:</strong></small>';
+                html += '<input type="number" id="roomMarkup_' + room.id + '" class="form-control form-control-sm" style="width: 80px;" value="' + roomMarkup + '" min="0" max="100" step="1" onchange="updateRoomMarkup(' + room.id + ', this.value)">';
+                html += '<span>%</span>';
+                html += '<button onclick="toggleMarkupVisibility(' + room.id + ')" class="btn btn-sm btn-outline-secondary" title="Toggle visibility to client"><i id="markupIcon_' + room.id + '" class="fas fa-eye"></i></button>';
+                html += '</div>';
+                html += '<button onclick="addLine(' + room.id + ')" class="btn btn-sm btn-light text-dark mt-1">';
+                html += '<i class="fas fa-plus"></i> Add Item</button>';
+                html += '<button onclick="deleteRoom(' + room.id + ')" class="btn btn-sm btn-danger mt-1">';
+                html += '<i class="fas fa-trash"></i> Delete Room</button>';
+                html += '<button onclick="saveRoomAsTemplate(' + room.id + ')" class="btn btn-sm btn-info text-white ms-1" title="Save this room as a template">';
+                html += '<i class="fas fa-bookmark"></i></button>';
+                html += '</div>';
+                
+                // Per-room notes/scope section
+                const roomNotes = room.scopeNotes || '';
+                html += '<div class="mt-2 mb-2">';
+                html += '<label><small><i class="fas fa-clipboard-list"></i> <strong>Scope / Notes</strong> <span class="text-muted">(visible to client)</span></small></label>';
+                html += '<textarea id="scopeNotes_' + room.id + '" class="form-control form-control-sm" rows="3" placeholder="Describe the scope of work for this room... e.g., Sometimes this comes up easy, usually not haha." onchange="updateRoomScopeNotes(' + room.id + ')">' + roomNotes + '</textarea>';
+                html += '</div>';
+                
+                if (room.items.length > 0) {
+                    const hasMaterialCosts = room.items.some(item => item.materialCost > 0);
+                    const markupFactor = 1 + (room.markup || 0) / 100;
+
+                    // Build category groups in default trade order
+                    const sortedItems = sortItemsByCategory(room.items);
+                    // Collect groups preserving sorted order
+                    const groupOrder = [];
+                    const groups = {};
+                    sortedItems.forEach(item => {
+                        const cat = item.category || 'Miscellaneous';
+                        if (!groups[cat]) { groups[cat] = []; groupOrder.push(cat); }
+                        groups[cat].push({ item, origIndex: room.items.indexOf(item) });
+                    });
+
+                    // Apply per-room custom category order if set
+                    const customOrder = room.categoryOrder;
+                    const orderedCats = customOrder
+                        ? [...customOrder.filter(c => groups[c]), ...groupOrder.filter(c => !customOrder.includes(c))]
+                        : groupOrder;
+
+                    // Wrap everything in a sortable container
+                    html += '<div class="cat-groups-container" data-room-id="' + room.id + '">';
+
+                    let displayNum = 1;
+                    orderedCats.forEach(cat => {
+                        const entries = groups[cat];
+                        if (!entries) return;
+                        const colSpan = hasMaterialCosts ? 7 : 6;
+                        const catDisplay = canonicalCat(cat);
+
+                        html += '<div class="cat-group-block" data-cat="' + cat + '">';
+                        html += '<div class="cat-group-header" style="background:#f0f4ff; padding:4px 8px; font-size:0.78rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#495057; border-bottom:1px solid #dee2e6;">';
+                        html += '<span class="cat-drag-handle" title="Drag to reorder category">&#8801;</span>';
+                        html += '<i class="fas fa-tag me-1" style="color:#6c757d;"></i>' + catDisplay;
+                        html += '</div>';
+                        html += '<table class="table table-sm mb-0"><tbody>';
+
+                        entries.forEach(({ item, origIndex }) => {
+                            const displayRate = item.rate * markupFactor;
+                            const displayTotal = item.total * markupFactor;
+                            const hasUpgrade = !!(item.upgrade && item.upgrade.name);
+                            const isUpgraded = !!item.upgraded;
+                            const isOptional = !!item.optional;
+                            const rowStyle = isOptional ? ' style="border-left:3px dashed #0dcaf0;"' : '';
+                            html += '<tr' + rowStyle + '>';
+                            html += '<td style="width:30px">' + displayNum + (isOptional ? ' <span class="badge bg-info" style="font-size:0.6em;">opt</span>' : '') + '</td>';
+                            html += '<td><strong>' + item.description + '</strong>' + (item.itemDescription ? '<br><small class="text-muted fst-italic">' + item.itemDescription + '</small>' : '') + (item.notes ? '<br><small class="text-info"><i class="fas fa-info-circle"></i> ' + item.notes + '</small>' : '') + '</td>';
+                            html += '<td style="white-space:nowrap">' + item.quantity + ' ' + (item.unitType || '') + '</td>';
+                            html += '<td style="white-space:nowrap">$' + displayRate.toFixed(2) + '</td>';
+                            html += '<td style="white-space:nowrap"><strong>$' + displayTotal.toFixed(2) + '</strong></td>';
+                            if (hasMaterialCosts) {
+                                const matCost = (item.materialCost || 0) * item.quantity;
+                                const profit = displayTotal - matCost;
+                                const margin = displayTotal > 0 ? (profit / displayTotal * 100).toFixed(0) : 0;
+                                const profitClass = profit >= 0 ? 'profit-positive' : 'profit-negative';
+                                const profitIcon = profit >= 0 ? '▲' : '▼';
+                                html += '<td class="' + profitClass + '"><strong>' + profitIcon + ' $' + Math.abs(profit).toFixed(2) + '</strong><br><small>' + margin + '%</small></td>';
+                            }
+                            let upgradeBtn = '';
+                            if (hasUpgrade) {
+                                upgradeBtn = '<button onclick="toggleItemUpgrade(' + room.id + ', ' + origIndex + ')" class="btn btn-sm ' + (isUpgraded ? 'btn-warning' : 'btn-outline-warning') + '" title="' + (isUpgraded ? 'Upgraded: ' + item.upgrade.name : 'Upgrade: ' + item.upgrade.name) + '"><i class="fas fa-arrow-up"></i> ' + (isUpgraded ? 'Upgraded' : 'Upgrade') + '</button>';
+                            }
+                            const optionalBtn = '<button onclick="toggleItemOptional(' + room.id + ', ' + origIndex + ')" class="btn btn-sm ' + (isOptional ? 'btn-info' : 'btn-outline-secondary') + '" title="' + (isOptional ? 'Client can remove this item' : 'Mark as removable by client') + '"><i class="fas fa-' + (isOptional ? 'toggle-on' : 'toggle-off') + '"></i> Optional</button>';
+                            html += '<td><div class="d-flex gap-1 flex-wrap">' + upgradeBtn + optionalBtn + '<button onclick="editLineItem(' + room.id + ', ' + origIndex + ')" class="btn btn-sm btn-outline-primary" title="Edit"><i class="fas fa-edit"></i></button><button onclick="deleteItem(' + room.id + ', ' + origIndex + ')" class="btn btn-sm btn-danger" title="Delete"><i class="fas fa-trash"></i></button></div></td>';
+                            html += '</tr>';
+                            displayNum++;
+                        });
+
+                        html += '</tbody></table>';
+                        html += '</div>'; // end cat-group-block
+                    });
+
+                    html += '</div>'; // end cat-groups-container
+                } else {
+                    html += '<p class="text-muted text-center py-2">No items yet.</p>';
+                }
+                html += '</div>'; // close room-card
+            });
+            
+            // Capture timeline values back into room data
+            if (showTimelines) {
+                rooms.forEach(room => {
+                    const timelineInput = document.getElementById('timeline_' + room.id);
+                    if (timelineInput) {
+                        room.timeline = timelineInput.value.trim();
+                    }
+                });
+            }
+            
+            container.innerHTML = html;
+            calculateTotals();
+            markUnsaved();
+            initSortable();
+        }
+
+        function initSortable() {
+            if (typeof Sortable === 'undefined') return;
+
+            // Room-level drag
+            const container = document.getElementById('roomsContainer');
+            if (container) {
+                Sortable.create(container, {
+                    handle: '.drag-handle',
+                    animation: 150,
+                    ghostClass: 'sortable-ghost',
+                    onEnd: function(evt) {
+                        const cards = container.querySelectorAll('.room-card');
+                        const newOrder = Array.from(cards).map(el => parseInt(el.dataset.roomId));
+                        rooms = newOrder.map(id => rooms.find(r => r.id === id));
+                        renderRooms();
+                    }
+                });
+            }
+
+            // Category-level drag — one Sortable per room's cat-groups-container
+            document.querySelectorAll('.cat-groups-container').forEach(catContainer => {
+                const roomId = parseInt(catContainer.dataset.roomId);
+                Sortable.create(catContainer, {
+                    handle: '.cat-drag-handle',
+                    animation: 150,
+                    ghostClass: 'sortable-ghost',
+                    onEnd: function() {
+                        const room = rooms.find(r => r.id === roomId);
+                        if (!room) return;
+                        const blocks = catContainer.querySelectorAll('.cat-group-block');
+                        room.categoryOrder = Array.from(blocks).map(el => el.dataset.cat);
+                        renderRooms();
+                    }
+                });
+            });
+        }
+
+                function getSelectedTerms() {
+            var terms = [];
+            document.querySelectorAll('#termsCheckboxes input[type="checkbox"]').forEach(function(cb) {
+                if (cb.checked) terms.push(cb.dataset.text);
+            });
+            return terms;
+        }
+
+        function renderTermsCheckboxes() {
+            var container = document.getElementById('termsCheckboxes');
+            if (!container) return;
+            var defaultTerms = [
+                { id: 't1', label: 'Deposit Required', text: 'A deposit of 30\u201350% of the total project cost is required before work begins. Work will not commence until the deposit is received.', defaultOn: true },
+                { id: 't2', label: 'Timeline Estimate', text: 'All project timelines provided are estimates only and are subject to change due to unforeseen conditions, material delays, weather, or client-requested changes.', defaultOn: true },
+                { id: 't3', label: 'Workmanship Warranty', text: 'All labor is warranted for 1 year from the date of project completion. This warranty covers defects in workmanship only and does not cover damage caused by client misuse, third parties, or normal wear and tear.', defaultOn: true },
+                { id: 't4', label: 'Payment Terms', text: 'Final payment is due within 7 days of project completion. Overdue balances may be subject to a 2% monthly interest charge.', defaultOn: true },
+                { id: 't5', label: 'Change Orders', text: 'Any changes to the agreed scope of work must be submitted in writing and approved by both parties. Change orders may affect the project timeline and total cost.', defaultOn: true },
+                { id: 't6', label: 'Site Access', text: 'The client agrees to provide safe and reasonable access to the property during agreed working hours. Delays caused by lack of access may affect the project timeline.', defaultOn: true },
+                { id: 't7', label: 'Material Costs', text: 'Material costs are estimated based on current pricing and may fluctuate. Any significant increase in material costs will be communicated to the client before proceeding.', defaultOn: false },
+                { id: 't8', label: 'Permits & Inspections', text: 'The contractor will obtain all required permits unless otherwise agreed in writing. Permit fees are the responsibility of the client and will be billed at cost.', defaultOn: false },
+                { id: 't9', label: 'Hidden Conditions', text: 'Unforeseen conditions discovered during work (e.g., rot, mold, faulty wiring, structural issues) are not included in the original quote. Additional costs will be discussed and approved before proceeding.', defaultOn: true },
+                { id: 't10', label: 'Debris & Cleanup', text: 'The contractor will remove all project-related debris upon completion. The client is responsible for clearing personal items from the work area prior to project start.', defaultOn: false },
+                { id: 't11', label: 'Subcontractors', text: 'The contractor reserves the right to use qualified subcontractors for portions of the work. All subcontractors are vetted and held to the same quality standards.', defaultOn: false },
+                { id: 't12', label: 'Dispute Resolution', text: 'Any disputes arising from this agreement will first be addressed through good-faith negotiation. If unresolved, disputes will be submitted to mediation before any legal action is taken.', defaultOn: false }
+            ];
+            var terms = JSON.parse(localStorage.getItem('ald_custom_terms') || 'null') || defaultTerms;
+            container.innerHTML = terms.map(function(t) {
+                return '<div class="form-check mb-1">' +
+                    '<input class="form-check-input" type="checkbox" id="term_' + t.id + '" data-text="' + t.text.replace(/"/g, '&quot;') + '"' + (t.defaultOn ? ' checked' : '') + '>' +
+                    '<label class="form-check-label" for="term_' + t.id + '">' + t.label + '</label>' +
+                    '</div>';
+            }).join('');
+        }
+        
+        function exportToPDF() {
+            // Simple export - print to PDF
+            window.print();
+        }
+
+        function toggleTimelines() {
+            showTimelines = !showTimelines;
+            renderRooms();
+            
+            // Update button text/icon based on state
+            const btn = document.getElementById('toggleTimelinesBtn');
+            if (btn) {
+                if (showTimelines) {
+                    btn.innerHTML = '<i class="fas fa-eye-slash"></i> Hide Timelines';
+                } else {
+                    btn.innerHTML = '<i class="fas fa-eye"></i> Show Timelines';
+                }
+            }
+        }
+
+        function updateRoomMarkup(roomId, value) {
+            const room = rooms.find(r => r.id === roomId);
+            if (room) {
+                room.markup = parseFloat(value) || 0;
+                renderRooms();
+            }
+        }
+
+        function toggleMarkupVisibility(roomId) {
+            const room = rooms.find(r => r.id === roomId);
+            if (room && room.hideMarkup !== undefined) {
+                room.hideMarkup = !room.hideMarkup;
+            } else {
+                room.hideMarkup = true; // Default to hidden
+            }
+            
+            // Update icon
+            const icon = document.getElementById('markupIcon_' + roomId);
+            if (icon) {
+                if (room.hideMarkup) {
+                    icon.className = 'fas fa-eye';
+                } else {
+                    icon.className = 'fas fa-eye-slash';
+                }
+            }
+        }
+
+        function applyGlobalMarkup() {
+            const markupPercent = prompt('Enter markup percentage to apply to entire quote (0-100%):');
+            if (markupPercent === null) return; // Cancelled
+            
+            const percent = parseFloat(markupPercent);
+            if (isNaN(percent) || percent < 0 || percent > 100) {
+                alert('Please enter a valid percentage between 0 and 100.');
+                return;
+            }
+            
+            // Apply to all rooms
+            rooms.forEach(room => {
+                room.markup = percent;
+                room.hideMarkup = true; // Default to hidden from client
+            });
+            
+            renderRooms();
+            alert('Markup of ' + percent + '% applied to all rooms!');
+        }
+
+        // Template Management Functions
+        let currentTemplateIndex = null;
+        
+        // Auto-save draft functionality
+        const DRAFT_KEY = 'ald_current_draft';
+        const RECENT_QUOTES_KEY = 'ald_recent_quotes';
+        
+        // Track the Supabase ID for the currently loaded quote
+        let currentSupabaseId = null;
+
+        async function saveCurrentQuoteAsDraft() {
+            if (rooms.length === 0) {
+                alert('No rooms to save. Add at least one room first.');
+                return;
+            }
+            
+            const draftData = {
+                id: currentSupabaseId || Date.now(),
+                supabaseId: currentSupabaseId || null,
+                clientName: document.getElementById('clientName')?.value || 'Client',
+                quoteNumber: document.getElementById('quoteNumber')?.value || '',
+                projectAddress: document.getElementById('projectAddress')?.value || 'Project Address',
+                clientAddress: document.getElementById('projectAddress')?.value || '',
+                clientCity: '',
+                clientPhone: document.getElementById('clientPhone')?.value || '',
+                clientEmail: document.getElementById('clientEmail')?.value || '',
+                email: document.getElementById('clientEmail')?.value || '',
+                phone: document.getElementById('clientPhone')?.value || '',
+                rooms: JSON.parse(JSON.stringify(rooms)),
+                grandTotal: parseFloat(document.getElementById('grandTotalDisplay').textContent.replace(/[^0-9.]/g, '')) || 0,
+                total: parseFloat(document.getElementById('grandTotalDisplay').textContent.replace(/[^0-9.]/g, '')) || 0,
+                status: 'draft',
+                savedAt: new Date().toISOString()
+            };
+            
+            // Always save to localStorage first (local backup)
+            localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
+            let recentQuotes = JSON.parse(localStorage.getItem(RECENT_QUOTES_KEY) || '[]');
+            recentQuotes.unshift(draftData);
+            recentQuotes = recentQuotes.slice(0, 10);
+            localStorage.setItem(RECENT_QUOTES_KEY, JSON.stringify(recentQuotes));
+
+            // Also save to Supabase (cloud backup)
+            if (typeof saveQuoteToSupabase === 'function') {
+                try {
+                    const { data, error } = await saveQuoteToSupabase(draftData);
+                    if (error) {
+                        console.warn('Supabase save failed (local save succeeded):', error.message);
+                        alert('Quote saved locally! (Cloud sync failed: ' + error.message + ')');
+                    } else {
+                        // Store the Supabase ID for future updates
+                        currentSupabaseId = data.id;
+                        draftData.supabaseId = data.id;
+                        localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
+                        alert('Quote saved! ✓ (Saved to cloud + local backup)');
+                    }
+                } catch(e) {
+                    console.warn('Supabase save error:', e);
+                    alert('Quote saved locally! (Cloud unavailable)');
+                }
+            } else {
+                alert('Quote saved as draft! You can load it later.');
+            }
+            renderRecentQuotesSection();
+        }
+        
+        function loadRecentQuotes() {
+            const recentQuotes = JSON.parse(localStorage.getItem(RECENT_QUOTES_KEY) || '[]');
+            
+            if (recentQuotes.length === 0) {
+                alert('No recent quotes found. Save your current work first!');
+                return;
+            }
+            
+            // Build dropdown/modal with recent quotes
+            let html = '<div class="dropdown-menu show" style="position: absolute; top: 100%; left: 0; z-index: 1000;">';
+            recentQuotes.forEach((quote, index) => {
+                html += `
+                    <a class="dropdown-item" href="#" onclick="loadRecentQuote(${index}); return false;">
+                        <i class="fas fa-file-alt"></i> ${quote.clientName || 'Client'} - ${quote.projectAddress}
+                        <small class="text-muted d-block">${new Date(quote.savedAt).toLocaleString()} | $${quote.grandTotal.toFixed(2)}</small>
+                    </a>
+                `;
+            });
+            html += '</div>';
+            
+            const container = document.getElementById('recentQuotesDropdownContainer');
+            if (container) {
+                container.innerHTML = html;
+            } else {
+                const btn = event.target.closest('button');
+                const container = document.createElement('div');
+                container.id = 'recentQuotesDropdownContainer';
+                btn.parentNode.appendChild(container);
+                container.innerHTML = html;
+            }
+        }
+        
+        function loadRecentQuote(index) {
+            const recentQuotes = JSON.parse(localStorage.getItem(RECENT_QUOTES_KEY) || '[]');
+            const quote = recentQuotes[index];
+            
+            if (!quote) {
+                alert('Quote not found.');
+                return;
+            }
+            
+            // Load client info
+            if (document.getElementById('clientName')) document.getElementById('clientName').value = quote.clientName || '';
+            if (document.getElementById('quoteNumber')) document.getElementById('quoteNumber').value = quote.quoteNumber || '';
+            if (document.getElementById('projectAddress')) document.getElementById('projectAddress').value = quote.projectAddress || '';
+            if (document.getElementById('clientEmail')) document.getElementById('clientEmail').value = quote.email || '';
+            if (document.getElementById('clientPhone')) document.getElementById('clientPhone').value = quote.phone || '';
+            
+            // Load rooms
+            rooms = [];
+            roomCounter = 0;
+            quote.rooms.forEach(room => {
+                roomCounter++;
+                const newRoom = {
+                    id: roomCounter,
+                    name: room.name,
+                    items: JSON.parse(JSON.stringify(room.items))
+                };
+                rooms.push(newRoom);
+            });
+            
+            renderRooms();
+            alert(`Loaded quote from ${new Date(quote.savedAt).toLocaleString()}!`);
+        }
+        
+        function loadDraft() {
+            const draftData = localStorage.getItem(DRAFT_KEY);
+            if (!draftData) return false;
+            
+            const quote = JSON.parse(draftData);
+            
+            // Load client info
+            if (document.getElementById('clientName')) document.getElementById('clientName').value = quote.clientName || '';
+            if (document.getElementById('projectAddress')) document.getElementById('projectAddress').value = quote.projectAddress || '';
+            if (document.getElementById('clientEmail')) document.getElementById('clientEmail').value = quote.email || '';
+            if (document.getElementById('clientPhone')) document.getElementById('clientPhone').value = quote.phone || '';
+            
+            // Load rooms
+            rooms = [];
+            roomCounter = 0;
+            quote.rooms.forEach(room => {
+                roomCounter++;
+                const newRoom = {
+                    id: roomCounter,
+                    name: room.name,
+                    items: JSON.parse(JSON.stringify(room.items))
+                };
+                rooms.push(newRoom);
+            });
+            
+            renderRooms();
+            return true;
+        }
+        
+        function autoSaveDraft() {
+            // Save current state as draft automatically
+            if (rooms.length === 0) return;
+            
+            const draftData = {
+                id: Date.now(),
+                clientName: document.getElementById('clientName')?.value || 'Client',
+                projectAddress: document.getElementById('projectAddress')?.value || 'Project Address',
+                email: document.getElementById('clientEmail')?.value || '',
+                phone: document.getElementById('clientPhone')?.value || '',
+                rooms: JSON.parse(JSON.stringify(rooms)), // Deep copy
+                grandTotal: parseFloat(document.getElementById('grandTotalDisplay').textContent.replace(/[^0-9.]/g, '')) || 0,
+                savedAt: new Date().toISOString()
+            };
+            
+            localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
+        }
+        
+        function renderRecentQuotesSection() {
+            const recentQuotes = JSON.parse(localStorage.getItem(RECENT_QUOTES_KEY) || '[]');
+            const draftContainer = document.getElementById('draftSectionContainer');
+            
+            if (recentQuotes.length > 0) {
+                draftContainer.style.display = 'block';
+            } else {
+                draftContainer.style.display = 'none';
+            }
+        }
+        
+        // Auto-save on any change
+        function setupAutoSave() {
+            const inputs = document.querySelectorAll('input, select, textarea');
+            let saveTimeout;
+            
+            inputs.forEach(input => {
+                input.addEventListener('change', () => {
+                    clearTimeout(saveTimeout);
+                    saveTimeout = setTimeout(autoSaveDraft, 1000); // Save after 1 second of inactivity
+                });
+            });
+        }
+        
+        function saveTemplate() {
+            if (rooms.length === 0) {
+                alert('Please add at least one room before saving a template.');
+                return;
+            }
+            
+            const templateName = prompt('Enter a name for this template:');
+            if (!templateName || !templateName.trim()) {
+                alert('Template name cannot be empty.');
+                return;
+            }
+            
+            // Get current templates
+            let templates = JSON.parse(localStorage.getItem('ald_quote_templates') || '{}');
+            
+            // Save the template with timestamp
+            const quoteData = {
+                id: Date.now(),
+                name: templateName.trim(),
+                rooms: JSON.parse(JSON.stringify(rooms)), // Deep copy
+                createdAt: new Date().toISOString()
+            };
+            
+            templates[quoteData.id] = quoteData;
+            localStorage.setItem('ald_quote_templates', JSON.stringify(templates));
+            
+            alert(`Template "${templateName}" saved successfully!`);
+            if (typeof renderTemplateDropdown === 'function') renderTemplateDropdown();
+        }
+
+        // ─── UNIFIED TEMPLATE SYSTEM ─────────────────────────────────────────────
+        // All templates stored as array in localStorage 'ald_quote_templates'
+        // Each entry: { id: <timestamp>, name: <str>, rooms: [...] } OR { id, name, room: {...} }
+
+        function _getTemplates() {
+            var raw = localStorage.getItem('ald_quote_templates');
+            if (!raw) return [];
+            try {
+                var parsed = JSON.parse(raw);
+                // Handle legacy object format
+                if (!Array.isArray(parsed)) {
+                    return Object.values(parsed).map(function(t) {
+                        return { id: t.id || Date.now(), name: t.name || 'Template', rooms: t.rooms || [] };
+                    });
+                }
+                return parsed;
+            } catch(e) { return []; }
+        }
+
+        function _saveTemplates(arr) {
+            localStorage.setItem('ald_quote_templates', JSON.stringify(arr));
+        }
+
+        // Open dropdown on button click — toggle if already open
+        function openTemplatesMenu(btn) {
+            var existing = document.getElementById('_templateDropdown');
+            if (existing) { existing.remove(); return; }
+            var templates = _getTemplates();
+            var order = JSON.parse(localStorage.getItem('ald_template_order') || 'null');
+            if (order && order.length) {
+                templates.sort(function(a,b) {
+                    var ai = order.indexOf(a.id), bi = order.indexOf(b.id);
+                    if (ai===-1) ai=9999; if (bi===-1) bi=9999;
+                    return ai-bi;
+                });
+            } else {
+                templates.sort(function(a,b){ return b.id - a.id; });
+            }
+            var top15 = templates.slice(0, 15);
+            var div = document.createElement('div');
+            div.id = '_templateDropdown';
+            div.style.cssText = 'position:absolute;background:#fff;border:1px solid #ccc;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.15);z-index:9999;min-width:240px;max-height:360px;overflow-y:auto;padding:4px 0;';
+            var manageHtml = '<div style="padding:8px 16px;border-bottom:1px solid #eee;"><a href="#" onclick="openManageTemplates();return false;" style="font-weight:600;color:#1a56a0;"><i class="fas fa-cog me-1"></i>Manage Templates</a></div>';
+            var itemsHtml = '';
+            if (top15.length === 0) {
+                itemsHtml = '<div style="padding:8px 16px;color:#999;">No templates saved yet</div>';
+            } else {
+                top15.forEach(function(t) {
+                    var roomCount = t.rooms ? t.rooms.length : (t.room ? 1 : 0);
+                    itemsHtml += '<a href="#" onclick="loadTemplateById(' + t.id + ');return false;" style="display:block;padding:8px 16px;color:#333;text-decoration:none;" onmouseover="this.style.background=\'#f0f4ff\'" onmouseout="this.style.background=\'\'"><i class="fas fa-bookmark me-2" style="color:#17a2b8"></i>' + t.name + ' <span style="color:#999;font-size:0.85em;">(' + roomCount + ' room' + (roomCount!==1?'s':'') + ')</span></a>';
+                });
+            }
+            div.innerHTML = manageHtml + itemsHtml;
+            btn.style.position = 'relative';
+            btn.parentNode.style.position = 'relative';
+            btn.parentNode.appendChild(div);
+            // Close on outside click
+            setTimeout(function() {
+                document.addEventListener('click', function _close(e) {
+                    if (!div.contains(e.target) && e.target !== btn) {
+                        div.remove();
+                        document.removeEventListener('click', _close);
+                    }
+                });
+            }, 10);
+        }
+
+        function loadTemplateById(id) {
+            var existing = document.getElementById('_templateDropdown');
+            if (existing) existing.remove();
+            var templates = _getTemplates();
+            var t = templates.find(function(x){ return x.id === id; });
+            if (!t) return;
+            if (!confirm('Load template "' + t.name + '"? Rooms will be added to your current quote.')) return;
+            if (t.rooms && t.rooms.length) {
+                t.rooms.forEach(function(room) {
+                    var newRoom = JSON.parse(JSON.stringify(room));
+                    newRoom.id = Date.now() + Math.floor(Math.random()*1000);
+                    rooms.push(newRoom);
+                });
+            } else if (t.room) {
+                var newRoom = JSON.parse(JSON.stringify(t.room));
+                newRoom.id = Date.now() + Math.floor(Math.random()*1000);
+                rooms.push(newRoom);
+            }
+            renderRooms();
+            updateTotals();
+            markUnsaved();
+        }
+
+        function saveRoomAsTemplate(roomId) {
+            var room = rooms.find(function(r) { return r.id === roomId; });
+            if (!room) return;
+            var name = prompt('Save as template:', room.name || 'My Template');
+            if (!name) return;
+            var templates = _getTemplates();
+            templates.push({ id: Date.now(), name: name, rooms: [JSON.parse(JSON.stringify(room))] });
+            _saveTemplates(templates);
+            alert('Template "' + name + '" saved!');
+        }
+
+        function saveTemplate() {
+            if (!rooms.length) { alert('No rooms to save!'); return; }
+            var name = prompt('Save all rooms as template:', 'My Quote Template');
+            if (!name) return;
+            var templates = _getTemplates();
+            templates.push({ id: Date.now(), name: name, rooms: JSON.parse(JSON.stringify(rooms)) });
+            _saveTemplates(templates);
+            alert('Template "' + name + '" saved!');
+        }
+
+        function openManageTemplates() {
+            var templates = _getTemplates();
+            var order = JSON.parse(localStorage.getItem('ald_template_order') || 'null');
+            if (order && order.length) {
+                templates.sort(function(a,b){
+                    var ai=order.indexOf(a.id),bi=order.indexOf(b.id);
+                    if(ai===-1)ai=9999;if(bi===-1)bi=9999;
+                    return ai-bi;
+                });
+            } else {
+                templates.sort(function(a,b){ return b.id-a.id; });
+            }
+            var existing = document.getElementById('manageTemplatesModal');
+            if (existing) existing.remove();
+            var modal = document.createElement('div');
+            modal.id = 'manageTemplatesModal';
+            modal.className = 'modal fade';
+            modal.setAttribute('tabindex','-1');
+            var rows = templates.map(function(t) {
+                var roomCount = t.rooms ? t.rooms.length : (t.room ? 1 : 0);
+                return '<li class="list-group-item d-flex justify-content-between align-items-center" data-id="'+t.id+'">' +
+                    '<span><i class="fas fa-grip-vertical me-2 text-muted" style="cursor:grab"></i><strong>'+t.name+'</strong> <span class="text-muted small">('+roomCount+' room'+(roomCount!==1?'s':'')+')</span></span>' +
+                    '<button class="btn btn-sm btn-outline-danger" onclick="deleteTemplateById('+t.id+')"><i class="fas fa-trash"></i></button></li>';
+            }).join('');
+            modal.innerHTML = '<div class="modal-dialog modal-lg"><div class="modal-content">' +
+                '<div class="modal-header"><h5 class="modal-title"><i class="fas fa-bookmark me-2"></i>Manage Templates</h5>' +
+                '<button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>' +
+                '<div class="modal-body"><p class="text-muted small mb-3">Drag to reorder. Top 15 appear in the quick dropdown.</p>' +
+                '<ul id="manageTemplatesList" class="list-group">' + rows + '</ul></div>' +
+                '<div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>' +
+                '</div></div>';
+            document.body.appendChild(modal);
+            var bsModal = new bootstrap.Modal(modal);
+            bsModal.show();
+            if (window.Sortable) {
+                var list = document.getElementById('manageTemplatesList');
+                new Sortable(list, {
+                    animation: 150,
+                    handle: '.fa-grip-vertical',
+                    onEnd: function() {
+                        var newOrder = Array.from(list.querySelectorAll('li')).map(function(li){ return parseInt(li.getAttribute('data-id')); });
+                        localStorage.setItem('ald_template_order', JSON.stringify(newOrder));
+                    }
+                });
+            }
+        }
+
+        function deleteTemplateById(id) {
+            if (!confirm('Delete this template?')) return;
+            var templates = _getTemplates().filter(function(t){ return t.id !== id; });
+            _saveTemplates(templates);
+            openManageTemplates();
+        }
+
+        function generateInvoiceLink() {
+            if (rooms.length === 0) {
+                alert('Please add at least one room before generating an invoice.');
+                return;
+            }
+            const invoiceId = 'invoice_' + Date.now();
+            const invoiceData = {
+                id: invoiceId,
+                clientName: document.getElementById('clientName')?.value || 'Client',
+                projectAddress: document.getElementById('projectAddress')?.value || 'Project Address',
+                email: document.getElementById('clientEmail')?.value || '',
+                phone: document.getElementById('clientPhone')?.value || '',
+                quoteNumber: document.getElementById('quoteNumber')?.value || '',
+                rooms: JSON.parse(JSON.stringify(rooms)),
+                grandTotal: parseFloat(document.getElementById('grandTotalDisplay').textContent.replace(/[^0-9.]/g, '')) || 0,
+                terms: getSelectedTerms()
+            };
+            localStorage.setItem(invoiceId, JSON.stringify(invoiceData));
+            localStorage.setItem('ald_last_preview_invoice', invoiceId);
+            const invoiceBaseUrl = window.location.href.split('?')[0].replace('quote-builder.html', 'invoice-viewer.html');
+            const invoiceUrl = invoiceBaseUrl + '?invoice=' + invoiceId;
+            window.open(invoiceUrl, '_blank');
+        }
+
+        // Quote style state
+        var _quoteStyle = { accent: '#ffffff', bg: '#ffffff' };
+
+        function updateStylePreview() {
+            var prev = document.getElementById('stylePreview');
+            var hdr = document.getElementById('previewHeader');
+            var tot = document.getElementById('previewTotal');
+            if (prev) prev.style.background = _quoteStyle.bg;
+            if (hdr) hdr.style.background = _quoteStyle.accent;
+            if (tot) tot.style.background = _quoteStyle.accent;
+        }
+
+        function initStyleModal() {
+            document.querySelectorAll('#accentSwatches .style-swatch').forEach(function(sw) {
+                sw.onclick = function() {
+                    document.querySelectorAll('#accentSwatches .style-swatch').forEach(function(s){ s.classList.remove('selected'); });
+                    sw.classList.add('selected');
+                    _quoteStyle.accent = sw.getAttribute('data-accent');
+                    updateStylePreview();
+                };
+            });
+            document.querySelectorAll('#bgSwatches .style-swatch').forEach(function(sw) {
+                sw.onclick = function() {
+                    document.querySelectorAll('#bgSwatches .style-swatch').forEach(function(s){ s.classList.remove('selected'); });
+                    sw.classList.add('selected');
+                    _quoteStyle.bg = sw.getAttribute('data-bg');
+                    updateStylePreview();
+                };
+            });
+            updateStylePreview();
+        }
+
+        function generateInteractiveLink() {
+            if (rooms.length === 0) {
+                alert('Please add at least one room before generating an interactive quote.');
+                return;
+            }
+            markQuoteNumberUsed(document.getElementById('quoteNumber')?.value);
+            initStyleModal();
+            var modal = new bootstrap.Modal(document.getElementById('quoteStyleModal'));
+            modal.show();
+        }
+
+        function confirmGenerateQuote() {
+            var styleModal = bootstrap.Modal.getInstance(document.getElementById('quoteStyleModal'));
+            if (styleModal) styleModal.hide();
+
+            const quoteId = 'quote_' + Date.now();
+
+            const quoteData = {
+                id: quoteId,
+                clientName: document.getElementById('clientName')?.value || 'Client',
+                projectAddress: document.getElementById('projectAddress')?.value || 'Project Address',
+                email: document.getElementById('clientEmail')?.value || '',
+                phone: document.getElementById('clientPhone')?.value || '',
+                quoteNumber: document.getElementById('quoteNumber')?.value || '',
+                rooms: JSON.parse(JSON.stringify(rooms)),
+                grandTotal: parseFloat(document.getElementById('grandTotalDisplay').textContent.replace(/[^0-9.]/g, '')) || 0,
+                terms: getSelectedTerms(),
+                style: JSON.parse(JSON.stringify(_quoteStyle))
+            };
+
+            localStorage.setItem(quoteId, JSON.stringify(quoteData));
+            // Also store as 'last viewed' so viewer can find it even if file:// strips query params
+            localStorage.setItem('ald_last_preview_quote', quoteId);
+
+            // Build viewer URL (works for both local files and web server)
+            const baseUrl = window.location.href.split('?')[0].replace('quote-builder.html', 'interactive-quote-viewer.html');
+            const viewerUrl = baseUrl + '?quote=' + quoteId;
+
+            // Open the viewer in a new tab immediately
+            window.open(viewerUrl, '_blank');
+
+            // Show a copyable link modal
+            let modal = document.getElementById('interactiveLinkModal');
+            if (!modal) {
+                document.body.insertAdjacentHTML('beforeend', `
+                    <div class="modal fade" id="interactiveLinkModal" tabindex="-1">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header bg-success text-white">
+                                    <h5 class="modal-title"><i class="fas fa-check-circle"></i> Interactive Quote Ready!</h5>
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p>The client view has been opened in a new tab. You can also copy the link below:</p>
+                                    <div class="input-group">
+                                        <input type="text" id="interactiveLinkInput" class="form-control" readonly>
+                                        <button class="btn btn-outline-secondary" onclick="copyInteractiveLink()" title="Copy to clipboard">
+                                            <i class="fas fa-copy"></i> Copy
+                                        </button>
+                                    </div>
+                                    <small class="text-muted mt-2 d-block">
+                                        <i class="fas fa-info-circle"></i> This link works in the same browser on this computer.
+                                        To share with clients remotely, upload both HTML files to a web server.
+                                    </small>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-success" onclick="window.open(document.getElementById('interactiveLinkInput').value, '_blank')">
+                                        <i class="fas fa-external-link-alt"></i> Open Client View Again
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `);
+                modal = document.getElementById('interactiveLinkModal');
+            }
+
+            document.getElementById('interactiveLinkInput').value = viewerUrl;
+            new bootstrap.Modal(modal).show();
+        }
+
+        function copyInteractiveLink() {
+            const input = document.getElementById('interactiveLinkInput');
+            navigator.clipboard.writeText(input.value).then(() => {
+                const btn = input.nextElementSibling;
+                btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+                btn.classList.replace('btn-outline-secondary', 'btn-success');
+                setTimeout(() => {
+                    btn.innerHTML = '<i class="fas fa-copy"></i> Copy';
+                    btn.classList.replace('btn-success', 'btn-outline-secondary');
+                }, 2000);
+            }).catch(() => {
+                input.select();
+                document.execCommand('copy');
+            });
+        }
+
+        // ── Save / Load / Auto-save ─────────────────────────────────────────────
+
+        let saveFileHandle = null;
+        let autoSaveTimer = null;
+        var _autoSaveTimer = null;
+        var _autoSaveOn = localStorage.getItem('ald_autosave_enabled') !== 'false';
+        let unsavedChanges = false;
+        let initDone = false;
+        let supabaseQuoteId = null;
+        let currentUser = null;
+
+        function collectQuoteData() {
+            return {
+                version: 1,
+                savedAt: new Date().toISOString(),
+                clientName:     document.getElementById('clientName')?.value     || '',
+                projectAddress: document.getElementById('projectAddress')?.value || '',
+                clientPhone:    document.getElementById('clientPhone')?.value    || '',
+                clientEmail:    document.getElementById('clientEmail')?.value    || '',
+                terms: getSelectedTerms(),
+                rooms: JSON.parse(JSON.stringify(rooms)),
+                roomCounter: roomCounter,
+                supabaseId: window._supabaseQuoteId || null
+            };
+        }
+
+        function applyQuoteData(data) {
+            var wasInitDone = initDone;
+            initDone = false; // suppress markUnsaved during load
+            if (document.getElementById('clientName'))     document.getElementById('clientName').value     = data.clientName     || '';
+            if (document.getElementById('projectAddress')) document.getElementById('projectAddress').value = data.projectAddress || '';
+            if (document.getElementById('clientPhone'))    document.getElementById('clientPhone').value    = data.clientPhone    || '';
+            if (document.getElementById('clientEmail'))    document.getElementById('clientEmail').value    = data.clientEmail    || '';
+            renderTermsCheckboxes();
+            if (data.terms && Array.isArray(data.terms)) {
+                document.querySelectorAll('#termsCheckboxes input[type="checkbox"]').forEach(function(cb) {
+                    cb.checked = data.terms.includes(cb.dataset.text);
+                });
+            }
+            rooms = data.rooms || [];
+            roomCounter = data.roomCounter || rooms.length;
+            renderRooms();
+            initDone = wasInitDone;
+            unsavedChanges = false; // clean slate after load
+        }
+
+        function updateSaveStatus(state, detail) {
+            const el = document.getElementById('saveStatus');
+            if (!el) return;
+            const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            if (state === 'saved') {
+                el.innerHTML = '<span style="color:#28a745;"><i class="fas fa-check-circle"></i> Saved at ' + t + (detail ? ' \u2014 ' + detail : '') + '</span>';
+                unsavedChanges = false;
+            } else if (state === 'unsaved') {
+                el.innerHTML = '<span style="color:#fd7e14;"><i class="fas fa-circle"></i> Unsaved changes</span>';
+            } else if (state === 'saving') {
+                el.innerHTML = '<span style="color:#6c757d;"><i class="fas fa-spinner fa-spin"></i> Saving\u2026</span>';
+            } else if (state === 'loaded') {
+                el.innerHTML = '<span style="color:#1a56a0;"><i class="fas fa-folder-open"></i> Opened at ' + t + (detail ? ' \u2014 ' + detail : '') + '</span>';
+                unsavedChanges = false;
+            } else if (state === 'error') {
+                el.innerHTML = '<span style="color:#dc3545;"><i class="fas fa-exclamation-triangle"></i> ' + (detail || 'Save failed') + '</span>';
+            }
+        }
+
+        function markUnsaved() {
+            unsavedChanges = true;
+            var el = document.getElementById('saveStatus');
+            if (el) el.innerHTML = '<span style="color:#fd7e14;"><i class="fas fa-circle"></i> Unsaved changes</span>';
+            // Debounced auto-save: 1 second after last change
+            if (_autoSaveOn) {
+                clearTimeout(_autoSaveTimer);
+                _autoSaveTimer = setTimeout(function() { doAutoSave(); }, 1000);
+            }
+        }
+
+        async function writeToHandle(handle) {
+            updateSaveStatus('saving');
+            const writable = await handle.createWritable();
+            await writable.write(JSON.stringify(collectQuoteData(), null, 2));
+            await writable.close();
+            updateSaveStatus('saved');
+            updateDraftWarning();
+        }
+
+        function newQuote() {
+            if (!confirm('Start a new quote? Any unsaved changes will be lost.')) return;
+            // Clear all fields
+            ['clientName','clientEmail','projectAddress','quoteNotes'].forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            rooms = [];
+            renderRooms();
+            document.getElementById('quoteNumber').value = nextQuoteNumberValue();
+            checkQuoteNumberDuplicate();
+            currentQuoteId = null;
+            saveFileHandle = null; // force "Save As" on next save
+            unsavedChanges = false;
+            document.title = 'Quote Builder - QuoteDr';
+        }
+
+        async function saveQuote() {
+            if (!saveFileHandle) {
+                try {
+                    const client = document.getElementById('clientName')?.value.trim() || 'Quote';
+                    const date = new Date().toISOString().slice(0, 10);
+                    saveFileHandle = await window.showSaveFilePicker({
+                        suggestedName: client + ' - ' + date + '.qdr',
+                        types: [{ description: 'QuoteDr File', accept: { 'application/json': ['.qdr'] } }]
+                    });
+                    startAutoSave();
+                } catch (err) {
+                    if (err.name === 'AbortError') return;
+                    downloadQuoteFallback();
+                    return;
+                }
+            }
+            try {
+                await writeToHandle(saveFileHandle);
+            } catch (err) {
+                updateSaveStatus('error', 'Could not write file');
+            }
+        }
+
+        async function loadQuoteFromFile() {
+            if (unsavedChanges && !confirm('You have unsaved changes. Open a different quote anyway?')) return;
+            try {
+                const [handle] = await window.showOpenFilePicker({
+                    types: [{ description: 'QuoteDr File', accept: { 'application/json': ['.qdr', '.aldquote'] } }]
+                });
+                const file = await handle.getFile();
+                const data = JSON.parse(await file.text());
+                saveFileHandle = handle;
+                applyQuoteData(data);
+                startAutoSave();
+                updateSaveStatus('loaded', handle.name);
+            } catch (err) {
+                if (err.name !== 'AbortError') updateSaveStatus('error', 'Could not open file');
+            }
+        }
+
+        function saveSessionQuote() {
+            try {
+                localStorage.setItem('ald_session_quote', JSON.stringify(collectQuoteData()));
+            } catch(e) {}
+        }
+
+        function startAutoSave() {
+            // No-op: auto-save is handled by markUnsaved() debounce
+        }
+
+        function updateDraftWarning() {
+            var banner = document.getElementById('draftWarningBanner');
+            if (!banner) return;
+            banner.style.display = saveFileHandle ? 'none' : 'block';
+        }
+
+        async function doAutoSave() {
+            if (!unsavedChanges) return;
+            var t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            var el = document.getElementById('saveStatus');
+            // Always save to localStorage as backup
+            try {
+                localStorage.setItem('ald_autosave_draft', JSON.stringify(collectQuoteData()));
+                localStorage.setItem('ald_session_quote', JSON.stringify(collectQuoteData()));
+            } catch(e) {}
+            // Also write to file if we have a handle
+            if (saveFileHandle) {
+                try {
+                    await writeToHandle(saveFileHandle);
+                } catch(e) {
+                    if (el) el.innerHTML = '<span style="color:#dc3545;"><i class="fas fa-exclamation-triangle"></i> Auto-save failed</span>';
+                }
+            }
+            // Cloud save to Supabase — always runs regardless of file handle
+            if (typeof saveQuoteToSupabase === 'function') {
+                var qData = collectQuoteData();
+                saveQuoteToSupabase(qData).then(function(result) {
+                    if (result && result.data && result.data.id) {
+                        window._supabaseQuoteId = result.data.id;
+                    }
+                }).catch(function(){});
+            }
+            unsavedChanges = false;
+            if (!saveFileHandle) {
+                if (el) el.innerHTML = '<span style="color:#28a745;"><i class="fas fa-check-circle"></i> Draft saved at ' + t + '</span>';
+            }
+            updateDraftWarning();
+        }
+
+        function downloadQuoteFallback() {
+            const blob = new Blob([JSON.stringify(collectQuoteData(), null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const client = document.getElementById('clientName')?.value.trim() || 'Quote';
+            a.href = url;
+            a.download = client + ' - ' + new Date().toISOString().slice(0, 10) + '.qdr';
+            a.click();
+            URL.revokeObjectURL(url);
+            updateSaveStatus('saved');
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                saveQuote();
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Auth check — redirect to login if not signed in
+            if (typeof requireAuth === 'function') {
+                const user = await requireAuth();
+                if (user) window.currentUser = user;
+                // Don't return on no user — let page load regardless (auth handled at login)
+            }
+
+            // Load user's uploaded logo from onboarding/settings
+            var savedLogo = localStorage.getItem('ald_logo');
+            if (savedLogo) {
+                var logoImg = document.getElementById('userLogoImg');
+                if (logoImg) { logoImg.src = savedLogo; logoImg.style.display = 'block'; }
+            }
+
+            // (delegated listeners moved to standalone script block to guarantee they attach)
+
+            // Check for ?load=ID in URL — load quote from Supabase
+            const urlParams = new URLSearchParams(window.location.search);
+            const loadId = urlParams.get('load');
+            if (loadId && typeof loadQuoteFromSupabase === 'function') {
+                try {
+                    const { data, error } = await loadQuoteFromSupabase(loadId);
+                    if (error) {
+                        console.warn('Could not load quote from cloud:', error.message);
+                    } else if (data && data.data) {
+                        const q = data.data;
+                        currentSupabaseId = data.id;
+                        // Populate fields
+                        if (document.getElementById('clientName')) document.getElementById('clientName').value = q.clientName || data.client_name || '';
+                        if (document.getElementById('quoteNumber')) document.getElementById('quoteNumber').value = q.quoteNumber || data.quote_number || '';
+                        if (document.getElementById('projectAddress')) document.getElementById('projectAddress').value = q.projectAddress || data.client_address || '';
+                        if (document.getElementById('clientEmail')) document.getElementById('clientEmail').value = q.clientEmail || data.client_email || '';
+                        if (document.getElementById('clientPhone')) document.getElementById('clientPhone').value = q.clientPhone || data.client_phone || '';
+                        // Load rooms
+                        if (q.rooms && q.rooms.length > 0) {
+                            rooms = [];
+                            roomCounter = 0;
+                            q.rooms.forEach(room => {
+                                roomCounter++;
+                                rooms.push({ id: roomCounter, name: room.name, items: JSON.parse(JSON.stringify(room.items)) });
+                            });
+                            renderRooms();
+                        }
+                    }
+                } catch(e) {
+                    console.warn('Error loading quote from cloud:', e);
+                }
+            }
+        });
+
+        // ── End Save / Load ──────────────────────────────────────────────────────
+
+        // ── Custom Line Items (localStorage) ─────────────────────────────────────
+
+        // ── Item overrides: edits to built-in items saved to localStorage ────────
+        let itemOverrides = {}; // { "Category::Item Name": { rate, materialCost, supplierUrl, unitType } }
+
+        function loadItemOverrides() {
+            try {
+                itemOverrides = JSON.parse(localStorage.getItem('ald_item_overrides') || '{}');
+            } catch(e) { itemOverrides = {}; }
+            // Apply overrides to pricingDatabase
+            Object.entries(itemOverrides).forEach(([key, overrides]) => {
+                const [cat, name] = key.split('::');
+                if (pricingDatabase[cat]) {
+                    const item = pricingDatabase[cat].find(i => i.name === name);
+                    if (item) Object.assign(item, overrides);
+                }
+            });
+        }
+
+        function saveItemOverride(category, name, fields) {
+            const key = category + '::' + name;
+            itemOverrides[key] = { ...(itemOverrides[key] || {}), ...fields };
+            localStorage.setItem('ald_item_overrides', JSON.stringify(itemOverrides));
+            // Also apply to live pricingDatabase
+            if (pricingDatabase[category]) {
+                const item = pricingDatabase[category].find(i => i.name === name);
+                if (item) Object.assign(item, fields);
+            }
+        }
+
+        function loadCustomItems() {
+            try {
+                customItems = JSON.parse(localStorage.getItem('ald_custom_items') || '{}');
+            } catch (e) {
+                customItems = {};
+            }
+            for (const [category, items] of Object.entries(customItems)) {
+                if (!pricingDatabase[category]) pricingDatabase[category] = [];
+                items.forEach(item => {
+                    if (!pricingDatabase[category].find(e => e._custom && e.name === item.name)) {
+                        pricingDatabase[category].push({ ...item, _custom: true });
+                    }
+                });
+            }
+            loadItemOverrides();
+        }
+
+        function saveCustomItems() {
+            localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
+        }
+
+        function addNewCategory() {
+            const newCat = prompt('Enter new category name:').trim();
+            if (!newCat || newCat.length === 0) return;
+            if (pricingDatabase[newCat]) { alert('Category already exists!'); return; }
+            pricingDatabase[newCat] = [];
+            // Repopulate dropdown
+            const catSelect = document.getElementById('newItemCategory');
+            const opt = document.createElement('option');
+            opt.value = newCat;
+            opt.textContent = newCat;
+            opt.selected = true;
+            catSelect.appendChild(opt);
+        }
+
+        function addNewUnitType() {
+            const newUnit = prompt('Enter new unit type (e.g., "bundle", "bag", "gallon"):').trim();
+            if (!newUnit || newUnit.length === 0) return;
+            const datalist = document.getElementById('unitTypeOptions');
+            if ([...datalist.children].find(opt => opt.value === newUnit)) { alert('Unit type already exists!'); return; }
+            const opt = document.createElement('option');
+            opt.value = newUnit;
+            datalist.appendChild(opt);
+            // Also set it in the input
+            document.getElementById('newItemUnit').value = newUnit;
+        }
+
+        function handleCategoryChange() {
+            // Just a placeholder — can be used for future logic
+        }
+
+        function openManageItemsModal() {
+            const catSelect = document.getElementById('newItemCategory');
+            catSelect.innerHTML = '';
+            Object.keys(pricingDatabase).forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat;
+                opt.textContent = cat;
+                catSelect.appendChild(opt);
+            });
+            document.getElementById('newItemName').value = '';
+            document.getElementById('newItemUnit').value = '';
+            document.getElementById('newItemRate').value = '';
+            document.getElementById('newItemMaterialCost').value = '';
+            document.getElementById('newItemSupplierUrl').value = '';
+            clearPricingDirty();
+            const searchEl = document.getElementById('itemSearchFilter');
+            if (searchEl) searchEl.value = '';
+            renderAllItemsList();
+            new bootstrap.Modal(document.getElementById('manageItemsModal')).show();
+        }
+
+        function closeManageItemsModal() {
+            if (pricingDirty) {
+                const choice = confirm('You have unsaved pricing changes.\n\nClick OK to save all changes before closing, or Cancel to close without saving.');
+                if (choice) {
+                    saveAllPricingRows();
+                }
+            }
+            clearPricingDirty();
+            const modal = bootstrap.Modal.getInstance(document.getElementById('manageItemsModal'));
+            if (modal) modal.hide();
+        }
+
+        let pricingDirty = false; // tracks unsaved changes in Manage Items modal
+        let lastDeletedItem = null; // for undo functionality
+
+        function markPricingDirty() {
+            pricingDirty = true;
+            const indicator = document.getElementById('pricingUnsavedIndicator');
+            if (indicator) indicator.style.display = 'inline';
+        }
+
+        function clearPricingDirty() {
+            pricingDirty = false;
+            const indicator = document.getElementById('pricingUnsavedIndicator');
+            if (indicator) indicator.style.display = 'none';
+        }
+
+        function saveItemRow(cat, name) {
+            const safeId = (cat + '_' + name).replace(/[^a-z0-9]/gi,'_');
+            const row = document.getElementById('row_' + safeId);
+            if (!row) return;
+            
+            // Get new name if it was changed
+            const newName = row.querySelector('input.item-name-input')?.value.trim() || name;
+            const inputs = row.querySelectorAll('input.item-input');
+            const unitType    = inputs[0].value.trim();
+            const rate        = parseFloat(inputs[1].value) || 0;
+            const matCost     = parseFloat(inputs[2].value) || 0;
+            const supplierUrl = inputs[3].value.trim();
+            saveItemFieldEdit(cat, name, 'unitType',     unitType);
+            saveItemFieldEdit(cat, name, 'rate',         rate);
+            saveItemFieldEdit(cat, name, 'materialCost', matCost);
+            saveItemFieldEdit(cat, name, 'supplierUrl',  supplierUrl);
+            // Save description from collapse row
+            const descRow = document.getElementById('desc_' + safeId);
+            if (descRow) {
+                const itemDesc = descRow.querySelector('.item-description-textarea')?.value.trim() || '';
+                saveItemFieldEdit(cat, name, 'itemDescription', itemDesc);
+            }
+            // Save upgrade fields from collapse row
+            const collapseRow = document.getElementById('upg_' + safeId);
+            if (collapseRow) {
+                const upgName = collapseRow.querySelector('.upgrade-name')?.value.trim() || '';
+                const upgRate = parseFloat(collapseRow.querySelector('.upgrade-rate')?.value) || 0;
+                const upgDesc = collapseRow.querySelector('.upgrade-desc')?.value.trim() || '';
+                const upgrade = upgName ? { name: upgName, rate: upgRate, description: upgDesc } : null;
+                saveItemFieldEdit(cat, name, 'upgrade', upgrade);
+            }
+            // Flash row green to confirm
+            row.style.transition = 'background 0.3s';
+            row.style.background = '#d1e7dd';
+            setTimeout(() => { row.style.background = ''; }, 900);
+            clearPricingDirty();
+        }
+
+        function saveAllPricingRows() {
+            // Save every row in the table
+            Object.entries(pricingDatabase).forEach(([cat, items]) => {
+                items.forEach(item => saveItemRow(cat, item.name));
+            });
+            clearPricingDirty();
+        }
+
+        function whizzScroll(containerId, direction) {
+            const el = document.getElementById(containerId);
+            if (!el) return;
+            const start = el.scrollTop;
+            const end = direction === 'top' ? 0 : el.scrollHeight;
+            const distance = end - start;
+            if (distance === 0) return;
+            const duration = 380; // ms — fast enough to "whizz", slow enough to see it fly
+            const startTime = performance.now();
+            // Ease-in-out cubic for a satisfying whizz
+            function easeInOutCubic(t) {
+                return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2;
+            }
+            function step(now) {
+                const elapsed = now - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                el.scrollTop = start + distance * easeInOutCubic(progress);
+                if (progress < 1) requestAnimationFrame(step);
+            }
+            requestAnimationFrame(step);
+        }
+
+        function filterItemsList() {
+            const q = (document.getElementById('itemSearchFilter')?.value || '').toLowerCase().trim();
+            const container = document.getElementById('customItemsList');
+
+            container.querySelectorAll('table').forEach(table => {
+                let anyVisible = false;
+                table.querySelectorAll('tbody tr').forEach(row => {
+                    // Skip hidden desc/upgrade collapse rows — never touch them
+                    const isCollapse = row.id && (row.id.startsWith('desc_') || row.id.startsWith('upg_'));
+                    if (isCollapse) return;
+
+                    if (!q) {
+                        row.style.display = '';
+                        anyVisible = true;
+                        return;
+                    }
+                    // Name is now in an input field, not a <strong>
+                    const nameInput = row.querySelector('input.item-name-input');
+                    const name = (nameInput?.value || '').toLowerCase();
+                    const show = name.includes(q);
+                    row.style.display = show ? '' : 'none';
+                    if (show) anyVisible = true;
+                });
+                table.style.display = (!q || anyVisible) ? '' : 'none';
+                const prev = table.previousElementSibling;
+                if (prev && prev.tagName === 'H6') prev.style.display = (!q || anyVisible) ? '' : 'none';
+            });
+        }
+
+        function renderAllItemsList() {
+            const container = document.getElementById('customItemsList');
+            let html = '';
+
+            Object.entries(pricingDatabase).forEach(([cat, items]) => {
+                if (!items.length) return;
+                html += `<h6 class="fw-bold mt-3 mb-1 text-primary">${cat}</h6>`;
+                html += '<table class="table table-sm table-bordered mb-2"><thead class="table-light"><tr><th>Name</th><th style="width:80px">Unit</th><th style="width:90px">Rate ($)</th><th style="width:100px">Mat. Cost ($)</th><th>Supplier URL</th><th style="width:110px"></th></tr></thead><tbody>';
+                items.forEach(item => {
+                    const safeId = (cat + '_' + item.name).replace(/[^a-z0-9]/gi,'_');
+                    const isCustom = !!item._custom;
+                    const rate = parseFloat(item.rate || 0).toFixed(2);
+                    const matCost = parseFloat(item.materialCost || 0).toFixed(2);
+                    const supplier = (item.supplierUrl || '').replace(/"/g,'&quot;');
+                    const catE = cat.replace(/"/g,'&quot;');
+                    const nameE = item.name.replace(/"/g,'&quot;');
+                    const upg = item.upgrade || {};
+                    const upgName = (upg.name || '').replace(/"/g,'&quot;');
+                    const upgRate = parseFloat(upg.rate || 0).toFixed(2);
+                    const upgDesc = (upg.description || '').replace(/"/g,'&quot;');
+                    const hasUpgrade = !!upg.name;
+                    const collapseId = 'upg_' + safeId;
+                    html += `<tr id="row_${safeId}">
+                        <td>
+                            <input type="text" class="form-control form-control-sm item-name-input" style="margin-bottom:6px;" value="${item.name.replace(/"/g,'&quot;')}" placeholder="Item name" oninput="markPricingDirty()">
+                            <button class="btn btn-xs btn-sm btn-outline-warning upgrade-toggle-btn" data-target="${collapseId}" title="${hasUpgrade ? 'Edit upgrade option' : 'Add upgrade option'}" style="font-size:0.65em; padding:1px 6px;">
+                                ${hasUpgrade ? '⬆ Edit Upgrade' : '+ Add Upgrade'}
+                            </button>
+                        </td>
+                        <td><input type="text" class="form-control form-control-sm item-input" value="${item.unitType}" oninput="markPricingDirty()"></td>
+                        <td><input type="number" class="form-control form-control-sm item-input" value="${rate}" step="0.01" min="0" oninput="markPricingDirty()"></td>
+                        <td><input type="number" class="form-control form-control-sm item-input" value="${matCost}" step="0.01" min="0" oninput="markPricingDirty()"></td>
+                        <td><input type="url" class="form-control form-control-sm item-input" value="${supplier}" placeholder="https://..." oninput="markPricingDirty()"></td>
+                        <td>
+                            <div class="d-flex gap-1">
+                                <button class="btn btn-sm btn-info description-toggle-btn" data-target="desc_${safeId}" title="Show/edit description"><i class="fas fa-align-left"></i> Desc</button>
+                                <button class="btn btn-sm btn-success item-save-btn" data-cat="${catE}" data-name="${nameE}" title="Save this row"><i class="fas fa-save"></i></button>
+                                ${isCustom ? `<button class="btn btn-sm btn-danger item-delete-btn" data-cat="${catE}" data-name="${nameE}" title="Delete"><i class="fas fa-trash"></i></button>` : ''}
+                            </div>
+                        </td>
+                    </tr>
+                    <tr id="desc_${safeId}" style="display:none; background:#e7f3ff;">
+                        <td colspan="6">
+                            <div class="p-2">
+                                <small class="text-info fw-bold"><i class="fas fa-align-left"></i> Item Description (shown to clients on interactive quote)</small>
+                                <textarea class="form-control form-control-sm item-description-textarea mt-2" rows="3" placeholder="e.g., Complete drywall installation including hanging, mudding, taping, sanding and priming. Professional finish ready for paint." spellcheck="true">${item.itemDescription || ''}</textarea>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr id="${collapseId}" style="display:none; background:#fffbea;">
+                        <td colspan="6">
+                            <div class="p-2">
+                                <small class="text-warning fw-bold"><i class="fas fa-arrow-up"></i> Upgrade Option</small>
+                                <div class="row g-2 mt-1">
+                                    <div class="col-md-4">
+                                        <label class="form-label" style="font-size:0.75em">Upgrade Name</label>
+                                        <input type="text" class="form-control form-control-sm upgrade-name" value="${upgName}" placeholder="e.g., Tall Baseboard 5.5&quot;" oninput="markPricingDirty()">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label" style="font-size:0.75em">Upgrade Rate ($)</label>
+                                        <input type="number" class="form-control form-control-sm upgrade-rate" value="${upgRate}" step="0.01" min="0" oninput="markPricingDirty()">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label" style="font-size:0.75em">Description (shown to client)</label>
+                                        <input type="text" class="form-control form-control-sm upgrade-desc" value="${upgDesc}" placeholder="e.g., Premium 5.5&quot; tall baseboard — a luxurious finishing touch" oninput="markPricingDirty()">
+                                    </div>
+                                </div>
+                                <small class="text-muted">Leave name blank to remove upgrade option. Save the row above to save upgrade too.</small>
+                            </div>
+                        </td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+            });
+
+            container.innerHTML = html || '<p class="text-muted">No items found.</p>';
+
+            // Attach event listeners
+            container.querySelectorAll('.item-save-btn').forEach(btn => {
+                btn.addEventListener('click', () => saveItemRow(btn.dataset.cat, btn.dataset.name));
+            });
+            container.querySelectorAll('.item-delete-btn').forEach(btn => {
+                btn.addEventListener('click', () => deleteCustomItem(btn.dataset.cat, btn.dataset.name));
+            });
+            container.querySelectorAll('.upgrade-toggle-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const target = document.getElementById(btn.dataset.target);
+                    if (target) {
+                        const isOpen = target.style.display !== 'none';
+                        target.style.display = isOpen ? 'none' : 'table-row';
+                    }
+                });
+            });
+            container.querySelectorAll('.description-toggle-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const target = document.getElementById(btn.dataset.target);
+                    if (target) {
+                        const isOpen = target.style.display !== 'none';
+                        target.style.display = isOpen ? 'none' : 'table-row';
+                        btn.classList.toggle('btn-info', isOpen);
+                        btn.classList.toggle('btn-secondary', !isOpen);
+                    }
+                });
+            });
+        }
+
+        function saveItemFieldEdit(category, name, field, value) {
+            // For custom items: update customItems store
+            if (customItems[category]) {
+                const ci = customItems[category].find(i => i.name === name);
+                if (ci) {
+                    ci[field] = value;
+                    saveCustomItems();
+                    // Also update live pricingDatabase
+                    const pi = pricingDatabase[category]?.find(i => i._custom && i.name === name);
+                    if (pi) pi[field] = value;
+                    return;
+                }
+            }
+            // For built-in items: use overrides
+            saveItemOverride(category, name, { [field]: value });
+        }
+
+        function addCustomItem() {
+            const category = document.getElementById('newItemCategory').value;
+            const name = document.getElementById('newItemName').value.trim();
+            const unitType = document.getElementById('newItemUnit').value.trim();
+            const rate = parseFloat(document.getElementById('newItemRate').value) || 0;
+            const materialCost = parseFloat(document.getElementById('newItemMaterialCost').value) || 0;
+            const supplierUrl = document.getElementById('newItemSupplierUrl').value.trim();
+
+            if (!name || !unitType) {
+                alert('Please fill in item name and unit type.');
+                return;
+            }
+
+            if (!customItems[category]) customItems[category] = [];
+            if (customItems[category].find(i => i.name === name) ||
+                pricingDatabase[category]?.find(i => i.name === name)) {
+                alert('An item with this name already exists in this category.');
+                return;
+            }
+
+            const newItem = { name, unitType, rate, materialCost, supplierUrl };
+            customItems[category].push(newItem);
+            saveCustomItems();
+
+            if (!pricingDatabase[category]) pricingDatabase[category] = [];
+            pricingDatabase[category].push({ ...newItem, _custom: true });
+
+            document.getElementById('newItemName').value = '';
+            document.getElementById('newItemUnit').value = '';
+            document.getElementById('newItemRate').value = '';
+            document.getElementById('newItemMaterialCost').value = '';
+            document.getElementById('newItemSupplierUrl').value = '';
+
+            renderAllItemsList();
+        }
+
+        function deleteCustomItem(category, name) {
+            if (!customItems[category]) return;
+            customItems[category] = customItems[category].filter(i => i.name !== name);
+            if (customItems[category].length === 0) delete customItems[category];
+            saveCustomItems();
+            if (pricingDatabase[category]) {
+                pricingDatabase[category] = pricingDatabase[category].filter(i => !(i._custom && i.name === name));
+            }
+            renderAllItemsList();
+        }
+
+        // ── End Custom Line Items ─────────────────────────────────────────────────
+
+        // Load templates from localStorage on startup
+        let templates = JSON.parse(localStorage.getItem('ald_quote_templates') || '{}');
+
+        // Migrate Adam's legacy pricing into localStorage on first run (one-time)
+        migrateLegacyPricing();
+        // Load custom items and merge into pricingDatabase before first render
+        loadCustomItems();
+
+        // Initialize with one room
+        // Start with clean slate — no default room
+
+        // Set up initial pricing options
+        updatePricingOptions();
+        renderRooms();
+        
+        // Auto-generate quote number on load if not already set
+        if (!document.getElementById('quoteNumber').value) {
+            document.getElementById('quoteNumber').value = generateQuoteNumber();
+        }
+        
+        if (typeof renderTemplateDropdown === 'function') renderTemplateDropdown();
+        renderTermsCheckboxes();
+        initDone = true; // changes after this point are tracked
+
+
+    </script>
+
+    <script>
+        // These run independently of auth — always fire on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Auto-save: catch all changes including dynamic room inputs
+            document.addEventListener('input', function(e) {
+                if (e.target.closest('.modal')) return;
+                if (typeof markUnsaved === 'function') markUnsaved();
+            });
+            document.addEventListener('change', function(e) {
+                if (e.target.closest('.modal')) return;
+                if (typeof markUnsaved === 'function') markUnsaved();
+            });
+
+            // Auto-save toggle wiring
+            var _toggleEl = document.getElementById('autoSaveToggle');
+            if (_toggleEl) {
+                _toggleEl.checked = _autoSaveOn;
+                _toggleEl.addEventListener('change', function() {
+                    if (!this.checked) {
+                        if (!confirm('Turning off auto-save is not recommended. Are you sure?')) {
+                            this.checked = true;
+                            return;
+                        }
+                    }
+                    _autoSaveOn = this.checked;
+                    localStorage.setItem('ald_autosave_enabled', this.checked ? 'true' : 'false');
+                });
+            }
+        });
+
+        // Warn on refresh/close if unsaved
+        window.addEventListener('beforeunload', function(e) {
+            if (typeof unsavedChanges !== 'undefined' && unsavedChanges) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+
+        function startupContinueSession() {
+            var session = null;
+            try { session = JSON.parse(localStorage.getItem('ald_session_quote')); } catch(e) {}
+            if (!session) { alert('No session found.'); return; }
+            bootstrap.Modal.getInstance(document.getElementById('startupModal')).hide();
+            applyQuoteData(session);
+            if (session.quoteNumber) document.getElementById('quoteNumber').value = session.quoteNumber;
+            renderTermsCheckboxes();
+            if (session.terms && Array.isArray(session.terms)) {
+                document.querySelectorAll('#termsCheckboxes input[type="checkbox"]').forEach(function(cb) {
+                    cb.checked = session.terms.includes(cb.dataset.text);
+                });
+            }
+            var el = document.getElementById('saveStatus');
+            if (el) el.innerHTML = '<span style="color:#1a56a0;"><i class="fas fa-history"></i> Session restored</span>';
+            updateDraftWarning();
+        }
+
+        function startupNewQuote() {
+            localStorage.removeItem('ald_session_quote');
+            bootstrap.Modal.getInstance(document.getElementById('startupModal')).hide();
+            // Ensure quote number is set
+            if (!document.getElementById('quoteNumber').value) {
+                document.getElementById('quoteNumber').value = nextQuoteNumberValue();
+            }
+            // Force save-as before starting — open file picker to create the file
+            setTimeout(async function() {
+                try {
+                    saveFileHandle = await window.showSaveFilePicker({
+                        suggestedName: 'New Quote - ' + new Date().toISOString().slice(0,10) + '.qdr',
+                        types: [{ description: 'QuoteDr File', accept: { 'application/json': ['.qdr'] } }]
+                    });
+                    await writeToHandle(saveFileHandle);
+                    startAutoSave();
+                } catch(err) {
+                    if (err.name !== 'AbortError') console.warn('Save skipped:', err);
+                }
+            }, 200);
+            updateDraftWarning();
+        }
+
+        function startupRecoverDraft() {
+            try {
+                var draft = JSON.parse(localStorage.getItem('ald_autosave_draft'));
+                if (!draft) { alert('No draft found.'); return; }
+                bootstrap.Modal.getInstance(document.getElementById('startupModal')).hide();
+                applyQuoteData(draft);
+                if (draft.quoteNumber) document.getElementById('quoteNumber').value = draft.quoteNumber;
+                renderTermsCheckboxes();
+                if (draft.terms && Array.isArray(draft.terms)) {
+                    document.querySelectorAll('#termsCheckboxes input[type="checkbox"]').forEach(function(cb) {
+                        cb.checked = draft.terms.includes(cb.dataset.text);
+                    });
+                }
+                var el = document.getElementById('saveStatus');
+                if (el) el.innerHTML = '<span style="color:#fd7e14;"><i class="fas fa-history"></i> Draft recovered — save to file to keep it safe</span>';
+                updateDraftWarning();
+            } catch(e) { alert('Could not recover draft.'); }
+        }
+
+        async function startupOpenQuote() {
+            bootstrap.Modal.getInstance(document.getElementById('startupModal')).hide();
+            try {
+                const [handle] = await window.showOpenFilePicker({
+                    types: [{ description: 'QuoteDr File', accept: { 'application/json': ['.qdr', '.aldquote'] } }]
+                });
+                const file = await handle.getFile();
+                const data = JSON.parse(await file.text());
+                saveFileHandle = handle;
+                applyQuoteData(data);
+                // Load supabaseId from file data if present
+                if (data.supabaseId) window._supabaseQuoteId = data.supabaseId;
+                if (data.quoteNumber) document.getElementById('quoteNumber').value = data.quoteNumber;
+                updateSaveStatus('loaded', file.name);
+                startAutoSave();
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    // Fall back to input picker
+                    var input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = '.qdr,.aldquote,application/json';
+                    input.onchange = function(e) {
+                        var f = e.target.files[0];
+                        if (!f) return;
+                        var reader = new FileReader();
+                        reader.onload = function(ev) {
+                            try {
+                                var d = JSON.parse(ev.target.result);
+                                applyQuoteData(d);
+                                // Load supabaseId from file data if present
+                                if (d.supabaseId) window._supabaseQuoteId = d.supabaseId;
+                                if (d.quoteNumber) document.getElementById('quoteNumber').value = d.quoteNumber;
+                                updateSaveStatus('loaded', f.name);
+                            } catch(e) { alert('Could not read file.'); }
+                        };
+                        reader.readAsText(f);
+                    };
+                    input.click();
+                }
+            }
+        }
+    </script>
+    
+    <!-- Client Autocomplete System -->
+    <style>
+        .autocomplete-dropdown {
+            display: none;
+            position: absolute;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 1000;
+            width: 100%;
+        }
+        .autocomplete-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background-color 0.2s;
+        }
+        .autocomplete-item:hover,
+        .autocomplete-item.active {
+            background-color: #eef4fb;
+        }
+        .autocomplete-item:last-child {
+            border-bottom: none;
+        }
+        .autocomplete-item strong {
+            color: #1a56a0;
+        }
+        .autocomplete-item small {
+            display: block;
+            margin-top: 4px;
+            color: #6c757d;
+        }
+    </style>
+    
+    <script>
+        // Client database from past quotes
+        // clientDatabase is now empty — all clients live in localStorage (ald_clients)
+        // Legacy clients were migrated on first load via loadSavedClients()
+        const clientDatabase = {};
+
+        // Legacy clients to migrate on first run (will never appear in code again after migration)
+        const LEGACY_CLIENTS = [];
+
+        // Fuzzy matching function
+        function fuzzyMatch(query, text) {
+            query = query.toLowerCase().trim();
+            text = text.toLowerCase().trim();
+            
+            if (query === text) return { score: 100, exact: true };
+            if (text.includes(query)) return { score: 90, exact: false };
+            
+            const distances = [];
+            for (let i = 0; i < text.length; i++) {
+                let j = 0;
+                while (j < query.length && text[i + j] === query[j]) {
+                    j++;
+                }
+                if (j > 0) distances.push(j);
+            }
+            
+            const maxMatch = Math.max(...distances, 0);
+            return { score: (maxMatch / query.length) * 100, exact: false };
+        }
+
+        // Search clients based on input (merged database)
+        function searchClients(query) {
+            if (!query || query.length < 2) return [];
+            const all = getAllClients();
+            const results = [];
+            for (const [clientName, data] of Object.entries(all)) {
+                const match = fuzzyMatch(query, clientName);
+                if (match.score > 50) {
+                    results.push({ ...data, score: match.score });
+                }
+            }
+            return results.sort((a, b) => b.score - a.score);
+        }
+
+        // Show autocomplete dropdown
+        function showClientSuggestions() {
+            const query = document.getElementById('clientName').value;
+            const results = searchClients(query);
+            const dropdown = document.getElementById('clientDropdown');
+            
+            if (results.length > 0) {
+                dropdown.innerHTML = '';
+                results.forEach(client => {
+                    const item = document.createElement('div');
+                    item.className = 'autocomplete-item';
+                    
+                    let displayName = client.name;
+                    if (!client.exact) {
+                        const idx = displayName.toLowerCase().indexOf(query.toLowerCase());
+                        if (idx >= 0) {
+                            displayName = displayName.substring(0, idx) + 
+                                         '<strong>' + displayName.substring(idx, idx + query.length) + '</strong>' + 
+                                         displayName.substring(idx + query.length);
+                        }
+                    }
+                    
+                    const subtitle = client.address ? client.address : (client.filename ? 'From: ' + client.filename : '');
+                    item.innerHTML = `<span>${displayName}</span><small class="text-muted">${subtitle}</small>`;
+                    item.onclick = function() {
+                        fillClientInfo(client.name, client);
+                        hideClientDropdown();
+                    };
+                    dropdown.appendChild(item);
+                });
+                dropdown.style.display = 'block';
+            } else {
+                hideClientDropdown();
+            }
+        }
+
+        // Hide autocomplete dropdown
+        function hideClientDropdown() {
+            setTimeout(() => {
+                document.getElementById('clientDropdown').style.display = 'none';
+            }, 200);
+        }
+
+        // ── Client Database (localStorage) ──────────────────────────────────────
+        let savedClients = {};
+
+        function loadSavedClients() {
+            try { savedClients = JSON.parse(localStorage.getItem('ald_clients') || '{}'); }
+            catch(e) { savedClients = {}; }
+            // One-time migration: import legacy clients that aren't already saved
+            let migrated = false;
+            LEGACY_CLIENTS.forEach(name => {
+                if (!savedClients[name]) {
+                    savedClients[name] = { name, phone: '', email: '', address: '' };
+                    migrated = true;
+                }
+            });
+            if (migrated) localStorage.setItem('ald_clients', JSON.stringify(savedClients));
+        }
+
+        function persistClients() {
+            localStorage.setItem('ald_clients', JSON.stringify(savedClients));
+        }
+
+        function getAllClients() {
+            // All clients live in savedClients — no hardcoded list
+            const merged = {};
+            Object.entries(savedClients).forEach(([name, data]) => {
+                merged[name] = { ...data, name };
+            });
+            return merged;
+        }
+
+        function fillClientInfo(clientName, clientData) {
+            document.getElementById('clientName').value = clientName;
+            if (clientData.phone)   document.getElementById('clientPhone').value = clientData.phone;
+            if (clientData.email)   document.getElementById('clientEmail').value = clientData.email;
+            if (clientData.address) document.getElementById('projectAddress').value = clientData.address;
+        }
+
+        function saveCurrentClient() {
+            const name    = document.getElementById('clientName').value.trim();
+            const phone   = document.getElementById('clientPhone').value.trim();
+            const email   = document.getElementById('clientEmail').value.trim();
+            const address = document.getElementById('projectAddress').value.trim();
+            if (!name) { alert('Please enter a client name first.'); return; }
+            savedClients[name] = { name, phone, email, address };
+            persistClients();
+            // Flash save status
+            const el = document.getElementById('saveStatus');
+            if (el) { el.textContent = '✓ Client "' + name + '" saved!'; setTimeout(() => { el.textContent = ''; }, 3000); }
+        }
+
+        function openManageClientsModal() {
+            clearClientForm();
+            renderClientsList();
+            new bootstrap.Modal(document.getElementById('manageClientsModal')).show();
+        }
+
+        function clearClientForm() {
+            ['newClientName','newClientPhone','newClientEmail','newClientAddress'].forEach(id => {
+                document.getElementById(id).value = '';
+            });
+        }
+
+        function editClientInModal(name) {
+            const c = savedClients[name];
+            if (!c) return;
+            document.getElementById('newClientName').value    = c.name    || name;
+            document.getElementById('newClientPhone').value   = c.phone   || '';
+            document.getElementById('newClientEmail').value   = c.email   || '';
+            document.getElementById('newClientAddress').value = c.address || '';
+            // Scroll to top of modal body and highlight the form
+            const modalBody = document.querySelector('#manageClientsModal .modal-body');
+            if (modalBody) modalBody.scrollTop = 0;
+            // Flash the form to show it's been populated
+            const form = document.querySelector('#manageClientsModal .row.g-2.mb-3');
+            if (form) {
+                form.style.transition = 'background 0.3s';
+                form.style.background = '#fff3cd';
+                setTimeout(() => { form.style.background = ''; }, 1200);
+            }
+            document.getElementById('newClientName').focus();
+        }
+
+        function saveClientFromModal() {
+            const name    = document.getElementById('newClientName').value.trim();
+            const phone   = document.getElementById('newClientPhone').value.trim();
+            const email   = document.getElementById('newClientEmail').value.trim();
+            const address = document.getElementById('newClientAddress').value.trim();
+            if (!name) { alert('Please enter a client name.'); return; }
+            savedClients[name] = { name, phone, email, address };
+            persistClients();
+            clearClientForm();
+            renderClientsList();
+        }
+
+        function deleteClient(name) {
+            if (!confirm('Delete "' + name + '" from your client database?')) return;
+            delete savedClients[name];
+            persistClients();
+            renderClientsList();
+        }
+
+        function renderClientsList() {
+            const filter = (document.getElementById('clientSearchFilter')?.value || '').toLowerCase();
+            const all = getAllClients();
+            const filtered = Object.values(all).filter(c => c.name.toLowerCase().includes(filter)).sort((a,b) => a.name.localeCompare(b.name));
+            const container = document.getElementById('clientsList');
+            if (!filtered.length) { container.innerHTML = '<p class="text-muted text-center py-3">No clients found.</p>'; return; }
+            let html = '<table class="table table-sm table-hover"><thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Address</th><th></th></tr></thead><tbody>';
+            filtered.forEach(c => {
+                const escapedName = c.name.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+                html += `<tr>
+                    <td><strong>${c.name.replace(/&/g,'&amp;')}</strong></td>
+                    <td>${c.phone || '<span class="text-muted">—</span>'}</td>
+                    <td>${c.email || '<span class="text-muted">—</span>'}</td>
+                    <td>${c.address || '<span class="text-muted">—</span>'}</td>
+                    <td>
+                        <div class="d-flex gap-1">
+                            <button class="btn btn-sm btn-outline-primary client-edit-btn" data-name="${escapedName}" title="Edit"><i class="fas fa-edit"></i></button>
+                            <button class="btn btn-sm btn-danger client-delete-btn" data-name="${escapedName}" title="Delete"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+            container.innerHTML = html;
+            // Attach event listeners safely (avoids inline onclick issues with special chars in names)
+            container.querySelectorAll('.client-edit-btn').forEach(btn => {
+                btn.addEventListener('click', () => editClientInModal(btn.dataset.name));
+            });
+            container.querySelectorAll('.client-delete-btn').forEach(btn => {
+                btn.addEventListener('click', () => deleteClient(btn.dataset.name));
+            });
+        }
+
+        loadSavedClients();
+        // ── End Client Database ───────────────────────────────────────────────────
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
+
+    <!-- Sticky total bar -->
+    <div id="stickyTotalBar">
+        <div>
+            <div class="total-label">QUOTE TOTAL (incl. HST)</div>
+            <div class="total-amount" id="stickyTotalAmount">$0.00</div>
+        </div>
+        <div class="text-end">
+            <div class="total-sub" id="stickySubtotal">Subtotal: $0.00</div>
+            <div class="total-sub" id="stickyTax">HST: $0.00</div>
+        </div>
+        <button onclick="toggleStickyTotal()" class="btn btn-sm btn-light ms-4" style="border-radius:20px; opacity:0.85;">
+            <i class="fas fa-times"></i> Hide
+        </button>
+    </div>
+
+    <!-- Sticky floating toolbar -->
+    <div id="stickyToolbar">
+        <button onclick="addRoom()" class="btn btn-primary btn-sm" title="Add room">
+            <i class="fas fa-plus"></i> Room
+        </button>
+        <button onclick="saveQuote()" class="btn btn-warning btn-sm" title="Save">
+            <i class="fas fa-save"></i> Save
+        </button>
+        <button onclick="exportToPDF()" class="btn btn-success btn-sm" title="Export PDF">
+            <i class="fas fa-download"></i> PDF
+        </button>
+        <button onclick="generateInteractiveLink()" class="btn btn-primary btn-sm" title="Send Quote">
+            <i class="fas fa-share-square"></i> Quote
+        </button>
+        <button onclick="generateInvoiceLink()" class="btn btn-danger btn-sm" title="Send Invoice">
+            <i class="fas fa-file-invoice-dollar"></i> Invoice
+        </button>
+        <span style="width:1px; background:#dee2e6; height:24px; display:inline-block; margin:0 4px;"></span>
+        <a href="dashboard.html" class="btn btn-outline-secondary btn-sm" title="Dashboard" onclick="if(unsavedChanges && !confirm('You have unsaved changes. Leave anyway?')) return false; saveSessionQuote();">
+            <i class="fas fa-th-large"></i>
+        </a>
+        <a href="settings.html" class="btn btn-outline-secondary btn-sm" title="Settings" onclick="if(unsavedChanges && !confirm('You have unsaved changes. Leave anyway?')) return false; saveSessionQuote();">
+            <i class="fas fa-cog"></i>
+        </a>
+        <button onclick="if(unsavedChanges && !confirm('You have unsaved changes. Leave anyway?')) return; signOut();" class="btn btn-outline-danger btn-sm" title="Sign out">
+            <i class="fas fa-sign-out-alt"></i>
+        </button>
+        <span style="width:1px; background:#dee2e6; height:24px; display:inline-block; margin:0 4px;"></span>
+        <button onclick="toggleStickyToolbar()" class="btn btn-outline-secondary btn-sm" title="Hide toolbar">
+            <i class="fas fa-eye-slash"></i>
+        </button>
+    </div>
+
+    <!-- Sticky toolbar show button (visible when toolbar is hidden) -->
+    <button id="stickyToolbarReveal" onclick="toggleStickyToolbar()" title="Show toolbar"
+        style="position:fixed; bottom:24px; right:24px; z-index:1051; display:none;
+               background:rgba(255,255,255,0.97); border:2px solid #1a56a0; border-radius:50%;
+               width:48px; height:48px; box-shadow:0 4px 20px rgba(26,86,160,0.35); cursor:pointer;
+               align-items:center; justify-content:center;">
+        <i class="fas fa-eye" style="color:#1a56a0; font-size:1.2rem;"></i>
+    </button>
+
+    <script>
+        // Show sticky toolbar after scrolling past the header — always visible by default
+        (function() {
+            const toolbar = document.getElementById('stickyToolbar');
+            const reveal = document.getElementById('stickyToolbarReveal');
+            // Always reset to visible on each page load
+            localStorage.removeItem('stickyToolbarHidden');
+            window.addEventListener('scroll', function() {
+                const hidden = localStorage.getItem('stickyToolbarHidden') === '1';
+                if (!hidden && window.scrollY > 180) {
+                    toolbar.classList.add('visible');
+                    reveal.style.display = 'none';
+                } else if (!hidden) {
+                    toolbar.classList.remove('visible');
+                }
+            }, { passive: true });
+        })();
+
+        function toggleStickyToolbar() {
+            const toolbar = document.getElementById('stickyToolbar');
+            const reveal = document.getElementById('stickyToolbarReveal');
+            const hidden = localStorage.getItem('stickyToolbarHidden') === '1';
+            if (hidden) {
+                // Show toolbar
+                localStorage.removeItem('stickyToolbarHidden');
+                toolbar.classList.add('visible');
+                reveal.style.display = 'none';
+                reveal.classList.remove('wiggling');
+            } else {
+                // Hide toolbar
+                localStorage.setItem('stickyToolbarHidden', '1');
+                toolbar.classList.remove('visible');
+                if (window.scrollY > 180) {
+                    reveal.style.display = 'flex';
+                    // Start wiggling after a short delay to get user's attention
+                    setTimeout(function() { reveal.classList.add('wiggling'); }, 400);
+                }
+            }
+        }
+
+        // Sticky total bar toggle
+        let stickyTotalVisible = false;
+        function toggleStickyTotal() {
+            stickyTotalVisible = !stickyTotalVisible;
+            const bar = document.getElementById('stickyTotalBar');
+            const btn = document.getElementById('toggleTotalBarBtn');
+            bar.classList.toggle('visible', stickyTotalVisible);
+            if (btn) {
+                btn.classList.toggle('btn-outline-dark', !stickyTotalVisible);
+                btn.classList.toggle('btn-warning', stickyTotalVisible);
+            }
+        }
+    </script>
+
+    <!-- Quote Style Modal -->
+    <div class="modal fade" id="quoteStyleModal" tabindex="-1">
+        <div class="modal-dialog modal-md">
+            <div class="modal-content">
+                <div class="modal-header" style="background:linear-gradient(135deg,#1a56a0,#0f3460);color:white;">
+                    <h5 class="modal-title"><i class="fas fa-palette me-2"></i>Style Your Quote</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small mb-3">Choose a colour scheme for your client's quote. All themes keep text readable.</p>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Accent Colour</label>
+                        <div class="d-flex flex-wrap gap-2" id="accentSwatches">
+                            <div class="style-swatch selected" data-accent="#ffffff" style="background:#ffffff;border:1px solid #ddd;" title="Default (no accent)"></div>
+                            <div class="style-swatch" data-accent="#1a56a0" style="background:#1a56a0;" title="Classic Blue"></div>
+                            <div class="style-swatch" data-accent="#0f7b5e" style="background:#0f7b5e;" title="Forest Green"></div>
+                            <div class="style-swatch" data-accent="#7c3aed" style="background:#7c3aed;" title="Violet"></div>
+                            <div class="style-swatch" data-accent="#b45309" style="background:#b45309;" title="Amber"></div>
+                            <div class="style-swatch" data-accent="#be123c" style="background:#be123c;" title="Crimson"></div>
+                            <div class="style-swatch" data-accent="#0e7490" style="background:#0e7490;" title="Teal"></div>
+                            <div class="style-swatch" data-accent="#374151" style="background:#374151;" title="Charcoal"></div>
+                            <div class="style-swatch" data-accent="#e87e2a" style="background:#e87e2a;" title="Orange"></div>
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Background Tint</label>
+                        <div class="d-flex flex-wrap gap-2" id="bgSwatches">
+                            <div class="style-swatch bg-swatch selected" data-bg="#ffffff" style="background:#ffffff;border:1px solid #ddd;" title="White"></div>
+                            <div class="style-swatch bg-swatch" data-bg="#f0f7ff" style="background:#f0f7ff;" title="Cool Blue"></div>
+                            <div class="style-swatch bg-swatch" data-bg="#f0fdf4" style="background:#f0fdf4;" title="Soft Green"></div>
+                            <div class="style-swatch bg-swatch" data-bg="#fefce8" style="background:#fefce8;" title="Warm Sand"></div>
+                            <div class="style-swatch bg-swatch" data-bg="#fdf4ff" style="background:#fdf4ff;" title="Lavender"></div>
+                            <div class="style-swatch bg-swatch" data-bg="#fff1f2" style="background:#fff1f2;" title="Blush"></div>
+                            <div class="style-swatch bg-swatch" data-bg="#f8fafc" style="background:#f8fafc;" title="Slate"></div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Preview</label>
+                        <div id="stylePreview" style="border-radius:8px;padding:12px;border:1px solid #eee;">
+                            <div id="previewHeader" style="padding:8px 12px;border-radius:6px 6px 0 0;margin:-12px -12px 10px -12px;color:white;font-weight:700;font-size:0.9rem;">Quote Preview</div>
+                            <div style="font-size:0.8rem;color:#555;">Client Name — 123 Main Street</div>
+                            <div id="previewTotal" style="margin-top:8px;padding:6px 10px;border-radius:4px;color:white;font-weight:700;font-size:0.85rem;display:inline-block;">Total: $12,450.00</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="confirmGenerateQuote()">
+                        <i class="fas fa-share-square me-1"></i>Generate Quote Link
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Startup Modal -->
+    <div class="modal fade" id="startupModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title w-100 text-center" style="color:#1a56a0; font-weight:700;"><i class="fas fa-file-invoice me-2"></i>QuoteDr</h5>
+                </div>
+                <div class="modal-body text-center py-4">
+                    <p class="text-muted mb-4">What would you like to do?</p>
+                    <div class="d-flex flex-wrap gap-3 justify-content-center">
+                        <button class="btn btn-lg" style="background:#e87e2a; color:#fff; min-width:140px;" onclick="startupNewQuote()">
+                            <i class="fas fa-plus d-block mb-1" style="font-size:1.5rem;"></i>
+                            New Quote
+                        </button>
+                        <button class="btn btn-lg btn-outline-primary" style="min-width:140px;" onclick="startupOpenQuote()">
+                            <i class="fas fa-folder-open d-block mb-1" style="font-size:1.5rem;"></i>
+                            Open Saved
+                        </button>
+                        <button id="continueSessionBtn" class="btn btn-lg btn-outline-success" style="min-width:140px; display:none;" onclick="startupContinueSession()">
+                            <i class="fas fa-play d-block mb-1" style="font-size:1.5rem;"></i>
+                            Continue
+                        </button>
+                        <button id="recoverDraftBtn" class="btn btn-lg btn-outline-warning" style="min-width:140px; display:none;" onclick="startupRecoverDraft()">
+                            <i class="fas fa-history d-block mb-1" style="font-size:1.5rem;"></i>
+                            Recover Draft
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        // Runs on load — independent of auth. Handles session restore + startup modal.
+        window.addEventListener('load', function() {
+            var _startupAttempts = 0;
+            function tryStartup() {
+                _startupAttempts++;
+                // Wait for Bootstrap + initDone, but give up after 3 seconds and show modal anyway
+                if (typeof bootstrap === 'undefined' || (typeof initDone === 'undefined' || !initDone) && _startupAttempts < 38) {
+                    setTimeout(tryStartup, 80);
+                    return;
+                }
+                
+                // Check for cloud quote to open
+                var cloudQuoteId = localStorage.getItem('ald_open_cloud_quote');
+                if (cloudQuoteId) {
+                    localStorage.removeItem('ald_open_cloud_quote');
+                    if (typeof loadQuoteFromSupabase === 'function') {
+                        loadQuoteFromSupabase(cloudQuoteId).then(function(result) {
+                            if (result && result.data) {
+                                var qData = result.data.data; // the full quote data is stored in the jsonb 'data' column
+                                qData.supabaseId = result.data.id;
+                                window._supabaseQuoteId = result.data.id;
+                                applyQuoteData(qData);
+                                if (qData.quoteNumber) document.getElementById('quoteNumber').value = qData.quoteNumber;
+                                renderTermsCheckboxes();
+                                var el = document.getElementById('saveStatus');
+                                if (el) el.innerHTML = '<span style="color:#1a56a0;"><i class="fas fa-cloud"></i> Loaded from cloud</span>';
+                                updateDraftWarning();
+                            }
+                        });
+                        return; // don't show modal while loading
+                    }
+                }
+                
+                // Show Continue button if session exists
+                var session = null;
+                try { session = JSON.parse(localStorage.getItem('ald_session_quote')); } catch(e) {}
+                var hasSession = !!(session && (session.clientName || (session.rooms && session.rooms.length > 0)));
+                var continueBtn = document.getElementById('continueSessionBtn');
+                if (continueBtn) continueBtn.style.display = hasSession ? 'inline-block' : 'none';
+                // Show Recover Draft button if draft exists
+                var recoverBtn = document.getElementById('recoverDraftBtn');
+                if (recoverBtn) recoverBtn.style.display = localStorage.getItem('ald_autosave_draft') ? 'inline-block' : 'none';
+                // Always show startup modal
+                var modalEl = document.getElementById('startupModal');
+                if (modalEl) {
+                    new bootstrap.Modal(modalEl).show();
+                }
+            }
+            tryStartup();
+        });
+    </script>
+</body>
+</html>

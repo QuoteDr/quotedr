@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Onboarding - QuoteDr.io</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .step-panel {
+            display: none;
+        }
+        .step-panel.active {
+            display: block;
+        }
+        .progress {
+            height: 8px;
+        }
+        .btn-orange {
+            background-color: #ff7700;
+            border-color: #ff7700;
+            color: white;
+        }
+        .btn-orange:hover {
+            background-color: #e66a00;
+            border-color: #e66a00;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container py-5">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="text-center mb-4">
+                    <h1 class="display-6 fw-bold">Welcome to QuoteDr.io</h1>
+                    <p class="text-muted">Let's get you set up with your custom quote builder</p>
+                </div>
+
+                <div class="progress mb-4">
+                    <div id="progressBar" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                </div>
+                <div class="text-center mb-4">
+                    <span id="stepIndicator" class="text-muted small">Step 1 of 6</span>
+                </div>
+
+                <div class="bg-white rounded shadow-sm p-4 p-md-5">
+                    <!-- Step 1: Business Info -->
+                    <div class="step-panel active" id="step1">
+                        <h2 class="text-center mb-3">Business Information</h2>
+                        <p class="text-center text-muted mb-4">Tell us about your business</p>
+                        
+                        <form id="businessForm" novalidate>
+                            <div class="mb-3">
+                                <label for="businessName" class="form-label">Business Name *</label>
+                                <input type="text" class="form-control" id="businessName" required>
+                                <div class="invalid-feedback">Please enter your business name.</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="companyTagline" class="form-label">Company Tagline</label>
+                                <input type="text" class="form-control" id="companyTagline" placeholder="e.g., Quality Renovations You Can Trust">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="ownerName" class="form-label">Owner Name *</label>
+                                <input type="text" class="form-control" id="ownerName" required>
+                                <div class="invalid-feedback">Please enter your name.</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="streetAddress" class="form-label">Street Address *</label>
+                                <input type="text" class="form-control" id="streetAddress" required>
+                                <div class="invalid-feedback">Please enter your street address.</div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="city" class="form-label">City *</label>
+                                    <input type="text" class="form-control" id="city" required>
+                                    <div class="invalid-feedback">Please enter your city.</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="province" class="form-label">Province *</label>
+                                    <input type="text" class="form-control" id="province" required>
+                                    <div class="invalid-feedback">Please enter your province.</div>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="postalCode" class="form-label">Postal Code *</label>
+                                    <input type="text" class="form-control" id="postalCode" required>
+                                    <div class="invalid-feedback">Please enter your postal code.</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="phone" class="form-label">Phone *</label>
+                                    <input type="tel" class="form-control" id="phone" required>
+                                    <div class="invalid-feedback">Please enter your phone number.</div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="email" class="form-label">Email *</label>
+                                <input type="email" class="form-control" id="email" required>
+                                <div class="invalid-feedback">Please enter a valid email address.</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="hstNumber" class="form-label">HST Number</label>
+                                <input type="text" class="form-control" id="hstNumber" placeholder="e.g., 123456789 RT0001">
+                            </div>
+                            
+                            <div class="d-flex justify-content-between">
+                                <button class="btn btn-outline-secondary" onclick="prevStep()"><i class="fas fa-arrow-left"></i> Back</button>
+                                <button class="btn btn-primary" onclick="saveBusinessInfo()">Next →</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Step 2: Logo Upload -->
+                    <div class="step-panel p-4 p-md-5" id="step2">
+                        <h2 class="text-center mb-3">Upload Your Logo</h2>
+                        <p class="text-center text-muted mb-4">Add your business logo to quotes</p>
+                        
+                        <div class="text-center mb-4">
+                            <img id="logoPreview" src="" alt="Logo Preview" style="max-height: 150px; display: none;" class="img-thumbnail mx-auto d-block">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="logoUpload" class="form-label">Upload Logo</label>
+                            <input type="file" class="form-control" id="logoUpload" accept="image/*">
+                            <div class="form-text">PNG, JPG, or GIF up to 5MB</div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <button class="btn btn-outline-secondary" onclick="prevStep()"><i class="fas fa-arrow-left"></i> Back</button>
+                            <button class="btn btn-primary" onclick="nextStep()">Next →</button>
+                        </div>
+                    </div>
+
+                    <!-- Step 3: Quote Preferences -->
+                    <div class="step-panel p-4 p-md-5" id="step3">
+                        <h2 class="text-center mb-3">Quote Preferences</h2>
+                        <p class="text-center text-muted mb-4">Customize your quote style</p>
+                        
+                        <div class="mb-3">
+                            <label for="quoteHeading" class="form-label">Quote Heading</label>
+                            <input type="text" class="form-control" id="quoteHeading" placeholder="Your Renovation Quote">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="quotePrefix" class="form-label">Quote Prefix</label>
+                            <input type="text" class="form-control" id="quotePrefix" placeholder="ALD">
+                        </div>
+                        
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="showPrefix" checked>
+                            <label class="form-check-label" for="showPrefix">Show prefix in quotes</label>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <button class="btn btn-outline-secondary" onclick="prevStep()"><i class="fas fa-arrow-left"></i> Back</button>
+                            <button class="btn btn-primary" onclick="saveQuotePrefs()">Next →</button>
+                        </div>
+                    </div>
+
+                    <!-- Step 4: Terms & Conditions -->
+                    <div class="step-panel p-4 p-md-5" id="step4">
+                        <h2 class="text-center mb-3">Terms & Conditions</h2>
+                        <p class="text-center text-muted mb-4">Customize your contract terms</p>
+                        
+                        <div class="mb-3">
+                            <button class="btn btn-outline-primary btn-sm" onclick="addOnboardingTerm()">
+                                <i class="fas fa-plus me-1"></i> Add Term
+                            </button>
+                        </div>
+                        
+                        <div id="onboardingTermsList">
+                            <!-- Terms will be rendered here -->
+                        </div>
+                        
+                        <div class="d-flex justify-content-between mt-4">
+                            <button class="btn btn-outline-secondary" onclick="prevStep()"><i class="fas fa-arrow-left"></i> Back</button>
+                            <button class="btn btn-primary" onclick="saveOnboardingTerms()">Next →</button>
+                        </div>
+                    </div>
+
+                    <!-- Step 5: Custom Items -->
+                    <div class="step-panel p-4 p-md-5" id="step5">
+                        <h2 class="text-center mb-3">Custom Materials</h2>
+                        <p class="text-center text-muted mb-4">Add materials to your quote builder</p>
+                        
+                        <div class="mb-3">
+                            <button class="btn btn-outline-primary btn-sm" onclick="addCustomItem()">
+                                <i class="fas fa-plus me-1"></i> Add Material
+                            </button>
+                        </div>
+                        
+                        <div id="customItemsList">
+                            <!-- Custom items will be rendered here -->
+                        </div>
+                        
+                        <div class="d-flex justify-content-between mt-4">
+                            <button class="btn btn-outline-secondary" onclick="prevStep()"><i class="fas fa-arrow-left"></i> Back</button>
+                            <button class="btn btn-primary" onclick="nextStep()">Next →</button>
+                        </div>
+                    </div>
+
+                    <!-- Step 6: All Done -->
+                    <div class="step-panel p-4 p-md-5" id="step6">
+                        <h2 class="text-center mb-3">You're all set! 🎉</h2>
+                        <p class="text-center text-muted mb-4">Your account is ready. Start building professional quotes right away.</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <button class="btn btn-outline-secondary" onclick="prevStep()"><i class="fas fa-arrow-left"></i> Back</button>
+                            <button class="btn btn-orange btn-lg" onclick="completeOnboarding()">Start Building Quotes →</button>
+                        </div>
+                    </div>
+
+                    <!-- Step 7: Import Data (Optional) -->
+                    <div class="step-panel p-4 p-md-5" id="step7">
+                        <h2 class="text-center mb-3">Import Your Data (Optional)</h2>
+                        <p class="text-center text-muted mb-4">Upload .txt files to import your clients and materials.</p>
+                        
+                        <div class="mb-4">
+                            <h6 class="fw-bold mb-2"><i class="fas fa-users me-2" style="color:#1a56a0;"></i>Import Clients</h6>
+                            <p class="text-muted small">Upload a .txt file with one client per line: Name Phone Email Address</p>
+                            <input type="file" id="importClientsFile" accept=".txt" class="form-control mb-2">
+                            <button class="btn btn-outline-primary btn-sm" onclick="importClientsFromFile()">
+                                <i class="fas fa-upload me-1"></i>Import Clients
+                            </button>
+                            <div id="importClientsResult" class="mt-2 small"></div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <h6 class="fw-bold mb-2"><i class="fas fa-box me-2" style="color:#e87e2a;"></i>Import Materials</h6>
+                            <p class="text-muted small">Upload a .txt file with materials grouped by category (Name | Unit | Price)</p>
+                            <input type="file" id="importMaterialsFile" accept=".txt" class="form-control mb-2">
+                            <button class="btn btn-outline-primary btn-sm" onclick="importMaterialsFromFile()">
+                                <i class="fas fa-upload me-1"></i>Import Materials
+                            </button>
+                            <div id="importMaterialsResult" class="mt-2 small"></div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between mt-4">
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-outline-secondary" onclick="prevStep()"><i class="fas fa-arrow-left"></i> Back</button>
+                                <button class="btn btn-outline-secondary" onclick="skipStep()">Skip</button>
+                            </div>
+                            <button class="btn btn-primary" onclick="nextStep()">Next →</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOMContentLoaded check for authentication
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if user is authenticated
+            if (typeof requireAuth === 'function') {
+                requireAuth();
+            }
+        });
+
+        let currentStep = 1;
+        const totalSteps = 7;
+
+        // Update progress bar and step indicator
+        function updateProgress() {
+            const progressPercent = ((currentStep - 1) / (totalSteps - 1)) * 100;
+            document.getElementById('progressBar').style.width = `${progressPercent}%`;
+            document.getElementById('stepIndicator').textContent = `Step ${currentStep} of ${totalSteps}`;
+        }
+
+        // Show current step
+        function showStep(stepNumber) {
+            // Hide all steps
+            document.querySelectorAll('.step-panel').forEach(panel => {
+                panel.classList.remove('active');
+            });
+            
+            // Show current step
+            document.getElementById(`step${stepNumber}`).classList.add('active');
+            
+            // Update progress
+            currentStep = stepNumber;
+            updateProgress();
+            // Render terms list when step 4 becomes visible
+            if (stepNumber === 4 && typeof renderOnboardingTerms === 'function') renderOnboardingTerms();
+        }
+
+        // Go to next step
+        function nextStep() {
+            if (currentStep < totalSteps) {
+                showStep(currentStep + 1);
+            }
+        }
+
+        // Go to previous step
+        function prevStep() {
+            if (currentStep > 1) {
+                showStep(currentStep - 1);
+            }
+        }
+
+        // Skip current step and proceed to quote-builder.html
+        function skipStep() {
+            localStorage.setItem('ald_onboarding_complete', '1');
+            window.location.href = 'quote-builder.html';
+        }
+
+        // Save business info to localStorage and proceed
+        function saveBusinessInfo() {
+            const businessForm = document.getElementById('businessForm');
+            
+            if (!businessForm.checkValidity()) {
+                businessForm.reportValidity();
+                return;
+            }
+            
+            const profile = {
+                business_name: document.getElementById('businessName').value,
+                tagline: document.getElementById('companyTagline').value.trim(),
+                businessName: document.getElementById('businessName').value,
+                ownerName: document.getElementById('ownerName').value,
+                streetAddress: document.getElementById('streetAddress').value,
+                city: document.getElementById('city').value,
+                province: document.getElementById('province').value,
+                postalCode: document.getElementById('postalCode').value,
+                phone: document.getElementById('phone').value,
+                email: document.getElementById('email').value,
+                hstNumber: document.getElementById('hstNumber').value
+            };
+            
+            localStorage.setItem('ald_business_profile', JSON.stringify(profile));
+            
+            // Try to call saveBusinessProfile if it exists
+            if (typeof saveBusinessProfile === 'function') {
+                saveBusinessProfile(profile);
+            }
+            
+            nextStep();
+        }
+
+        // Handle logo upload and preview
+        document.getElementById('logoUpload').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const base64String = event.target.result;
+                    localStorage.setItem('ald_logo', base64String);
+                    document.getElementById('logoPreview').src = base64String;
+                    document.getElementById('logoPreview').style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Complete onboarding and redirect
+        function completeOnboarding() {
+            localStorage.setItem('ald_onboarding_complete', '1');
+            window.location.href = 'quote-builder.html';
+        }
+
+        // Initialize first step
+        showStep(1);
+        
+        var _onboardingTerms = [
+            { id: 't1', label: 'Deposit Required', text: 'A deposit of 30\u201350% of the total project cost is required before work begins. Work will not commence until the deposit is received.', defaultOn: true },
+            { id: 't2', label: 'Timeline Estimate', text: 'All project timelines provided are estimates only and are subject to change due to unforeseen conditions, material delays, weather, or client-requested changes.', defaultOn: true },
+            { id: 't3', label: 'Workmanship Warranty', text: 'All labor is warranted for 1 year from the date of project completion. This warranty covers defects in workmanship only and does not cover damage caused by client misuse, third parties, or normal wear and tear.', defaultOn: true },
+            { id: 't4', label: 'Payment Terms', text: 'Final payment is due within 7 days of project completion. Overdue balances may be subject to a 2% monthly interest charge.', defaultOn: true },
+            { id: 't5', label: 'Change Orders', text: 'Any changes to the agreed scope of work must be submitted in writing and approved by both parties. Change orders may affect the project timeline and total cost.', defaultOn: true },
+            { id: 't6', label: 'Site Access', text: 'The client agrees to provide safe and reasonable access to the property during agreed working hours. Delays caused by lack of access may affect the project timeline.', defaultOn: true },
+            { id: 't7', label: 'Material Costs', text: 'Material costs are estimated based on current pricing and may fluctuate. Any significant increase in material costs will be communicated to the client before proceeding.', defaultOn: false },
+            { id: 't8', label: 'Permits & Inspections', text: 'The contractor will obtain all required permits unless otherwise agreed in writing. Permit fees are the responsibility of the client and will be billed at cost.', defaultOn: false },
+            { id: 't9', label: 'Hidden Conditions', text: 'Unforeseen conditions discovered during work (e.g., rot, mold, faulty wiring, structural issues) are not included in the original quote. Additional costs will be discussed and approved before proceeding.', defaultOn: true },
+            { id: 't10', label: 'Debris & Cleanup', text: 'The contractor will remove all project-related debris upon completion. The client is responsible for clearing personal items from the work area prior to project start.', defaultOn: false },
+            { id: 't11', label: 'Subcontractors', text: 'The contractor reserves the right to use qualified subcontractors for portions of the work. All subcontractors are vetted and held to the same quality standards.', defaultOn: false },
+            { id: 't12', label: 'Dispute Resolution', text: 'Any disputes arising from this agreement will first be addressed through good-faith negotiation. If unresolved, disputes will be submitted to mediation before any legal action is taken.', defaultOn: false }
+        ];
+        function renderOnboardingTerms() {
+            var el = document.getElementById('onboardingTermsList');
+            if (!el) return;
+            el.innerHTML = _onboardingTerms.map(function(t, i) {
+                return '<div class="d-flex gap-2 align-items-center mb-2">'+
+                    '<input type="text" class="form-control form-control-sm" value="'+t.label.replace(/"/g,'&quot;')+'" onchange="_onboardingTerms['+i+'].label=this.value" placeholder="Term label" style="max-width:200px;">'+
+                    '<div class="form-check mb-0">'+
+                    '<input class="form-check-input" type="checkbox"'+(t.defaultOn?' checked':'')+' onchange="_onboardingTerms['+i+'].defaultOn=this.checked">'+
+                    '<label class="form-check-label small">Default on</label>'+
+                    '</div>'+
+                    '<button class="btn btn-sm btn-outline-danger" onclick="_onboardingTerms.splice('+i+',1);renderOnboardingTerms();"><i class="fas fa-trash"></i></button>'+
+                    '</div>';
+            }).join('');
+        }
+        function addOnboardingTerm() {
+            _onboardingTerms.push({ id: 't'+Date.now(), label: 'New Term', text: '', defaultOn: false });
+            renderOnboardingTerms();
+        }
+        function saveOnboardingTerms() {
+            localStorage.setItem('ald_custom_terms', JSON.stringify(_onboardingTerms));
+            nextStep();
+        }
+
+        function saveQuotePrefs() {
+            var prefs = {
+                heading: document.getElementById('quoteHeading').value.trim() || 'Your Renovation Quote',
+                prefix: document.getElementById('quotePrefix').value.trim() || 'ALD',
+                showPrefix: document.getElementById('showPrefix').checked
+            };
+            localStorage.setItem('ald_quote_prefs', JSON.stringify(prefs));
+            nextStep();
+        }
+
+        // Import functions
+        function importClientsFromFile() {
+            var file = document.getElementById('importClientsFile').files[0];
+            var resultEl = document.getElementById('importClientsResult');
+            if (!file) { resultEl.innerHTML = '<span class="text-danger">Please select a file first.</span>'; return; }
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                var lines = e.target.result.split('\n');
+                // ald_clients is an object keyed by client name
+                var clients = {};
+                try { clients = JSON.parse(localStorage.getItem('ald_clients') || '{}'); } catch(err) {}
+                var added = 0;
+                lines.forEach(function(line) {
+                    line = line.trim();
+                    if (!line) return;
+                    var phoneMatch = line.match(/(\d{3}[\s\-]\d{3}[\s\-]\d{4})/);
+                    var emailMatch = line.match(/([^\s]+@[^\s]+)/);
+                    if (!phoneMatch && !emailMatch) return;
+                    var phone = phoneMatch ? phoneMatch[1] : '';
+                    var email = emailMatch ? emailMatch[1] : '';
+                    // Name is everything before the phone number (or email if no phone)
+                    var name = '';
+                    if (phoneMatch) {
+                        name = line.substring(0, line.indexOf(phoneMatch[1])).trim();
+                    } else if (emailMatch) {
+                        name = line.substring(0, line.indexOf(emailMatch[1])).trim();
+                    }
+                    if (!name) return;
+                    // Address is everything after the email
+                    var address = '';
+                    if (emailMatch) {
+                        address = line.substring(line.indexOf(emailMatch[1]) + emailMatch[1].length).trim();
+                    }
+                    clients[name] = { name: name, phone: phone, email: email, address: address };
+                    added++;
+                });
+                localStorage.setItem('ald_clients', JSON.stringify(clients));
+                resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>' + added + ' clients imported!</span>';
+            };
+            reader.readAsText(file);
+        }
+
+        function importMaterialsFromFile() {
+            var file = document.getElementById('importMaterialsFile').files[0];
+            var resultEl = document.getElementById('importMaterialsResult');
+            if (!file) { resultEl.innerHTML = '<span class="text-danger">Please select a file first.</span>'; return; }
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                var lines = e.target.result.split('\n');
+                // ald_custom_items is an object: { "Category": [{name, unit, price, materialCost, supplierUrl}] }
+                var items = {};
+                try { items = JSON.parse(localStorage.getItem('ald_custom_items') || '{}'); } catch(err) {}
+                var currentCategory = 'General';
+                var added = 0;
+                for (var i = 0; i < lines.length; i++) {
+                    var line = lines[i].trim();
+                    if (!line || line.match(/^-+$/)) continue;
+                    // Category header: ALL CAPS line (no pipe)
+                    if (line === line.toUpperCase() && line.length > 2 && !line.includes('|')) {
+                        // Title-case the category
+                        currentCategory = line.charAt(0) + line.slice(1).toLowerCase();
+                        continue;
+                    }
+                    // Material line: Name | Unit | Price
+                    if (line.includes(' | ')) {
+                        var parts = line.split(' | ');
+                        if (parts.length >= 3) {
+                            var price = parseFloat(parts[2].replace(/[$,]/g, '')) || 0;
+                            if (!items[currentCategory]) items[currentCategory] = [];
+                            items[currentCategory].push({ name: parts[0].trim(), unit: parts[1].trim(), price: price, materialCost: 0, supplierUrl: '' });
+                            added++;
+                        }
+                    }
+                }
+                localStorage.setItem('ald_custom_items', JSON.stringify(items));
+                resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>' + added + ' materials imported!</span>';
+            };
+            reader.readAsText(file);
+        }
+    </script>
+</body>
+</html>

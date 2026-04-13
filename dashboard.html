@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuoteDr - Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background: #eef4fb; }
+        .navbar { background: #f0f4fa; border-bottom: 2px solid #d0dff0; overflow: visible; }
+        .quote-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+            transition: transform 0.15s, box-shadow 0.15s;
+            cursor: pointer;
+        }
+        .quote-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+        }
+        .status-badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.6rem;
+            border-radius: 20px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .status-draft { background: #e9ecef; color: #495057; }
+        .status-sent { background: #cfe2ff; color: #084298; }
+        .status-accepted { background: #d1e7dd; color: #0f5132; }
+        .status-declined { background: #f8d7da; color: #842029; }
+        .status-invoiced { background: #fff3cd; color: #664d03; }
+        .status-select {
+            background: transparent;
+        }
+        .status-select.status-draft {
+            color: #495057;
+        }
+        .status-select.status-sent {
+            color: #084298;
+        }
+        .status-select.status-accepted {
+            color: #0f5132;
+        }
+        .status-select.status-declined {
+            color: #842029;
+        }
+        .status-select.status-invoiced {
+            color: #664d03;
+        }
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+        }
+        .stat-card .number { font-size: 2rem; font-weight: 800; color: #1a56a0; }
+        .empty-state { text-align: center; padding: 4rem 2rem; color: #999; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-light px-4 py-2" style="position: relative; min-height: 64px;">
+        <div class="d-flex align-items-center gap-3">
+            <a href="quote-builder.html" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+        </div>
+        <!-- Centered logo -->
+        <div style="position: absolute; left: 50%; transform: translateX(-50%); top: 50%; margin-top: -96px;">
+            <img src="quotedr-logo.svg" alt="QuoteDr" style="height: 192px; width: auto;">
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary btn-sm" onclick="window.location.href='settings.html'">
+                <i class="fas fa-cog"></i> Settings
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="signOut()">
+                <i class="fas fa-sign-out-alt"></i> Sign Out
+            </button>
+        </div>
+    </nav>
+
+    <div class="container py-4">
+        <!-- Stats row -->
+        <div class="row g-3 mb-4" id="statsRow">
+            <div class="col-6 col-md-3">
+                <div class="stat-card">
+                    <div class="number" id="statTotal">-</div>
+                    <div class="text-muted small">Total Quotes</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-card">
+                    <div class="number" id="statDraft">-</div>
+                    <div class="text-muted small">Drafts</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-card">
+                    <div class="number" id="statAccepted">-</div>
+                    <div class="text-muted small">Accepted</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-card">
+                    <div class="number" id="statValue">-</div>
+                    <div class="text-muted small">Total Value</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action bar -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0 fw-bold">Your Quotes</h5>
+            <button class="btn btn-primary" onclick="newQuote()" style="background: linear-gradient(135deg,#1a56a0,#0f3460); border:none;">
+                <i class="fas fa-plus"></i> New Quote
+            </button>
+        </div>
+
+        <!-- Search -->
+        <div class="mb-3">
+            <input type="text" class="form-control" id="searchInput" placeholder="Search by client name or quote number..." oninput="filterQuotes()">
+        </div>
+
+        <!-- Quotes list -->
+        <div id="quotesList">
+            <div class="empty-state">
+                <i class="fas fa-file-invoice fa-3x mb-3" style="color:#ddd"></i>
+                <p><span class="spinner-border spinner-border-sm me-2"></span>Loading quotes...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase.js"></script>
+    <script>
+        const _supabase = window.supabase.createClient('https://axmoffknvblluibuitrq.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso');
+        let allQuotes = [];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (typeof requireAuth === 'function') {
+                const user = await requireAuth();
+                if (user) window.currentUser = user;
+                // Don't bail on no user — still load quotes (RLS handles security)
+            }
+            await loadQuotes();
+        });
+
+        async function loadQuotes() {
+            const { data, error } = await listQuotesFromSupabase();
+            if (error) {
+                document.getElementById('quotesList').innerHTML = `<div class="alert alert-danger">Error loading quotes: ${error.message}</div>`;
+                return;
+            }
+            allQuotes = data || [];
+            updateStats(allQuotes);
+            renderQuotes(allQuotes);
+        }
+
+        function updateStats(quotes) {
+            document.getElementById('statTotal').textContent = quotes.length;
+            document.getElementById('statDraft').textContent = quotes.filter(q => q.status === 'draft').length;
+            document.getElementById('statAccepted').textContent = quotes.filter(q => q.status === 'accepted').length;
+            const totalValue = quotes.reduce((sum, q) => sum + (parseFloat(q.total) || 0), 0);
+            document.getElementById('statValue').textContent = '$' + totalValue.toLocaleString('en-CA', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+        }
+
+        function renderQuotes(quotes) {
+            const el = document.getElementById('quotesList');
+            if (!quotes.length) {
+                el.innerHTML = `<div class="empty-state">
+                    <i class="fas fa-file-invoice fa-3x mb-3" style="color:#ddd"></i>
+                    <p>No quotes saved yet! <a href="#" onclick="newQuote()">Build your first quote →</a></p>
+                </div>`;
+                return;
+            }
+            el.innerHTML = quotes.map(q => `
+                <div class="quote-card">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div onclick="openQuote('${q.id}')" style="flex:1; cursor:pointer;">
+                            <div class="fw-bold">${q.client_name || 'Unnamed Client'}</div>
+                            <div class="text-muted small">${q.quote_number ? '#' + q.quote_number + ' · ' : ''}${formatDate(q.quote_date)} · Updated ${timeAgo(q.updated_at)}</div>
+                        </div>
+                        <div class="text-end d-flex flex-column align-items-end gap-1">
+                            <div class="fw-bold">$${parseFloat(q.total || 0).toLocaleString('en-CA', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                            <select class="form-select form-select-sm status-select status-${q.status}" style="width:auto; font-size:0.72rem; font-weight:600; text-transform:uppercase; border:none; cursor:pointer;" onchange="changeStatus('${q.id}', this.value, this)" onclick="event.stopPropagation()">
+                                <option value="draft" ${q.status==='draft'?'selected':''}>${q.status==='draft'?'Draft':'Draft'}</option>
+                                <option value="sent" ${q.status==='sent'?'selected':''}>${q.status==='sent'?'Sent':'Sent'}</option>
+                                <option value="accepted" ${q.status==='accepted'?'selected':''}>${q.status==='accepted'?'Accepted':'Accepted'}</option>
+                                <option value="declined" ${q.status==='declined'?'selected':''}>${q.status==='declined'?'Declined':'Declined'}</option>
+                                <option value="invoiced" ${q.status==='invoiced'?'selected':''}>${q.status==='invoiced'?'Invoiced':'Invoiced'}</option>
+                            </select>
+                            <button class="btn btn-sm btn-outline-danger mt-1" style="font-size:0.75rem; padding:0.2rem 0.5rem;" onclick="deleteQuote('${q.id}', event)">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function filterQuotes() {
+            const q = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = allQuotes.filter(quote =>
+                (quote.client_name || '').toLowerCase().includes(q) ||
+                (quote.quote_number || '').toLowerCase().includes(q)
+            );
+            renderQuotes(filtered);
+        }
+
+        function formatDate(d) {
+            if (!d) return '';
+            return new Date(d).toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' });
+        }
+
+        function newQuote() {
+            window.location.href = 'quote-builder.html?new=1';
+        }
+
+        function openQuote(id) {
+            localStorage.setItem('ald_open_cloud_quote', id);
+            window.location.href = 'quote-builder.html';
+        }
+
+        function timeAgo(dateStr) {
+            if (!dateStr) return '';
+            const diff = Date.now() - new Date(dateStr).getTime();
+            const mins = Math.floor(diff / 60000);
+            if (mins < 1) return 'just now';
+            if (mins < 60) return mins + 'm ago';
+            const hrs = Math.floor(mins / 60);
+            if (hrs < 24) return hrs + 'h ago';
+            const days = Math.floor(hrs / 24);
+            return days + 'd ago';
+        }
+
+        async function changeStatus(quoteId, newStatus, selectEl) {
+            selectEl.className = 'form-select form-select-sm status-select status-' + newStatus;
+            const user = await getCurrentUser();
+            if (!user) return;
+            const { error: err } = await _supabase
+                .from('quotes')
+                .update({ status: newStatus, updated_at: new Date().toISOString() })
+                .eq('id', quoteId)
+                .eq('user_id', user.id);
+            if (err) {
+                alert('Error updating status: ' + err.message);
+                await loadQuotes();
+            } else {
+                const q = allQuotes.find(x => x.id === quoteId);
+                if (q) q.status = newStatus;
+                updateStats(allQuotes);
+            }
+        }
+
+        async function deleteQuote(quoteId, event) {
+            event.stopPropagation();
+            if (!confirm('Delete this quote? This cannot be undone.')) return;
+            const { error } = await deleteQuoteFromSupabase(quoteId);
+            if (error) {
+                alert('Error deleting: ' + error.message);
+                return;
+            }
+            allQuotes = allQuotes.filter(q => q.id !== quoteId);
+            updateStats(allQuotes);
+            renderQuotes(allQuotes);
+        }
+    </script>
+</body>
+</html>
