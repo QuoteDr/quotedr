@@ -32,9 +32,14 @@
         <!-- Header -->
         <div class="d-flex align-items-center justify-content-between mb-4">
             <h1><i class="fas fa-th-large me-2"></i>Dashboard</h1>
-            <a href="quote-builder.html" class="btn btn-primary" onclick="saveSessionQuote();">
-                <i class="fas fa-plus me-2"></i>New Quote
-            </a>
+            <div class="d-flex gap-2">
+                <a href="quote-builder.html" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>Back
+                </a>
+                <a href="quote-builder.html" class="btn btn-primary" onclick="localStorage.removeItem('ald_session_quote');">
+                    <i class="fas fa-plus me-2"></i>New Quote
+                </a>
+            </div>
         </div>
 
         <!-- Stats Cards -->

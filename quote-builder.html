@@ -2228,6 +2228,15 @@
             } catch (err) {
                 updateSaveStatus('error', 'Could not write file');
             }
+            // Always cloud save on manual save
+            if (typeof saveQuoteToSupabase === 'function') {
+                var qData = collectQuoteData();
+                saveQuoteToSupabase(qData).then(function(result) {
+                    if (result && result.data && result.data.id) {
+                        window._supabaseQuoteId = result.data.id;
+                    }
+                }).catch(function(){});
+            }
         }
 
         async function loadQuoteFromFile() {
