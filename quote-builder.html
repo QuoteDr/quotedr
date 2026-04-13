@@ -881,6 +881,30 @@
             return nextQuoteNumberValue();
         }
 
+        async function syncQuoteNumberFromCloud() {
+            try {
+                if (typeof listQuotesFromSupabase !== 'function') return;
+                const quotesResult = await listQuotesFromSupabase();
+                if (quotesResult.error || !quotesResult.data || quotesResult.data.length === 0) return;
+                var maxNum = 0;
+                quotesResult.data.forEach(function(q) {
+                    if (q.quote_number) {
+                        var m = String(q.quote_number).match(/(\d+)$/);
+                        if (m) { var n = parseInt(m[1]); if (n > maxNum) maxNum = n; }
+                    }
+                });
+                // Store max so nextQuoteNumberValue picks it up via getUsedQuoteNumbers
+                var used = [];
+                try { used = JSON.parse(localStorage.getItem('ald_used_quote_numbers') || '[]'); } catch(e) {}
+                var year = new Date().getFullYear();
+                var synced = year + '-' + String(maxNum).padStart(3, '0');
+                if (maxNum > 0 && used.indexOf(synced) === -1) {
+                    used.push(synced);
+                    localStorage.setItem('ald_used_quote_numbers', JSON.stringify(used));
+                }
+            } catch(e) { console.warn('syncQuoteNumberFromCloud:', e); }
+        }
+
         function nextQuoteNumberValue() {
             var prefs = JSON.parse(localStorage.getItem('ald_quote_prefs') || '{}');
             var year = new Date().getFullYear();
@@ -3457,39 +3481,3 @@
     </script>
 </body>
 </html>
-
-        // ─── CLOUD SYNC FUNCTIONS ──────────────────────────────────────────────────
-
-        async function syncQuoteNumberFromCloud() {
-            try {
-                const quotesResult = await listQuotesFromSupabase();
-                if (quotesResult.error) {
-                    console.error('Error fetching quotes from Supabase:', quotesResult.error);
-                    return;
-                }
-                
-                if (!quotesResult.data || quotesResult.data.length === 0) {
-                    return; // No existing quotes, keep current counter
-                }
-                
-                let maxQuoteNumber = 0;
-                quotesResult.data.forEach(quote => {
-                    if (quote.quote_number && quote.quote_number.startsWith('2026-')) {
-                        const numberPart = parseInt(quote.quote_number.split('-')[1]);
-                        if (!isNaN(numberPart) && numberPart > maxQuoteNumber) {
-                            maxQuoteNumber = numberPart;
-                        }
-                    }
-                });
-                
-                // Update local counter if cloud has higher number
-                const prefs = JSON.parse(localStorage.getItem('ald_prefs') || '{}');
-                const currentCounter = parseInt(prefs.quoteCounter) || 0;
-                if (maxQuoteNumber > currentCounter) {
-                    prefs.quoteCounter = maxQuoteNumber;
-                    localStorage.setItem('ald_prefs', JSON.stringify(prefs));
-                }
-            } catch (error) {
-                console.error('Error syncing quote number from cloud:', error);
-            }
-        }
