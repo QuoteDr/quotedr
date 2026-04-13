@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Material Calculator - ALD Direct</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --ald-purple: #6a1b9a;
+            --ald-dark: #4a148c;
+            --ald-light: #f3e5f5;
+            --ald-success: #4caf50;
+        }
+        body { background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%); padding: 20px; }
+        .calculator-card { background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(106, 27, 154, 0.15); margin-bottom: 20px; }
+        .header-section { background: linear-gradient(135deg, var(--ald-purple) 0%, var(--ald-dark) 100%); color: white; padding: 20px; border-radius: 12px 12px 0 0; margin: -20px -20px 20px -20px; }
+        .category-btn { flex: 1; min-width: 80px; margin: 2px; padding: 10px 15px; font-size: 14px; border-radius: 6px; border: 2px solid var(--ald-purple); background: white; color: var(--ald-purple); cursor: pointer; transition: all 0.2s; }
+        .category-btn.active { background: var(--ald-purple); color: white; font-weight: bold; }
+        .result-box { background: var(--ald-light); border-left: 4px solid var(--ald-purple); padding: 15px; margin-top: 15px; border-radius: 0 8px 8px 0; }
+        .calculation-step { font-size: 13px; color: #666; margin-top: 5px; }
+        .material-card { border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px; margin-bottom: 15px; }
+        .material-card h6 { color: var(--ald-purple); border-bottom: 1px solid #eee; padding-bottom: 8px; margin-top: 0; }
+        .quote-section { background: #e8f5e9; border-left: 4px solid var(--ald-success); padding: 15px; margin-top: 20px; border-radius: 0 8px 8px 0; }
+        @media print { body { background: white; padding: 0; } .no-print { display: none !important; } .calculator-card { box-shadow: none; border: 1px solid #ddd; } }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <!-- Header -->
+        <div class="header-section text-center">
+            <h2 class="mb-1">🏗️ Enhanced Material Calculator</h2>
+            <p class="mb-0 opacity-75">Quick estimates for ALD Direct renovation projects</p>
+        </div>
+
+        <!-- Category Selector -->
+        <div class="calculator-card p-3">
+            <label class="form-label fw-bold mb-2">Select Calculation Type:</label>
+            <div id="categoryButtons" class="d-flex flex-wrap gap-1"></div>
+        </div>
+
+        <!-- Calculator Form -->
+        <div class="calculator-card p-4 d-none" id="calculatorForm">
+            <h5 id="calcTitle" class="mb-3 fw-bold text-primary"></h5>
+            
+            <form id="calcForm">
+                <div class="row g-3" id="inputFields"></div>
+                
+                <!-- Waste Factor -->
+                <div class="mt-3">
+                    <label class="form-label small">Waste/Cut-off factor (%):</label>
+                    <select class="form-select form-select-sm" id="wasteFactor" style="width: 150px; display: inline-block;">
+                        <option value="5">5% (minimal waste)</option>
+                        <option value="10" selected>10% (standard)</option>
+                        <option value="15">15% (complex cuts)</option>
+                        <option value="20">20% (high waste/diagonal)</option>
+                    </select>
+                </div>
+
+                <!-- Results -->
+                <div id="results" class="result-box d-none"></div>
+                
+                <!-- Quote Section -->
+                <div id="quoteSection" class="quote-section d-none">
+                    <h6>📋 Project Summary</h6>
+                    <p id="quoteSummary"></p>
+                    <button type="button" class="btn btn-success btn-sm" onclick="copyQuote()">📋 Copy to Clipboard</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Quick Reference Card -->
+        <div class="calculator-card p-4">
+            <h5 class="fw-bold mb-3">📋 Quick Reference</h5>
+            <ul id="refList" class="small text-muted mb-0"></ul>
+        </div>
+
+        <!-- Print Button -->
+        <button onclick="window.print()" class="btn btn-purple btn-lg w-100 no-print mt-3">🖨️ Print Results</button>
+    </div>
+
+    <script>
+        // Enhanced Calculator Definitions
+        const calculators = {
+            drywall: {
+                title: "Drywall Estimator",
+                inputs: [
+                    { id: "length", label: "Wall Length (ft)", type: "number", step: 0.1, required: true },
+                    { id: "height", label: "Wall Height (ft)", type: "number", step: 0.1, required: true }
+                ],
+                reference: [
+                    "Standard sheet: 4' x 8' = 32 sq ft",
+                    "Ceiling height: 8' standard",
+                    "One person can hang ~15-20 sheets/day",
+                    "Mud & tape: ~$0.80-1.20/sq ft"
+                ],
+                calculate: (vals, waste) => {
+                    const area = vals.length * vals.height;
+                    const sheets = Math.ceil(area / 32);
+                    const withWaste = Math.ceil(sheets * (1 + waste/100));
+                    return [
+                        { label: "Total Wall Area", value: area.toFixed(1) + " sq ft" },
+                        { label: "Standard Sheets Needed", value: sheets + " sheets" },
+                        { label: `With ${waste}% Waste`, value: withWaste + " sheets" },
+                        { label: "Estimated Labor", value: (withWaste / 17).toFixed(1) + " person-days" },
+                        { label: "Cost Estimate", value: "$" + (withWaste * 8).toFixed(0) + " - $" + (withWaste * 12).toFixed(0) }
+                    ];
+                }
+            },
+            flooring: {
+                title: "Flooring Estimator",
+                inputs: [
+                    { id: "length", label: "Room Length (ft)", type: "number", step: 0.1, required: true },
+                    { id: "width", label: "Room Width (ft)", type: "number", step: 0.1, required: true }
+                ],
+                reference: [
+                    "Add 10% for standard cuts",
+                    "Add 15-20% for diagonal patterns",
+                    "Laminate/LVP: ~50 sq ft per box",
+                    "Tile: ~10-15 sq ft per case"
+                ],
+                calculate: (vals, waste) => {
+                    const area = vals.length * vals.width;
+                    const withWaste = Math.ceil((area * (1 + waste/100)) / 32) * 32;
+                    return [
+                        { label: "Floor Area", value: area.toFixed(1) + " sq ft" },
+                        { label: `With ${waste}% Waste`, value: withWaste.toFixed(1) + " sq ft" },
+                        { label: "Laminate Boxes (50sqft/box)", value: Math.ceil(withWaste / 50) + " boxes" },
+                        { label: "Tile Cases (12sqft/case)", value: Math.ceil(withWaste / 12) + " cases" },
+                        { label: "Cost Estimate", value: "$" + (Math.ceil(withWaste / 50) * 80).toFixed(0) + " - $" + (Math.ceil(withWaste / 50) * 120).toFixed(0) }
+                    ];
+                }
+            },
+            paint: {
+                title: "Paint Estimator",
+                inputs: [
+                    { id: "length", label: "Wall Length (ft)", type: "number", step: 0.1, required: true },
+                    { id: "height", label: "Wall Height (ft)", type: "number", step: 0.1, required: true },
+                    { id: "doors", label: "Doors (#)", type: "number", default: 1 },
+                    { id: "windows", label: "Windows (#)", type: "number", default: 2 }
+                ],
+                reference: [
+                    "Paint coverage: ~350 sq ft/gallon",
+                    "Typical rooms need 1-2 coats",
+                    "Primer: 1 coat before painting",
+                    "Trim paint: ~400 sq ft/gallon"
+                ],
+                calculate: (vals, waste) => {
+                    const wallArea = vals.length * vals.height;
+                    const doorArea = vals.doors * 21; // 3'x7'
+                    const windowArea = vals.windows * 15; // average
+                    const paintableArea = Math.max(wallArea - doorArea - windowArea, 0);
+                    const gallons = Math.ceil((paintableArea / 350) * 2); // 2 coats
+                    return [
+                        { label: "Wall Area", value: wallArea.toFixed(1) + " sq ft" },
+                        { label: "Less Doors/Windows", value: "-" + ((doorArea + windowArea).toFixed(1)) + " sq ft" },
+                        { label: "Paintable Area", value: paintableArea.toFixed(1) + " sq ft" },
+                        { label: "Gallons Needed (2 coats)", value: gallons + " gallon(s)" },
+                        { label: "Estimated Cost", value: "$" + (gallons * 45).toFixed(0) + " - $" + (gallons * 75).toFixed(0) }
+                    ];
+                }
+            },
+            framing: {
+                title: "Framing Estimator",
+                inputs: [
+                    { id: "length", label: "Wall Length (ft)", type: "number", step: 0.1, required: true },
+                    { id: "height", label: "Wall Height (ft)", type: "number", step: 0.1, default: 8 },
+                    { id: "type", label: "Framing Type", type: "select", options: ["2x4 Wall", "2x6 Wall"] }
+                ],
+                reference: [
+                    "Standard spacing: 16\" OC (on center)",
+                    "Add 1 stud for each corner/intersection",
+                    "Top plates: 2 per wall",
+                    "Bottom plate: 1 per wall"
+                ],
+                calculate: (vals, waste) => {
+                    const studsPerWall = Math.ceil(vals.length * 12 / 16) + 2; // +2 for corners
+                    const totalStuds = Math.ceil(studsPerWall * (1 + waste/100));
+                    const plateLength = vals.length * 3; // 2 top + 1 bottom
+                    const withWastePlates = Math.ceil(plateLength * (1 + waste/100));
+                    return [
+                        { label: "Wall Length", value: vals.length.toFixed(1) + " ft" },
+                        { label: "Studs @ 16\" OC", value: studsPerWall + " studs" },
+                        { label: `With ${waste}% Waste`, value: totalStuds + " studs" },
+                        { label: "2x4 Lumber (plates)", value: withWastePlates.toFixed(0) + " linear ft" },
+                        { label: "Estimated Cost", value: "$" + (totalStuds * 3).toFixed(0) + " - $" + (totalStuds * 5).toFixed(0) }
+                    ];
+                }
+            },
+            insulation: {
+                title: "Insulation Estimator",
+                inputs: [
+                    { id: "length", label: "Wall Length (ft)", type: "number", step: 0.1, required: true },
+                    { id: "height", label: "Wall Height (ft)", type: "number", step: 0.1, default: 8 },
+                    { id: "rValue", label: "R-Value", type: "select", options: ["R-13", "R-15", "R-21"] }
+                ],
+                reference: [
+                    "Batts come in 15\" or 23\" widths",
+                    "Standard coverage: ~40 sq ft per batt (R-13/15)",
+                    "Cut-offs create waste (~10%)",
+                    "R-21 typically for exterior walls"
+                ],
+                calculate: (vals, waste) => {
+                    const area = vals.length * 8; // standard 8' height
+                    const battsPerRoll = 4; // typical
+                    const sqFtPerBatt = vals.rValue === "R-21" ? 30 : 40;
+                    const totalArea = area * (1 + waste/100);
+                    const battsNeeded = Math.ceil(totalArea / sqFtPerBatt);
+                    return [
+                        { label: "Wall Area", value: area.toFixed(1) + " sq ft" },
+                        { label: `With ${waste}% Waste`, value: totalArea.toFixed(1) + " sq ft" },
+                        { label: `${vals.rValue} Batts Needed`, value: battsNeeded + " batts" },
+                        { label: "Rolls Required", value: Math.ceil(battsNeeded / battsPerRoll) + " roll(s)" },
+                        { label: "Estimated Cost", value: "$" + (Math.ceil(battsNeeded / battsPerRoll) * 40).toFixed(0) + " - $" + (Math.ceil(battsNeeded / battsPerRoll) * 60).toFixed(0) }
+                    ];
+                }
+            },
+            tile: {
+                title: "Tile Estimator",
+                inputs: [
+                    { id: "length", label: "Room Length (ft)", type: "number", step: 0.1, required: true },
+                    { id: "width", label: "Room Width (ft)", type: "number", step: 0.1, required: true },
+                    { id: "size", label: "Tile Size", type: "select", options: ["12\"x12\"", "16\"x16\"", "18\"x18\"", "24\"x24\"", "12\"x24\""] }
+                ],
+                reference: [
+                    "Larger tiles = more breakage waste",
+                    "Diagonal layout adds 15% waste",
+                    "Grout lines: 1/8\" standard, 3/16\" large format",
+                    "Thinset: ~40 sq ft per bag (1/4\")"
+                ],
+                calculate: (vals, waste) => {
+                    const area = vals.length * vals.width;
+                    const tileSizes = {"12\"x12\"": 1, "16\"x16\"": 1.78, "18\"x18\"": 2.25, "24\"x24\"": 4, "12\"x24\"": 2};
+                    const sqFtPerTile = tileSizes[vals.size];
+                    const withWaste = area * (1 + waste/100);
+                    const tilesNeeded = Math.ceil(withWaste / sqFtPerTile);
+                    return [
+                        { label: "Floor Area", value: area.toFixed(1) + " sq ft" },
+                        { label: `With ${waste}% Waste`, value: withWaste.toFixed(1) + " sq ft" },
+                        { label: `${vals.size} Tiles Needed`, value: tilesNeeded + " tiles" },
+                        { label: "Extra for Breakage", value: Math.ceil(tilesNeeded * 0.1) + " additional tiles" },
+                        { label: "Estimated Cost", value: "$" + (Math.ceil(tilesNeeded * 0.1) * 2).toFixed(0) + " - $" + (tilesNeeded * 5).toFixed(0) }
+                    ];
+                }
+            }
+        };
+
+        // Initialize
+        let currentCalc = null;
+
+        function init() {
+            const categories = [
+                { id: 'drywall', label: '📄 Drywall' },
+                { id: 'flooring', label: '🏠 Flooring' },
+                { id: 'paint', label: '🎨 Paint' },
+                { id: 'framing', label: '🔨 Framing' },
+                { id: 'insulation', label: '🧊 Insulation' },
+                { id: 'tile', label: '🟫 Tile' }
+            ];
+
+            const btnContainer = document.getElementById('categoryButtons');
+            categories.forEach(cat => {
+                const btn = document.createElement('button');
+                btn.className = 'category-btn';
+                btn.textContent = cat.label;
+                btn.onclick = () => selectCalculator(cat.id, btn);
+                btnContainer.appendChild(btn);
+            });
+
+            // Default selection
+            selectCalculator('drywall', btnContainer.firstChild);
+        }
+
+        function selectCalculator(id, btnElement) {
+            currentCalc = calculators[id];
+            
+            // Update buttons
+            document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+            if (btnElement) btnElement.classList.add('active');
+
+            // Show form
+            document.getElementById('calculatorForm').classList.remove('d-none');
+            document.getElementById('calcTitle').textContent = currentCalc.title;
+
+            // Build inputs
+            const inputContainer = document.getElementById('inputFields');
+            inputContainer.innerHTML = '';
+            
+            currentCalc.inputs.forEach(field => {
+                const col = document.createElement('div');
+                col.className = 'col-md-6';
+                
+                let inputHtml = `<label class="form-label small">${field.label}</label>`;
+                
+                if (field.type === 'select') {
+                    inputHtml += '<select class="form-select form-select-sm" id="' + field.id + '" onchange="calculate()">';
+                    field.options.forEach(opt => {
+                        inputHtml += `<option value="${opt}" ${field.default === opt ? 'selected' : ''}>${opt}</option>`;
+                    });
+                    inputHtml += '</select>';
+                } else {
+                    inputHtml += `<input type="${field.type}" class="form-control form-control-sm" id="${field.id}" 
+                        step="${field.step || 1}" value="${field.default || ''}" required onchange="calculate()">`;
+                }
+                
+                col.innerHTML = inputHtml;
+                inputContainer.appendChild(col);
+            });
+
+            // Update reference
+            const refList = document.getElementById('refList');
+            refList.innerHTML = currentCalc.reference.map(r => `<li>${r}</li>`).join('');
+
+            // Clear results
+            document.getElementById('results').classList.add('d-none');
+            document.getElementById('quoteSection').classList.add('d-none');
+        }
+
+        function calculate() {
+            if (!currentCalc) return;
+
+            const vals = {};
+            let valid = true;
+
+            currentCalc.inputs.forEach(field => {
+                const el = document.getElementById(field.id);
+                if (el) {
+                    vals[field.id] = field.type === 'number' ? parseFloat(el.value) || 0 : el.value;
+                    if (field.required && (!el.value || (field.type === 'number' && isNaN(vals[field.id])))) {
+                        valid = false;
+                    }
+                }
+            });
+
+            if (!valid) return;
+
+            const waste = parseFloat(document.getElementById('wasteFactor').value);
+            const results = currentCalc.calculate(vals, waste);
+
+            // Display results
+            const resultsContainer = document.getElementById('results');
+            const resultsHtml = results.map(r => `<div class="row"><div class="col-6"><strong>${r.label}:</strong></div><div class="col-6">${r.value}</div></div>`).join('');
+            resultsContainer.innerHTML = '<div class="row">' + resultsHtml + '</div>';
+            resultsContainer.classList.remove('d-none');
+
+            // Create quote summary
+            const quoteSection = document.getElementById('quoteSection');
+            const quoteSummary = document.getElementById('quoteSummary');
+            
+            let summaryText = `Project: ${currentCalc.title} - `;
+            summaryText += results.map(r => `${r.label}: ${r.value}`).join(', ');
+            summaryText += ` | Waste Factor: ${waste}%`;
+            
+            quoteSummary.textContent = summaryText;
+            quoteSection.classList.remove('d-none');
+        }
+
+        function copyQuote() {
+            const quoteSummary = document.getElementById('quoteSummary').textContent;
+            navigator.clipboard.writeText(quoteSummary).then(() => {
+                alert('Quote copied to clipboard!');
+            });
+        }
+
+        // Initialize when page loads
+        window.onload = init;
+    </script>
+</body>
+</html>

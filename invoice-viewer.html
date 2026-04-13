@@ -128,6 +128,8 @@
             .no-print { display: none !important; }
             .totals-section { box-shadow: none; border: 1px solid #dee2e6; }
         }
+
+        .no-print, .btn, nav, .navbar { display: none !important; }\n        body { background: white !important; }\n        @page { margin: 1cm; }\n    </style>
     </style>
 </head>
 <body>
@@ -467,5 +469,13 @@
     </script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase.js"></script>
+</body>
+</html>
+-e 
+<div class="no-print" style="position:fixed; bottom:24px; right:24px; z-index:9999;">
+    <button onclick="window.print()" class="btn btn-lg shadow" style="background:#1a56a0; color:#fff; font-weight:600; border-radius:50px; padding:12px 24px;">
+        <i class="fas fa-download me-2"></i>Download PDF
+    </button>
+</div>
 </body>
 </html>
