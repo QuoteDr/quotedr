@@ -223,6 +223,13 @@
                         <div class="d-flex align-items-center gap-3">
                             <label class="mb-0"><strong>Quote #:</strong></label>
                             <input type="text" id="quoteNumber" class="form-control" style="max-width: 200px; font-weight: bold; font-size: 1.1rem;" placeholder="2026-001" id="quoteNumber" oninput="checkQuoteNumberDuplicate()">
+                            <select id="quoteStatus" class="form-select form-select-sm d-inline-block" style="width:auto; font-size:0.8rem;" onchange="markUnsaved()">
+                                <option value="draft">Draft</option>
+                                <option value="sent">Sent</option>
+                                <option value="accepted">Accepted</option>
+                                <option value="declined">Declined</option>
+                                <option value="invoiced">Invoiced</option>
+                            </select>
                             <button onclick="randomizeQuoteNumber()" class="btn btn-sm btn-outline-secondary" title="Generate a random unused quote number">
                                 <i class="fas fa-random"></i> Randomize
                             </button>
@@ -1008,6 +1015,13 @@
 
         // Global variable to track if we're editing an existing item
         let editingItemIndex = null;
+
+        // Auto-save on beforeunload
+        window.addEventListener('beforeunload', function() {
+            if (typeof collectQuoteData === 'function' && typeof saveSessionQuote === 'function') {
+                saveSessionQuote();
+            }
+        });
 
         function editLineItem(roomId, itemIndex) {
             const room = rooms.find(r => r.id === roomId);

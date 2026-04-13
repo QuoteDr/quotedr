@@ -135,7 +135,7 @@
             <div class="mb-3">
                 <label class="form-label">Password</label>
                 <div class="input-group">
-                    <input type="password" class="form-control" id="signinPassword" placeholder="Enter your password">
+                    <input type="password" class="form-control" id="signinPassword" placeholder="Enter your password" onkeypress="if(event.key==='Enter') handleSignIn();">
                     <button type="button" class="btn btn-outline-secondary" onclick="togglePassword('signinPassword', this)" tabindex="-1">
                         <i class="fas fa-eye"></i>
                     </button>
