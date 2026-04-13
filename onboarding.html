@@ -483,7 +483,7 @@
                         if (parts.length >= 3) {
                             var price = parseFloat(parts[2].replace(/[$,]/g, '')) || 0;
                             if (!items[currentCategory]) items[currentCategory] = [];
-                            items[currentCategory].push({ name: parts[0].trim(), unit: parts[1].trim(), price: price, materialCost: 0, supplierUrl: '' });
+                            items[currentCategory].push({ name: parts[0].trim(), unitType: parts[1].trim(), rate: price, materialCost: 0, supplierUrl: '' });
                             added++;
                         }
                     }
