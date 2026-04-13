@@ -362,6 +362,11 @@
         });
 
         // Complete onboarding and redirect
+        function skipOnboarding() {
+            localStorage.setItem('ald_onboarding_complete', '1');
+            window.location.href = 'quote-builder.html';
+        }
+
         function completeOnboarding() {
             localStorage.setItem('ald_onboarding_complete', '1');
             window.location.href = 'quote-builder.html';
