@@ -117,12 +117,25 @@
         async function refreshQuotes() {
             try {
                 const { data, error } = await listQuotesFromSupabase();
+                if (error === 'Not authenticated') {
+                    // Retry after delay — session may not be ready yet
+                    setTimeout(async function() {
+                        const retry = await listQuotesFromSupabase();
+                        if (!retry.error) {
+                            renderQuotes(retry.data || []);
+                            updateStats(retry.data || []);
+                        } else {
+                            document.getElementById('quotesList').innerHTML = '<div class="alert alert-warning">Please <a href="login.html">log in</a> to see your quotes.</div>';
+                        }
+                    }, 1500);
+                    return;
+                }
                 if (error) throw error;
-                renderQuotes(data);
-                updateStats(data);
+                renderQuotes(data || []);
+                updateStats(data || []);
             } catch (err) {
-                console.error('Error loading quotes:', err.message);
-                alert('Error loading quotes: ' + err.message);
+                console.error('Error loading quotes:', err.message || err);
+                document.getElementById('quotesList').innerHTML = '<div class="alert alert-danger">Error loading quotes: ' + (err.message || err) + '</div>';
             }
         }
 
@@ -271,11 +284,14 @@
 
         async function initDashboard() {
             try {
-                await requireAuth();
+                // Don't bail on no auth — try to load quotes regardless
+                if (typeof requireAuth === 'function') {
+                    const user = await requireAuth().catch(function(){return null;});
+                    if (user) window.currentUser = user;
+                }
                 await refreshQuotes();
             } catch (err) {
                 console.error('Init error:', err.message);
-                alert('Authentication failed: ' + err.message);
             }
         }
 

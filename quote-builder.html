@@ -2043,6 +2043,9 @@
         }
 
         function confirmGenerateQuote() {
+            // Open window FIRST before any other work to avoid popup blocker
+            var viewerWindow = window.open('', '_blank');
+
             var styleModal = bootstrap.Modal.getInstance(document.getElementById('quoteStyleModal'));
             if (styleModal) styleModal.hide();
 
@@ -2069,8 +2072,12 @@
             const baseUrl = window.location.href.split('?')[0].replace('quote-builder.html', 'interactive-quote-viewer.html');
             const viewerUrl = baseUrl + '?quote=' + quoteId;
 
-            // Open the viewer in a new tab immediately
-            window.open(viewerUrl, '_blank');
+            // Navigate the pre-opened window to avoid popup blocker
+            if (viewerWindow) {
+                viewerWindow.location.href = viewerUrl;
+            } else {
+                window.open(viewerUrl, '_blank');
+            }
 
             // Show a copyable link modal
             let modal = document.getElementById('interactiveLinkModal');
