@@ -5,176 +5,144 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QuoteDr - Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { background: #eef4fb; }
-        .navbar { background: #f0f4fa; border-bottom: 2px solid #d0dff0; overflow: visible; }
+        body { background-color: #eef4fb; }
         .quote-card {
             background: white;
-            border-radius: 12px;
-            padding: 1.25rem;
+            border-radius: 8px;
+            padding: 1rem;
             margin-bottom: 1rem;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.07);
-            transition: transform 0.15s, box-shadow 0.15s;
-            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            transition: transform 0.2s, box-shadow 0.2s;
         }
         .quote-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
         }
-        .status-badge {
-            font-size: 0.75rem;
-            padding: 0.25rem 0.6rem;
-            border-radius: 20px;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-        .status-draft { background: #e9ecef; color: #495057; }
-        .status-sent { background: #cfe2ff; color: #084298; }
-        .status-accepted { background: #d1e7dd; color: #0f5132; }
-        .status-declined { background: #f8d7da; color: #842029; }
-        .status-invoiced { background: #fff3cd; color: #664d03; }
-        .status-select {
-            background: transparent;
-        }
-        .status-select.status-draft {
-            color: #495057;
-        }
-        .status-select.status-sent {
-            color: #084298;
-        }
-        .status-select.status-accepted {
-            color: #0f5132;
-        }
-        .status-select.status-declined {
-            color: #842029;
-        }
-        .status-select.status-invoiced {
-            color: #664d03;
-        }
-        .stat-card {
-            background: white;
-            border-radius: 12px;
-            padding: 1.5rem;
-            text-align: center;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.07);
-        }
-        .stat-card .number { font-size: 2rem; font-weight: 800; color: #1a56a0; }
-        .empty-state { text-align: center; padding: 4rem 2rem; color: #999; }
+        .status-draft { background-color: #e9ecef; color: #6c757d; }
+        .status-sent { background-color: #cce5ff; color: #004085; }
+        .status-accepted { background-color: #d4edda; color: #155724; }
+        .status-declined { background-color: #f8d7da; color: #721c24; }
+        .status-invoiced { background-color: #fff3cd; color: #856404; }
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-light px-4 py-2" style="position: relative; min-height: 64px;">
-        <div class="d-flex align-items-center gap-3">
-            <a href="quote-builder.html" class="btn btn-outline-secondary btn-sm">
-                <i class="fas fa-arrow-left"></i> Back
+    <div class="container-fluid py-4">
+        <!-- Header -->
+        <div class="d-flex align-items-center justify-content-between mb-4">
+            <h1><i class="fas fa-th-large me-2"></i>Dashboard</h1>
+            <a href="quote-builder.html" class="btn btn-primary" onclick="saveSessionQuote();">
+                <i class="fas fa-plus me-2"></i>New Quote
             </a>
         </div>
-        <!-- Centered logo -->
-        <div style="position: absolute; left: 50%; transform: translateX(-50%); top: 50%; margin-top: -96px;">
-            <img src="quotedr-logo.svg" alt="QuoteDr" style="height: 192px; width: auto;">
-        </div>
-        <div class="d-flex gap-2">
-            <button class="btn btn-outline-secondary btn-sm" onclick="window.location.href='settings.html'">
-                <i class="fas fa-cog"></i> Settings
-            </button>
-            <button class="btn btn-outline-secondary btn-sm" onclick="signOut()">
-                <i class="fas fa-sign-out-alt"></i> Sign Out
-            </button>
-        </div>
-    </nav>
 
-    <div class="container py-4">
-        <!-- Stats row -->
-        <div class="row g-3 mb-4" id="statsRow">
-            <div class="col-6 col-md-3">
-                <div class="stat-card">
-                    <div class="number" id="statTotal">-</div>
-                    <div class="text-muted small">Total Quotes</div>
+        <!-- Stats Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3 col-sm-6 mb-3">
+                <div class="card border-primary">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">Total Quotes</h5>
+                        <p class="display-6" id="totalQuotesCount">0</p>
+                    </div>
                 </div>
             </div>
-            <div class="col-6 col-md-3">
-                <div class="stat-card">
-                    <div class="number" id="statDraft">-</div>
-                    <div class="text-muted small">Drafts</div>
+            <div class="col-md-3 col-sm-6 mb-3">
+                <div class="card border-success">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">Accepted</h5>
+                        <p class="display-6" id="acceptedQuotesCount">0</p>
+                    </div>
                 </div>
             </div>
-            <div class="col-6 col-md-3">
-                <div class="stat-card">
-                    <div class="number" id="statAccepted">-</div>
-                    <div class="text-muted small">Accepted</div>
+            <div class="col-md-3 col-sm-6 mb-3">
+                <div class="card border-warning">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">Invoiced</h5>
+                        <p class="display-6" id="invoicedQuotesCount">0</p>
+                    </div>
                 </div>
             </div>
-            <div class="col-6 col-md-3">
-                <div class="stat-card">
-                    <div class="number" id="statValue">-</div>
-                    <div class="text-muted small">Total Value</div>
+            <div class="col-md-3 col-sm-6 mb-3">
+                <div class="card border-info">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">Revenue</h5>
+                        <p class="display-6" id="totalRevenue">$0.00</p>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Action bar -->
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="mb-0 fw-bold">Your Quotes</h5>
-            <button class="btn btn-primary" onclick="newQuote()" style="background: linear-gradient(135deg,#1a56a0,#0f3460); border:none;">
-                <i class="fas fa-plus"></i> New Quote
-            </button>
-        </div>
-
-        <!-- Search -->
-        <div class="mb-3">
-            <input type="text" class="form-control" id="searchInput" placeholder="Search by client name or quote number..." oninput="filterQuotes()">
-        </div>
-
-        <!-- Quotes list -->
-        <div id="quotesList">
-            <div class="empty-state">
-                <i class="fas fa-file-invoice fa-3x mb-3" style="color:#ddd"></i>
-                <p><span class="spinner-border spinner-border-sm me-2"></span>Loading quotes...</p>
+        <!-- Quotes List -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h3>Recent Quotes</h3>
+                        <div>
+                            <button class="btn btn-sm btn-outline-secondary me-2" onclick="refreshQuotes()">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="exportQuotesToCSV()">
+                                <i class="fas fa-file-export"></i> Export CSV
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="quotesList">
+                            <!-- Quotes will be rendered here -->
+                        </div>
+                    </div>
+                </div>
             </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="mt-5 text-center text-muted small">
+            <p>QuoteDr.io - Professional Renovation Quoting Software</p>
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase.js"></script>
     <script>
-        const _supabase = window.supabase.createClient('https://axmoffknvblluibuitrq.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso');
-        let allQuotes = [];
+        // ─── DASHBOARD FUNCTIONS ─────────────────────────────────────────────────────
 
-        document.addEventListener('DOMContentLoaded', async () => {
-            if (typeof requireAuth === 'function') {
-                const user = await requireAuth();
-                if (user) window.currentUser = user;
-                // Don't bail on no user — still load quotes (RLS handles security)
+        async function refreshQuotes() {
+            try {
+                const { data, error } = await listQuotesFromSupabase();
+                if (error) throw error;
+                renderQuotes(data);
+                updateStats(data);
+            } catch (err) {
+                console.error('Error loading quotes:', err.message);
+                alert('Error loading quotes: ' + err.message);
             }
-            await loadQuotes();
-        });
-
-        async function loadQuotes() {
-            const { data, error } = await listQuotesFromSupabase();
-            if (error) {
-                document.getElementById('quotesList').innerHTML = `<div class="alert alert-danger">Error loading quotes: ${error.message}</div>`;
-                return;
-            }
-            allQuotes = data || [];
-            updateStats(allQuotes);
-            renderQuotes(allQuotes);
         }
 
         function updateStats(quotes) {
-            document.getElementById('statTotal').textContent = quotes.length;
-            document.getElementById('statDraft').textContent = quotes.filter(q => q.status === 'draft').length;
-            document.getElementById('statAccepted').textContent = quotes.filter(q => q.status === 'accepted').length;
-            const totalValue = quotes.reduce((sum, q) => sum + (parseFloat(q.total) || 0), 0);
-            document.getElementById('statValue').textContent = '$' + totalValue.toLocaleString('en-CA', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+            const total = quotes.length;
+            const accepted = quotes.filter(q => q.status === 'accepted').length;
+            const invoiced = quotes.filter(q => q.status === 'invoiced').length;
+            const revenue = quotes.reduce((sum, q) => sum + (parseFloat(q.total) || 0), 0);
+            
+            document.getElementById('totalQuotesCount').textContent = total;
+            document.getElementById('acceptedQuotesCount').textContent = accepted;
+            document.getElementById('invoicedQuotesCount').textContent = invoiced;
+            document.getElementById('totalRevenue').textContent = '$' + revenue.toFixed(2);
         }
 
         function renderQuotes(quotes) {
             const el = document.getElementById('quotesList');
             if (!quotes.length) {
-                el.innerHTML = `<div class="empty-state">
-                    <i class="fas fa-file-invoice fa-3x mb-3" style="color:#ddd"></i>
-                    <p>No quotes saved yet! <a href="#" onclick="newQuote()">Build your first quote →</a></p>
+                el.innerHTML = `<div class="text-center py-5">
+                    <i class="fas fa-file-invoice fa-4x mb-4" style="color:#1a56a0; opacity:0.3;"></i>
+                    <h4 style="color:#444;">No quotes yet</h4>
+                    <p class="text-muted mb-4">Start building your first professional quote — it only takes a minute.</p>
+                    <a href="quote-builder.html" class="btn btn-lg" style="background:#e87e2a; color:#fff; font-weight:600;">
+                        <i class="fas fa-plus me-2"></i>Build Your First Quote
+                    </a>
                 </div>`;
                 return;
             }
@@ -203,72 +171,111 @@
             `).join('');
         }
 
-        function filterQuotes() {
-            const q = document.getElementById('searchInput').value.toLowerCase();
-            const filtered = allQuotes.filter(quote =>
-                (quote.client_name || '').toLowerCase().includes(q) ||
-                (quote.quote_number || '').toLowerCase().includes(q)
-            );
-            renderQuotes(filtered);
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' });
         }
 
-        function formatDate(d) {
-            if (!d) return '';
-            return new Date(d).toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' });
+        function timeAgo(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diffInHours = Math.floor((now - date) / (1000 * 60 * 60));
+            
+            if (diffInHours < 1) return 'Just now';
+            if (diffInHours < 24) return `${diffInHours}h ago`;
+            const diffInDays = Math.floor(diffInHours / 24);
+            if (diffInDays < 7) return `${diffInDays}d ago`;
+            return date.toLocaleDateString('en-CA');
         }
 
-        function newQuote() {
-            window.location.href = 'quote-builder.html?new=1';
-        }
-
-        function openQuote(id) {
-            localStorage.setItem('ald_open_cloud_quote', id);
-            window.location.href = 'quote-builder.html';
-        }
-
-        function timeAgo(dateStr) {
-            if (!dateStr) return '';
-            const diff = Date.now() - new Date(dateStr).getTime();
-            const mins = Math.floor(diff / 60000);
-            if (mins < 1) return 'just now';
-            if (mins < 60) return mins + 'm ago';
-            const hrs = Math.floor(mins / 60);
-            if (hrs < 24) return hrs + 'h ago';
-            const days = Math.floor(hrs / 24);
-            return days + 'd ago';
-        }
-
-        async function changeStatus(quoteId, newStatus, selectEl) {
-            selectEl.className = 'form-select form-select-sm status-select status-' + newStatus;
-            const user = await getCurrentUser();
-            if (!user) return;
-            const { error: err } = await _supabase
-                .from('quotes')
-                .update({ status: newStatus, updated_at: new Date().toISOString() })
-                .eq('id', quoteId)
-                .eq('user_id', user.id);
-            if (err) {
-                alert('Error updating status: ' + err.message);
-                await loadQuotes();
-            } else {
-                const q = allQuotes.find(x => x.id === quoteId);
-                if (q) q.status = newStatus;
-                updateStats(allQuotes);
+        async function changeStatus(quoteId, newStatus, selectElement) {
+            try {
+                const quote = await loadQuoteFromSupabase(quoteId);
+                if (!quote.data) throw new Error('Quote not found');
+                
+                quote.data.status = newStatus;
+                const { data, error } = await saveQuoteToSupabase(quote.data);
+                if (error) throw error;
+                
+                // Update UI
+                selectElement.classList.remove(...selectElement.classList);
+                selectElement.classList.add('status-select', `status-${newStatus}`);
+                refreshQuotes(); // Refresh to show updated status
+            } catch (err) {
+                console.error('Error changing status:', err.message);
+                alert('Error changing status: ' + err.message);
             }
         }
 
         async function deleteQuote(quoteId, event) {
             event.stopPropagation();
-            if (!confirm('Delete this quote? This cannot be undone.')) return;
-            const { error } = await deleteQuoteFromSupabase(quoteId);
-            if (error) {
-                alert('Error deleting: ' + error.message);
-                return;
+            if (!confirm('Are you sure you want to delete this quote?')) return;
+            
+            try {
+                const { error } = await deleteQuoteFromSupabase(quoteId);
+                if (error) throw error;
+                
+                refreshQuotes(); // Refresh to show updated list
+                alert('Quote deleted successfully');
+            } catch (err) {
+                console.error('Error deleting quote:', err.message);
+                alert('Error deleting quote: ' + err.message);
             }
-            allQuotes = allQuotes.filter(q => q.id !== quoteId);
-            updateStats(allQuotes);
-            renderQuotes(allQuotes);
         }
+
+        async function openQuote(quoteId) {
+            try {
+                const { data, error } = await loadQuoteFromSupabase(quoteId);
+                if (error) throw error;
+                
+                // Save to localStorage for editing
+                localStorage.setItem('ald_session_quote', JSON.stringify(data));
+                window.location.href = 'quote-builder.html';
+            } catch (err) {
+                console.error('Error opening quote:', err.message);
+                alert('Error opening quote: ' + err.message);
+            }
+        }
+
+        async function exportQuotesToCSV() {
+            try {
+                const { data, error } = await listQuotesFromSupabase();
+                if (error) throw error;
+                
+                let csvContent = 'Quote Number,Client Name,Quote Date,Total,Status,Updated At\n';
+                data.forEach(quote => {
+                    csvContent += `"${quote.quote_number || ''}","${quote.client_name || ''}","${quote.quote_date || ''}",${quote.total || 0},"${quote.status || ''}","${quote.updated_at || ''}"\n`;
+                });
+                
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.setAttribute('href', url);
+                link.setAttribute('download', 'quotes-export.csv');
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } catch (err) {
+                console.error('Error exporting quotes:', err.message);
+                alert('Error exporting quotes: ' + err.message);
+            }
+        }
+
+        // ─── INITIALIZATION ──────────────────────────────────────────────────────────
+
+        async function initDashboard() {
+            try {
+                await requireAuth();
+                await refreshQuotes();
+            } catch (err) {
+                console.error('Init error:', err.message);
+                alert('Authentication failed: ' + err.message);
+            }
+        }
+
+        // Initialize dashboard when page loads
+        document.addEventListener('DOMContentLoaded', initDashboard);
     </script>
 </body>
 </html>

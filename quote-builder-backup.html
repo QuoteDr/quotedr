@@ -1,0 +1,1525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ALD Direct Inc. - Quote Builder</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background-color: #f8f9fa; }
+        .room-header { 
+            background: linear-gradient(135deg, #74b9ff 0%, #0652DD 100%);
+            color: white;
+            padding: 1rem;
+            margin-top: 1.5rem;
+            border-radius: 8px;
+        }
+        .room-header h3 { margin: 0; font-weight: bold; }
+        .line-item { 
+            background: white;
+            border-left: 4px solid #667eea;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            border-radius: 4px;
+        }
+        .room-total { 
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #28a745;
+        }
+        .grand-total {
+            background: #343a40;
+            color: white;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+        /* Hide markup controls when printing for client view */
+        @media print {
+            .room-header > div:not(:first-child) {
+                display: none !important;
+            }
+            [id^="markupControls_"] {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid py-4">
+        <!-- Professional Header with Logo -->
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <div class="d-flex align-items-center mb-2">
+                    <img src="ald-logo.svg" alt="ALD Direct Inc." style="height: 100px; margin-right: 20px; max-width: none; display: block;">
+                    <div>
+                        <h2 class="mb-0" style="color: #2c3e50;">ALD Direct Inc.</h2>
+                        <p class="text-muted mb-0">Professional Renovation Services</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 text-end">
+                <div class="mb-2">
+                    <button onclick="saveQuote()" class="btn btn-warning me-1 shadow-sm" title="Save quote (Ctrl+S)">
+                        <i class="fas fa-save"></i> Save
+                    </button>
+                    <button onclick="loadQuoteFromFile()" class="btn btn-secondary me-1 shadow-sm" title="Open a saved quote">
+                        <i class="fas fa-folder-open"></i> Open
+                    </button>
+                    <button onclick="exportToPDF()" class="btn btn-success me-1 shadow-sm">
+                        <i class="fas fa-download"></i> PDF
+                    </button>
+                    <button onclick="generateInteractiveLink()" class="btn btn-primary shadow-sm">
+                        <i class="fas fa-share-square"></i> Send Quote
+                    </button>
+                </div>
+                <div id="saveStatus" class="text-muted small" style="min-height: 1.2em;"></div>
+            </div>
+        </div>
+
+        <!-- Client Info -->
+        <div class="card mb-4">
+            <div class="card-header"><i class="fas fa-user"></i> Client Information</div>
+            <div class="card-body">
+                <div class="row">
+                    <!-- Client Information Section -->
+                    <div class="col-md-12 autocomplete-container">
+                        <label><strong>Client Name (Type to search from past quotes):</strong></label>
+                        <input type="text" id="clientName" class="form-control" placeholder="Start typing client name..."
+                               onkeyup="showClientSuggestions()" onblur="hideClientDropdown()">
+                        <div id="clientDropdown" class="autocomplete-dropdown"></div>
+                    </div>
+                    
+                    <!-- Terms & Conditions Section -->
+                    <div class="col-md-12 mt-3">
+                        <label><strong>Terms & Conditions:</strong></label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="termDeposit" value="50% deposit required before work begins">
+                            <label class="form-check-label" for="termDeposit">
+                                50% deposit required before work begins
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="termTimeline" value="2-week timeline estimate (subject to change)">
+                            <label class="form-check-label" for="termTimeline">
+                                2-week timeline estimate (subject to change)
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="termWarranty" value="1-year workmanship warranty on all labor">
+                            <label class="form-check-label" for="termWarranty">
+                                1-year workmanship warranty on all labor
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="termPayment30" value="Payment due within 30 days of completion">
+                            <label class="form-check-label" for="termPayment30">
+                                Payment due within 30 days of completion
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="termChanges" value="Change orders must be in writing and may affect timeline/cost">
+                            <label class="form-check-label" for="termChanges">
+                                Change orders must be in writing (may affect timeline/cost)
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="termAccess" value="Client to provide access to property during agreed work hours">
+                            <label class="form-check-label" for="termAccess">
+                                Client to provide access during agreed work hours
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6 mt-3">
+                        <label><strong>Project Address:</strong></label>
+                        <input type="text" id="projectAddress" class="form-control" placeholder="123 Main St, Toronto">
+                    </div>
+                    
+                    <div class="col-md-6 mt-3">
+                        <label><strong>Phone Number:</strong></label>
+                        <input type="tel" id="clientPhone" class="form-control" placeholder="(416) 555-0123">
+                    </div>
+                    
+                    <div class="col-md-12 mt-3">
+                        <label><strong>Email Address:</strong></label>
+                        <input type="email" id="clientEmail" class="form-control" placeholder="client@email.com">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Room Breaks Section -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-th-large"></i> Quote by Room/Area</span>
+                <div class="btn-group" role="group">
+                    <button onclick="addRoom()" class="btn btn-sm btn-light text-dark">
+                        <i class="fas fa-plus"></i> Add Room
+                    </button>
+                    <button onclick="saveTemplate()" class="btn btn-sm btn-info text-white" title="Save current rooms as a template">
+                        <i class="fas fa-save"></i> Save Template
+                    </button>
+                    <button onclick="loadTemplatesDropdown()" class="btn btn-sm btn-warning" title="Load existing templates">
+                        <i class="fas fa-folder-open"></i> Templates
+                    </button>
+                    <button id="toggleTimelinesBtn" onclick="toggleTimelines()" class="btn btn-sm btn-secondary" title="Show/hide timeline estimates">
+                        <i class="fas fa-eye-slash"></i> Hide Timelines
+                    </button>
+                    <button onclick="applyGlobalMarkup()" class="btn btn-sm btn-success text-white" title="Apply markup to all rooms">
+                        <i class="fas fa-percent"></i> Markup All
+                    </button>
+                </div>
+            </div>
+            <div class="card-body" id="roomsContainer">
+                <!-- Rooms will be added here dynamically -->
+            </div>
+        </div>
+
+        <!-- Draft & Recent Quotes Section -->
+        <div id="draftSectionContainer" style="display: none;" class="card mb-4">
+            <div class="card-header bg-light">
+                <span><i class="fas fa-file-medical"></i> Your Work</span>
+            </div>
+            <div class="card-body">
+                <button onclick="saveCurrentQuoteAsDraft()" class="btn btn-sm btn-success me-2">
+                    <i class="fas fa-save"></i> Save Current Quote
+                </button>
+                <button onclick="loadRecentQuotes()" class="btn btn-sm btn-primary">
+                    <i class="fas fa-history"></i> Load Recent Quotes
+                </button>
+            </div>
+        </div>
+
+        <!-- Pricing Summary -->
+        <div class="row">
+            <div class="col-md-6">
+                <div class="grand-total text-center">
+                    <h4><i class="fas fa-calculator"></i> Quote Total</h4>
+                    <div id="subtotalDisplay" style="font-size: 1.5rem;">Subtotal: $0.00</div>
+                    <div id="taxDisplay" style="font-size: 1.2rem;">HST (13%): $0.00</div>
+                    <div id="grandTotalDisplay" style="font-size: 2rem; font-weight: bold; margin-top: 0.5rem;">TOTAL: $0.00</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Room Modal -->
+    <div class="modal fade" id="addRoomModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Room/Area Break</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <label><strong>Room Name:</strong></label>
+                    <input type="text" id="newRoomName" class="form-control mb-3" placeholder="e.g., Basement, Kitchen, Bathroom">
+                    <small class="text-muted">Common examples: Basement, Kitchen, Bathroom, Master Bedroom, Garage</small>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="confirmAddRoom()">Add Room Break</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Line Item Modal -->
+    <div class="modal fade" id="addLineModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Line Item</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="currentRoomId">
+                    
+                    <label><strong>Description:</strong></label>
+                    <input type="text" id="lineDescription" class="form-control mb-3" placeholder="e.g., 2x4 Wall Framing, Drywall Hang & Finish">
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label><strong>Category:</strong></label>
+                            <select id="lineCategory" class="form-select" onchange="updatePricingOptions()">
+                                <option value="Framing">Framing</option>
+                                <option value="Subflooring">Subflooring</option>
+                                <option value="Electrical">Electrical</option>
+                                <option value="Plumbing">Plumbing</option>
+                                <option value="HVAC">HVAC</option>
+                                <option value="Insulation">Insulation</option>
+                                <option value="Drywall">Drywall</option>
+                                <option value="Painting">Painting</option>
+                                <option value="Doors & Trim">Doors & Trim</option>
+                                <option value="Tiling">Tiling</option>
+                                <option value="Flooring">Flooring</option>
+                                <option value="Carpentry">Carpentry</option>
+                                <option value="Demolition">Demolition</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label><strong>Service:</strong></label>
+                            <select id="lineService" class="form-select" onchange="autoFillPricing()">
+                                <!-- Options will populate based on category -->
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label><strong>Unit Type:</strong></label>
+                            <input type="text" id="lineUnitType" class="form-control" placeholder="LF, sq ft, each, hourly">
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label><strong>Quantity:</strong></label>
+                            <input type="number" id="lineQuantity" class="form-control" value="1" step="0.01">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label><strong>Rate ($):</strong></label>
+                            <input type="number" id="lineRate" class="form-control" value="0" step="0.01">
+                        </div>
+                    </div>
+
+                    <label><strong>Notes (Optional):</strong></label>
+                    <textarea id="lineNotes" class="form-control mb-3" rows="2" placeholder="Additional details..."></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="confirmAddLine()">Add Line Item</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Pricing Database - Adam's Rates (ALD Direct Inc. 2026)
+        const pricingDatabase = {
+            'Framing': [
+                { name: '2x4 Wall Framing', unitType: 'LF', rate: 14.60 },
+                { name: '2x6 Wall Framing', unitType: 'LF', rate: 17.35 },
+                { name: 'Basement Walls', unitType: 'LF', rate: 20.00 }
+            ],
+            'Subflooring': [
+                { name: '1/2" OSB Subfloor', unitType: 'sheet', rate: 2.15 },
+                { name: '5/8" OSB Subfloor', unitType: 'sheet', rate: 2.50 },
+                { name: '3/4" OSB Subfloor', unitType: 'sheet', rate: 2.75 },
+                { name: 'Subfloor (Linear)', unitType: 'LF', rate: 1.45 }
+            ],
+            'Electrical': [
+                { name: 'Standard Electrical Work', unitType: 'hourly', rate: 100.00 },
+                { name: 'Recessed Tilt Lights', unitType: 'each', rate: 80.00 },
+                { name: 'Regular Recessed Pots', unitType: 'each', rate: 30.00 },
+                { name: 'Under Cabinet Lighting', unitType: 'base + each', rate: 200.00, note: '$200 base + $100/extra location' },
+                { name: 'Standard Light Fixture Replacement', unitType: 'each', rate: 75.00 },
+                { name: 'Add Receptacle 15A (existing circuit)', unitType: 'each', rate: 70.00 },
+                { name: 'Add GFCI 15A (existing circuit)', unitType: 'each', rate: 95.00 },
+                { name: 'Install Ceiling Fan & Mount', unitType: 'each', rate: 150.00 },
+                { name: 'Extractor Fan + Roof Vent (<80 sq ft)', unitType: 'each', rate: 450.00 },
+                { name: 'Extractor Fan + Roof Vent (<100 sq ft)', unitType: 'each', rate: 520.00 },
+                { name: 'Extractor Fan + Roof Vent (<140 sq ft)', unitType: 'each', rate: 605.00 },
+                { name: 'TV Mount', unitType: 'each', rate: 175.00 },
+                { name: 'Doorbell Camera Install', unitType: 'each', rate: 200.00 }
+            ],
+            'Plumbing': [
+                { name: 'Standard Plumbing Work', unitType: 'hourly', rate: 100.00 },
+                { name: 'Solder Shut-off', unitType: 'each', rate: 150.00 },
+                { name: 'PEX Shut-off', unitType: 'each', rate: 125.00 },
+                { name: 'Toilet Replacement', unitType: 'each', rate: 250.00 },
+                { name: 'Shower Rough-in', unitType: 'each', rate: 1000.00 },
+                { name: 'Toilet Install Only', unitType: 'each', rate: 200.00 },
+                { name: 'Tub Installation', unitType: 'each', rate: 600.00 },
+                { name: 'Kitchen Sink Cutout, Mount + Fixtures', unitType: 'each', rate: 400.00 },
+                { name: 'Dishwasher Replacement', unitType: 'each', rate: 300.00 },
+                { name: 'New Dishwasher Install', unitType: 'each', rate: 400.00 },
+                { name: 'Sink Faucet Installation', unitType: 'each', rate: 200.00 }
+            ],
+            'HVAC': [
+                { name: 'HVAC Work', unitType: 'hourly', rate: 100.00 },
+                { name: 'Heat Run (6" supply)', unitType: 'LF', rate: 20.00, note: 'NO GRILLS' },
+                { name: 'Flat Minimum Heat Run', unitType: 'minimum', rate: 75.00 },
+                { name: 'Floor Vent Framed (M+L)', unitType: 'each', rate: 190.00 },
+                { name: 'Floor Vent Framed TILE', unitType: 'each', rate: 260.00 },
+                { name: 'Floor Vent Frameless (M+L)', unitType: 'each', rate: 245.00 },
+                { name: 'Drywall Vent C.A.R. Large', unitType: 'each', rate: 290.00 }
+            ],
+            'Insulation': [
+                { name: 'Batts Install Labor Only', unitType: 'sq ft', rate: 1.00, note: 'Materials extra' },
+                { name: 'Vapor Barrier Install', unitType: 'sq ft', rate: 1.00 },
+                { name: 'R14 Insulation (2x4 studs)', unitType: 'sq ft', rate: 2.00, note: '$3 with vapor' },
+                { name: 'R22 Insulation', unitType: 'sq ft', rate: 2.70, note: '$3.70 with vapor' },
+                { name: 'EPS Foam Panels (1.5")', unitType: 'sq ft', rate: 2.50 }
+            ],
+            'Drywall': [
+                { name: 'Complete Service (Hang, Mud, Tape, Sand)', unitType: 'sq ft', rate: 6.40 },
+                { name: '8\' Wall - ONE SIDE Complete', unitType: 'LF', rate: 65.80 },
+                { name: "8' Wall - BOTH SIDES Complete", unitType: 'LF', rate: 117.00 }
+            ],
+            'Painting': [
+                { name: 'General Painting (coverage area)', unitType: 'sq ft', rate: 1.75 },
+                { name: 'Doors (2 coats)', unitType: 'each', rate: 150.00 },
+                { name: 'Baseboards (2 coats)', unitType: 'LF', rate: 2.00 },
+                { name: 'Crown Molding (2 coats)', unitType: 'LF', rate: 2.00 }
+            ],
+            'Doors & Trim': [
+                { name: 'Standard Door Installation', unitType: 'each', rate: 500.00, note: '+$15 per glass panel' },
+                { name: 'Solid Core Door Installation', unitType: 'each', rate: 600.00 },
+                { name: '2-3/4" Trim (painted)', unitType: 'LF', rate: 5.50 },
+                { name: '3-1/2" Trim', unitType: 'LF', rate: 6.15 },
+                { name: '2-3/4" MDF (painted complete)', unitType: 'LF', rate: 9.45 }
+            ],
+            'Tiling': [
+                { name: 'Floor Tile Installation', unitType: 'sq ft', rate: 8.00 },
+                { name: 'Wall Tile Installation', unitType: 'sq ft', rate: 10.00 },
+                { name: 'Backsplash Tile', unitType: 'sq ft', rate: 12.00 },
+                { name: 'Shower Tile (walls + floor)', unitType: 'sq ft', rate: 14.00 },
+                { name: 'Tile Removal', unitType: 'sq ft', rate: 3.00 }
+            ],
+            'Flooring': [
+                { name: 'Laminate Installation', unitType: 'sq ft', rate: 3.50 },
+                { name: 'Vinyl Plank (LVP) Installation', unitType: 'sq ft', rate: 4.00 },
+                { name: 'Hardwood Installation', unitType: 'sq ft', rate: 6.00 },
+                { name: 'Floor Leveling (Self-Leveler)', unitType: 'sq ft', rate: 5.00 },
+                { name: 'Carpet Removal', unitType: 'sq ft', rate: 1.50 }
+            ],
+            'Carpentry': [
+                { name: 'Custom Shelving', unitType: 'LF', rate: 45.00 },
+                { name: 'Closet Build-out', unitType: 'each', rate: 800.00 },
+                { name: 'Crown Molding Install', unitType: 'LF', rate: 8.00 },
+                { name: 'Baseboard Install', unitType: 'LF', rate: 5.50 },
+                { name: 'General Carpentry', unitType: 'hourly', rate: 75.00 }
+            ],
+            'Demolition': [
+                { name: 'General Demo', unitType: 'hourly', rate: 65.00 },
+                { name: 'Wall Removal (non-load-bearing)', unitType: 'each', rate: 500.00 },
+                { name: 'Floor Removal', unitType: 'sq ft', rate: 2.00 },
+                { name: 'Ceiling Removal', unitType: 'sq ft', rate: 2.50 },
+                { name: 'Debris Removal / Dump Run', unitType: 'each', rate: 250.00 }
+            ]
+        };
+
+        let rooms = [];
+        let roomCounter = 0;
+        
+        // Timeline feature - show/hide toggle
+        let showTimelines = true;
+        
+        function addRoom() {
+            const modal = new bootstrap.Modal(document.getElementById('addRoomModal'));
+            document.getElementById('newRoomName').value = '';
+            modal.show();
+        }
+
+        function confirmAddRoom() {
+            const name = document.getElementById('newRoomName').value.trim();
+            if (!name) return;
+            
+            roomCounter++;
+            rooms.push({
+                id: roomCounter,
+                name: name,
+                items: []
+            });
+            
+            renderRooms();
+            
+            // Close modal
+            const modalEl = document.getElementById('addRoomModal');
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            modal.hide();
+        }
+
+        function addLine(roomId) {
+            document.getElementById('currentRoomId').value = roomId;
+            const modal = new bootstrap.Modal(document.getElementById('addLineModal'));
+            
+            // Reset form fields
+            document.getElementById('lineDescription').value = '';
+            document.getElementById('lineQuantity').value = '1';
+            document.getElementById('lineRate').value = '0';
+            document.getElementById('lineNotes').value = '';
+            
+            // Set default category to Framing and populate options
+            document.getElementById('lineCategory').value = 'Framing';
+            updatePricingOptions();
+            
+            modal.show();
+        }
+
+        function updatePricingOptions() {
+            const category = document.getElementById('lineCategory').value;
+            const serviceSelect = document.getElementById('lineService');
+            
+            // Clear existing options
+            serviceSelect.innerHTML = '';
+            
+            // Get services for this category
+            const services = pricingDatabase[category] || [];
+            
+            if (services.length === 0) {
+                // No predefined services, add a generic option
+                const option = document.createElement('option');
+                option.value = 'custom';
+                option.text = 'Custom Service';
+                serviceSelect.appendChild(option);
+            } else {
+                // Add all services from database
+                services.forEach(service => {
+                    const option = document.createElement('option');
+                    option.value = service.name;
+                    option.text = service.name;
+                    option.dataset.unitType = service.unitType;
+                    option.dataset.rate = service.rate;
+                    if (service.note) {
+                        option.dataset.note = service.note;
+                    }
+                    serviceSelect.appendChild(option);
+                });
+            }
+            
+            // Auto-fill if first service selected
+            if (services.length > 0) {
+                autoFillPricing();
+            }
+        }
+
+        function autoFillPricing() {
+            const serviceSelect = document.getElementById('lineService');
+            const selectedOption = serviceSelect.options[serviceSelect.selectedIndex];
+            
+            if (selectedOption && selectedOption.dataset.unitType) {
+                // Auto-fill unit type and rate from database
+                document.getElementById('lineUnitType').value = selectedOption.dataset.unitType;
+                document.getElementById('lineRate').value = selectedOption.dataset.rate;
+                
+                // Also update description to match service name
+                if (selectedOption.value !== 'custom') {
+                    document.getElementById('lineDescription').value = selectedOption.text;
+                }
+            }
+        }
+
+        function confirmAddLine() {
+            const roomId = parseInt(document.getElementById('currentRoomId').value);
+            const description = document.getElementById('lineDescription').value.trim();
+            const category = document.getElementById('lineCategory').value;
+            const unitType = document.getElementById('lineUnitType').value.trim();
+            const quantity = parseFloat(document.getElementById('lineQuantity').value) || 0;
+            const rate = parseFloat(document.getElementById('lineRate').value) || 0;
+            const notes = document.getElementById('lineNotes').value.trim();
+            
+            if (!description) return;
+            
+            const roomIndex = rooms.findIndex(r => r.id === roomId);
+            if (roomIndex !== -1) {
+                rooms[roomIndex].items.push({
+                    description,
+                    category,
+                    unitType,
+                    quantity,
+                    rate,
+                    notes,
+                    total: quantity * rate
+                });
+                
+                renderRooms();
+                
+                // Close modal
+                const modalEl = document.getElementById('addLineModal');
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                modal.hide();
+            }
+        }
+
+        function deleteRoom(roomId) {
+            if (confirm('Delete this room? All items will be lost.')) {
+                rooms = rooms.filter(r => r.id !== roomId);
+                renderRooms();
+            }
+        }
+
+        function deleteItem(roomId, itemIndex) {
+            const room = rooms.find(r => r.id === roomId);
+            if (room) {
+                room.items.splice(itemIndex, 1);
+                renderRooms();
+            }
+        }
+
+        function calculateTotals() {
+            let subtotal = 0;
+
+            rooms.forEach(room => {
+                const baseTotal = room.items.reduce((sum, item) => sum + item.total, 0);
+                const markup = room.markup || 0;
+                const roomTotal = baseTotal * (1 + markup / 100);
+                room.roomTotal = roomTotal;
+                subtotal += roomTotal;
+            });
+
+            const tax = subtotal * 0.13;
+            const total = subtotal + tax;
+
+            document.getElementById('subtotalDisplay').textContent = 'Subtotal: $' + subtotal.toFixed(2);
+            document.getElementById('taxDisplay').textContent = 'HST (13%): $' + tax.toFixed(2);
+            document.getElementById('grandTotalDisplay').textContent = 'TOTAL: $' + total.toFixed(2);
+        }
+
+        function renderRooms() {
+            const container = document.getElementById('roomsContainer');
+            
+            if (rooms.length === 0) {
+                container.innerHTML = '<div class="text-center py-4 text-muted"><p>No rooms yet. Add your first room break!</p></div>';
+                calculateTotals();
+                return;
+            }
+            
+            let html = '';
+            
+            rooms.forEach(room => {
+                // Apply room markup if set
+                const roomMarkup = room.markup || 0;
+                let roomTotal = room.items.reduce((sum, item) => sum + item.total, 0);
+                if (roomMarkup > 0) {
+                    roomTotal = roomTotal * (1 + roomMarkup / 100);
+                }
+                
+                html += '<div class="room-header">';
+                html += '<h3><i class="fas fa-door-open"></i> ' + room.name + '</h3>';
+                html += '<p class="mb-0">' + room.items.length + ' items | Total: $' + roomTotal.toFixed(2) + '</p>';
+                
+                // Timeline input field (shown when showTimelines is true)
+                if (showTimelines) {
+                    const timelineValue = room.timeline || '';
+                    html += '<div class="mt-2"><label><small>Timeline Estimate:</small></label><input type="text" id="timeline_' + room.id + '" class="form-control form-control-sm" value="' + timelineValue + '" placeholder="e.g., 1-2 weeks"></div>';
+                }
+                // Markup controls (hidden from client view)
+                html += '<div class="mt-2 d-flex align-items-center gap-2" id="markupControls_' + room.id + '">';
+                html += '<small><strong>Markup:</strong></small>';
+                html += '<input type="number" id="roomMarkup_' + room.id + '" class="form-control form-control-sm" style="width: 80px;" value="' + roomMarkup + '" min="0" max="100" step="1" onchange="updateRoomMarkup(' + room.id + ', this.value)">';
+                html += '<span>%</span>';
+                html += '<button onclick="toggleMarkupVisibility(' + room.id + ')" class="btn btn-sm btn-outline-secondary" title="Toggle visibility to client"><i id="markupIcon_' + room.id + '" class="fas fa-eye"></i></button>';
+                html += '</div>';
+                html += '<button onclick="addLine(' + room.id + ')" class="btn btn-sm btn-light text-dark mt-1">';
+                html += '<i class="fas fa-plus"></i> Add Item</button>';
+                html += '<button onclick="deleteRoom(' + room.id + ')" class="btn btn-sm btn-danger mt-1">';
+                html += '<i class="fas fa-trash"></i> Delete Room</button>';
+                html += '</div>';
+                
+                if (room.items.length > 0) {
+                    html += '<table class="table table-striped mb-3"><thead><tr><th>#</th><th>Description</th><th>Category</th><th>Qty</th><th>Rate</th><th>Total</th><th></th></tr></thead><tbody>';
+
+                    const markupFactor = 1 + (room.markup || 0) / 100;
+
+                    room.items.forEach((item, index) => {
+                        const displayRate = item.rate * markupFactor;
+                        const displayTotal = item.total * markupFactor;
+                        html += '<tr>';
+                        html += '<td>' + (index + 1) + '</td>';
+                        html += '<td><strong>' + item.description + '</strong><br><small class="text-muted">' + (item.notes || '') + '</small></td>';
+                        html += '<td>' + item.category + '</td>';
+                        html += '<td>' + item.quantity + ' ' + (item.unitType || '') + '</td>';
+                        html += '<td>$' + displayRate.toFixed(2) + '</td>';
+                        html += '<td><strong>$' + displayTotal.toFixed(2) + '</strong></td>';
+                        html += '<td><button onclick="deleteItem(' + room.id + ', ' + index + ')" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button></td>';
+                        html += '</tr>';
+                    });
+
+                    html += '</tbody></table>';
+                } else {
+                    html += '<p class="text-muted text-center py-2">No items yet.</p>';
+                }
+            });
+            
+            // Capture timeline values back into room data
+            if (showTimelines) {
+                rooms.forEach(room => {
+                    const timelineInput = document.getElementById('timeline_' + room.id);
+                    if (timelineInput) {
+                        room.timeline = timelineInput.value.trim();
+                    }
+                });
+            }
+            
+            container.innerHTML = html;
+            calculateTotals();
+            markUnsaved();
+        }
+
+        function getSelectedTerms() {
+            const terms = [];
+            if (document.getElementById('termDeposit').checked) terms.push(document.getElementById('termDeposit').value);
+            if (document.getElementById('termTimeline').checked) terms.push(document.getElementById('termTimeline').value);
+            if (document.getElementById('termWarranty').checked) terms.push(document.getElementById('termWarranty').value);
+            if (document.getElementById('termPayment30').checked) terms.push(document.getElementById('termPayment30').value);
+            if (document.getElementById('termChanges').checked) terms.push(document.getElementById('termChanges').value);
+            if (document.getElementById('termAccess').checked) terms.push(document.getElementById('termAccess').value);
+            return terms;
+        }
+        
+        function exportToPDF() {
+            // Simple export - print to PDF
+            window.print();
+        }
+
+        function toggleTimelines() {
+            showTimelines = !showTimelines;
+            renderRooms();
+            
+            // Update button text/icon based on state
+            const btn = document.getElementById('toggleTimelinesBtn');
+            if (btn) {
+                if (showTimelines) {
+                    btn.innerHTML = '<i class="fas fa-eye-slash"></i> Hide Timelines';
+                } else {
+                    btn.innerHTML = '<i class="fas fa-eye"></i> Show Timelines';
+                }
+            }
+        }
+
+        function updateRoomMarkup(roomId, value) {
+            const room = rooms.find(r => r.id === roomId);
+            if (room) {
+                room.markup = parseFloat(value) || 0;
+                renderRooms();
+            }
+        }
+
+        function toggleMarkupVisibility(roomId) {
+            const room = rooms.find(r => r.id === roomId);
+            if (room && room.hideMarkup !== undefined) {
+                room.hideMarkup = !room.hideMarkup;
+            } else {
+                room.hideMarkup = true; // Default to hidden
+            }
+            
+            // Update icon
+            const icon = document.getElementById('markupIcon_' + roomId);
+            if (icon) {
+                if (room.hideMarkup) {
+                    icon.className = 'fas fa-eye';
+                } else {
+                    icon.className = 'fas fa-eye-slash';
+                }
+            }
+        }
+
+        function applyGlobalMarkup() {
+            const markupPercent = prompt('Enter markup percentage to apply to entire quote (0-100%):');
+            if (markupPercent === null) return; // Cancelled
+            
+            const percent = parseFloat(markupPercent);
+            if (isNaN(percent) || percent < 0 || percent > 100) {
+                alert('Please enter a valid percentage between 0 and 100.');
+                return;
+            }
+            
+            // Apply to all rooms
+            rooms.forEach(room => {
+                room.markup = percent;
+                room.hideMarkup = true; // Default to hidden from client
+            });
+            
+            renderRooms();
+            alert('Markup of ' + percent + '% applied to all rooms!');
+        }
+
+        // Template Management Functions
+        let currentTemplateIndex = null;
+        
+        // Auto-save draft functionality
+        const DRAFT_KEY = 'ald_current_draft';
+        const RECENT_QUOTES_KEY = 'ald_recent_quotes';
+        
+        function saveCurrentQuoteAsDraft() {
+            if (rooms.length === 0) {
+                alert('No rooms to save. Add at least one room first.');
+                return;
+            }
+            
+            const draftData = {
+                id: Date.now(),
+                clientName: document.getElementById('clientName')?.value || 'Client',
+                projectAddress: document.getElementById('projectAddress')?.value || 'Project Address',
+                email: document.getElementById('clientEmail')?.value || '',
+                phone: document.getElementById('clientPhone')?.value || '',
+                rooms: JSON.parse(JSON.stringify(rooms)), // Deep copy
+                grandTotal: parseFloat(document.getElementById('grandTotalDisplay').textContent.replace(/[^0-9.]/g, '')) || 0,
+                savedAt: new Date().toISOString()
+            };
+            
+            // Save current draft
+            localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
+            
+            // Add to recent quotes list
+            let recentQuotes = JSON.parse(localStorage.getItem(RECENT_QUOTES_KEY) || '[]');
+            recentQuotes.unshift(draftData);
+            // Keep only last 10
+            recentQuotes = recentQuotes.slice(0, 10);
+            localStorage.setItem(RECENT_QUOTES_KEY, JSON.stringify(recentQuotes));
+            
+            alert('Quote saved as draft! You can load it later.');
+            renderRecentQuotesSection();
+        }
+        
+        function loadRecentQuotes() {
+            const recentQuotes = JSON.parse(localStorage.getItem(RECENT_QUOTES_KEY) || '[]');
+            
+            if (recentQuotes.length === 0) {
+                alert('No recent quotes found. Save your current work first!');
+                return;
+            }
+            
+            // Build dropdown/modal with recent quotes
+            let html = '<div class="dropdown-menu show" style="position: absolute; top: 100%; left: 0; z-index: 1000;">';
+            recentQuotes.forEach((quote, index) => {
+                html += `
+                    <a class="dropdown-item" href="#" onclick="loadRecentQuote(${index}); return false;">
+                        <i class="fas fa-file-alt"></i> ${quote.clientName || 'Client'} - ${quote.projectAddress}
+                        <small class="text-muted d-block">${new Date(quote.savedAt).toLocaleString()} | $${quote.grandTotal.toFixed(2)}</small>
+                    </a>
+                `;
+            });
+            html += '</div>';
+            
+            const container = document.getElementById('recentQuotesDropdownContainer');
+            if (container) {
+                container.innerHTML = html;
+            } else {
+                const btn = event.target.closest('button');
+                const container = document.createElement('div');
+                container.id = 'recentQuotesDropdownContainer';
+                btn.parentNode.appendChild(container);
+                container.innerHTML = html;
+            }
+        }
+        
+        function loadRecentQuote(index) {
+            const recentQuotes = JSON.parse(localStorage.getItem(RECENT_QUOTES_KEY) || '[]');
+            const quote = recentQuotes[index];
+            
+            if (!quote) {
+                alert('Quote not found.');
+                return;
+            }
+            
+            // Load client info
+            if (document.getElementById('clientName')) document.getElementById('clientName').value = quote.clientName || '';
+            if (document.getElementById('projectAddress')) document.getElementById('projectAddress').value = quote.projectAddress || '';
+            if (document.getElementById('clientEmail')) document.getElementById('clientEmail').value = quote.email || '';
+            if (document.getElementById('clientPhone')) document.getElementById('clientPhone').value = quote.phone || '';
+            
+            // Load rooms
+            rooms = [];
+            roomCounter = 0;
+            quote.rooms.forEach(room => {
+                roomCounter++;
+                const newRoom = {
+                    id: roomCounter,
+                    name: room.name,
+                    items: JSON.parse(JSON.stringify(room.items))
+                };
+                rooms.push(newRoom);
+            });
+            
+            renderRooms();
+            alert(`Loaded quote from ${new Date(quote.savedAt).toLocaleString()}!`);
+        }
+        
+        function loadDraft() {
+            const draftData = localStorage.getItem(DRAFT_KEY);
+            if (!draftData) return false;
+            
+            const quote = JSON.parse(draftData);
+            
+            // Load client info
+            if (document.getElementById('clientName')) document.getElementById('clientName').value = quote.clientName || '';
+            if (document.getElementById('projectAddress')) document.getElementById('projectAddress').value = quote.projectAddress || '';
+            if (document.getElementById('clientEmail')) document.getElementById('clientEmail').value = quote.email || '';
+            if (document.getElementById('clientPhone')) document.getElementById('clientPhone').value = quote.phone || '';
+            
+            // Load rooms
+            rooms = [];
+            roomCounter = 0;
+            quote.rooms.forEach(room => {
+                roomCounter++;
+                const newRoom = {
+                    id: roomCounter,
+                    name: room.name,
+                    items: JSON.parse(JSON.stringify(room.items))
+                };
+                rooms.push(newRoom);
+            });
+            
+            renderRooms();
+            return true;
+        }
+        
+        function autoSaveDraft() {
+            // Save current state as draft automatically
+            if (rooms.length === 0) return;
+            
+            const draftData = {
+                id: Date.now(),
+                clientName: document.getElementById('clientName')?.value || 'Client',
+                projectAddress: document.getElementById('projectAddress')?.value || 'Project Address',
+                email: document.getElementById('clientEmail')?.value || '',
+                phone: document.getElementById('clientPhone')?.value || '',
+                rooms: JSON.parse(JSON.stringify(rooms)), // Deep copy
+                grandTotal: parseFloat(document.getElementById('grandTotalDisplay').textContent.replace(/[^0-9.]/g, '')) || 0,
+                savedAt: new Date().toISOString()
+            };
+            
+            localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
+        }
+        
+        function renderRecentQuotesSection() {
+            const recentQuotes = JSON.parse(localStorage.getItem(RECENT_QUOTES_KEY) || '[]');
+            const draftContainer = document.getElementById('draftSectionContainer');
+            
+            if (recentQuotes.length > 0) {
+                draftContainer.style.display = 'block';
+            } else {
+                draftContainer.style.display = 'none';
+            }
+        }
+        
+        // Auto-save on any change
+        function setupAutoSave() {
+            const inputs = document.querySelectorAll('input, select, textarea');
+            let saveTimeout;
+            
+            inputs.forEach(input => {
+                input.addEventListener('change', () => {
+                    clearTimeout(saveTimeout);
+                    saveTimeout = setTimeout(autoSaveDraft, 1000); // Save after 1 second of inactivity
+                });
+            });
+        }
+        
+        function saveTemplate() {
+            if (rooms.length === 0) {
+                alert('Please add at least one room before saving a template.');
+                return;
+            }
+            
+            const templateName = prompt('Enter a name for this template:');
+            if (!templateName || !templateName.trim()) {
+                alert('Template name cannot be empty.');
+                return;
+            }
+            
+            // Get current templates
+            let templates = JSON.parse(localStorage.getItem('ald_quote_templates') || '{}');
+            
+            // Save the template with timestamp
+            const quoteData = {
+                id: Date.now(),
+                name: templateName.trim(),
+                rooms: JSON.parse(JSON.stringify(rooms)), // Deep copy
+                createdAt: new Date().toISOString()
+            };
+            
+            templates[quoteData.id] = quoteData;
+            localStorage.setItem('ald_quote_templates', JSON.stringify(templates));
+            
+            alert(`Template "${templateName}" saved successfully!`);
+            renderTemplateDropdown();
+        }
+
+        function loadTemplatesDropdown() {
+            const templates = JSON.parse(localStorage.getItem('ald_quote_templates') || '{}');
+            const templateIds = Object.keys(templates);
+            
+            if (templateIds.length === 0) {
+                alert('No saved templates found. Create one first!');
+                return;
+            }
+            
+            // Build dropdown menu
+            let options = '<div class="dropdown-menu show" style="position: absolute; top: 100%; left: 0; z-index: 1000;">';
+            templateIds.forEach(id => {
+                const template = templates[id];
+                options += `
+                    <a class="dropdown-item" href="#" onclick="loadTemplate(${id}); return false;">
+                        <i class="fas fa-plus-circle"></i> Add: ${template.name}
+                        <small class="text-muted d-block">${new Date(template.createdAt).toLocaleDateString()}</small>
+                    </a>
+                `;
+            });
+            options += '</div>';
+            
+            // Show the dropdown
+            const container = document.getElementById('templatesDropdownContainer');
+            if (container) {
+                container.innerHTML = options;
+            } else {
+                // Create container if it doesn't exist
+                const btn = event.target.closest('button');
+                const container = document.createElement('div');
+                container.id = 'templatesDropdownContainer';
+                btn.parentNode.appendChild(container);
+                container.innerHTML = options;
+            }
+        }
+
+        function loadTemplate(templateId) {
+            const templates = JSON.parse(localStorage.getItem('ald_quote_templates') || '{}');
+            const template = templates[templateId];
+
+            if (!template) {
+                alert('Template not found.');
+                return;
+            }
+
+            // Append template rooms to the existing quote (never replace)
+            template.rooms.forEach(room => {
+                roomCounter++;
+                const newRoom = {
+                    id: roomCounter,
+                    name: room.name,
+                    items: JSON.parse(JSON.stringify(room.items))
+                };
+                rooms.push(newRoom);
+            });
+
+            renderRooms();
+            alert(`Added ${template.rooms.length} room(s) from "${template.name}" to your quote!`);
+        }
+
+        function deleteTemplate(templateId) {
+            const templates = JSON.parse(localStorage.getItem('ald_quote_templates') || '{}');
+            const templateName = templates[templateId]?.name;
+            
+            if (!confirm(`Delete template "${templateName}"? This cannot be undone.`)) {
+                return;
+            }
+            
+            delete templates[templateId];
+            localStorage.setItem('ald_quote_templates', JSON.stringify(templates));
+            renderTemplateDropdown();
+            alert('Template deleted.');
+        }
+
+        function renderTemplateDropdown() {
+            // This could show a modal with all templates and delete buttons
+            const templates = JSON.parse(localStorage.getItem('ald_quote_templates') || '{}');
+            
+            if (Object.keys(templates).length === 0) return;
+            
+            let html = '<div class="alert alert-info mt-2">';
+            html += '<strong>Saved Templates:</strong><br>';
+            
+            Object.values(templates).forEach(template => {
+                html += `<a href="#" onclick="loadTemplate(${template.id}); return false;" style="text-decoration: none;">`;
+                html += `  <i class="fas fa-file-alt"></i> ${template.name} (${new Date(template.createdAt).toLocaleDateString()})<br>`;
+                html += '</a>';
+            });
+            
+            html += '<button onclick="showTemplateManager();" class="btn btn-sm btn-outline-danger mt-2">Manage Templates</button>';
+            html += '</div>';
+            
+            const container = document.getElementById('templatesListContainer');
+            if (container) {
+                container.innerHTML = html;
+            } else {
+                const header = document.querySelector('.card-header');
+                const container = document.createElement('div');
+                container.id = 'templatesListContainer';
+                header.parentNode.insertBefore(container, header.nextSibling);
+                container.innerHTML = html;
+            }
+        }
+
+        function showTemplateManager() {
+            const templates = JSON.parse(localStorage.getItem('ald_quote_templates') || '{}');
+            
+            let modalHtml = `
+                <div class="modal fade" id="templateManagerModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Manage Templates</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+            `;
+            
+            if (Object.keys(templates).length === 0) {
+                modalHtml += '<p>No templates saved yet.</p>';
+            } else {
+                Object.values(templates).forEach(template => {
+                    modalHtml += `
+                        <div class="list-group-item">
+                            <strong>${template.name}</strong><br>
+                            <small class="text-muted">${new Date(template.createdAt).toLocaleString()}</small><br>
+                            ${template.rooms.length} room(s)<br>
+                            <button onclick="loadTemplate(${template.id}); bootstrap.Modal.getInstance(document.getElementById('templateManagerModal')).hide();" class="btn btn-sm btn-primary mt-1">Add Rooms to Quote</button>
+                            <button onclick="deleteTemplate(${template.id}); showTemplateManager();" class="btn btn-sm btn-danger mt-1">Delete</button>
+                        </div>
+                    `;
+                });
+            }
+            
+            modalHtml += `
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Add modal to body if it doesn't exist
+            let existingModal = document.getElementById('templateManagerModal');
+            if (!existingModal) {
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+                existingModal = document.getElementById('templateManagerModal');
+            }
+            
+            // Show the modal
+            const bsModal = new bootstrap.Modal(existingModal);
+            existingModal.classList.add('show');
+        }
+
+        function generateInteractiveLink() {
+            if (rooms.length === 0) {
+                alert('Please add at least one room before generating an interactive quote.');
+                return;
+            }
+
+            const quoteId = 'quote_' + Date.now();
+
+            const quoteData = {
+                id: quoteId,
+                clientName: document.getElementById('clientName')?.value || 'Client',
+                projectAddress: document.getElementById('projectAddress')?.value || 'Project Address',
+                email: document.getElementById('clientEmail')?.value || '',
+                phone: document.getElementById('clientPhone')?.value || '',
+                rooms: JSON.parse(JSON.stringify(rooms)),
+                grandTotal: parseFloat(document.getElementById('grandTotalDisplay').textContent.replace(/[^0-9.]/g, '')) || 0,
+                terms: getSelectedTerms()
+            };
+
+            localStorage.setItem(quoteId, JSON.stringify(quoteData));
+
+            // Build viewer URL (works for both local files and web server)
+            const viewerUrl = window.location.href.replace('quote-builder.html', 'interactive-quote-viewer.html') + '?quote=' + quoteId;
+
+            // Open the viewer in a new tab immediately
+            window.open(viewerUrl, '_blank');
+
+            // Show a copyable link modal
+            let modal = document.getElementById('interactiveLinkModal');
+            if (!modal) {
+                document.body.insertAdjacentHTML('beforeend', `
+                    <div class="modal fade" id="interactiveLinkModal" tabindex="-1">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header bg-success text-white">
+                                    <h5 class="modal-title"><i class="fas fa-check-circle"></i> Interactive Quote Ready!</h5>
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p>The client view has been opened in a new tab. You can also copy the link below:</p>
+                                    <div class="input-group">
+                                        <input type="text" id="interactiveLinkInput" class="form-control" readonly>
+                                        <button class="btn btn-outline-secondary" onclick="copyInteractiveLink()" title="Copy to clipboard">
+                                            <i class="fas fa-copy"></i> Copy
+                                        </button>
+                                    </div>
+                                    <small class="text-muted mt-2 d-block">
+                                        <i class="fas fa-info-circle"></i> This link works in the same browser on this computer.
+                                        To share with clients remotely, upload both HTML files to a web server.
+                                    </small>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-success" onclick="window.open(document.getElementById('interactiveLinkInput').value, '_blank')">
+                                        <i class="fas fa-external-link-alt"></i> Open Client View Again
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `);
+                modal = document.getElementById('interactiveLinkModal');
+            }
+
+            document.getElementById('interactiveLinkInput').value = viewerUrl;
+            new bootstrap.Modal(modal).show();
+        }
+
+        function copyInteractiveLink() {
+            const input = document.getElementById('interactiveLinkInput');
+            navigator.clipboard.writeText(input.value).then(() => {
+                const btn = input.nextElementSibling;
+                btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+                btn.classList.replace('btn-outline-secondary', 'btn-success');
+                setTimeout(() => {
+                    btn.innerHTML = '<i class="fas fa-copy"></i> Copy';
+                    btn.classList.replace('btn-success', 'btn-outline-secondary');
+                }, 2000);
+            }).catch(() => {
+                input.select();
+                document.execCommand('copy');
+            });
+        }
+
+        // ── Save / Load / Auto-save ─────────────────────────────────────────────
+
+        let saveFileHandle = null;
+        let autoSaveTimer = null;
+        let unsavedChanges = false;
+        let initDone = false;
+
+        function collectQuoteData() {
+            return {
+                version: 1,
+                savedAt: new Date().toISOString(),
+                clientName:     document.getElementById('clientName')?.value     || '',
+                projectAddress: document.getElementById('projectAddress')?.value || '',
+                clientPhone:    document.getElementById('clientPhone')?.value    || '',
+                clientEmail:    document.getElementById('clientEmail')?.value    || '',
+                terms: {
+                    deposit:   document.getElementById('termDeposit')?.checked   || false,
+                    timeline:  document.getElementById('termTimeline')?.checked  || false,
+                    warranty:  document.getElementById('termWarranty')?.checked  || false,
+                    payment30: document.getElementById('termPayment30')?.checked || false,
+                    changes:   document.getElementById('termChanges')?.checked   || false,
+                    access:    document.getElementById('termAccess')?.checked    || false,
+                },
+                rooms: JSON.parse(JSON.stringify(rooms)),
+                roomCounter: roomCounter
+            };
+        }
+
+        function applyQuoteData(data) {
+            if (document.getElementById('clientName'))     document.getElementById('clientName').value     = data.clientName     || '';
+            if (document.getElementById('projectAddress')) document.getElementById('projectAddress').value = data.projectAddress || '';
+            if (document.getElementById('clientPhone'))    document.getElementById('clientPhone').value    = data.clientPhone    || '';
+            if (document.getElementById('clientEmail'))    document.getElementById('clientEmail').value    = data.clientEmail    || '';
+            if (data.terms) {
+                document.getElementById('termDeposit').checked   = data.terms.deposit   || false;
+                document.getElementById('termTimeline').checked  = data.terms.timeline  || false;
+                document.getElementById('termWarranty').checked  = data.terms.warranty  || false;
+                document.getElementById('termPayment30').checked = data.terms.payment30 || false;
+                document.getElementById('termChanges').checked   = data.terms.changes   || false;
+                document.getElementById('termAccess').checked    = data.terms.access    || false;
+            }
+            rooms = data.rooms || [];
+            roomCounter = data.roomCounter || rooms.length;
+            renderRooms();
+        }
+
+        function updateSaveStatus(state, detail) {
+            const el = document.getElementById('saveStatus');
+            if (!el) return;
+            const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            if (state === 'saved') {
+                el.innerHTML = '<span style="color:#28a745;"><i class="fas fa-check-circle"></i> Saved at ' + t + (detail ? ' \u2014 ' + detail : '') + '</span>';
+                unsavedChanges = false;
+            } else if (state === 'unsaved') {
+                el.innerHTML = '<span style="color:#fd7e14;"><i class="fas fa-circle"></i> Unsaved changes</span>';
+            } else if (state === 'saving') {
+                el.innerHTML = '<span style="color:#6c757d;"><i class="fas fa-spinner fa-spin"></i> Saving\u2026</span>';
+            } else if (state === 'loaded') {
+                el.innerHTML = '<span style="color:#667eea;"><i class="fas fa-folder-open"></i> Opened at ' + t + (detail ? ' \u2014 ' + detail : '') + '</span>';
+                unsavedChanges = false;
+            } else if (state === 'error') {
+                el.innerHTML = '<span style="color:#dc3545;"><i class="fas fa-exclamation-triangle"></i> ' + (detail || 'Save failed') + '</span>';
+            }
+        }
+
+        function markUnsaved() {
+            if (!initDone) return;
+            unsavedChanges = true;
+            updateSaveStatus('unsaved');
+        }
+
+        async function writeToHandle(handle) {
+            updateSaveStatus('saving');
+            const writable = await handle.createWritable();
+            await writable.write(JSON.stringify(collectQuoteData(), null, 2));
+            await writable.close();
+            updateSaveStatus('saved');
+        }
+
+        async function saveQuote() {
+            if (!saveFileHandle) {
+                try {
+                    const client = document.getElementById('clientName')?.value.trim() || 'Quote';
+                    const date = new Date().toISOString().slice(0, 10);
+                    saveFileHandle = await window.showSaveFilePicker({
+                        suggestedName: client + ' - ' + date + '.aldquote',
+                        types: [{ description: 'ALD Quote File', accept: { 'application/json': ['.aldquote'] } }]
+                    });
+                    startAutoSave();
+                } catch (err) {
+                    if (err.name === 'AbortError') return;
+                    downloadQuoteFallback();
+                    return;
+                }
+            }
+            try {
+                await writeToHandle(saveFileHandle);
+            } catch (err) {
+                updateSaveStatus('error', 'Could not write file');
+            }
+        }
+
+        async function loadQuoteFromFile() {
+            try {
+                const [handle] = await window.showOpenFilePicker({
+                    types: [{ description: 'ALD Quote File', accept: { 'application/json': ['.aldquote'] } }]
+                });
+                const file = await handle.getFile();
+                const data = JSON.parse(await file.text());
+                saveFileHandle = handle;
+                applyQuoteData(data);
+                startAutoSave();
+                updateSaveStatus('loaded', handle.name);
+            } catch (err) {
+                if (err.name !== 'AbortError') updateSaveStatus('error', 'Could not open file');
+            }
+        }
+
+        function startAutoSave() {
+            if (autoSaveTimer) clearInterval(autoSaveTimer);
+            autoSaveTimer = setInterval(async () => {
+                if (saveFileHandle && unsavedChanges) {
+                    try { await writeToHandle(saveFileHandle); }
+                    catch (err) { updateSaveStatus('error', 'Auto-save failed'); }
+                }
+            }, 3 * 60 * 1000);
+        }
+
+        function downloadQuoteFallback() {
+            const blob = new Blob([JSON.stringify(collectQuoteData(), null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const client = document.getElementById('clientName')?.value.trim() || 'Quote';
+            a.href = url;
+            a.download = client + ' - ' + new Date().toISOString().slice(0, 10) + '.aldquote';
+            a.click();
+            URL.revokeObjectURL(url);
+            updateSaveStatus('saved');
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                saveQuote();
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            ['clientName','projectAddress','clientPhone','clientEmail',
+             'termDeposit','termTimeline','termWarranty','termPayment30','termChanges','termAccess'
+            ].forEach(function(id) {
+                const el = document.getElementById(id);
+                if (el) el.addEventListener('change', markUnsaved);
+            });
+        });
+
+        // ── End Save / Load ──────────────────────────────────────────────────────
+
+        // Load templates from localStorage on startup
+        let templates = JSON.parse(localStorage.getItem('ald_quote_templates') || '{}');
+        
+        // Initialize with one room
+        rooms.push({ id: 1, name: 'Basement', items: [] });
+        
+        // Set up initial pricing options
+        updatePricingOptions();
+        renderRooms();
+        renderTemplateDropdown();
+        initDone = true; // changes after this point are tracked
+    </script>
+    
+    <!-- Client Autocomplete System -->
+    <style>
+        .autocomplete-dropdown {
+            display: none;
+            position: absolute;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 1000;
+            width: 100%;
+        }
+        .autocomplete-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background-color 0.2s;
+        }
+        .autocomplete-item:hover,
+        .autocomplete-item.active {
+            background-color: #f8f9fa;
+        }
+        .autocomplete-item:last-child {
+            border-bottom: none;
+        }
+        .autocomplete-item strong {
+            color: #667eea;
+        }
+        .autocomplete-item small {
+            display: block;
+            margin-top: 4px;
+            color: #6c757d;
+        }
+    </style>
+    
+    <script>
+        // Client database from past quotes
+        const clientDatabase = {
+            "Adrian Wade Kitchen Outlets": {"filename": "24.03 Adrian Wade Kitchen Outlets.pdf", "phone": null, "email": null},
+            "Alexandra Rawlings": {"filename": "25.16 Alexandra Rawlings - Front Deck.pdf", "phone": null, "email": null},
+            "Ali Al Dujaili": {"filename": "25.17 Ali Al Dujaili - Paint Flower Beds.pdf", "phone": null, "email": null},
+            "Amanda and David Maclennan": {"filename": "25.12 Amanda and David Maclennan - Full Renovation.pdf", "phone": null, "email": null},
+            "Andrew Pembleton": {"filename": "24.44 Andrew Pembleton - Fence and Shed.pdf", "phone": null, "email": null},
+            "Brenda Pinkus": {"filename": "24.40 Brenda Pinkus - Condo Repairs.pdf", "phone": null, "email": null},
+            "Carrie Hutton": {"filename": "24.15 Carrie Hutton.pdf", "phone": null, "email": null},
+            "Concept Wraps": {"filename": "24.35A Concept Wraps - Paint - Copy.pdf", "phone": null, "email": null},
+            "Elena Williamson": {"filename": "25.22 Elena Williamson - Attic Insulation.pdf", "phone": null, "email": null},
+            "Elizabeth Craig": {"filename": "24.49 Elizabeth Craig - Drywall Repair.pdf", "phone": null, "email": null},
+            "Evan Anderson": {"filename": "25.14 Evan Anderson - Door, window trim, railing.pdf", "phone": null, "email": null},
+            "Evan Gelman": {"filename": "24.41 Evan Gelman - Laundry Room.pdf", "phone": null, "email": null},
+            "Fiona Morrison": {"filename": "26.02 Fiona Morrison - Railing and Shower Door.pdf", "phone": null, "email": null},
+            "Gerry and Nicole Deck Clean and Stain": {"filename": "25.19 Gerry and Nicole Deck Clean and Stain.pdf", "phone": null, "email": null},
+            "Gerry and Nicole Deck Reface": {"filename": "25.20 Gerry and Nicole Deck Reface.pdf", "phone": null, "email": null},
+            "Jackie and Kaya Smith": {"filename": "25.09A Jackie and Kaya Smith - Bathtub.pdf", "phone": null, "email": null},
+            "Joseph Sant": {"filename": "25.02 Joseph Sant - Bathroom.pdf", "phone": null, "email": null},
+            "Kyle Hosiac Shed": {"filename": "24.14B Kyle Hosiac Shed.pdf", "phone": null, "email": null},
+            "Liz Wilson, Basement": {"filename": "24.08 Liz Wilson, Basement.pdf", "phone": null, "email": null},
+            "Mahbubur Rahman 84 Rayne Venting": {"filename": "24.32 Mahbubur Rahman 84 Rayne Venting.pdf", "phone": null, "email": null},
+            "Mallory Peirce": {"filename": "24.52 Mallory Peirce - Kitchen.pdf", "phone": null, "email": null},
+            "Mat Pecaric, Flooring": {"filename": "24.07 Mat Pecaric, Flooring.pdf", "phone": null, "email": null},
+            "Michelle Ventrella": {"filename": "24.02 Michelle Ventrella.pdf", "phone": null, "email": null},
+            "Mike Anderson": {"filename": "25.07 Mike Anderson - Master Bedroom.pdf", "phone": null, "email": null},
+            "Mike Urban, Self Leveler": {"filename": "24.13 Mike Urban, Self Leveler.pdf", "phone": null, "email": null},
+            "Mike and Dianne Cupples Fireplace": {"filename": "24.20 Mike and Dianne Cupples Fireplace.pdf", "phone": null, "email": null},
+            "Neil Garraway 173 Thomas St.": {"filename": "24.21 Neil Garraway 173 Thomas St..pdf", "phone": null, "email": null},
+            "Orysa Steele": {"filename": "24.22 Orysa Steele Swap Garage Lights.pdf", "phone": null, "email": null},
+            "Peter Morris Shed and Shutters": {"filename": "24.24 Peter Morris Shed and Shutters.pdf", "phone": null, "email": null},
+            "Pinkus Interiors": {"filename": "25.26 Pinkus Interiors - Haddon.pdf", "phone": null, "email": null},
+            "Pranav Kapoor": {"filename": "24.04 Pranav Kapoor.pdf", "phone": null, "email": null},
+            "Rob Becker": {"filename": "25.15A Rob Becker - Feature Wall.pdf", "phone": null, "email": null},
+            "Rosa and Doug Carrick": {"filename": "25.17 Rosa and Doug Carrick - Laundry.pdf", "phone": null, "email": null},
+            "Samantha and Kevin Matten": {"filename": "25.21 Samantha and Kevin Matten - Faucet + Micro-Hood.pdf", "phone": null, "email": null},
+            "Sheila Maher": {"filename": "25.08 Sheila Maher - Exterior Cameras and Lock.pdf", "phone": null, "email": null},
+            "Sherri Basement": {"filename": "24.33 Sherri Basement.pdf", "phone": null, "email": null},
+            "Sherri Bathroom With Bathtub": {"filename": "24.31B Sherri Bathroom With Bathtub.pdf", "phone": null, "email": null},
+            "Steve Tylliros": {"filename": "24.38 Steve Tylliros - Outdoor Receptacles.pdf", "phone": null, "email": null},
+            "Thomas Hamilton": {"filename": "24.37 Thomas Hamilton - Shed.pdf", "phone": null, "email": null},
+            "Tiago Vieira": {"filename": "24.35 Tiago Vieira - Paint.pdf", "phone": null, "email": null},
+            "Tracy Quennell": {"filename": "24.05 Tracy Quennell.pdf", "phone": null, "email": null},
+            "Tracy Rivers": {"filename": "24.05A Tracy Rivers.pdf", "phone": null, "email": null},
+            "Victoria Niven, James Miller": {"filename": "24.39B Victoria Niven, James Miller - Basement FINAL .pdf", "phone": null, "email": null},
+            "Patrick Slaughter": {"filename": "23.34a Patrick Slaughter, Flooring and Baseboards.pdf", "phone": null, "email": null}
+        };
+
+        // Fuzzy matching function
+        function fuzzyMatch(query, text) {
+            query = query.toLowerCase().trim();
+            text = text.toLowerCase().trim();
+            
+            if (query === text) return { score: 100, exact: true };
+            if (text.includes(query)) return { score: 90, exact: false };
+            
+            const distances = [];
+            for (let i = 0; i < text.length; i++) {
+                let j = 0;
+                while (j < query.length && text[i + j] === query[j]) {
+                    j++;
+                }
+                if (j > 0) distances.push(j);
+            }
+            
+            const maxMatch = Math.max(...distances, 0);
+            return { score: (maxMatch / query.length) * 100, exact: false };
+        }
+
+        // Search clients based on input
+        function searchClients(query) {
+            if (!query || query.length < 2) return [];
+            
+            const results = [];
+            for (const [clientName, data] of Object.entries(clientDatabase)) {
+                const match = fuzzyMatch(query, clientName);
+                if (match.score > 50) {
+                    results.push({ name: clientName, ...data, score: match.score });
+                }
+            }
+            return results.sort((a, b) => b.score - a.score);
+        }
+
+        // Show autocomplete dropdown
+        function showClientSuggestions() {
+            const query = document.getElementById('clientName').value;
+            const results = searchClients(query);
+            const dropdown = document.getElementById('clientDropdown');
+            
+            if (results.length > 0) {
+                dropdown.innerHTML = '';
+                results.forEach(client => {
+                    const item = document.createElement('div');
+                    item.className = 'autocomplete-item';
+                    
+                    let displayName = client.name;
+                    if (!client.exact) {
+                        const idx = displayName.toLowerCase().indexOf(query.toLowerCase());
+                        if (idx >= 0) {
+                            displayName = displayName.substring(0, idx) + 
+                                         '<strong>' + displayName.substring(idx, idx + query.length) + '</strong>' + 
+                                         displayName.substring(idx + query.length);
+                        }
+                    }
+                    
+                    item.innerHTML = `<span>${displayName}</span><small>From: ${client.filename}</small>`;
+                    item.onclick = function() {
+                        fillClientInfo(client.name, client);
+                        hideClientDropdown();
+                    };
+                    dropdown.appendChild(item);
+                });
+                dropdown.style.display = 'block';
+            } else {
+                hideClientDropdown();
+            }
+        }
+
+        // Hide autocomplete dropdown
+        function hideClientDropdown() {
+            setTimeout(() => {
+                document.getElementById('clientDropdown').style.display = 'none';
+            }, 200);
+        }
+
+        // Fill client information when selected
+        function fillClientInfo(clientName, clientData) {
+            document.getElementById('clientName').value = clientName;
+            
+            // Auto-fill address if available in database (future enhancement)
+            // For now, these fields are ready for manual entry or future PDF extraction:
+            // - projectAddress
+            // - clientPhone  
+            // - clientEmail
+            
+            console.log(`Client ${clientName} selected`);
+        }
+    </script>
+</body>
+</html>

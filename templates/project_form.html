@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}{% if project %}Edit Project{% else %}New Project for {{ client.first_name }}{% endif %} - ALD Direct Inc.{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h2><i class="fas fa-project-diagram"></i> {% if project %}Edit Project{% else %}New Project for {{ client.first_name }} {{ client.last_name }}{% endif %}</h2>
+        <p class="text-muted">Project details and timeline</p>
+    </div>
+    <div class="col-md-4 text-end">
+        <a href="{{ url_for('list_projects') }}" class="btn btn-secondary">
+            <i class="fas fa-times"></i> Cancel
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-header">{% if project %}Edit{% else %}New{% endif %} Project Information</div>
+            <div class="card-body">
+                <form method="POST" action="{% if project %}{{ url_for('edit_project', project_id=project.id) }}{% else %}{{ url_for('new_project', client_id=client.id) }}{% endif %}">
+                    <!-- Project Name -->
+                    <div class="mb-3">
+                        <label for="project_name" class="form-label">Project Name *</label>
+                        <input type="text" class="form-control" id="project_name" name="project_name" 
+                               value="{{ project.project_name if project else '' }}" required
+                               placeholder="e.g., Basement Finishing - Thompson Residence">
+                    </div>
+
+                    <!-- Status -->
+                    <div class="mb-3">
+                        <label for="status" class="form-label">Status *</label>
+                        <select class="form-select" id="status" name="status" required>
+                            <option value="Quote" {% if project and project.status == 'Quote' %}selected{% endif %}>Quote</option>
+                            <option value="Accepted" {% if project and project.status == 'Accepted' %}selected{% endif %}>Accepted</option>
+                            <option value="In Progress" {% if project and project.status == 'In Progress' %}selected{% endif %}>In Progress</option>
+                            <option value="Complete" {% if project and project.status == 'Complete' %}selected{% endif %}>Complete</option>
+                            <option value="On Hold" {% if project and project.status == 'On Hold' %}selected{% endif %}>On Hold</option>
+                        </select>
+                    </div>
+
+                    <!-- Dates -->
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="quote_date" class="form-label">Quote Date</label>
+                            <input type="date" class="form-control" id="quote_date" name="quote_date" 
+                                   value="{{ project.quote_date.strftime('%Y-%m-%d') if project and project.quote_date else '' }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="start_date" class="form-label">Start Date</label>
+                            <input type="date" class="form-control" id="start_date" name="start_date" 
+                                   value="{{ project.start_date.strftime('%Y-%m-%d') if project and project.start_date else '' }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="estimated_end_date" class="form-label">Est. End Date</label>
+                            <input type="date" class="form-control" id="estimated_end_date" name="estimated_end_date" 
+                                   value="{{ project.estimated_end_date.strftime('%Y-%m-%d') if project and project.estimated_end_date else '' }}">
+                        </div>
+                    </div>
+
+                    <!-- Notes -->
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">Notes</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="4">{{ project.notes if project else '' }}</textarea>
+                        <small class="text-muted">Project-specific details, material choices, client preferences</small>
+                    </div>
+
+                    <!-- Submit Buttons -->
+                    <div class="d-flex justify-content-end gap-2 mt-4">
+                        <a href="{{ url_for('list_projects') }}" class="btn btn-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> {% if project %}Update Project{% else %}Create Project{% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

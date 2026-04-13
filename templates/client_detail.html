@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}{{ client.first_name }} {{ client.last_name }} - ALD Direct Inc.{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h2><i class="fas fa-user"></i> {{ client.first_name }} {{ client.last_name }}</h2>
+        <p class="text-muted">Client details and project history</p>
+    </div>
+    <div class="col-md-4 text-end">
+        <a href="{{ url_for('list_clients') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Clients
+        </a>
+        <a href="{{ url_for('edit_client', client_id=client.id) }}" class="btn btn-success">
+            <i class="fas fa-edit"></i> Edit Client
+        </a>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <!-- Contact Information -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><i class="fas fa-address-card"></i> Contact Information</div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <th style="width: 120px;">Name:</th>
+                        <td><strong>{{ client.first_name }} {{ client.last_name }}</strong></td>
+                    </tr>
+                    {% if client.email %}
+                    <tr>
+                        <th>Email:</th>
+                        <td><a href="mailto:{{ client.email }}">{{ client.email }}</a></td>
+                    </tr>
+                    {% endif %}
+                    {% if client.phone %}
+                    <tr>
+                        <th>Phone:</th>
+                        <td><i class="fas fa-phone"></i> {{ client.phone }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if client.address %}
+                    <tr>
+                        <th>Address:</th>
+                        <td>{{ client.address }}<br>{% if client.city %}{{ client.city }}, {{ client.province }} {{ client.postal_code }}{% endif %}</td>
+                    </tr>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Client Notes -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><i class="fas fa-sticky-note"></i> Notes & History</div>
+            <div class="card-body">
+                {% if client.notes %}
+                    <p>{{ client.notes }}</p>
+                {% else %}
+                    <p class="text-muted mb-0">No notes yet.</p>
+                {% endif %}
+                
+                {% if client.referral_source %}
+                    <hr>
+                    <strong><i class="fas fa-arrow-right"></i> Referral Source:</strong> {{ client.referral_source }}
+                {% endif %}
+                
+                <hr>
+                <div class="row">
+                    <div class="col-6">
+                        <strong>Total Spent:</strong><br>
+                        <span class="text-success">${{ "%.2f"|format(client.total_spent) }}</span>
+                    </div>
+                    <div class="col-6 text-end">
+                        <strong>Last Project:</strong><br>
+                        {% if client.last_project_date %}
+                            {{ client.last_project_date.strftime('%Y-%m-%d') }}
+                        {% else %}
+                            Never
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Projects List -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-project-diagram"></i> Project History</span>
+                <a href="{{ url_for('new_project', client_id=client.id) }}" class="btn btn-sm btn-light text-dark">
+                    <i class="fas fa-plus"></i> New Project
+                </a>
+            </div>
+            <div class="card-body p-0">
+                {% if projects %}
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Project Name</th>
+                                <th>Status</th>
+                                <th>Date Created</th>
+                                <th>Total Quote</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for project in projects %}
+                            <tr>
+                                <td><strong>{{ project.project_name }}</strong></td>
+                                <td>
+                                    <span class="status-badge status-{{ project.status }}">
+                                        {{ project.status }}
+                                    </span>
+                                </td>
+                                <td>{{ project.created_at.strftime('%Y-%m-%d') }}</td>
+                                <td>${{ "%.2f"|format(project.total_quote_amount or 0) }}</td>
+                                <td>
+                                    <a href="{{ url_for('view_project', project_id=project.id) }}" 
+                                       class="btn btn-sm btn-primary">
+                                        <i class="fas fa-eye"></i> View
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <p>No projects yet for this client.</p>
+                        <a href="{{ url_for('new_project', client_id=client.id) }}" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Create First Project
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

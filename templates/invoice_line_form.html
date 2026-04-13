@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+
+{% block title %}Add Line Item - ALD Direct Inc.{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h2><i class="fas fa-plus-circle"></i> Add Invoice Line Item</h2>
+        <p class="text-muted">Project: {{ project.project_name }}</p>
+    </div>
+    <div class="col-md-4 text-end">
+        <a href="{{ url_for('view_project', project_id=project.id) }}" class="btn btn-secondary">
+            <i class="fas fa-times"></i> Cancel
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-header">Line Item Details</div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('new_invoice_line', project_id=project.id) }}">
+                    <!-- Room Break (Optional) -->
+                    <div class="mb-3">
+                        <label for="room_break_id" class="form-label">Room/Area (Optional)</label>
+                        <select class="form-select" id="room_break_id" name="room_break_id">
+                            <option value="">-- No Room Break --</option>
+                            {% for room in project.room_breaks %}
+                            <option value="{{ room.id }}">{{ room.room_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Category -->
+                    <div class="mb-3">
+                        <label for="category" class="form-label">Category *</label>
+                        <select class="form-select" id="category" name="category" required onchange="updateRates()">
+                            {% for cat in categories %}
+                            <option value="{{ cat }}" {% if cat == 'Framing' %}selected{% endif %}>
+                                {{ cat }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Service Name -->
+                    <div class="mb-3">
+                        <label for="service_name" class="form-label">Service *</label>
+                        <select class="form-select" id="service_name" name="service_name" required onchange="updateRateFromService()">
+                            {% for rate in rates %}
+                            <option value="{{ rate.service_name }}" 
+                                    data-unit-type="{{ rate.unit_type }}" 
+                                    data-rate="{{ rate.total_rate }}">
+                                {{ rate.service_name }} ({{ "%.2f"|format(rate.total_rate) }}/{{ rate.unit_type if rate.unit_type else 'each' }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Description -->
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description *</label>
+                        <input type="text" class="form-control" id="description" name="description" required
+                               placeholder="e.g., Framing (all basement walls), Electrical rough-in and finish">
+                    </div>
+
+                    <!-- Quantity -->
+                    <div class="mb-3">
+                        <label for="quantity" class="form-label">Quantity *</label>
+                        <input type="number" step="0.01" class="form-control" id="quantity" name="quantity" 
+                               value="1" required oninput="calculateTotal()">
+                    </div>
+
+                    <!-- Unit Rate -->
+                    <div class="mb-3">
+                        <label for="unit_rate" class="form-label">Unit Rate *</label>
+                        <input type="number" step="0.01" class="form-control" id="unit_rate" name="unit_rate" 
+                               value="{{ rates[0].total_rate if rates else 0 }}" required oninput="calculateTotal()">
+                    </div>
+
+                    <!-- Line Total (Auto-calculated) -->
+                    <div class="mb-3">
+                        <label for="line_total" class="form-label">Line Total</label>
+                        <input type="number" step="0.01" class="form-control" id="line_total" name="line_total" 
+                               value="{{ rates[0].total_rate if rates else 0 }}" readonly
+                               style="background-color: #e9ecef;">
+                    </div>
+
+                    <!-- Notes -->
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">Notes</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="2"></textarea>
+                        <small class="text-muted">Additional details about this line item</small>
+                    </div>
+
+                    <!-- Submit Buttons -->
+                    <div class="d-flex justify-content-end gap-2 mt-4">
+                        <a href="{{ url_for('view_project', project_id=project.id) }}" class="btn btn-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Add Line Item
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Pricing Reference -->
+        <div class="card mt-4">
+            <div class="card-header"><i class="fas fa-info-circle"></i> Pricing Reference</div>
+            <div class="card-body">
+                <h6>Available {{ request.args.get('category', 'Framing') }} Rates:</h6>
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Service</th>
+                            <th>Unit Type</th>
+                            <th>Total Rate</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for rate in rates %}
+                        <tr>
+                            <td>{{ rate.service_name }}</td>
+                            <td>{{ rate.unit_type or 'each' }}</td>
+                            <td>${{ "%.2f"|format(rate.total_rate) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+function updateRates() {
+    const category = document.getElementById('category').value;
+    // In a real app, this would fetch rates via AJAX
+    console.log('Category changed to:', category);
+}
+
+function updateRateFromService() {
+    const serviceSelect = document.getElementById('service_name');
+    const selectedOption = serviceSelect.options[serviceSelect.selectedIndex];
+    
+    if (selectedOption) {
+        const rate = parseFloat(selectedOption.getAttribute('data-rate'));
+        const unitType = selectedOption.getAttribute('data-unit-type');
+        
+        document.getElementById('unit_rate').value = rate;
+        calculateTotal();
+    }
+}
+
+function calculateTotal() {
+    const quantity = parseFloat(document.getElementById('quantity').value) || 0;
+    const unitRate = parseFloat(document.getElementById('unit_rate').value) || 0;
+    
+    document.getElementById('line_total').value = (quantity * unitRate).toFixed(2);
+}
+
+// Initialize on page load
+updateRateFromService();
+</script>
+{% endblock %}
+
+{% endblock %}

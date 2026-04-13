@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}{% if client %}Edit Client{% else %}Add New Client{% endif %} - ALD Direct Inc.{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h2><i class="fas fa-user-plus"></i> {% if client %}Edit Client{% else %}Add New Client{% endif %}</h2>
+        <p class="text-muted">Client information and contact details</p>
+    </div>
+    <div class="col-md-4 text-end">
+        <a href="{{ url_for('list_clients') }}" class="btn btn-secondary">
+            <i class="fas fa-times"></i> Cancel
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-header">{% if client %}Edit{% else %}Add New{% endif %} Client Information</div>
+            <div class="card-body">
+                <form method="POST" action="{% if client %}{{ url_for('edit_client', client_id=client.id) }}{% else %}{{ url_for('new_client') }}{% endif %}">
+                    <!-- First Name -->
+                    <div class="mb-3">
+                        <label for="first_name" class="form-label">First Name *</label>
+                        <input type="text" class="form-control" id="first_name" name="first_name" 
+                               value="{{ client.first_name if client else '' }}" required>
+                    </div>
+
+                    <!-- Last Name -->
+                    <div class="mb-3">
+                        <label for="last_name" class="form-label">Last Name *</label>
+                        <input type="text" class="form-control" id="last_name" name="last_name" 
+                               value="{{ client.last_name if client else '' }}" required>
+                    </div>
+
+                    <!-- Email -->
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="email" name="email" 
+                               value="{{ client.email if client else '' }}">
+                    </div>
+
+                    <!-- Phone -->
+                    <div class="mb-3">
+                        <label for="phone" class="form-label">Phone</label>
+                        <input type="tel" class="form-control" id="phone" name="phone" 
+                               value="{{ client.phone if client else '' }}">
+                    </div>
+
+                    <!-- Address -->
+                    <div class="mb-3">
+                        <label for="address" class="form-label">Street Address</label>
+                        <input type="text" class="form-control" id="address" name="address" 
+                               value="{{ client.address if client else '' }}">
+                    </div>
+
+                    <!-- City, Province, Postal Code -->
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="city" class="form-label">City</label>
+                            <input type="text" class="form-control" id="city" name="city" 
+                                   value="{{ client.city if client else '' }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="province" class="form-label">Province</label>
+                            <input type="text" class="form-control" id="province" name="province" 
+                                   value="{{ client.province if client else '' }}">
+                        </div>
+                        <div class="col-md-5">
+                            <label for="postal_code" class="form-label">Postal Code</label>
+                            <input type="text" class="form-control" id="postal_code" name="postal_code" 
+                                   value="{{ client.postal_code if client else '' }}">
+                        </div>
+                    </div>
+
+                    <!-- Referral Source -->
+                    <div class="mb-3">
+                        <label for="referral_source" class="form-label">Referral Source</label>
+                        <input type="text" class="form-control" id="referral_source" name="referral_source" 
+                               value="{{ client.referral_source if client else '' }}"
+                               placeholder="e.g., Ruairidh referred us, James & Victoria referral">
+                    </div>
+
+                    <!-- Notes -->
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">Notes</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="4">{{ client.notes if client else '' }}</textarea>
+                        <small class="text-muted">Project history, preferences, special notes (e.g., "James and Victoria - basement job 2024")</small>
+                    </div>
+
+                    <!-- Submit Buttons -->
+                    <div class="d-flex justify-content-end gap-2 mt-4">
+                        <a href="{{ url_for('list_clients') }}" class="btn btn-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> {% if client %}Update Client{% else %}Add Client{% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

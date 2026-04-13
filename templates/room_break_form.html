@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}{% if room_break %}Edit Room Break{% else %}Add Room/Area Break{% endif %} - ALD Direct Inc.{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h2><i class="fas fa-door-open"></i> {% if room_break %}Edit Room Break{% else %}Add Room/Area Break{% endif %}</h2>
+        <p class="text-muted">Organize your quote by space (basement, kitchen, bathroom, etc.)</p>
+    </div>
+    <div class="col-md-4 text-end">
+        <a href="{{ url_for('view_project', project_id=project.id) }}" class="btn btn-secondary">
+            <i class="fas fa-times"></i> Cancel
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-header">{% if room_break %}Edit{% else %}Add New{% endif %} Room/Area Break</div>
+            <div class="card-body">
+                <form method="POST" action="{% if room_break %}{{ url_for('edit_room_break', room_id=room_break.id) }}{% else %}{{ url_for('new_room_break', project_id=project.id) }}{% endif %}">
+                    <!-- Room Name -->
+                    <div class="mb-3">
+                        <label for="room_name" class="form-label">Room/Area Name *</label>
+                        <input type="text" class="form-control" id="room_name" name="room_name" 
+                               value="{{ room_break.room_name if room_break else '' }}" required
+                               placeholder="e.g., Basement, Kitchen, Bathroom, Living Room">
+                        <small class="text-muted">Common examples: Basement, Kitchen, Bathroom, Master Bedroom, Garage, Outdoor</small>
+                    </div>
+
+                    <!-- Notes -->
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">Notes (Optional)</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="2">{{ room_break.notes if room_break else '' }}</textarea>
+                        <small class="text-muted">Additional details about this space</small>
+                    </div>
+
+                    <!-- Submit Buttons -->
+                    <div class="d-flex justify-content-end gap-2 mt-4">
+                        <a href="{{ url_for('view_project', project_id=project.id) }}" class="btn btn-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> {% if room_break %}Update Room{% else %}Add Room Break{% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- How It Works -->
+        <div class="card mt-4">
+            <div class="card-header"><i class="fas fa-info-circle"></i> How Room Breaks Work</div>
+            <div class="card-body">
+                <ul class="mb-0">
+                    <li><strong>Organize your quote by space:</strong> Create breaks for Basement, Kitchen, Bathroom, etc.</li>
+                    <li><strong>Assign line items to rooms:</strong> When adding invoice items, select which room they belong to</li>
+                    <li><strong>Client-friendly format:</strong> Your quotes will show clear sections so clients see exactly what's included in each area</li>
+                    <li><strong>Easier upgrades:</strong> Later you can add upgrade options per room (e.g., "Upgrade to 7½" baseboard")</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

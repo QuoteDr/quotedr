@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - ALD Direct Inc.{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h2><i class="fas fa-tachometer-alt"></i> Dashboard</h2>
+        <p class="text-muted">Welcome to your ALD Direct Inc. invoicing system!</p>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="stat-number">{{ total_clients }}</div>
+            <div class="stat-label">Total Clients</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="stat-number">{{ active_projects }}</div>
+            <div class="stat-label">Active Projects</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="stat-number">
+                {% set total = projects | selectattr('status', 'equalto', 'Complete') | list | length %}
+                {{ total }}
+            </div>
+            <div class="stat-label">Completed Projects</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="stat-number">
+                {% set quote = projects | selectattr('status', 'equalto', 'Quote') | list | length %}
+                {{ quote }}
+            </div>
+            <div class="stat-label">Quotes Pending</div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Projects -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-project-diagram"></i> Recent Projects</span>
+                <a href="{{ url_for('list_projects') }}" class="btn btn-sm btn-light text-dark">View All</a>
+            </div>
+            <div class="card-body p-0">
+                {% if projects %}
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Project Name</th>
+                                <th>Client</th>
+                                <th>Status</th>
+                                <th>Date Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for project in projects %}
+                            <tr>
+                                <td><strong>{{ project.project_name }}</strong></td>
+                                <td>
+                                    {% set client = clients | selectattr('id', 'equalto', project.client_id) | first %}
+                                    {{ client.first_name }} {{ client.last_name }}
+                                </td>
+                                <td>
+                                    <span class="status-badge status-{{ project.status }}">
+                                        {{ project.status }}
+                                    </span>
+                                </td>
+                                <td>{{ project.created_at.strftime('%Y-%m-%d') }}</td>
+                                <td>
+                                    <a href="{{ url_for('view_project', project_id=project.id) }}" 
+                                       class="btn btn-sm btn-primary">
+                                        <i class="fas fa-eye"></i> View
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-inbox fa-3x mb-3"></i>
+                        <p>No projects yet. Create your first project!</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row">
+    <div class="col-md-6 mb-3">
+        <div class="card h-100">
+            <div class="card-header"><i class="fas fa-plus-circle"></i> Quick Actions</div>
+            <div class="card-body d-flex flex-column justify-content-center align-items-center text-center">
+                <a href="{{ url_for('new_client') }}" class="btn btn-primary mb-2">
+                    <i class="fas fa-user-plus"></i> Add New Client
+                </a>
+                <hr class="w-100 my-3" style="opacity: 0.1;">
+                <a href="{{ url_for('list_projects') }}" class="btn btn-success mb-2">
+                    <i class="fas fa-project-diagram"></i> View All Projects
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 mb-3">
+        <div class="card h-100">
+            <div class="card-header"><i class="fas fa-info-circle"></i> System Info</div>
+            <div class="card-body">
+                <ul class="list-unstyled mb-0">
+                    <li class="mb-2">
+                        <strong><i class="fas fa-database"></i> Pricing Database:</strong> 
+                        Loaded with {{ pricing_count }} rates
+                    </li>
+                    <li class="mb-2">
+                        <strong><i class="fas fa-users"></i> Client Database:</strong> 
+                        {{ total_clients }} clients tracked
+                    </li>
+                    <li>
+                        <strong><i class="fas fa-calendar-check"></i> Last Updated:</strong> 
+                        {{ now.strftime('%Y-%m-%d %H:%M') }}
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Update pricing count dynamically
+fetch('/api/pricing-rates/Framing')
+    .then(response => response.json())
+    .then(data => {
+        document.querySelectorAll('.pricing-count').forEach(el => {
+            el.textContent = data.length;
+        });
+    });
+</script>
+{% endblock %}

@@ -142,6 +142,53 @@ async function saveBusinessProfile(profile) {
     return { data, error };
 }
 
+// ─── CLIENTS HELPERS ──────────────────────────────────────────────────────────
+
+async function saveClientsToSupabase(clientsObj) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    const clientsArray = Object.values(clientsObj);
+    const { data, error } = await _supabase
+        .from('user_data')
+        .upsert({ user_id: user.id, key: 'clients', value: clientsObj, updated_at: new Date().toISOString() }, { onConflict: 'user_id,key' })
+        .select().single();
+    return { data, error };
+}
+
+async function loadClientsFromSupabase() {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    const { data, error } = await _supabase
+        .from('user_data')
+        .select('value')
+        .eq('user_id', user.id)
+        .eq('key', 'clients')
+        .single();
+    return { data: data ? data.value : null, error };
+}
+
+async function saveMaterialsToSupabase(materialsObj) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    const { data, error } = await _supabase
+        .from('user_data')
+        .upsert({ user_id: user.id, key: 'materials', value: materialsObj, updated_at: new Date().toISOString() }, { onConflict: 'user_id,key' })
+        .select().single();
+    return { data, error };
+}
+
+async function loadMaterialsFromSupabase() {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    const { data, error } = await _supabase
+        .from('user_data')
+        .select('value')
+        .eq('user_id', user.id)
+        .eq('key', 'materials')
+        .single();
+    return { data: data ? data.value : null, error };
+}
+
 // ─── CLIENT HELPERS ──────────────────────────────────────────────────────────
 
 async function saveClientToSupabase(clientData) {
