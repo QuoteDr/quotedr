@@ -3419,7 +3419,7 @@
                         </button>
                         <button class="btn btn-lg btn-outline-primary" style="min-width:140px;" onclick="startupOpenQuote()">
                             <i class="fas fa-folder-open d-block mb-1" style="font-size:1.5rem;"></i>
-                            Open Saved
+                            Open File
                         </button>
                         <button id="continueSessionBtn" class="btn btn-lg btn-outline-success" style="min-width:140px; display:none;" onclick="startupContinueSession()">
                             <i class="fas fa-play d-block mb-1" style="font-size:1.5rem;"></i>
@@ -3446,25 +3446,30 @@
                     return;
                 }
                 
-                // Check for cloud quote to open
+                // Check if opening a specific cloud quote from dashboard
                 var cloudQuoteId = localStorage.getItem('ald_open_cloud_quote');
                 if (cloudQuoteId) {
                     localStorage.removeItem('ald_open_cloud_quote');
                     if (typeof loadQuoteFromSupabase === 'function') {
                         loadQuoteFromSupabase(cloudQuoteId).then(function(result) {
-                            if (result && result.data) {
-                                var qData = result.data.data; // the full quote data is stored in the jsonb 'data' column
+                            if (result && result.data && result.data.data) {
+                                var qData = result.data.data;
                                 qData.supabaseId = result.data.id;
                                 window._supabaseQuoteId = result.data.id;
                                 applyQuoteData(qData);
                                 if (qData.quoteNumber) document.getElementById('quoteNumber').value = qData.quoteNumber;
                                 renderTermsCheckboxes();
+                                if (qData.terms && Array.isArray(qData.terms)) {
+                                    document.querySelectorAll('#termsCheckboxes input[type="checkbox"]').forEach(function(cb) {
+                                        cb.checked = qData.terms.includes(cb.dataset.text);
+                                    });
+                                }
                                 var el = document.getElementById('saveStatus');
                                 if (el) el.innerHTML = '<span style="color:#1a56a0;"><i class="fas fa-cloud"></i> Loaded from cloud</span>';
                                 updateDraftWarning();
                             }
-                        });
-                        return; // don't show modal while loading
+                        }).catch(function(e) { console.warn('Failed to load cloud quote:', e); });
+                        return; // Don't show modal while loading
                     }
                 }
                 
