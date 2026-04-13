@@ -34,6 +34,9 @@
                 <div class="text-center mb-4">
                     <h1 class="display-6 fw-bold">Welcome to QuoteDr.io</h1>
                     <p class="text-muted">Let's get you set up with your custom quote builder</p>
+                <div class="text-end mb-2">
+                    <a href="#" onclick="skipOnboarding(); return false;" class="text-muted small">Skip for now →</a>
+                </div>
                 </div>
 
                 <div class="progress mb-4">
@@ -49,7 +52,7 @@
                         <h2 class="text-center mb-3">Business Information</h2>
                         <p class="text-center text-muted mb-4">Tell us about your business</p>
                         
-                        <form id="businessForm" novalidate>
+                        <form id="businessForm" novalidate onsubmit="return false">
                             <div class="mb-3">
                                 <label for="businessName" class="form-label">Business Name *</label>
                                 <input type="text" class="form-control" id="businessName" required>
