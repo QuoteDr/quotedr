@@ -191,22 +191,61 @@
 
                     <!-- Step 5: Custom Items -->
                     <div class="step-panel p-4 p-md-5" id="step5">
-                        <h2 class="text-center mb-3">Custom Materials</h2>
-                        <p class="text-center text-muted mb-4">Add materials to your quote builder</p>
-                        
+                        <h2 class="text-center mb-3">Your Line Items</h2>
+                        <p class="text-center text-muted mb-1">Pre-load your common services so they're ready in the quote builder.</p>
+                        <p class="text-center mb-4"><small class="text-muted"><i class="fas fa-stethoscope me-1"></i>Dr. Anxiety says: <em>"Don't panic — you can add, edit, or remove these anytime from the quote builder. No prescription needed."</em></small></p>
+
+                        <div class="row g-2 mb-2 align-items-end">
+                            <div class="col-md-3">
+                                <label class="form-label form-label-sm"><strong>Category</strong></label>
+                                <input type="text" id="ob_itemCategory" class="form-control form-control-sm" placeholder="e.g., Tiling" list="ob_categoryOptions">
+                                <datalist id="ob_categoryOptions">
+                                    <option value="Tiling">
+                                    <option value="Flooring">
+                                    <option value="Drywall">
+                                    <option value="Painting">
+                                    <option value="Framing">
+                                    <option value="Trim">
+                                    <option value="Plumbing">
+                                    <option value="Electrical">
+                                    <option value="Demo">
+                                    <option value="Other">
+                                </datalist>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label form-label-sm"><strong>Item Name</strong></label>
+                                <input type="text" id="ob_itemName" class="form-control form-control-sm" placeholder="e.g., Tile Installation">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label form-label-sm"><strong>Unit Type</strong></label>
+                                <input type="text" id="ob_itemUnit" class="form-control form-control-sm" placeholder="sq ft" list="ob_unitOptions">
+                                <datalist id="ob_unitOptions">
+                                    <option value="sq ft">
+                                    <option value="LF">
+                                    <option value="each">
+                                    <option value="hourly">
+                                    <option value="sheet">
+                                    <option value="minimum">
+                                </datalist>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label form-label-sm"><strong>Rate ($)</strong></label>
+                                <input type="number" id="ob_itemRate" class="form-control form-control-sm" step="0.01" min="0" placeholder="0.00">
+                            </div>
+                            <div class="col-md-2">
+                                <button class="btn btn-primary btn-sm w-100" onclick="ob_addLineItem()"><i class="fas fa-plus"></i> Add</button>
+                            </div>
+                        </div>
                         <div class="mb-3">
-                            <button class="btn btn-outline-primary btn-sm" onclick="addCustomItem()">
-                                <i class="fas fa-plus me-1"></i> Add Material
-                            </button>
+                            <label class="form-label form-label-sm"><strong>Description</strong> <span class="text-muted small">(optional)</span></label>
+                            <textarea id="ob_itemDescription" class="form-control form-control-sm" rows="2" placeholder="What does this service include? Shown to clients on their quote."></textarea>
                         </div>
-                        
-                        <div id="customItemsList">
-                            <!-- Custom items will be rendered here -->
-                        </div>
-                        
+
+                        <div id="ob_lineItemsList" class="mb-3"></div>
+
                         <div class="d-flex justify-content-between mt-4">
                             <button class="btn btn-outline-secondary" onclick="prevStep()"><i class="fas fa-arrow-left"></i> Back</button>
-                            <button class="btn btn-primary" onclick="saveCustomItems();nextStep()">Next →</button>
+                            <button class="btn btn-primary" onclick="ob_saveLineItems();nextStep()">Next →</button>
                         </div>
                     </div>
 
@@ -432,31 +471,6 @@
         }
 
         // Custom items functions
-        var _customItems = JSON.parse(localStorage.getItem('ald_custom_materials') || '[]');
-
-        function renderCustomItems() {
-            var el = document.getElementById('customItemsList');
-            if (!el) return;
-            if (_customItems.length === 0) {
-                el.innerHTML = '<p class="text-muted small">No materials added yet. Click "Add Material" to get started.</p>';
-                return;
-            }
-            el.innerHTML = _customItems.map(function(item, i) {
-                return '<div class="d-flex align-items-center gap-2 mb-2 flex-wrap">' +
-                    '<input type="text" class="form-control form-control-sm" placeholder="Material name" value="' + (item.name||'').replace(/"/g,'&quot;') + '" onchange="_customItems['+i+'].name=this.value" style="min-width:140px;">' +
-                    '<input type="text" class="form-control form-control-sm" placeholder="Unit (e.g. sqft)" value="' + (item.unit||'').replace(/"/g,'&quot;') + '" onchange="_customItems['+i+'].unit=this.value" style="max-width:90px;">' +
-                    '<input type="number" class="form-control form-control-sm" placeholder="Price" value="' + (item.price||'') + '" onchange="_customItems['+i+'].price=parseFloat(this.value)||0" style="max-width:90px;">' +
-                    '<button class="btn btn-sm btn-outline-danger" onclick="_customItems.splice('+i+',1);renderCustomItems();"><i class="fas fa-trash"></i></button>' +
-                    '</div>';
-            }).join('');
-        }
-
-        function addCustomItem() {
-            _customItems.push({ name: '', unit: '', price: 0 });
-            renderCustomItems();
-        }
-
-        function saveCustomItems() {
             localStorage.setItem('ald_custom_materials', JSON.stringify(_customItems));
         }
 
