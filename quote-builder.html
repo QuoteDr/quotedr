@@ -224,33 +224,33 @@
             <!-- Toolbar right -->
             <div style="flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
                 <div class="d-flex flex-wrap justify-content-end gap-1">
-                    <button onclick="newQuote()" class="btn btn-sm shadow-sm" style="background:#e87e2a; color:#fff; border-color:#e87e2a;" title="Start a fresh new quote">
+                    <a href="javascript:void(0)" onclick="newQuote()" class="btn btn-sm shadow-sm" style="background:#e87e2a; color:#fff; border-color:#e87e2a;" title="Start a fresh new quote">
                         <i class="fas fa-plus"></i> New
-                    </button>
-                    <button onclick="saveQuote()" class="btn btn-warning btn-sm shadow-sm" title="Save quote (Ctrl+S)">
+                    </a>
+                    <a href="javascript:void(0)" onclick="saveQuote()" class="btn btn-warning btn-sm shadow-sm" title="Save quote (Ctrl+S)">
                         <i class="fas fa-save"></i> Save
-                    </button>
-                    <button onclick="loadQuoteFromFile()" class="btn btn-secondary btn-sm shadow-sm" title="Open a saved quote">
+                    </a>
+                    <a href="javascript:void(0)" onclick="loadQuoteFromFile()" class="btn btn-secondary btn-sm shadow-sm" title="Open a saved quote">
                         <i class="fas fa-folder-open"></i> Open
-                    </button>
-                    <button onclick="exportToPDF()" class="btn btn-success btn-sm shadow-sm">
+                    </a>
+                    <a href="javascript:void(0)" onclick="exportToPDF()" class="btn btn-success btn-sm shadow-sm">
                         <i class="fas fa-download"></i> PDF
-                    </button>
-                    <button onclick="generateInteractiveLink()" class="btn btn-primary btn-sm shadow-sm">
+                    </a>
+                    <a href="javascript:void(0)" onclick="generateInteractiveLink()" class="btn btn-primary btn-sm shadow-sm">
                         <i class="fas fa-share-square"></i> Send Quote
-                    </button>
-                    <button onclick="generateInvoiceLink()" class="btn btn-danger btn-sm shadow-sm">
+                    </a>
+                    <a href="javascript:void(0)" onclick="generateInvoiceLink()" class="btn btn-danger btn-sm shadow-sm">
                         <i class="fas fa-file-invoice-dollar"></i> Send Invoice
-                    </button>
+                    </a>
                     <a href="dashboard.html" class="btn btn-outline-secondary btn-sm shadow-sm" title="Dashboard" onclick="if(unsavedChanges && !confirm('You have unsaved changes. Leave anyway?')) return false; saveSessionQuote();">
                         <i class="fas fa-th-large"></i>
                     </a>
                     <a href="settings.html" class="btn btn-outline-secondary btn-sm shadow-sm" title="Settings" onclick="if(unsavedChanges && !confirm('You have unsaved changes. Leave anyway?')) return false; saveSessionQuote();">
                         <i class="fas fa-cog"></i>
                     </a>
-                    <button onclick="if(unsavedChanges && !confirm('You have unsaved changes. Leave anyway?')) return; signOut();" class="btn btn-outline-danger btn-sm shadow-sm" title="Sign out">
+                    <a href="javascript:void(0)" onclick="if(unsavedChanges && !confirm('You have unsaved changes. Leave anyway?')) return; signOut();" class="btn btn-outline-danger btn-sm shadow-sm" title="Sign out">
                         <i class="fas fa-sign-out-alt"></i>
-                    </button>
+                    </a>
                 </div>
                 <div class="d-flex align-items-center gap-2">
                     <div id="saveStatus" class="text-muted small" style="min-height: 1.2em;"></div>
@@ -351,33 +351,33 @@
                 <span><i class="fas fa-th-large"></i> Quote by Room/Area</span>
                 <!-- Desktop buttons (hidden on mobile) -->
                 <div class="btn-group d-none d-md-flex" role="group">
-                    <button onclick="addRoom()" class="btn btn-sm btn-light text-dark">
+                    <a href="javascript:void(0)" onclick="addRoom()" class="btn btn-sm btn-light text-dark">
                         <i class="fas fa-plus"></i> Add Room
-                    </button>
-                    <button onclick="saveTemplate()" class="btn btn-sm btn-info text-white" title="Save current rooms as a template">
+                    </a>
+                    <a href="javascript:void(0)" onclick="saveTemplate()" class="btn btn-sm btn-info text-white" title="Save current rooms as a template">
                         <i class="fas fa-save"></i> Save Template
-                    </button>
-                    <button onclick="openTemplatesMenu(this)" class="btn btn-sm btn-warning" title="Load existing templates">
+                    </a>
+                    <a href="javascript:void(0)" onclick="openTemplatesMenu(this)" class="btn btn-sm btn-warning" title="Load existing templates">
                         <i class="fas fa-folder-open"></i> Templates
-                    </button>
-                    <button id="toggleTimelinesBtn" onclick="toggleTimelines()" class="btn btn-sm btn-secondary" title="Show/hide timeline estimates">
+                    </a>
+                    <a href="javascript:void(0)" id="toggleTimelinesBtn" onclick="toggleTimelines()" class="btn btn-sm btn-secondary" title="Show/hide timeline estimates">
                         <i class="fas fa-eye-slash"></i> Hide Timelines
-                    </button>
-                    <button onclick="applyGlobalMarkup()" class="btn btn-sm btn-success text-white" title="Apply markup to all rooms">
+                    </a>
+                    <a href="javascript:void(0)" onclick="applyGlobalMarkup()" class="btn btn-sm btn-success text-white" title="Apply markup to all rooms">
                         <i class="fas fa-percent"></i> Markup All
-                    </button>
-                    <button onclick="openManageItemsModal()" class="btn btn-sm btn-dark" title="Add custom line items to the pricing database">
+                    </a>
+                    <a href="javascript:void(0)" onclick="openManageItemsModal()" class="btn btn-sm btn-dark" title="Add custom line items to the pricing database">
                         <i class="fas fa-database"></i> Manage Items
-                    </button>
-                    <button id="toggleTotalBarBtn" onclick="toggleStickyTotal()" class="btn btn-sm btn-outline-dark" title="Show/hide floating quote total">
+                    </a>
+                    <a href="javascript:void(0)" id="toggleTotalBarBtn" onclick="toggleStickyTotal()" class="btn btn-sm btn-outline-dark" title="Show/hide floating quote total">
                         <i class="fas fa-dollar-sign"></i> Total
-                    </button>
+                    </a>
                 </div>
                 <!-- Mobile: Add Room button always visible + dropdown for rest -->
                 <div class="d-flex d-md-none gap-2 align-items-center">
-                    <button onclick="addRoom()" class="btn btn-sm btn-primary">
+                    <a href="javascript:void(0)" onclick="addRoom()" class="btn btn-sm btn-primary">
                         <i class="fas fa-plus"></i> Add Room
-                    </button>
+                    </a>
                     <div class="dropdown">
                         <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
                             <i class="fas fa-ellipsis-v"></i> More
@@ -3766,26 +3766,26 @@ async function saveQuote() {
     </script>
     <!-- Mobile bottom action bar (hidden on desktop) -->
     <div class="d-md-none" style="position:fixed; bottom:0; left:0; right:0; background:white; border-top:2px solid #dee2e6; padding:6px 8px; z-index:1055; display:flex; gap:6px; box-shadow: 0 -4px 12px rgba(0,0,0,0.1);">
-        <button onclick="saveQuote()" class="btn btn-warning btn-sm flex-shrink-0" style="min-width:60px; flex-direction:column; display:flex; align-items:center; padding:4px 8px;">
+        <a href="javascript:void(0)" onclick="saveQuote()" class="btn btn-warning btn-sm flex-shrink-0" style="min-width:60px; flex-direction:column; display:flex; align-items:center; padding:4px 8px;">
             <i class="fas fa-save d-block" style="font-size:1.1rem;"></i>
             <span style="font-size:0.6rem;">Save</span>
-        </button>
-        <button onclick="generateInteractiveLink()" class="btn btn-primary btn-sm flex-shrink-0" style="min-width:72px; flex-direction:column; display:flex; align-items:center; padding:4px 8px;">
+        </a>
+        <a href="javascript:void(0)" onclick="generateInteractiveLink()" class="btn btn-primary btn-sm flex-shrink-0" style="min-width:72px; flex-direction:column; display:flex; align-items:center; padding:4px 8px;">
             <i class="fas fa-share-square d-block" style="font-size:1.1rem;"></i>
             <span style="font-size:0.6rem; white-space:nowrap;">Send Quote</span>
-        </button>
-        <button onclick="generateInvoiceLink()" class="btn btn-danger btn-sm flex-shrink-0" style="min-width:72px; flex-direction:column; display:flex; align-items:center; padding:4px 8px;">
+        </a>
+        <a href="javascript:void(0)" onclick="generateInvoiceLink()" class="btn btn-danger btn-sm flex-shrink-0" style="min-width:72px; flex-direction:column; display:flex; align-items:center; padding:4px 8px;">
             <i class="fas fa-file-invoice-dollar d-block" style="font-size:1.1rem;"></i>
             <span style="font-size:0.6rem; white-space:nowrap;">Invoice</span>
-        </button>
-        <button onclick="exportToPDF()" class="btn btn-success btn-sm flex-shrink-0" style="min-width:60px; flex-direction:column; display:flex; align-items:center; padding:4px 8px;">
+        </a>
+        <a href="javascript:void(0)" onclick="exportToPDF()" class="btn btn-success btn-sm flex-shrink-0" style="min-width:60px; flex-direction:column; display:flex; align-items:center; padding:4px 8px;">
             <i class="fas fa-download d-block" style="font-size:1.1rem;"></i>
             <span style="font-size:0.6rem;">PDF</span>
-        </button>
-        <button onclick="openManageItemsModal()" class="btn btn-dark btn-sm flex-shrink-0" style="min-width:60px; flex-direction:column; display:flex; align-items:center; padding:4px 8px;">
+        </a>
+        <a href="javascript:void(0)" onclick="openManageItemsModal()" class="btn btn-dark btn-sm flex-shrink-0" style="min-width:60px; flex-direction:column; display:flex; align-items:center; padding:4px 8px;">
             <i class="fas fa-database d-block" style="font-size:1.1rem;"></i>
             <span style="font-size:0.6rem;">Items</span>
-        </button>
+        </a>
         <!-- Spacer pushes Home+Settings to far right -->
         <div style="flex:1; min-width:12px;"></div>
         <a href="dashboard.html" class="btn btn-outline-secondary btn-sm flex-shrink-0" style="min-width:60px; flex-direction:column; display:flex; align-items:center; padding:4px 8px;" onclick="if(unsavedChanges && !confirm('Unsaved changes. Leave?')) return false; saveSessionQuote();">
