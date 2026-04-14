@@ -3137,24 +3137,28 @@ async function saveQuote() {
 
         function startupNewQuote() {
             localStorage.removeItem('ald_session_quote');
-            bootstrap.Modal.getInstance(document.getElementById('startupModal')).hide(); cleanupModalBackdrop();
+            var modal = bootstrap.Modal.getInstance(document.getElementById('startupModal'));
+            if (modal) modal.hide();
+            cleanupModalBackdrop();
             // Ensure quote number is set
             if (!document.getElementById('quoteNumber').value) {
                 document.getElementById('quoteNumber').value = nextQuoteNumberValue();
             }
-            // Force save-as before starting — open file picker to create the file
-            setTimeout(async function() {
-                try {
-                    saveFileHandle = await window.showSaveFilePicker({
-                        suggestedName: 'New Quote - ' + new Date().toISOString().slice(0,10) + '.qdr',
-                        types: [{ description: 'QuoteDr File', accept: { 'application/json': ['.qdr'] } }]
-                    });
-                    await writeToHandle(saveFileHandle);
-                    startAutoSave();
-                } catch(err) {
-                    if (err.name !== 'AbortError') console.warn('Save skipped:', err);
-                }
-            }, 200);
+            // On mobile (no File System API), skip the file picker — just start fresh
+            if (window.showSaveFilePicker) {
+                setTimeout(async function() {
+                    try {
+                        saveFileHandle = await window.showSaveFilePicker({
+                            suggestedName: 'New Quote - ' + new Date().toISOString().slice(0,10) + '.qdr',
+                            types: [{ description: 'QuoteDr File', accept: { 'application/json': ['.qdr'] } }]
+                        });
+                        await writeToHandle(saveFileHandle);
+                        startAutoSave();
+                    } catch(err) {
+                        if (err.name !== 'AbortError') console.warn('Save skipped:', err);
+                    }
+                }, 400);
+            }
             updateDraftWarning();
         }
 
@@ -3178,7 +3182,37 @@ async function saveQuote() {
         }
 
         async function startupOpenQuote() {
-            bootstrap.Modal.getInstance(document.getElementById('startupModal')).hide(); cleanupModalBackdrop();
+            // Hide modal and clean up backdrop FIRST before any async work
+            var modal = bootstrap.Modal.getInstance(document.getElementById('startupModal'));
+            if (modal) modal.hide();
+            cleanupModalBackdrop();
+            
+            // On mobile: use simple file input (no File System API)
+            if (!window.showOpenFilePicker) {
+                var input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.qdr,.aldquote,application/json';
+                input.onchange = function(e) {
+                    var f = e.target.files[0];
+                    if (!f) return;
+                    var reader = new FileReader();
+                    reader.onload = function(ev) {
+                        try {
+                            var d = JSON.parse(ev.target.result);
+                            applyQuoteData(d);
+                            if (d.supabaseId) window._supabaseQuoteId = d.supabaseId;
+                            if (d.quoteNumber) document.getElementById('quoteNumber').value = d.quoteNumber;
+                            updateSaveStatus('loaded', f.name);
+                        } catch(e) { alert('Could not read file.'); }
+                    };
+                    reader.readAsText(f);
+                };
+                // Small delay so backdrop is fully removed before input click
+                setTimeout(function() { input.click(); }, 400);
+                return;
+            }
+
+            // Desktop: use File System API
             try {
                 const [handle] = await window.showOpenFilePicker({
                     types: [{ description: 'QuoteDr File', accept: { 'application/json': ['.qdr', '.aldquote'] } }]
@@ -3187,35 +3221,14 @@ async function saveQuote() {
                 const data = JSON.parse(await file.text());
                 saveFileHandle = handle;
                 applyQuoteData(data);
-                // Load supabaseId from file data if present
                 if (data.supabaseId) window._supabaseQuoteId = data.supabaseId;
                 if (data.quoteNumber) document.getElementById('quoteNumber').value = data.quoteNumber;
                 updateSaveStatus('loaded', file.name);
                 startAutoSave();
             } catch (err) {
-                if (err.name !== 'AbortError') {
-                    // Fall back to input picker
-                    var input = document.createElement('input');
-                    input.type = 'file';
-                    input.accept = '.qdr,.aldquote,application/json';
-                    input.onchange = function(e) {
-                        var f = e.target.files[0];
-                        if (!f) return;
-                        var reader = new FileReader();
-                        reader.onload = function(ev) {
-                            try {
-                                var d = JSON.parse(ev.target.result);
-                                applyQuoteData(d);
-                                // Load supabaseId from file data if present
-                                if (d.supabaseId) window._supabaseQuoteId = d.supabaseId;
-                                if (d.quoteNumber) document.getElementById('quoteNumber').value = d.quoteNumber;
-                                updateSaveStatus('loaded', f.name);
-                            } catch(e) { alert('Could not read file.'); }
-                        };
-                        reader.readAsText(f);
-                    };
-                    input.click();
-                }
+                if (err.name !== 'AbortError') console.warn('File open error:', err);
+                // Always ensure backdrop is cleaned up
+                cleanupModalBackdrop();
             }
         }
     </script>
