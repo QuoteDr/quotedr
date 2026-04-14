@@ -805,8 +805,8 @@
             const qd = document.getElementById('itemSearchDropdown');
             if (qd) qd.style.display = 'none';
 
-            // Populate category dropdown dynamically
-            populateCategoryDropdown(Object.keys(pricingDatabase)[0] || 'General');
+            // Populate category dropdown dynamically — no pre-selection so placeholder shows
+            populateCategoryDropdown(null);
             updatePricingOptions();
             
             modal.show();
