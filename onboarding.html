@@ -393,15 +393,31 @@
             var el = document.getElementById('onboardingTermsList');
             if (!el) return;
             el.innerHTML = _onboardingTerms.map(function(t, i) {
-                return '<div class="d-flex gap-2 align-items-center mb-2">'+
-                    '<input type="text" class="form-control form-control-sm" value="'+t.label.replace(/"/g,'&quot;')+'" onchange="_onboardingTerms['+i+'].label=this.value" placeholder="Term label" style="max-width:200px;">'+
-                    '<div class="form-check mb-0">'+
-                    '<input class="form-check-input" type="checkbox"'+(t.defaultOn?' checked':'')+' onchange="_onboardingTerms['+i+'].defaultOn=this.checked">'+
-                    '<label class="form-check-label small">Default on</label>'+
-                    '</div>'+
-                    '<button class="btn btn-sm btn-outline-danger" onclick="_onboardingTerms.splice('+i+',1);renderOnboardingTerms();"><i class="fas fa-trash"></i></button>'+
-                    '</div>';
+                var escapedText = (t.text||'').replace(/\\/g,'\\\\').replace(/`/g,'\\`');
+                var escapedLabel = (t.label||'').replace(/"/g,'&quot;');
+                return '<div class="card mb-2 border-0 shadow-sm" id="term-card-'+i+'">' +
+                    '<div class="card-body p-2">' +
+                    '<div class="d-flex align-items-center gap-2 flex-wrap">' +
+                    '<input class="form-check-input flex-shrink-0" type="checkbox"'+(t.defaultOn?' checked':'')+' onchange="_onboardingTerms['+i+'].defaultOn=this.checked" title="Include by default">' +
+                    '<input type="text" class="form-control form-control-sm flex-grow-1" value="'+escapedLabel+'" onchange="_onboardingTerms['+i+'].label=this.value" placeholder="Term name" style="min-width:140px; max-width:220px;">' +
+                    '<button class="btn btn-sm btn-outline-secondary" onclick="toggleTermText('+i+')" title="View/edit full text"><i class="fas fa-eye"></i></button>' +
+                    '<button class="btn btn-sm btn-outline-danger" onclick="_onboardingTerms.splice('+i+',1);renderOnboardingTerms();" title="Remove"><i class="fas fa-trash"></i></button>' +
+                    '</div>' +
+                    '<div id="term-text-'+i+'" style="display:none; margin-top:8px;">' +
+                    '<textarea class="form-control form-control-sm" rows="3" placeholder="Enter the full term text..." onchange="_onboardingTerms['+i+'].text=this.value">'+((t.text||'').replace(/</g,'&lt;').replace(/>/g,'&gt;'))+'</textarea>' +
+                    '<small class="text-muted">This text appears in the quote footer when this term is selected.</small>' +
+                    '</div>' +
+                    '</div></div>';
             }).join('');
+        }
+        function toggleTermText(i) {
+            var el = document.getElementById('term-text-'+i);
+            if (!el) return;
+            var isVisible = el.style.display !== 'none';
+            el.style.display = isVisible ? 'none' : 'block';
+            // Toggle eye icon
+            var btn = el.closest('.card-body').querySelector('.fa-eye, .fa-eye-slash');
+            if (btn) btn.className = isVisible ? 'fas fa-eye' : 'fas fa-eye-slash';
         }
         function addOnboardingTerm() {
             _onboardingTerms.push({ id: 't'+Date.now(), label: 'New Term', text: '', defaultOn: false });
