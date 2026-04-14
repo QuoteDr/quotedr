@@ -384,6 +384,38 @@
                 font-size: 1.8rem;
             }
         }
+        
+        .video-placeholder {
+            border-radius: 12px;
+            overflow: hidden;
+            background: rgba(255,255,255,0.05);
+            border: 1px dashed rgba(255,255,255,0.2);
+            aspect-ratio: 16/9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .video-coming-soon {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            color: rgba(255,255,255,0.4);
+            font-size: 0.85rem;
+        }
+        
+        .video-coming-soon span {
+            font-size: 1.8rem;
+            opacity: 0.5;
+        }
+        
+        .step-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 12px;
+        }
     </style>
 </head>
 <body>
@@ -447,16 +479,43 @@
                     <div style="color:#e87e2a; font-size:2rem; font-weight:800; margin-bottom:4px;">1.</div>
                     <h5 style="color:white; font-weight:600;">Customize & Brand</h5>
                     <p style="color:rgba(255,255,255,0.6); font-size:0.95rem;">Add your logo, choose a style, set your terms. Looks like you hired a designer.</p>
+                    <div class="video-placeholder mt-3" data-step="1">
+                        <video class="step-video" autoplay loop muted playsinline style="display:none;" data-src="videos/step1-brand.mp4">
+                            Your browser does not support the video tag.
+                        </video>
+                        <div class="video-coming-soon">
+                            <span>🎬</span>
+                            <small>Video coming soon</small>
+                        </div>
+                    </div>
                 </div>
                 <div class="col-md-4 mb-4">
                     <div style="color:#e87e2a; font-size:2rem; font-weight:800; margin-bottom:4px;">2.</div>
                     <h5 style="color:white; font-weight:600;">Add Your Rooms</h5>
                     <p style="color:rgba(255,255,255,0.6); font-size:0.95rem;">Name each room or area, add line items, and let QuoteDr track your material costs and profit margins automatically.</p>
+                    <div class="video-placeholder mt-3" data-step="2">
+                        <video class="step-video" autoplay loop muted playsinline style="display:none;" data-src="videos/step2-rooms.mp4">
+                            Your browser does not support the video tag.
+                        </video>
+                        <div class="video-coming-soon">
+                            <span>🎬</span>
+                            <small>Video coming soon</small>
+                        </div>
+                    </div>
                 </div>
                 <div class="col-md-4 mb-4">
                     <div style="color:#e87e2a; font-size:2rem; font-weight:800; margin-bottom:4px;">3.</div>
                     <h5 style="color:white; font-weight:600;">Send to Client</h5>
                     <p style="color:rgba(255,255,255,0.6); font-size:0.95rem;">One click sends a professional interactive quote your client can view, choose finishes, and request upgrades — all from their phone.</p>
+                    <div class="video-placeholder mt-3" data-step="3">
+                        <video class="step-video" autoplay loop muted playsinline style="display:none;" data-src="videos/step3-send.mp4">
+                            Your browser does not support the video tag.
+                        </video>
+                        <div class="video-coming-soon">
+                            <span>🎬</span>
+                            <small>Video coming soon</small>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
