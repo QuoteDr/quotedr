@@ -403,7 +403,7 @@
                     </div>
 
                     <label><strong>Description:</strong></label>
-                    <input type="text" id="lineDescription" class="form-control mb-3" placeholder="e.g., 2x4 Wall Framing, Drywall Hang & Finish" spellcheck="true">
+                    <input type="text" id="lineDescription" class="form-control mb-3" placeholder="e.g., 2x4 Wall Framing, Drywall Hang & Finish" spellcheck="true" oninput="checkIfNewItem()">
                     
                     <div class="row">
                         <div class="col-md-6 mb-3">
@@ -468,6 +468,9 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-outline-success" id="saveNewItemBtn" onclick="saveLineItemToDatabase()" style="display:none;" title="Save this item to your database for future use">
+                        <i class="fas fa-bookmark me-1"></i>Save New Item
+                    </button>
                     <button type="button" class="btn btn-primary" onclick="confirmAddLine()">Add Line Item</button>
                 </div>
             </div>
@@ -1164,11 +1167,60 @@
                 
                 renderRooms();
                 
+                // Prompt to save if this is a new item
+                const saveBtn = document.getElementById('saveNewItemBtn');
+                if (saveBtn && saveBtn.style.display !== 'none') {
+                    const desc = document.getElementById('lineDescription').value.trim();
+                    if (desc && confirm('Save "' + desc + '" to your item database for next time?')) {
+                        saveLineItemToDatabase();
+                    }
+                }
+                
                 // Close modal
                 const modalEl = document.getElementById('addLineModal');
                 const modal = bootstrap.Modal.getInstance(modalEl);
                 modal.hide();
             }
+        }
+
+        function checkIfNewItem() {
+            const desc = document.getElementById('lineDescription').value.trim().toLowerCase();
+            const saveNewItemBtn = document.getElementById('saveNewItemBtn');
+            if (!saveNewItemBtn || !desc) { if (saveNewItemBtn) saveNewItemBtn.style.display = 'none'; return; }
+            // Check if this description matches any saved item name
+            let found = false;
+            try {
+                const items = JSON.parse(localStorage.getItem('ald_custom_items') || '{}');
+                for (const cat of Object.values(items)) {
+                    if (Array.isArray(cat) && cat.some(i => i.name && i.name.toLowerCase() === desc)) {
+                        found = true; break;
+                    }
+                }
+            } catch(e) {}
+            saveNewItemBtn.style.display = found ? 'none' : 'inline-block';
+        }
+
+        function saveLineItemToDatabase() {
+            const desc = document.getElementById('lineDescription').value.trim();
+            const category = document.getElementById('lineCategory').value || 'Custom';
+            const unitType = document.getElementById('lineUnitType').value.trim();
+            const rate = parseFloat(document.getElementById('lineRate').value) || 0;
+            const materialCost = parseFloat(document.getElementById('lineMaterialCost').value) || 0;
+            if (!desc) return;
+            try {
+                const items = JSON.parse(localStorage.getItem('ald_custom_items') || '{}');
+                if (!items[category]) items[category] = [];
+                // Don't add duplicate
+                if (!items[category].find(i => i.name === desc)) {
+                    items[category].push({ name: desc, unitType: unitType, rate: rate, materialCost: materialCost, supplierUrl: '', itemDescription: '', upgrade: null });
+                    localStorage.setItem('ald_custom_items', JSON.stringify(items));
+                    // Update pricingDatabase in memory
+                    if (!pricingDatabase[category]) pricingDatabase[category] = [];
+                    pricingDatabase[category].push({ name: desc, unitType: unitType, rate: rate, materialCost: materialCost, supplierUrl: '', itemDescription: '', upgrade: null });
+                }
+            } catch(e) { console.error('Error saving item:', e); }
+            const saveNewItemBtn = document.getElementById('saveNewItemBtn');
+            if (saveNewItemBtn) { saveNewItemBtn.style.display = 'none'; saveNewItemBtn.innerHTML = '<i class="fas fa-check me-1"></i>Saved!'; setTimeout(function(){ saveNewItemBtn.innerHTML = '<i class="fas fa-bookmark me-1"></i>Save New Item'; }, 1500); }
         }
 
         function toggleDepositSection() {
