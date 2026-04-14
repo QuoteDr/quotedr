@@ -402,9 +402,6 @@
                         <div id="itemSearchDropdown" style="display:none; position:absolute; left:0; right:0; z-index:2000; background:white; border:1px solid #dee2e6; border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.15); max-height:220px; overflow-y:auto;"></div>
                     </div>
 
-                    <label><strong>Description:</strong></label>
-                    <input type="text" id="lineDescription" class="form-control mb-3" placeholder="e.g., 2x4 Wall Framing, Drywall Hang & Finish" spellcheck="true" oninput="checkIfNewItem()">
-                    
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label><strong>Category:</strong></label>
@@ -419,6 +416,9 @@
                             </select>
                         </div>
                     </div>
+
+                    <label><strong>Description:</strong></label>
+                    <input type="text" id="lineDescription" class="form-control mb-3" placeholder="e.g., 2x4 Wall Framing, Drywall Hang & Finish" spellcheck="true" oninput="checkIfNewItem()">
 
                     <div class="row">
                         <div class="col-md-6 mb-3">
@@ -851,6 +851,11 @@
                         localStorage.setItem('ald_custom_items', JSON.stringify(items));
                         updatePricingOptions();
                         serviceSelect.value = newSvc.trim();
+                        // Auto-fill description and show save button
+                        const descField = document.getElementById('lineDescription');
+                        if (descField && !descField.value.trim()) descField.value = newSvc.trim();
+                        const saveBtn = document.getElementById('saveNewItemBtn');
+                        if (saveBtn) saveBtn.style.display = 'inline-block';
                     } else { serviceSelect.selectedIndex = 1; }
                 } else { autoFillPricing(); }
             };
