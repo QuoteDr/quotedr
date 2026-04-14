@@ -63,7 +63,7 @@ async function getUserProfile() {
     if (!user) return null;
     
     const { data, error } = await _supabase
-        .from('users')
+        .from('user_data')
         .select('*')
         .eq('id', user.id)
         .single();
@@ -81,7 +81,7 @@ async function updateUserProfile(profileData) {
     if (!user) return { error: 'Not authenticated' };
     
     const { data, error } = await _supabase
-        .from('users')
+        .from('user_data')
         .update(profileData)
         .eq('id', user.id);
         

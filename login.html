@@ -209,7 +209,7 @@
                     // Check Supabase profile (cross-device)
                     try {
                         const { data: profile } = await _supabase
-                            .from('users')
+                            .from('user_data')
                             .select('onboarding_complete')
                             .eq('id', session.user.id)
                             .single();
