@@ -132,14 +132,19 @@
             position: relative;
         }
         
-        .section-title:after {
+        .section-title span {
+            display: inline-block;
+            position: relative;
+            padding-bottom: 10px;
+        }
+        .section-title span:after {
             content: '';
-            display: block;
-            width: 80%;
-            max-width: 500px;
+            position: absolute;
+            bottom: 0;
+            left: 5%;
+            width: 90%;
             height: 4px;
             background-color: var(--accent-orange);
-            margin: 0.75rem auto 0;
             border-radius: 2px;
         }
         
@@ -458,7 +463,7 @@
     <!-- Story Section -->
     <section class="story-section">
         <div class="container">
-            <h2 class="section-title">Why We Built This</h2>
+            <h2 class="section-title"><span>Why We Built This</span></h2>
             <div class="row justify-content-center">
                 <div class="col-lg-10">
                     <div class="story-content">
@@ -480,7 +485,7 @@
     <!-- Features Section -->
     <section class="features-section">
         <div class="container">
-            <h2 class="section-title">Everything You Need. Nothing You Don't.</h2>
+            <h2 class="section-title"><span>Everything You Need. Nothing You Don't.</span></h2>
             <div class="row">
                 <div class="col-md-6 mb-4">
                     <div class="feature-card">
@@ -541,7 +546,7 @@
     <!-- Pricing Section -->
     <section class="pricing-section">
         <div class="container">
-            <h2 class="section-title">Simple Pricing. No Surprises.</h2>
+            <h2 class="section-title"><span>Simple Pricing. No Surprises.</span></h2>
             <div class="row justify-content-center">
                 <div class="col-lg-8">
                     <div class="pricing-card">
