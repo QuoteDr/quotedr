@@ -3780,16 +3780,13 @@ async function saveQuote() {
                 // Show Recover Draft button if draft exists
                 var recoverBtn = document.getElementById('recoverDraftBtn');
                 if (recoverBtn) recoverBtn.style.display = localStorage.getItem('ald_autosave_draft') ? 'inline-block' : 'none';
-                // Always show startup modal
-                var modalEl = document.getElementById('startupModal');
-                if (modalEl) {
-                    new bootstrap.Modal(modalEl).show();
-                }
+                // Startup modal disabled — using draft warning banner instead
+                // Just restore session if one exists
+                startupContinueSession();
             }
             tryStartup();
         });
     </script>
-    <!-- Mobile bottom action bar (hidden on desktop) -->
     <!-- Mobile bottom action bar (hidden on desktop) -->
     <div class="d-md-none" style="position:fixed; bottom:0; left:0; right:0; background:white; border-top:2px solid #dee2e6; padding:6px 8px; z-index:1055; display:flex; gap:6px; overflow-x:auto; -webkit-overflow-scrolling:touch; box-shadow: 0 -4px 12px rgba(0,0,0,0.1); scrollbar-width:none;">
         <button onclick="saveQuote()" class="btn btn-warning btn-sm flex-shrink-0" style="min-width:60px; flex-direction:column; display:flex; align-items:center; padding:4px 8px;">
