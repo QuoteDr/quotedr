@@ -407,3 +407,14 @@ var listInvoicesFromSupabase = listInvoices;
 var listTemplatesFromSupabase = listTemplates;
 var listTermsFromSupabase = listTerms;
 var listItemsFromSupabase = listItems;
+
+// Save/load aliases
+var saveQuoteToSupabase = saveQuote;
+var saveInvoiceToSupabase = saveInvoice;
+var loadQuoteFromSupabase = function(quoteId) {
+    return listQuotes().then(function(result) {
+        if (result.error) return { error: result.error };
+        var found = (result.data || []).find(function(q) { return q.id === quoteId || (q.data && q.data.id === quoteId); });
+        return { data: found || null };
+    });
+};
