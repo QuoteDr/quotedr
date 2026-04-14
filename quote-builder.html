@@ -156,6 +156,9 @@
             #addLineModal .modal-body { padding: 12px; }
             table { font-size: 0.8rem; }
             td, th { padding: 4px 6px !important; }
+            .col-md-6.mt-3, .col-md-12.mt-3 { width: 100% !important; }
+            #quoteNumber { max-width: 100% !important; }
+            .d-flex.align-items-center.gap-3 { flex-wrap: wrap; gap: 6px !important; }
         }
 
 </style>
@@ -300,9 +303,10 @@
 
         <!-- Room Breaks Section -->
         <div class="card mb-4">
-            <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <span><i class="fas fa-th-large"></i> Quote by Room/Area</span>
-                <div class="btn-group" role="group">
+                <!-- Desktop buttons (hidden on mobile) -->
+                <div class="btn-group d-none d-md-flex" role="group">
                     <button onclick="addRoom()" class="btn btn-sm btn-light text-dark">
                         <i class="fas fa-plus"></i> Add Room
                     </button>
@@ -324,6 +328,25 @@
                     <button id="toggleTotalBarBtn" onclick="toggleStickyTotal()" class="btn btn-sm btn-outline-dark" title="Show/hide floating quote total">
                         <i class="fas fa-dollar-sign"></i> Total
                     </button>
+                </div>
+                <!-- Mobile: Add Room button always visible + dropdown for rest -->
+                <div class="d-flex d-md-none gap-2 align-items-center">
+                    <button onclick="addRoom()" class="btn btn-sm btn-primary">
+                        <i class="fas fa-plus"></i> Add Room
+                    </button>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-ellipsis-v"></i> More
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="#" onclick="saveTemplate(); return false;"><i class="fas fa-save me-2"></i>Save Template</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="openTemplatesMenu(this); return false;"><i class="fas fa-folder-open me-2"></i>Load Template</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="toggleTimelines(); return false;"><i class="fas fa-eye-slash me-2"></i>Toggle Timelines</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="applyGlobalMarkup(); return false;"><i class="fas fa-percent me-2"></i>Markup All</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="openManageItemsModal(); return false;"><i class="fas fa-database me-2"></i>Manage Items</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="toggleStickyTotal(); return false;"><i class="fas fa-dollar-sign me-2"></i>Toggle Total Bar</a></li>
+                        </ul>
+                    </div>
                 </div>
             </div>
             <div class="card-body" id="roomsContainer">
@@ -3651,5 +3674,26 @@
             tryStartup();
         });
     </script>
+    <!-- Mobile bottom action bar (hidden on desktop) -->
+    <div class="d-md-none" style="position:fixed; bottom:0; left:0; right:0; background:white; border-top:2px solid #dee2e6; padding:8px 12px; z-index:1060; display:flex; gap:8px; justify-content:space-around; box-shadow: 0 -4px 12px rgba(0,0,0,0.1);">
+        <button onclick="saveQuote()" class="btn btn-warning btn-sm flex-fill" style="max-width:80px;">
+            <i class="fas fa-save d-block" style="font-size:1.2rem;"></i>
+            <span style="font-size:0.65rem;">Save</span>
+        </button>
+        <button onclick="generateInteractiveLink()" class="btn btn-primary btn-sm flex-fill" style="max-width:100px;">
+            <i class="fas fa-share-square d-block" style="font-size:1.2rem;"></i>
+            <span style="font-size:0.65rem;">Send Quote</span>
+        </button>
+        <button onclick="generateInvoiceLink()" class="btn btn-danger btn-sm flex-fill" style="max-width:100px;">
+            <i class="fas fa-file-invoice-dollar d-block" style="font-size:1.2rem;"></i>
+            <span style="font-size:0.65rem;">Invoice</span>
+        </button>
+        <a href="dashboard.html" class="btn btn-outline-secondary btn-sm flex-fill" style="max-width:80px;" onclick="if(unsavedChanges && !confirm('Unsaved changes. Leave?')) return false; saveSessionQuote();">
+            <i class="fas fa-th-large d-block" style="font-size:1.2rem;"></i>
+            <span style="font-size:0.65rem;">Home</span>
+        </a>
+    </div>
+    <!-- Spacer so content isn't hidden behind mobile bar -->
+    <div class="d-md-none" style="height:70px;"></div>
 </body>
 </html>
