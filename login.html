@@ -193,6 +193,8 @@
 
         // Only auto-redirect if URL has ?redirect=1 (i.e. came here intentionally, not directly)
         const urlParams = new URLSearchParams(window.location.search);
+        // Auto-switch to signup tab if ?signup=1
+        if (urlParams.has('signup')) { showTab('signup'); }
         if (!urlParams.has('noredirect')) {
             _supabase.auth.getSession().then(({ data: { session } }) => {
                 if (session) {
