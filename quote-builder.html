@@ -3107,11 +3107,21 @@ async function saveQuote() {
             }
         });
 
+        // Clean up Bootstrap modal backdrop — needed on iOS Safari where backdrop lingers
+        function cleanupModalBackdrop() {
+            setTimeout(function() {
+                document.querySelectorAll('.modal-backdrop').forEach(function(el){ el.remove(); });
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('overflow');
+                document.body.style.removeProperty('padding-right');
+            }, 300);
+        }
+
         function startupContinueSession() {
             var session = null;
             try { session = JSON.parse(localStorage.getItem('ald_session_quote')); } catch(e) {}
             if (!session) { alert('No session found.'); return; }
-            bootstrap.Modal.getInstance(document.getElementById('startupModal')).hide();
+            bootstrap.Modal.getInstance(document.getElementById('startupModal')).hide(); cleanupModalBackdrop();
             applyQuoteData(session);
             if (session.quoteNumber) document.getElementById('quoteNumber').value = session.quoteNumber;
             renderTermsCheckboxes();
@@ -3127,7 +3137,7 @@ async function saveQuote() {
 
         function startupNewQuote() {
             localStorage.removeItem('ald_session_quote');
-            bootstrap.Modal.getInstance(document.getElementById('startupModal')).hide();
+            bootstrap.Modal.getInstance(document.getElementById('startupModal')).hide(); cleanupModalBackdrop();
             // Ensure quote number is set
             if (!document.getElementById('quoteNumber').value) {
                 document.getElementById('quoteNumber').value = nextQuoteNumberValue();
@@ -3152,7 +3162,7 @@ async function saveQuote() {
             try {
                 var draft = JSON.parse(localStorage.getItem('ald_autosave_draft'));
                 if (!draft) { alert('No draft found.'); return; }
-                bootstrap.Modal.getInstance(document.getElementById('startupModal')).hide();
+                bootstrap.Modal.getInstance(document.getElementById('startupModal')).hide(); cleanupModalBackdrop();
                 applyQuoteData(draft);
                 if (draft.quoteNumber) document.getElementById('quoteNumber').value = draft.quoteNumber;
                 renderTermsCheckboxes();
@@ -3168,7 +3178,7 @@ async function saveQuote() {
         }
 
         async function startupOpenQuote() {
-            bootstrap.Modal.getInstance(document.getElementById('startupModal')).hide();
+            bootstrap.Modal.getInstance(document.getElementById('startupModal')).hide(); cleanupModalBackdrop();
             try {
                 const [handle] = await window.showOpenFilePicker({
                     types: [{ description: 'QuoteDr File', accept: { 'application/json': ['.qdr', '.aldquote'] } }]
@@ -3690,6 +3700,11 @@ async function saveQuote() {
     </div>
     <script>
         // Runs on load — independent of auth. Handles session restore + startup modal.
+        // Global safety net: always clean up backdrop when any modal hides
+        document.addEventListener('hidden.bs.modal', function() {
+            cleanupModalBackdrop();
+        });
+
         window.addEventListener('load', function() {
             var _startupAttempts = 0;
             function tryStartup() {
