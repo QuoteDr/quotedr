@@ -405,6 +405,9 @@
             <div class="hero-content">
                 <img src="quotedr-logo.svg" alt="QuoteDr Logo" class="hero-logo">
                 <h1 class="hero-headline">Stop quoting. Start winning.</h1>
+                <div id="rotating-tagline" style="min-height:2rem; margin-bottom:1.2rem;">
+    <p class="rotating-text" style="color:rgba(255,255,255,0.85); font-size:1.1rem; font-style:italic; margin:0; transition: opacity 0.5s ease;"></p>
+</div>
                 <p class="hero-subheadline">Professional renovation quotes in minutes — not days. Your clients will be impressed. You'll have your evenings back. Built-in upsell options mean clients upgrade themselves.</p>
                 <div class="mt-4">
                     <a href="login.html" class="btn btn-hero btn-primary-hero">Start Free</a>
@@ -633,6 +636,37 @@
                 navbar.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
             }
         });
+        
+        // Rotating taglines in hero section
+        (function() {
+            var taglines = [
+                "No waiting room. No co-pay. Just quotes that close.",
+                "Dr. QuoteDr will see your client now. 🩺",
+                "Diagnosing your problem: too much time on quotes. Prescription: this.",
+                "The doctor is in. Your spreadsheet is out.",
+                "Built by someone who's mudded more drywall than written code.",
+                "Your quote used to take 6 hours. Your coffee's still hot.",
+                "Clients used to ghost you. Now they're signing.",
+                "Excel called. It wants you back. Ignore it.",
+                "More time quoting = less time billing. Do the math.",
+                "Your competition is still copy-pasting. You're already on site.",
+                "Quotes so professional, clients think you hired someone.",
+                "Less time at the laptop. More time on the tools."
+            ];
+            var el = document.querySelector('.rotating-text');
+            if (!el) return;
+            var index = 0;
+            function showNext() {
+                el.style.opacity = '0';
+                setTimeout(function() {
+                    el.textContent = taglines[index];
+                    el.style.opacity = '1';
+                    index = (index + 1) % taglines.length;
+                }, 500);
+            }
+            showNext();
+            setInterval(showNext, 4000);
+        })();
     </script>
 </body>
 </html>
