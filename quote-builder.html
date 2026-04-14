@@ -408,7 +408,7 @@
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label><strong>Category:</strong></label>
-                            <select id="lineCategory" class="form-select" onchange="updatePricingOptions()">
+                            <select id="lineCategory" class="form-select" onchange="handleLineCategoryChange()">
                                 <!-- Populated dynamically from pricingDatabase -->
                             </select>
                         </div>
@@ -763,6 +763,10 @@
             const cats = Object.keys(pricingDatabase);
             const hiddenCategories = JSON.parse(localStorage.getItem('ald_hidden_categories') || '[]');
             sel.innerHTML = '';
+            // Add New Category option at top
+            const addCatOpt = document.createElement('option');
+            addCatOpt.value = '__add_new_category__'; addCatOpt.text = '+ Add New Category';
+            sel.appendChild(addCatOpt);
             if (cats.length === 0) {
                 const opt = document.createElement('option');
                 opt.value = 'General'; opt.text = 'General';
@@ -803,6 +807,23 @@
             modal.show();
         }
 
+        function handleLineCategoryChange() {
+            const sel = document.getElementById('lineCategory');
+            if (sel.value === '__add_new_category__') {
+                const newCat = prompt('Enter new category name:');
+                if (newCat && newCat.trim()) {
+                    if (!pricingDatabase[newCat.trim()]) pricingDatabase[newCat.trim()] = [];
+                    const items = JSON.parse(localStorage.getItem('ald_custom_items') || '{}');
+                    if (!items[newCat.trim()]) items[newCat.trim()] = [];
+                    localStorage.setItem('ald_custom_items', JSON.stringify(items));
+                    populateCategoryDropdown(newCat.trim());
+                } else {
+                    sel.selectedIndex = 1;
+                }
+            }
+            updatePricingOptions();
+        }
+
         function updatePricingOptions() {
             const category = document.getElementById('lineCategory').value;
             const serviceSelect = document.getElementById('lineService');
@@ -812,6 +833,27 @@
             
             // Get services for this category
             const services = pricingDatabase[category] || [];
+
+            // Add New Service option at top
+            const addSvcOpt = document.createElement('option');
+            addSvcOpt.value = '__add_new_service__'; addSvcOpt.text = '+ Add New Service';
+            serviceSelect.appendChild(addSvcOpt);
+            serviceSelect.onchange = function() {
+                if (serviceSelect.value === '__add_new_service__') {
+                    const newSvc = prompt('Enter new service name:');
+                    if (newSvc && newSvc.trim()) {
+                        const cat = document.getElementById('lineCategory').value;
+                        if (!pricingDatabase[cat]) pricingDatabase[cat] = [];
+                        pricingDatabase[cat].push({ name: newSvc.trim(), unitType: '', rate: 0 });
+                        const items = JSON.parse(localStorage.getItem('ald_custom_items') || '{}');
+                        if (!items[cat]) items[cat] = [];
+                        items[cat].push({ name: newSvc.trim(), unitType: '', rate: 0 });
+                        localStorage.setItem('ald_custom_items', JSON.stringify(items));
+                        updatePricingOptions();
+                        serviceSelect.value = newSvc.trim();
+                    } else { serviceSelect.selectedIndex = 1; }
+                } else { autoFillPricing(); }
+            };
             
             if (services.length === 0) {
                 // No predefined services, add a generic option
