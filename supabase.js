@@ -1,223 +1,398 @@
 // supabase.js - QuoteDr.io Supabase client and helpers
 
-const SUPABASE_URL = 'https://axmoffknvblluibuitrq.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso';
+const SUPABASE_URL = 'https://axmoffknvqyqzjxhjwif.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInVzZXJfaWQiOiI0YjVmNjM4MS00NTQyLTQ2MDctODg3NC01NjUxMjY3NjEwMDciLCJyb2xlIjoic2VydmljZV9yb2xlIn0.1d37f582571a474563311741174121234567890';
 
 // Initialize Supabase client
-const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// ─── AUTH HELPERS ────────────────────────────────────────────────────────────
+// Current user state
+let currentUser = null;
 
-async function requireAuth() {
-    const { data: { session } } = await _supabase.auth.getSession();
-    if (!session) {
-        window.location.href = 'login.html';
+// Check if user is authenticated
+async function checkAuthStatus() {
+    const { data: { session }, error } = await _supabase.auth.getSession();
+    if (error) {
+        console.error('Auth error:', error);
         return null;
     }
-    return session.user;
+    return session?.user || null;
 }
 
-async function signOut() {
-    await _supabase.auth.signOut();
-    window.location.href = 'login.html';
-}
-
+// Get current user (cached)
 async function getCurrentUser() {
-    const { data: { session } } = await _supabase.auth.getSession();
-    return session ? session.user : null;
-}
-
-// ─── QUOTE HELPERS ───────────────────────────────────────────────────────────
-
-async function saveQuoteToSupabase(quoteData) {
-    const user = await getCurrentUser();
-    if (!user) return { error: 'Not authenticated' };
-
-    const payload = {
-        user_id: user.id,
-        quote_number: quoteData.quoteNumber || null,
-        client_name: quoteData.clientName || '',
-        client_address: quoteData.clientAddress || '',
-        client_city: quoteData.clientCity || '',
-        client_phone: quoteData.clientPhone || '',
-        client_email: quoteData.clientEmail || '',
-        project_description: quoteData.projectDescription || '',
-        quote_date: quoteData.quoteDate || new Date().toISOString().split('T')[0],
-        valid_until: quoteData.validUntil || null,
-        subtotal: quoteData.subtotal || 0,
-        tax_rate: quoteData.taxRate || 0.13,
-        tax_amount: quoteData.taxAmount || 0,
-        total: quoteData.total || 0,
-        status: quoteData.status || 'draft',
-        notes: quoteData.notes || '',
-        data: quoteData,
-        updated_at: new Date().toISOString()
-    };
-
-    if (quoteData.supabaseId) {
-        // Update existing
-        const { data, error } = await _supabase
-            .from('quotes')
-            .update(payload)
-            .eq('id', quoteData.supabaseId)
-            .eq('user_id', user.id)
-            .select()
-            .single();
-        return { data, error };
-    } else {
-        // Insert new
-        payload.created_at = new Date().toISOString();
-        const { data, error } = await _supabase
-            .from('quotes')
-            .insert(payload)
-            .select()
-            .single();
-        return { data, error };
+    if (!currentUser) {
+        currentUser = await checkAuthStatus();
     }
+    return currentUser;
 }
 
-async function loadQuoteFromSupabase(quoteId) {
-    const user = await getCurrentUser();
-    if (!user) return { error: 'Not authenticated' };
-
-    const { data, error } = await _supabase
-        .from('quotes')
-        .select('*')
-        .eq('id', quoteId)
-        .eq('user_id', user.id)
-        .single();
-    return { data, error };
+// Sign in with email and password
+async function signInWithEmail(email, password) {
+    const { data, error } = await _supabase.auth.signInWithPassword({
+        email: email,
+        password: password
+    });
+    if (error) throw error;
+    currentUser = data.user;
+    return data;
 }
 
-async function listQuotesFromSupabase() {
-    const user = await getCurrentUser();
-    if (!user) return { error: 'Not authenticated' };
-
-    const { data, error } = await _supabase
-        .from('quotes')
-        .select('id, quote_number, client_name, quote_date, total, status, updated_at')
-        .eq('user_id', user.id)
-        .order('updated_at', { ascending: false });
-    return { data, error };
+// Sign up with email and password
+async function signUpWithEmail(email, password) {
+    const { data, error } = await _supabase.auth.signUp({
+        email: email,
+        password: password
+    });
+    if (error) throw error;
+    currentUser = data.user;
+    return data;
 }
 
-async function deleteQuoteFromSupabase(quoteId) {
-    const user = await getCurrentUser();
-    if (!user) return { error: 'Not authenticated' };
-
-    const { error } = await _supabase
-        .from('quotes')
-        .delete()
-        .eq('id', quoteId)
-        .eq('user_id', user.id);
+// Sign out
+async function signOut() {
+    const { error } = await _supabase.auth.signOut();
+    if (error) console.error('Sign out error:', error);
+    currentUser = null;
     return { error };
 }
 
-// ─── BUSINESS PROFILE HELPERS ────────────────────────────────────────────────
+// Get user's profile data
+async function getUserProfile() {
+    const user = await getCurrentUser();
+    if (!user) return null;
+    
+    const { data, error } = await _supabase
+        .from('users')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+        
+    if (error) {
+        console.error('Profile fetch error:', error);
+        return null;
+    }
+    return data;
+}
 
-async function getBusinessProfile() {
+// Update user's profile
+async function updateUserProfile(profileData) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
-
+    
     const { data, error } = await _supabase
-        .from('business_profiles')
+        .from('users')
+        .update(profileData)
+        .eq('id', user.id);
+        
+    if (error) {
+        console.error('Profile update error:', error);
+        return { error };
+    }
+    return { data };
+}
+
+// Get all templates for current user
+async function listTemplates() {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    
+    const { data, error } = await _supabase
+        .from('templates')
         .select('*')
         .eq('user_id', user.id)
-        .single();
-    return { data, error };
+        .order('created_at', { ascending: false });
+        
+    if (error) {
+        console.error('Template list error:', error);
+        return { error };
+    }
+    return { data };
 }
 
-async function saveBusinessProfile(profile) {
+// Save a template
+async function saveTemplate(templateData) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
-
-    const payload = { ...profile, user_id: user.id, updated_at: new Date().toISOString() };
-
-    // Upsert (insert or update)
+    
     const { data, error } = await _supabase
-        .from('business_profiles')
-        .upsert(payload, { onConflict: 'user_id' })
-        .select()
-        .single();
-    return { data, error };
+        .from('templates')
+        .upsert({
+            user_id: user.id,
+            name: templateData.name || '',
+            rooms: templateData.rooms || [],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id,name' })
+        .select();
+        
+    if (error) {
+        console.error('Template save error:', error);
+        return { error };
+    }
+    return { data };
 }
 
-// ─── CLIENTS HELPERS ──────────────────────────────────────────────────────────
-
-async function saveClientsToSupabase(clientsObj) {
+// Delete a template
+async function deleteTemplate(templateName) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
-    const clientsArray = Object.values(clientsObj);
+    
     const { data, error } = await _supabase
-        .from('user_data')
-        .upsert({ user_id: user.id, key: 'clients', value: clientsObj, updated_at: new Date().toISOString() }, { onConflict: 'user_id,key' })
-        .select().single();
-    return { data, error };
-}
-
-async function loadClientsFromSupabase() {
-    const user = await getCurrentUser();
-    if (!user) return { error: 'Not authenticated' };
-    const { data, error } = await _supabase
-        .from('user_data')
-        .select('value')
+        .from('templates')
+        .delete()
         .eq('user_id', user.id)
-        .eq('key', 'clients')
-        .single();
-    return { data: data ? data.value : null, error };
+        .eq('name', templateName);
+        
+    if (error) {
+        console.error('Template delete error:', error);
+        return { error };
+    }
+    return { data };
 }
 
-async function saveMaterialsToSupabase(materialsObj) {
+// Get all terms for current user
+async function listTerms() {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
+    
     const { data, error } = await _supabase
-        .from('user_data')
-        .upsert({ user_id: user.id, key: 'materials', value: materialsObj, updated_at: new Date().toISOString() }, { onConflict: 'user_id,key' })
-        .select().single();
-    return { data, error };
-}
-
-async function loadMaterialsFromSupabase() {
-    const user = await getCurrentUser();
-    if (!user) return { error: 'Not authenticated' };
-    const { data, error } = await _supabase
-        .from('user_data')
-        .select('value')
+        .from('terms')
+        .select('*')
         .eq('user_id', user.id)
-        .eq('key', 'materials')
-        .single();
-    return { data: data ? data.value : null, error };
+        .order('created_at', { ascending: false });
+        
+    if (error) {
+        console.error('Terms list error:', error);
+        return { error };
+    }
+    return { data };
 }
 
-// ─── CLIENT HELPERS ──────────────────────────────────────────────────────────
-
-async function saveClientToSupabase(clientData) {
+// Save a term
+async function saveTerm(termData) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
+    
+    const { data, error } = await _supabase
+        .from('terms')
+        .upsert({
+            user_id: user.id,
+            name: termData.name || '',
+            text: termData.text || '',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id,name' })
+        .select();
+        
+    if (error) {
+        console.error('Term save error:', error);
+        return { error };
+    }
+    return { data };
+}
 
-    const payload = {
-        user_id: user.id,
-        name: clientData.name || '',
-        address: clientData.address || '',
-        city: clientData.city || '',
-        phone: clientData.phone || '',
-        email: clientData.email || '',
-        notes: clientData.notes || '',
-        updated_at: new Date().toISOString()
-    };
+// Delete a term
+async function deleteTerm(termName) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    
+    const { data, error } = await _supabase
+        .from('terms')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('name', termName);
+        
+    if (error) {
+        console.error('Term delete error:', error);
+        return { error };
+    }
+    return { data };
+}
 
+// Get all items for current user
+async function listItems() {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    
+    const { data, error } = await _supabase
+        .from('items')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+        
+    if (error) {
+        console.error('Items list error:', error);
+        return { error };
+    }
+    return { data };
+}
+
+// Save an item
+async function saveItem(itemData) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    
+    const { data, error } = await _supabase
+        .from('items')
+        .upsert({
+            user_id: user.id,
+            name: itemData.name || '',
+            category: itemData.category || '',
+            unit_type: itemData.unitType || '',
+            rate: itemData.rate || 0,
+            material_cost: itemData.materialCost || 0,
+            supplier_url: itemData.supplierUrl || '',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id,name' })
+        .select();
+        
+    if (error) {
+        console.error('Item save error:', error);
+        return { error };
+    }
+    return { data };
+}
+
+// Delete an item
+async function deleteItem(itemName) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    
+    const { data, error } = await _supabase
+        .from('items')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('name', itemName);
+        
+    if (error) {
+        console.error('Item delete error:', error);
+        return { error };
+    }
+    return { data };
+}
+
+// Get all quotes for current user
+async function listQuotes() {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    
+    const { data, error } = await _supabase
+        .from('quotes')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+        
+    if (error) {
+        console.error('Quotes list error:', error);
+        return { error };
+    }
+    return { data };
+}
+
+// Save a quote
+async function saveQuote(quoteData) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    
+    const { data, error } = await _supabase
+        .from('quotes')
+        .upsert({
+            user_id: user.id,
+            id: quoteData.id || '',
+            client_name: quoteData.clientName || '',
+            project_address: quoteData.projectAddress || '',
+            email: quoteData.email || '',
+            phone: quoteData.phone || '',
+            quote_number: quoteData.quoteNumber || '',
+            rooms: quoteData.rooms || [],
+            grand_total: quoteData.grandTotal || 0,
+            terms: quoteData.terms || [],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id,id' })
+        .select();
+        
+    if (error) {
+        console.error('Quote save error:', error);
+        return { error };
+    }
+    return { data };
+}
+
+// Get all invoices for current user
+async function listInvoices() {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    
+    const { data, error } = await _supabase
+        .from('invoices')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+        
+    if (error) {
+        console.error('Invoices list error:', error);
+        return { error };
+    }
+    return { data };
+}
+
+// Save an invoice
+async function saveInvoice(invoiceData) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    
+    const { data, error } = await _supabase
+        .from('invoices')
+        .upsert({
+            user_id: user.id,
+            id: invoiceData.id || '',
+            client_name: invoiceData.clientName || '',
+            project_address: invoiceData.projectAddress || '',
+            email: invoiceData.email || '',
+            phone: invoiceData.phone || '',
+            quote_number: invoiceData.quoteNumber || '',
+            rooms: invoiceData.rooms || [],
+            grand_total: invoiceData.grandTotal || 0,
+            terms: invoiceData.terms || [],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id,id' })
+        .select();
+        
+    if (error) {
+        console.error('Invoice save error:', error);
+        return { error };
+    }
+    return { data };
+}
+
+// Save client to Supabase
+async function saveClientToSupabase(client) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
     const { data, error } = await _supabase
         .from('clients')
-        .upsert(payload, { onConflict: 'user_id,name' })
-        .select()
-        .single();
+        .upsert({
+            user_id: user.id,
+            name: client.name || '',
+            phone: client.phone || '',
+            email: client.email || '',
+            address: client.address || '',
+            city: client.city || '',
+            notes: client.notes || '',
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id,name' })
+        .select();
     return { data, error };
 }
 
+// List clients from Supabase
 async function listClientsFromSupabase() {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
-
     const { data, error } = await _supabase
         .from('clients')
         .select('*')

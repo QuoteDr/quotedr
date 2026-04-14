@@ -2104,7 +2104,14 @@
             localStorage.setItem('ald_last_preview_invoice', invoiceId);
             const invoiceBaseUrl = window.location.href.split('?')[0].replace('quote-builder.html', 'invoice-viewer.html');
             const invoiceUrl = invoiceBaseUrl + '?invoice=' + invoiceId;
-            window.open(invoiceUrl, '_blank');
+            // Use anchor with target=_blank to avoid popup blocker
+            const a = document.createElement('a');
+            a.href = invoiceUrl;
+            a.target = '_blank';
+            a.rel = 'noopener';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
         }
 
         // Quote style state
@@ -3225,6 +3232,13 @@
 
         function persistClients() {
             localStorage.setItem('ald_clients', JSON.stringify(savedClients));
+            
+            // Also sync to Supabase if available
+            if (typeof saveClientToSupabase === 'function') {
+                savedClients.forEach(function(client) {
+                    saveClientToSupabase(client).catch(function(e){ console.warn('Client sync error:', e); });
+                });
+            }
         }
 
         function getAllClients() {
@@ -3552,6 +3566,22 @@
                 if (typeof bootstrap === 'undefined' || (typeof initDone === 'undefined' || !initDone) && _startupAttempts < 38) {
                     setTimeout(tryStartup, 80);
                     return;
+                }
+                
+                // Sync clients from Supabase on load
+                if (typeof listClientsFromSupabase === 'function') {
+                    listClientsFromSupabase().then(function(result) {
+                        if (result.data && result.data.length > 0) {
+                            // Merge Supabase clients with localStorage
+                            var existing = JSON.parse(localStorage.getItem('ald_clients') || '[]');
+                            result.data.forEach(function(sc) {
+                                if (!existing.find(function(c){ return c.name === sc.name; })) {
+                                    existing.push({ name: sc.name, phone: sc.phone, email: sc.email, address: sc.address, city: sc.city, notes: sc.notes });
+                                }
+                            });
+                            localStorage.setItem('ald_clients', JSON.stringify(existing));
+                        }
+                    }).catch(function(e){ console.warn('Client load error:', e); });
                 }
                 
                 // Check if opening a specific cloud quote from dashboard
