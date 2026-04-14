@@ -159,6 +159,29 @@
             .col-md-6.mt-3, .col-md-12.mt-3 { width: 100% !important; }
             #quoteNumber { max-width: 100% !important; }
             .d-flex.align-items-center.gap-3 { flex-wrap: wrap; gap: 6px !important; }
+            /* Line item cards on mobile */
+            .line-item { padding: 0.6rem !important; }
+            .line-item .d-flex { flex-wrap: wrap; }
+            /* Room header on mobile */
+            .room-header { padding: 0.6rem 0.8rem !important; }
+            .room-header .d-flex { flex-wrap: wrap; gap: 6px !important; }
+            /* Sticky toolbar on mobile - move above bottom bar */
+            #stickyToolbar { bottom: 80px !important; right: 12px !important; padding: 7px 12px !important; }
+            /* Sticky total bar font on mobile */
+            #stickyTotalBar .total-amount { font-size: 1.2rem !important; }
+            /* Grand total section */
+            .grand-total { padding: 0.75rem !important; }
+            .grand-total h4 { font-size: 1rem !important; }
+            /* Card headers wrapping */
+            .card-header { flex-wrap: wrap; gap: 4px; }
+            /* Hide autosave toggle label on mobile to save space */
+            .form-check-label { display: none !important; }
+            /* Hide user logo on mobile to save header space */
+            #userLogoImg { display: none !important; }
+            /* Compact top header on mobile */
+            .container-fluid > .d-flex:first-child { min-height: 0 !important; padding: 4px 0 !important; }
+            /* Make top toolbar buttons smaller */
+            .container-fluid > .d-flex:first-child .btn { padding: 3px 6px !important; font-size: 0.7rem !important; }
         }
 
 </style>
@@ -371,7 +394,7 @@
 
         <!-- Pricing Summary -->
         <div class="row">
-            <div class="col-md-6 col-12">
+            <div class="col-12">
                 <div class="grand-total text-center">
                     <h4><i class="fas fa-calculator"></i> Quote Total</h4>
                     <div id="subtotalDisplay" style="font-size: 1.5rem;">Subtotal: $0.00</div>
