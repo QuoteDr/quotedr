@@ -406,6 +406,21 @@
 
         // Complete onboarding and redirect
         function skipOnboarding() {
+            const bizName = document.getElementById('businessName') ? document.getElementById('businessName').value.trim() : '';
+            if (!bizName) {
+                alert('Please enter your company name before skipping.');
+                if (document.getElementById('businessName')) document.getElementById('businessName').focus();
+                return;
+            }
+            // Save whatever business info is filled in
+            const profile = {
+                business_name: bizName,
+                businessName: bizName,
+                ownerName: document.getElementById('ownerName') ? document.getElementById('ownerName').value : '',
+                phone: document.getElementById('phone') ? document.getElementById('phone').value : '',
+                email: document.getElementById('email') ? document.getElementById('email').value : ''
+            };
+            localStorage.setItem('ald_business_profile', JSON.stringify(profile));
             localStorage.setItem('ald_onboarding_complete', '1');
             if (typeof updateUserProfile === 'function') {
                 updateUserProfile({ onboarding_complete: true }).catch(function(e){ console.warn('onboarding sync error:', e); });
@@ -478,6 +493,7 @@
         }
 
         // Custom items functions
+        function saveCustomItems() {
             localStorage.setItem('ald_custom_materials', JSON.stringify(_customItems));
         }
 
