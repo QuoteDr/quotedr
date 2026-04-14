@@ -43,7 +43,7 @@
                     <div id="progressBar" class="progress-bar" role="progressbar" style="width: 0%"></div>
                 </div>
                 <div class="text-center mb-4">
-                    <span id="stepIndicator" class="text-muted small">Step 1 of 6</span>
+                    <span id="stepIndicator" class="text-muted small">Step 1 of 7</span>
                 </div>
 
                 <div class="bg-white rounded shadow-sm p-4 p-md-5">
@@ -206,7 +206,7 @@
                         
                         <div class="d-flex justify-content-between mt-4">
                             <button class="btn btn-outline-secondary" onclick="prevStep()"><i class="fas fa-arrow-left"></i> Back</button>
-                            <button class="btn btn-primary" onclick="nextStep()">Next →</button>
+                            <button class="btn btn-primary" onclick="saveCustomItems();nextStep()">Next →</button>
                         </div>
                     </div>
 
@@ -292,6 +292,8 @@
             updateProgress();
             // Render terms list when step 4 becomes visible
             if (stepNumber === 4 && typeof renderOnboardingTerms === 'function') renderOnboardingTerms();
+            // Render custom items when step 5 becomes visible
+            if (stepNumber === 5 && typeof renderCustomItems === 'function') renderCustomItems();
         }
 
         // Go to next step
@@ -427,6 +429,35 @@
         function saveOnboardingTerms() {
             localStorage.setItem('ald_custom_terms', JSON.stringify(_onboardingTerms));
             nextStep();
+        }
+
+        // Custom items functions
+        var _customItems = JSON.parse(localStorage.getItem('ald_custom_materials') || '[]');
+
+        function renderCustomItems() {
+            var el = document.getElementById('customItemsList');
+            if (!el) return;
+            if (_customItems.length === 0) {
+                el.innerHTML = '<p class="text-muted small">No materials added yet. Click "Add Material" to get started.</p>';
+                return;
+            }
+            el.innerHTML = _customItems.map(function(item, i) {
+                return '<div class="d-flex align-items-center gap-2 mb-2 flex-wrap">' +
+                    '<input type="text" class="form-control form-control-sm" placeholder="Material name" value="' + (item.name||'').replace(/"/g,'&quot;') + '" onchange="_customItems['+i+'].name=this.value" style="min-width:140px;">' +
+                    '<input type="text" class="form-control form-control-sm" placeholder="Unit (e.g. sqft)" value="' + (item.unit||'').replace(/"/g,'&quot;') + '" onchange="_customItems['+i+'].unit=this.value" style="max-width:90px;">' +
+                    '<input type="number" class="form-control form-control-sm" placeholder="Price" value="' + (item.price||'') + '" onchange="_customItems['+i+'].price=parseFloat(this.value)||0" style="max-width:90px;">' +
+                    '<button class="btn btn-sm btn-outline-danger" onclick="_customItems.splice('+i+',1);renderCustomItems();"><i class="fas fa-trash"></i></button>' +
+                    '</div>';
+            }).join('');
+        }
+
+        function addCustomItem() {
+            _customItems.push({ name: '', unit: '', price: 0 });
+            renderCustomItems();
+        }
+
+        function saveCustomItems() {
+            localStorage.setItem('ald_custom_materials', JSON.stringify(_customItems));
         }
 
         function saveQuotePrefs() {
