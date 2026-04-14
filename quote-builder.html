@@ -1168,8 +1168,8 @@
                 renderRooms();
                 
                 // Prompt to save if this is a new item
-                const saveBtn = document.getElementById('saveNewItemBtn');
-                if (saveBtn && saveBtn.style.display !== 'none') {
+                const savNewItemBtn = document.getElementById('saveNewItemBtn');
+                if (savNewItemBtn && savNewItemBtn.style.display !== 'none') {
                     const desc = document.getElementById('lineDescription').value.trim();
                     if (desc && confirm('Save "' + desc + '" to your item database for next time?')) {
                         saveLineItemToDatabase();
