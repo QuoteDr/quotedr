@@ -199,12 +199,29 @@
         // Auto-switch to signup tab if ?signup=1
         if (urlParams.has('signup')) { showTab('signup'); }
         if (!urlParams.has('noredirect')) {
-            _supabase.auth.getSession().then(({ data: { session } }) => {
+            _supabase.auth.getSession().then(async ({ data: { session } }) => {
                 if (session) {
-                    if (!localStorage.getItem('ald_onboarding_complete')) {
-                        window.location.href = 'onboarding.html';
-                    } else {
+                    // Check localStorage first (fast path)
+                    if (localStorage.getItem('ald_onboarding_complete')) {
                         window.location.href = 'quote-builder.html';
+                        return;
+                    }
+                    // Check Supabase profile (cross-device)
+                    try {
+                        const { data: profile } = await _supabase
+                            .from('users')
+                            .select('onboarding_complete')
+                            .eq('id', session.user.id)
+                            .single();
+                        if (profile && profile.onboarding_complete) {
+                            localStorage.setItem('ald_onboarding_complete', '1');
+                            window.location.href = 'quote-builder.html';
+                        } else {
+                            window.location.href = 'onboarding.html';
+                        }
+                    } catch(e) {
+                        // If Supabase check fails, fall back to onboarding
+                        window.location.href = 'onboarding.html';
                     }
                 }
             });

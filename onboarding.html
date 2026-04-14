@@ -357,10 +357,11 @@
 
         // Save business info to localStorage and proceed
         function saveBusinessInfo() {
-            const businessForm = document.getElementById('businessForm');
-            
-            if (!businessForm.checkValidity()) {
-                businessForm.reportValidity();
+            // Only require business name; skip strict validation on mobile
+            const bizName = document.getElementById('businessName').value.trim();
+            if (!bizName) {
+                document.getElementById('businessName').focus();
+                document.getElementById('businessName').placeholder = 'Please enter your business name';
                 return;
             }
             
@@ -406,11 +407,17 @@
         // Complete onboarding and redirect
         function skipOnboarding() {
             localStorage.setItem('ald_onboarding_complete', '1');
+            if (typeof updateUserProfile === 'function') {
+                updateUserProfile({ onboarding_complete: true }).catch(function(e){ console.warn('onboarding sync error:', e); });
+            }
             window.location.href = 'quote-builder.html';
         }
 
         function completeOnboarding() {
             localStorage.setItem('ald_onboarding_complete', '1');
+            if (typeof updateUserProfile === 'function') {
+                updateUserProfile({ onboarding_complete: true }).catch(function(e){ console.warn('onboarding sync error:', e); });
+            }
             window.location.href = 'quote-builder.html';
         }
 
