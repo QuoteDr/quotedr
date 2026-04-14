@@ -3120,8 +3120,15 @@ async function saveQuote() {
         function startupContinueSession() {
             var session = null;
             try { session = JSON.parse(localStorage.getItem('ald_session_quote')); } catch(e) {}
-            if (!session) { alert('No session found.'); return; }
-            bootstrap.Modal.getInstance(document.getElementById('startupModal')).hide(); cleanupModalBackdrop();
+            if (!session) {
+                // No saved session — just start fresh, no alert needed
+                updateDraftWarning();
+                return;
+            }
+            // Hide startup modal if it's open
+            var sm = document.getElementById('startupModal');
+            if (sm) { var mi = bootstrap.Modal.getInstance(sm); if (mi) mi.hide(); }
+            cleanupModalBackdrop();
             applyQuoteData(session);
             if (session.quoteNumber) document.getElementById('quoteNumber').value = session.quoteNumber;
             renderTermsCheckboxes();
