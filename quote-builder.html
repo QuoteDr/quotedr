@@ -763,7 +763,12 @@
             const cats = Object.keys(pricingDatabase);
             const hiddenCategories = JSON.parse(localStorage.getItem('ald_hidden_categories') || '[]');
             sel.innerHTML = '';
-            // Add New Category option at top
+            // Blank default option first
+            const blankCatOpt = document.createElement('option');
+            blankCatOpt.value = ''; blankCatOpt.text = '— Select a category —'; blankCatOpt.disabled = true;
+            if (!selectedCat) blankCatOpt.selected = true;
+            sel.appendChild(blankCatOpt);
+            // Add New Category option
             const addCatOpt = document.createElement('option');
             addCatOpt.value = '__add_new_category__'; addCatOpt.text = '+ Add New Category';
             sel.appendChild(addCatOpt);
