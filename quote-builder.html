@@ -834,7 +834,11 @@
             // Get services for this category
             const services = pricingDatabase[category] || [];
 
-            // Add New Service option at top
+            // Blank default option first
+            const blankOpt = document.createElement('option');
+            blankOpt.value = ''; blankOpt.text = '— Select a service —'; blankOpt.disabled = true; blankOpt.selected = true;
+            serviceSelect.appendChild(blankOpt);
+            // Add New Service option
             const addSvcOpt = document.createElement('option');
             addSvcOpt.value = '__add_new_service__'; addSvcOpt.text = '+ Add New Service';
             serviceSelect.appendChild(addSvcOpt);
