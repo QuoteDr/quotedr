@@ -807,7 +807,7 @@
 
             // Populate category dropdown dynamically — no pre-selection so placeholder shows
             populateCategoryDropdown(null);
-            updatePricingOptions();
+            // Don't call updatePricingOptions() here — let user pick category first
             
             modal.show();
         }
