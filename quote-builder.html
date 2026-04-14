@@ -182,6 +182,18 @@
             .container-fluid > .d-flex:first-child { min-height: 0 !important; padding: 4px 0 !important; }
             /* Make top toolbar buttons smaller */
             .container-fluid > .d-flex:first-child .btn { padding: 3px 6px !important; font-size: 0.7rem !important; }
+            /* Top header toolbar: icon-only on mobile */
+            .container-fluid > div > div[style*="flex-direction: column"] .btn span,
+            .container-fluid > div > div[style*="flex-direction: column"] .btn-sm { 
+                font-size: 0 !important; 
+            }
+            .container-fluid > div > div[style*="flex-direction: column"] .btn-sm i { 
+                font-size: 0.85rem !important; 
+            }
+            /* Prevent any horizontal overflow */
+            body { overflow-x: hidden !important; }
+            .container-fluid { overflow-x: hidden !important; max-width: 100vw !important; }
+            .d-flex { min-width: 0; }
         }
 
 </style>
@@ -191,9 +203,9 @@
 <body>
     <div class="container-fluid py-4">
         <!-- Professional Header -->
-        <div class="d-flex align-items-center justify-content-between mb-2" style="height: 110px; overflow: visible; padding-top: 15px; padding-bottom: 23px;">
+        <div class="d-flex align-items-center justify-content-between mb-2" style="overflow: visible; padding-top: 8px; padding-bottom: 8px; flex-wrap: wrap;">
             <!-- User logo left -->
-            <div style="flex: 0 0 220px; display: flex; align-items: center;">
+            <div style="flex: 0 0 0px; display: flex; align-items: center; overflow: hidden;">
                 <img id="userLogoImg" src="" alt="Your Logo" style="height: 118px; width: auto; max-width: 200px; display: none;">
             </div>
             <!-- QuoteDr logo center -->
@@ -727,9 +739,20 @@
         }
 
         function addRoom() {
-            const modal = new bootstrap.Modal(document.getElementById('addRoomModal'));
+            // Dismiss any lingering startup modal backdrop first
+            var startupEl = document.getElementById('startupModal');
+            if (startupEl) {
+                var existing = bootstrap.Modal.getInstance(startupEl);
+                if (existing) { try { existing.hide(); } catch(e) {} }
+            }
+            document.querySelectorAll('.modal-backdrop').forEach(function(b){ b.remove(); });
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('overflow');
+            document.body.style.removeProperty('padding-right');
+            
+            var roomModal = new bootstrap.Modal(document.getElementById('addRoomModal'));
             document.getElementById('newRoomName').value = '';
-            modal.show();
+            roomModal.show();
         }
 
         function confirmAddRoom() {

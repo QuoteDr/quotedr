@@ -400,3 +400,10 @@ async function listClientsFromSupabase() {
         .order('name', { ascending: true });
     return { data, error };
 }
+
+// Aliases for consistent naming
+var listQuotesFromSupabase = listQuotes;
+var listInvoicesFromSupabase = listInvoices;
+var listTemplatesFromSupabase = listTemplates;
+var listTermsFromSupabase = listTerms;
+var listItemsFromSupabase = listItems;
