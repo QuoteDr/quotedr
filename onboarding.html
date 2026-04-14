@@ -245,7 +245,7 @@
 
                         <div class="d-flex justify-content-between mt-4">
                             <button class="btn btn-outline-secondary" onclick="prevStep()"><i class="fas fa-arrow-left"></i> Back</button>
-                            <button class="btn btn-primary" onclick="ob_saveLineItems();nextStep()">Next →</button>
+                            <button class="btn btn-primary" onclick="ob_saveLineItems();nextStep();" type="button">Next →</button>
                         </div>
                     </div>
 
@@ -496,6 +496,78 @@
         function saveCustomItems() {
             localStorage.setItem('ald_custom_materials', JSON.stringify(_customItems));
         }
+
+        // ---- Onboarding Line Items (Step 5) ----
+        var _ob_items = [];
+
+        function ob_renderLineItems() {
+            var list = document.getElementById('ob_lineItemsList');
+            if (!list) return;
+            if (_ob_items.length === 0) {
+                list.innerHTML = '<p class="text-muted small text-center">No items added yet. Add one above or just hit Next to skip.</p>';
+                return;
+            }
+            list.innerHTML = _ob_items.map(function(item, i) {
+                return '<div class="d-flex justify-content-between align-items-center border rounded px-3 py-2 mb-2">' +
+                    '<div><strong>' + item.name + '</strong> <span class="text-muted small">(' + item.category + ' · ' + item.unit + ' · $' + item.rate + ')</span></div>' +
+                    '<button class="btn btn-sm btn-outline-danger" onclick="_ob_items.splice(' + i + ',1);ob_renderLineItems();">&times;</button>' +
+                '</div>';
+            }).join('');
+        }
+
+        function ob_addLineItem() {
+            var category = (document.getElementById('ob_itemCategory').value || '').trim();
+            var name = (document.getElementById('ob_itemName').value || '').trim();
+            var unit = (document.getElementById('ob_itemUnit').value || '').trim();
+            var rate = parseFloat(document.getElementById('ob_itemRate').value) || 0;
+            var desc = (document.getElementById('ob_itemDescription') ? document.getElementById('ob_itemDescription').value : '').trim();
+
+            if (!name) {
+                alert('Please enter an item name.');
+                document.getElementById('ob_itemName').focus();
+                return;
+            }
+            if (!category) category = 'General';
+            if (!unit) unit = 'each';
+
+            _ob_items.push({ category: category, name: name, unit: unit, rate: rate, description: desc });
+
+            // Clear inputs for next item
+            document.getElementById('ob_itemCategory').value = '';
+            document.getElementById('ob_itemName').value = '';
+            document.getElementById('ob_itemUnit').value = '';
+            document.getElementById('ob_itemRate').value = '';
+            if (document.getElementById('ob_itemDescription')) document.getElementById('ob_itemDescription').value = '';
+
+            ob_renderLineItems();
+        }
+
+        function ob_saveLineItems() {
+            // Save all collected items to ald_custom_items in localStorage
+            var items = {};
+            try { items = JSON.parse(localStorage.getItem('ald_custom_items') || '{}'); } catch(e) {}
+            _ob_items.forEach(function(item) {
+                if (!items[item.category]) items[item.category] = [];
+                // Avoid duplicates
+                var exists = items[item.category].find(function(i){ return i.name === item.name; });
+                if (!exists) {
+                    items[item.category].push({ name: item.name, unitType: item.unit, rate: item.rate, description: item.description || '', materialCost: 0, supplierUrl: '' });
+                }
+            });
+            localStorage.setItem('ald_custom_items', JSON.stringify(items));
+            // Also try to save to Supabase if available
+            if (typeof saveItem === 'function') {
+                _ob_items.forEach(function(item) {
+                    saveItem({ category: item.category, name: item.name, unitType: item.unit, rate: item.rate, description: item.description || '' }).catch(function(e){ console.warn('item sync error:', e); });
+                });
+            }
+        }
+
+        // alias for showStep callback
+        function renderCustomItems() {
+            ob_renderLineItems();
+        }
+        // ---- End Onboarding Line Items ----
 
         function saveQuotePrefs() {
             var prefs = {
