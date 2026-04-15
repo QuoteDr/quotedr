@@ -496,13 +496,7 @@ if (location.search.includes('debug')) {
 			setTimeout(function() { badge.style.display = 'none'; }, 3000);
 		}
 
--e 		function resetOnboarding() {
-			localStorage.removeItem('ald_onboarding_complete');
-			if (confirm('Onboarding reset! Go to onboarding now?')) {
-				window.location.href = 'onboarding.html';
-			}
-		}
--e 		function resetOnboarding() {
+		function resetOnboarding() {
 			localStorage.removeItem('ald_onboarding_complete');
 			if (confirm('Onboarding reset! Go to onboarding now?')) {
 				window.location.href = 'onboarding.html';
