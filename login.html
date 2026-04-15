@@ -198,6 +198,7 @@ if (location.search.includes('debug')) {
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-v2.js"></script>
     <script>
         const SUPABASE_URL = 'https://axmoffknvblluibuitrq.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso';
@@ -314,11 +315,45 @@ if (location.search.includes('debug')) {
             var result = await _supabase.auth.signInWithPassword({ email: email, password: password });
             setLoading('signinBtn', false);
             if (result.error) { showMessage('signinMessage', result.error.message); return; }
-            if (!localStorage.getItem('ald_onboarding_complete')) {
-                window.location.href = 'onboarding.html';
-            } else {
+            // Preload items + clients into localStorage before redirect
+            await preloadUserData(result.data.user);
+            // Check onboarding from Supabase (source of truth)
+            await checkOnboardingAndRedirect(result.data.user);
+        }
+
+        async function checkOnboardingAndRedirect(user) {
+            try {
+                const { data } = await _supabase.from('user_data').select('onboarding_complete').eq('id', user.id).single();
+                if (data && data.onboarding_complete) {
+                    localStorage.setItem('ald_onboarding_complete', '1');
+                    window.location.href = 'quote-builder.html';
+                    return;
+                }
+            } catch(e) { console.warn('Onboarding check error:', e); }
+            if (localStorage.getItem('ald_onboarding_complete')) {
                 window.location.href = 'quote-builder.html';
+                return;
             }
+            window.location.href = 'onboarding.html';
+        }
+
+        async function preloadUserData(user) {
+            try {
+                if (typeof loadItemsFromSupabase === 'function') {
+                    const r = await loadItemsFromSupabase();
+                    if (r.data && Object.keys(r.data).length > 0) {
+                        localStorage.setItem('ald_custom_items', JSON.stringify(r.data));
+                        console.log('Items preloaded:', Object.keys(r.data).length, 'categories');
+                    }
+                }
+                if (typeof loadClientsFromSupabase === 'function') {
+                    const r = await loadClientsFromSupabase();
+                    if (r.data && r.data.length > 0) {
+                        localStorage.setItem('ald_clients', JSON.stringify(r.data));
+                        console.log('Clients preloaded:', r.data.length, 'clients');
+                    }
+                }
+            } catch(e) { console.warn('Preload error:', e); }
         }
 
         async function handleSignUp() {

@@ -3092,15 +3092,14 @@ async function saveQuote() {
             if (_voiceRecording) { stopVoiceRecording(); } else { startVoiceRecording(); }
         }
 
-        function startVoiceRecording() {
+        function _createRecognition() {
             var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            _voiceRecognition = new SpeechRecognition();
-            _voiceRecognition.continuous = false;
-            _voiceRecognition.interimResults = true;
-            _voiceRecognition.lang = 'en-CA';
-            _voiceRecognition.onresult = function(event) {
+            var r = new SpeechRecognition();
+            r.continuous = true;
+            r.interimResults = true;
+            r.lang = 'en-CA';
+            r.onresult = function(event) {
                 var interim = '';
-                // Only process NEW results using event.resultIndex
                 for (var i = event.resultIndex; i < event.results.length; i++) {
                     if (event.results[i].isFinal) {
                         _voiceTranscriptFull += event.results[i][0].transcript + ' ';
@@ -3119,16 +3118,36 @@ async function saveQuote() {
                 }
                 if (!_voiceTranscriptFull && !interim) el.textContent = 'Listening...';
             };
-            _voiceRecognition.onerror = function(e) {
+            r.onerror = function(e) {
                 console.warn('Speech error:', e.error);
-                stopVoiceRecording();
-                if (e.error !== 'aborted') document.getElementById('voiceStatus').textContent = 'Microphone error: ' + e.error;
+                if (e.error !== 'aborted' && e.error !== 'no-speech') {
+                    stopVoiceRecording();
+                    document.getElementById('voiceStatus').textContent = 'Microphone error: ' + e.error;
+                }
             };
-            _voiceRecognition.onend = function() {
-                // Do not auto-restart — just call stopVoiceRecording()
-                if (_voiceRecording) stopVoiceRecording();
+            r.onend = function() {
+                if (_voiceRecording) {
+                    // Restart to keep recording through natural speech pauses
+                    setTimeout(function() {
+                        if (_voiceRecording) {
+                            _voiceRecognition = _createRecognition();
+                            try { _voiceRecognition.start(); } catch(e) { stopVoiceRecording(); }
+                        }
+                    }, 100);
+                }
             };
-            _voiceRecognition.start();
+            return r;
+        }
+
+        function startVoiceRecording() {
+            if (!_voiceTranscriptFull) _voiceTranscriptFull = '';
+            _voiceRecognition = _createRecognition();
+            try {
+                _voiceRecognition.start();
+            } catch(e) {
+                document.getElementById('voiceStatus').textContent = 'Could not start microphone: ' + e.message;
+                return;
+            }
             _voiceRecording = true;
             var micBtn = document.getElementById('voiceMicBtn');
             micBtn.style.background = '#dc3545';
@@ -3138,15 +3157,18 @@ async function saveQuote() {
 
         function stopVoiceRecording() {
             _voiceRecording = false;
-            if (_voiceRecognition) { try { _voiceRecognition.stop(); } catch(e) {} _voiceRecognition = null; }
+            if (_voiceRecognition) {
+                try { _voiceRecognition.abort(); } catch(e) {}
+                _voiceRecognition = null;
+            }
             var micBtn = document.getElementById('voiceMicBtn');
             micBtn.style.background = '#7c3aed';
             micBtn.innerHTML = '<i class="fas fa-microphone"></i>';
             if (_voiceTranscriptFull.trim()) {
-                document.getElementById('voiceStatus').textContent = 'Got it! Review and generate:';
+                document.getElementById('voiceStatus').textContent = 'Done! Tap mic to add more, or generate:';
                 document.getElementById('voiceActions').style.display = 'block';
             } else {
-                document.getElementById('voiceStatus').textContent = 'Nothing recorded. Try again.';
+                document.getElementById('voiceStatus').textContent = 'Nothing recorded. Tap the mic to try again.';
             }
         }
 
