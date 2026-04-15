@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { transcript } = await req.json();
+    const { transcript, customItems } = await req.json();
     if (!transcript) {
       return new Response(JSON.stringify({ error: 'No transcript provided' }), {
         status: 400,
@@ -57,7 +57,25 @@ Rules:
 - Use realistic unit types: sqft, lf, ea, hr, ls (lump sum)
 - Keep descriptions concise and professional
 - If the contractor mentions a bathroom, create a separate room for it
+- IMPORTANT: If a user price list is provided, match items to it as closely as possible and use those exact prices and unit types. Only use $0 for items not in the price list.
 - Return ONLY the JSON, no explanation`;
+
+    // Build materials reference from user's custom items
+    let materialsRef = '';
+    if (customItems && typeof customItems === 'object') {
+      const lines: string[] = [];
+      for (const [category, items] of Object.entries(customItems)) {
+        if (!Array.isArray(items)) continue;
+        for (const item of items as any[]) {
+          if (item.name && item.rate) {
+            lines.push(`${category} | ${item.name} | ${item.unitType || item.unit || 'ls'} | $${parseFloat(item.rate).toFixed(2)}`);
+          }
+        }
+      }
+      if (lines.length > 0) {
+        materialsRef = `\n\nUSER'S PRICE LIST (use these exact prices and descriptions when they match):\n${lines.slice(0, 100).join('\n')}`;
+      }
+    }
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -68,7 +86,7 @@ Rules:
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages: [
-          { role: 'system', content: systemPrompt },
+          { role: 'system', content: systemPrompt + materialsRef },
           { role: 'user', content: transcript }
         ],
         temperature: 0.3,
