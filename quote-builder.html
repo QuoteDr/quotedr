@@ -3129,20 +3129,15 @@ async function saveQuote() {
             };
             r.onend = function() {
                 if (_voiceRecording) {
-                    // Restart to keep recording through natural speech pauses
-                    setTimeout(function() {
-                        if (_voiceRecording) {
-                            _voiceRecognition = _createRecognition();
-                            try { _voiceRecognition.start(); } catch(e) { stopVoiceRecording(); }
-                        }
-                    }, 100);
+                    // continuous:true handles pauses; only restart if recognition stopped unexpectedly
+                    try { r.start(); } catch(e) {}
                 }
             };
             return r;
         }
 
         function startVoiceRecording() {
-            if (!_voiceTranscriptFull) _voiceTranscriptFull = '';
+            _voiceTranscriptFull = '';
             _voiceRecognition = _createRecognition();
             try {
                 _voiceRecognition.start();
