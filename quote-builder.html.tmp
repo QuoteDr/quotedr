@@ -1,0 +1,64 @@
+async function saveQuote() {
+            // On mobile (no File System API), go straight to cloud save
+            const isMobile = !window.showSaveFilePicker;
+            
+            if (isMobile) {
+                // Cloud save only on mobile
+                var qData = collectQuoteData();
+                if (!qData.clientName && !qData.rooms.length) {
+                    alert('Nothing to save yet — add a client name or some rooms first.');
+                    return;
+                }
+                updateSaveStatus('saving', 'Saving to cloud...');
+                if (typeof saveQuoteToSupabase === 'function') {
+                    try {
+                        var result = await saveQuoteToSupabase(qData);
+                        if (result && !result.error) {
+                            unsavedChanges = false;
+                            updateSaveStatus('saved', 'Saved to cloud ✓');
+                        } else {
+                            updateSaveStatus('error', 'Cloud save failed — saved locally');
+                            localStorage.setItem('ald_autosave_draft', JSON.stringify(qData));
+                        }
+                    } catch(e) {
+                        updateSaveStatus('error', 'Saved locally only');
+                        localStorage.setItem('ald_autosave_draft', JSON.stringify(qData));
+                    }
+                } else {
+                    localStorage.setItem('ald_autosave_draft', JSON.stringify(qData));
+                    updateSaveStatus('saved', 'Saved locally ✓');
+                }
+                return;
+            }
+
+            // Desktop: use File System API
+            if (!saveFileHandle) {
+                try {
+                    const client = document.getElementById('clientName')?.value.trim() || 'Quote';
+                    const date = new Date().toISOString().slice(0, 10);
+                    saveFileHandle = await window.showSaveFilePicker({
+                        suggestedName: client + ' - ' + date + '.qdr',
+                        types: [{ description: 'QuoteDr File', accept: { 'application/json': ['.qdr'] } }]
+                    });
+                    startAutoSave();
+                } catch (err) {
+                    if (err.name === 'AbortError') return;
+                    downloadQuoteFallback();
+                    return;
+                }
+            }
+            try {
+                await writeToHandle(saveFileHandle);
+            } catch (err) {
+                updateSaveStatus('error', 'Could not write file');
+            }
+            // Always cloud save on manual save
+            if (typeof saveQuoteToSupabase === 'function') {
+                var qData = collectQuoteData();
+                saveQuoteToSupabase(qData).then(function(result) {
+                    if (result && result.data && result.data.id) {
+                        window._supabaseQuoteId = result.data.id;
+                    }
+                }).catch(function(){});
+            }
+        }
