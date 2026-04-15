@@ -437,26 +437,41 @@ if (location.search.includes('debug')) {
 		function renderCustomItems() {
 			var el = document.getElementById('customItemsList');
 			if (!el) return;
-			el.innerHTML = customItems.map(function(item, i) {
-				return '<div class="card mb-2">' +
-					'<div class="card-body p-3">' +
+			
+			// Build HTML by iterating over categories and their items
+			var html = '';
+			Object.entries(customItems).forEach(function(category, catIndex) {
+				var categoryName = category[0];
+				var items = category[1];
+				
+				html += '<div class="mb-3">';
+				html += '<h6 class="text-muted small mb-2">' + categoryName + '</h6>';
+				html += '<div class="card mb-2">';
+				
+				items.forEach(function(item, i) {
+					html += '<div class="card-body p-3">' +
 						'<div class="d-flex gap-2 align-items-center mb-2">' +
-							'<input type="text" class="form-control form-control-sm" value="' + item.name.replace(/"/g, '&quot;') + '" onchange="customItems[' + i + '].name=this.value" placeholder="Item name" style="max-width:150px;">' +
-							'<input type="text" class="form-control form-control-sm" value="' + item.unit.replace(/"/g, '&quot;') + '" onchange="customItems[' + i + '].unit=this.value" placeholder="Unit (e.g. LF, sq.ft., sheet)" style="max-width:100px;">' +
-							'<input type="number" class="form-control form-control-sm" value="' + item.price + '" onchange="customItems[' + i + '].price=parseFloat(this.value) || 0" placeholder="Price" style="max-width:100px;">' +
-							'<select class="form-select form-select-sm" onchange="customItems[' + i + '].category=this.value">' +
-								CATEGORIES.map(function(cat) {
-									return '<option value="' + cat + '"' + (item.category === cat ? ' selected' : '') + '>' + cat + '</option>';
-								}).join('') +
-							'</select>' +
-							'<button class="btn btn-sm btn-outline-danger" onclick="customItems.splice(' + i + ',1);renderCustomItems();"><i class="fas fa-trash"></i></button>' +
+							'<input type="text" class="form-control form-control-sm" value="' + item.name.replace(/"/g, '&quot;') + '" onchange="customItems[\'' + categoryName + '\'][\'' + i + '\'].name=this.value" placeholder="Item name" style="max-width:150px;">' +
+							'<input type="text" class="form-control form-control-sm" value="' + item.unitType.replace(/"/g, '&quot;') + '" onchange="customItems[\'' + categoryName + '\'][\'' + i + '\'].unitType=this.value" placeholder="Unit (e.g. LF, sq.ft., sheet)" style="max-width:100px;">' +
+							'<input type="number" class="form-control form-control-sm" value="' + item.rate + '" onchange="customItems[\'' + categoryName + '\'][\'' + i + '\'].rate=parseFloat(this.value) || 0" placeholder="Rate" style="max-width:100px;">' +
+							'<input type="number" class="form-control form-control-sm" value="' + item.materialCost + '" onchange="customItems[\'' + categoryName + '\'][\'' + i + '\'].materialCost=parseFloat(this.value) || 0" placeholder="Material Cost" style="max-width:100px;">' +
+							'<button class="btn btn-sm btn-outline-danger" onclick="customItems[\'' + categoryName + '\'].splice(' + i + ',1);renderCustomItems();"><i class="fas fa-trash"></i></button>' +
 						'</div>' +
-					'</div>' +
-				'</div>';
-			}).join('');
+					'</div>';
+				});
+				
+				html += '</div>';
+				html += '</div>';
+			});
+			
+			el.innerHTML = html;
 		}
 		function addCustomItem() {
-			customItems.push({ name: '', unit: '', price: 0, category: 'General' });
+			// Add new item to first category
+			var firstCategory = Object.keys(customItems)[0];
+			if (firstCategory && customItems[firstCategory]) {
+				customItems[firstCategory].push({ name: '', unitType: '', rate: 0, materialCost: 0 });
+			}
 			renderCustomItems();
 		}
 
