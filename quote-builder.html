@@ -3108,8 +3108,11 @@ async function saveQuote() {
                     }
                 }
                 var el = document.getElementById('voiceTranscript');
-                el.textContent = '';
-                el.appendChild(document.createTextNode(_voiceTranscriptFull));
+                // Only append new final results, don't clear existing text
+                if (_voiceTranscriptFull) {
+                    var textNode = document.createTextNode(_voiceTranscriptFull);
+                    el.appendChild(textNode);
+                }
                 if (interim) {
                     var span = document.createElement('span');
                     span.style.color = '#aaa';
