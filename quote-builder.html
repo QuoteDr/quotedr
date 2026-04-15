@@ -2274,7 +2274,8 @@ if (location.search.includes('debug')) {
                 const supabaseId = result.data.id;
                 window._supabaseQuoteId = supabaseId;
                 
-                const viewerUrl = window.location.href.split('?')[0].replace('quote-builder.html', 'interactive-quote-viewer.html') + '?id=' + supabaseId;
+                const _base = window.location.href.split('?')[0].replace(/quote-builder(\.html)?$/, '');
+                const viewerUrl = _base + 'interactive-quote-viewer.html?id=' + supabaseId;
                 
                 if (saveStatus) saveStatus.innerHTML = '<span style="color:green;"><i class="fas fa-check"></i> Quote saved!</span>';
 
