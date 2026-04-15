@@ -428,24 +428,34 @@ if (location.search.includes('debug')) {
 
         async function loadQuoteFromURL() {
             const params = new URLSearchParams(window.location.search);
-            let quoteId = params.get('quote');
 
-            // Fallback: file:// protocol in Chrome strips query params
+            // New flow: load from Supabase by ?id= param
+            const supabaseId = params.get('id');
+            if (supabaseId && typeof loadQuoteForViewing === 'function') {
+                const result = await loadQuoteForViewing(supabaseId);
+                if (result && result.data && result.data.data) {
+                    quoteData = result.data.data;
+                    console.log('Loaded quote from Supabase:', quoteData);
+                    return;
+                } else {
+                    alert('Quote not found or could not be loaded. The link may be invalid.');
+                    return;
+                }
+            }
+
+            // Legacy fallback: load from localStorage by ?quote= param
+            let quoteId = params.get('quote');
             if (!quoteId) {
                 quoteId = localStorage.getItem('ald_last_preview_quote');
             }
-
             if (!quoteId) {
                 alert('Invalid or missing quote ID. Please check the link you were sent.');
                 return;
             }
-
-            // Load from localStorage
             const storedQuote = localStorage.getItem(quoteId);
-
             if (storedQuote) {
                 quoteData = JSON.parse(storedQuote);
-                console.log('Loaded quote:', quoteData);
+                console.log('Loaded quote from localStorage:', quoteData);
             } else {
                 alert('Quote not found. The link may be expired or invalid.');
             }
