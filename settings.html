@@ -613,14 +613,21 @@ if (location.search.includes('debug')) {
 					}
 				}
 				localStorage.setItem('ald_custom_items', JSON.stringify(items));
-				// Sync to Supabase for cross-device access
+				resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>' + added + ' materials imported! Syncing to cloud...</span>';
+				// Sync to Supabase FIRST, then reload
 				if (typeof saveItemsToSupabase === 'function') {
-					saveItemsToSupabase(items).then(function() {
-						console.log('Items synced to Supabase ✓');
-					}).catch(function(e) { console.warn('Items sync error:', e); });
+					saveItemsToSupabase(items).then(function(res) {
+						console.log('Items synced to Supabase ✓', res);
+						resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>' + added + ' materials synced to cloud! Reloading...</span>';
+						setTimeout(function() { location.reload(); }, 800);
+					}).catch(function(e) {
+						console.warn('Items sync error:', e);
+						resultEl.innerHTML = '<span class="text-warning"><i class="fas fa-exclamation-triangle me-1"></i>' + added + ' materials saved locally (cloud sync failed: ' + (e.message||e) + ')</span>';
+						setTimeout(function() { location.reload(); }, 2000);
+					});
+				} else {
+					setTimeout(function() { location.reload(); }, 1200);
 				}
-				resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>' + added + ' materials imported and synced to cloud! Reloading...</span>';
-				setTimeout(function() { location.reload(); }, 1200);
 			};
 			reader.readAsText(file);
 		}
