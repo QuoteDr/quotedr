@@ -1,5 +1,15 @@
 // supabase.js - QuoteDr.io Supabase client and helpers
 
+// Run this in Supabase SQL Editor:
+// CREATE TABLE IF NOT EXISTS items (
+//   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+//   user_id uuid REFERENCES auth.users(id),
+//   data jsonb NOT NULL,
+//   updated_at timestamptz DEFAULT now()
+// );
+// ALTER TABLE items ENABLE ROW LEVEL SECURITY;
+// CREATE POLICY "Users manage own items" ON items FOR ALL TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
 const SUPABASE_URL = 'https://axmoffknvblluibuitrq.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso';
 
@@ -349,14 +359,14 @@ async function saveInvoice(invoiceData) {
         .upsert({
             user_id: user.id,
             id: invoiceData.id || '',
-            client_name: invoiceData.clientName || '',
-            project_address: invoiceData.projectAddress || '',
-            email: invoiceData.email || '',
-            phone: invoiceData.phone || '',
-            quote_number: invoiceData.quoteNumber || '',
-            rooms: invoiceData.rooms || [],
-            grand_total: invoiceData.grandTotal || 0,
-            terms: invoiceData.terms || [],
+            client_name: quoteData.clientName || '',
+            project_address: quoteData.projectAddress || '',
+            email: quoteData.email || '',
+            phone: quoteData.phone || '',
+            quote_number: quoteData.quoteNumber || '',
+            rooms: quoteData.rooms || [],
+            grand_total: quoteData.grandTotal || 0,
+            terms: quoteData.terms || [],
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
         }, { onConflict: 'user_id,id' })
@@ -442,6 +452,66 @@ async function loadQuoteForViewing(supabaseId) {
         .select('*')
         .eq('id', supabaseId)
         .single();
+    return { data, error };
+}
+
+// Save all custom items to Supabase (stored as single JSON blob per user)
+async function saveItemsToSupabase(itemsData) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not logged in' };
+    // Check if row exists
+    const { data: existing } = await _supabase
+        .from('items')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+    if (existing) {
+        return await _supabase.from('items').update({ data: itemsData, updated_at: new Date().toISOString() }).eq('user_id', user.id);
+    } else {
+        return await _supabase.from('items').insert({ user_id: user.id, data: itemsData });
+    }
+}
+
+// Load custom items from Supabase
+async function loadItemsFromSupabase() {
+    const user = await getCurrentUser();
+    if (!user) return { data: null, error: 'Not logged in' };
+    const { data, error } = await _supabase
+        .from('items')
+        .select('data')
+        .eq('user_id', user.id)
+        .single();
+    return { data: data ? data.data : null, error };
+}
+
+// Save all clients to Supabase (upsert by name per user)
+async function saveAllClientsToSupabase(clientsArray) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not logged in' };
+    // Delete existing and re-insert (simplest approach for full sync)
+    await _supabase.from('clients').delete().eq('user_id', user.id);
+    if (!clientsArray || clientsArray.length === 0) return { data: [], error: null };
+    const rows = clientsArray.map(c => ({
+        user_id: user.id,
+        name: c.name || '',
+        phone: c.phone || '',
+        email: c.email || '',
+        address: c.address || '',
+        city: c.city || '',
+        notes: c.notes || ''
+    }));
+    return await _supabase.from('clients').insert(rows);
+}
+
+// Load all clients from Supabase
+async function loadClientsFromSupabase() {
+    const user = await getCurrentUser();
+    if (!user) return { data: null, error: 'Not logged in' };
+    const { data, error } = await _supabase
+        .from('clients')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('name', { ascending: true });
     return { data, error };
 }
 
