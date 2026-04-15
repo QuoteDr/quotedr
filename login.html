@@ -200,9 +200,7 @@ if (location.search.includes('debug')) {
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-v2.js"></script>
     <script>
-        const SUPABASE_URL = 'https://axmoffknvblluibuitrq.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso';
-        const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        // _supabase, SUPABASE_URL, SUPABASE_ANON_KEY are provided by supabase-v2.js
 
         // Only auto-redirect if URL has ?redirect=1 (i.e. came here intentionally, not directly)
         const urlParams = new URLSearchParams(window.location.search);
