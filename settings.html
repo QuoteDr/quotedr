@@ -271,6 +271,7 @@ if (location.search.includes('debug')) {
 				<div id="importMaterialsResultSettings" class="mt-2 small"></div>
 			</div>
 		</div>
+			<button class="btn btn-outline-danger btn-sm" onclick="clearAllMaterials()">Clear All</button>
 
 		<!-- Footer -->
 		<div class="text-center text-muted small mt-4">
@@ -475,6 +476,16 @@ if (location.search.includes('debug')) {
 			renderCustomItems();
 		}
 
+			function clearAllMaterials() {
+				if (!confirm('Clear all custom materials? This cannot be undone.')) return;
+				localStorage.setItem('ald_custom_items', '{}');
+				if (typeof saveItemsToSupabase === 'function') {
+					saveItemsToSupabase({}).then(function() {
+						console.log('Materials cleared from Supabase');
+					}).catch(function(e) { console.warn('Clear error:', e); });
+				}
+				location.reload();
+			}
 		async function saveCustomItems() {
 			var btn = document.querySelector('.btn-save');
 			btn.disabled = true;
