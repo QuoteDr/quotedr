@@ -3115,14 +3115,8 @@ async function saveQuote() {
                 if (e.error !== 'aborted') document.getElementById('voiceStatus').textContent = 'Microphone error: ' + e.error;
             };
             _voiceRecognition.onend = function() {
-                // Only auto-restart if still recording AND it stopped unexpectedly (not user-initiated)
-                if (_voiceRecording) {
-                    setTimeout(function() {
-                        if (_voiceRecording) {
-                            try { _voiceRecognition.start(); } catch(e) { stopVoiceRecording(); }
-                        }
-                    }, 300);
-                }
+                // Do not auto-restart — continuous mode handles it
+                if (_voiceRecording) stopVoiceRecording();
             };
             _voiceRecognition.start();
             _voiceRecording = true;
