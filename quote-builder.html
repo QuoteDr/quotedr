@@ -3068,6 +3068,7 @@ async function saveQuote() {
         var _voiceRecognition = null;
         var _voiceRecording = false;
         var _voiceTranscriptFull = '';
+        var _voiceLastResultIndex = 0;
 
         function startVoiceQuote() {
             if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
@@ -3098,12 +3099,14 @@ async function saveQuote() {
             _voiceRecognition.interimResults = true;
             _voiceRecognition.lang = 'en-CA';
             _voiceRecognition.onresult = function(event) {
-                var interim = '', final = '';
+                var interim = '';
                 for (var i = event.resultIndex; i < event.results.length; i++) {
-                    if (event.results[i].isFinal) { final += event.results[i][0].transcript + ' '; }
-                    else { interim += event.results[i][0].transcript; }
+                    if (event.results[i].isFinal) {
+                        _voiceTranscriptFull += event.results[i][0].transcript + ' ';
+                    } else {
+                        interim += event.results[i][0].transcript;
+                    }
                 }
-                _voiceTranscriptFull += final;
                 document.getElementById('voiceTranscript').textContent = (_voiceTranscriptFull + interim) || 'Listening...';
             };
             _voiceRecognition.onerror = function(e) {
@@ -3112,7 +3115,14 @@ async function saveQuote() {
                 if (e.error !== 'aborted') document.getElementById('voiceStatus').textContent = 'Microphone error: ' + e.error;
             };
             _voiceRecognition.onend = function() {
-                if (_voiceRecording) { try { _voiceRecognition.start(); } catch(e) {} }
+                // Only auto-restart if still recording AND it stopped unexpectedly (not user-initiated)
+                if (_voiceRecording) {
+                    setTimeout(function() {
+                        if (_voiceRecording) {
+                            try { _voiceRecognition.start(); } catch(e) { stopVoiceRecording(); }
+                        }
+                    }, 300);
+                }
             };
             _voiceRecognition.start();
             _voiceRecording = true;
