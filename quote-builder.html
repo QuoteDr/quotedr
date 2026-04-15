@@ -3095,30 +3095,17 @@ async function saveQuote() {
         function _createRecognition() {
             var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             var r = new SpeechRecognition();
-            r.continuous = true;
-            r.interimResults = true;
+            r.continuous = false;
+            r.interimResults = false;
             r.lang = 'en-CA';
             r.onresult = function(event) {
-                var interim = '';
-                for (var i = event.resultIndex; i < event.results.length; i++) {
+                for (var i = 0; i < event.results.length; i++) {
                     if (event.results[i].isFinal) {
                         _voiceTranscriptFull += event.results[i][0].transcript + ' ';
-                    } else {
-                        interim += event.results[i][0].transcript;
                     }
                 }
                 var el = document.getElementById('voiceTranscript');
-                el.innerHTML = '';
-                if (_voiceTranscriptFull) {
-                    el.appendChild(document.createTextNode(_voiceTranscriptFull));
-                }
-                if (interim) {
-                    var span = document.createElement('span');
-                    span.style.color = '#aaa';
-                    span.textContent = interim;
-                    el.appendChild(span);
-                }
-                if (!_voiceTranscriptFull && !interim) el.textContent = 'Listening...';
+                el.textContent = _voiceTranscriptFull || 'Listening...';
             };
             r.onerror = function(e) {
                 console.warn('Speech error:', e.error);
@@ -3129,8 +3116,13 @@ async function saveQuote() {
             };
             r.onend = function() {
                 if (_voiceRecording) {
-                    // continuous:true handles pauses; only restart if recognition stopped unexpectedly
-                    try { r.start(); } catch(e) {}
+                    // Restart with a fresh instance — safe because _voiceTranscriptFull accumulates externally
+                    setTimeout(function() {
+                        if (_voiceRecording) {
+                            _voiceRecognition = _createRecognition();
+                            try { _voiceRecognition.start(); } catch(e) {}
+                        }
+                    }, 150);
                 }
             };
             return r;
