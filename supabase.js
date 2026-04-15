@@ -418,3 +418,37 @@ var loadQuoteFromSupabase = function(quoteId) {
         return { data: found || null };
     });
 };
+
+// Save a quote to Supabase for sharing
+async function saveQuoteForSharing(quoteData) {
+    const user = await getCurrentUser();
+    const { data, error } = await _supabase
+        .from('quotes')
+        .upsert({
+            id: quoteData.supabaseId || undefined,
+            user_id: user ? user.id : null,
+            data: quoteData,
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'id' })
+        .select()
+        .single();
+    return { data, error };
+}
+
+// Load a quote from Supabase for viewing
+async function loadQuoteForViewing(supabaseId) {
+    const { data, error } = await _supabase
+        .from('quotes')
+        .select('*')
+        .eq('id', supabaseId)
+        .single();
+    return { data, error };
+}
+
+// Supabase RLS policies needed:
+/*
+-- Allow anyone to read quotes (for sharing)
+CREATE POLICY "Public quote viewing" ON quotes FOR SELECT USING (true);
+-- Allow authenticated users to insert/update their own quotes  
+CREATE POLICY "Users manage own quotes" ON quotes FOR ALL USING (auth.uid() = user_id);
+*/

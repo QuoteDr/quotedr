@@ -426,7 +426,7 @@ if (location.search.includes('debug')) {
             updateTotal();
         });
 
-        function loadQuoteFromURL() {
+        async function loadQuoteFromURL() {
             const params = new URLSearchParams(window.location.search);
             let quoteId = params.get('quote');
 

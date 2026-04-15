@@ -2255,82 +2255,67 @@ if (location.search.includes('debug')) {
             modal.show();
         }
 
-        function confirmGenerateQuote() {
-            // Open window FIRST before any other work to avoid popup blocker
-            var viewerWindow = window.open('', '_blank');
-
+        async function confirmGenerateQuote() {
             var styleModal = bootstrap.Modal.getInstance(document.getElementById('quoteStyleModal'));
             if (styleModal) styleModal.hide();
 
-            const quoteId = 'quote_' + Date.now();
+            // Show saving indicator
+            var saveStatus = document.getElementById('saveStatus');
+            if (saveStatus) saveStatus.innerHTML = '<span style="color:#1a56a0;"><i class="fas fa-spinner fa-spin"></i> Saving quote...</span>';
 
-            const quoteData = {
-                id: quoteId,
-                clientName: document.getElementById('clientName')?.value || 'Client',
-                projectAddress: document.getElementById('projectAddress')?.value || 'Project Address',
-                email: document.getElementById('clientEmail')?.value || '',
-                phone: document.getElementById('clientPhone')?.value || '',
-                quoteNumber: document.getElementById('quoteNumber')?.value || '',
-                rooms: JSON.parse(JSON.stringify(rooms)),
-                grandTotal: parseFloat(document.getElementById('grandTotalDisplay').textContent.replace(/[^0-9.]/g, '')) || 0,
-                terms: getSelectedTerms(),
-                style: JSON.parse(JSON.stringify(_quoteStyle))
-            };
+            const quoteData = collectQuoteData();
+            quoteData.style = JSON.parse(JSON.stringify(_quoteStyle));
+            if (window._supabaseQuoteId) quoteData.supabaseId = window._supabaseQuoteId;
 
-            localStorage.setItem(quoteId, JSON.stringify(quoteData));
-            // Also store as 'last viewed' so viewer can find it even if file:// strips query params
-            localStorage.setItem('ald_last_preview_quote', quoteId);
+            try {
+                const result = await saveQuoteForSharing(quoteData);
+                if (result.error) throw result.error;
+                
+                const supabaseId = result.data.id;
+                window._supabaseQuoteId = supabaseId;
+                
+                const viewerUrl = window.location.href.split('?')[0].replace('quote-builder.html', 'interactive-quote-viewer.html') + '?id=' + supabaseId;
+                
+                if (saveStatus) saveStatus.innerHTML = '<span style="color:green;"><i class="fas fa-check"></i> Quote saved!</span>';
 
-            // Build viewer URL (works for both local files and web server)
-            const baseUrl = window.location.href.split('?')[0].replace('quote-builder.html', 'interactive-quote-viewer.html');
-            const viewerUrl = baseUrl + '?quote=' + quoteId;
-
-            // Navigate the pre-opened window to avoid popup blocker
-            if (viewerWindow) {
-                viewerWindow.location.href = viewerUrl;
-            } else {
-                window.open(viewerUrl, '_blank');
-            }
-
-            // Show a copyable link modal
-            let modal = document.getElementById('interactiveLinkModal');
-            if (!modal) {
-                document.body.insertAdjacentHTML('beforeend', `
-                    <div class="modal fade" id="interactiveLinkModal" tabindex="-1">
-                        <div class="modal-dialog">
-                            <div class="modal-content">
-                                <div class="modal-header bg-success text-white">
-                                    <h5 class="modal-title"><i class="fas fa-check-circle"></i> Interactive Quote Ready!</h5>
-                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <p>The client view has been opened in a new tab. You can also copy the link below:</p>
-                                    <div class="input-group">
-                                        <input type="text" id="interactiveLinkInput" class="form-control" readonly>
-                                        <button class="btn btn-outline-secondary" onclick="copyInteractiveLink()" title="Copy to clipboard">
-                                            <i class="fas fa-copy"></i> Copy
-                                        </button>
+                // Show the link modal
+                let modal = document.getElementById('interactiveLinkModal');
+                if (!modal) {
+                    document.body.insertAdjacentHTML('beforeend', `
+                        <div class="modal fade" id="interactiveLinkModal" tabindex="-1">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header bg-success text-white">
+                                        <h5 class="modal-title"><i class="fas fa-check-circle"></i> Quote Ready!</h5>
+                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                                     </div>
-                                    <small class="text-muted mt-2 d-block">
-                                        <i class="fas fa-info-circle"></i> This link works in the same browser on this computer.
-                                        To share with clients remotely, upload both HTML files to a web server.
-                                    </small>
-                                </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-success" onclick="window.open(document.getElementById('interactiveLinkInput').value, '_blank')">
-                                        <i class="fas fa-external-link-alt"></i> Open Client View Again
-                                    </button>
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                    <div class="modal-body">
+                                        <p>Share this link with your client:</p>
+                                        <div class="input-group mb-2">
+                                            <input type="text" id="interactiveLinkInput" class="form-control" readonly>
+                                            <button class="btn btn-outline-secondary" onclick="copyInteractiveLink()" title="Copy to clipboard">
+                                                <i class="fas fa-copy"></i> Copy
+                                            </button>
+                                        </div>
+                                        <a id="openViewerBtn" href="#" target="_blank" class="btn btn-success w-100 mt-2">
+                                            <i class="fas fa-external-link-alt"></i> Open Client View
+                                        </a>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                `);
-                modal = document.getElementById('interactiveLinkModal');
-            }
+                    `);
+                }
+                document.getElementById('interactiveLinkInput').value = viewerUrl;
+                document.getElementById('openViewerBtn').href = viewerUrl;
+                var linkModal = new bootstrap.Modal(document.getElementById('interactiveLinkModal'));
+                linkModal.show();
 
-            document.getElementById('interactiveLinkInput').value = viewerUrl;
-            new bootstrap.Modal(modal).show();
+            } catch(err) {
+                console.error('Failed to save quote:', err);
+                alert('Failed to save quote to cloud: ' + (err.message || err));
+                if (saveStatus) saveStatus.innerHTML = '<span style="color:red;"><i class="fas fa-times"></i> Save failed</span>';
+            }
         }
 
         function copyInteractiveLink() {
