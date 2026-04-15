@@ -3108,10 +3108,9 @@ async function saveQuote() {
                     }
                 }
                 var el = document.getElementById('voiceTranscript');
-                // Only append new final results, don't clear existing text
+                el.innerHTML = '';
                 if (_voiceTranscriptFull) {
-                    var textNode = document.createTextNode(_voiceTranscriptFull);
-                    el.appendChild(textNode);
+                    el.appendChild(document.createTextNode(_voiceTranscriptFull));
                 }
                 if (interim) {
                     var span = document.createElement('span');
