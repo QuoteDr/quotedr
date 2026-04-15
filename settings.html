@@ -571,7 +571,14 @@ if (location.search.includes('debug')) {
 					added++;
 				});
 				localStorage.setItem('ald_clients', JSON.stringify(clients));
-				resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>' + added + ' clients imported! Reloading...</span>';
+				// Sync to Supabase for cross-device access
+				if (typeof saveAllClientsToSupabase === 'function') {
+					var clientsArray = Object.values(clients);
+					saveAllClientsToSupabase(clientsArray).then(function() {
+						console.log('Clients synced to Supabase ✓');
+					}).catch(function(e) { console.warn('Clients sync error:', e); });
+				}
+				resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>' + added + ' clients imported and synced to cloud! Reloading...</span>';
 				setTimeout(function() { location.reload(); }, 1200);
 			};
 			reader.readAsText(file);
@@ -606,7 +613,13 @@ if (location.search.includes('debug')) {
 					}
 				}
 				localStorage.setItem('ald_custom_items', JSON.stringify(items));
-				resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>' + added + ' materials imported! Reloading...</span>';
+				// Sync to Supabase for cross-device access
+				if (typeof saveItemsToSupabase === 'function') {
+					saveItemsToSupabase(items).then(function() {
+						console.log('Items synced to Supabase ✓');
+					}).catch(function(e) { console.warn('Items sync error:', e); });
+				}
+				resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>' + added + ' materials imported and synced to cloud! Reloading...</span>';
 				setTimeout(function() { location.reload(); }, 1200);
 			};
 			reader.readAsText(file);
