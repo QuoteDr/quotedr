@@ -616,17 +616,24 @@ if (location.search.includes('debug')) {
 				resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>' + added + ' materials imported! Syncing to cloud...</span>';
 				// Sync to Supabase FIRST, then reload
 				if (typeof saveItemsToSupabase === 'function') {
+					console.log('Saving to Supabase...', Object.keys(items).length, 'categories');
 					saveItemsToSupabase(items).then(function(res) {
-						console.log('Saving to Supabase...', Object.keys(items).length, 'categories');
-				console.log('Items synced to Supabase ✓', res);
-						resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>' + added + ' materials synced to cloud! Reloading...</span>';
-						setTimeout(function() { location.reload(); }, 800);
+						console.log('Supabase save result:', JSON.stringify(res));
+						if (res && res.error) {
+							console.error('Save error:', JSON.stringify(res.error));
+							resultEl.innerHTML = '<span class="text-warning">Saved locally but cloud sync failed: ' + JSON.stringify(res.error) + '</span>';
+							setTimeout(function() { location.reload(); }, 3000);
+						} else {
+							resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>' + added + ' materials synced to cloud! Reloading...</span>';
+							setTimeout(function() { location.reload(); }, 800);
+						}
 					}).catch(function(e) {
-						console.warn('Items sync error:', e);
-						resultEl.innerHTML = '<span class="text-warning"><i class="fas fa-exclamation-triangle me-1"></i>' + added + ' materials saved locally (cloud sync failed: ' + (e.message||e) + ')</span>';
-						setTimeout(function() { location.reload(); }, 2000);
+						console.error('Items sync exception:', e.message || e);
+						resultEl.innerHTML = '<span class="text-warning">Saved locally, cloud sync failed: ' + (e.message||e) + '</span>';
+						setTimeout(function() { location.reload(); }, 3000);
 					});
 				} else {
+					console.warn('saveItemsToSupabase not available!');
 					setTimeout(function() { location.reload(); }, 1200);
 				}
 			};
