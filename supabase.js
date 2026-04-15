@@ -54,7 +54,7 @@ async function signOut() {
     const { error } = await _supabase.auth.signOut();
     if (error) console.error('Sign out error:', error);
     currentUser = null;
-    return { error };
+    window.location.href = 'login.html';
 }
 
 // Get user's profile data
