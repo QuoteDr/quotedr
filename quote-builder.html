@@ -205,6 +205,29 @@
         .container-fluid > .d-flex.align-items-center.justify-content-between > div:last-child { width: 100% !important; }
     }
 
+    /* Full screen modals in landscape on mobile */
+    @media (max-height: 500px) and (orientation: landscape) {
+        .modal-dialog {
+            max-width: 100% !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        .modal-content {
+            border-radius: 0 !important;
+            min-height: 100vh;
+            height: 100vh;
+            overflow-y: auto;
+        }
+        .modal-body {
+            overflow-y: auto;
+            max-height: calc(100vh - 110px);
+        }
+        .modal-dialog-scrollable .modal-body {
+            max-height: calc(100vh - 110px);
+        }
+    }
+
 </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-v2.js"></script>
