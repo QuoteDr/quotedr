@@ -1,6 +1,6 @@
 // supabase.js - QuoteDr.io Supabase client and helpers
 
-const SUPABASE_URL = 'https://axmoffknvqyqzjxhjwif.supabase.co';
+const SUPABASE_URL = 'https://axmoffknvblluibuitrq.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInVzZXJfaWQiOiI0YjVmNjM4MS00NTQyLTQ2MDctODg3NC01NjUxMjY3NjEwMDciLCJyb2xlIjoic2VydmljZV9yb2xlIn0.1d37f582571a474563311741174121234567890';
 
 // Initialize Supabase client
