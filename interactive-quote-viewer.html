@@ -379,7 +379,7 @@ if (location.search.includes('debug')) {
         }
         
         // Initialize on page load
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
             // Load user's uploaded logo
             var savedLogo = localStorage.getItem('ald_logo');
             if (savedLogo) {
@@ -393,7 +393,7 @@ if (location.search.includes('debug')) {
             if (nameEl && bizProfile.business_name) nameEl.textContent = bizProfile.business_name;
             if (tagEl && bizProfile.tagline) tagEl.textContent = bizProfile.tagline;
             else if (tagEl && !bizProfile.tagline) tagEl.style.display = 'none';
-            loadQuoteFromURL();
+            await loadQuoteFromURL();
             // Apply quote style theme (only targets total bar and terms section)
             if (quoteData && quoteData.style) {
                 var accent = quoteData.style.accent || '#ffffff';
