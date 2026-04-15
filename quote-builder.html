@@ -3857,18 +3857,18 @@ async function saveQuote() {
                 
                 // Sync clients from Supabase on load
                 // Load custom items from Supabase
-                if (typeof loadItemsFromSupabase === function) {
+                if (typeof loadItemsFromSupabase === 'function') {
                     loadItemsFromSupabase().then(function(result) {
                         if (result.data && Object.keys(result.data).length > 0) {
-                            // Merge with localStorage - Supabase wins for conflicts
-                            var local = JSON.parse(localStorage.getItem(ald_custom_items) || {});
+                            var local = JSON.parse(localStorage.getItem('ald_custom_items') || '{}');
                             var merged = Object.assign({}, local, result.data);
-                            localStorage.setItem(ald_custom_items, JSON.stringify(merged));
-                            loadCustomItems(); // Reload pricing database
+                            localStorage.setItem('ald_custom_items', JSON.stringify(merged));
+                            loadCustomItems();
                         }
-                    }).catch(function(e) { console.warn(Items
-                if (typeof listClientsFromSupabase === 'function') {
-                    listClientsFromSupabase().then(function(result) {
+                    }).catch(function(e) { console.warn('Items load error:', e); });
+                }
+                if (typeof loadClientsFromSupabase === 'function') {
+                    loadClientsFromSupabase().then(function(result) {
                         if (result.data && result.data.length > 0) {
                             // Merge Supabase clients with localStorage
                             var existing = JSON.parse(localStorage.getItem('ald_clients') || '[]');
