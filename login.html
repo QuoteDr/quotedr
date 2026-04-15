@@ -347,8 +347,11 @@ if (location.search.includes('debug')) {
                 if (typeof loadClientsFromSupabase === 'function') {
                     const r = await loadClientsFromSupabase();
                     if (r.data && r.data.length > 0) {
-                        localStorage.setItem('ald_clients', JSON.stringify(r.data));
-                        console.log('Clients preloaded:', r.data.length, 'clients');
+                        // Convert array to object keyed by name (format the app expects)
+                        const clientsObj = {};
+                        (r.data || []).forEach(c => { if (c.name) clientsObj[c.name] = c; });
+                        localStorage.setItem('ald_clients', JSON.stringify(clientsObj));
+                        console.log('Clients preloaded:', Object.keys(clientsObj).length, 'clients');
                     }
                 }
             } catch(e) { console.warn('Preload error:', e); }
