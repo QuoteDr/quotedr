@@ -43,9 +43,7 @@ QuoteDr App Flow:
 - AI Quote: Tap mic, describe job verbally, AI generates the quote structure
 - Invoice: Convert quote to invoice
 
-Keep answers concise and practical. Use bullet points for steps. If asked how to do something in the app, give clear step-by-step instructions.
-
-You are friendly, helpful, and speak like a knowledgeable contractor buddy.`;
+Keep answers concise and practical. Use bullet points for steps. If asked how to do something in the app, give clear step-by-step instructions. You are friendly, helpful, and speak like a knowledgeable contractor buddy.`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
