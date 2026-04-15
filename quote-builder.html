@@ -3095,11 +3095,12 @@ async function saveQuote() {
         function startVoiceRecording() {
             var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             _voiceRecognition = new SpeechRecognition();
-            _voiceRecognition.continuous = true;
+            _voiceRecognition.continuous = false;
             _voiceRecognition.interimResults = true;
             _voiceRecognition.lang = 'en-CA';
             _voiceRecognition.onresult = function(event) {
                 var interim = '';
+                // Only process NEW results using event.resultIndex
                 for (var i = event.resultIndex; i < event.results.length; i++) {
                     if (event.results[i].isFinal) {
                         _voiceTranscriptFull += event.results[i][0].transcript + ' ';
@@ -3107,7 +3108,6 @@ async function saveQuote() {
                         interim += event.results[i][0].transcript;
                     }
                 }
-                // Show final text + greyed interim preview
                 var el = document.getElementById('voiceTranscript');
                 el.textContent = '';
                 el.appendChild(document.createTextNode(_voiceTranscriptFull));
@@ -3125,7 +3125,7 @@ async function saveQuote() {
                 if (e.error !== 'aborted') document.getElementById('voiceStatus').textContent = 'Microphone error: ' + e.error;
             };
             _voiceRecognition.onend = function() {
-                // Do not auto-restart — continuous mode handles it
+                // Do not auto-restart — just call stopVoiceRecording()
                 if (_voiceRecording) stopVoiceRecording();
             };
             _voiceRecognition.start();

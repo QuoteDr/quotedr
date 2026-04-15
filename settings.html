@@ -617,7 +617,8 @@ if (location.search.includes('debug')) {
 				// Sync to Supabase FIRST, then reload
 				if (typeof saveItemsToSupabase === 'function') {
 					saveItemsToSupabase(items).then(function(res) {
-						console.log('Items synced to Supabase ✓', res);
+						console.log('Saving to Supabase...', Object.keys(items).length, 'categories');
+				console.log('Items synced to Supabase ✓', res);
 						resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>' + added + ' materials synced to cloud! Reloading...</span>';
 						setTimeout(function() { location.reload(); }, 800);
 					}).catch(function(e) {
