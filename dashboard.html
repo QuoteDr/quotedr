@@ -26,6 +26,15 @@
         .status-declined { background-color: #f8d7da; color: #721c24; }
         .status-invoiced { background-color: #fff3cd; color: #856404; }
     </style>
+<!-- Eruda mobile console (only loads with ?debug in URL) -->
+<script>
+if (location.search.includes('debug')) {
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/eruda';
+    s.onload = function() { eruda.init(); };
+    document.head.appendChild(s);
+}
+</script>
 </head>
 <body>
     <div class="container-fluid py-4">

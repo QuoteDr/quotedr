@@ -164,6 +164,15 @@
     </style>
 
         .no-print, .btn, nav, .navbar { display: none !important; }\n        body { background: white !important; }\n        @page { margin: 1cm; }\n    </style>
+<!-- Eruda mobile console (only loads with ?debug in URL) -->
+<script>
+if (location.search.includes('debug')) {
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/eruda';
+    s.onload = function() { eruda.init(); };
+    document.head.appendChild(s);
+}
+</script>
 </head>
 <body>
     <div class="container py-4">
