@@ -3860,10 +3860,13 @@ async function saveQuote() {
                 if (typeof loadItemsFromSupabase === 'function') {
                     loadItemsFromSupabase().then(function(result) {
                         if (result.data && Object.keys(result.data).length > 0) {
+                            console.log('Items loaded from Supabase:', Object.keys(result.data).length, 'categories');
                             var local = JSON.parse(localStorage.getItem('ald_custom_items') || '{}');
                             var merged = Object.assign({}, local, result.data);
                             localStorage.setItem('ald_custom_items', JSON.stringify(merged));
                             loadCustomItems();
+                        } else {
+                            console.log('No items found in Supabase:', result.error || 'empty');
                         }
                     }).catch(function(e) { console.warn('Items load error:', e); });
                 }
