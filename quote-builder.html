@@ -3107,7 +3107,17 @@ async function saveQuote() {
                         interim += event.results[i][0].transcript;
                     }
                 }
-                document.getElementById('voiceTranscript').textContent = (_voiceTranscriptFull + interim) || 'Listening...';
+                // Show final text + greyed interim preview
+                var el = document.getElementById('voiceTranscript');
+                el.textContent = '';
+                el.appendChild(document.createTextNode(_voiceTranscriptFull));
+                if (interim) {
+                    var span = document.createElement('span');
+                    span.style.color = '#aaa';
+                    span.textContent = interim;
+                    el.appendChild(span);
+                }
+                if (!_voiceTranscriptFull && !interim) el.textContent = 'Listening...';
             };
             _voiceRecognition.onerror = function(e) {
                 console.warn('Speech error:', e.error);
@@ -3846,6 +3856,17 @@ async function saveQuote() {
                 }
                 
                 // Sync clients from Supabase on load
+                // Load custom items from Supabase
+                if (typeof loadItemsFromSupabase === function) {
+                    loadItemsFromSupabase().then(function(result) {
+                        if (result.data && Object.keys(result.data).length > 0) {
+                            // Merge with localStorage - Supabase wins for conflicts
+                            var local = JSON.parse(localStorage.getItem(ald_custom_items) || {});
+                            var merged = Object.assign({}, local, result.data);
+                            localStorage.setItem(ald_custom_items, JSON.stringify(merged));
+                            loadCustomItems(); // Reload pricing database
+                        }
+                    }).catch(function(e) { console.warn(Items
                 if (typeof listClientsFromSupabase === 'function') {
                     listClientsFromSupabase().then(function(result) {
                         if (result.data && result.data.length > 0) {
