@@ -259,6 +259,9 @@ if (location.search.includes('debug')) {
 				<button class="btn btn-outline-primary btn-sm" onclick="importClientsFromFileSettings()">
 					<i class="fas fa-upload me-1"></i>Import Clients
 				</button>
+				<button class="btn btn-outline-primary btn-sm" onclick="aiImportClients()">
+					<i class="fas fa-robot me-1"></i>🤖 AI Import
+				</button>
 				<div id="importClientsResultSettings" class="mt-2 small"></div>
 			</div>
 			
@@ -268,6 +271,9 @@ if (location.search.includes('debug')) {
 				<input type="file" id="importMaterialsFileSettings" accept=".txt" class="form-control mb-2">
 				<button class="btn btn-outline-primary btn-sm" onclick="importMaterialsFromFileSettings()">
 					<i class="fas fa-upload me-1"></i>Import Materials
+				</button>
+				<button class="btn btn-outline-primary btn-sm" onclick="aiImportMaterials()">
+					<i class="fas fa-robot me-1"></i>🤖 AI Import
 				</button>
 				<div id="importMaterialsResultSettings" class="mt-2 small"></div>
 			</div>
