@@ -35,6 +35,7 @@ Deno.serve(async (req) => {
       'cancel_url': cancelUrl || 'https://quotedr.io/login.html',
       'metadata[userId]': userId || '',
       'allow_promotion_codes': 'true',
+      'subscription_data[trial_period_days]': '14',
     });
 
     const response = await fetch('https://api.stripe.com/v1/checkout/sessions', {
