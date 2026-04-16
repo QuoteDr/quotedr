@@ -697,9 +697,8 @@ if (location.search.includes('debug')) {
 						headers: {
 							'Content-Type': 'application/json',
 							'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso'
-						}
-					}),
-					body: JSON.stringify({ content: e.target.result, type: 'materials' })
+						},
+						body: JSON.stringify({ content: e.target.result, type: 'materials' })
 					});
 					var data = await res.json();
 					if (data.error) throw new Error(data.error);
@@ -729,9 +728,8 @@ if (location.search.includes('debug')) {
 						headers: {
 							'Content-Type': 'application/json',
 							'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso'
-						}
-					},
-					body: JSON.stringify({ content: e.target.result, type: 'clients' })
+						},
+						body: JSON.stringify({ content: e.target.result, type: 'clients' })
 					});
 					var data = await res.json();
 					if (data.error) throw new Error(data.error);
