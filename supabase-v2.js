@@ -312,13 +312,16 @@ async function saveQuote(quoteData) {
             user_id: user.id,
             id: quoteData.id || '',
             client_name: quoteData.clientName || '',
-            project_address: quoteData.projectAddress || '',
-            email: quoteData.email || '',
-            phone: quoteData.phone || '',
             quote_number: quoteData.quoteNumber || '',
-            rooms: quoteData.rooms || [],
-            grand_total: quoteData.grandTotal || 0,
-            terms: quoteData.terms || [],
+            total: quoteData.grandTotal || 0,
+            status: 'draft',
+            data: {
+                project_address: quoteData.projectAddress || '',
+                email: quoteData.email || '',
+                phone: quoteData.phone || '',
+                rooms: quoteData.rooms || [],
+                terms: quoteData.terms || []
+            },
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
         }, { onConflict: 'user_id,id' })
