@@ -3,51 +3,75 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QuoteDr - Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>QuoteDr.io - Dashboard</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { background-color: #eef4fb; }
+        body {
+            background-color: #f8f9fa;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
         .quote-card {
-            background: white;
+            background: #fff;
+            border: 1px solid #e9ecef;
             border-radius: 8px;
             padding: 1rem;
-            margin-bottom: 1rem;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            transition: transform 0.2s, box-shadow 0.2s;
+            margin-bottom: 0.75rem;
+            transition: box-shadow 0.2s, transform 0.2s;
         }
         .quote-card:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
         }
-        .status-draft { background-color: #e9ecef; color: #6c757d; }
-        .status-sent { background-color: #cce5ff; color: #004085; }
-        .status-accepted { background-color: #d4edda; color: #155724; }
-        .status-declined { background-color: #f8d7da; color: #721c24; }
-        .status-invoiced { background-color: #fff3cd; color: #856404; }
+        .status-draft { color: #6c757d; }
+        .status-sent { color: #0d6efd; }
+        .status-accepted { color: #198754; }
+        .status-invoiced { color: #ffc107; }
+        .status-declined { color: #dc3545; }
+        .quote-card .status-select {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .quote-card .btn-outline-danger {
+            font-size: 0.7rem;
+            padding: 0.25rem 0.5rem;
+        }
+        @media (max-width: 768px) {
+            .quote-card {
+                padding: 0.75rem;
+            }
+            .quote-card .d-flex {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+            .quote-card .d-flex.justify-content-between {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .quote-card .text-end {
+                width: 100%;
+                flex-direction: row;
+                justify-content: space-between;
+                align-items: center;
+            }
+        }
     </style>
-<!-- Eruda mobile console (only loads with ?debug in URL) -->
-<script>
-if (location.search.includes('debug')) {
-    var s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/eruda';
-    s.onload = function() { eruda.init(); };
-    document.head.appendChild(s);
-}
-</script>
-<script src="error-reporter.js"></script>
 </head>
 <body>
-    <div class="container-fluid py-4">
+    <div class="container py-4">
         <!-- Header -->
-        <div class="d-flex align-items-center justify-content-between mb-4">
-            <h1><i class="fas fa-th-large me-2"></i>Dashboard</h1>
-            <div class="d-flex gap-2">
-                <a href="quote-builder.html" class="btn btn-outline-secondary">
-                    <i class="fas fa-arrow-left me-2"></i>Back
-                </a>
-                <a href="quote-builder.html" class="btn btn-primary" onclick="localStorage.removeItem('ald_session_quote');">
-                    <i class="fas fa-plus me-2"></i>New Quote
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="fw-bold mb-1">QuoteDr.io</h2>
+                <p class="text-muted mb-0">Welcome back! Here's your quoting overview.</p>
+            </div>
+            <div class="text-end">
+                <div class="fw-bold" id="userName">Loading...</div>
+                <a href="settings.html" class="text-decoration-none text-muted small">
+                    <i class="fas fa-cog"></i> Settings
                 </a>
             </div>
         </div>
@@ -92,10 +116,10 @@ if (location.search.includes('debug')) {
         <div class="row">
             <div class="col-12">
                 <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h3>Recent Quotes</h3>
-                        <div>
-                            <button class="btn btn-sm btn-outline-secondary me-2" onclick="refreshQuotes()">
+                    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <h3 class="mb-0">Recent Quotes</h3>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="refreshQuotes()">
                                 <i class="fas fa-sync-alt"></i> Refresh
                             </button>
                             <button class="btn btn-sm btn-outline-secondary" onclick="exportQuotesToCSV()">
@@ -104,6 +128,31 @@ if (location.search.includes('debug')) {
                         </div>
                     </div>
                     <div class="card-body">
+                        <!-- Search and Filter Bar -->
+                        <div class="row mb-3">
+                            <div class="col-md-6 mb-2 mb-md-0">
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white">
+                                        <i class="fas fa-search text-muted"></i>
+                                    </span>
+                                    <input type="text" id="searchInput" class="form-control" placeholder="Search by client name or quote number..." oninput="filterQuotes()">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <select id="statusFilter" class="form-select" onchange="filterQuotes()">
+                                    <option value="all">All Statuses</option>
+                                    <option value="draft">Draft</option>
+                                    <option value="sent">Sent</option>
+                                    <option value="accepted">Accepted</option>
+                                    <option value="invoiced">Invoiced</option>
+                                    <option value="declined">Declined</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3 text-md-end">
+                                <span id="filteredCount" class="text-muted small"></span>
+                            </div>
+                        </div>
+
                         <div id="quotesList">
                             <!-- Quotes will be rendered here -->
                         </div>
@@ -124,6 +173,8 @@ if (location.search.includes('debug')) {
     <script>
         // ─── DASHBOARD FUNCTIONS ─────────────────────────────────────────────────────
 
+        let allQuotes = []; // Store all quotes for client-side filtering
+
         async function refreshQuotes() {
             try {
                 const { data, error } = await listQuotesFromSupabase();
@@ -132,8 +183,9 @@ if (location.search.includes('debug')) {
                     setTimeout(async function() {
                         const retry = await listQuotesFromSupabase();
                         if (!retry.error) {
-                            renderQuotes(retry.data || []);
-                            updateStats(retry.data || []);
+                            allQuotes = retry.data || [];
+                            renderQuotes(allQuotes);
+                            updateStats(allQuotes);
                         } else {
                             document.getElementById('quotesList').innerHTML = '<div class="alert alert-warning">Please <a href="login.html">log in</a> to see your quotes.</div>';
                         }
@@ -141,8 +193,9 @@ if (location.search.includes('debug')) {
                     return;
                 }
                 if (error) throw error;
-                renderQuotes(data || []);
-                updateStats(data || []);
+                allQuotes = data || [];
+                renderQuotes(allQuotes);
+                updateStats(allQuotes);
             } catch (err) {
                 console.error('Error loading quotes:', err.message || err);
                 document.getElementById('quotesList').innerHTML = '<div class="alert alert-danger">Error loading quotes: ' + (err.message || err) + '</div>';
@@ -154,7 +207,7 @@ if (location.search.includes('debug')) {
             const accepted = quotes.filter(q => q.status === 'accepted').length;
             const invoiced = quotes.filter(q => q.status === 'invoiced').length;
             const revenue = quotes.reduce((sum, q) => sum + (parseFloat(q.total) || 0), 0);
-            
+
             document.getElementById('totalQuotesCount').textContent = total;
             document.getElementById('acceptedQuotesCount').textContent = accepted;
             document.getElementById('invoicedQuotesCount').textContent = invoiced;
@@ -182,15 +235,15 @@ if (location.search.includes('debug')) {
                             <div class="text-muted small">${q.quote_number ? '#' + q.quote_number + ' · ' : ''}${formatDate(q.quote_date)} · Updated ${timeAgo(q.updated_at)}</div>
                         </div>
                         <div class="text-end d-flex flex-column align-items-end gap-1">
-                            <div class="fw-bold">$${parseFloat(q.total || 0).toLocaleString('en-CA', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
-                            <select class="form-select form-select-sm status-select status-${q.status}" style="width:auto; font-size:0.72rem; font-weight:600; text-transform:uppercase; border:none; cursor:pointer;" onchange="changeStatus('${q.id}', this.value, this)" onclick="event.stopPropagation()">
-                                <option value="draft" ${q.status==='draft'?'selected':''}>${q.status==='draft'?'Draft':'Draft'}</option>
-                                <option value="sent" ${q.status==='sent'?'selected':''}>${q.status==='sent'?'Sent':'Sent'}</option>
-                                <option value="accepted" ${q.status==='accepted'?'selected':''}>${q.status==='accepted'?'Accepted':'Accepted'}</option>
-                                <option value="declined" ${q.status==='declined'?'selected':''}>${q.status==='declined'?'Declined':'Declined'}</option>
-                                <option value="invoiced" ${q.status==='invoiced'?'selected':''}>${q.status==='invoiced'?'Invoiced':'Invoiced'}</option>
+                            <div class="fw-bold">$${parseFloat(q.total || 0).toFixed(2)}</div>
+                            <select class="status-select status-${q.status}" onchange="updateQuoteStatus('${q.id}', this.value)">
+                                <option value="draft" ${q.status === 'draft' ? 'selected' : ''}>Draft</option>
+                                <option value="sent" ${q.status === 'sent' ? 'selected' : ''}>Sent</option>
+                                <option value="accepted" ${q.status === 'accepted' ? 'selected' : ''}>Accepted</option>
+                                <option value="invoiced" ${q.status === 'invoiced' ? 'selected' : ''}>Invoiced</option>
+                                <option value="declined" ${q.status === 'declined' ? 'selected' : ''}>Declined</option>
                             </select>
-                            <button class="btn btn-sm btn-outline-danger mt-1" style="font-size:0.75rem; padding:0.2rem 0.5rem;" onclick="deleteQuote('${q.id}', event)">
+                            <button class="btn btn-outline-danger" onclick="deleteQuote('${q.id}')">
                                 <i class="fas fa-trash"></i>
                             </button>
                         </div>
@@ -199,115 +252,67 @@ if (location.search.includes('debug')) {
             `).join('');
         }
 
+        function filterQuotes() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const statusFilter = document.getElementById('statusFilter').value;
+
+            const filtered = allQuotes.filter(quote => {
+                const matchesSearch = !searchTerm ||
+                    (quote.client_name && quote.client_name.toLowerCase().includes(searchTerm)) ||
+                    (quote.quote_number && quote.quote_number.toLowerCase().includes(searchTerm));
+                const matchesStatus = statusFilter === 'all' || quote.status === statusFilter;
+                return matchesSearch && matchesStatus;
+            });
+
+            renderQuotes(filtered);
+            document.getElementById('filteredCount').textContent = filtered.length > 0 ? `${filtered.length} quote${filtered.length !== 1 ? 's' : ''} found` : '';
+        }
+
+        function updateQuoteStatus(quoteId, newStatus) {
+            const quote = allQuotes.find(q => q.id === quoteId);
+            if (quote) {
+                quote.status = newStatus;
+                updateStats(allQuotes);
+            }
+        }
+
+        async function deleteQuote(quoteId) {
+            if (!confirm('Are you sure you want to delete this quote?')) return;
+
+            try {
+                await fetch(`/api/quotes/${quoteId}`, {
+                    method: 'DELETE'
+                });
+                allQuotes = allQuotes.filter(q => q.id !== quoteId);
+                renderQuotes(allQuotes);
+                updateStats(allQuotes);
+            } catch (err) {
+                console.error('Error deleting quote:', err);
+                alert('Failed to delete quote');
+            }
+        }
+
         function formatDate(dateString) {
             const date = new Date(dateString);
-            return date.toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' });
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         }
 
         function timeAgo(dateString) {
             const date = new Date(dateString);
             const now = new Date();
-            const diffInHours = Math.floor((now - date) / (1000 * 60 * 60));
-            
-            if (diffInHours < 1) return 'Just now';
-            if (diffInHours < 24) return `${diffInHours}h ago`;
-            const diffInDays = Math.floor(diffInHours / 24);
-            if (diffInDays < 7) return `${diffInDays}d ago`;
-            return date.toLocaleDateString('en-CA');
+            const seconds = Math.floor((now - date) / 1000);
+
+            if (seconds < 60) return 'just now';
+            if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+            if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+            return `${Math.floor(seconds / 86400)}d ago`;
         }
 
-        async function changeStatus(quoteId, newStatus, selectElement) {
-            try {
-                const quote = await loadQuoteFromSupabase(quoteId);
-                if (!quote.data) throw new Error('Quote not found');
-                
-                quote.data.status = newStatus;
-                const { data, error } = await saveQuoteToSupabase(quote.data);
-                if (error) throw error;
-                
-                // Update UI
-                selectElement.classList.remove(...selectElement.classList);
-                selectElement.classList.add('status-select', `status-${newStatus}`);
-                refreshQuotes(); // Refresh to show updated status
-            } catch (err) {
-                console.error('Error changing status:', err.message);
-                alert('Error changing status: ' + err.message);
-            }
-        }
-
-        async function deleteQuote(quoteId, event) {
-            event.stopPropagation();
-            if (!confirm('Are you sure you want to delete this quote?')) return;
-            
-            try {
-                const { error } = await deleteQuoteFromSupabase(quoteId);
-                if (error) throw error;
-                
-                refreshQuotes(); // Refresh to show updated list
-                alert('Quote deleted successfully');
-            } catch (err) {
-                console.error('Error deleting quote:', err.message);
-                alert('Error deleting quote: ' + err.message);
-            }
-        }
-
-        async function openQuote(quoteId) {
-            try {
-                const { data, error } = await loadQuoteFromSupabase(quoteId);
-                if (error) throw error;
-                
-                // Save to localStorage for editing
-                localStorage.setItem('ald_session_quote', JSON.stringify(data));
-                window.location.href = 'quote-builder.html';
-            } catch (err) {
-                console.error('Error opening quote:', err.message);
-                alert('Error opening quote: ' + err.message);
-            }
-        }
-
-        async function exportQuotesToCSV() {
-            try {
-                const { data, error } = await listQuotesFromSupabase();
-                if (error) throw error;
-                
-                let csvContent = 'Quote Number,Client Name,Quote Date,Total,Status,Updated At\n';
-                data.forEach(quote => {
-                    csvContent += `"${quote.quote_number || ''}","${quote.client_name || ''}","${quote.quote_date || ''}",${quote.total || 0},"${quote.status || ''}","${quote.updated_at || ''}"\n`;
-                });
-                
-                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.setAttribute('href', url);
-                link.setAttribute('download', 'quotes-export.csv');
-                link.style.visibility = 'hidden';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            } catch (err) {
-                console.error('Error exporting quotes:', err.message);
-                alert('Error exporting quotes: ' + err.message);
-            }
-        }
-
-        // ─── INITIALIZATION ──────────────────────────────────────────────────────────
-
-        async function initDashboard() {
-            try {
-                // Don't bail on no auth — try to load quotes regardless
-                if (typeof requireAuth === 'function') {
-                    const user = await requireAuth().catch(function(){return null;});
-                    if (user) window.currentUser = user;
-                }
-                await refreshQuotes();
-            } catch (err) {
-                console.error('Init error:', err.message);
-            }
-        }
-
-        // Initialize dashboard when page loads
-        document.addEventListener('DOMContentLoaded', initDashboard);
+        // Load user name
+        document.addEventListener('DOMContentLoaded', async () => {
+            const userName = localStorage.getItem('ald_user_name') || 'User';
+            document.getElementById('userName').textContent = userName;
+        });
     </script>
-<script src="ai-assistant.js"></script>
 </body>
 </html>

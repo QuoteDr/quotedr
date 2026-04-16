@@ -262,6 +262,7 @@ if (location.search.includes('debug')) {
 				<button class="btn btn-outline-primary btn-sm" onclick="aiImportClients()">
 					<i class="fas fa-robot me-1"></i>🤖 AI Import
 				</button>
+				<button class="btn btn-outline-danger btn-sm ms-2" onclick="clearAllClients()">Clear All</button>
 				<div id="importClientsResultSettings" class="mt-2 small"></div>
 			</div>
 			
@@ -483,16 +484,26 @@ if (location.search.includes('debug')) {
 			renderCustomItems();
 		}
 
-			function clearAllMaterials() {
-				if (!confirm('Clear all custom materials? This cannot be undone.')) return;
-				localStorage.setItem('ald_custom_items', '{}');
-				if (typeof saveItemsToSupabase === 'function') {
-					saveItemsToSupabase({}).then(function() {
-						console.log('Materials cleared from Supabase');
-					}).catch(function(e) { console.warn('Clear error:', e); });
-				}
-				location.reload();
+		function clearAllMaterials() {
+			if (!confirm('Clear all custom materials? This cannot be undone.')) return;
+			localStorage.setItem('ald_custom_items', '{}');
+			if (typeof saveItemsToSupabase === 'function') {
+				saveItemsToSupabase({}).then(function() {
+					console.log('Materials cleared from Supabase');
+				}).catch(function(e) { console.warn('Clear error:', e); });
 			}
+			location.reload();
+		}
+
+		function clearAllClients() {
+			if (!confirm('Clear all clients? This cannot be undone.')) return;
+			localStorage.setItem('ald_clients', '{}');
+			if (typeof saveAllClientsToSupabase === 'function') {
+				saveAllClientsToSupabase([]).catch(function(e) { console.warn('Clear clients error:', e); });
+			}
+			location.reload();
+		}
+
 		async function saveCustomItems() {
 			var btn = document.querySelector('.btn-save');
 			btn.disabled = true;
