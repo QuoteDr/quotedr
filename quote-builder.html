@@ -3143,13 +3143,26 @@ async function saveQuote() {
             };
             r.onend = function() {
                 if (_voiceRecording) {
-                    // Restart with a fresh instance — safe because _voiceTranscriptFull accumulates externally
+                    // Show brief 'paused' indicator then restart
+                    var el = document.getElementById('voiceStatus');
+                    if (el) el.textContent = '🎙️ Listening...';
                     setTimeout(function() {
                         if (_voiceRecording) {
                             _voiceRecognition = _createRecognition();
-                            try { _voiceRecognition.start(); } catch(e) {}
+                            try {
+                                _voiceRecognition.start();
+                                if (el) el.textContent = '🎙️ Recording — speak your quote';
+                            } catch(e) {
+                                // Back off and retry once more
+                                setTimeout(function() {
+                                    if (_voiceRecording) {
+                                        _voiceRecognition = _createRecognition();
+                                        try { _voiceRecognition.start(); } catch(e2) {}
+                                    }
+                                }, 300);
+                            }
                         }
-                    }, 150);
+                    }, 250);
                 }
             };
             return r;
