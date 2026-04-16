@@ -11,9 +11,12 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { email, userId, successUrl, cancelUrl } = await req.json();
+    const { email, userId, successUrl, cancelUrl, plan } = await req.json();
     const stripeKey = Deno.env.get('STRIPE_SECRET_KEY');
-    const priceId = Deno.env.get('STRIPE_PRICE_ID');
+    const plan = req_body.plan || 'pro';
+    const priceId = plan === 'starter' 
+        ? Deno.env.get('STRIPE_PRICE_ID_STARTER')
+        : Deno.env.get('STRIPE_PRICE_ID_PRO');
 
     if (!stripeKey || !priceId) {
       return new Response(JSON.stringify({ error: 'Stripe not configured' }), {

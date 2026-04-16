@@ -9,53 +9,45 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         body { background: #f8fafc; font-family: 'Segoe UI', sans-serif; }
-        .navbar-brand img { height: 36px; }
-        .hero { background: linear-gradient(135deg, #0f3460, #1a56a0); color: white; padding: 60px 0 80px; text-align: center; }
-        .hero h1 { font-size: 2.5rem; font-weight: 800; }
-        .hero p { font-size: 1.15rem; opacity: 0.9; }
-        .pricing-card {
-            background: white; border-radius: 20px; padding: 40px;
-            box-shadow: 0 8px 40px rgba(0,0,0,0.12); max-width: 420px;
-            margin: -50px auto 40px; position: relative;
-            border: 3px solid #e87e2a;
-        }
-        .badge-popular {
-            position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
-            background: #e87e2a; color: white; padding: 4px 20px; border-radius: 20px;
-            font-size: 0.8rem; font-weight: 700; letter-spacing: 1px;
-        }
-        .price { font-size: 3.5rem; font-weight: 800; color: #0f3460; line-height: 1; }
-        .price span { font-size: 1.1rem; font-weight: 400; color: #666; }
+        .hero { background: linear-gradient(135deg, #0f3460, #1a56a0); color: white; padding: 60px 20px 100px; text-align: center; }
+        .hero h1 { font-size: 2.4rem; font-weight: 800; }
+        .hero p { font-size: 1.1rem; opacity: 0.85; max-width: 500px; margin: 12px auto 0; }
+        .plans-row { margin-top: -60px; padding: 0 16px 40px; }
+        .plan-card { background: white; border-radius: 20px; padding: 36px 32px; box-shadow: 0 8px 32px rgba(0,0,0,0.10); height: 100%; border: 2px solid transparent; position: relative; }
+        .plan-card.featured { border-color: #e87e2a; box-shadow: 0 12px 48px rgba(232,126,42,0.2); }
+        .badge-popular { position: absolute; top: -14px; left: 50%; transform: translateX(-50%); background: #e87e2a; color: white; padding: 4px 20px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; letter-spacing: 1px; white-space: nowrap; }
+        .plan-name { font-size: 1.1rem; font-weight: 700; color: #1a56a0; margin-bottom: 4px; }
+        .plan-tagline { color: #666; font-size: 0.88rem; margin-bottom: 20px; }
+        .price { font-size: 3rem; font-weight: 800; color: #0f3460; line-height: 1; }
+        .price span { font-size: 1rem; font-weight: 400; color: #888; }
         .feature-list { list-style: none; padding: 0; margin: 24px 0; }
-        .feature-list li { padding: 8px 0; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; gap: 10px; }
+        .feature-list li { padding: 7px 0; border-bottom: 1px solid #f3f4f6; display: flex; align-items: flex-start; gap: 10px; font-size: 0.92rem; color: #333; }
         .feature-list li:last-child { border-bottom: none; }
-        .feature-list li i { color: #22c55e; font-size: 1rem; width: 20px; }
-        .btn-subscribe {
-            background: linear-gradient(135deg, #e87e2a, #d4691a);
-            color: white; border: none; border-radius: 12px;
-            padding: 14px 32px; font-size: 1.1rem; font-weight: 700;
-            width: 100%; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;
-        }
-        .btn-subscribe:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(232,126,42,0.4); }
-        .btn-subscribe:disabled { opacity: 0.7; transform: none; }
-        .trial-note { text-align: center; color: #666; font-size: 0.88rem; margin-top: 12px; }
-        .faq { max-width: 680px; margin: 0 auto; padding: 40px 20px; }
-        .faq h2 { color: #0f3460; font-weight: 700; text-align: center; margin-bottom: 30px; }
-        .faq-item { background: white; border-radius: 12px; padding: 20px 24px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-        .faq-item h6 { color: #0f3460; font-weight: 700; margin-bottom: 8px; }
-        .faq-item p { color: #555; margin: 0; font-size: 0.92rem; }
-        .testimonials { background: white; padding: 50px 20px; text-align: center; }
-        .testimonial-card { background: #f8fafc; border-radius: 12px; padding: 24px; max-width: 320px; margin: 0 auto 20px; }
-        .stars { color: #f59e0b; font-size: 1.1rem; margin-bottom: 8px; }
-        footer { background: #0f3460; color: rgba(255,255,255,0.7); text-align: center; padding: 24px; font-size: 0.88rem; }
+        .feature-list li i.fa-check-circle { color: #22c55e; margin-top: 2px; flex-shrink: 0; }
+        .feature-list li i.fa-robot { color: #7c3aed; margin-top: 2px; flex-shrink: 0; }
+        .btn-starter { background: white; color: #1a56a0; border: 2px solid #1a56a0; border-radius: 12px; padding: 13px 24px; font-size: 1rem; font-weight: 700; width: 100%; cursor: pointer; transition: all 0.2s; }
+        .btn-starter:hover { background: #1a56a0; color: white; }
+        .btn-pro { background: linear-gradient(135deg, #e87e2a, #d4691a); color: white; border: none; border-radius: 12px; padding: 13px 24px; font-size: 1rem; font-weight: 700; width: 100%; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 16px rgba(232,126,42,0.35); }
+        .btn-pro:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(232,126,42,0.45); }
+        button:disabled { opacity: 0.65; transform: none !important; cursor: default; }
+        .trial-note { text-align: center; color: #888; font-size: 0.82rem; margin-top: 10px; }
+        .compare-tag { background: #f0f9ff; border-left: 3px solid #1a56a0; padding: 10px 16px; border-radius: 0 8px 8px 0; font-size: 0.85rem; color: #1a56a0; margin-bottom: 20px; }
+        .section-title { text-align: center; color: #0f3460; font-weight: 800; font-size: 1.6rem; margin-bottom: 30px; }
+        .faq-item { background: white; border-radius: 12px; padding: 20px 24px; margin-bottom: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .faq-item h6 { color: #0f3460; font-weight: 700; margin-bottom: 6px; }
+        .faq-item p { color: #555; margin: 0; font-size: 0.9rem; }
+        .testimonial-card { background: #f8fafc; border-radius: 12px; padding: 22px; }
+        .stars { color: #f59e0b; margin-bottom: 8px; }
+        footer { background: #0f3460; color: rgba(255,255,255,0.6); text-align: center; padding: 24px; font-size: 0.85rem; }
         footer a { color: rgba(255,255,255,0.7); text-decoration: none; }
+        .ai-badge { background: #ede9fe; color: #6d28d9; font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; margin-left: 4px; vertical-align: middle; }
     </style>
 </head>
 <body>
 
 <nav class="navbar navbar-light bg-white shadow-sm px-3 px-md-5">
-    <a class="navbar-brand" href="landing.html">
-        <img src="quotedr-logo.svg" alt="QuoteDr">
+    <a class="navbar-brand d-flex align-items-center gap-2" href="landing.html">
+        <img src="quotedr-logo.svg" alt="QuoteDr" style="height:34px;">
     </a>
     <div class="d-flex gap-2">
         <a href="login.html" class="btn btn-outline-primary btn-sm">Sign In</a>
@@ -64,86 +56,108 @@
 
 <div class="hero">
     <div class="container">
-        <h1>Simple, Honest Pricing</h1>
-        <p>Everything you need to quote faster, win more jobs, and get paid.</p>
+        <h1>Simple or AI-Powered.<br>You Choose.</h1>
+        <p>Start free. Upgrade when you're ready. Cancel anytime.</p>
     </div>
 </div>
 
-<div class="container">
-    <div class="pricing-card">
-        <div class="badge-popular">MOST POPULAR</div>
-        <div class="text-center mb-3">
-            <div class="price">$29<span>/month</span></div>
-            <div class="text-muted mt-1" style="font-size:0.9rem;">Per contractor. Cancel anytime.</div>
+<div class="container plans-row">
+    <div class="row g-4 justify-content-center">
+        <!-- STARTER -->
+        <div class="col-md-5">
+            <div class="plan-card">
+                <div class="plan-name">Starter</div>
+                <div class="plan-tagline">Perfect for solo contractors getting organized</div>
+                <div class="price">$29<span>/mo</span></div>
+                <ul class="feature-list mt-3">
+                    <li><i class="fas fa-check-circle"></i> Unlimited quotes &amp; invoices</li>
+                    <li><i class="fas fa-check-circle"></i> Professional themes &amp; custom branding</li>
+                    <li><i class="fas fa-check-circle"></i> Client database</li>
+                    <li><i class="fas fa-check-circle"></i> Cross-device sync</li>
+                    <li><i class="fas fa-check-circle"></i> Shareable quote links</li>
+                    <li><i class="fas fa-check-circle"></i> Interactive quote viewer for clients</li>
+                    <li><i class="fas fa-check-circle"></i> Quote templates</li>
+                    <li><i class="fas fa-check-circle"></i> Custom price list import</li>
+                </ul>
+                <button class="btn-starter" id="starterBtn" onclick="startCheckout('starter')">Start Free Trial</button>
+                <p class="trial-note">14 days free &middot; No credit card required</p>
+            </div>
         </div>
-        <ul class="feature-list">
-            <li><i class="fas fa-check-circle"></i> Unlimited quotes &amp; invoices</li>
-            <li><i class="fas fa-check-circle"></i> AI voice-to-quote (speak, AI builds it)</li>
-            <li><i class="fas fa-check-circle"></i> AI smart import — any file format</li>
-            <li><i class="fas fa-check-circle"></i> Cross-device sync (phone + desktop)</li>
-            <li><i class="fas fa-check-circle"></i> Client management</li>
-            <li><i class="fas fa-check-circle"></i> Shareable quote links for clients</li>
-            <li><i class="fas fa-check-circle"></i> Professional invoice generation</li>
-            <li><i class="fas fa-check-circle"></i> AI assistant built-in</li>
-            <li><i class="fas fa-check-circle"></i> Custom price list &amp; materials</li>
-        </ul>
-        <button class="btn-subscribe" id="checkoutBtn" onclick="startCheckout()">
-            🚀 Start Free 14-Day Trial
-        </button>
-        <p class="trial-note">No credit card required to start. Cancel anytime.</p>
+        <!-- PRO -->
+        <div class="col-md-5">
+            <div class="plan-card featured">
+                <div class="badge-popular">⚡ MOST POPULAR</div>
+                <div class="plan-name" style="color:#e87e2a;">Pro</div>
+                <div class="plan-tagline">Everything in Starter, plus AI superpowers</div>
+                <div class="price" style="color:#e87e2a;">$55<span>/mo</span></div>
+                <div class="compare-tag mt-3">💡 Competitors charge $500–$1,000/mo for less</div>
+                <ul class="feature-list">
+                    <li><i class="fas fa-check-circle"></i> Everything in Starter</li>
+                    <li><i class="fas fa-robot"></i> AI voice-to-quote <span class="ai-badge">AI</span></li>
+                    <li><i class="fas fa-robot"></i> AI smart import — any file format <span class="ai-badge">AI</span></li>
+                    <li><i class="fas fa-robot"></i> AI assistant built-in <span class="ai-badge">AI</span></li>
+                    <li><i class="fas fa-check-circle"></i> Interactive quote upsells</li>
+                    <li><i class="fas fa-check-circle"></i> Profit margin tracking</li>
+                    <li><i class="fas fa-check-circle"></i> Automated payment reminders <span style="font-size:0.75rem;color:#aaa;">(coming soon)</span></li>
+                    <li><i class="fas fa-check-circle"></i> Priority support</li>
+                </ul>
+                <button class="btn-pro" id="proBtn" onclick="startCheckout('pro')">🚀 Get Started with Pro</button>
+                <p class="trial-note">14 days free &middot; No credit card required</p>
+            </div>
+        </div>
     </div>
 </div>
 
-<div class="testimonials">
+<div style="background:white; padding:50px 20px;">
     <div class="container">
-        <h4 style="color:#0f3460; font-weight:700; margin-bottom:30px;">Built by a contractor, for contractors</h4>
-        <div class="row justify-content-center g-3">
+        <div class="section-title">What contractors are saying</div>
+        <div class="row g-3 justify-content-center">
             <div class="col-md-4">
                 <div class="testimonial-card">
                     <div class="stars">★★★★★</div>
-                    <p style="color:#333; font-size:0.9rem;">"I used to spend an hour writing quotes. Now I describe the job out loud and it's done in 2 minutes."</p>
-                    <div style="font-size:0.82rem; color:#888; margin-top:8px;">— Mike T., General Contractor</div>
+                    <p style="color:#333; font-size:0.9rem;">"I describe the job out loud and the quote is done in 2 minutes. Used to take me an hour."</p>
+                    <div style="font-size:0.8rem; color:#888; margin-top:8px;">— Mike T., General Contractor</div>
                 </div>
             </div>
             <div class="col-md-4">
                 <div class="testimonial-card">
                     <div class="stars">★★★★★</div>
-                    <p style="color:#333; font-size:0.9rem;">"Finally a quoting app that works on my phone at the job site. My clients love the professional quotes."</p>
-                    <div style="font-size:0.82rem; color:#888; margin-top:8px;">— Sarah K., Renovation Contractor</div>
+                    <p style="color:#333; font-size:0.9rem;">"Works on my phone at the job site. My clients love getting an interactive quote link instead of a PDF."</p>
+                    <div style="font-size:0.8rem; color:#888; margin-top:8px;">— Sarah K., Renovation Contractor</div>
                 </div>
             </div>
             <div class="col-md-4">
                 <div class="testimonial-card">
                     <div class="stars">★★★★★</div>
-                    <p style="color:#333; font-size:0.9rem;">"Way better than what I was paying $80/month for. The AI voice feature alone is worth it."</p>
-                    <div style="font-size:0.82rem; color:#888; margin-top:8px;">— Dave R., Flooring Specialist</div>
+                    <p style="color:#333; font-size:0.9rem;">"Was paying $800/month for worse software. Switched to QuoteDr Pro and never looked back."</p>
+                    <div style="font-size:0.8rem; color:#888; margin-top:8px;">— Dave R., Flooring Specialist</div>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<div class="faq">
-    <h2>Frequently Asked Questions</h2>
+<div class="container" style="max-width:680px; padding:50px 20px;">
+    <div class="section-title">Frequently Asked Questions</div>
     <div class="faq-item">
-        <h6>Do I need a credit card to start the trial?</h6>
-        <p>No. Start your 14-day free trial with just your email. You'll only be charged if you decide to continue after the trial.</p>
+        <h6>Do I need a credit card to start?</h6>
+        <p>No. Start your 14-day free trial with just your email. Only pay if you love it.</p>
     </div>
     <div class="faq-item">
-        <h6>Can I cancel anytime?</h6>
-        <p>Yes, cancel anytime with one click. No contracts, no cancellation fees. Your quotes and data are always yours.</p>
+        <h6>Can I switch plans or cancel anytime?</h6>
+        <p>Yes — upgrade, downgrade, or cancel with one click. No contracts, no cancellation fees.</p>
     </div>
     <div class="faq-item">
         <h6>Does it work on my phone?</h6>
-        <p>Yes — QuoteDr is built mobile-first. Use it on your phone at the job site, tablet in the truck, or desktop in the office. All synced.</p>
+        <p>Built mobile-first. Use it on your phone at the job site, tablet in the truck, desktop in the office. All synced instantly.</p>
+    </div>
+    <div class="faq-item">
+        <h6>What's the difference between Starter and Pro?</h6>
+        <p>Starter is a powerful quoting tool. Pro adds AI — voice-to-quote, smart import, AI assistant, upsells, and margin tracking. If you want to quote faster and smarter, Pro pays for itself.</p>
     </div>
     <div class="faq-item">
         <h6>Can I import my existing price list?</h6>
-        <p>Yes. Our AI smart import reads any file format — spreadsheets, text files, old software exports. Just upload it and the AI figures it out.</p>
-    </div>
-    <div class="faq-item">
-        <h6>What's included in the $29/month?</h6>
-        <p>Everything. Unlimited quotes, unlimited invoices, all AI features, cross-device sync, client management. No hidden fees or feature tiers.</p>
+        <p>Yes. Pro's AI smart import reads any format — spreadsheets, text files, old software exports. Just upload it.</p>
     </div>
 </div>
 
@@ -152,8 +166,8 @@
 </footer>
 
 <script>
-async function startCheckout() {
-    var btn = document.getElementById('checkoutBtn');
+async function startCheckout(plan) {
+    var btn = document.getElementById(plan === 'pro' ? 'proBtn' : 'starterBtn');
     btn.disabled = true;
     btn.textContent = 'Loading...';
     try {
@@ -161,31 +175,18 @@ async function startCheckout() {
         var auth = JSON.parse(localStorage.getItem(authKey) || '{}');
         var email = auth.user && auth.user.email ? auth.user.email : '';
         var userId = auth.user && auth.user.id ? auth.user.id : '';
-
-        if (!email) {
-            window.location.href = 'login.html?redirect=pricing.html';
-            return;
-        }
-
+        if (!email) { window.location.href = 'login.html?redirect=pricing.html'; return; }
         var res = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/stripe-checkout', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso'
-            },
-            body: JSON.stringify({
-                email: email,
-                userId: userId,
-                successUrl: window.location.origin + '/quote-builder.html?subscribed=1',
-                cancelUrl: window.location.href
-            })
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso' },
+            body: JSON.stringify({ email: email, userId: userId, plan: plan, successUrl: window.location.origin + '/quote-builder.html?subscribed=1', cancelUrl: window.location.href })
         });
         var data = await res.json();
         if (data.error) throw new Error(data.error);
         window.location.href = data.url;
     } catch(e) {
         btn.disabled = false;
-        btn.innerHTML = '🚀 Start Free 14-Day Trial';
+        btn.textContent = plan === 'pro' ? '🚀 Get Started with Pro' : 'Start Free Trial';
         alert('Error: ' + e.message);
     }
 }
