@@ -11,10 +11,11 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { email, userId, successUrl, cancelUrl, plan } = await req.json();
+    const body = await req.json();
+    const { email, userId, successUrl, cancelUrl } = body;
+    const plan = body.plan || 'pro';
     const stripeKey = Deno.env.get('STRIPE_SECRET_KEY');
-    const plan = req_body.plan || 'pro';
-    const priceId = plan === 'starter' 
+    const priceId = plan === 'starter'
         ? Deno.env.get('STRIPE_PRICE_ID_STARTER')
         : Deno.env.get('STRIPE_PRICE_ID_PRO');
 
