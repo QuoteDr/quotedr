@@ -186,6 +186,9 @@ function init() {
         <input id="qdAiInput" type="text" placeholder="Ask anything..." onkeypress="if(event.key==='Enter') window._qdAiSend()">
         <button id="qdAiSend" onclick="window._qdAiSend()">&#10148;</button>
       </div>
+      <div style="text-align:center; padding: 6px 0 2px; font-size: 0.75rem;">
+        <a href="help.html" style="color:#1a56a0; text-decoration:none;">📄 Need more help? View FAQ</a>
+      </div>
     </div>
   `;
   var div = document.createElement('div');
