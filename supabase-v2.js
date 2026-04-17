@@ -524,7 +524,7 @@ async function saveBusinessProfile(profile) {
     if (!user) return { error: 'Not authenticated' };
     const { data, error } = await _supabase
         .from('user_data')
-        .upsert({ id: user.id, business_profile: profile }, { onConflict: 'id' });
+        .upsert({ user_id: user.id, business_profile: profile }, { onConflict: 'user_id' });
     if (!error) localStorage.setItem('ald_business_profile', JSON.stringify(profile));
     return { data, error };
 }
@@ -536,7 +536,7 @@ async function loadBusinessProfile() {
     const { data, error } = await _supabase
         .from('user_data')
         .select('business_profile')
-        .eq('id', user.id)
+        .eq('user_id', user.id)
         .single();
     if (!error && data && data.business_profile) {
         localStorage.setItem('ald_business_profile', JSON.stringify(data.business_profile));
@@ -551,7 +551,7 @@ async function saveLogoToSupabase(base64) {
     if (!user) return { error: 'Not authenticated' };
     const { data, error } = await _supabase
         .from('user_data')
-        .upsert({ id: user.id, company_logo: base64 }, { onConflict: 'id' });
+        .upsert({ user_id: user.id, company_logo: base64 }, { onConflict: 'user_id' });
     return { data, error };
 }
 
@@ -562,7 +562,7 @@ async function loadLogoFromSupabase() {
     const { data, error } = await _supabase
         .from('user_data')
         .select('company_logo')
-        .eq('id', user.id)
+        .eq('user_id', user.id)
         .single();
     if (!error && data && data.company_logo) {
         localStorage.setItem('ald_company_logo', data.company_logo);
