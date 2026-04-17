@@ -1,4 +1,5 @@
-// QuoteDr AI Assistant Widget (function() {
+// QuoteDr AI Assistant Widget
+(function() {
 var SUPABASE_URL = 'https://axmoffknvblluibuitrq.supabase.co';
 var ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso';
 var FUNCTION_URL = SUPABASE_URL + '/functions/v1/ai-assistant';
