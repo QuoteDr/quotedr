@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Help & FAQ — QuoteDr</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --navy: #0f3460;
+            --blue: #1a56a0;
+            --orange: #e87e2a;
+        }
+        body {
+            background-color: #f8f9fa;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        .navbar {
+            background-color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .navbar-brand img {
+            height: 34px;
+        }
+        .hero {
+            background: linear-gradient(135deg, var(--navy) 0%, var(--blue) 100%);
+            color: white;
+            padding: 60px 0;
+            text-align: center;
+        }
+        .hero h1 {
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+        .hero p {
+            opacity: 0.9;
+        }
+        .container {
+            max-width: 900px;
+        }
+        .faq-section {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-top: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .faq-section h3 {
+            color: var(--navy);
+            border-bottom: 2px solid var(--blue);
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+        }
+        .accordion-item {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px !important;
+            margin-bottom: 15px;
+        }
+        .accordion-button {
+            background-color: #f8f9fa;
+            color: var(--navy);
+            font-weight: 600;
+        }
+        .accordion-button:not(.collapsed) {
+            background-color: #e8f0fe;
+            color: var(--blue);
+        }
+        .accordion-button:focus {
+            box-shadow: 0 0 0 0.25rem rgba(26, 86, 160, 0.25);
+        }
+        .accordion-body {
+            color: #555;
+            line-height: 1.7;
+        }
+        .footer {
+            background-color: var(--navy);
+            color: white;
+            padding: 30px 0;
+            margin-top: 50px;
+        }
+        .footer a {
+            color: white;
+            text-decoration: none;
+            opacity: 0.8;
+        }
+        .footer a:hover {
+            opacity: 1;
+        }
+        .support-box {
+            background: linear-gradient(135deg, var(--blue) 0%, var(--navy) 100%);
+            color: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-top: 30px;
+            text-align: center;
+        }
+        .support-box h3 {
+            margin-bottom: 15px;
+        }
+        .support-box p {
+            opacity: 0.9;
+            margin-bottom: 20px;
+        }
+        .btn-support {
+            background-color: var(--orange);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+        .btn-support:hover {
+            transform: scale(1.05);
+            background-color: #d67020;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+<nav class="navbar navbar-light bg-white shadow-sm px-3 px-md-5">
+    <a class="navbar-brand d-flex align-items-center gap-2" href="landing.html">
+        <img src="quotedr-logo.svg" alt="QuoteDr" style="height:34px;">
+    </a>
+    <div class="d-flex gap-2">
+        <a href="login.html" class="btn btn-outline-primary btn-sm">Sign In</a>
+    </div>
+</nav>
+
+<div class="hero">
+    <div class="container">
+        <h1>Help & FAQ</h1>
+        <p>Everything you need to know about using QuoteDr</p>
+    </div>
+</div>
+
+<div class="container">
+    <div class="faq-section">
+        <h3>Getting Started</h3>
+        <div class="accordion" id="faqGettingStarted">
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading1">
+                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapse1">
+                        How do I create my first quote?
+                    </button>
+                </h2>
+                <div id="collapse1" class="accordion-collapse collapse show" data-bs-parent="#faqGettingStarted">
+                    <div class="accordion-body">
+                        Log in, click "New Quote" from the dashboard, fill in your client's name and project details, then add rooms and line items. You can type items manually or use the AI voice feature to speak your quote out loud.
+                    </div>
+                </div>
+            </div>
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading2">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse2">
+                        How do I add my business info (logo, name, HST number)?
+                    </button>
+                </h2>
+                <div id="collapse2" class="accordion-collapse collapse" data-bs-parent="#faqGettingStarted">
+                    <div class="accordion-body">
+                        Go to Settings → Business Profile. Fill in your name, address, HST number, and tagline. This info appears automatically on every quote you send.
+                    </div>
+                </div>
+            </div>
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading3">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse3">
+                        What devices does QuoteDr work on?
+                    </button>
+                </h2>
+                <div id="collapse3" class="accordion-collapse collapse" data-bs-parent="#faqGettingStarted">
+                    <div class="accordion-body">
+                        QuoteDr works on any device with a browser — iPhone, Android, iPad, laptop, or desktop. The voice quote feature works best on iPhone/Safari.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="faq-section">
+        <h3>Building Quotes</h3>
+        <div class="accordion" id="faqBuildingQuotes">
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading4">
+                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapse4">
+                        How do I add rooms and line items?
+                    </button>
+                </h2>
+                <div id="collapse4" class="accordion-collapse collapse" data-bs-parent="#faqBuildingQuotes">
+                    <div class="accordion-body">
+                        Inside a quote, click "Add Room" to create a new section (e.g. Bathroom, Kitchen). Then click "Add Item" inside the room to add labour and material line items.
+                    </div>
+                </div>
+            </div>
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading5">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse5">
+                        Can I save my own materials and pricing?
+                    </button>
+                </h2>
+                <div id="collapse5" class="accordion-collapse collapse" data-bs-parent="#faqBuildingQuotes">
+                    <div class="accordion-body">
+                        Yes! Go to Settings → My Materials. Add your custom items with your own rates. When you use AI voice quotes, it will automatically pull from your price list.
+                    </div>
+                </div>
+            </div>
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading6">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse6">
+                        How do I send a quote to a client?
+                    </button>
+                </h2>
+                <div id="collapse6" class="accordion-collapse collapse" data-bs-parent="#faqBuildingQuotes">
+                    <div class="accordion-body">
+                        After saving your quote, click "Share" to get a link you can text or email to your client. They can view it on any device without needing an account.
+                    </div>
+                </div>
+            </div>
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading7">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse7">
+                        Can I convert a quote to an invoice?
+                    </button>
+                </h2>
+                <div id="collapse7" class="accordion-collapse collapse" data-bs-parent="#faqBuildingQuotes">
+                    <div class="accordion-body">
+                        Yes — change the quote status to "Invoiced" from the dashboard dropdown. Invoice view is available from the quote actions menu.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="faq-section">
+        <h3>AI Features (Pro)</h3>
+        <div class="accordion" id="faqAI">
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading8">
+                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapse8">
+                        How does the AI voice quote work?
+                    </button>
+                </h2>
+                <div id="collapse8" class="accordion-collapse collapse" data-bs-parent="#faqAI">
+                    <div class="accordion-body">
+                        Tap the microphone button, describe the job out loud (e.g. "bathroom renovation, new tile floor, new vanity, paint walls"), then tap Generate. The AI builds a structured quote from your description in seconds.
+                    </div>
+                </div>
+            </div>
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading9">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse9">
+                        What is AI Smart Import?
+                    </button>
+                </h2>
+                <div id="collapse9" class="accordion-collapse collapse" data-bs-parent="#faqAI">
+                    <div class="accordion-body">
+                        In Settings, you can upload a text file of your materials or client list and the AI will automatically read and import it — no manual entry needed.
+                    </div>
+                </div>
+            </div>
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading10">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse10">
+                        Does the AI use my own pricing?
+                    </button>
+                </h2>
+                <div id="collapse10" class="accordion-collapse collapse" data-bs-parent="#faqAI">
+                    <div class="accordion-body">
+                        Yes. If you've set up your custom materials in Settings, the AI voice quote will match your prices automatically.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="faq-section">
+        <h3>Clients & Data</h3>
+        <div class="accordion" id="faqClients">
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading11">
+                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapse11">
+                        How do I add clients?
+                    </button>
+                </h2>
+                <div id="collapse11" class="accordion-collapse collapse" data-bs-parent="#faqClients">
+                    <div class="accordion-body">
+                        Go to Settings → Import Clients, or add clients directly when creating a quote. Client info is saved and synced across all your devices.
+                    </div>
+                </div>
+            </div>
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading12">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse12">
+                        Is my data backed up?
+                    </button>
+                </h2>
+                <div id="collapse12" class="accordion-collapse collapse" data-bs-parent="#faqClients">
+                    <div class="accordion-body">
+                        Yes. All quotes, clients, and materials are saved to the cloud and available on any device you log into.
+                    </div>
+                </div>
+            </div>
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading13">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse13">
+                        Can I export my data?
+                    </button>
+                </h2>
+                <div id="collapse13" class="accordion-collapse collapse" data-bs-parent="#faqClients">
+                    <div class="accordion-body">
+                        Yes — go to Settings and use the Export buttons to download your clients and materials as text files.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="faq-section">
+        <h3>Account & Billing</h3>
+        <div class="accordion" id="faqBilling">
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading14">
+                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapse14">
+                        What's the difference between Starter and Pro?
+                    </button>
+                </h2>
+                <div id="collapse14" class="accordion-collapse collapse" data-bs-parent="#faqBilling">
+                    <div class="accordion-body">
+                        Starter ($29/mo) includes unlimited quotes, client management, and cross-device sync. Pro ($55/mo) adds AI voice quotes, AI smart import, the AI assistant chat, and team features (coming soon).
+                    </div>
+                </div>
+            </div>
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading15">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse15">
+                        Is there a free trial?
+                    </button>
+                </h2>
+                <div id="collapse15" class="accordion-collapse collapse" data-bs-parent="#faqBilling">
+                    <div class="accordion-body">
+                        Yes! Both plans come with a 14-day free trial. No charge until the trial ends, cancel anytime.
+                    </div>
+                </div>
+            </div>
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading16">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse16">
+                        How do I cancel my subscription?
+                    </button>
+                </h2>
+                <div id="collapse16" class="accordion-collapse collapse" data-bs-parent="#faqBilling">
+                    <div class="accordion-body">
+                        Email support@quotedr.io and we'll cancel your subscription within 24 hours. No hassle, no questions.
+                    </div>
+                </div>
+            </div>
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading17">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse17">
+                        I found a bug or need help — how do I contact support?
+                    </button>
+                </h2>
+                <div id="collapse17" class="accordion-collapse collapse" data-bs-parent="#faqBilling">
+                    <div class="accordion-body">
+                        Email support@quotedr.io or use the AI Assistant chat button (bottom right of any page). We typically respond within 1 business day.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="support-box">
+        <h3><i class="fas fa-headset me-2"></i>Still need help?</h3>
+        <p>Our support team is here to help you get the most out of QuoteDr.</p>
+        <a href="mailto:support@quotedr.io" class="btn btn-support">
+            <i class="fas fa-envelope me-2"></i>Contact Support
+        </a>
+    </div>
+</div>
+
+<div class="footer">
+    <div class="container text-center">
+        <p class="mb-0">&copy; 2026 QuoteDr.io — All rights reserved.</p>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
