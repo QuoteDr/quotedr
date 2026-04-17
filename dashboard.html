@@ -314,6 +314,23 @@
         document.addEventListener('DOMContentLoaded', async () => {
             const userName = localStorage.getItem('ald_user_name') || 'User';
             document.getElementById('userName').textContent = userName;
+
+            // Load quotes — retry up to 3 times to handle auth session warmup
+            var attempts = 0;
+            async function loadWithRetry() {
+                attempts++;
+                var result = await listQuotesFromSupabase();
+                if (result.error === 'Not authenticated' && attempts < 3) {
+                    setTimeout(loadWithRetry, 800 * attempts);
+                } else if (!result.error) {
+                    allQuotes = result.data || [];
+                    renderQuotes(allQuotes);
+                    updateStats(allQuotes);
+                } else {
+                    document.getElementById('quotesList').innerHTML = '<div class="alert alert-warning">Please <a href="login.html">log in</a> to see your quotes.</div>';
+                }
+            }
+            loadWithRetry();
         });
     </script>
     <script src="ai-assistant.js"></script>
