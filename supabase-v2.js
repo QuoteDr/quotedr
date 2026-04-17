@@ -518,6 +518,59 @@ async function loadClientsFromSupabase() {
     return { data, error };
 }
 
+// Save business profile to Supabase user_data table
+async function saveBusinessProfile(profile) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    const { data, error } = await _supabase
+        .from('user_data')
+        .upsert({ id: user.id, business_profile: profile }, { onConflict: 'id' });
+    if (!error) localStorage.setItem('ald_business_profile', JSON.stringify(profile));
+    return { data, error };
+}
+
+// Load business profile from Supabase (falls back to localStorage)
+async function loadBusinessProfile() {
+    const user = await getCurrentUser();
+    if (!user) return JSON.parse(localStorage.getItem('ald_business_profile') || '{}');
+    const { data, error } = await _supabase
+        .from('user_data')
+        .select('business_profile')
+        .eq('id', user.id)
+        .single();
+    if (!error && data && data.business_profile) {
+        localStorage.setItem('ald_business_profile', JSON.stringify(data.business_profile));
+        return data.business_profile;
+    }
+    return JSON.parse(localStorage.getItem('ald_business_profile') || '{}');
+}
+
+// Save company logo to Supabase user_data table (as base64)
+async function saveLogoToSupabase(base64) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    const { data, error } = await _supabase
+        .from('user_data')
+        .upsert({ id: user.id, company_logo: base64 }, { onConflict: 'id' });
+    return { data, error };
+}
+
+// Load company logo from Supabase (falls back to localStorage)
+async function loadLogoFromSupabase() {
+    const user = await getCurrentUser();
+    if (!user) return localStorage.getItem('ald_company_logo');
+    const { data, error } = await _supabase
+        .from('user_data')
+        .select('company_logo')
+        .eq('id', user.id)
+        .single();
+    if (!error && data && data.company_logo) {
+        localStorage.setItem('ald_company_logo', data.company_logo);
+        return data.company_logo;
+    }
+    return localStorage.getItem('ald_company_logo');
+}
+
 // Supabase RLS policies needed:
 /*
 -- Allow anyone to read quotes (for sharing)

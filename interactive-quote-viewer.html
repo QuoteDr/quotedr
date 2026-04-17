@@ -380,14 +380,25 @@ if (location.search.includes('debug')) {
         
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', async function() {
-            // Load user's uploaded logo
-            var savedLogo = localStorage.getItem('ald_logo');
+            // Load user's uploaded logo (check both key names, then try Supabase)
+            var savedLogo = localStorage.getItem('ald_company_logo') || localStorage.getItem('ald_logo');
             if (savedLogo) {
                 var logoEl = document.getElementById('businessLogoImg');
                 if (logoEl) logoEl.src = savedLogo;
             }
-            // Load company name + tagline
+            if (typeof loadLogoFromSupabase === 'function') {
+                loadLogoFromSupabase().then(function(logo) {
+                    if (logo) {
+                        var logoEl = document.getElementById('businessLogoImg');
+                        if (logoEl) logoEl.src = logo;
+                    }
+                });
+            }
+            // Load company name + tagline (try Supabase first)
             var bizProfile = JSON.parse(localStorage.getItem('ald_business_profile') || '{}');
+            if (typeof loadBusinessProfile === 'function') {
+                loadBusinessProfile().then(function(p) { if (p && p.business_name) bizProfile = p; });
+            }
             var nameEl = document.getElementById('companyNameDisplay');
             var tagEl = document.getElementById('companyTaglineDisplay');
             if (nameEl && bizProfile.business_name) nameEl.textContent = bizProfile.business_name;

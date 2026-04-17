@@ -316,10 +316,14 @@ if (location.search.includes('debug')) {
 			if (!file) return;
 			if (file.size > 1024 * 1024) { alert('Logo must be under 1MB.'); return; }
 			var reader = new FileReader();
-			reader.onload = function(e) {
+			reader.onload = async function(e) {
 				var dataUrl = e.target.result;
 				localStorage.setItem('ald_company_logo', dataUrl);
 				showLogoPreview(dataUrl);
+				if (typeof saveLogoToSupabase === 'function') {
+					var result = await saveLogoToSupabase(dataUrl);
+					if (result.error) console.warn('Logo cloud save failed:', result.error);
+				}
 			};
 			reader.readAsDataURL(file);
 		}
@@ -344,9 +348,14 @@ if (location.search.includes('debug')) {
 		}
 
 		document.addEventListener('DOMContentLoaded', function() {
-			// Load saved logo
+			// Load saved logo (from Supabase or localStorage)
 			var savedLogo = localStorage.getItem('ald_company_logo');
 			if (savedLogo) showLogoPreview(savedLogo);
+			if (typeof loadLogoFromSupabase === 'function') {
+				loadLogoFromSupabase().then(function(logo) {
+					if (logo) showLogoPreview(logo);
+				});
+			}
 
 			// Load saved values
 			const savedProfile = JSON.parse(localStorage.getItem('ald_business_profile') || '{}');
