@@ -519,15 +519,30 @@ async function loadClientsFromSupabase() {
 }
 
 // Save business profile to Supabase user_data table
-// Save business profile using key/value pattern (matches existing user_data schema)
+// Uses check-then-update/insert to avoid relying on upsert + unique constraint
 async function saveBusinessProfile(profile) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
-    const { data, error } = await _supabase
+    const { data: existing } = await _supabase
         .from('user_data')
-        .upsert({ user_id: user.id, key: 'business_profile', value: profile, updated_at: new Date().toISOString() }, { onConflict: 'user_id,key' });
-    if (!error) localStorage.setItem('ald_business_profile', JSON.stringify(profile));
-    return { data, error };
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('key', 'business_profile')
+        .maybeSingle();
+    let result;
+    if (existing) {
+        result = await _supabase
+            .from('user_data')
+            .update({ value: profile, updated_at: new Date().toISOString() })
+            .eq('user_id', user.id)
+            .eq('key', 'business_profile');
+    } else {
+        result = await _supabase
+            .from('user_data')
+            .insert({ user_id: user.id, key: 'business_profile', value: profile, updated_at: new Date().toISOString() });
+    }
+    if (!result.error) localStorage.setItem('ald_business_profile', JSON.stringify(profile));
+    return result;
 }
 
 async function loadBusinessProfile() {
@@ -549,11 +564,26 @@ async function loadBusinessProfile() {
 async function saveLogoToSupabase(base64) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
-    const { data, error } = await _supabase
+    const { data: existing } = await _supabase
         .from('user_data')
-        .upsert({ user_id: user.id, key: 'company_logo', value: { logo: base64 }, updated_at: new Date().toISOString() }, { onConflict: 'user_id,key' });
-    if (!error) localStorage.setItem('ald_company_logo', base64);
-    return { data, error };
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('key', 'company_logo')
+        .maybeSingle();
+    let result;
+    if (existing) {
+        result = await _supabase
+            .from('user_data')
+            .update({ value: { logo: base64 }, updated_at: new Date().toISOString() })
+            .eq('user_id', user.id)
+            .eq('key', 'company_logo');
+    } else {
+        result = await _supabase
+            .from('user_data')
+            .insert({ user_id: user.id, key: 'company_logo', value: { logo: base64 }, updated_at: new Date().toISOString() });
+    }
+    if (!result.error) localStorage.setItem('ald_company_logo', base64);
+    return result;
 }
 
 async function loadLogoFromSupabase() {

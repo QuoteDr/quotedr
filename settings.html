@@ -347,6 +347,20 @@ if (location.search.includes('debug')) {
 			removeBtn.style.cssText = 'display:block!important';
 		}
 
+		function applyProfileToForm(p) {
+			if (!p || typeof p !== 'object') return;
+			if (p.business_name !== undefined) document.getElementById('businessName').value = p.business_name;
+			if (p.owner_name !== undefined) document.getElementById('ownerName').value = p.owner_name;
+			if (p.address !== undefined) document.getElementById('bizAddress').value = p.address;
+			if (p.city !== undefined) document.getElementById('bizCity').value = p.city;
+			if (p.province !== undefined) document.getElementById('bizProvince').value = p.province;
+			if (p.postal_code !== undefined) document.getElementById('bizPostal').value = p.postal_code;
+			if (p.phone !== undefined) document.getElementById('bizPhone').value = p.phone;
+			if (p.email !== undefined) document.getElementById('bizEmail').value = p.email;
+			if (p.hst_number !== undefined) document.getElementById('bizHst').value = p.hst_number;
+			if (p.tagline !== undefined) document.getElementById('bizTagline').value = p.tagline;
+		}
+
 		document.addEventListener('DOMContentLoaded', function() {
 			// Load saved logo (from Supabase or localStorage)
 			var savedLogo = localStorage.getItem('ald_company_logo');
@@ -357,18 +371,14 @@ if (location.search.includes('debug')) {
 				});
 			}
 
-			// Load saved values
-			const savedProfile = JSON.parse(localStorage.getItem('ald_business_profile') || '{}');
-			if (savedProfile.business_name) document.getElementById('businessName').value = savedProfile.business_name;
-			if (savedProfile.owner_name) document.getElementById('ownerName').value = savedProfile.owner_name;
-			if (savedProfile.address) document.getElementById('bizAddress').value = savedProfile.address;
-			if (savedProfile.city) document.getElementById('bizCity').value = savedProfile.city;
-			if (savedProfile.province) document.getElementById('bizProvince').value = savedProfile.province;
-			if (savedProfile.postal_code) document.getElementById('bizPostal').value = savedProfile.postal_code;
-			if (savedProfile.phone) document.getElementById('bizPhone').value = savedProfile.phone;
-			if (savedProfile.email) document.getElementById('bizEmail').value = savedProfile.email;
-			if (savedProfile.hst_number) document.getElementById('bizHst').value = savedProfile.hst_number;
-			if (savedProfile.tagline) document.getElementById('bizTagline').value = savedProfile.tagline;
+			// Load saved profile — localStorage first, then Supabase overrides with cloud data
+			var savedProfile = JSON.parse(localStorage.getItem('ald_business_profile') || '{}');
+			applyProfileToForm(savedProfile);
+			if (typeof loadBusinessProfile === 'function') {
+				loadBusinessProfile().then(function(profile) {
+					if (profile && Object.keys(profile).length > 0) applyProfileToForm(profile);
+				});
+			}
 
 			// Load terms
 			const savedTerms = JSON.parse(localStorage.getItem('ald_custom_terms') || '[]');
