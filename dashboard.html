@@ -61,23 +61,22 @@
     </style>
 </head>
 <body>
-    <div class="container py-4">
-        <!-- Header -->
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <div>
-                <h2 class="fw-bold mb-1">QuoteDr.io</h2>
-                <p class="text-muted mb-0">Welcome back! Here's your quoting overview.</p>
-            </div>
-            <div class="text-end">
-                <div class="fw-bold" id="userName">Loading...</div>
-                <a href="settings.html" class="text-decoration-none text-muted small">
-                    <i class="fas fa-cog"></i> Settings
-                </a>
-                <a href="help.html" class="text-decoration-none text-muted small ms-3" title="Help">
-                    <i class="fas fa-question-circle"></i> Help
-                </a>
-            </div>
+    <nav class="navbar navbar-light px-4 py-2" style="background: #f0f4fa; border-bottom: 2px solid #d0dff0; position: relative; min-height: 64px;">
+        <div class="d-flex align-items-center gap-3">
+            <a href="quote-builder.html" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+            <a href="help.html" class="text-muted small ms-2" title="Help"><i class="fas fa-question-circle"></i> Help</a>
         </div>
+        <div style="position: absolute; left: 50%; transform: translateX(-50%); font-weight: 700; font-size: 1.1rem; color: #0f3460;">QuoteDr.io</div>
+        <div class="d-flex align-items-center gap-2">
+            <span class="fw-bold small" id="userName"></span>
+            <a href="settings.html" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-cog"></i> Settings
+            </a>
+        </div>
+    </nav>
+    <div class="container py-4">
 
         <!-- Stats Cards -->
         <div class="row mb-4">
