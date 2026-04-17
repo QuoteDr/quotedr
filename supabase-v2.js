@@ -537,7 +537,7 @@ async function loadBusinessProfile() {
         .from('user_data')
         .select('business_profile')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
     if (!error && data && data.business_profile) {
         localStorage.setItem('ald_business_profile', JSON.stringify(data.business_profile));
         return data.business_profile;
@@ -563,7 +563,7 @@ async function loadLogoFromSupabase() {
         .from('user_data')
         .select('company_logo')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
     if (!error && data && data.company_logo) {
         localStorage.setItem('ald_company_logo', data.company_logo);
         return data.company_logo;
