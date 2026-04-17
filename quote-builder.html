@@ -3937,16 +3937,20 @@ async function saveQuote() {
         document.addEventListener('hidden.bs.modal', function() {
             cleanupModalBackdrop();
         });
-        // Hide/show sticky toolbar when modals open/close
+        // Hide/show sticky toolbar AND total bar when modals open/close
         document.addEventListener('show.bs.modal', function() {
             var tb = document.getElementById('stickyToolbar');
             if (tb) tb.style.setProperty('display', 'none', 'important');
+            var bar = document.getElementById('stickyTotalBar');
+            if (bar) bar.style.setProperty('display', 'none', 'important');
         });
         document.addEventListener('hidden.bs.modal', function() {
-            // Only show toolbar if no other modals are open
+            // Only show if no other modals are open
             if (!document.querySelector('.modal.show')) {
                 var tb = document.getElementById('stickyToolbar');
                 if (tb) tb.style.removeProperty('display');
+                var bar = document.getElementById('stickyTotalBar');
+                if (bar && stickyTotalVisible) bar.style.removeProperty('display');
             }
         });
 
