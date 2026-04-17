@@ -305,14 +305,34 @@ if (location.search.includes('debug')) {
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            // Load user's uploaded logo
-            var savedLogo = localStorage.getItem('ald_logo');
+            // Load user's uploaded logo (localStorage first, then Supabase)
+            var savedLogo = localStorage.getItem('ald_company_logo') || localStorage.getItem('ald_logo');
             if (savedLogo) {
                 var logoEl = document.getElementById('businessLogoImg');
                 if (logoEl) logoEl.src = savedLogo;
             }
-            // Load company name + tagline
+            if (typeof loadLogoFromSupabase === 'function') {
+                loadLogoFromSupabase().then(function(logo) {
+                    if (logo) {
+                        var logoEl = document.getElementById('businessLogoImg');
+                        if (logoEl) logoEl.src = logo;
+                    }
+                });
+            }
+            // Load company name + tagline (localStorage first, then Supabase)
             var bizProfile = JSON.parse(localStorage.getItem('ald_business_profile') || '{}');
+            if (typeof loadBusinessProfile === 'function') {
+                loadBusinessProfile().then(function(p) {
+                    if (p && p.business_name) {
+                        var nameEl = document.getElementById('companyNameDisplay');
+                        if (nameEl) nameEl.textContent = p.business_name;
+                    }
+                    if (p && p.tagline) {
+                        var tagEl = document.getElementById('companyTaglineDisplay');
+                        if (tagEl) tagEl.textContent = p.tagline;
+                    }
+                });
+            }
             var nameEl = document.getElementById('companyNameDisplay');
             var tagEl = document.getElementById('companyTaglineDisplay');
             if (nameEl && bizProfile.business_name) nameEl.textContent = bizProfile.business_name;

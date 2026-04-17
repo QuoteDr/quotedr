@@ -2627,11 +2627,45 @@ async function saveQuote() {
                 // Don't return on no user — let page load regardless (auth handled at login)
             }
 
+            // Subscription status check — show banner if trial ended
+            var sub = JSON.parse(localStorage.getItem('ald_subscription') || '{}');
+            if (sub.status && sub.status !== 'active' && sub.status !== 'trialing') {
+                var banner = document.createElement('div');
+                banner.style.cssText = 'background:#fff3cd;border-bottom:1px solid #ffc107;text-align:center;padding:8px;font-size:0.9rem;';
+                banner.innerHTML = '⚠️ Your trial has ended. <a href="pricing.html" style="color:#1a56a0;font-weight:600;">Upgrade to continue using QuoteDr</a>';
+                document.body.insertBefore(banner, document.body.firstChild);
+            }
+
             // Load user's uploaded logo from onboarding/settings
             var savedLogo = localStorage.getItem('ald_logo');
             if (savedLogo) {
                 var logoImg = document.getElementById('userLogoImg');
                 if (logoImg) { logoImg.src = savedLogo; logoImg.style.display = 'block'; }
+            }
+            
+            // Load logo from Supabase if available
+            if (typeof loadLogoFromSupabase === 'function') {
+                try {
+                    const logoUrl = await loadLogoFromSupabase();
+                    if (logoUrl) {
+                        var logoImg = document.getElementById('userLogoImg');
+                        if (logoImg) { logoImg.src = logoUrl; logoImg.style.display = 'block'; }
+                    }
+                } catch (e) {
+                    console.warn('Failed to load logo from Supabase:', e);
+                }
+            }
+            
+            // Load business profile from Supabase
+            if (typeof loadBusinessProfile === 'function') {
+                try {
+                    const profile = await loadBusinessProfile();
+                    if (profile) {
+                        localStorage.setItem('ald_business_profile', JSON.stringify(profile));
+                    }
+                } catch (e) {
+                    console.warn('Failed to load business profile from Supabase:', e);
+                }
             }
 
             // (delegated listeners moved to standalone script block to guarantee they attach)
