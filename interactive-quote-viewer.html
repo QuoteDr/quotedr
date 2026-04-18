@@ -780,6 +780,13 @@ if (location.search.includes('debug')) {
                 // No signature needed - just submit with notes
                 submitUpgrades();
                 document.getElementById('hiddenSubmitBtn').click();
+                // Mark as in_review in Supabase
+                const urlParams = new URLSearchParams(window.location.search);
+                const quoteId = urlParams.get('id');
+                if (quoteId) {
+                    const sb = window._supabaseClient || (typeof supabase !== 'undefined' ? supabase : null);
+                    if (sb) sb.from('quotes').update({ status: 'in_review', updated_at: new Date().toISOString() }).eq('id', quoteId).then(() => {});
+                }
             } else {
                 // Open signature/approval modal
                 openSignatureModal();

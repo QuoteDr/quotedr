@@ -26,6 +26,7 @@
         .status-draft { color: #6c757d; }
         .status-sent { color: #0d6efd; }
         .status-viewed { color: #0dcaf0; font-weight: 600; }
+        .status-in_review { color: #fd7e14; font-weight: 600; }
         .status-accepted { color: #198754; }
         .status-invoiced { color: #ffc107; }
         .status-declined { color: #dc3545; }
@@ -248,6 +249,7 @@
                                 <option value="draft" ${q.status === 'draft' ? 'selected' : ''}>Draft</option>
                                 <option value="sent" ${q.status === 'sent' ? 'selected' : ''}>Sent</option>
                                 <option value="viewed" ${q.status === 'viewed' ? 'selected' : ''}>👁 Viewed</option>
+                                <option value="in_review" ${q.status === 'in_review' ? 'selected' : ''}>🔄 In Review</option>
                                 <option value="accepted" ${q.status === 'accepted' ? 'selected' : ''}>✅ Accepted</option>
                                 <option value="invoiced" ${q.status === 'invoiced' ? 'selected' : ''}>Invoiced</option>
                                 <option value="declined" ${q.status === 'declined' ? 'selected' : ''}>Declined</option>

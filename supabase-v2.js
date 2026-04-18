@@ -456,7 +456,7 @@ async function saveQuoteForSharing(quoteData) {
             id: quoteData.supabaseId || undefined,
             user_id: user ? user.id : null,
             data: quoteData,
-            status: quoteData.status || 'sent',
+            status: 'sent',
             updated_at: new Date().toISOString()
         }, { onConflict: 'id' })
         .select()
