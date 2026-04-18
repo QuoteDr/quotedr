@@ -2794,6 +2794,9 @@ async function saveQuote() {
 
         async function confirmOverwrite() {
             if (!_saveDialogData || !_selectedOverwriteId) return;
+            var selectedEl = document.querySelector('.save-quote-item[style*="background"]');
+            var quoteName = selectedEl ? selectedEl.querySelector('.fw-bold')?.textContent : 'this quote';
+            if (!confirm('Are you sure you want to overwrite \u201c' + quoteName + '\u201d? This cannot be undone.')) return;
             _saveDialogData.supabaseId = _selectedOverwriteId;
             window._supabaseQuoteId = _selectedOverwriteId;
             var owBtn = document.getElementById('overwriteBtn');
