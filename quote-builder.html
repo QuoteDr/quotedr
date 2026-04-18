@@ -789,6 +789,7 @@ if (location.search.includes('debug')) {
         let rooms = [];
         let roomCounter = 0;
         let customItems = {};
+        let categoryStyles = {}; // { "Tile & Stone": { icon: "fa-border-all", color: "#f0f4ff" } }
 
         // Timeline feature - show/hide toggle
         let showTimelines = true;
@@ -970,6 +971,153 @@ if (location.search.includes('debug')) {
             _iconPickerRoomId = null;
         }
         // ── End Room Icon Picker ─────────────────────────────────────────
+
+        // ── Category Style Picker ──────────────────────────────────
+        var CAT_ICONS = [
+            { fa: 'fa-tag',              label: 'Tag (default)' },
+            { fa: 'fa-border-all',       label: 'Grid / Tile' },
+            { fa: 'fa-paint-roller',     label: 'Painting' },
+            { fa: 'fa-hammer',           label: 'Carpentry' },
+            { fa: 'fa-layer-group',      label: 'Flooring' },
+            { fa: 'fa-faucet',           label: 'Plumbing' },
+            { fa: 'fa-plug',             label: 'Electrical' },
+            { fa: 'fa-fire',             label: 'HVAC' },
+            { fa: 'fa-dumbbell',         label: 'Labour' },
+            { fa: 'fa-hard-hat',         label: 'Construction' },
+            { fa: 'fa-tools',            label: 'Tools' },
+            { fa: 'fa-wrench',           label: 'Repairs' },
+            { fa: 'fa-drafting-compass', label: 'Design' },
+            { fa: 'fa-ruler-combined',   label: 'Measurement' },
+            { fa: 'fa-window-maximize',  label: 'Windows' },
+            { fa: 'fa-door-open',        label: 'Doors' },
+            { fa: 'fa-couch',            label: 'Furniture' },
+            { fa: 'fa-lightbulb',        label: 'Lighting' },
+            { fa: 'fa-leaf',             label: 'Landscaping' },
+            { fa: 'fa-broom',            label: 'Cleaning' },
+            { fa: 'fa-vector-square',    label: 'Tiling' },
+            { fa: 'fa-box',              label: 'Materials' },
+            { fa: 'fa-truck',            label: 'Delivery' },
+            { fa: 'fa-star',             label: 'Featured' },
+            { fa: 'fa-home',             label: 'General' },
+            { fa: 'fa-clipboard-list',   label: 'List' },
+        ];
+
+        var CAT_COLORS = [
+            { color: '#f0f4ff', label: 'Blue (default)' },
+            { color: '#fff3e0', label: 'Orange' },
+            { color: '#e8f5e9', label: 'Green' },
+            { color: '#fce4ec', label: 'Pink' },
+            { color: '#f3e5f5', label: 'Purple' },
+            { color: '#e0f7fa', label: 'Cyan' },
+            { color: '#fffde7', label: 'Yellow' },
+            { color: '#fbe9e7', label: 'Red' },
+            { color: '#f5f5f5', label: 'Grey' },
+            { color: '#e8eaf6', label: 'Indigo' },
+            { color: '#f1f8e9', label: 'Lime' },
+            { color: '#ffffff', label: 'White' },
+        ];
+
+        var _catPickerOpen = null;
+
+        function closeCategoryPicker() {
+            var ov = document.getElementById('catPickerOverlay');
+            var sh = document.getElementById('catPickerSheet');
+            var pk = document.getElementById('catPickerPopover');
+            if (ov) ov.remove(); if (sh) sh.remove(); if (pk) pk.remove();
+            _catPickerOpen = null;
+        }
+
+        function _catPickerHTML(cat) {
+            var cur = categoryStyles[cat] || {};
+            var html = '<div class="icon-section-label" style="font-size:0.7rem;font-weight:700;text-transform:uppercase;color:#6c757d;letter-spacing:0.5px;margin:4px 0 6px;">Icon</div>';
+            html += '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;">';
+            CAT_ICONS.forEach(function(ico) {
+                var active = cur.icon === ico.fa ? 'background:#1a56a0;color:white;border-color:#1a56a0;' : '';
+                html += '<div title="' + ico.label + '" onclick="selectCatIcon(' + JSON.stringify(cat) + ',\'' + ico.fa + '\')" style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:6px;cursor:pointer;border:2px solid #dee2e6;' + active + '"><i class="fas ' + ico.fa + '"></i></div>';
+            });
+            html += '</div>';
+            html += '<div class="icon-section-label" style="font-size:0.7rem;font-weight:700;text-transform:uppercase;color:#6c757d;letter-spacing:0.5px;margin:4px 0 6px;">Background Colour</div>';
+            html += '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+            CAT_COLORS.forEach(function(c) {
+                var active = cur.color === c.color ? 'border:3px solid #1a56a0;transform:scale(1.15);' : 'border:2px solid #dee2e6;';
+                html += '<div title="' + c.label + '" onclick="selectCatColor(' + JSON.stringify(cat) + ',\'' + c.color + '\')" style="width:28px;height:28px;border-radius:50%;background:' + c.color + ';cursor:pointer;' + active + '"></div>';
+            });
+            html += '</div>';
+            return html;
+        }
+
+        function selectCatIcon(cat, iconClass) {
+            if (!categoryStyles[cat]) categoryStyles[cat] = {};
+            categoryStyles[cat].icon = iconClass;
+            markPricingDirty();
+            localStorage.setItem('ald_category_styles', JSON.stringify(categoryStyles));
+            renderAllItemsList();
+            renderRooms();
+            // Re-open picker on new button position
+            closeCategoryPicker();
+        }
+
+        function selectCatColor(cat, color) {
+            if (!categoryStyles[cat]) categoryStyles[cat] = {};
+            categoryStyles[cat].color = color;
+            markPricingDirty();
+            localStorage.setItem('ald_category_styles', JSON.stringify(categoryStyles));
+            renderAllItemsList();
+            renderRooms();
+            closeCategoryPicker();
+        }
+
+        function openCategoryStylePicker(cat, triggerEl) {
+            if (_catPickerOpen === cat) { closeCategoryPicker(); return; }
+            closeCategoryPicker();
+            _catPickerOpen = cat;
+            var isMobile = window.innerWidth < 768;
+
+            if (isMobile) {
+                var overlay = document.createElement('div');
+                overlay.id = 'catPickerOverlay';
+                overlay.onclick = closeCategoryPicker;
+                overlay.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.45);';
+                document.body.appendChild(overlay);
+                var sheet = document.createElement('div');
+                sheet.id = 'catPickerSheet';
+                sheet.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:9999;background:#fff;border-radius:20px 20px 0 0;padding:16px 16px 32px;max-height:75vh;overflow-y:auto;box-shadow:0 -4px 24px rgba(0,0,0,0.18);';
+                sheet.innerHTML = '<div style="width:40px;height:4px;background:#dee2e6;border-radius:2px;margin:0 auto 14px;"></div>' +
+                    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><strong>' + cat + ' Style</strong>' +
+                    '<button onclick="closeCategoryPicker()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#6c757d;">&times;</button></div>' +
+                    _catPickerHTML(cat);
+                document.body.appendChild(sheet);
+            } else {
+                var pk = document.createElement('div');
+                pk.id = 'catPickerPopover';
+                pk.style.cssText = 'position:fixed;z-index:9999;background:#fff;border:1px solid #dee2e6;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.18);padding:14px;width:300px;max-height:400px;overflow-y:auto;';
+                pk.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><strong style="font-size:0.9rem;">' + cat + ' Style</strong>' +
+                    '<button onclick="closeCategoryPicker()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#6c757d;">&times;</button></div>' +
+                    _catPickerHTML(cat);
+                document.body.appendChild(pk);
+                var rect = triggerEl.getBoundingClientRect();
+                var pw = 300, ph = 400;
+                var top = rect.bottom + 8;
+                var left = rect.left;
+                if (left + pw > window.innerWidth - 8) left = window.innerWidth - pw - 8;
+                if (left < 8) left = 8;
+                if (top + ph > window.innerHeight - 8) top = rect.top - ph - 8;
+                if (top < 8) top = 8;
+                pk.style.top = top + 'px';
+                pk.style.left = left + 'px';
+                setTimeout(function() {
+                    document.addEventListener('click', function handler(e) {
+                        var p = document.getElementById('catPickerPopover');
+                        if (!p) { document.removeEventListener('click', handler); return; }
+                        if (!p.contains(e.target) && !triggerEl.contains(e.target)) {
+                            closeCategoryPicker();
+                            document.removeEventListener('click', handler);
+                        }
+                    });
+                }, 0);
+            }
+        }
+        // ── End Category Style Picker ──────────────────────────────────
 
         function editRoomName(roomId) {
             const room = rooms.find(r => r.id === roomId);
@@ -1808,9 +1956,12 @@ if (location.search.includes('debug')) {
                         const catDisplay = canonicalCat(cat);
 
                         html += '<div class="cat-group-block" data-cat="' + cat + '">';
-                        html += '<div class="cat-group-header" style="background:#f0f4ff; padding:4px 8px; font-size:0.78rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#495057; border-bottom:1px solid #dee2e6;">';
+                        var catStyle = categoryStyles[cat] || {};
+                        var catIcon = catStyle.icon || 'fa-tag';
+                        var catBg = catStyle.color || '#f0f4ff';
+                        html += '<div class="cat-group-header" style="background:' + catBg + '; padding:4px 8px; font-size:0.78rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#495057; border-bottom:1px solid #dee2e6;">';
                         html += '<span class="cat-drag-handle" title="Drag to reorder category">&#8801;</span>';
-                        html += '<i class="fas fa-tag me-1" style="color:#6c757d;"></i>' + catDisplay;
+                        html += '<i class="fas ' + catIcon + ' me-1" style="color:#6c757d;"></i>' + catDisplay;
                         html += '</div>';
                         html += '<div style="overflow-x:auto;"><table class="table table-sm mb-0" style="min-width:480px;"><colgroup><col style="width:32px"><col><col style="width:90px"><col style="width:80px"><col style="width:80px"><col style="width:180px"></colgroup><tbody>';
 
@@ -2732,8 +2883,9 @@ async function saveQuote() {
             // Load existing quotes
             var listEl = document.getElementById('saveQuoteList');
             if (listEl) listEl.innerHTML = '<div class="text-muted small text-center py-3"><span class="spinner-border spinner-border-sm me-2"></span>Loading...</div>';
-            // Show modal
-            var modal = new bootstrap.Modal(document.getElementById('saveQuoteModal'));
+            // Show modal (reuse existing instance if already initialized)
+            var saveModalEl = document.getElementById('saveQuoteModal');
+            var modal = bootstrap.Modal.getInstance(saveModalEl) || new bootstrap.Modal(saveModalEl);
             modal.show();
             // Fetch quotes
             if (typeof listQuotesFromSupabase === 'function') {
@@ -3061,6 +3213,11 @@ async function saveQuote() {
             } catch (e) {
                 customItems = {};
             }
+            try {
+                categoryStyles = JSON.parse(localStorage.getItem('ald_category_styles') || '{}');
+            } catch (e) {
+                categoryStyles = {};
+            }
             for (const [category, items] of Object.entries(customItems)) {
                 if (!pricingDatabase[category]) pricingDatabase[category] = [];
                 items.forEach(item => {
@@ -3074,9 +3231,10 @@ async function saveQuote() {
 
         function saveCustomItems() {
             localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
+            localStorage.setItem('ald_category_styles', JSON.stringify(categoryStyles));
             // Also sync to Supabase cloud
             if (typeof saveItemsToSupabase === 'function') {
-                saveItemsToSupabase({ customItems, itemOverrides: itemOverrides || {} }).catch(function(){});
+                saveItemsToSupabase({ customItems, itemOverrides: itemOverrides || {}, categoryStyles }).catch(function(){});
             }
         }
 
@@ -3128,7 +3286,7 @@ async function saveQuote() {
             const searchEl = document.getElementById('itemSearchFilter');
             if (searchEl) searchEl.value = '';
             renderAllItemsList();
-            new bootstrap.Modal(document.getElementById('manageItemsModal')).show();
+(bootstrap.Modal.getInstance(document.getElementById('manageItemsModal')) || new bootstrap.Modal(document.getElementById('manageItemsModal'))).show();
         }
 
         function closeManageItemsModal() {
@@ -3261,7 +3419,17 @@ async function saveQuote() {
 
             Object.entries(pricingDatabase).forEach(([cat, items]) => {
                 if (!items.length) return;
-                html += `<h6 class="fw-bold mt-3 mb-1 text-primary">${cat}</h6>`;
+                const catSty = categoryStyles[cat] || {};
+                const cIcon = catSty.icon || 'fa-tag';
+                const cColor = catSty.color || '#f0f4ff';
+                const catEsc = cat.replace(/'/g, "\\'");
+                html += `<div class="d-flex align-items-center gap-2 mt-3 mb-1 px-2 py-1 rounded" style="background:${cColor};">
+                  <i class="fas ${cIcon}" style="color:#495057;"></i>
+                  <h6 class="fw-bold mb-0 text-primary" style="flex:1;">${cat}</h6>
+                  <button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem; padding:1px 8px;" onclick="openCategoryStylePicker('${catEsc}', this)" title="Customize icon &amp; colour">
+                    <i class="fas fa-palette me-1"></i>Style
+                  </button>
+                </div>`;
                 html += '<table class="table table-sm table-bordered mb-2"><thead class="table-light"><tr><th>Name</th><th style="width:80px">Unit</th><th style="width:90px">Rate ($)</th><th style="width:100px">Mat. Cost ($)</th><th>Supplier URL</th><th style="width:110px"></th></tr></thead><tbody>';
                 items.forEach(item => {
                     const safeId = (cat + '_' + item.name).replace(/[^a-z0-9]/gi,'_');
@@ -4208,13 +4376,19 @@ async function saveQuote() {
                             var cloudData = result.data;
                             var cloudCustom = cloudData.customItems || cloudData; // handle both formats
                             var cloudOverrides = cloudData.itemOverrides || {};
+                            var cloudCategoryStyles = cloudData.categoryStyles || {};
                             // Merge with local
                             var local = JSON.parse(localStorage.getItem('ald_custom_items') || '{}');
                             var merged = Object.assign({}, local, cloudCustom);
                             localStorage.setItem('ald_custom_items', JSON.stringify(merged));
-                            // Also restore overrides
+                            // Restore overrides
                             if (Object.keys(cloudOverrides).length > 0) {
                                 localStorage.setItem('ald_item_overrides', JSON.stringify(cloudOverrides));
+                            }
+                            // Restore category styles
+                            if (Object.keys(cloudCategoryStyles).length > 0) {
+                                var localStyles = JSON.parse(localStorage.getItem('ald_category_styles') || '{}');
+                                localStorage.setItem('ald_category_styles', JSON.stringify(Object.assign({}, localStyles, cloudCategoryStyles)));
                             }
                             loadCustomItems();
                         } else {
