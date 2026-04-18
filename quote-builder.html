@@ -1673,6 +1673,13 @@ if (location.search.includes('debug')) {
                 });
             }
             
+            // Add "Add another room" button at the bottom
+            html += `<div class="text-center py-3">
+                <button onclick="addRoom()" class="btn btn-outline-primary px-4" style="border-radius:30px; border-style:dashed;">
+                    <i class="fas fa-plus me-2"></i>Add Another Room
+                </button>
+            </div>`;
+
             container.innerHTML = html;
             calculateTotals();
             markUnsaved();
