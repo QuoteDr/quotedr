@@ -25,6 +25,7 @@
         }
         .status-draft { color: #6c757d; }
         .status-sent { color: #0d6efd; }
+        .status-viewed { color: #0dcaf0; font-weight: 600; }
         .status-accepted { color: #198754; }
         .status-invoiced { color: #ffc107; }
         .status-declined { color: #dc3545; }
@@ -120,6 +121,7 @@
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <h3 class="mb-0">Recent Quotes</h3>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="loadQuotes()" title="Refresh quotes"><i class="fas fa-sync-alt"></i></button>
                         <div class="d-flex gap-2 flex-wrap">
                             <button class="btn btn-sm btn-outline-secondary" onclick="refreshQuotes()">
                                 <i class="fas fa-sync-alt"></i> Refresh
@@ -245,7 +247,8 @@
                             <select class="status-select status-${q.status}" onchange="updateQuoteStatus('${q.id}', this.value)">
                                 <option value="draft" ${q.status === 'draft' ? 'selected' : ''}>Draft</option>
                                 <option value="sent" ${q.status === 'sent' ? 'selected' : ''}>Sent</option>
-                                <option value="accepted" ${q.status === 'accepted' ? 'selected' : ''}>Accepted</option>
+                                <option value="viewed" ${q.status === 'viewed' ? 'selected' : ''}>👁 Viewed</option>
+                                <option value="accepted" ${q.status === 'accepted' ? 'selected' : ''}>✅ Accepted</option>
                                 <option value="invoiced" ${q.status === 'invoiced' ? 'selected' : ''}>Invoiced</option>
                                 <option value="declined" ${q.status === 'declined' ? 'selected' : ''}>Declined</option>
                             </select>
@@ -279,12 +282,21 @@
             window.location.href = 'quote-builder.html?load=' + quoteId;
         }
 
-        function updateQuoteStatus(quoteId, newStatus) {
+        async function updateQuoteStatus(quoteId, newStatus) {
             const quote = allQuotes.find(q => q.id === quoteId);
             if (quote) {
                 quote.status = newStatus;
+                renderQuotes(allQuotes);
                 updateStats(allQuotes);
             }
+            try {
+                const { error } = await _supabase
+                    .from('quotes')
+                    .update({ status: newStatus, updated_at: new Date().toISOString() })
+                    .eq('id', quoteId);
+                if (error) console.error('Status update error:', error);
+            } catch(e) { console.warn('Could not update status in Supabase:', e); }
+        }
         }
 
         async function deleteQuote(quoteId) {

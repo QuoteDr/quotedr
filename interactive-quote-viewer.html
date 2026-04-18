@@ -348,6 +348,15 @@ if (location.search.includes('debug')) {
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        // Initialize Supabase for status tracking (read-only anon key)
+        try {
+            window._supabaseClient = supabase.createClient(
+                'https://axmoffknvblluibuitrq.supabase.co',
+                'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso'
+            );
+        } catch(e) { console.warn('Supabase init failed:', e); }
+    </script>
     <script src="supabase-v2.js"></script>
     
     <script>
@@ -438,6 +447,14 @@ if (location.search.includes('debug')) {
         });
 
         async function loadQuoteFromURL() {
+            const params = new URLSearchParams(window.location.search);
+            const quoteId = params.get('id');
+
+            // Mark as viewed in Supabase if still draft or sent
+            if (quoteId) {
+                markQuoteViewed(quoteId);
+            }
+
             const params = new URLSearchParams(window.location.search);
 
             // New flow: load from Supabase by ?id= param
@@ -812,6 +829,34 @@ if (location.search.includes('debug')) {
             sigCanvas.classList.remove('signed');
             sigHasStrokes = false;
         }
+        async function markQuoteViewed(quoteId) {
+            try {
+                const sb = window._supabaseClient || (typeof supabase !== 'undefined' ? supabase : null);
+                if (!sb || !quoteId) return;
+                // Only update if still draft or sent (don't overwrite accepted/declined)
+                await sb.from('quotes').update({
+                    status: 'viewed',
+                    viewed_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', quoteId)
+                .in('status', ['draft', 'sent']);
+            } catch(e) { console.warn('Could not mark quote viewed:', e); }
+        }
+
+        async function markQuoteAccepted(quoteId, signerName) {
+            try {
+                const sb = window._supabaseClient || (typeof supabase !== 'undefined' ? supabase : null);
+                if (!sb || !quoteId) return;
+                await sb.from('quotes').update({
+                    status: 'accepted',
+                    accepted_at: new Date().toISOString(),
+                    accepted_by: signerName,
+                    updated_at: new Date().toISOString()
+                }).eq('id', quoteId);
+            } catch(e) { console.warn('Could not mark quote accepted:', e); }
+        }
+
         function confirmApproval() {
             const name = document.getElementById('signerName').value.trim();
             if (!name) { alert('Please enter your full name.'); return; }
@@ -831,6 +876,13 @@ if (location.search.includes('debug')) {
             document.getElementById('approvalSigPreview').src = sigDataUrl;
             document.getElementById('approvalMeta').textContent = 'Signed by ' + name + ' on ' + dateStr;
             document.getElementById('approvalBanner').classList.add('visible');
+
+            // Update status to accepted in Supabase
+            const urlParams = new URLSearchParams(window.location.search);
+            const quoteId = urlParams.get('id');
+            if (quoteId) {
+                markQuoteAccepted(quoteId, name);
+            }
 
             // Hide approve section and auto-submit
             document.getElementById('approveSection').style.display = 'none';
