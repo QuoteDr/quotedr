@@ -385,7 +385,8 @@
         /* Responsive adjustments */
         @media (max-width: 768px) {
             .hero-headline {
-                font-size: 2rem;
+                font-size: 1.6rem;
+                white-space: nowrap;
             }
             
             .hero-subheadline {
@@ -649,25 +650,45 @@
     <section class="pricing-section">
         <div class="container">
             <h2 class="section-title"><span>Simple Pricing. No Surprises.</span></h2>
-            <div class="row justify-content-center">
-                <div class="col-lg-8">
-                    <div class="pricing-card">
+            <div class="row justify-content-center g-4">
+                <!-- Standard -->
+                <div class="col-lg-5 col-md-6">
+                    <div class="pricing-card h-100">
                         <h3 class="pricing-title">QuoteDr Standard</h3>
                         <div class="pricing-price">$29<span>/month</span></div>
                         <p class="text-muted">or $290/year — save 2 months</p>
-                        
                         <ul class="pricing-features">
                             <li><i class="fas fa-check"></i> Unlimited quotes</li>
                             <li><i class="fas fa-check"></i> Cloud storage & sync</li>
-                            <li><i class="fas fa-check"></i> Client payment reminders</li>
                             <li><i class="fas fa-check"></i> Quote dashboard</li>
                             <li><i class="fas fa-check"></i> PDF export</li>
+                            <li><i class="fas fa-check"></i> Client quote viewer</li>
                             <li><i class="fas fa-check"></i> Client upsell options</li>
                             <li><i class="fas fa-check"></i> Import/export your data</li>
                             <li><i class="fas fa-check"></i> Cancel anytime</li>
                         </ul>
-                        
                         <a href="login.html?signup=1" class="btn pricing-button">Get Started Free</a>
+                        <p class="pricing-note">14-day free trial. No credit card required.</p>
+                    </div>
+                </div>
+                <!-- Pro -->
+                <div class="col-lg-5 col-md-6">
+                    <div class="pricing-card h-100" style="border:2px solid #e87e2a; position:relative;">
+                        <div style="position:absolute; top:-14px; left:50%; transform:translateX(-50%); background:#e87e2a; color:white; font-size:0.75rem; font-weight:700; padding:4px 16px; border-radius:20px; letter-spacing:0.5px;">MOST POPULAR</div>
+                        <h3 class="pricing-title">QuoteDr Pro</h3>
+                        <div class="pricing-price">$59<span>/month</span></div>
+                        <p class="text-muted">or $590/year — save 2 months</p>
+                        <ul class="pricing-features">
+                            <li><i class="fas fa-check"></i> Everything in Standard</li>
+                            <li><i class="fas fa-check"></i> AI-powered quote builder</li>
+                            <li><i class="fas fa-check"></i> Email quotes to clients</li>
+                            <li><i class="fas fa-check"></i> Client approval & e-signature</li>
+                            <li><i class="fas fa-check"></i> Quote status tracking</li>
+                            <li><i class="fas fa-check"></i> Client notifications</li>
+                            <li><i class="fas fa-check"></i> Priority support</li>
+                            <li><i class="fas fa-check"></i> Early access to new features</li>
+                        </ul>
+                        <a href="login.html?signup=1" class="btn pricing-button" style="background:#e87e2a; border-color:#e87e2a;">Get Started Free</a>
                         <p class="pricing-note">14-day free trial. No credit card required.</p>
                     </div>
                 </div>
