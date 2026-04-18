@@ -61,7 +61,7 @@
                             
                             <div class="mb-3">
                                 <label for="companyTagline" class="form-label">Company Tagline</label>
-                                <input type="text" class="form-control" id="companyTagline" placeholder="e.g., Quality Renovations You Can Trust">
+                                <input type="text" class="form-control" id="companyTagline" placeholder="e.g., Quality Service You Can Trust">
                             </div>
                             
                             <div class="mb-3">
@@ -148,7 +148,7 @@
                         
                         <div class="mb-3">
                             <label for="quoteHeading" class="form-label">Quote Heading</label>
-                            <input type="text" class="form-control" id="quoteHeading" placeholder="Your Renovation Quote">
+                            <input type="text" class="form-control" id="quoteHeading" placeholder="Your Quote">
                         </div>
                         
                         <div class="mb-3">
@@ -571,7 +571,7 @@
 
         function saveQuotePrefs() {
             var prefs = {
-                heading: document.getElementById('quoteHeading').value.trim() || 'Your Renovation Quote',
+                heading: document.getElementById('quoteHeading').value.trim() || 'Your Quote',
                 prefix: document.getElementById('quotePrefix').value.trim() || 'ALD',
                 showPrefix: document.getElementById('showPrefix').checked
             };

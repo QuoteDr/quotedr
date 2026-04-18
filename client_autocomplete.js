@@ -5,7 +5,7 @@ const clientDatabase = {
   "Adrian Wade Kitchen Outlets": {"filename": "24.03 Adrian Wade Kitchen Outlets.pdf", "phone": null, "email": null},
   "Alexandra Rawlings": {"filename": "25.16 Alexandra Rawlings - Front Deck.pdf", "phone": null, "email": null},
   "Ali Al Dujaili": {"filename": "25.17 Ali Al Dujaili - Paint Flower Beds.pdf", "phone": null, "email": null},
-  "Amanda and David Maclennan": {"filename": "25.12 Amanda and David Maclennan - Full Renovation.pdf", "phone": null, "email": null},
+  "Amanda and David Maclennan": {"filename": "25.12 Amanda and David Maclennan - Full Project.pdf", "phone": null, "email": null},
   "Andrew Pembleton": {"filename": "24.44 Andrew Pembleton - Fence and Shed.pdf", "phone": null, "email": null},
   "Brenda Pinkus": {"filename": "24.40 Brenda Pinkus - Condo Repairs.pdf", "phone": null, "email": null},
   "Carrie Hutton": {"filename": "24.15 Carrie Hutton.pdf", "phone": null, "email": null},

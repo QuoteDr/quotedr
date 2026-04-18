@@ -13,7 +13,7 @@ var SUGGESTIONS = [
   'How do I add my pricing list?',
   'How do I save a quote?',
   'How do I create an invoice?',
-  'Tips for pricing a bathroom reno?'
+  'Tips for pricing a job?'
 ];
 
 function init() {
@@ -180,7 +180,7 @@ function init() {
         <button id="qdAiClose" onclick="window._qdAiToggle()">&#x2715;</button>
       </div>
       <div id="qdAiMessages">
-        <div class="qdMsg ai">Hey! I'm your QuoteDr assistant. Ask me anything about the app or renovation quoting! &#128293;</div>
+        <div class="qdMsg ai">Hey! I'm your QuoteDr assistant. Ask me anything about the app or quoting! &#128293;</div>
       </div>
       <div id="qdSuggestions"></div>
       <div id="qdAiInputRow">

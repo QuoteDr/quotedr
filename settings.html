@@ -112,7 +112,7 @@ if (location.search.includes('debug')) {
 				</div>
 				<div class="col-12">
 					<label class="form-label mb-0">Company Tagline <span class="text-muted small">(optional)</span></label>
-					<input type="text" class="form-control" id="bizTagline" placeholder="e.g. Professional Renovation Services">
+					<input type="text" class="form-control" id="bizTagline" placeholder="e.g. Professional Services">
 					<div class="form-text">Appears below your company name on quotes and invoices.</div>
 				</div>
 				<div class="col-12">
@@ -198,7 +198,7 @@ if (location.search.includes('debug')) {
 			<div class="row g-3">
 				<div class="col-12">
 					<label class="form-label mb-0">Quote Heading</label>
-					<input type="text" class="form-control" id="quoteHeading" placeholder="Your Renovation Quote">
+					<input type="text" class="form-control" id="quoteHeading" placeholder="Your Quote">
 				</div>
 				<div class="col-12">
 					<label class="form-label mb-0">Quote Prefix</label>
@@ -450,7 +450,7 @@ Sarah Jones, 905-555-5678"></textarea>
 
 			// Load quote prefs
 			const savedPrefs = JSON.parse(localStorage.getItem('ald_quote_prefs') || '{}');
-			if (document.getElementById('quoteHeading')) document.getElementById('quoteHeading').value = savedPrefs.heading || 'Your Renovation Quote';
+			if (document.getElementById('quoteHeading')) document.getElementById('quoteHeading').value = savedPrefs.heading || 'Your Quote';
 			if (document.getElementById('quotePrefix')) document.getElementById('quotePrefix').value = savedPrefs.prefix || 'ALD';
 			if (document.getElementById('showPrefix') && savedPrefs.showPrefix === false) document.getElementById('showPrefix').checked = false;
 		});
@@ -666,7 +666,7 @@ Sarah Jones, 905-555-5678"></textarea>
 
 		function saveQuotePrefs() {
 			var prefs = {
-				heading: document.getElementById('quoteHeading').value.trim() || 'Your Renovation Quote',
+				heading: document.getElementById('quoteHeading').value.trim() || 'Your Quote',
 				prefix: document.getElementById('quotePrefix').value.trim() || 'ALD',
 				showPrefix: document.getElementById('showPrefix').checked
 			};
