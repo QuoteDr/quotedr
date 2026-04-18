@@ -3937,12 +3937,14 @@ async function saveQuote() {
         document.addEventListener('hidden.bs.modal', function() {
             cleanupModalBackdrop();
         });
-        // Hide/show sticky toolbar AND total bar when modals open/close
+        // Hide/show sticky toolbar, total bar AND mobile action bar when modals open/close
         document.addEventListener('show.bs.modal', function() {
             var tb = document.getElementById('stickyToolbar');
             if (tb) tb.style.setProperty('display', 'none', 'important');
             var bar = document.getElementById('stickyTotalBar');
             if (bar) bar.style.setProperty('display', 'none', 'important');
+            var mob = document.getElementById('mobileActionBar');
+            if (mob) mob.style.setProperty('display', 'none', 'important');
         });
         document.addEventListener('hidden.bs.modal', function() {
             // Only show if no other modals are open
@@ -3951,6 +3953,8 @@ async function saveQuote() {
                 if (tb) tb.style.removeProperty('display');
                 var bar = document.getElementById('stickyTotalBar');
                 if (bar && stickyTotalVisible) bar.style.removeProperty('display');
+                var mob = document.getElementById('mobileActionBar');
+                if (mob) mob.style.removeProperty('display');
             }
         });
 
@@ -4038,7 +4042,7 @@ async function saveQuote() {
         });
     </script>
     <!-- Mobile bottom action bar (hidden on desktop) -->
-    <div class="d-md-none" style="position:fixed; bottom:0; left:0; right:0; background:white; border-top:2px solid #dee2e6; padding:6px 8px; z-index:1055; display:flex; gap:6px; box-shadow: 0 -4px 12px rgba(0,0,0,0.1);">
+    <div id="mobileActionBar" class="d-md-none" style="position:fixed; bottom:0; left:0; right:0; background:white; border-top:2px solid #dee2e6; padding:6px 8px; z-index:1055; display:flex; gap:6px; box-shadow: 0 -4px 12px rgba(0,0,0,0.1);">
         <a href="javascript:void(0)" onclick="saveQuote()" class="btn btn-warning btn-sm flex-shrink-0" style="min-width:60px; flex-direction:column; display:flex; align-items:center; padding:4px 8px;">
             <i class="fas fa-save d-block" style="font-size:1.1rem;"></i>
             <span style="font-size:0.6rem;">Save</span>
