@@ -259,48 +259,108 @@ if (location.search.includes('debug')) {
 			</div>
 		</div>
 
-		<!-- Import Data Section -->
+		<!-- Import / Export Section -->
 		<div class="settings-card">
-			<h5><i class="fas fa-upload me-2" style="color:#1a56a0"></i>Import / Export Data</h5>
-			<div class="mb-4">
-				<h6 class="fw-bold mb-2"><i class="fas fa-download me-2" style="color:#1a56a0;"></i>Export Your Data</h6>
-				<p class="text-muted small">Download your clients and materials as .txt files for backup or transfer to another device.</p>
-				<button class="btn btn-outline-secondary btn-sm me-2" onclick="exportClientsToFile()">
-					<i class="fas fa-users me-1"></i>Export Clients
-				</button>
-				<button class="btn btn-outline-secondary btn-sm" onclick="exportMaterialsToFile()">
-					<i class="fas fa-box me-1"></i>Export Materials
-				</button>
+			<h5><i class="fas fa-robot me-2" style="color:#7c3aed"></i>AI Import <span class="badge" style="background:#7c3aed; font-size:0.65rem;">Smart</span></h5>
+			<p class="text-muted small mb-3">Paste or upload anything — QuickBooks export, spreadsheet, old price list, contacts backup, messy notes. Our AI figures it out automatically.</p>
+
+			<!-- Tabs -->
+			<ul class="nav nav-tabs mb-3" id="importTabs">
+				<li class="nav-item"><a class="nav-link active" href="#" onclick="switchImportTab('pricing'); return false;"><i class="fas fa-box me-1"></i>Pricing / Items</a></li>
+				<li class="nav-item"><a class="nav-link" href="#" onclick="switchImportTab('clients'); return false;"><i class="fas fa-users me-1"></i>Clients</a></li>
+			</ul>
+
+			<!-- Pricing Tab -->
+			<div id="importTabPricing">
+				<div class="alert alert-light border small p-2 mb-3" style="border-left: 3px solid #7c3aed !important;">
+					<strong>Works with:</strong> QuickBooks item list, Jobber services, Excel/CSV price lists, hand-typed notes, old invoices — any format.
+					<details class="mt-1">
+						<summary class="text-primary" style="cursor:pointer; font-size:0.85rem;">How to export from QuickBooks / other apps ▾</summary>
+						<div class="mt-2" style="font-size:0.82rem; color:#555;">
+							<strong>QuickBooks:</strong> Lists → Product &amp; Services → Export to Excel → paste below<br>
+							<strong>Jobber:</strong> Settings → Services → export or copy-paste the list<br>
+							<strong>Excel/CSV:</strong> Just upload the file — AI reads columns automatically<br>
+							<strong>Anything else:</strong> Copy &amp; paste whatever you have — AI will sort it out
+						</div>
+					</details>
+				</div>
+
+				<!-- File upload -->
+				<div class="mb-3">
+					<label class="form-label fw-bold small">Upload a file <span class="text-muted fw-normal">(CSV, Excel export, TXT — any format)</span></label>
+					<input type="file" id="importPricingFile" accept=".csv,.txt,.xlsx,.xls,.tsv" class="form-control form-control-sm" onchange="previewImportFile('pricing')">
+				</div>
+
+				<!-- OR paste -->
+				<div class="mb-3">
+					<label class="form-label fw-bold small">Or paste your data here</label>
+					<textarea id="importPricingText" class="form-control" rows="6" placeholder="Paste anything — CSV rows, a price list, old invoice line items, QuickBooks export...
+Example:
+Tile installation, sqft, $8.50
+Drywall hanging, sqft, $3.00
+Painting walls, sqft, $2.50"></textarea>
+				</div>
+
+				<div class="d-flex gap-2 flex-wrap align-items-center">
+					<button class="btn btn-sm" style="background:#7c3aed; color:white; font-weight:600;" onclick="runAiImport('pricing')">
+						<i class="fas fa-magic me-1"></i>Import with AI
+					</button>
+					<button class="btn btn-outline-danger btn-sm" onclick="clearAllMaterials()"><i class="fas fa-trash me-1"></i>Clear All Items</button>
+				</div>
+				<div id="importPricingResult" class="mt-3"></div>
 			</div>
-			<hr>
-			<div class="mb-4">
-				<h6 class="fw-bold mb-2"><i class="fas fa-users me-2" style="color:#1a56a0;"></i>Import Clients</h6>
-				<p class="text-muted small">Upload a .txt file with one client per line: Name Phone Email Address</p>
-				<input type="file" id="importClientsFileSettings" accept=".txt" class="form-control mb-2">
-				<button class="btn btn-outline-primary btn-sm" onclick="importClientsFromFileSettings()">
-					<i class="fas fa-upload me-1"></i>Import Clients
-				</button>
-				<button class="btn btn-outline-primary btn-sm" onclick="aiImportClients()">
-					<i class="fas fa-robot me-1"></i>🤖 AI Import
-				</button>
-				<button class="btn btn-outline-danger btn-sm ms-2" onclick="clearAllClients()">Clear All</button>
-				<div id="importClientsResultSettings" class="mt-2 small"></div>
-			</div>
-			
-			<div class="mb-4">
-				<h6 class="fw-bold mb-2"><i class="fas fa-box me-2" style="color:#e87e2a;"></i>Import Materials</h6>
-				<p class="text-muted small">Upload a .txt file with materials grouped by category (Name | Unit | Price)</p>
-				<input type="file" id="importMaterialsFileSettings" accept=".txt" class="form-control mb-2">
-				<button class="btn btn-outline-primary btn-sm" onclick="importMaterialsFromFileSettings()">
-					<i class="fas fa-upload me-1"></i>Import Materials
-				</button>
-				<button class="btn btn-outline-primary btn-sm" onclick="aiImportMaterials()">
-					<i class="fas fa-robot me-1"></i>🤖 AI Import
-				</button>
-				<div id="importMaterialsResultSettings" class="mt-2 small"></div>
+
+			<!-- Clients Tab -->
+			<div id="importTabClients" style="display:none;">
+				<div class="alert alert-light border small p-2 mb-3" style="border-left: 3px solid #1a56a0 !important;">
+					<strong>Works with:</strong> QuickBooks customer list, phone contacts export, spreadsheet, any text list of names &amp; numbers.
+					<details class="mt-1">
+						<summary class="text-primary" style="cursor:pointer; font-size:0.85rem;">How to export from QuickBooks / other apps ▾</summary>
+						<div class="mt-2" style="font-size:0.82rem; color:#555;">
+							<strong>QuickBooks:</strong> Customers → Export to Excel → paste below<br>
+							<strong>iPhone Contacts:</strong> Use a contacts export app → vCard or CSV → upload<br>
+							<strong>Spreadsheet:</strong> Copy &amp; paste name/phone/email columns<br>
+							<strong>Anything else:</strong> Even a messy list works — AI will extract what it can
+						</div>
+					</details>
+				</div>
+
+				<div class="mb-3">
+					<label class="form-label fw-bold small">Upload a file <span class="text-muted fw-normal">(CSV, TXT, vCard — any format)</span></label>
+					<input type="file" id="importClientsFile" accept=".csv,.txt,.vcf,.tsv" class="form-control form-control-sm" onchange="previewImportFile('clients')">
+				</div>
+
+				<div class="mb-3">
+					<label class="form-label fw-bold small">Or paste your data here</label>
+					<textarea id="importClientsText" class="form-control" rows="6" placeholder="Paste anything — name &amp; phone, spreadsheet rows, QuickBooks export...
+Example:
+John Smith, 416-555-1234, john@email.com
+Sarah Jones, 905-555-5678"></textarea>
+				</div>
+
+				<div class="d-flex gap-2 flex-wrap align-items-center">
+					<button class="btn btn-sm" style="background:#1a56a0; color:white; font-weight:600;" onclick="runAiImport('clients')">
+						<i class="fas fa-magic me-1"></i>Import with AI
+					</button>
+					<button class="btn btn-outline-danger btn-sm" onclick="clearAllClients()"><i class="fas fa-trash me-1"></i>Clear All Clients</button>
+				</div>
+				<div id="importClientsResult" class="mt-3"></div>
 			</div>
 		</div>
-			<button class="btn btn-outline-danger btn-sm" onclick="clearAllMaterials()">Clear All</button>
+
+		<!-- Export Section -->
+		<div class="settings-card">
+			<h5><i class="fas fa-download me-2" style="color:#1a56a0"></i>Export Your Data</h5>
+			<p class="text-muted small mb-3">Download your data as a backup or to move to another device.</p>
+			<div class="d-flex gap-2 flex-wrap">
+				<button class="btn btn-outline-secondary btn-sm" onclick="exportClientsToFile()">
+					<i class="fas fa-users me-1"></i>Export Clients (CSV)
+				</button>
+				<button class="btn btn-outline-secondary btn-sm" onclick="exportMaterialsToFile()">
+					<i class="fas fa-box me-1"></i>Export Items (CSV)
+				</button>
+			</div>
+		</div>
 
 		<!-- Footer -->
 		<div class="text-center text-muted small mt-4">
@@ -629,40 +689,165 @@ if (location.search.includes('debug')) {
 			window.location.href = 'index.html';
 		}
 
-		// Import functions for settings
+		// ── Import / Export ─────────────────────────────────────────────────
+		const AI_IMPORT_URL = 'https://axmoffknvblluibuitrq.supabase.co/functions/v1/smart-import';
+		const AI_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso';
+
+		function switchImportTab(tab) {
+			document.getElementById('importTabPricing').style.display = tab === 'pricing' ? '' : 'none';
+			document.getElementById('importTabClients').style.display = tab === 'clients' ? '' : 'none';
+			document.querySelectorAll('#importTabs .nav-link').forEach(function(el, i) {
+				el.classList.toggle('active', (tab === 'pricing' && i === 0) || (tab === 'clients' && i === 1));
+			});
+		}
+
+		function previewImportFile(type) {
+			var fileEl = document.getElementById(type === 'pricing' ? 'importPricingFile' : 'importClientsFile');
+			var textEl = document.getElementById(type === 'pricing' ? 'importPricingText' : 'importClientsText');
+			var file = fileEl.files[0];
+			if (!file) return;
+			var reader = new FileReader();
+			reader.onload = function(e) { textEl.value = e.target.result.slice(0, 6000); };
+			reader.readAsText(file);
+		}
+
+		async function runAiImport(type) {
+			var textEl = document.getElementById(type === 'pricing' ? 'importPricingText' : 'importClientsText');
+			var resultEl = document.getElementById(type === 'pricing' ? 'importPricingResult' : 'importClientsResult');
+			var content = textEl.value.trim();
+			if (!content) {
+				resultEl.innerHTML = '<div class="alert alert-warning py-2 small">Please paste some data or upload a file first.</div>';
+				return;
+			}
+
+			resultEl.innerHTML = '<div class="alert alert-light py-2 small"><span class="spinner-border spinner-border-sm me-2"></span>AI is reading your data… this takes a few seconds.</div>';
+
+			try {
+				var res = await fetch(AI_IMPORT_URL, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + AI_ANON_KEY },
+					body: JSON.stringify({ content: content, type: type === 'pricing' ? 'materials' : 'clients' })
+				});
+				var data = await res.json();
+				if (data.error) throw new Error(data.error);
+
+				if (type === 'pricing') {
+					// Show preview
+					var cats = data.categories || {};
+					var count = data.count || 0;
+					var previewHtml = '<div class="alert alert-success py-2 mb-2 small"><i class="fas fa-check-circle me-1"></i>AI found <strong>' + count + ' items</strong> in <strong>' + Object.keys(cats).length + ' categories</strong>. Preview:</div>';
+					previewHtml += '<div style="max-height:200px; overflow-y:auto; border:1px solid #dee2e6; border-radius:6px; padding:8px; background:#f8f9fa; font-size:0.8rem; margin-bottom:10px;">';
+					Object.entries(cats).forEach(function(entry) {
+						previewHtml += '<div class="fw-bold text-primary mt-1">' + entry[0] + '</div>';
+						entry[1].forEach(function(item) {
+							previewHtml += '<div class="ps-2 text-muted">' + item.name + ' &mdash; ' + item.unitType + ' @ $' + parseFloat(item.rate).toFixed(2) + '</div>';
+						});
+					});
+					previewHtml += '</div>';
+					previewHtml += '<div class="d-flex gap-2">';
+					previewHtml += '<button class="btn btn-sm btn-success" onclick="commitPricingImport(' + JSON.stringify(JSON.stringify(cats)).slice(1,-1).replace(/"/g,"'") + ')"><i class="fas fa-check me-1"></i>Looks good — Import!</button>';
+					previewHtml += '<button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById(\'importPricingResult\').innerHTML=\'\'">Cancel</button>';
+					previewHtml += '</div>';
+					// Store parsed data for commit
+					window._pendingPricingImport = cats;
+					previewHtml = '<div class="alert alert-success py-2 mb-2 small"><i class="fas fa-check-circle me-1"></i>AI found <strong>' + count + ' items</strong> in <strong>' + Object.keys(cats).length + ' categories</strong>. Preview:</div>';
+					previewHtml += '<div style="max-height:200px; overflow-y:auto; border:1px solid #dee2e6; border-radius:6px; padding:8px; background:#f8f9fa; font-size:0.8rem; margin-bottom:10px;">';
+					Object.entries(cats).forEach(function(entry) {
+						previewHtml += '<div class="fw-bold text-primary mt-1">' + entry[0] + '</div>';
+						entry[1].forEach(function(item) {
+							previewHtml += '<div class="ps-2 text-muted">' + item.name + ' &mdash; ' + item.unitType + ' @ $' + parseFloat(item.rate).toFixed(2) + '</div>';
+						});
+					});
+					previewHtml += '</div>';
+					previewHtml += '<div class="d-flex gap-2">';
+					previewHtml += '<button class="btn btn-sm btn-success" onclick="commitPricingImport()"><i class="fas fa-check me-1"></i>Looks good — Import!</button>';
+					previewHtml += '<button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById(\'importPricingResult\').innerHTML=\'\'; window._pendingPricingImport=null;">Cancel</button>';
+					previewHtml += '</div>';
+					resultEl.innerHTML = previewHtml;
+				} else {
+					// Clients preview
+					var clients = data.clients || [];
+					var previewHtml = '<div class="alert alert-success py-2 mb-2 small"><i class="fas fa-check-circle me-1"></i>AI found <strong>' + clients.length + ' clients</strong>. Preview:</div>';
+					previewHtml += '<div style="max-height:200px; overflow-y:auto; border:1px solid #dee2e6; border-radius:6px; padding:8px; background:#f8f9fa; font-size:0.8rem; margin-bottom:10px;">';
+					clients.slice(0, 20).forEach(function(c) {
+						previewHtml += '<div class="py-1 border-bottom"><strong>' + c.name + '</strong>';
+						if (c.phone) previewHtml += ' &middot; ' + c.phone;
+						if (c.email) previewHtml += ' &middot; ' + c.email;
+						previewHtml += '</div>';
+					});
+					if (clients.length > 20) previewHtml += '<div class="text-muted small pt-1">...and ' + (clients.length - 20) + ' more</div>';
+					previewHtml += '</div>';
+					previewHtml += '<div class="d-flex gap-2">';
+					previewHtml += '<button class="btn btn-sm btn-success" onclick="commitClientsImport()"><i class="fas fa-check me-1"></i>Looks good — Import!</button>';
+					previewHtml += '<button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById(\'importClientsResult\').innerHTML=\'\'; window._pendingClientsImport=null;">Cancel</button>';
+					previewHtml += '</div>';
+					window._pendingClientsImport = clients;
+					resultEl.innerHTML = previewHtml;
+				}
+			} catch(e) {
+				resultEl.innerHTML = '<div class="alert alert-danger py-2 small"><i class="fas fa-exclamation-triangle me-1"></i>Import failed: ' + e.message + '</div>';
+			}
+		}
+
+		async function commitPricingImport() {
+			var cats = window._pendingPricingImport;
+			if (!cats) return;
+			var resultEl = document.getElementById('importPricingResult');
+			resultEl.innerHTML = '<div class="alert alert-light py-2 small"><span class="spinner-border spinner-border-sm me-2"></span>Saving to cloud…</div>';
+			try {
+				localStorage.setItem('ald_custom_items', JSON.stringify(cats));
+				if (typeof saveItemsToSupabase === 'function') await saveItemsToSupabase({ customItems: cats, itemOverrides: {} });
+				resultEl.innerHTML = '<div class="alert alert-success py-2 small"><i class="fas fa-check-circle me-1"></i>Done! Items saved and synced to cloud. <a href="quote-builder.html">Go to Quote Builder</a></div>';
+				window._pendingPricingImport = null;
+			} catch(e) {
+				resultEl.innerHTML = '<div class="alert alert-danger py-2 small">Save failed: ' + e.message + '</div>';
+			}
+		}
+
+		async function commitClientsImport() {
+			var clients = window._pendingClientsImport;
+			if (!clients) return;
+			var resultEl = document.getElementById('importClientsResult');
+			resultEl.innerHTML = '<div class="alert alert-light py-2 small"><span class="spinner-border spinner-border-sm me-2"></span>Saving to cloud…</div>';
+			try {
+				var clientsObj = {};
+				clients.forEach(function(c) { if (c.name) clientsObj[c.name] = c; });
+				localStorage.setItem('ald_clients', JSON.stringify(clientsObj));
+				if (typeof saveAllClientsToSupabase === 'function') await saveAllClientsToSupabase(clients);
+				resultEl.innerHTML = '<div class="alert alert-success py-2 small"><i class="fas fa-check-circle me-1"></i>Done! ' + clients.length + ' clients saved and synced to cloud. <a href="quote-builder.html">Go to Quote Builder</a></div>';
+				window._pendingClientsImport = null;
+			} catch(e) {
+				resultEl.innerHTML = '<div class="alert alert-danger py-2 small">Save failed: ' + e.message + '</div>';
+			}
+		}
+
 		function exportClientsToFile() {
 			var clients = {};
 			try { clients = JSON.parse(localStorage.getItem('ald_clients') || '{}'); } catch(e) {}
-			var lines = Object.values(clients).map(function(c) {
-				return [c.name, c.phone, c.email, c.address].filter(Boolean).join(' ');
+			var rows = [['Name','Phone','Email','Address','City','Notes']];
+			Object.values(clients).forEach(function(c) {
+				rows.push([c.name||'', c.phone||'', c.email||'', c.address||'', c.city||'', c.notes||'']);
 			});
-			var blob = new Blob([lines.join('\n')], { type: 'text/plain' });
-			var a = document.createElement('a');
-			a.href = URL.createObjectURL(blob);
-			a.download = 'quotedr-clients.txt';
-			a.click();
+			var csv = rows.map(function(r) { return r.map(function(v) { return '"'+String(v).replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
+			var blob = new Blob([csv], { type: 'text/csv' });
+			var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'quotedr-clients.csv'; a.click();
 		}
 
 		function exportMaterialsToFile() {
 			var items = {};
 			try { items = JSON.parse(localStorage.getItem('ald_custom_items') || '{}'); } catch(e) {}
-			var lines = [];
+			var rows = [['Category','Name','Unit','Rate','Material Cost']];
 			Object.entries(items).forEach(function(entry) {
-				var cat = entry[0], catItems = entry[1];
-				lines.push(cat.toUpperCase());
-				lines.push('-------');
-				catItems.forEach(function(item) {
-					lines.push(item.name + ' | ' + (item.unitType || item.unit || '') + ' | $' + parseFloat(item.rate || item.price || 0).toFixed(2));
+				entry[1].forEach(function(item) {
+					rows.push([entry[0], item.name||'', item.unitType||'', item.rate||0, item.materialCost||0]);
 				});
-				lines.push('');
 			});
-			var blob = new Blob([lines.join('\n')], { type: 'text/plain' });
-			var a = document.createElement('a');
-			a.href = URL.createObjectURL(blob);
-			a.download = 'quotedr-materials.txt';
-			a.click();
+			var csv = rows.map(function(r) { return r.map(function(v) { return '"'+String(v).replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
+			var blob = new Blob([csv], { type: 'text/csv' });
+			var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'quotedr-items.csv'; a.click();
 		}
 
+		// Legacy functions removed — replaced by AI import above
 		function importClientsFromFileSettings() {
 			var file = document.getElementById('importClientsFileSettings').files[0];
 			var resultEl = document.getElementById('importClientsResultSettings');
