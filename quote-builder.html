@@ -174,8 +174,8 @@
             .grand-total h4 { font-size: 1rem !important; }
             /* Card headers wrapping */
             .card-header { flex-wrap: wrap; gap: 4px; }
-            /* Hide autosave toggle label on mobile to save space */
-            .form-check-label { display: none !important; }
+            /* Hide autosave toggle label on mobile to save space (only target the toolbar toggle) */
+            #autoSaveToggle + .form-check-label { display: none !important; }
             /* Hide user logo on mobile to save header space */
             #userLogoImg { display: none !important; }
             /* Hide bottom action bar when modal is open on mobile */
