@@ -1619,7 +1619,7 @@ if (location.search.includes('debug')) {
                         html += '<span class="cat-drag-handle" title="Drag to reorder category">&#8801;</span>';
                         html += '<i class="fas fa-tag me-1" style="color:#6c757d;"></i>' + catDisplay;
                         html += '</div>';
-                        html += '<table class="table table-sm mb-0"><tbody>';
+                        html += '<div style="overflow-x:auto;"><table class="table table-sm mb-0" style="min-width:480px;"><colgroup><col style="width:32px"><col><col style="width:90px"><col style="width:80px"><col style="width:80px"><col style="width:180px"></colgroup><tbody>';
 
                         entries.forEach(({ item, origIndex }) => {
                             const displayRate = item.rate * markupFactor;
@@ -1652,7 +1652,7 @@ if (location.search.includes('debug')) {
                             displayNum++;
                         });
 
-                        html += '</tbody></table>';
+                        html += '</tbody></table></div>'; // end table scroll wrapper
                         html += '</div>'; // end cat-group-block
                     });
 
