@@ -2387,16 +2387,20 @@ if (location.search.includes('debug')) {
         currentUser = null;
 
         function collectQuoteData() {
+            var grandTotal = parseFloat((document.getElementById('grandTotalDisplay')?.textContent || '0').replace(/[^0-9.]/g, '')) || 0;
             return {
                 version: 1,
                 savedAt: new Date().toISOString(),
                 clientName:     document.getElementById('clientName')?.value     || '',
+                quoteNumber:    document.getElementById('quoteNumber')?.value    || '',
                 projectAddress: document.getElementById('projectAddress')?.value || '',
                 clientPhone:    document.getElementById('clientPhone')?.value    || '',
                 clientEmail:    document.getElementById('clientEmail')?.value    || '',
                 terms: getSelectedTerms(),
                 rooms: JSON.parse(JSON.stringify(rooms)),
                 roomCounter: roomCounter,
+                grandTotal: grandTotal,
+                total: grandTotal,
                 supabaseId: window._supabaseQuoteId || null
             };
         }
@@ -2611,6 +2615,29 @@ async function saveQuote() {
                 if (owBtn) { owBtn.disabled = false; owBtn.innerHTML = '<i class="fas fa-save me-1"></i>Overwrite'; }
             }
         }
+        async function confirmSaveLocally() {
+            bootstrap.Modal.getInstance(document.getElementById('saveQuoteModal')).hide();
+            if (window.showSaveFilePicker) {
+                // Desktop: use File System API
+                try {
+                    var client = (_saveDialogData && _saveDialogData.clientName) || 'Quote';
+                    var date = new Date().toISOString().slice(0, 10);
+                    saveFileHandle = await window.showSaveFilePicker({
+                        suggestedName: client + ' - ' + date + '.qdr',
+                        types: [{ description: 'QuoteDr File', accept: { 'application/json': ['.qdr'] } }]
+                    });
+                    await writeToHandle(saveFileHandle);
+                    updateSaveStatus('saved', 'Saved locally ✓');
+                    startAutoSave();
+                } catch(err) {
+                    if (err.name !== 'AbortError') downloadQuoteFallback();
+                }
+            } else {
+                // Mobile: download as file
+                downloadQuoteFallback();
+            }
+        }
+
         // ── End Save Dialog ──────────────────────────────────────────────────────
 
         async function loadQuoteFromFile() {
@@ -4122,9 +4149,10 @@ async function saveQuote() {
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer flex-wrap gap-2">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" id="saveAsNewBtn" class="btn btn-primary" onclick="confirmSaveAsNew()"><i class="fas fa-plus me-1"></i>Save as New</button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="confirmSaveLocally()"><i class="fas fa-folder me-1"></i>Save Locally</button>
+                    <button type="button" id="saveAsNewBtn" class="btn btn-primary" onclick="confirmSaveAsNew()"><i class="fas fa-cloud me-1"></i>Save as New</button>
                     <button type="button" id="overwriteBtn" class="btn btn-warning" onclick="confirmOverwrite()" disabled><i class="fas fa-save me-1"></i>Overwrite</button>
                 </div>
             </div>
