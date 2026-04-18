@@ -2670,7 +2670,8 @@ async function saveQuote() {
         function updateDraftWarning() {
             var banner = document.getElementById('draftWarningBanner');
             if (!banner) return;
-            banner.style.display = saveFileHandle ? 'none' : 'block';
+            // Hide if we have a local file handle OR a cloud save ID
+            banner.style.display = (saveFileHandle || window._supabaseQuoteId) ? 'none' : 'block';
         }
 
         async function doAutoSave() {
@@ -2700,8 +2701,14 @@ async function saveQuote() {
                 }).catch(function(){});
             }
             unsavedChanges = false;
-            if (!saveFileHandle) {
-                if (el) el.innerHTML = '<span style="color:#28a745;"><i class="fas fa-check-circle"></i> Draft saved at ' + t + '</span>';
+            if (el) {
+                if (saveFileHandle) {
+                    el.innerHTML = '<span style="color:#28a745;"><i class="fas fa-check-circle"></i> File saved at ' + t + '</span>';
+                } else if (window._supabaseQuoteId) {
+                    el.innerHTML = '<span style="color:#28a745;"><i class="fas fa-cloud"></i> Cloud saved at ' + t + '</span>';
+                } else {
+                    el.innerHTML = '<span style="color:#fd7e14;"><i class="fas fa-exclamation-triangle"></i> Draft saved locally at ' + t + '</span>';
+                }
             }
             updateDraftWarning();
         }
@@ -2806,6 +2813,7 @@ async function saveQuote() {
                         }
                         unsavedChanges = false;
                         updateSaveStatus('saved', 'Quote loaded ✓');
+                        updateDraftWarning();
                     }
                 } catch(e) {
                     console.warn('Error loading quote from cloud:', e);
