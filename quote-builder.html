@@ -3237,11 +3237,30 @@ async function saveQuote() {
                 qData.grandTotal = q.total || 0;
                 window._supabaseQuoteId = q.id;
                 applyQuoteData(qData);
+                window._loadedQuoteData = qData;
                 unsavedChanges = false;
                 updateSaveStatus('saved', 'Quote loaded ✓');
                 updateDraftWarning();
                 var m = bootstrap.Modal.getInstance(document.getElementById('loadQuoteModal'));
                 if (m) m.hide();
+                // Show client notes banner if opened from notes review
+                if (new URLSearchParams(window.location.search).get('shownotes') === '1') {
+                    setTimeout(function() {
+                        var notes = (window._loadedQuoteData && window._loadedQuoteData._roomNotes) || {};
+                        var noteEntries = Object.entries(notes).filter(function(e) { return e[1] && e[1].trim(); });
+                        if (noteEntries.length > 0) {
+                            var html = '<div id="clientNotesBanner" style="background:#fff3cd;border:2px solid #ffc107;border-radius:10px;padding:16px;margin-bottom:16px;"><div class="d-flex justify-content-between align-items-start"><strong><i class="fas fa-comments me-2" style="color:#fd7e14;"></i>Client Notes to Address:</strong><button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById(\"clientNotesBanner\").remove()">✕</button></div><hr style="margin:8px 0;">';
+                            noteEntries.forEach(function(entry) {
+                                var idx = entry[0], note = entry[1];
+                                var roomName = (rooms[parseInt(idx)] && rooms[parseInt(idx)].name) || ('Room ' + (parseInt(idx)+1));
+                                html += '<div class="mb-2"><strong>' + roomName + ':</strong> ' + note.trim() + '</div>';
+                            });
+                            html += '</div>';
+                            var container = document.getElementById('roomsContainer') || document.querySelector('.rooms-container') || document.querySelector('#rooms');
+                            if (container) container.insertAdjacentHTML('beforebegin', html);
+                        }
+                    }, 800);
+                }
             } catch(e) {
                 if (listEl) listEl.innerHTML = '<div class="alert alert-danger small py-2">Failed to load: ' + e.message + '</div>';
             }

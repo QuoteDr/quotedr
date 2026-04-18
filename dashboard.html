@@ -259,6 +259,8 @@
                             </button>
                         </div>
                     </div>
+                    ${q.status === 'in_review' ? `
+                    <button class="btn btn-warning btn-sm w-100 mt-2" onclick="openNotesReview('${q.id}', '${(q.client_name || '').replace(/'/g, "\\'")}')"><i class="fas fa-comments me-1"></i> Review Client Notes</button>` : ''}
                 </div>
             `).join('');
         }
@@ -280,8 +282,59 @@
         }
 
         function openQuote(quoteId) {
-            // Pass the quote ID to quote-builder via URL param so it loads the right quote
             window.location.href = 'quote-builder.html?load=' + quoteId;
+        }
+
+        var currentNotesQuoteId = null;
+
+        async function openNotesReview(quoteId, clientName) {
+            currentNotesQuoteId = quoteId;
+            document.getElementById('notesReviewClientName').textContent = clientName || 'Client';
+            document.getElementById('notesReviewBody').innerHTML = '<div class="text-center text-muted py-4"><i class="fas fa-spinner fa-spin"></i> Loading notes...</div>';
+            var modal = bootstrap.Modal.getInstance(document.getElementById('notesReviewModal')) || new bootstrap.Modal(document.getElementById('notesReviewModal'));
+            modal.show();
+            try {
+                var res = await _supabase.from('quotes').select('data, client_name').eq('id', quoteId).single();
+                if (res.error || !res.data) throw new Error('Could not load quote');
+                var qd = res.data.data || {};
+                var roomNotes = qd._roomNotes || {};
+                var rooms = qd.rooms || [];
+                var submittedAt = qd._clientSubmittedAt;
+                if (Object.keys(roomNotes).length === 0) {
+                    document.getElementById('notesReviewBody').innerHTML = '<p class="text-muted text-center py-3">No notes found for this quote.</p>';
+                    return;
+                }
+                var html = '';
+                if (submittedAt) html += '<p class="text-muted small mb-3"><i class="fas fa-clock me-1"></i>Submitted ' + new Date(submittedAt).toLocaleString() + '</p>';
+                Object.entries(roomNotes).forEach(function(entry) {
+                    var idx = entry[0], note = entry[1];
+                    if (!note || !note.trim()) return;
+                    var roomName = (rooms[parseInt(idx)] && rooms[parseInt(idx)].name) || ('Room ' + (parseInt(idx)+1));
+                    html += '<div class="card mb-3 border-warning"><div class="card-header py-2" style="background:#fff3cd;"><strong><i class="fas fa-door-open me-2"></i>' + roomName + '</strong></div><div class="card-body py-3"><p class="mb-2" style="white-space:pre-wrap;">' + note.trim() + '</p><button class="btn btn-outline-secondary btn-sm" onclick="copyNoteText(this, ' + JSON.stringify(roomName + ': ' + note.trim()) + ')"><i class="fas fa-copy me-1"></i>Copy Note</button></div></div>';
+                });
+                document.getElementById('notesReviewBody').innerHTML = html;
+            } catch(e) {
+                document.getElementById('notesReviewBody').innerHTML = '<p class="text-danger">Error loading notes: ' + e.message + '</p>';
+            }
+        }
+
+        function openQuoteWithNotes(quoteId) {
+            window.open('quote-builder.html?load=' + quoteId + '&shownotes=1', '_blank');
+        }
+
+        async function markAsResolved(quoteId) {
+            if (!confirm('Mark this quote as resolved?')) return;
+            await updateQuoteStatus(quoteId, 'sent');
+            var modal = bootstrap.Modal.getInstance(document.getElementById('notesReviewModal'));
+            if (modal) modal.hide();
+        }
+
+        function copyNoteText(btn, text) {
+            navigator.clipboard.writeText(text).then(function() {
+                var orig = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check me-1"></i>Copied!';
+                setTimeout(function() { btn.innerHTML = orig; }, 1500);
+            });
         }
 
         async function updateQuoteStatus(quoteId, newStatus) {
@@ -354,5 +407,24 @@
         });
     </script>
     <script src="ai-assistant.js"></script>
+<!-- Client Notes Review Modal -->
+<div class="modal fade" id="notesReviewModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header" style="background:#fff3cd; border-bottom:2px solid #ffc107;">
+                <h5 class="modal-title"><i class="fas fa-comments me-2" style="color:#fd7e14;"></i>Client Notes — <span id="notesReviewClientName"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="notesReviewBody">
+                <div class="text-center text-muted py-4"><i class="fas fa-spinner fa-spin"></i> Loading notes...</div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="openQuoteWithNotes(currentNotesQuoteId)"><i class="fas fa-edit me-1"></i> Open Quote to Edit</button>
+                <button class="btn btn-success" onclick="markAsResolved(currentNotesQuoteId)"><i class="fas fa-check me-1"></i> Mark Resolved</button>
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
 </body>
 </html>

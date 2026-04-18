@@ -943,6 +943,20 @@ if (location.search.includes('debug')) {
                 });
             }
             if (noteLines.length) addField('client_notes', noteLines.join('\n\n'));
+
+            // Save client notes to Supabase
+            var _sqid = new URLSearchParams(window.location.search).get('id');
+            if (_sqid && quoteData._roomNotes && Object.keys(quoteData._roomNotes).length > 0) {
+                var sb2 = window._supabaseClient || (typeof supabase !== 'undefined' ? supabase : null);
+                if (sb2) {
+                    sb2.from('quotes').select('data').eq('id', _sqid).single().then(function(res) {
+                        if (res.data && res.data.data) {
+                            var merged = Object.assign({}, res.data.data, { _roomNotes: quoteData._roomNotes, _clientSubmittedAt: new Date().toISOString() });
+                            sb2.from('quotes').update({ data: merged, updated_at: new Date().toISOString() }).eq('id', _sqid).then(function() {});
+                        }
+                    });
+                }
+            }
         }
 
         function displayTerms() {
