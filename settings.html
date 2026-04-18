@@ -64,16 +64,20 @@ if (location.search.includes('debug')) {
 			<a href="dashboard.html" class="btn btn-outline-secondary btn-sm">
 				<i class="fas fa-arrow-left"></i> Back
 			</a>
+			<a href="help.html" class="text-muted small ms-2" title="Help"><i class="fas fa-question-circle"></i> Help</a>
 		</div>
 		<!-- Centered logo -->
 		<div style="position: absolute; left: 50%; transform: translateX(-50%); font-weight: 700; font-size: 1.1rem; color: #0f3460;">QuoteDr.io</div>
 		<div class="d-flex align-items-center gap-2">
-			<a href="help.html" class="text-muted small" title="Help"><i class="fas fa-question-circle"></i> Help</a>
-			<button type="button" class="btn btn-outline-secondary btn-sm" onclick="signOut()">
-				<i class="fas fa-sign-out-alt"></i> Sign Out
-			</button>
+			<span class="fw-bold small" id="userName"></span>
 		</div>
 	</nav>
+	<!-- Sign out tucked below nav, right-aligned -->
+	<div class="text-end px-4 py-1" style="background:#f0f4fa; border-bottom:1px solid #e2e8f0;">
+		<button type="button" class="btn btn-link btn-sm text-muted p-0" style="font-size:0.78rem;" onclick="signOut()">
+			<i class="fas fa-sign-out-alt me-1"></i>Sign Out
+		</button>
+	</div>
 
 	<div class="container py-4" style="max-width: 680px;">
 		<!-- Business Profile -->
@@ -422,6 +426,10 @@ Sarah Jones, 905-555-5678"></textarea>
 		}
 
 		document.addEventListener('DOMContentLoaded', function() {
+			// Populate username in nav
+			var userName = localStorage.getItem('ald_user_name') || '';
+			var userEl = document.getElementById('userName');
+			if (userEl && userName) userEl.textContent = userName;
 			// Load saved logo (from Supabase or localStorage)
 			var savedLogo = localStorage.getItem('ald_company_logo');
 			if (savedLogo) showLogoPreview(savedLogo);
