@@ -2478,19 +2478,14 @@ if (location.search.includes('debug')) {
         }
 
 async function saveQuote() {
-            // On mobile (no File System API), go straight to cloud save
-            const isMobile = !window.showSaveFilePicker;
-            
-            if (isMobile) {
-                // Cloud save only on mobile
-                var qData = collectQuoteData();
-                if (!qData.clientName && !qData.rooms.length) {
-                    alert('Nothing to save yet — add a client name or some rooms first.');
-                    return;
-                }
-                showSaveDialog(qData);
+            // Always show save dialog first
+            var qData = collectQuoteData();
+            if (!qData.clientName && !qData.rooms.length) {
+                alert('Nothing to save yet — add a client name or some rooms first.');
                 return;
             }
+            showSaveDialog(qData);
+            return;
 
             // Desktop: use File System API
             if (!saveFileHandle) {
@@ -3850,117 +3845,6 @@ async function saveQuote() {
         // ── End Client Database ───────────────────────────────────────────────────
     </script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
-
-    <!-- Sticky total bar -->
-    <div id="stickyTotalBar">
-        <div>
-            <div class="total-label">QUOTE TOTAL (incl. HST)</div>
-            <div class="total-amount" id="stickyTotalAmount">$0.00</div>
-        </div>
-        <div class="text-end">
-            <div class="total-sub" id="stickySubtotal">Subtotal: $0.00</div>
-            <div class="total-sub" id="stickyTax">HST: $0.00</div>
-        </div>
-        <button onclick="toggleStickyTotal()" class="btn btn-sm btn-light ms-4" style="border-radius:20px; opacity:0.85;">
-            <i class="fas fa-times"></i> Hide
-        </button>
-    </div>
-
-    <!-- Sticky floating toolbar -->
-    <div id="stickyToolbar">
-        <button onclick="addRoom()" class="btn btn-primary btn-sm" title="Add room">
-            <i class="fas fa-plus"></i> Room
-        </button>
-        <button onclick="saveQuote()" class="btn btn-warning btn-sm" title="Save">
-            <i class="fas fa-save"></i> Save
-        </button>
-        <button onclick="exportToPDF()" class="btn btn-success btn-sm" title="Export PDF">
-            <i class="fas fa-download"></i> PDF
-        </button>
-        <button onclick="generateInteractiveLink()" class="btn btn-primary btn-sm" title="Send Quote">
-            <i class="fas fa-share-square"></i> Quote
-        </button>
-        <button onclick="generateInvoiceLink()" class="btn btn-danger btn-sm" title="Send Invoice">
-            <i class="fas fa-file-invoice-dollar"></i> Invoice
-        </button>
-        <span style="width:1px; background:#dee2e6; height:24px; display:inline-block; margin:0 4px;"></span>
-        <a href="dashboard.html" class="btn btn-outline-secondary btn-sm" title="Dashboard" onclick="if(unsavedChanges && !confirm('You have unsaved changes. Leave anyway?')) return false; saveSessionQuote();">
-            <i class="fas fa-th-large"></i>
-        </a>
-        <a href="settings.html" class="btn btn-outline-secondary btn-sm" title="Settings" onclick="if(unsavedChanges && !confirm('You have unsaved changes. Leave anyway?')) return false; saveSessionQuote();">
-            <i class="fas fa-cog"></i>
-        </a>
-        <button onclick="if(unsavedChanges && !confirm('You have unsaved changes. Leave anyway?')) return; signOut();" class="btn btn-outline-danger btn-sm" title="Sign out">
-            <i class="fas fa-sign-out-alt"></i>
-        </button>
-        <span style="width:1px; background:#dee2e6; height:24px; display:inline-block; margin:0 4px;"></span>
-        <button onclick="toggleStickyToolbar()" class="btn btn-outline-secondary btn-sm" title="Hide toolbar">
-            <i class="fas fa-eye-slash"></i>
-        </button>
-    </div>
-
-    <!-- Sticky toolbar show button (visible when toolbar is hidden) -->
-    <button id="stickyToolbarReveal" onclick="toggleStickyToolbar()" title="Show toolbar"
-        style="position:fixed; bottom:24px; right:24px; z-index:1051; display:none;
-               background:rgba(255,255,255,0.97); border:2px solid #1a56a0; border-radius:50%;
-               width:48px; height:48px; box-shadow:0 4px 20px rgba(26,86,160,0.35); cursor:pointer;
-               align-items:center; justify-content:center;">
-        <i class="fas fa-eye" style="color:#1a56a0; font-size:1.2rem;"></i>
-    </button>
-
-    <script>
-        // Show sticky toolbar after scrolling past the header — always visible by default
-        (function() {
-            const toolbar = document.getElementById('stickyToolbar');
-            const reveal = document.getElementById('stickyToolbarReveal');
-            // Always reset to visible on each page load
-            localStorage.removeItem('stickyToolbarHidden');
-            window.addEventListener('scroll', function() {
-                const hidden = localStorage.getItem('stickyToolbarHidden') === '1';
-                if (!hidden && window.scrollY > 180) {
-                    toolbar.classList.add('visible');
-                    reveal.style.display = 'none';
-                } else if (!hidden) {
-                    toolbar.classList.remove('visible');
-                }
-            }, { passive: true });
-        })();
-
-        function toggleStickyToolbar() {
-            const toolbar = document.getElementById('stickyToolbar');
-            const reveal = document.getElementById('stickyToolbarReveal');
-            const hidden = localStorage.getItem('stickyToolbarHidden') === '1';
-            if (hidden) {
-                // Show toolbar
-                localStorage.removeItem('stickyToolbarHidden');
-                toolbar.classList.add('visible');
-                reveal.style.display = 'none';
-                reveal.classList.remove('wiggling');
-            } else {
-                // Hide toolbar
-                localStorage.setItem('stickyToolbarHidden', '1');
-                toolbar.classList.remove('visible');
-                if (window.scrollY > 180) {
-                    reveal.style.display = 'flex';
-                    // Start wiggling after a short delay to get user's attention
-                    setTimeout(function() { reveal.classList.add('wiggling'); }, 400);
-                }
-            }
-        }
-
-        // Sticky total bar toggle
-        let stickyTotalVisible = false;
-        function toggleStickyTotal() {
-            stickyTotalVisible = !stickyTotalVisible;
-            const bar = document.getElementById('stickyTotalBar');
-            const btn = document.getElementById('toggleTotalBarBtn');
-            bar.classList.toggle('visible', stickyTotalVisible);
-            if (btn) {
-                btn.classList.toggle('btn-outline-dark', !stickyTotalVisible);
-                btn.classList.toggle('btn-warning', stickyTotalVisible);
-            }
-        }
-    </script>
 
     <!-- Quote Style Modal -->
     <div class="modal fade" id="quoteStyleModal" tabindex="-1">
