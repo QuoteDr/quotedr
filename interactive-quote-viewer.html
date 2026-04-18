@@ -48,12 +48,12 @@
         .warranty-item .label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #f0ad4e; }
         .warranty-item .sublabel { font-size: 0.72rem; opacity: 0.75; margin-top: 2px; }
 
-        .quote-header { 
+        .quote-header {
             margin-bottom: 2rem;
             padding-bottom: 1rem;
             border-bottom: 2px solid #dee2e6;
         }
-        .upgrade-card { 
+        .upgrade-card {
             background: white;
             border-left: 4px solid #667eea;
             padding: 1.5rem;
@@ -61,7 +61,7 @@
             border-radius: 8px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
-        .upgrade-option { 
+        .upgrade-option {
             display: flex;
             align-items: center;
             gap: 1rem;
@@ -70,12 +70,12 @@
             border-radius: 6px;
             margin-top: 0.5rem;
         }
-        .upgrade-option input[type="checkbox"] { 
+        .upgrade-option input[type="checkbox"] {
             width: 24px;
             height: 24px;
             cursor: pointer;
         }
-        .price-tag { 
+        .price-tag {
             font-weight: bold;
             color: #28a745;
             margin-left: auto;
@@ -208,7 +208,7 @@ if (location.search.includes('debug')) {
 
         <!-- Quote Summary -->
         <h4 class="mb-3"><i class="fas fa-list"></i> Your Quote Breakdown</h4>
-        
+
         <div id="quoteContainer">
             <!-- Rooms and items will be loaded here -->
         </div>
@@ -278,7 +278,7 @@ if (location.search.includes('debug')) {
                 <i class="fas fa-info-circle"></i> <strong>You've added notes to this quote.</strong> Adam will review your requests and send you an updated version.
             </div>
 
-            <!-- Single smart button — changes based on notes -->
+            <!-- Single smart button - changes based on notes -->
             <button type="button" class="btn btn-success btn-approve-pulse w-100" id="mainActionBtn"
                 style="font-size:1.15rem; font-weight:700; padding:1rem; border-radius:10px; letter-spacing:0.3px;"
                 onclick="handleMainAction()">
@@ -340,7 +340,7 @@ if (location.search.includes('debug')) {
 
         <!-- Formspree Success Redirect (optional) -->
         <!-- Uncomment below if you want custom redirect after submission -->
-        <!-- 
+        <!--
         <meta http-equiv="refresh" content="3;url=https://ald-direct.com/thank-you">
         -->
     </div>
@@ -358,7 +358,7 @@ if (location.search.includes('debug')) {
         } catch(e) { console.warn('Supabase init failed:', e); }
     </script>
     <script src="supabase-v2.js"></script>
-    
+
     <script>
         let quoteData = {};
 
@@ -386,7 +386,7 @@ if (location.search.includes('debug')) {
                 return ai - bi;
             });
         }
-        
+
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', async function() {
             // Load user's uploaded logo (check both key names, then try Supabase)
@@ -440,7 +440,7 @@ if (location.search.includes('debug')) {
                     ? 'Quote #' + prefs.prefix + '-' + qNum
                     : 'Quote #' + qNum;
             }
-            
+
             renderQuote();
             displayTerms();
             updateTotal();
@@ -539,7 +539,7 @@ if (location.search.includes('debug')) {
             document.getElementById('quoteId').value = quoteData.id || '';
 
             let html = '';
-            
+
             // Match color presets from quote builder
             const ROOM_COLORS = [
                 'linear-gradient(135deg,#2d2d2d 0%,#111111 100%)',
@@ -559,7 +559,7 @@ if (location.search.includes('debug')) {
             quoteData.rooms.forEach((room, roomIdx) => {
                 const roomTotal = room.items.reduce((sum, item) => sum + (item.quantity * item.rate), 0);
                 const headerBg = ROOM_COLORS[room.colorIndex ?? 0] || ROOM_COLORS[0];
-                
+
                 html += `
                     <div class="card mb-3">
                         <div class="card-header" style="background: ${headerBg}; color: white;">
@@ -567,7 +567,7 @@ if (location.search.includes('debug')) {
                         </div>
                         <div class="card-body">
                 `;
-                
+
                 // Sort items by trade category order, preserving original indexes
                 const sortedEntries = sortItemsByCategory(room.items);
                 // Group into category buckets
@@ -746,8 +746,8 @@ if (location.search.includes('debug')) {
             }
             const tax = subtotal * 0.13;
             const total = subtotal + tax;
-            
-            document.getElementById('upgradesTotalDisplay').innerHTML = 
+
+            document.getElementById('upgradesTotalDisplay').innerHTML =
                 upgradesTotal > 0 ? `Upgrades: <strong>+$${upgradesTotal.toFixed(2)}</strong>` : '';
             document.getElementById('newGrandTotal').textContent = `$${total.toFixed(2)}`;
         }
@@ -777,7 +777,7 @@ if (location.search.includes('debug')) {
 
         function handleMainAction() {
             if (hasClientNotes()) {
-                // No signature needed — just submit with notes
+                // No signature needed - just submit with notes
                 submitUpgrades();
                 document.getElementById('hiddenSubmitBtn').click();
             } else {
@@ -832,13 +832,13 @@ if (location.search.includes('debug')) {
                 const sb = window._supabaseClient || (typeof supabase !== 'undefined' ? supabase : null);
                 if (!sb || !quoteId) return;
                 // Only update if still draft or sent (don't overwrite accepted/declined)
-                await sb.from('quotes').update({
-                    status: 'viewed',
+                await sb.from('quotes').update({ 
+                    status: 'viewed', 
                     viewed_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', quoteId)
-                .in('status', ['draft', 'sent']);
+                .or('status.in.(draft,sent),status.is.null');
             } catch(e) { console.warn('Could not mark quote viewed:', e); }
         }
 
@@ -940,18 +940,18 @@ if (location.search.includes('debug')) {
 
         function displayTerms() {
             const termsContainer = document.getElementById('termsDisplay');
-            
+
             if (!quoteData.terms || quoteData.terms.length === 0) {
                 termsContainer.innerHTML = '<p class="text-muted">No specific terms included in this quote.</p>';
                 return;
             }
-            
+
             let html = '<ul class="list-group list-group-flush">';
             quoteData.terms.forEach(term => {
                 html += `<li class="list-group-item"><i class="fas fa-check-circle text-success"></i> ${term}</li>`;
             });
             html += '</ul>';
-            
+
             termsContainer.innerHTML = html;
         }
     </script>
