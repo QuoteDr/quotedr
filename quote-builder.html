@@ -2872,6 +2872,10 @@ async function saveQuote() {
 
         function saveCustomItems() {
             localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
+            // Also sync to Supabase cloud
+            if (typeof saveItemsToSupabase === 'function') {
+                saveItemsToSupabase({ customItems, itemOverrides: itemOverrides || {} }).catch(function(){});
+            }
         }
 
         function addNewCategory() {
@@ -3179,6 +3183,7 @@ async function saveQuote() {
             const rate = parseFloat(document.getElementById('newItemRate').value) || 0;
             const materialCost = parseFloat(document.getElementById('newItemMaterialCost').value) || 0;
             const supplierUrl = document.getElementById('newItemSupplierUrl').value.trim();
+            const itemDescription = document.getElementById('newItemDescription')?.value.trim() || '';
 
             if (!name || !unitType) {
                 alert('Please fill in item name and unit type.');
@@ -3192,7 +3197,7 @@ async function saveQuote() {
                 return;
             }
 
-            const newItem = { name, unitType, rate, materialCost, supplierUrl };
+            const newItem = { name, unitType, rate, materialCost, supplierUrl, itemDescription };
             customItems[category].push(newItem);
             saveCustomItems();
 
@@ -3204,6 +3209,7 @@ async function saveQuote() {
             document.getElementById('newItemRate').value = '';
             document.getElementById('newItemMaterialCost').value = '';
             document.getElementById('newItemSupplierUrl').value = '';
+            if (document.getElementById('newItemDescription')) document.getElementById('newItemDescription').value = '';
 
             renderAllItemsList();
         }
@@ -3996,10 +4002,18 @@ async function saveQuote() {
                 if (typeof loadItemsFromSupabase === 'function') {
                     loadItemsFromSupabase().then(function(result) {
                         if (result.data && Object.keys(result.data).length > 0) {
-                            console.log('Items loaded from Supabase:', Object.keys(result.data).length, 'categories');
+                            // Data may be { customItems: {}, itemOverrides: {} } or legacy flat format
+                            var cloudData = result.data;
+                            var cloudCustom = cloudData.customItems || cloudData; // handle both formats
+                            var cloudOverrides = cloudData.itemOverrides || {};
+                            // Merge with local
                             var local = JSON.parse(localStorage.getItem('ald_custom_items') || '{}');
-                            var merged = Object.assign({}, local, result.data);
+                            var merged = Object.assign({}, local, cloudCustom);
                             localStorage.setItem('ald_custom_items', JSON.stringify(merged));
+                            // Also restore overrides
+                            if (Object.keys(cloudOverrides).length > 0) {
+                                localStorage.setItem('ald_item_overrides', JSON.stringify(cloudOverrides));
+                            }
                             loadCustomItems();
                         } else {
                             console.log('No items found in Supabase:', result.error || 'empty');
