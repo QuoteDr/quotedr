@@ -569,24 +569,9 @@ async function loadClientsFromSupabase() {
 async function saveBusinessProfile(profile) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
-    const { data: existing } = await _supabase
+    const result = await _supabase
         .from('user_data')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('key', 'business_profile')
-        .maybeSingle();
-    let result;
-    if (existing) {
-        result = await _supabase
-            .from('user_data')
-            .update({ value: profile, updated_at: new Date().toISOString() })
-            .eq('user_id', user.id)
-            .eq('key', 'business_profile');
-    } else {
-        result = await _supabase
-            .from('user_data')
-            .insert({ user_id: user.id, key: 'business_profile', value: profile, updated_at: new Date().toISOString() });
-    }
+        .upsert({ user_id: user.id, key: 'business_profile', value: profile, updated_at: new Date().toISOString() }, { onConflict: 'user_id,key' });
     if (!result.error) localStorage.setItem('ald_business_profile', JSON.stringify(profile));
     return result;
 }
@@ -610,24 +595,9 @@ async function loadBusinessProfile() {
 async function saveLogoToSupabase(base64) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
-    const { data: existing } = await _supabase
+    const result = await _supabase
         .from('user_data')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('key', 'company_logo')
-        .maybeSingle();
-    let result;
-    if (existing) {
-        result = await _supabase
-            .from('user_data')
-            .update({ value: { logo: base64 }, updated_at: new Date().toISOString() })
-            .eq('user_id', user.id)
-            .eq('key', 'company_logo');
-    } else {
-        result = await _supabase
-            .from('user_data')
-            .insert({ user_id: user.id, key: 'company_logo', value: { logo: base64 }, updated_at: new Date().toISOString() });
-    }
+        .upsert({ user_id: user.id, key: 'company_logo', value: { logo: base64 }, updated_at: new Date().toISOString() }, { onConflict: 'user_id,key' });
     if (!result.error) localStorage.setItem('ald_company_logo', base64);
     return result;
 }
