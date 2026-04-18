@@ -470,15 +470,15 @@ if (location.search.includes('debug')) {
             }
 
             // Legacy fallback: load from localStorage by ?quote= param
-            let quoteId = params.get('quote');
-            if (!quoteId) {
-                quoteId = localStorage.getItem('ald_last_preview_quote');
+            let legacyQuoteId = params.get('quote');
+            if (!legacyQuoteId) {
+                legacyQuoteId = localStorage.getItem('ald_last_preview_quote');
             }
-            if (!quoteId) {
+            if (!legacyQuoteId) {
                 alert('Invalid or missing quote ID. Please check the link you were sent.');
                 return;
             }
-            const storedQuote = localStorage.getItem(quoteId);
+            const storedQuote = localStorage.getItem(legacyQuoteId);
             if (storedQuote) {
                 quoteData = JSON.parse(storedQuote);
                 console.log('Loaded quote from localStorage:', quoteData);
