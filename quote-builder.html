@@ -18,12 +18,18 @@
         .room-header h3 { margin: 0; font-weight: bold; }
         .room-icon-btn { opacity: 0.85; transition: opacity 0.15s, transform 0.15s; }
         .room-icon-btn:hover { opacity: 1; transform: scale(1.2); }
-        #roomIconPicker { position:fixed; z-index:9999; background:#fff; border:1px solid #dee2e6; border-radius:12px; box-shadow:0 8px 32px rgba(0,0,0,0.18); padding:12px; width:320px; max-height:380px; overflow-y:auto; }
-        #roomIconPicker .icon-section-label { font-size:0.7rem; font-weight:700; text-transform:uppercase; color:#6c757d; letter-spacing:0.5px; margin:8px 0 4px; }
-        #roomIconPicker .icon-grid { display:flex; flex-wrap:wrap; gap:4px; }
-        #roomIconPicker .icon-opt { width:36px; height:36px; display:flex; align-items:center; justify-content:center; border-radius:6px; cursor:pointer; font-size:1.1rem; color:#343a40; border:2px solid transparent; transition:all 0.1s; }
-        #roomIconPicker .icon-opt:hover { background:#e8f0fe; border-color:#1a56a0; color:#1a56a0; }
-        #roomIconPicker .icon-opt.active { background:#1a56a0; color:#fff; border-color:#1a56a0; }
+        /* Desktop popover */
+        #roomIconPicker { position:fixed; z-index:9999; background:#fff; border:1px solid #dee2e6; border-radius:12px; box-shadow:0 8px 32px rgba(0,0,0,0.18); padding:12px; width:300px; max-height:370px; overflow-y:auto; }
+        /* Mobile bottom sheet overlay */
+        #roomIconPickerOverlay { position:fixed; inset:0; z-index:9998; background:rgba(0,0,0,0.45); }
+        #roomIconPickerSheet { position:fixed; left:0; right:0; bottom:0; z-index:9999; background:#fff; border-radius:20px 20px 0 0; padding:16px 16px 32px; max-height:75vh; overflow-y:auto; box-shadow:0 -4px 24px rgba(0,0,0,0.18); }
+        #roomIconPickerSheet .sheet-handle { width:40px; height:4px; background:#dee2e6; border-radius:2px; margin:0 auto 14px; }
+        /* Shared grid styles */
+        .icon-picker-wrap .icon-section-label { font-size:0.7rem; font-weight:700; text-transform:uppercase; color:#6c757d; letter-spacing:0.5px; margin:8px 0 4px; }
+        .icon-picker-wrap .icon-grid { display:flex; flex-wrap:wrap; gap:5px; }
+        .icon-picker-wrap .icon-opt { width:42px; height:42px; display:flex; align-items:center; justify-content:center; border-radius:8px; cursor:pointer; font-size:1.15rem; color:#343a40; border:2px solid transparent; transition:all 0.1s; }
+        .icon-picker-wrap .icon-opt:hover { background:#e8f0fe; border-color:#1a56a0; color:#1a56a0; }
+        .icon-picker-wrap .icon-opt.active { background:#1a56a0; color:#fff; border-color:#1a56a0; }
         .line-item { 
             background: white;
             border-left: 4px solid #1a56a0;
@@ -856,24 +862,8 @@ if (location.search.includes('debug')) {
             ]},
         ];
 
-        function openIconPicker(roomId, triggerEl) {
-            // Close if already open for this room
-            var existing = document.getElementById('roomIconPicker');
-            if (existing && _iconPickerRoomId === roomId) {
-                existing.remove();
-                _iconPickerRoomId = null;
-                return;
-            }
-            if (existing) existing.remove();
-            _iconPickerRoomId = roomId;
-
-            var room = rooms.find(function(r) { return r.id === roomId; });
-            var currentIcon = (room && room.icon) || 'fa-door-open';
-
-            var picker = document.createElement('div');
-            picker.id = 'roomIconPicker';
-
-            var html = '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><strong style="font-size:0.9rem;">Choose Room Icon</strong><button onclick="document.getElementById(\'roomIconPicker\').remove(); _iconPickerRoomId=null;" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#6c757d;">&times;</button></div>';
+        function _iconPickerHTML(roomId, currentIcon) {
+            var html = '';
             ROOM_ICONS.forEach(function(section) {
                 html += '<div class="icon-section-label">' + section.label + '</div><div class="icon-grid">';
                 section.icons.forEach(function(ico) {
@@ -883,29 +873,82 @@ if (location.search.includes('debug')) {
                 });
                 html += '</div>';
             });
-            picker.innerHTML = html;
+            return html;
+        }
 
-            // Position near trigger
-            document.body.appendChild(picker);
-            var rect = triggerEl.getBoundingClientRect();
-            var pickerH = 380, pickerW = 320;
-            var top = rect.bottom + 8 + window.scrollY;
-            var left = rect.left + window.scrollX;
-            if (left + pickerW > window.innerWidth - 8) left = window.innerWidth - pickerW - 8;
-            if (top + pickerH > window.innerHeight + window.scrollY) top = rect.top + window.scrollY - pickerH - 8;
-            picker.style.top = top + 'px';
-            picker.style.left = left + 'px';
+        function closeIconPicker() {
+            var ov = document.getElementById('roomIconPickerOverlay');
+            var sh = document.getElementById('roomIconPickerSheet');
+            var pk = document.getElementById('roomIconPicker');
+            if (ov) ov.remove();
+            if (sh) sh.remove();
+            if (pk) pk.remove();
+            _iconPickerRoomId = null;
+        }
 
-            // Close on outside click
-            setTimeout(function() {
-                document.addEventListener('click', function handler(e) {
-                    if (!picker.contains(e.target) && !triggerEl.contains(e.target)) {
-                        picker.remove();
-                        _iconPickerRoomId = null;
-                        document.removeEventListener('click', handler);
-                    }
-                });
-            }, 0);
+        function openIconPicker(roomId, triggerEl) {
+            // Toggle closed if already open for same room
+            if (_iconPickerRoomId === roomId) { closeIconPicker(); return; }
+            closeIconPicker();
+            _iconPickerRoomId = roomId;
+
+            var room = rooms.find(function(r) { return r.id === roomId; });
+            var currentIcon = (room && room.icon) || 'fa-door-open';
+            var isMobile = window.innerWidth < 768;
+
+            if (isMobile) {
+                // Bottom sheet
+                var overlay = document.createElement('div');
+                overlay.id = 'roomIconPickerOverlay';
+                overlay.onclick = closeIconPicker;
+                document.body.appendChild(overlay);
+
+                var sheet = document.createElement('div');
+                sheet.id = 'roomIconPickerSheet';
+                sheet.className = 'icon-picker-wrap';
+                sheet.innerHTML = '<div class="sheet-handle"></div>' +
+                    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
+                    '<strong style="font-size:1rem;">Choose Room Icon</strong>' +
+                    '<button onclick="closeIconPicker()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#6c757d;line-height:1;">&times;</button></div>' +
+                    _iconPickerHTML(roomId, currentIcon);
+                document.body.appendChild(sheet);
+            } else {
+                // Desktop popover — smart positioned
+                var picker = document.createElement('div');
+                picker.id = 'roomIconPicker';
+                picker.className = 'icon-picker-wrap';
+                picker.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
+                    '<strong style="font-size:0.9rem;">Choose Room Icon</strong>' +
+                    '<button onclick="closeIconPicker()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#6c757d;line-height:1;">&times;</button></div>' +
+                    _iconPickerHTML(roomId, currentIcon);
+                document.body.appendChild(picker);
+
+                // Position: prefer below-left of trigger, flip if off screen
+                var rect = triggerEl.getBoundingClientRect();
+                var pw = 300, ph = 370;
+                var top = rect.bottom + 8;
+                var left = rect.left;
+                // Clamp right edge
+                if (left + pw > window.innerWidth - 8) left = window.innerWidth - pw - 8;
+                if (left < 8) left = 8;
+                // Flip above if not enough room below
+                if (top + ph > window.innerHeight - 8) top = rect.top - ph - 8;
+                if (top < 8) top = 8;
+                picker.style.top = top + 'px';
+                picker.style.left = left + 'px';
+
+                // Close on outside click
+                setTimeout(function() {
+                    document.addEventListener('click', function handler(e) {
+                        var pk2 = document.getElementById('roomIconPicker');
+                        if (!pk2) { document.removeEventListener('click', handler); return; }
+                        if (!pk2.contains(e.target) && !triggerEl.contains(e.target)) {
+                            closeIconPicker();
+                            document.removeEventListener('click', handler);
+                        }
+                    });
+                }, 0);
+            }
         }
 
         function selectRoomIcon(roomId, iconClass) {
