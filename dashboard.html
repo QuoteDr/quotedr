@@ -297,7 +297,6 @@
                 if (error) console.error('Status update error:', error);
             } catch(e) { console.warn('Could not update status in Supabase:', e); }
         }
-        }
 
         async function deleteQuote(quoteId) {
             if (!confirm('Are you sure you want to delete this quote?')) return;
