@@ -3937,6 +3937,23 @@ async function saveQuote() {
         document.addEventListener('hidden.bs.modal', function() {
             cleanupModalBackdrop();
         });
+        // Hide mobile action bar when quote total is visible on screen
+        var _grandTotalEl = document.querySelector('.grand-total');
+        if (_grandTotalEl && window.IntersectionObserver) {
+            var _totalObserver = new IntersectionObserver(function(entries) {
+                var mob = document.getElementById('mobileActionBar');
+                if (!mob) return;
+                if (entries[0].isIntersecting) {
+                    mob.style.setProperty('display', 'none', 'important');
+                } else {
+                    if (!document.querySelector('.modal.show')) {
+                        mob.style.removeProperty('display');
+                    }
+                }
+            }, { threshold: 0.1 });
+            _totalObserver.observe(_grandTotalEl);
+        }
+
         // Hide/show sticky toolbar, total bar AND mobile action bar when modals open/close
         document.addEventListener('show.bs.modal', function() {
             var tb = document.getElementById('stickyToolbar');
