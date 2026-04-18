@@ -263,8 +263,8 @@ if (location.search.includes('debug')) {
         <!-- Professional Header -->
         <div class="d-flex align-items-center justify-content-between mb-2" style="overflow: visible; padding-top: 8px; padding-bottom: 8px; flex-wrap: wrap;">
             <!-- User logo left -->
-            <div style="flex: 0 0 0px; display: flex; align-items: center; overflow: hidden;">
-                <img id="userLogoImg" src="" alt="Your Logo" style="height: 118px; width: auto; max-width: 200px; display: none;">
+            <div style="flex: 0 0 auto; display: flex; align-items: center;">
+                <img id="userLogoImg" src="" alt="Your Logo" style="height: 80px; width: auto; max-width: 180px; display: none; border-radius: 6px;">
             </div>
             <!-- QuoteDr logo center -->
             <div style="flex: 1; display: flex; justify-content: center; align-items: center;">
@@ -2952,7 +2952,7 @@ async function saveQuote() {
             }
 
             // Load user's uploaded logo from onboarding/settings
-            var savedLogo = localStorage.getItem('ald_logo');
+            var savedLogo = localStorage.getItem('ald_company_logo') || localStorage.getItem('ald_logo');
             if (savedLogo) {
                 var logoImg = document.getElementById('userLogoImg');
                 if (logoImg) { logoImg.src = savedLogo; logoImg.style.display = 'block'; }
