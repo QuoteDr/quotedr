@@ -7,92 +7,185 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { 
-            background-color: #eef4fb; 
-            font-family: 'Inter', sans-serif;
-        }
-        .navbar {
-            background: linear-gradient(135deg, #2d2d2d 0%, #111111 100%);
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .navbar-brand {
-            color: white !important;
-            font-weight: bold;
-        }
-        .privacy-content {
-            background: white;
-            border-radius: 10px;
-            padding: 2rem;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-            margin-top: 2rem;
-        }
-        h1, h2, h3 {
-            color: #1a56a0;
-        }
-        .footer {
-            background: linear-gradient(135deg, #2d2d2d 0%, #111111 100%);
-            color: white;
-            padding: 2rem 0;
-            margin-top: 3rem;
-        }
+        body { font-family: 'Segoe UI', sans-serif; background: #f8f9fa; color: #333; }
+        .page-header { background: linear-gradient(135deg, #0f3460, #1a56a0); color: white; padding: 48px 0 32px; }
+        .legal-card { background: white; border-radius: 12px; padding: 32px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        h2 { color: #0f3460; font-size: 1.15rem; font-weight: 700; margin-top: 24px; }
+        .nav-bar { background: #0f3460; padding: 12px 0; }
+        footer { background: #0f3460; color: rgba(255,255,255,0.7); text-align: center; padding: 20px; margin-top: 48px; font-size: 0.85rem; }
     </style>
 </head>
 <body>
-    <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark">
+    <!-- Navigation Bar -->
+    <nav class="nav-bar">
         <div class="container">
-            <a class="navbar-brand" href="landing.html">
-                <i class="fas fa-file-invoice-dollar"></i> QuoteDr
-            </a>
+            <div class="d-flex justify-content-between align-items-center">
+                <a href="landing.html" class="text-white text-decoration-none fw-bold">
+                    <i class="fas fa-file-invoice me-2"></i>QuoteDr
+                </a>
+                <a href="dashboard.html" class="text-white text-decoration-none">
+                    <i class="fas fa-arrow-left me-1"></i>Back to App
+                </a>
+            </div>
         </div>
     </nav>
 
-    <!-- Privacy Content -->
-    <div class="container privacy-content">
-        <h1>Privacy Policy</h1>
-        
-        <p>This privacy policy explains how QuoteDr collects, uses, and protects your personal information.</p>
-        
-        <h2>Information We Collect</h2>
-        <p>When you sign up for QuoteDr, we collect:</p>
-        <ul>
-            <li>Your email address</li>
-            <li>Your business information (name, phone number, etc.)</li>
-            <li>Quote data and project details</li>
-        </ul>
-        
-        <h2>How We Use Your Information</h2>
-        <p>We use your information to:</p>
-        <ul>
-            <li>Provide and improve our quote generation services</li>
-            <li>Store your quotes securely in your account</li>
-            <li>Communicate with you about your quotes and services</li>
-        </ul>
-        
-        <h2>Data Storage</h2>
-        <p>Your data is stored securely using Supabase, a cloud database service. We take security seriously and implement industry-standard protections to keep your information safe.</p>
-        
-        <h2>Sharing Your Information</h2>
-        <p>We do not sell or rent your personal information to third parties. We may share information with trusted service providers who help us operate our business, but they are contractually obligated to maintain the confidentiality of your data.</p>
-        
-        <h2>Security</h2>
-        <p>We implement appropriate technical and organizational security measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction.</p>
-        
-        <h2>Contact Us</h2>
-        <p>If you have questions about this privacy policy, please contact us at:</p>
-        <p><i class="fas fa-envelope"></i> info@alddirect.ca</p>
-        
-        <h2>Last Updated</h2>
-        <p>This privacy policy was last updated on April 2026.</p>
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="container">
+            <h1 class="mb-0">Privacy Policy</h1>
+            <p class="mb-0 opacity-75">Last updated: April 2026</p>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container py-5">
+        <div class="legal-card">
+            <h3 class="mb-4">1. Information We Collect</h3>
+            <p>We collect the following types of information to provide and improve our Service:</p>
+            <ul>
+                <li><strong>Personal Information:</strong> Name, email address, phone number, business name, and address</li>
+                <li><strong>Account Information:</strong> Username, password, subscription details, billing information</li>
+                <li><strong>Business Data:</strong> Quotes, invoices, customer information, payment history</li>
+                <li><strong>Usage Data:</strong> IP address, browser type, device information, usage patterns</li>
+            </ul>
+        </div>
+
+        <div class="legal-card">
+            <h3 class="mb-4">2. How We Use Your Information</h3>
+            <p>We use your information for the following purposes:</p>
+            <ul>
+                <li>Provide and maintain the Service</li>
+                <li>Process payments and manage subscriptions</li>
+                <li>Send invoices, quotes, and transactional communications</li>
+                <li>Improve, test, and develop our Service</li>
+                <li>Respond to customer support requests</li>
+                <li>Send service updates and promotional communications (with your consent)</li>
+            </ul>
+            <p class="mt-3"><strong>Important:</strong> We do not sell, trade, or rent your personal data to third parties. We only share your data with service providers necessary to operate the Service.</p>
+        </div>
+
+        <div class="legal-card">
+            <h3 class="mb-4">3. Data Storage</h3>
+            <p>Your data is stored on Supabase, a PostgreSQL database hosted on AWS. We implement industry-standard security measures to protect your data, including:</p>
+            <ul>
+                <li>Encryption at rest and in transit</li>
+                <li>Regular security audits and updates</li>
+                <li>Access controls and authentication</li>
+                <li>Backup and disaster recovery procedures</li>
+            </ul>
+        </div>
+
+        <div class="legal-card">
+            <h3 class="mb-4">4. Third-Party Services</h3>
+            <p>We use the following third-party services to operate the Service:</p>
+            <ul>
+                <li><strong>Stripe:</strong> Payment processing and billing</li>
+                <li><strong>Supabase:</strong> Database hosting and management</li>
+                <li><strong>Cloudflare:</strong> Website hosting and security</li>
+            </ul>
+            <p>These third parties have access to your data only to perform the services they provide and are prohibited from using it for other purposes.</p>
+        </div>
+
+        <div class="legal-card">
+            <h3 class="mb-4">5. Cookies and Tracking</h3>
+            <p>We use minimal cookies to enhance your experience:</p>
+            <ul>
+                <li><strong>Session Cookies:</strong> Required for you to use the Service</li>
+                <li><strong>Analytics Cookies:</strong> Help us understand how you use the Service (optional, can be disabled)</li>
+            </ul>
+            <p>You can manage cookie preferences through your browser settings.</p>
+        </div>
+
+        <div class="legal-card">
+            <h3 class="mb-4">6. Your Privacy Rights</h3>
+            <p>Under applicable laws, you have the right to:</p>
+            <ul>
+                <li><strong>Access:</strong> Request a copy of your personal data</li>
+                <li><strong>Correction:</strong> Request updates to inaccurate information</li>
+                <li><strong>Deletion:</strong> Request deletion of your data (see Data Retention below)</li>
+                <li><strong>Export:</strong> Request a copy of your data in a portable format</li>
+                <li><strong>Opt-out:</strong> Opt out of marketing communications</li>
+            </ul>
+            <p>To exercise these rights, contact privacy@quotedr.io.</p>
+        </div>
+
+        <div class="legal-card">
+            <h3 class="mb-4">7. PIPEDA Compliance</h3>
+            <p>As a Canadian company, we comply with the Personal Information Protection and Electronic Documents Act (PIPEDA). This means:</p>
+            <ul>
+                <li>We collect only the information necessary for our purposes</li>
+                <li>We obtain your consent for collection, use, and disclosure</li>
+                <li>We protect your information with appropriate security measures</li>
+                <li>You have the right to access and correct your information</li>
+                <li>We retain your information only as long as necessary</li>
+            </ul>
+        </div>
+
+        <div class="legal-card">
+            <h3 class="mb-4">8. GDPR Compliance</h3>
+            <p>If you are located in the European Union, we comply with the General Data Protection Regulation (GDPR). This includes:</p>
+            <ul>
+                <li>Providing clear and transparent information about data processing</li>
+                <li>Obtaining lawful basis for processing your data</li>
+                <li>Respecting your data subject rights</li>
+                <li>Implementing appropriate data protection measures</li>
+            </ul>
+        </div>
+
+        <div class="legal-card">
+            <h3 class="mb-4">9. Data Retention</h3>
+            <p>We retain your data for the following periods:</p>
+            <ul>
+                <li><strong>Active Accounts:</strong> As long as your account is active</li>
+                <li><strong>Closed Accounts:</strong> Your data is deleted within 30 days of account closure</li>
+                <li><strong>Legal Requirements:</strong> We may retain data longer if required by law</li>
+            </ul>
+        </div>
+
+        <div class="legal-card">
+            <h3 class="mb-4">10. Children's Privacy</h3>
+            <p>Our Service is not intended for children under 13 years of age. We do not knowingly collect personal information from children under 13.</p>
+        </div>
+
+        <div class="legal-card">
+            <h3 class="mb-4">11. International Data Transfers</h3>
+            <p>Your data may be transferred to and processed in countries other than your own. We ensure appropriate safeguards are in place to protect your data in accordance with applicable privacy laws.</p>
+        </div>
+
+        <div class="legal-card">
+            <h3 class="mb-4">12. Security</h3>
+            <p>We implement robust security measures to protect your data, including:</p>
+            <ul>
+                <li>Encryption of sensitive data</li>
+                <li>Secure authentication and authorization</li>
+                <li>Regular security assessments</li>
+                <li>Incident response procedures</li>
+            </ul>
+        </div>
+
+        <div class="legal-card">
+            <h3 class="mb-4">13. Changes to This Policy</h3>
+            <p>We may update this Privacy Policy from time to time. We will notify you of significant changes by:</p>
+            <ul>
+                <li>Posting the updated policy on this page</li>
+                <li>Sending an email notification to your registered email address</li>
+            </ul>
+            <p>Continued use of the Service after changes constitutes acceptance of the updated policy.</p>
+        </div>
+
+        <div class="legal-card">
+            <h3 class="mb-4">14. Contact Information</h3>
+            <p>If you have any questions about this Privacy Policy, please contact us at:</p>
+            <p><strong>Email:</strong> privacy@quotedr.io</p>
+        </div>
     </div>
 
     <!-- Footer -->
-    <footer class="footer">
-        <div class="container text-center">
-            <p>&copy; 2026 QuoteDr. All rights reserved.</p>
+    <footer>
+        <div class="container">
+            <p>© 2026 QuoteDr (ALD Direct Inc.) · All Rights Reserved</p>
         </div>
     </footer>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
