@@ -2708,8 +2708,9 @@ async function saveQuote() {
             if (typeof saveQuoteToSupabase === 'function') {
                 var qData2 = collectQuoteData();
                 saveQuoteToSupabase(qData2).then(function(result) {
-                    if (result && result.data && result.data.id) {
-                        window._supabaseQuoteId = result.data.id;
+                    if (result && result.data) {
+                        var saved = Array.isArray(result.data) ? result.data[0] : result.data;
+                        if (saved && saved.id) window._supabaseQuoteId = saved.id;
                     }
                 }).catch(function(){});
             }
@@ -2888,8 +2889,10 @@ async function saveQuote() {
             if (typeof saveQuoteToSupabase === 'function') {
                 var qData = collectQuoteData();
                 saveQuoteToSupabase(qData).then(function(result) {
-                    if (result && result.data && result.data.id) {
-                        window._supabaseQuoteId = result.data.id;
+                    if (result && result.data) {
+                        // result.data may be an array (insert) or object (update)
+                        var saved = Array.isArray(result.data) ? result.data[0] : result.data;
+                        if (saved && saved.id) window._supabaseQuoteId = saved.id;
                     }
                 }).catch(function(){});
             }
