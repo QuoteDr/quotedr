@@ -711,6 +711,75 @@ Sarah Jones, 905-555-5678"></textarea>
 			reader.readAsText(file);
 		}
 
+		// Shared helper: render preview for pricing
+		function renderPricingPreview(cats, resultEl) {
+			var count = Object.values(cats).reduce(function(s,a){return s+a.length;},0);
+			var html = '<div class="alert alert-success py-2 mb-2 small"><i class="fas fa-check-circle me-1"></i>AI found <strong>' + count + ' items</strong> in <strong>' + Object.keys(cats).length + ' categories</strong>.</div>';
+			html += '<div class="import-preview-box" style="max-height:220px;overflow-y:auto;border:1px solid #dee2e6;border-radius:6px;padding:8px;background:#f8f9fa;font-size:0.8rem;margin-bottom:10px;">';
+			Object.entries(cats).forEach(function(e) {
+				html += '<div class="fw-bold text-primary mt-1">' + e[0] + '</div>';
+				e[1].forEach(function(item) {
+					html += '<div class="ps-2 text-muted">' + item.name + ' &mdash; ' + item.unitType + ' @ $' + parseFloat(item.rate||0).toFixed(2) + '</div>';
+				});
+			});
+			html += '</div>';
+			// Action buttons
+			html += '<div class="d-flex gap-2 flex-wrap mb-2">';
+			html += '<button class="btn btn-sm btn-success" onclick="commitPricingImport()"><i class="fas fa-check me-1"></i>Looks good — Import!</button>';
+			html += '<button class="btn btn-sm" style="background:#7c3aed;color:white;" onclick="showFixItBox(\'pricing\')"><i class="fas fa-magic me-1"></i>Make Changes</button>';
+			html += '<button class="btn btn-sm btn-outline-secondary" onclick="cancelImport(\'pricing\')">Cancel</button>';
+			html += '</div>';
+			// Fix-it chat box (hidden by default)
+			html += '<div id="fixItBox_pricing" style="display:none; border:2px solid #7c3aed; border-radius:8px; padding:10px; background:#faf8ff;">';
+			html += '<div class="small fw-bold mb-1" style="color:#7c3aed;"><i class="fas fa-magic me-1"></i>Tell the AI what to fix:</div>';
+			html += '<textarea id="fixItText_pricing" class="form-control form-control-sm mb-2" rows="3" placeholder="e.g. The prices look right but the categories are all wrong — tile items should be under Tile, not General. Also the unit for painting should be sqft not ea."></textarea>';
+			html += '<div class="d-flex gap-2">';
+			html += '<button class="btn btn-sm" style="background:#7c3aed;color:white;" onclick="runFixIt(\'pricing\')"><i class="fas fa-magic me-1"></i>Fix It</button>';
+			html += '<button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById(\'fixItBox_pricing\').style.display=\'none\'">Never mind</button>';
+			html += '</div></div>';
+			resultEl.innerHTML = html;
+		}
+
+		// Shared helper: render preview for clients
+		function renderClientsPreview(clients, resultEl) {
+			var html = '<div class="alert alert-success py-2 mb-2 small"><i class="fas fa-check-circle me-1"></i>AI found <strong>' + clients.length + ' clients</strong>.</div>';
+			html += '<div class="import-preview-box" style="max-height:220px;overflow-y:auto;border:1px solid #dee2e6;border-radius:6px;padding:8px;background:#f8f9fa;font-size:0.8rem;margin-bottom:10px;">';
+			clients.slice(0,30).forEach(function(c) {
+				html += '<div class="py-1 border-bottom"><strong>' + (c.name||'') + '</strong>';
+				if (c.phone) html += ' &middot; ' + c.phone;
+				if (c.email) html += ' &middot; <span class="text-muted">' + c.email + '</span>';
+				if (c.address) html += ' &middot; <span class="text-muted">' + c.address + '</span>';
+				html += '</div>';
+			});
+			if (clients.length > 30) html += '<div class="text-muted small pt-1">...and ' + (clients.length-30) + ' more</div>';
+			html += '</div>';
+			html += '<div class="d-flex gap-2 flex-wrap mb-2">';
+			html += '<button class="btn btn-sm btn-success" onclick="commitClientsImport()"><i class="fas fa-check me-1"></i>Looks good — Import!</button>';
+			html += '<button class="btn btn-sm" style="background:#1a56a0;color:white;" onclick="showFixItBox(\'clients\')"><i class="fas fa-magic me-1"></i>Make Changes</button>';
+			html += '<button class="btn btn-sm btn-outline-secondary" onclick="cancelImport(\'clients\')">Cancel</button>';
+			html += '</div>';
+			html += '<div id="fixItBox_clients" style="display:none; border:2px solid #1a56a0; border-radius:8px; padding:10px; background:#f0f4ff;">';
+			html += '<div class="small fw-bold mb-1" style="color:#1a56a0;"><i class="fas fa-magic me-1"></i>Tell the AI what to fix:</div>';
+			html += '<textarea id="fixItText_clients" class="form-control form-control-sm mb-2" rows="3" placeholder="e.g. The names and emails got swapped. Also some entries are companies not people — keep them but use the company name."></textarea>';
+			html += '<div class="d-flex gap-2">';
+			html += '<button class="btn btn-sm" style="background:#1a56a0;color:white;" onclick="runFixIt(\'clients\')"><i class="fas fa-magic me-1"></i>Fix It</button>';
+			html += '<button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById(\'fixItBox_clients\').style.display=\'none\'">Never mind</button>';
+			html += '</div></div>';
+			resultEl.innerHTML = html;
+		}
+
+		function showFixItBox(type) {
+			var box = document.getElementById('fixItBox_' + type);
+			if (box) { box.style.display = 'block'; box.scrollIntoView({behavior:'smooth', block:'nearest'}); }
+		}
+
+		function cancelImport(type) {
+			window._pendingPricingImport = null;
+			window._pendingClientsImport = null;
+			window._originalImportContent = null;
+			document.getElementById(type === 'pricing' ? 'importPricingResult' : 'importClientsResult').innerHTML = '';
+		}
+
 		async function runAiImport(type) {
 			var textEl = document.getElementById(type === 'pricing' ? 'importPricingText' : 'importClientsText');
 			var resultEl = document.getElementById(type === 'pricing' ? 'importPricingResult' : 'importClientsResult');
@@ -719,9 +788,8 @@ Sarah Jones, 905-555-5678"></textarea>
 				resultEl.innerHTML = '<div class="alert alert-warning py-2 small">Please paste some data or upload a file first.</div>';
 				return;
 			}
-
+			window._originalImportContent = content; // save for fix-it context
 			resultEl.innerHTML = '<div class="alert alert-light py-2 small"><span class="spinner-border spinner-border-sm me-2"></span>AI is reading your data… this takes a few seconds.</div>';
-
 			try {
 				var res = await fetch(AI_IMPORT_URL, {
 					method: 'POST',
@@ -730,62 +798,56 @@ Sarah Jones, 905-555-5678"></textarea>
 				});
 				var data = await res.json();
 				if (data.error) throw new Error(data.error);
-
 				if (type === 'pricing') {
-					// Show preview
-					var cats = data.categories || {};
-					var count = data.count || 0;
-					var previewHtml = '<div class="alert alert-success py-2 mb-2 small"><i class="fas fa-check-circle me-1"></i>AI found <strong>' + count + ' items</strong> in <strong>' + Object.keys(cats).length + ' categories</strong>. Preview:</div>';
-					previewHtml += '<div style="max-height:200px; overflow-y:auto; border:1px solid #dee2e6; border-radius:6px; padding:8px; background:#f8f9fa; font-size:0.8rem; margin-bottom:10px;">';
-					Object.entries(cats).forEach(function(entry) {
-						previewHtml += '<div class="fw-bold text-primary mt-1">' + entry[0] + '</div>';
-						entry[1].forEach(function(item) {
-							previewHtml += '<div class="ps-2 text-muted">' + item.name + ' &mdash; ' + item.unitType + ' @ $' + parseFloat(item.rate).toFixed(2) + '</div>';
-						});
-					});
-					previewHtml += '</div>';
-					previewHtml += '<div class="d-flex gap-2">';
-					previewHtml += '<button class="btn btn-sm btn-success" onclick="commitPricingImport(' + JSON.stringify(JSON.stringify(cats)).slice(1,-1).replace(/"/g,"'") + ')"><i class="fas fa-check me-1"></i>Looks good — Import!</button>';
-					previewHtml += '<button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById(\'importPricingResult\').innerHTML=\'\'">Cancel</button>';
-					previewHtml += '</div>';
-					// Store parsed data for commit
-					window._pendingPricingImport = cats;
-					previewHtml = '<div class="alert alert-success py-2 mb-2 small"><i class="fas fa-check-circle me-1"></i>AI found <strong>' + count + ' items</strong> in <strong>' + Object.keys(cats).length + ' categories</strong>. Preview:</div>';
-					previewHtml += '<div style="max-height:200px; overflow-y:auto; border:1px solid #dee2e6; border-radius:6px; padding:8px; background:#f8f9fa; font-size:0.8rem; margin-bottom:10px;">';
-					Object.entries(cats).forEach(function(entry) {
-						previewHtml += '<div class="fw-bold text-primary mt-1">' + entry[0] + '</div>';
-						entry[1].forEach(function(item) {
-							previewHtml += '<div class="ps-2 text-muted">' + item.name + ' &mdash; ' + item.unitType + ' @ $' + parseFloat(item.rate).toFixed(2) + '</div>';
-						});
-					});
-					previewHtml += '</div>';
-					previewHtml += '<div class="d-flex gap-2">';
-					previewHtml += '<button class="btn btn-sm btn-success" onclick="commitPricingImport()"><i class="fas fa-check me-1"></i>Looks good — Import!</button>';
-					previewHtml += '<button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById(\'importPricingResult\').innerHTML=\'\'; window._pendingPricingImport=null;">Cancel</button>';
-					previewHtml += '</div>';
-					resultEl.innerHTML = previewHtml;
+					window._pendingPricingImport = data.categories || {};
+					renderPricingPreview(window._pendingPricingImport, resultEl);
 				} else {
-					// Clients preview
-					var clients = data.clients || [];
-					var previewHtml = '<div class="alert alert-success py-2 mb-2 small"><i class="fas fa-check-circle me-1"></i>AI found <strong>' + clients.length + ' clients</strong>. Preview:</div>';
-					previewHtml += '<div style="max-height:200px; overflow-y:auto; border:1px solid #dee2e6; border-radius:6px; padding:8px; background:#f8f9fa; font-size:0.8rem; margin-bottom:10px;">';
-					clients.slice(0, 20).forEach(function(c) {
-						previewHtml += '<div class="py-1 border-bottom"><strong>' + c.name + '</strong>';
-						if (c.phone) previewHtml += ' &middot; ' + c.phone;
-						if (c.email) previewHtml += ' &middot; ' + c.email;
-						previewHtml += '</div>';
-					});
-					if (clients.length > 20) previewHtml += '<div class="text-muted small pt-1">...and ' + (clients.length - 20) + ' more</div>';
-					previewHtml += '</div>';
-					previewHtml += '<div class="d-flex gap-2">';
-					previewHtml += '<button class="btn btn-sm btn-success" onclick="commitClientsImport()"><i class="fas fa-check me-1"></i>Looks good — Import!</button>';
-					previewHtml += '<button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById(\'importClientsResult\').innerHTML=\'\'; window._pendingClientsImport=null;">Cancel</button>';
-					previewHtml += '</div>';
-					window._pendingClientsImport = clients;
-					resultEl.innerHTML = previewHtml;
+					window._pendingClientsImport = data.clients || [];
+					renderClientsPreview(window._pendingClientsImport, resultEl);
 				}
 			} catch(e) {
 				resultEl.innerHTML = '<div class="alert alert-danger py-2 small"><i class="fas fa-exclamation-triangle me-1"></i>Import failed: ' + e.message + '</div>';
+			}
+		}
+
+		async function runFixIt(type) {
+			var fixText = document.getElementById('fixItText_' + type)?.value.trim();
+			var resultEl = document.getElementById(type === 'pricing' ? 'importPricingResult' : 'importClientsResult');
+			if (!fixText) { alert('Please describe what needs to be fixed!'); return; }
+
+			// Build context: original data + current parsed result + user instructions
+			var currentData = type === 'pricing'
+				? JSON.stringify(window._pendingPricingImport, null, 2)
+				: JSON.stringify(window._pendingClientsImport, null, 2);
+
+			var fixPrompt = 'Here is the original raw data the user uploaded:\n\n' +
+				(window._originalImportContent || '').slice(0, 3000) +
+				'\n\nHere is how AI parsed it so far:\n\n' + currentData.slice(0, 3000) +
+				'\n\nThe user wants these changes: ' + fixText +
+				'\n\nPlease re-parse the original data applying the user\'s corrections. Return the same JSON format as before.';
+
+			// Show spinner inside the fix-it box
+			var fixBtn = document.querySelector('#fixItBox_' + type + ' button');
+			if (fixBtn) { fixBtn.disabled = true; fixBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Fixing…'; }
+
+			try {
+				var res = await fetch(AI_IMPORT_URL, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + AI_ANON_KEY },
+					body: JSON.stringify({ content: fixPrompt, type: type === 'pricing' ? 'materials' : 'clients' })
+				});
+				var data = await res.json();
+				if (data.error) throw new Error(data.error);
+				if (type === 'pricing') {
+					window._pendingPricingImport = data.categories || {};
+					renderPricingPreview(window._pendingPricingImport, resultEl);
+				} else {
+					window._pendingClientsImport = data.clients || [];
+					renderClientsPreview(window._pendingClientsImport, resultEl);
+				}
+			} catch(e) {
+				if (fixBtn) { fixBtn.disabled = false; fixBtn.innerHTML = '<i class="fas fa-magic me-1"></i>Fix It'; }
+				alert('Fix failed: ' + e.message);
 			}
 		}
 
@@ -797,7 +859,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			try {
 				localStorage.setItem('ald_custom_items', JSON.stringify(cats));
 				if (typeof saveItemsToSupabase === 'function') await saveItemsToSupabase({ customItems: cats, itemOverrides: {} });
-				resultEl.innerHTML = '<div class="alert alert-success py-2 small"><i class="fas fa-check-circle me-1"></i>Done! Items saved and synced to cloud. <a href="quote-builder.html">Go to Quote Builder</a></div>';
+				resultEl.innerHTML = '<div class="alert alert-success py-2 small"><i class="fas fa-check-circle me-1"></i>Done! Items saved and synced to cloud. <a href="quote-builder.html">Go to Quote Builder →</a></div>';
 				window._pendingPricingImport = null;
 			} catch(e) {
 				resultEl.innerHTML = '<div class="alert alert-danger py-2 small">Save failed: ' + e.message + '</div>';
@@ -814,7 +876,7 @@ Sarah Jones, 905-555-5678"></textarea>
 				clients.forEach(function(c) { if (c.name) clientsObj[c.name] = c; });
 				localStorage.setItem('ald_clients', JSON.stringify(clientsObj));
 				if (typeof saveAllClientsToSupabase === 'function') await saveAllClientsToSupabase(clients);
-				resultEl.innerHTML = '<div class="alert alert-success py-2 small"><i class="fas fa-check-circle me-1"></i>Done! ' + clients.length + ' clients saved and synced to cloud. <a href="quote-builder.html">Go to Quote Builder</a></div>';
+				resultEl.innerHTML = '<div class="alert alert-success py-2 small"><i class="fas fa-check-circle me-1"></i>Done! ' + clients.length + ' clients saved and synced to cloud. <a href="quote-builder.html">Go to Quote Builder →</a></div>';
 				window._pendingClientsImport = null;
 			} catch(e) {
 				resultEl.innerHTML = '<div class="alert alert-danger py-2 small">Save failed: ' + e.message + '</div>';
