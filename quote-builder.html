@@ -2488,29 +2488,7 @@ async function saveQuote() {
                     alert('Nothing to save yet — add a client name or some rooms first.');
                     return;
                 }
-                updateSaveStatus('saving', 'Saving to cloud...');
-                if (typeof saveQuoteToSupabase === 'function') {
-                    try {
-                        var result = await saveQuoteToSupabase(qData);
-                        if (result && !result.error && result.data && result.data[0]) {
-                            window._supabaseQuoteId = result.data[0].id;
-                            unsavedChanges = false;
-                            updateSaveStatus('saved', 'Saved to cloud ✓');
-                        } else if (result && !result.error) {
-                            unsavedChanges = false;
-                            updateSaveStatus('saved', 'Saved to cloud ✓');
-                        } else {
-                            updateSaveStatus('error', 'Cloud save failed — saved locally');
-                            localStorage.setItem('ald_autosave_draft', JSON.stringify(qData));
-                        }
-                    } catch(e) {
-                        updateSaveStatus('error', 'Saved locally only');
-                        localStorage.setItem('ald_autosave_draft', JSON.stringify(qData));
-                    }
-                } else {
-                    localStorage.setItem('ald_autosave_draft', JSON.stringify(qData));
-                    updateSaveStatus('saved', 'Saved locally ✓');
-                }
+                showSaveDialog(qData);
                 return;
             }
 
@@ -2544,6 +2522,101 @@ async function saveQuote() {
                 }).catch(function(){});
             }
         }
+
+        // ── Save Dialog ──────────────────────────────────────────────────────────
+        var _saveDialogData = null;
+        var _selectedOverwriteId = null;
+
+        async function showSaveDialog(qData) {
+            _saveDialogData = qData;
+            _selectedOverwriteId = null;
+            // Pre-fill name
+            var nameInput = document.getElementById('saveQuoteNameInput');
+            if (nameInput) nameInput.value = qData.clientName || '';
+            // Disable overwrite button
+            var owBtn = document.getElementById('overwriteBtn');
+            if (owBtn) owBtn.disabled = true;
+            // Load existing quotes
+            var listEl = document.getElementById('saveQuoteList');
+            if (listEl) listEl.innerHTML = '<div class="text-muted small text-center py-3"><span class="spinner-border spinner-border-sm me-2"></span>Loading...</div>';
+            // Show modal
+            var modal = new bootstrap.Modal(document.getElementById('saveQuoteModal'));
+            modal.show();
+            // Fetch quotes
+            if (typeof listQuotesFromSupabase === 'function') {
+                var result = await listQuotesFromSupabase();
+                var quotes = (result && result.data) ? result.data : [];
+                if (!listEl) return;
+                if (!quotes.length) {
+                    listEl.innerHTML = '<div class="text-muted small text-center py-2">No saved quotes yet</div>';
+                    return;
+                }
+                listEl.innerHTML = quotes.map(function(q) {
+                    var date = q.updated_at ? new Date(q.updated_at).toLocaleDateString() : '';
+                    var total = q.total ? ('$' + parseFloat(q.total).toFixed(2)) : '$0.00';
+                    return '<div class="save-quote-item p-2 mb-1 rounded" style="border:1px solid #dee2e6; cursor:pointer;" onclick="selectSaveOverwrite(\'' + q.id + '\', this)">' +
+                        '<div class="fw-bold">' + (q.client_name || 'Unnamed') + '</div>' +
+                        '<div class="text-muted small">' + date + ' &middot; ' + total + '</div>' +
+                        '</div>';
+                }).join('');
+            }
+        }
+
+        function selectSaveOverwrite(id, el) {
+            _selectedOverwriteId = id;
+            document.querySelectorAll('.save-quote-item').forEach(function(e) {
+                e.style.background = '';
+                e.style.borderColor = '#dee2e6';
+            });
+            el.style.background = '#e8f0fe';
+            el.style.borderColor = '#1a56a0';
+            var owBtn = document.getElementById('overwriteBtn');
+            if (owBtn) owBtn.disabled = false;
+        }
+
+        async function confirmSaveAsNew() {
+            if (!_saveDialogData) return;
+            var nameInput = document.getElementById('saveQuoteNameInput');
+            if (nameInput && nameInput.value.trim()) _saveDialogData.clientName = nameInput.value.trim();
+            _saveDialogData.supabaseId = null; // Force new insert
+            window._supabaseQuoteId = null;
+            var saveBtn = document.getElementById('saveAsNewBtn');
+            if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...'; }
+            try {
+                var result = await saveQuoteToSupabase(_saveDialogData);
+                if (result && !result.error && result.data && result.data[0]) {
+                    window._supabaseQuoteId = result.data[0].id;
+                }
+                unsavedChanges = false;
+                updateSaveStatus('saved', 'Saved to cloud ✓');
+                bootstrap.Modal.getInstance(document.getElementById('saveQuoteModal')).hide();
+                // Update client name field if changed
+                if (document.getElementById('clientName')) document.getElementById('clientName').value = _saveDialogData.clientName;
+            } catch(e) {
+                alert('Save failed: ' + e.message);
+            } finally {
+                if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<i class="fas fa-plus me-1"></i>Save as New'; }
+            }
+        }
+
+        async function confirmOverwrite() {
+            if (!_saveDialogData || !_selectedOverwriteId) return;
+            _saveDialogData.supabaseId = _selectedOverwriteId;
+            window._supabaseQuoteId = _selectedOverwriteId;
+            var owBtn = document.getElementById('overwriteBtn');
+            if (owBtn) { owBtn.disabled = true; owBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...'; }
+            try {
+                var result = await saveQuoteToSupabase(_saveDialogData);
+                unsavedChanges = false;
+                updateSaveStatus('saved', 'Saved to cloud ✓');
+                bootstrap.Modal.getInstance(document.getElementById('saveQuoteModal')).hide();
+            } catch(e) {
+                alert('Save failed: ' + e.message);
+            } finally {
+                if (owBtn) { owBtn.disabled = false; owBtn.innerHTML = '<i class="fas fa-save me-1"></i>Overwrite'; }
+            }
+        }
+        // ── End Save Dialog ──────────────────────────────────────────────────────
 
         async function loadQuoteFromFile() {
             if (unsavedChanges && !confirm('You have unsaved changes. Open a different quote anyway?')) return;
@@ -4106,6 +4179,72 @@ async function saveQuote() {
             <i class="fas fa-cog d-block" style="font-size:1rem;"></i>
             <span style="font-size:0.55rem;">Settings</span>
         </a>
+    </div>
+
+    <!-- Save Quote Dialog Modal -->
+    <div class="modal fade" id="saveQuoteModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header" style="background: linear-gradient(135deg, #0f3460 0%, #1a56a0 100%); color: white; border: none;">
+                    <h5 class="modal-title" style="font-weight: 600;"><i class="fas fa-save me-2"></i>Save Quote</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" style="padding: 1.5rem;">
+                    <!-- Save as new input -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold mb-2">Save as:</label>
+                        <input type="text" id="saveQuoteNameInput" class="form-control" placeholder="Quote name" style="border: 2px solid #e0e0e0; padding: 0.6rem;">
+                    </div>
+
+                    <!-- Or overwrite section -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold mb-3" style="color: #666;">Or overwrite an existing quote:</h6>
+                        <div id="existingQuotesList" style="max-height: 300px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 6px; padding: 0;">
+                            <p class="text-muted text-center py-3 mb-0"><i class="fas fa-spinner fa-spin me-2"></i>Loading quotes...</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer" style="padding: 1rem 1.5rem; border-top: 1px solid #e0e0e0;">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal" style="border: 1px solid #ccc;">Cancel</button>
+                    <button type="button" id="saveAsNewBtn" class="btn" style="background: #e87e2a; color: white; font-weight: 600;" onclick="confirmSaveAsNew()">
+                        <i class="fas fa-plus me-2"></i>Save as New
+                    </button>
+                    <button type="button" id="overwriteBtn" class="btn btn-primary" style="font-weight: 600;" onclick="confirmOverwrite()" disabled>
+                        <i class="fas fa-check me-2"></i>Overwrite Selected
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Save Quote Dialog -->
+    <div class="modal fade" id="saveQuoteModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header" style="background:#1a56a0; color:white;">
+                    <h5 class="modal-title"><i class="fas fa-save me-2"></i>Save Quote</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Quote name</label>
+                        <input type="text" id="saveQuoteNameInput" class="form-control" placeholder="Client name or job description">
+                    </div>
+                    <hr>
+                    <div>
+                        <p class="fw-bold mb-2">Or overwrite an existing quote:</p>
+                        <div id="saveQuoteList" style="max-height:220px; overflow-y:auto;">
+                            <div class="text-muted small text-center py-3"><span class="spinner-border spinner-border-sm me-2"></span>Loading...</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" id="saveAsNewBtn" class="btn btn-primary" onclick="confirmSaveAsNew()"><i class="fas fa-plus me-1"></i>Save as New</button>
+                    <button type="button" id="overwriteBtn" class="btn btn-warning" onclick="confirmOverwrite()" disabled><i class="fas fa-save me-1"></i>Overwrite</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Voice Quote Modal -->
