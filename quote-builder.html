@@ -16,6 +16,14 @@
             border-radius: 8px;
         }
         .room-header h3 { margin: 0; font-weight: bold; }
+        .room-icon-btn { opacity: 0.85; transition: opacity 0.15s, transform 0.15s; }
+        .room-icon-btn:hover { opacity: 1; transform: scale(1.2); }
+        #roomIconPicker { position:fixed; z-index:9999; background:#fff; border:1px solid #dee2e6; border-radius:12px; box-shadow:0 8px 32px rgba(0,0,0,0.18); padding:12px; width:320px; max-height:380px; overflow-y:auto; }
+        #roomIconPicker .icon-section-label { font-size:0.7rem; font-weight:700; text-transform:uppercase; color:#6c757d; letter-spacing:0.5px; margin:8px 0 4px; }
+        #roomIconPicker .icon-grid { display:flex; flex-wrap:wrap; gap:4px; }
+        #roomIconPicker .icon-opt { width:36px; height:36px; display:flex; align-items:center; justify-content:center; border-radius:6px; cursor:pointer; font-size:1.1rem; color:#343a40; border:2px solid transparent; transition:all 0.1s; }
+        #roomIconPicker .icon-opt:hover { background:#e8f0fe; border-color:#1a56a0; color:#1a56a0; }
+        #roomIconPicker .icon-opt.active { background:#1a56a0; color:#fff; border-color:#1a56a0; }
         .line-item { 
             background: white;
             border-left: 4px solid #1a56a0;
@@ -779,6 +787,147 @@ if (location.search.includes('debug')) {
         // Timeline feature - show/hide toggle
         let showTimelines = true;
         
+        // ── Room Icon Picker ──────────────────────────────────────────
+        var _iconPickerRoomId = null;
+        var ROOM_ICONS = [
+            { label: 'Rooms', icons: [
+                { fa: 'fa-door-open',       label: 'Door Open' },
+                { fa: 'fa-door-closed',     label: 'Door Closed' },
+                { fa: 'fa-bed',             label: 'Bedroom' },
+                { fa: 'fa-bath',            label: 'Bathroom' },
+                { fa: 'fa-couch',           label: 'Living Room' },
+                { fa: 'fa-utensils',        label: 'Kitchen' },
+                { fa: 'fa-blender',         label: 'Kitchen Alt' },
+                { fa: 'fa-wine-glass',      label: 'Dining Room' },
+                { fa: 'fa-tv',              label: 'Media Room' },
+                { fa: 'fa-book',            label: 'Office / Library' },
+                { fa: 'fa-dumbbell',        label: 'Gym' },
+                { fa: 'fa-child',           label: 'Kids Room' },
+                { fa: 'fa-gamepad',         label: 'Game Room' },
+                { fa: 'fa-spa',             label: 'Spa / Sauna' },
+                { fa: 'fa-water',           label: 'Pool / Laundry' },
+                { fa: 'fa-tshirt',          label: 'Laundry Room' },
+            ]},
+            { label: 'Structure', icons: [
+                { fa: 'fa-home',            label: 'House' },
+                { fa: 'fa-building',        label: 'Building' },
+                { fa: 'fa-warehouse',       label: 'Garage / Warehouse' },
+                { fa: 'fa-store',           label: 'Commercial' },
+                { fa: 'fa-archway',         label: 'Hallway / Arch' },
+                { fa: 'fa-stairs',          label: 'Stairs' },
+                { fa: 'fa-campground',      label: 'Outdoor / Deck' },
+                { fa: 'fa-tree',            label: 'Yard' },
+                { fa: 'fa-swimming-pool',   label: 'Pool' },
+                { fa: 'fa-car',             label: 'Garage' },
+                { fa: 'fa-tools',           label: 'Workshop' },
+                { fa: 'fa-industry',        label: 'Basement / Industrial' },
+            ]},
+            { label: 'Trades', icons: [
+                { fa: 'fa-paint-roller',    label: 'Painting' },
+                { fa: 'fa-hammer',          label: 'Carpentry' },
+                { fa: 'fa-plug',            label: 'Electrical' },
+                { fa: 'fa-faucet',          label: 'Plumbing' },
+                { fa: 'fa-fire',            label: 'HVAC / Fireplace' },
+                { fa: 'fa-snowflake',       label: 'HVAC / AC' },
+                { fa: 'fa-hard-hat',        label: 'Construction' },
+                { fa: 'fa-drafting-compass',label: 'Design' },
+                { fa: 'fa-ruler-combined',  label: 'Measurement' },
+                { fa: 'fa-layer-group',     label: 'Flooring' },
+                { fa: 'fa-vector-square',   label: 'Tiling' },
+                { fa: 'fa-window-maximize', label: 'Windows' },
+                { fa: 'fa-border-all',      label: 'Drywall / Grid' },
+                { fa: 'fa-lightbulb',       label: 'Lighting' },
+                { fa: 'fa-solar-panel',     label: 'Solar' },
+                { fa: 'fa-wifi',            label: 'Smart Home' },
+            ]},
+            { label: 'Other', icons: [
+                { fa: 'fa-star',            label: 'Star' },
+                { fa: 'fa-tag',             label: 'Tag' },
+                { fa: 'fa-clipboard-list',  label: 'List' },
+                { fa: 'fa-boxes',           label: 'Storage' },
+                { fa: 'fa-map-marker-alt',  label: 'Location' },
+                { fa: 'fa-flag',            label: 'Flag' },
+                { fa: 'fa-circle',          label: 'Circle' },
+                { fa: 'fa-cube',            label: 'Cube' },
+                { fa: 'fa-project-diagram', label: 'Project' },
+                { fa: 'fa-tasks',           label: 'Tasks' },
+                { fa: 'fa-wrench',          label: 'Wrench' },
+                { fa: 'fa-cog',             label: 'Settings' },
+            ]},
+        ];
+
+        function openIconPicker(roomId, triggerEl) {
+            // Close if already open for this room
+            var existing = document.getElementById('roomIconPicker');
+            if (existing && _iconPickerRoomId === roomId) {
+                existing.remove();
+                _iconPickerRoomId = null;
+                return;
+            }
+            if (existing) existing.remove();
+            _iconPickerRoomId = roomId;
+
+            var room = rooms.find(function(r) { return r.id === roomId; });
+            var currentIcon = (room && room.icon) || 'fa-door-open';
+
+            var picker = document.createElement('div');
+            picker.id = 'roomIconPicker';
+
+            var html = '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><strong style="font-size:0.9rem;">Choose Room Icon</strong><button onclick="document.getElementById(\'roomIconPicker\').remove(); _iconPickerRoomId=null;" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#6c757d;">&times;</button></div>';
+            ROOM_ICONS.forEach(function(section) {
+                html += '<div class="icon-section-label">' + section.label + '</div><div class="icon-grid">';
+                section.icons.forEach(function(ico) {
+                    var active = ico.fa === currentIcon ? ' active' : '';
+                    html += '<div class="icon-opt' + active + '" title="' + ico.label + '" onclick="selectRoomIcon(' + roomId + ', \'' + ico.fa + '\')">' +
+                        '<i class="fas ' + ico.fa + '"></i></div>';
+                });
+                html += '</div>';
+            });
+            picker.innerHTML = html;
+
+            // Position near trigger
+            document.body.appendChild(picker);
+            var rect = triggerEl.getBoundingClientRect();
+            var pickerH = 380, pickerW = 320;
+            var top = rect.bottom + 8 + window.scrollY;
+            var left = rect.left + window.scrollX;
+            if (left + pickerW > window.innerWidth - 8) left = window.innerWidth - pickerW - 8;
+            if (top + pickerH > window.innerHeight + window.scrollY) top = rect.top + window.scrollY - pickerH - 8;
+            picker.style.top = top + 'px';
+            picker.style.left = left + 'px';
+
+            // Close on outside click
+            setTimeout(function() {
+                document.addEventListener('click', function handler(e) {
+                    if (!picker.contains(e.target) && !triggerEl.contains(e.target)) {
+                        picker.remove();
+                        _iconPickerRoomId = null;
+                        document.removeEventListener('click', handler);
+                    }
+                });
+            }, 0);
+        }
+
+        function selectRoomIcon(roomId, iconClass) {
+            var room = rooms.find(function(r) { return r.id === roomId; });
+            if (!room) return;
+            room.icon = iconClass;
+            markUnsaved();
+            // Update icon in header without full re-render
+            var iconEl = document.querySelector('.room-icon-btn[data-room-id="' + roomId + '"]');
+            if (iconEl) {
+                // Remove all fa-* classes and add new one
+                var classes = Array.from(iconEl.classList).filter(function(c) { return !c.startsWith('fa-'); });
+                classes.push(iconClass);
+                iconEl.className = classes.join(' ');
+            }
+            // Close picker
+            var picker = document.getElementById('roomIconPicker');
+            if (picker) picker.remove();
+            _iconPickerRoomId = null;
+        }
+        // ── End Room Icon Picker ─────────────────────────────────────────
+
         function editRoomName(roomId) {
             const room = rooms.find(r => r.id === roomId);
             if (!room) return;
@@ -1545,7 +1694,8 @@ if (location.search.includes('debug')) {
                 html += '<div class="room-header" style="background:' + headerBg + '">';
                 html += '<div class="d-flex justify-content-between align-items-start">';
                 html += '<div>';
-                html += '<h3><span class="drag-handle" title="Drag to reorder">&#8801;</span><i class="fas fa-door-open"></i> <span id="roomName_' + room.id + '" class="room-name-display" onclick="editRoomName(' + room.id + ')" style="cursor:pointer; text-decoration:underline dotted; padding:2px 4px;" title="Click to edit">' + room.name + '</span></h3>';
+                var roomIcon = room.icon || 'fa-door-open';
+                html += '<h3><span class="drag-handle" title="Drag to reorder">&#8801;</span><i class="fas ' + roomIcon + ' room-icon-btn" data-room-id="' + room.id + '" onclick="openIconPicker(' + room.id + ', this)" title="Click to change icon" style="cursor:pointer;"></i> <span id="roomName_' + room.id + '" class="room-name-display" onclick="editRoomName(' + room.id + ')" style="cursor:pointer; text-decoration:underline dotted; padding:2px 4px;" title="Click to edit">' + room.name + '</span></h3>';
                 html += '<p class="mb-0">' + room.items.length + ' items | Total: $' + roomTotal.toFixed(2) + '</p>';
                 html += '</div>';
                 // Color swatches
