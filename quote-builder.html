@@ -2492,7 +2492,11 @@ async function saveQuote() {
                 if (typeof saveQuoteToSupabase === 'function') {
                     try {
                         var result = await saveQuoteToSupabase(qData);
-                        if (result && !result.error) {
+                        if (result && !result.error && result.data && result.data[0]) {
+                            window._supabaseQuoteId = result.data[0].id;
+                            unsavedChanges = false;
+                            updateSaveStatus('saved', 'Saved to cloud ✓');
+                        } else if (result && !result.error) {
                             unsavedChanges = false;
                             updateSaveStatus('saved', 'Saved to cloud ✓');
                         } else {
@@ -2685,25 +2689,28 @@ async function saveQuote() {
                     const { data, error } = await loadQuoteFromSupabase(loadId);
                     if (error) {
                         console.warn('Could not load quote from cloud:', error.message);
-                    } else if (data && data.data) {
-                        const q = data.data;
-                        currentSupabaseId = data.id;
-                        // Populate fields
-                        if (document.getElementById('clientName')) document.getElementById('clientName').value = q.clientName || data.client_name || '';
-                        if (document.getElementById('quoteNumber')) document.getElementById('quoteNumber').value = q.quoteNumber || data.quote_number || '';
-                        if (document.getElementById('projectAddress')) document.getElementById('projectAddress').value = q.projectAddress || data.client_address || '';
-                        if (document.getElementById('clientEmail')) document.getElementById('clientEmail').value = q.clientEmail || data.client_email || '';
-                        if (document.getElementById('clientPhone')) document.getElementById('clientPhone').value = q.clientPhone || data.client_phone || '';
+                    } else if (data) {
+                        const q = data.data || {};
+                        window._supabaseQuoteId = data.id;
+                        // Populate top-level fields
+                        if (document.getElementById('clientName')) document.getElementById('clientName').value = data.client_name || q.clientName || '';
+                        if (document.getElementById('quoteNumber')) document.getElementById('quoteNumber').value = data.quote_number || q.quoteNumber || '';
+                        if (document.getElementById('projectAddress')) document.getElementById('projectAddress').value = q.project_address || q.projectAddress || '';
+                        if (document.getElementById('clientEmail')) document.getElementById('clientEmail').value = q.email || q.clientEmail || '';
+                        if (document.getElementById('clientPhone')) document.getElementById('clientPhone').value = q.phone || q.clientPhone || '';
                         // Load rooms
-                        if (q.rooms && q.rooms.length > 0) {
+                        const loadedRooms = q.rooms || [];
+                        if (loadedRooms.length > 0) {
                             rooms = [];
                             roomCounter = 0;
-                            q.rooms.forEach(room => {
+                            loadedRooms.forEach(room => {
                                 roomCounter++;
-                                rooms.push({ id: roomCounter, name: room.name, items: JSON.parse(JSON.stringify(room.items)) });
+                                rooms.push({ id: roomCounter, name: room.name, items: JSON.parse(JSON.stringify(room.items || [])), colorIndex: room.colorIndex || 0, markup: room.markup || 0 });
                             });
                             renderRooms();
                         }
+                        unsavedChanges = false;
+                        updateSaveStatus('saved', 'Quote loaded ✓');
                     }
                 } catch(e) {
                     console.warn('Error loading quote from cloud:', e);

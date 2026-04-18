@@ -305,28 +305,43 @@ async function listQuotes() {
 async function saveQuote(quoteData) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
-    
-    const { data, error } = await _supabase
-        .from('quotes')
-        .upsert({
-            user_id: user.id,
-            id: quoteData.id || '',
-            client_name: quoteData.clientName || '',
-            quote_number: quoteData.quoteNumber || '',
-            total: quoteData.grandTotal || 0,
-            status: 'draft',
-            data: {
-                project_address: quoteData.projectAddress || '',
-                email: quoteData.email || '',
-                phone: quoteData.phone || '',
-                rooms: quoteData.rooms || [],
-                terms: quoteData.terms || []
-            },
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-        }, { onConflict: 'user_id,id' })
-        .select();
-        
+
+    const payload = {
+        user_id: user.id,
+        client_name: quoteData.clientName || '',
+        quote_number: quoteData.quoteNumber || '',
+        total: quoteData.grandTotal || 0,
+        status: quoteData.status || 'draft',
+        data: {
+            project_address: quoteData.projectAddress || '',
+            email: quoteData.email || '',
+            phone: quoteData.phone || '',
+            rooms: quoteData.rooms || [],
+            terms: quoteData.terms || [],
+            style: quoteData.style || {},
+            notes: quoteData.notes || ''
+        },
+        updated_at: new Date().toISOString()
+    };
+
+    let data, error;
+    if (quoteData.supabaseId) {
+        // Update existing quote
+        ({ data, error } = await _supabase
+            .from('quotes')
+            .update(payload)
+            .eq('id', quoteData.supabaseId)
+            .eq('user_id', user.id)
+            .select());
+    } else {
+        // Insert new quote
+        payload.created_at = new Date().toISOString();
+        ({ data, error } = await _supabase
+            .from('quotes')
+            .insert(payload)
+            .select());
+    }
+
     if (error) {
         console.error('Quote save error:', error);
         return { error };
@@ -449,6 +464,19 @@ async function saveQuoteForSharing(quoteData) {
 }
 
 // Load a quote from Supabase for viewing
+// Load a quote for editing in the quote builder
+async function loadQuoteFromSupabase(supabaseId) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    const { data, error } = await _supabase
+        .from('quotes')
+        .select('*')
+        .eq('id', supabaseId)
+        .eq('user_id', user.id)
+        .single();
+    return { data, error };
+}
+
 async function loadQuoteForViewing(supabaseId) {
     const { data, error } = await _supabase
         .from('quotes')

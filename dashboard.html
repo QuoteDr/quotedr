@@ -270,6 +270,11 @@
             document.getElementById('filteredCount').textContent = filtered.length > 0 ? `${filtered.length} quote${filtered.length !== 1 ? 's' : ''} found` : '';
         }
 
+        function openQuote(quoteId) {
+            // Pass the quote ID to quote-builder via URL param so it loads the right quote
+            window.location.href = 'quote-builder.html?load=' + quoteId;
+        }
+
         function updateQuoteStatus(quoteId, newStatus) {
             const quote = allQuotes.find(q => q.id === quoteId);
             if (quote) {
