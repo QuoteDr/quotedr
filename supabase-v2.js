@@ -463,6 +463,24 @@ async function saveQuoteForSharing(quoteData) {
     return { data, error };
 }
 
+// Delete a quote from Supabase
+async function deleteQuoteFromSupabase(quoteId) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+
+    const { error } = await _supabase
+        .from('quotes')
+        .delete()
+        .eq('id', quoteId)
+        .eq('user_id', user.id);
+
+    if (error) {
+        console.error('Delete quote error:', error);
+        return { error };
+    }
+    return { success: true };
+}
+
 // Load a quote from Supabase for viewing
 // Load a quote for editing in the quote builder
 async function loadQuoteFromSupabase(supabaseId) {

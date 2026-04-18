@@ -286,17 +286,15 @@
         async function deleteQuote(quoteId) {
             if (!confirm('Are you sure you want to delete this quote?')) return;
 
-            try {
-                await fetch(`/api/quotes/${quoteId}`, {
-                    method: 'DELETE'
-                });
-                allQuotes = allQuotes.filter(q => q.id !== quoteId);
-                renderQuotes(allQuotes);
-                updateStats(allQuotes);
-            } catch (err) {
-                console.error('Error deleting quote:', err);
-                alert('Failed to delete quote');
+            const result = await deleteQuoteFromSupabase(quoteId);
+            if (result && result.error) {
+                console.error('Error deleting quote:', result.error);
+                alert('Failed to delete quote: ' + (result.error.message || result.error));
+                return;
             }
+            allQuotes = allQuotes.filter(q => q.id !== quoteId);
+            renderQuotes(allQuotes);
+            updateStats(allQuotes);
         }
 
         function formatDate(dateString) {
