@@ -1,0 +1,125 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  try {
+    const { to, clientName, contractorName, companyName, quoteNumber, total, quoteUrl, message } = await req.json();
+
+    if (!to || !quoteUrl) {
+      return new Response(JSON.stringify({ error: 'Missing required fields: to, quoteUrl' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const resendKey = Deno.env.get('RESEND_API_KEY');
+    if (!resendKey) {
+      return new Response(JSON.stringify({ error: 'Email service not configured. Please add RESEND_API_KEY to Supabase secrets.' }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const fromName = companyName || contractorName || 'QuoteDr';
+    const greeting = clientName ? `Hi ${clientName},` : 'Hi there,';
+    const quoteRef = quoteNumber ? `Quote #${quoteNumber}` : 'Your Quote';
+    const totalStr = total ? `$${parseFloat(total).toFixed(2)}` : '';
+    const customMessage = message ? `<p style="color:#555; line-height:1.6;">${message.replace(/\n/g, '<br>')}</p>` : '';
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0; padding:0; background:#f4f4f4; font-family:'Segoe UI',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4; padding:32px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px; width:100%; background:white; border-radius:12px; overflow:hidden; box-shadow:0 4px 16px rgba(0,0,0,0.08);">
+        
+        <!-- Header -->
+        <tr><td style="background:linear-gradient(135deg,#0f3460,#1a56a0); padding:32px 40px; text-align:center;">
+          <div style="font-size:2rem; font-weight:800; color:white; letter-spacing:-1px;">QuoteDr</div>
+          <div style="color:rgba(255,255,255,0.75); font-size:0.9rem; margin-top:4px;">${fromName}</div>
+        </td></tr>
+
+        <!-- Body -->
+        <tr><td style="padding:40px;">
+          <p style="font-size:1.1rem; font-weight:600; color:#0f3460; margin:0 0 16px;">${greeting}</p>
+          ${customMessage}
+          <p style="color:#555; line-height:1.6; margin:0 0 24px;">
+            ${contractorName || 'Your contractor'} has sent you ${quoteRef}${totalStr ? ` for <strong>${totalStr}</strong>` : ''}. 
+            Click below to view your quote, review all the details, and let us know if you'd like to proceed.
+          </p>
+
+          <!-- CTA Button -->
+          <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:8px 0 32px;">
+            <a href="${quoteUrl}" style="display:inline-block; background:#e87e2a; color:white; font-weight:700; font-size:1rem; padding:16px 40px; border-radius:50px; text-decoration:none; letter-spacing:0.3px;">
+              View My Quote →
+            </a>
+          </td></tr></table>
+
+          <!-- Quote details box -->
+          ${quoteNumber || totalStr ? `
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa; border-radius:8px; margin-bottom:24px;">
+            <tr><td style="padding:20px;">
+              ${quoteNumber ? `<div style="margin-bottom:8px;"><span style="color:#999; font-size:0.85rem;">Quote Number</span><br><strong style="color:#333;">#${quoteNumber}</strong></div>` : ''}
+              ${totalStr ? `<div><span style="color:#999; font-size:0.85rem;">Total</span><br><strong style="color:#0f3460; font-size:1.2rem;">${totalStr} + tax</strong></div>` : ''}
+            </td></tr>
+          </table>` : ''}
+
+          <p style="color:#999; font-size:0.8rem; margin:0;">
+            If the button doesn't work, copy and paste this link into your browser:<br>
+            <a href="${quoteUrl}" style="color:#1a56a0; word-break:break-all;">${quoteUrl}</a>
+          </p>
+        </td></tr>
+
+        <!-- Footer -->
+        <tr><td style="background:#f8f9fa; padding:20px 40px; text-align:center; border-top:1px solid #eee;">
+          <p style="color:#aaa; font-size:0.75rem; margin:0;">
+            Sent via <a href="https://quotedr.io" style="color:#1a56a0; text-decoration:none;">QuoteDr.io</a> · 
+            Professional quoting for service businesses<br>
+            © 2026 QuoteDr (ALD Direct Inc.)
+          </p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${resendKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: `${fromName} via QuoteDr <quotes@quotedr.io>`,
+        to: [to],
+        subject: `${quoteRef} from ${fromName}${totalStr ? ' — ' + totalStr : ''}`,
+        html,
+        reply_to: 'support@quotedr.io',
+      }),
+    });
+
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.message || JSON.stringify(result));
+    }
+
+    return new Response(JSON.stringify({ success: true, id: result.id }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+});

@@ -2748,15 +2748,25 @@ if (location.search.includes('debug')) {
                                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                                     </div>
                                     <div class="modal-body">
-                                        <p>Share this link with your client:</p>
-                                        <div class="input-group mb-2">
+                                        <p class="text-muted small mb-2">Share this link with your client:</p>
+                                        <div class="input-group mb-3">
                                             <input type="text" id="interactiveLinkInput" class="form-control" readonly>
                                             <button class="btn btn-outline-secondary" onclick="copyInteractiveLink()" title="Copy to clipboard">
                                                 <i class="fas fa-copy"></i> Copy
                                             </button>
                                         </div>
-                                        <a id="openViewerBtn" href="#" target="_blank" class="btn btn-success w-100 mt-2">
-                                            <i class="fas fa-external-link-alt"></i> Open Client View
+                                        <!-- Email to client -->
+                                        <div style="border:1px solid #dee2e6; border-radius:8px; padding:14px; background:#f8f9fa; margin-bottom:12px;">
+                                            <div class="fw-bold small mb-2"><i class="fas fa-envelope me-1" style="color:#1a56a0;"></i>Email directly to client</div>
+                                            <input type="email" id="sendQuoteEmail" class="form-control form-control-sm mb-2" placeholder="Client email address">
+                                            <textarea id="sendQuoteMessage" class="form-control form-control-sm mb-2" rows="2" placeholder="Optional personal message (e.g. Great chatting with you! Let me know if you have any questions.)"></textarea>
+                                            <button class="btn btn-primary btn-sm w-100" onclick="sendQuoteByEmail()" id="sendQuoteEmailBtn">
+                                                <i class="fas fa-paper-plane me-1"></i>Send Quote by Email
+                                            </button>
+                                            <div id="sendQuoteEmailResult" class="mt-2 small"></div>
+                                        </div>
+                                        <a id="openViewerBtn" href="#" target="_blank" class="btn btn-outline-success w-100">
+                                            <i class="fas fa-external-link-alt me-1"></i>Open Client View
                                         </a>
                                     </div>
                                 </div>
@@ -2766,13 +2776,77 @@ if (location.search.includes('debug')) {
                 }
                 document.getElementById('interactiveLinkInput').value = viewerUrl;
                 document.getElementById('openViewerBtn').href = viewerUrl;
-                var linkModal = new bootstrap.Modal(document.getElementById('interactiveLinkModal'));
+                // Pre-fill client email if available
+                var clientEmail = document.getElementById('clientEmail')?.value.trim();
+                var sendEmailEl = document.getElementById('sendQuoteEmail');
+                if (sendEmailEl && clientEmail) sendEmailEl.value = clientEmail;
+                // Clear previous result
+                var resultEl = document.getElementById('sendQuoteEmailResult');
+                if (resultEl) resultEl.innerHTML = '';
+                var linkModalEl = document.getElementById('interactiveLinkModal');
+                var linkModal = bootstrap.Modal.getInstance(linkModalEl) || new bootstrap.Modal(linkModalEl);
                 linkModal.show();
 
             } catch(err) {
                 console.error('Failed to save quote:', err);
                 alert('Failed to save quote to cloud: ' + (err.message || err));
                 if (saveStatus) saveStatus.innerHTML = '<span style="color:red;"><i class="fas fa-times"></i> Save failed</span>';
+            }
+        }
+
+        async function sendQuoteByEmail() {
+            var emailEl = document.getElementById('sendQuoteEmail');
+            var msgEl = document.getElementById('sendQuoteMessage');
+            var resultEl = document.getElementById('sendQuoteEmailResult');
+            var btn = document.getElementById('sendQuoteEmailBtn');
+            var email = emailEl ? emailEl.value.trim() : '';
+            if (!email || !email.includes('@')) {
+                resultEl.innerHTML = '<span class="text-danger">Please enter a valid email address.</span>';
+                return;
+            }
+            var quoteUrl = document.getElementById('interactiveLinkInput')?.value || '';
+            if (!quoteUrl) { resultEl.innerHTML = '<span class="text-danger">No quote link found.</span>'; return; }
+
+            // Gather quote info
+            var qData = collectQuoteData();
+            var profile = {};
+            try { profile = JSON.parse(localStorage.getItem('ald_business_profile') || '{}'); } catch(e) {}
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Sending...';
+            resultEl.innerHTML = '';
+
+            try {
+                var res = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/send-quote-email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso'
+                    },
+                    body: JSON.stringify({
+                        to: email,
+                        clientName: qData.clientName || '',
+                        contractorName: profile.ownerName || profile.name || '',
+                        companyName: profile.companyName || profile.businessName || '',
+                        quoteNumber: qData.quoteNumber || '',
+                        total: qData.grandTotal || 0,
+                        quoteUrl: quoteUrl,
+                        message: msgEl ? msgEl.value.trim() : ''
+                    })
+                });
+                var data = await res.json();
+                if (data.error) throw new Error(data.error);
+                resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>Quote sent to ' + email + '!</span>';
+                emailEl.value = '';
+                if (msgEl) msgEl.value = '';
+                // Auto-fill client email for next time
+                var clientEmailEl = document.getElementById('clientEmail');
+                if (clientEmailEl && !clientEmailEl.value) clientEmailEl.value = email;
+            } catch(e) {
+                resultEl.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>' + e.message + '</span>';
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-paper-plane me-1"></i>Send Quote by Email';
             }
         }
 
