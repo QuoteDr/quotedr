@@ -2993,6 +2993,11 @@ async function saveQuote() {
         // ── End Save Dialog ──────────────────────────────────────────────────────
 
         async function loadQuoteFromFile() {
+            // Always show the cloud load modal first
+            showLoadModal();
+        }
+
+        async function loadQuoteFromLocalFile() {
             if (unsavedChanges && !confirm('You have unsaved changes. Open a different quote anyway?')) return;
             try {
                 const [handle] = await window.showOpenFilePicker({
@@ -3004,8 +3009,94 @@ async function saveQuote() {
                 applyQuoteData(data);
                 startAutoSave();
                 updateSaveStatus('loaded', handle.name);
+                var m = bootstrap.Modal.getInstance(document.getElementById('loadQuoteModal'));
+                if (m) m.hide();
             } catch (err) {
                 if (err.name !== 'AbortError') updateSaveStatus('error', 'Could not open file');
+            }
+        }
+
+        async function showLoadModal() {
+            if (unsavedChanges && !confirm('You have unsaved changes. Open a different quote anyway?')) return;
+
+            // Build or show modal
+            var modalEl = document.getElementById('loadQuoteModal');
+            if (!modalEl) {
+                modalEl = document.createElement('div');
+                modalEl.className = 'modal fade';
+                modalEl.id = 'loadQuoteModal';
+                modalEl.tabIndex = -1;
+                modalEl.innerHTML = `
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header" style="background:#1a56a0; color:white;">
+                            <h5 class="modal-title"><i class="fas fa-folder-open me-2"></i>Open Quote</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div id="loadQuoteList" style="max-height:300px; overflow-y:auto;">
+                                <div class="text-muted small text-center py-3"><span class="spinner-border spinner-border-sm me-2"></span>Loading your quotes...</div>
+                            </div>
+                        </div>
+                        <div class="modal-footer flex-wrap gap-2">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="loadQuoteFromLocalFile()" id="openLocalFileBtn" style="display:none;"><i class="fas fa-folder me-1"></i>Open Local File</button>
+                        </div>
+                    </div>
+                </div>`;
+                document.body.appendChild(modalEl);
+                // Show local file button only if File System API available
+                if (window.showOpenFilePicker) {
+                    modalEl.querySelector('#openLocalFileBtn').style.display = '';
+                }
+            }
+
+            var modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+            modal.show();
+
+            // Fetch cloud quotes
+            var listEl = document.getElementById('loadQuoteList');
+            if (typeof listQuotesFromSupabase === 'function') {
+                var result = await listQuotesFromSupabase();
+                var quotes = (result && result.data) ? result.data : [];
+                if (!quotes.length) {
+                    listEl.innerHTML = '<div class="text-muted small text-center py-3">No saved cloud quotes yet.<br>Save a quote first using the Save button.</div>';
+                    return;
+                }
+                listEl.innerHTML = quotes.map(function(q) {
+                    var date = q.updated_at ? new Date(q.updated_at).toLocaleDateString() : '';
+                    var total = q.total ? ('$' + parseFloat(q.total).toFixed(2)) : '$0.00';
+                    return '<div class="p-2 mb-1 rounded" style="border:1px solid #dee2e6; cursor:pointer;" ' +
+                        'onclick="loadCloudQuote(\'' + q.id + '\')" ' +
+                        'onmouseover="this.style.background=\'#e8f0fe\'" onmouseout="this.style.background=\'\'">' +
+                        '<div class="fw-bold">' + (q.client_name || 'Unnamed') + '</div>' +
+                        '<div class="text-muted small">' + date + ' &middot; ' + total + '</div>' +
+                        '</div>';
+                }).join('');
+            }
+        }
+
+        async function loadCloudQuote(quoteId) {
+            var listEl = document.getElementById('loadQuoteList');
+            if (listEl) listEl.innerHTML = '<div class="text-muted small text-center py-3"><span class="spinner-border spinner-border-sm me-2"></span>Loading quote...</div>';
+            try {
+                var result = await loadQuoteFromSupabase(quoteId);
+                if (result.error) throw new Error(result.error.message || result.error);
+                var q = result.data;
+                var qData = q.data || {};
+                qData.supabaseId = q.id;
+                qData.clientName = q.client_name || qData.clientName || '';
+                qData.quoteNumber = q.quote_number || qData.quoteNumber || '';
+                qData.grandTotal = q.total || 0;
+                window._supabaseQuoteId = q.id;
+                applyQuoteData(qData);
+                unsavedChanges = false;
+                updateSaveStatus('saved', 'Quote loaded ✓');
+                updateDraftWarning();
+                var m = bootstrap.Modal.getInstance(document.getElementById('loadQuoteModal'));
+                if (m) m.hide();
+            } catch(e) {
+                if (listEl) listEl.innerHTML = '<div class="alert alert-danger small py-2">Failed to load: ' + e.message + '</div>';
             }
         }
 
