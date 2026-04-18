@@ -3947,7 +3947,7 @@ async function saveQuote() {
                     mob.style.setProperty('display', 'none', 'important');
                 } else {
                     if (!document.querySelector('.modal.show')) {
-                        mob.style.removeProperty('display');
+                        mob.style.setProperty('display', 'flex', 'important');
                     }
                 }
             }, { threshold: 0.1 });
@@ -3971,7 +3971,7 @@ async function saveQuote() {
                 var bar = document.getElementById('stickyTotalBar');
                 if (bar && stickyTotalVisible) bar.style.removeProperty('display');
                 var mob = document.getElementById('mobileActionBar');
-                if (mob) mob.style.removeProperty('display');
+                if (mob) mob.style.setProperty('display', 'flex', 'important');
             }
         });
 
