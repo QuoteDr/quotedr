@@ -455,10 +455,8 @@ if (location.search.includes('debug')) {
                 markQuoteViewed(quoteId);
             }
 
-            const params = new URLSearchParams(window.location.search);
-
             // New flow: load from Supabase by ?id= param
-            const supabaseId = params.get('id');
+            const supabaseId = quoteId;
             if (supabaseId && typeof loadQuoteForViewing === 'function') {
                 const result = await loadQuoteForViewing(supabaseId);
                 if (result && result.data && result.data.data) {
