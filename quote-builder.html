@@ -2767,14 +2767,96 @@ if (location.search.includes('debug')) {
             }
             const invoiceBaseUrl = window.location.href.split('?')[0].replace('quote-builder.html', 'invoice-viewer.html');
             const invoiceUrl = invoiceBaseUrl + '?invoice=' + invoiceId;
-            // Use anchor with target=_blank to avoid popup blocker
-            const a = document.createElement('a');
-            a.href = invoiceUrl;
-            a.target = '_blank';
-            a.rel = 'noopener';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+
+            // Show send modal (same pattern as quote send)
+            var existing = document.getElementById('sendInvoiceModal');
+            if (!existing) {
+                document.body.insertAdjacentHTML('beforeend', `
+                <div class="modal fade" id="sendInvoiceModal" tabindex="-1">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header bg-primary text-white">
+                                <h5 class="modal-title"><i class="fas fa-file-invoice me-2"></i>Invoice Ready!</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div style="border:1px solid #dee2e6; border-radius:8px; padding:14px; background:#f8f9fa; margin-bottom:12px;">
+                                    <div class="fw-bold small mb-2"><i class="fas fa-envelope me-1" style="color:#1a56a0;"></i>Email invoice to client</div>
+                                    <input type="email" id="sendInvoiceEmail" class="form-control form-control-sm mb-2" placeholder="Client email address">
+                                    <textarea id="sendInvoiceMessage" class="form-control form-control-sm mb-2" rows="2" placeholder="Optional message..."></textarea>
+                                    <button class="btn btn-primary btn-sm w-100" onclick="sendInvoiceByEmail()" id="sendInvoiceEmailBtn">
+                                        <i class="fas fa-paper-plane me-1"></i>Send Invoice by Email
+                                    </button>
+                                    <div id="sendInvoiceEmailResult" class="mt-2 small"></div>
+                                </div>
+                                <a id="openInvoiceBtn" href="#" target="_blank" class="btn btn-outline-success w-100">
+                                    <i class="fas fa-external-link-alt me-1"></i>Open Invoice
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>`);
+            }
+            document.getElementById('openInvoiceBtn').href = invoiceUrl;
+            window._currentInvoiceUrl = invoiceUrl;
+            window._currentInvoiceData = invoiceData;
+            // Pre-fill client email
+            var clientEmail = document.getElementById('clientEmail')?.value.trim();
+            var sendEmailEl = document.getElementById('sendInvoiceEmail');
+            if (sendEmailEl) sendEmailEl.value = clientEmail || '';
+            var resultEl = document.getElementById('sendInvoiceEmailResult');
+            if (resultEl) resultEl.innerHTML = '';
+            var modal = bootstrap.Modal.getInstance(document.getElementById('sendInvoiceModal')) || new bootstrap.Modal(document.getElementById('sendInvoiceModal'));
+            modal.show();
+        }
+
+        async function sendInvoiceByEmail() {
+            var emailEl = document.getElementById('sendInvoiceEmail');
+            var msgEl = document.getElementById('sendInvoiceMessage');
+            var resultEl = document.getElementById('sendInvoiceEmailResult');
+            var btn = document.getElementById('sendInvoiceEmailBtn');
+            var email = emailEl ? emailEl.value.trim() : '';
+            if (!email || !email.includes('@')) {
+                resultEl.innerHTML = '<span class="text-danger">Please enter a valid email address.</span>';
+                return;
+            }
+            var invoiceUrl = window._currentInvoiceUrl || '';
+            var invoiceData = window._currentInvoiceData || {};
+            var profile = {};
+            try { profile = JSON.parse(localStorage.getItem('ald_business_profile') || '{}'); } catch(e) {}
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Sending...';
+            resultEl.innerHTML = '';
+            try {
+                var res = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/send-quote-email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso'
+                    },
+                    body: JSON.stringify({
+                        to: email,
+                        clientName: invoiceData.clientName || '',
+                        contractorName: profile.ownerName || profile.name || '',
+                        companyName: profile.companyName || profile.businessName || '',
+                        quoteNumber: invoiceData.quoteNumber || '',
+                        total: invoiceData.grandTotal || 0,
+                        quoteUrl: invoiceUrl,
+                        subject: 'Invoice from ' + (profile.companyName || profile.businessName || 'ALD Direct Inc.'),
+                        message: msgEl ? msgEl.value.trim() : '',
+                        isInvoice: true
+                    })
+                });
+                var data = await res.json();
+                if (data.error) throw new Error(data.error);
+                resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>Invoice sent to ' + email + '!</span>';
+                if (msgEl) msgEl.value = '';
+            } catch(e) {
+                resultEl.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>' + e.message + '</span>';
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-paper-plane me-1"></i>Send Invoice by Email';
+            }
         }
 
         // Quote style state
