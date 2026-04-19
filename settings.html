@@ -247,6 +247,32 @@ if (location.search.includes('debug')) {
 					</div>
 				</div>
 			</div>
+				<div class="row g-3 mt-2">
+					<div class="col-sm-6">
+						<label class="form-label fw-bold">Tax Rate</label>
+						<div class="input-group" style="max-width:200px;">
+							<input type="number" class="form-control" id="taxRate" min="0" max="100" step="0.1" value="13" placeholder="13">
+							<span class="input-group-text">%</span>
+						</div>
+						<div class="form-text">HST/GST/VAT rate. Set to 0 to disable.</div>
+					</div>
+					<div class="col-sm-6">
+						<label class="form-label fw-bold">Tax Label</label>
+						<input type="text" class="form-control" id="taxLabel" placeholder="HST" value="HST" style="max-width:200px;">
+						<div class="form-text">e.g. HST, GST, VAT, Sales Tax</div>
+					</div>
+					<div class="col-sm-6">
+						<label class="form-label fw-bold">Currency</label>
+						<select class="form-select" id="currencySetting" style="max-width:200px;">
+							<option value="CAD">🇨🇦 CAD — Canadian Dollar</option>
+							<option value="USD">🇺🇸 USD — US Dollar</option>
+							<option value="GBP">🇬🇧 GBP — British Pound</option>
+							<option value="EUR">🇪🇺 EUR — Euro</option>
+							<option value="AUD">🇦🇺 AUD — Australian Dollar</option>
+							<option value="NZD">🇳🇿 NZD — New Zealand Dollar</option>
+						</select>
+					</div>
+				</div>
 			<div class="mt-3 d-flex align-items-center gap-3">
 				<button type="button" class="btn btn-save btn-primary" onclick="saveQuotePrefs()">
 					<i class="fas fa-save me-1"></i> Save Preferences
@@ -641,6 +667,9 @@ Sarah Jones, 905-555-5678"></textarea>
 			if (document.getElementById('quoteHeading')) document.getElementById('quoteHeading').value = savedPrefs.heading || 'Your Quote';
 			if (document.getElementById('quotePrefix')) document.getElementById('quotePrefix').value = savedPrefs.prefix || 'ALD';
 			if (document.getElementById('showPrefix') && savedPrefs.showPrefix === false) document.getElementById('showPrefix').checked = false;
+			if (document.getElementById('taxRate') && savedPrefs.taxRate !== undefined) document.getElementById('taxRate').value = savedPrefs.taxRate;
+			if (document.getElementById('taxLabel') && savedPrefs.taxLabel) document.getElementById('taxLabel').value = savedPrefs.taxLabel;
+			if (document.getElementById('currencySetting') && savedPrefs.currency) document.getElementById('currencySetting').value = savedPrefs.currency;
 		});
 
 		async function saveProfile() {
@@ -856,7 +885,10 @@ Sarah Jones, 905-555-5678"></textarea>
 			var prefs = {
 				heading: document.getElementById('quoteHeading').value.trim() || 'Your Quote',
 				prefix: document.getElementById('quotePrefix').value.trim() || 'ALD',
-				showPrefix: document.getElementById('showPrefix').checked
+				showPrefix: document.getElementById('showPrefix').checked,
+				taxRate: document.getElementById('taxRate') ? document.getElementById('taxRate').value : '13',
+				taxLabel: document.getElementById('taxLabel') ? document.getElementById('taxLabel').value.trim() || 'HST' : 'HST',
+				currency: document.getElementById('currencySetting') ? document.getElementById('currencySetting').value : 'CAD'
 			};
 			localStorage.setItem('ald_quote_prefs', JSON.stringify(prefs));
 			

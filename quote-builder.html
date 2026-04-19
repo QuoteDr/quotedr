@@ -492,6 +492,14 @@ if (location.search.includes('debug')) {
                     </button>
                     
                     <div id="grandTotalDisplay" style="font-size: 2rem; font-weight: bold; margin-top: 0.5rem;">TOTAL: $0.00</div>
+                    <div class="mt-3">
+                        <button class="btn btn-outline-secondary btn-sm w-100" type="button" data-bs-toggle="collapse" data-bs-target="#profitReport" aria-expanded="false">
+                            <i class="fas fa-chart-line me-1"></i> View Profit Report
+                        </button>
+                        <div class="collapse mt-2" id="profitReport">
+                            <div id="profitReportContent" class="small"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1892,20 +1900,26 @@ if (location.search.includes('debug')) {
                 subtotal += roomTotal;
             });
 
-            const tax = subtotal * 0.13;
+            var _qprefs = {}; try { _qprefs = JSON.parse(localStorage.getItem('ald_quote_prefs') || '{}'); } catch(e) {}
+            var _taxRate = (_qprefs.taxRate !== undefined && _qprefs.taxRate !== '') ? parseFloat(_qprefs.taxRate) / 100 : 0.13;
+            var _taxLabel = _qprefs.taxLabel || 'HST';
+            var _currency = _qprefs.currency || 'CAD';
+            var _currencySymbols = { CAD:'$', USD:'$', GBP:'\u00a3', EUR:'\u20ac', AUD:'$', NZD:'$' };
+            var _sym = _currencySymbols[_currency] || '$';
+            const tax = subtotal * _taxRate;
             const total = subtotal + tax;
 
-            document.getElementById('subtotalDisplay').textContent = 'Subtotal: $' + subtotal.toFixed(2);
-            document.getElementById('taxDisplay').textContent = 'HST (13%): $' + tax.toFixed(2);
-            document.getElementById('grandTotalDisplay').textContent = 'TOTAL: $' + total.toFixed(2);
+            document.getElementById('subtotalDisplay').textContent = 'Subtotal: ' + _sym + subtotal.toFixed(2);
+            document.getElementById('taxDisplay').textContent = _taxLabel + ' (' + (_taxRate*100).toFixed(1).replace(/\.0$/,'') + '%): ' + _sym + tax.toFixed(2);
+            document.getElementById('grandTotalDisplay').textContent = 'TOTAL: ' + _sym + total.toFixed(2);
 
             // Keep sticky total bar in sync
             const stickyAmt = document.getElementById('stickyTotalAmount');
             const stickySub = document.getElementById('stickySubtotal');
             const stickyTax = document.getElementById('stickyTax');
-            if (stickyAmt) stickyAmt.textContent = '$' + total.toFixed(2);
-            if (stickySub) stickySub.textContent = 'Subtotal: $' + subtotal.toFixed(2);
-            if (stickyTax) stickyTax.textContent = 'HST: $' + tax.toFixed(2);
+            if (stickyAmt) stickyAmt.textContent = _sym + total.toFixed(2);
+            if (stickySub) stickySub.textContent = 'Subtotal: ' + _sym + subtotal.toFixed(2);
+            if (stickyTax) stickyTax.textContent = _taxLabel + ': ' + _sym + tax.toFixed(2);
 
             // Update deposit calculator
             const depositBtn = document.getElementById('depositToggleBtn');
@@ -1916,6 +1930,80 @@ if (location.search.includes('debug')) {
             const remainingEl = document.getElementById('remainingBalanceDisplay');
             if (depositAmtEl) depositAmtEl.textContent = depositAmt.toFixed(2);
             if (remainingEl) remainingEl.textContent = remaining.toFixed(2);
+            updateProfitReport();
+        }
+
+        // Room photo functions
+        function addRoomPhoto(roomId) {
+            var input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.multiple = true;
+            input.onchange = function() {
+                var room = rooms.find(function(r) { return r.id === roomId; });
+                if (!room) return;
+                if (!room.photos) room.photos = [];
+                var files = Array.from(input.files);
+                var pending = files.length;
+                files.forEach(function(file) {
+                    var reader = new FileReader();
+                    reader.onload = function(e) {
+                        room.photos.push(e.target.result);
+                        pending--;
+                        if (pending === 0) { renderRooms(); calculateTotals(); unsavedChanges = true; }
+                    };
+                    reader.readAsDataURL(file);
+                });
+            };
+            input.click();
+        }
+
+        function removeRoomPhoto(roomId, photoIndex) {
+            var room = rooms.find(function(r) { return r.id === roomId; });
+            if (!room || !room.photos) return;
+            room.photos.splice(photoIndex, 1);
+            renderRooms();
+            calculateTotals();
+            unsavedChanges = true;
+        }
+
+        function updateProfitReport() {
+            var content = document.getElementById('profitReportContent');
+            if (!content) return;
+            var totalRevenue = 0, totalMaterialCost = 0;
+            var roomRows = '';
+            rooms.forEach(function(room) {
+                var roomRevenue = 0, roomMaterial = 0;
+                (room.items || []).forEach(function(item) {
+                    if (item._removed) return;
+                    var qty = parseFloat(item.quantity) || 1;
+                    var rate = parseFloat(item.rate) || 0;
+                    var mat = parseFloat(item.materialCost) || 0;
+                    roomRevenue += rate * qty;
+                    roomMaterial += mat * qty;
+                });
+                var roomMarkup = parseFloat(room.markup) || 0;
+                if (roomMarkup) roomRevenue = roomRevenue * (1 + roomMarkup / 100);
+                var roomProfit = roomRevenue - roomMaterial;
+                var roomMargin = roomRevenue > 0 ? (roomProfit / roomRevenue * 100) : 0;
+                totalRevenue += roomRevenue;
+                totalMaterialCost += roomMaterial;
+                if (roomRevenue > 0) {
+                    roomRows += '<div class="d-flex justify-content-between py-1 border-bottom"><span>' + room.name + '</span>' +
+                        '<span class="' + (roomProfit >= 0 ? 'text-success' : 'text-danger') + '">$' + roomProfit.toFixed(2) + ' (' + roomMargin.toFixed(0) + '%)</span></div>';
+                }
+            });
+            var totalProfit = totalRevenue - totalMaterialCost;
+            var totalMargin = totalRevenue > 0 ? (totalProfit / totalRevenue * 100) : 0;
+            var html = '<div class="card border-0 bg-light p-3">';
+            html += '<div class="fw-bold mb-2"><i class="fas fa-chart-bar me-1"></i>Job Profit Summary</div>';
+            html += roomRows;
+            html += '<div class="d-flex justify-content-between pt-2 mt-1"><span class="text-muted">Total Revenue</span><span>$' + totalRevenue.toFixed(2) + '</span></div>';
+            html += '<div class="d-flex justify-content-between"><span class="text-muted">Material Costs</span><span class="text-danger">-$' + totalMaterialCost.toFixed(2) + '</span></div>';
+            html += '<div class="d-flex justify-content-between fw-bold border-top pt-2 mt-1"><span>Estimated Profit</span><span class="' + (totalProfit >= 0 ? 'text-success' : 'text-danger') + '">$' + totalProfit.toFixed(2) + ' (' + totalMargin.toFixed(0) + '%)</span></div>';
+            if (totalMaterialCost === 0) html += '<p class="text-muted mt-2 mb-0" style="font-size:0.8rem;"><i class="fas fa-info-circle me-1"></i>Add material costs to line items for accurate profit tracking.</p>';
+            html += '</div>';
+            content.innerHTML = html;
         }
 
         function calculateMaterialTotal() {
@@ -2077,6 +2165,22 @@ if (location.search.includes('debug')) {
                 } else {
                     html += '<p class="text-muted text-center py-2">No items yet.</p>';
                 }
+                // Photo attachments section
+                html += '<div class="room-photos px-3 pb-3 pt-1">';
+                html += '<button class="btn btn-outline-secondary btn-sm" onclick="addRoomPhoto(' + room.id + ')"><i class="fas fa-camera me-1"></i>Add Photo</button>';
+                if (room.photos && room.photos.length > 0) {
+                    html += '<div class="d-flex flex-wrap gap-2 mt-2" id="photoGrid_' + room.id + '">';
+                    room.photos.forEach(function(p, pi) {
+                        html += '<div style="position:relative;display:inline-block;">';
+                        html += '<img src="' + p + '" style="height:80px;width:110px;object-fit:cover;border-radius:6px;border:1px solid #ddd;cursor:pointer;" onclick="window.open(this.src)" title="Click to view full size">';
+                        html += '<button class="btn btn-danger btn-sm" style="position:absolute;top:-6px;right:-6px;padding:0 5px;font-size:0.65rem;border-radius:50%;line-height:1.4;" onclick="removeRoomPhoto(' + room.id + ',' + pi + ')">&times;</button>';
+                        html += '</div>';
+                    });
+                    html += '</div>';
+                } else {
+                    html += '<div id="photoGrid_' + room.id + '" class="d-flex flex-wrap gap-2 mt-2"></div>';
+                }
+                html += '</div>';
                 html += '</div>'; // close room-card
             });
             
@@ -2896,7 +3000,8 @@ if (location.search.includes('debug')) {
                 roomCounter: roomCounter,
                 grandTotal: grandTotal,
                 total: grandTotal,
-                supabaseId: window._supabaseQuoteId || null
+                supabaseId: window._supabaseQuoteId || null,
+                currency: (function(){ try { return JSON.parse(localStorage.getItem('ald_quote_prefs')||'{}').currency||'CAD'; } catch(e){return 'CAD';} })()
             };
         }
 

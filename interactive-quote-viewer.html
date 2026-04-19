@@ -677,6 +677,13 @@ if (location.search.includes('debug')) {
                             </div>
                         </div>
                     </div>
+                    ${room.photos && room.photos.length > 0 ? `
+                    <div class="px-3 pb-3">
+                        <div class="fw-bold small text-muted mb-2"><i class="fas fa-camera me-1"></i>Site Photos</div>
+                        <div class="d-flex flex-wrap gap-2">
+                            ${room.photos.map(p => `<img src="${p}" style="height:120px;width:160px;object-fit:cover;border-radius:8px;border:1px solid #dee2e6;cursor:pointer;" onclick="window.open('${p}')" title="Click to view full size">`).join('')}
+                        </div>
+                    </div>` : ''}
                 `;
             });
 
@@ -748,7 +755,9 @@ if (location.search.includes('debug')) {
                     });
                 });
             }
-            const tax = subtotal * 0.13;
+            var _vqp = {}; try { _vqp = JSON.parse(localStorage.getItem('ald_quote_prefs')||'{}'); } catch(e) {}
+            var _vTaxRate = (_vqp.taxRate !== undefined && _vqp.taxRate !== '') ? parseFloat(_vqp.taxRate)/100 : (quoteData.taxRate || 0.13);
+            const tax = subtotal * _vTaxRate;
             const total = subtotal + tax;
 
             document.getElementById('upgradesTotalDisplay').innerHTML =
