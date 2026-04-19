@@ -3247,25 +3247,9 @@ async function saveQuote() {
                 updateDraftWarning();
                 var m = bootstrap.Modal.getInstance(document.getElementById('loadQuoteModal'));
                 if (m) m.hide();
-                // Show client notes banner if opened from notes review
+                // Show client feedback banner if opened from notes review
                 if (new URLSearchParams(window.location.search).get('shownotes') === '1') {
-                    setTimeout(function() {
-                        var notes = (window._loadedQuoteData && window._loadedQuoteData._roomNotes) || {};
-                        var noteEntries = Object.entries(notes).filter(function(e) { return e[1] && e[1].trim(); });
-                        if (document.getElementById('clientNotesBanner')) return; // already shown
-                        if (noteEntries.length > 0) {
-                            var html = '<div id="clientNotesBanner" class="container-fluid" style="padding:0 0 16px 0;"><div style="background:#fff3cd;border:2px solid #ffc107;border-radius:10px;padding:16px;"><div class="d-flex justify-content-between align-items-center mb-2"><strong><i class="fas fa-comments me-2" style="color:#fd7e14;"></i>Client Notes to Address:</strong><button class="btn btn-sm btn-outline-secondary py-0" onclick="document.getElementById(&quot;clientNotesBanner&quot;).remove()">&times; Dismiss</button></div>';
-                            noteEntries.forEach(function(entry) {
-                                var idx = entry[0], note = entry[1];
-                                var roomName = (rooms[parseInt(idx)] && rooms[parseInt(idx)].name) || ('Room ' + (parseInt(idx)+1));
-                                html += '<div class="mb-1"><strong>' + roomName + ':</strong> ' + note.trim().replace(/\n/g,'<br>') + '</div>';
-                            });
-                            html += '</div></div>';
-                            // Insert at top of main content area
-                            var mainArea = document.querySelector('.container-fluid.py-4') || document.querySelector('.container-fluid') || document.body;
-                            mainArea.insertAdjacentHTML('afterbegin', html);
-                        }
-                    }, 1200);
+                    setTimeout(function() { showClientNotesBanner(window._loadedQuoteData || {}); }, 1200);
                 }
             } catch(e) {
                 if (listEl) listEl.innerHTML = '<div class="alert alert-danger small py-2">Failed to load: ' + e.message + '</div>';
@@ -3434,7 +3418,7 @@ async function saveQuote() {
                         // Show client notes banner if ?shownotes=1
                         if (urlParams.get('shownotes') === '1') {
                             window._loadedQuoteData = q;
-                            showClientNotesBanner(q._roomNotes || {});
+                            showClientNotesBanner(q);
                         }
                     }
                 } catch(e) {
@@ -4121,42 +4105,76 @@ async function saveQuote() {
             }, 300);
         }
 
-        function showClientNotesBanner(roomNotes) {
+        function showClientNotesBanner(loadedData) {
             if (document.getElementById('clientNotesBanner')) return;
+            var roomNotes = (loadedData && loadedData._roomNotes) || {};
+            var upgrades = (loadedData && loadedData._clientUpgrades) || [];
+            var removals = (loadedData && loadedData._clientRemovals) || [];
             var noteEntries = Object.entries(roomNotes).filter(function(e) { return e[1] && e[1].trim(); });
-            if (noteEntries.length === 0) return;
+            if (noteEntries.length === 0 && upgrades.length === 0 && removals.length === 0) return;
+
             var html = '<div id="clientNotesBanner" style="background:#fff3cd;border:2px solid #ffc107;border-radius:10px;padding:16px;margin:0 12px 16px;">';
-            html += '<div class="d-flex justify-content-between align-items-center mb-2">';
-            html += '<strong style="color:#856404;"><i class="fas fa-comments me-2"></i>Client Notes — check off as you address each one:</strong>';
+            html += '<div class="d-flex justify-content-between align-items-center mb-3">';
+            html += '<strong style="color:#856404;"><i class="fas fa-comments me-2"></i>Client Feedback — review and address each item:</strong>';
             html += '<button class="btn btn-sm btn-outline-secondary py-0" onclick="document.getElementById(\'clientNotesBanner\').remove()">&times; Dismiss</button>';
             html += '</div>';
-            noteEntries.forEach(function(entry, i) {
-                var idx = entry[0], note = entry[1];
-                var roomName = (rooms[parseInt(idx)] && rooms[parseInt(idx)].name) || ('Room ' + (parseInt(idx)+1));
-                var cbId = 'noteCheck_' + i;
-                html += '<div class="d-flex align-items-start gap-2 mb-2 p-2 rounded" style="background:rgba(255,255,255,0.6);" id="noteRow_' + i + '">';
-                html += '<input type="checkbox" class="form-check-input mt-1" id="' + cbId + '" onchange="markNoteRow(' + i + ', this.checked)" style="flex-shrink:0;width:18px;height:18px;">';
-                html += '<label for="' + cbId + '" style="margin:0;cursor:pointer;"><strong>' + roomName + ':</strong> ' + note.trim().replace(/\n/g, '<br>') + '</label>';
+
+            // Upgrades
+            if (upgrades.length > 0) {
+                html += '<div class="mb-3"><div class="fw-bold small text-success mb-1"><i class="fas fa-arrow-up me-1"></i>Client chose these upgrades — apply them in the quote:</div>';
+                upgrades.forEach(function(u, i) {
+                    var cbId = 'upgradeCheck_' + i;
+                    html += '<div class="d-flex align-items-center gap-2 mb-1 p-2 rounded" style="background:rgba(25,135,84,0.07);" id="upgradeRow_' + i + '">';
+                    html += '<input type="checkbox" class="form-check-input" id="' + cbId + '" onchange="markBannerRow(\'upgradeRow_' + i + '\', this.checked)" style="width:16px;height:16px;">';
+                    html += '<label for="' + cbId + '" style="margin:0;cursor:pointer;"><strong>' + u.room + ':</strong> ' + u.from + ' → <span class="text-success fw-bold">' + u.to + '</span> <span class="text-success">(+$' + parseFloat(u.diff||0).toFixed(2) + ')</span></label>';
+                    html += '</div>';
+                });
                 html += '</div>';
-            });
-            html += '<div class="text-muted small mt-2"><i class="fas fa-info-circle me-1"></i>These are the notes your client left. Address them in the quote above, then reshare.</div>';
+            }
+
+            // Removals
+            if (removals.length > 0) {
+                html += '<div class="mb-3"><div class="fw-bold small text-danger mb-1"><i class="fas fa-times-circle me-1"></i>Client removed these items:</div>';
+                removals.forEach(function(r, i) {
+                    var cbId = 'removalCheck_' + i;
+                    html += '<div class="d-flex align-items-center gap-2 mb-1 p-2 rounded" style="background:rgba(220,53,69,0.07);" id="removalRow_' + i + '">';
+                    html += '<input type="checkbox" class="form-check-input" id="' + cbId + '" onchange="markBannerRow(\'removalRow_' + i + '\', this.checked)" style="width:16px;height:16px;">';
+                    html += '<label for="' + cbId + '" style="margin:0;cursor:pointer;"><strong>' + r.room + ':</strong> <s>' + r.item + '</s></label>';
+                    html += '</div>';
+                });
+                html += '</div>';
+            }
+
+            // Notes
+            if (noteEntries.length > 0) {
+                html += '<div class="mb-2"><div class="fw-bold small text-warning-emphasis mb-1"><i class="fas fa-comment me-1"></i>Client notes to address:</div>';
+                noteEntries.forEach(function(entry, i) {
+                    var idx = entry[0], note = entry[1];
+                    var roomName = (rooms[parseInt(idx)] && rooms[parseInt(idx)].name) || ('Room ' + (parseInt(idx)+1));
+                    var cbId = 'noteCheck_' + i;
+                    html += '<div class="d-flex align-items-start gap-2 mb-2 p-2 rounded" style="background:rgba(255,255,255,0.6);" id="noteRow_' + i + '">';
+                    html += '<input type="checkbox" class="form-check-input mt-1" id="' + cbId + '" onchange="markBannerRow(\'noteRow_' + i + '\', this.checked)" style="flex-shrink:0;width:16px;height:16px;">';
+                    html += '<label for="' + cbId + '" style="margin:0;cursor:pointer;"><strong>' + roomName + ':</strong> ' + note.trim().replace(/\n/g,'<br>') + '</label>';
+                    html += '</div>';
+                });
+                html += '</div>';
+            }
+
+            html += '<div class="text-muted small mt-2"><i class="fas fa-info-circle me-1"></i>Check off each item as you address it, then reshare the updated quote.</div>';
             html += '</div>';
-            // Insert right after the navbar/toolbar
             var mainArea = document.querySelector('.container-fluid.py-4') || document.querySelector('.container-fluid') || document.body;
             mainArea.insertAdjacentHTML('afterbegin', html);
         }
 
-        function markNoteRow(i, checked) {
-            var row = document.getElementById('noteRow_' + i);
+        function markBannerRow(rowId, checked) {
+            var row = document.getElementById(rowId);
             if (!row) return;
             if (checked) {
-                row.style.background = 'rgba(25,135,84,0.1)';
-                row.style.textDecoration = 'line-through';
-                row.style.opacity = '0.6';
+                row.style.opacity = '0.45';
+                row.querySelectorAll('label').forEach(function(l) { l.style.textDecoration = 'line-through'; });
             } else {
-                row.style.background = 'rgba(255,255,255,0.6)';
-                row.style.textDecoration = '';
                 row.style.opacity = '1';
+                row.querySelectorAll('label').forEach(function(l) { l.style.textDecoration = ''; });
             }
         }
 

@@ -292,31 +292,62 @@
         async function openNotesReview(quoteId, clientName) {
             currentNotesQuoteId = quoteId;
             document.getElementById('notesReviewClientName').textContent = clientName || 'Client';
-            document.getElementById('notesReviewBody').innerHTML = '<div class="text-center text-muted py-4"><i class="fas fa-spinner fa-spin"></i> Loading notes...</div>';
+            document.getElementById('notesReviewBody').innerHTML = '<div class="text-center text-muted py-4"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
             var modal = bootstrap.Modal.getInstance(document.getElementById('notesReviewModal')) || new bootstrap.Modal(document.getElementById('notesReviewModal'));
             modal.show();
             try {
-                var res = await _supabase.from('quotes').select('data, client_name').eq('id', quoteId).single();
+                var res = await _supabase.from('quotes').select('data, client_name, total').eq('id', quoteId).single();
                 if (res.error || !res.data) throw new Error('Could not load quote');
                 var qd = res.data.data || {};
                 var roomNotes = qd._roomNotes || {};
                 var rooms = qd.rooms || [];
+                var upgrades = qd._clientUpgrades || [];
+                var removals = qd._clientRemovals || [];
                 var submittedAt = qd._clientSubmittedAt;
-                if (Object.keys(roomNotes).length === 0) {
-                    document.getElementById('notesReviewBody').innerHTML = '<p class="text-muted text-center py-3">No notes found for this quote.</p>';
+                var hasNotes = Object.values(roomNotes).some(function(n) { return n && n.trim(); });
+                var hasChanges = upgrades.length > 0 || removals.length > 0;
+
+                if (!hasNotes && !hasChanges) {
+                    document.getElementById('notesReviewBody').innerHTML = '<p class="text-muted text-center py-3">No notes or changes found for this quote.</p>';
                     return;
                 }
+
                 var html = '';
                 if (submittedAt) html += '<p class="text-muted small mb-3"><i class="fas fa-clock me-1"></i>Submitted ' + new Date(submittedAt).toLocaleString() + '</p>';
-                Object.entries(roomNotes).forEach(function(entry) {
-                    var idx = entry[0], note = entry[1];
-                    if (!note || !note.trim()) return;
-                    var roomName = (rooms[parseInt(idx)] && rooms[parseInt(idx)].name) || ('Room ' + (parseInt(idx)+1));
-                    html += '<div class="card mb-3 border-warning"><div class="card-header py-2" style="background:#fff3cd;"><strong><i class="fas fa-door-open me-2"></i>' + roomName + '</strong></div><div class="card-body py-3"><p class="mb-2" style="white-space:pre-wrap;">' + note.trim() + '</p><button class="btn btn-outline-secondary btn-sm" onclick="copyNoteText(this, ' + JSON.stringify(roomName + ': ' + note.trim()) + ')"><i class="fas fa-copy me-1"></i>Copy Note</button></div></div>';
-                });
+
+                // Upgrades section
+                if (upgrades.length > 0) {
+                    html += '<div class="card mb-3 border-success"><div class="card-header py-2" style="background:#d1e7dd;"><strong><i class="fas fa-arrow-up me-2 text-success"></i>Client Selected Upgrades</strong></div><div class="card-body py-2">';
+                    upgrades.forEach(function(u) {
+                        html += '<div class="d-flex justify-content-between align-items-center py-1 border-bottom"><div><strong>' + u.room + ':</strong> ' + u.from + ' → <span class="text-success fw-bold">' + u.to + '</span></div><div class="text-success fw-bold">+$' + parseFloat(u.diff || 0).toFixed(2) + '</div></div>';
+                    });
+                    var upgradeTotal = upgrades.reduce(function(s, u) { return s + parseFloat(u.diff || 0); }, 0);
+                    html += '<div class="d-flex justify-content-between pt-2"><strong>Upgrade Total</strong><strong class="text-success">+$' + upgradeTotal.toFixed(2) + '</strong></div>';
+                    html += '</div></div>';
+                }
+
+                // Removals section
+                if (removals.length > 0) {
+                    html += '<div class="card mb-3 border-danger"><div class="card-header py-2" style="background:#f8d7da;"><strong><i class="fas fa-times-circle me-2 text-danger"></i>Client Removed Items</strong></div><div class="card-body py-2">';
+                    removals.forEach(function(r) {
+                        html += '<div class="py-1 border-bottom"><strong>' + r.room + ':</strong> <s class="text-danger">' + r.item + '</s></div>';
+                    });
+                    html += '</div></div>';
+                }
+
+                // Notes section
+                if (hasNotes) {
+                    Object.entries(roomNotes).forEach(function(entry) {
+                        var idx = entry[0], note = entry[1];
+                        if (!note || !note.trim()) return;
+                        var roomName = (rooms[parseInt(idx)] && rooms[parseInt(idx)].name) || ('Room ' + (parseInt(idx)+1));
+                        html += '<div class="card mb-3 border-warning"><div class="card-header py-2" style="background:#fff3cd;"><strong><i class="fas fa-comment me-2"></i>' + roomName + ' — Client Note</strong></div><div class="card-body py-3"><p class="mb-2" style="white-space:pre-wrap;">' + note.trim() + '</p><button class="btn btn-outline-secondary btn-sm" onclick="copyNoteText(this, ' + JSON.stringify(roomName + ': ' + note.trim()) + ')"><i class="fas fa-copy me-1"></i>Copy</button></div></div>';
+                    });
+                }
+
                 document.getElementById('notesReviewBody').innerHTML = html;
             } catch(e) {
-                document.getElementById('notesReviewBody').innerHTML = '<p class="text-danger">Error loading notes: ' + e.message + '</p>';
+                document.getElementById('notesReviewBody').innerHTML = '<p class="text-danger">Error loading: ' + e.message + '</p>';
             }
         }
 

@@ -779,20 +779,32 @@ if (location.search.includes('debug')) {
             }
         }
 
+        function hasClientUpgrades() {
+            return (quoteData.rooms || []).some(function(room) {
+                return (room.items || []).some(function(item) { return !!item.upgraded; });
+            });
+        }
+
         function handleMainAction() {
-            if (hasClientNotes()) {
-                // No signature needed - just submit with notes
+            var hasNotes = hasClientNotes();
+            var hasUpgrades = hasClientUpgrades();
+            if (hasNotes || hasUpgrades) {
+                // Save upgrades + notes to Supabase, mark as in_review
                 submitUpgrades();
                 document.getElementById('hiddenSubmitBtn').click();
-                // Mark as in_review in Supabase
-                const urlParams = new URLSearchParams(window.location.search);
-                const quoteId = urlParams.get('id');
+                var urlParams = new URLSearchParams(window.location.search);
+                var quoteId = urlParams.get('id');
                 if (quoteId) {
-                    const sb = window._supabaseClient || (typeof supabase !== 'undefined' ? supabase : null);
-                    if (sb) sb.from('quotes').update({ status: 'in_review', updated_at: new Date().toISOString() }).eq('id', quoteId).then(() => {});
+                    var sb = window._supabaseClient || (typeof supabase !== 'undefined' ? supabase : null);
+                    if (sb) sb.from('quotes').update({ status: 'in_review', updated_at: new Date().toISOString() }).eq('id', quoteId).then(function() {});
                 }
+                // Show confirmation to client
+                var approveSection = document.getElementById('approveSection');
+                if (approveSection) approveSection.style.display = 'none';
+                var successMsg = document.getElementById('successMessage');
+                if (successMsg) successMsg.style.display = '';
             } else {
-                // Open signature/approval modal
+                // No changes — open signature/approval modal
                 openSignatureModal();
             }
         }
@@ -963,14 +975,34 @@ if (location.search.includes('debug')) {
             }
             if (noteLines.length) addField('client_notes', noteLines.join('\n\n'));
 
-            // Save client notes to Supabase
+            // Build upgrade summary for Supabase
+            var _clientUpgrades = [];
+            var _clientRemovals = [];
+            (quoteData.rooms || []).forEach(function(room) {
+                (room.items || []).forEach(function(item) {
+                    if (item.upgraded && item.upgrade) {
+                        _clientUpgrades.push({ room: room.name, from: item.description, to: item.upgrade.name, diff: (item.upgrade.rate - (item._baseRate || item.rate)) * item.quantity });
+                    }
+                    if (item._removed) {
+                        _clientRemovals.push({ room: room.name, item: item.description });
+                    }
+                });
+            });
+
+            // Save notes + upgrades + updated rooms to Supabase
             var _sqid = new URLSearchParams(window.location.search).get('id');
-            if (_sqid && quoteData._roomNotes && Object.keys(quoteData._roomNotes).length > 0) {
+            if (_sqid) {
                 var sb2 = window._supabaseClient || (typeof supabase !== 'undefined' ? supabase : null);
                 if (sb2) {
                     sb2.from('quotes').select('data').eq('id', _sqid).single().then(function(res) {
                         if (res.data && res.data.data) {
-                            var merged = Object.assign({}, res.data.data, { _roomNotes: quoteData._roomNotes, _clientSubmittedAt: new Date().toISOString() });
+                            var merged = Object.assign({}, res.data.data, {
+                                _roomNotes: quoteData._roomNotes || {},
+                                _clientUpgrades: _clientUpgrades,
+                                _clientRemovals: _clientRemovals,
+                                _clientRooms: JSON.parse(JSON.stringify(quoteData.rooms || [])),
+                                _clientSubmittedAt: new Date().toISOString()
+                            });
                             sb2.from('quotes').update({ data: merged, updated_at: new Date().toISOString() }).eq('id', _sqid).then(function() {});
                         }
                     });
