@@ -4707,8 +4707,11 @@ async function saveQuote() {
                 var recoverBtn = document.getElementById('recoverDraftBtn');
                 if (recoverBtn) recoverBtn.style.display = localStorage.getItem('ald_autosave_draft') ? 'inline-block' : 'none';
                 // Startup modal disabled — using draft warning banner instead
-                // Just restore session if one exists
-                startupContinueSession();
+                // Skip session restore if loading a specific quote from URL
+                var _urlp = new URLSearchParams(window.location.search);
+                if (!_urlp.get('load') && !_urlp.get('shownotes')) {
+                    startupContinueSession();
+                }
             }
             tryStartup();
         });
