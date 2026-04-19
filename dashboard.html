@@ -343,7 +343,7 @@
                 var res = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/send-quote-email', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso' },
-                    body: JSON.stringify({ to: clientEmail, clientName: clientName, contractorName: '', companyName: '', quoteNumber: quote.quote_number || '', total: quote.total || 0, quoteUrl: viewerUrl, message: "Just following up on the quote I sent you! Let me know if you have any questions or if you're ready to proceed." })
+                    body: JSON.stringify({ to: clientEmail, clientName: clientName, contractorName: '', companyName: '', quoteNumber: quote.quote_number || '', total: quote.total || 0, quoteUrl: viewerUrl, message: (function(){ try { var ns = JSON.parse(localStorage.getItem('ald_notification_settings') || '{}'); return ns.followupMessage || "Just following up on the quote I sent you! Let me know if you have any questions or if you're ready to proceed."; } catch(e) { return "Just following up on the quote I sent you!"; } })() })
                 });
                 var data = await res.json();
                 if (data.error) throw new Error(data.error);

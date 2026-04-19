@@ -79,8 +79,36 @@ if (location.search.includes('debug')) {
 		</button>
 	</div>
 
-	<div class="container py-4" style="max-width: 680px;">
-		<!-- Business Profile -->
+	<div class="container-fluid py-4" style="max-width:1100px; margin:0 auto;">
+
+		<!-- Search bar -->
+		<div class="mb-4">
+			<div class="input-group">
+				<span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
+				<input type="text" id="settingsSearch" class="form-control" placeholder="Search settings... (e.g. logo, tax, reminder)" oninput="searchSettings(this.value)">
+				<button class="btn btn-outline-secondary" onclick="clearSearch()" style="display:none;" id="searchClearBtn">✕</button>
+			</div>
+			<div id="searchResults" class="mt-2" style="display:none;"></div>
+		</div>
+
+		<div class="row g-4" id="settingsMain">
+			<!-- Sidebar -->
+			<div class="col-lg-3">
+				<div class="list-group shadow-sm" id="settingsTabs">
+					<a href="#" class="list-group-item list-group-item-action active fw-semibold" onclick="showTab('business',this);return false;"><i class="fas fa-building me-2" style="color:#1a56a0"></i>Business</a>
+					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('quotes',this);return false;"><i class="fas fa-file-invoice me-2" style="color:#1a56a0"></i>Quotes</a>
+					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('pricing',this);return false;"><i class="fas fa-boxes me-2" style="color:#1a56a0"></i>Pricing &amp; Data</a>
+					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('notifications',this);return false;"><i class="fas fa-bell me-2" style="color:#e87e2a"></i>Notifications</a>
+					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('account',this);return false;"><i class="fas fa-user-circle me-2" style="color:#6f42c1"></i>Account</a>
+				</div>
+			</div>
+
+			<!-- Tab content -->
+			<div class="col-lg-9">
+
+				<!-- BUSINESS TAB -->
+				<div id="tab-business">
+					<!-- Business Profile -->
 		<div class="settings-card">
 			<h5><i class="fas fa-building me-2" style="color:#1a56a0"></i>Business Profile</h5>
 			<div class="row g-3">
@@ -196,8 +224,12 @@ if (location.search.includes('debug')) {
 			</div>
 		</div>
 
-		<!-- Quote Preferences -->
-		<div class="settings-card">
+				</div><!-- /tab-business -->
+
+				<!-- QUOTES TAB -->
+				<div id="tab-quotes" style="display:none;">
+				<!-- Quote Preferences -->
+				<div class="settings-card">
 			<h5><i class="fas fa-file-invoice me-2" style="color:#1a56a0"></i>Quote Preferences</h5>
 			<div class="row g-3">
 				<div class="col-12">
@@ -243,8 +275,12 @@ if (location.search.includes('debug')) {
 			</div>
 		</div>
 
-		<!-- Custom Materials -->
-		<div class="settings-card">
+				</div><!-- /tab-quotes -->
+
+				<!-- PRICING TAB -->
+				<div id="tab-pricing" style="display:none;">
+				<!-- Custom Materials -->
+				<div class="settings-card">
 			<h5><i class="fas fa-boxes me-2" style="color:#1a56a0"></i>Custom Materials</h5>
 			<p class="text-muted small">Add materials to your quote builder.</p>
 			<div class="mb-3">
@@ -366,15 +402,153 @@ Sarah Jones, 905-555-5678"></textarea>
 			</div>
 		</div>
 
+				</div><!-- /tab-pricing -->
+
+				<!-- NOTIFICATIONS TAB -->
+				<div id="tab-notifications" style="display:none;">
+					<div class="settings-card">
+						<h5><i class="fas fa-paper-plane me-2" style="color:#e87e2a"></i>Follow-up Email</h5>
+						<p class="text-muted small">Customize the message sent when you follow up with a client on a quote.</p>
+						<div class="mb-3">
+							<label class="form-label fw-bold">Follow-up Message</label>
+							<textarea id="followupMessage" class="form-control" rows="5" placeholder="Just following up on the quote I sent you! Let me know if you have any questions or if you're ready to proceed."></textarea>
+							<div class="form-text">The quote link is always included automatically at the bottom of the email.</div>
+						</div>
+						<button class="btn btn-primary btn-save" onclick="saveNotificationSettings()"><i class="fas fa-save me-1"></i> Save</button>
+						<span class="saved-badge ms-2" id="notifSaved" style="display:none;"><i class="fas fa-check-circle me-1"></i>Saved!</span>
+					</div>
+
+					<div class="settings-card">
+						<h5><i class="fas fa-clock me-2" style="color:#e87e2a"></i>Automatic Reminders</h5>
+						<p class="text-muted small">Automatically remind clients who haven't responded to a quote.</p>
+						<div class="form-check form-switch mb-3">
+							<input class="form-check-input" type="checkbox" id="autoReminderEnabled" role="switch">
+							<label class="form-check-label fw-bold" for="autoReminderEnabled">Enable automatic reminders</label>
+						</div>
+						<div class="mb-3">
+							<label class="form-label fw-bold">Send reminder after</label>
+							<div class="d-flex align-items-center gap-2">
+								<input type="number" id="reminderDays" class="form-control" style="width:90px;" min="1" max="90" value="3">
+								<span class="text-muted">days with no response</span>
+							</div>
+							<div class="form-text">Clients who haven't viewed or accepted within this window will get a reminder. Requires client email to be filled in on the quote.</div>
+						</div>
+						<div class="alert alert-info small py-2"><i class="fas fa-info-circle me-1"></i>Automatic sending requires the QuoteDr Pro plan. You can always send manual follow-ups from the dashboard.</div>
+						<button class="btn btn-primary btn-save" onclick="saveNotificationSettings()"><i class="fas fa-save me-1"></i> Save Reminder Settings</button>
+					</div>
+				</div><!-- /tab-notifications -->
+
+				<!-- ACCOUNT TAB -->
+				<div id="tab-account" style="display:none;">
+					<div class="settings-card">
+						<h5><i class="fas fa-user-circle me-2" style="color:#6f42c1"></i>Account</h5>
+						<p class="text-muted">Subscription &amp; billing settings coming soon.</p>
+						<a href="pricing.html" class="btn btn-outline-primary"><i class="fas fa-arrow-up me-1"></i>View Plans</a>
+					</div>
+				</div><!-- /tab-account -->
+
+			</div><!-- /col-lg-9 -->
+		</div><!-- /row -->
+
 		<!-- Footer -->
 		<div class="text-center text-muted small mt-4">
-			<p>QuoteDr.io &copy; 2024 - All Rights Reserved</p>
+			<p>QuoteDr.io &copy; 2026 - All Rights Reserved</p>
 		</div>
 	</div>
 
 	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 	<script>
-		// Initialize settings
+		// ── Tab Navigation ──────────────────────────────────────────────────
+		function showTab(name, el) {
+			document.querySelectorAll('[id^="tab-"]').forEach(function(t) { t.style.display = 'none'; });
+			var tab = document.getElementById('tab-' + name);
+			if (tab) tab.style.display = '';
+			document.querySelectorAll('#settingsTabs .list-group-item').forEach(function(a) { a.classList.remove('active'); });
+			if (el) el.classList.add('active');
+			localStorage.setItem('ald_settings_tab', name);
+		}
+
+		// ── Settings Search ──────────────────────────────────────────────────
+		var settingsIndex = [
+			{ tab: 'business', keywords: ['business','company','name','logo','phone','email','address','hst','tagline','owner','city','province','postal'], label: 'Business Profile' },
+			{ tab: 'quotes', keywords: ['quote','prefix','tax','valid','expiry','markup','terms','conditions','heading','number'], label: 'Quote Preferences & Terms' },
+			{ tab: 'pricing', keywords: ['pricing','items','materials','import','export','ai','csv','custom','clients','quickbooks'], label: 'Pricing & Data' },
+			{ tab: 'notifications', keywords: ['email','reminder','followup','follow-up','notification','auto','automatic','days','message'], label: 'Notifications & Reminders' },
+			{ tab: 'account', keywords: ['account','subscription','billing','plan','upgrade','pro'], label: 'Account' },
+		];
+
+		function searchSettings(query) {
+			var resultsEl = document.getElementById('searchResults');
+			var mainEl = document.getElementById('settingsMain');
+			var clearBtn = document.getElementById('searchClearBtn');
+			if (!query || !query.trim()) {
+				resultsEl.style.display = 'none';
+				mainEl.style.display = '';
+				if (clearBtn) clearBtn.style.display = 'none';
+				return;
+			}
+			if (clearBtn) clearBtn.style.display = '';
+			var q = query.toLowerCase().trim();
+			mainEl.style.display = 'none';
+			resultsEl.style.display = '';
+			var matches = settingsIndex.filter(function(s) {
+				return s.keywords.some(function(k) { return k.includes(q) || q.includes(k); });
+			});
+			if (matches.length === 0) {
+				resultsEl.innerHTML = '<p class="text-muted ps-1">No settings found for "' + query + '"</p>';
+				return;
+			}
+			resultsEl.innerHTML = matches.map(function(m) {
+				return '<div class="alert alert-light border mb-2 py-2" style="cursor:pointer;" onclick="clearSearch(\'' + m.tab + '\')">' +
+					'<i class="fas fa-arrow-right me-2 text-primary"></i><strong>' + m.label + '</strong>' +
+					'<span class="text-muted ms-2 small">— click to open</span></div>';
+			}).join('');
+		}
+
+		function clearSearch(tab) {
+			document.getElementById('settingsSearch').value = '';
+			document.getElementById('searchResults').style.display = 'none';
+			document.getElementById('settingsMain').style.display = '';
+			var btn = document.getElementById('searchClearBtn');
+			if (btn) btn.style.display = 'none';
+			if (tab) {
+				var tabEl = document.querySelector('#settingsTabs [onclick*="\'' + tab + '\'"]');
+				showTab(tab, tabEl);
+			}
+		}
+
+		// ── Notification Settings ──────────────────────────────────────────
+		function saveNotificationSettings() {
+			var settings = {
+				followupMessage: (document.getElementById('followupMessage') || {}).value || '',
+				autoReminderEnabled: !!(document.getElementById('autoReminderEnabled') || {}).checked,
+				reminderDays: parseInt((document.getElementById('reminderDays') || {}).value || '3')
+			};
+			localStorage.setItem('ald_notification_settings', JSON.stringify(settings));
+			if (typeof _supabase !== 'undefined' && typeof getCurrentUser === 'function') {
+				getCurrentUser().then(function(u) {
+					if (u) _supabase.from('user_data').upsert({ user_id: u.id, key: 'notification_settings', value: settings, updated_at: new Date().toISOString() }, { onConflict: 'user_id,key' }).then(function() {});
+				});
+			}
+			var badge = document.getElementById('notifSaved');
+			if (badge) { badge.style.display = 'inline'; setTimeout(function() { badge.style.display = 'none'; }, 2500); }
+		}
+
+		function loadNotificationSettings() {
+			var raw = localStorage.getItem('ald_notification_settings');
+			if (!raw) return;
+			try {
+				var s = JSON.parse(raw);
+				var fm = document.getElementById('followupMessage');
+				if (fm && s.followupMessage) fm.value = s.followupMessage;
+				var ar = document.getElementById('autoReminderEnabled');
+				if (ar) ar.checked = !!s.autoReminderEnabled;
+				var rd = document.getElementById('reminderDays');
+				if (rd && s.reminderDays) rd.value = s.reminderDays;
+			} catch(e) {}
+		}
+
+		// ── Initialize settings
 		function handleLogoUpload(event) {
 			var file = event.target.files[0];
 			if (!file) return;
@@ -426,6 +600,12 @@ Sarah Jones, 905-555-5678"></textarea>
 		}
 
 		document.addEventListener('DOMContentLoaded', function() {
+			// Restore last active tab
+			var lastTab = localStorage.getItem('ald_settings_tab') || 'business';
+			var tabEl = document.querySelector('#settingsTabs [onclick*="\'' + lastTab + '\'"]');
+			showTab(lastTab, tabEl);
+			// Load notification settings
+			loadNotificationSettings();
 			// Populate username in nav
 			var userName = localStorage.getItem('ald_user_name') || '';
 			var userEl = document.getElementById('userName');
