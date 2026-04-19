@@ -214,6 +214,48 @@ if (location.search.includes('debug')) {
             </div>
         </div>
 
+        <!-- Deposit / Payment Request -->
+        <div class="text-center my-4" id="depositRequestBtn" style="display:none;">
+            <button class="btn btn-success btn-lg px-5" onclick="openDepositModal()">
+                <i class="fas fa-credit-card me-2"></i>Request Deposit
+            </button>
+            <div id="depositRequestedBadge" class="mt-2" style="display:none;">
+                <span class="badge bg-success fs-6"><i class="fas fa-check-circle me-1"></i>Payment Link Sent</span>
+            </div>
+        </div>
+
+        <!-- Deposit Modal -->
+        <div class="modal fade" id="depositModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="fas fa-credit-card me-2"></i>Request Deposit</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-muted">Set the deposit amount to request from your client. A Stripe payment link will open.</p>
+                        <label class="form-label fw-bold">Deposit Amount</label>
+                        <div class="input-group mb-2">
+                            <span class="input-group-text">$</span>
+                            <input type="number" class="form-control" id="depositAmountInput" min="1" step="0.01" placeholder="0.00">
+                        </div>
+                        <div class="d-flex gap-2 mb-3">
+                            <button class="btn btn-outline-secondary btn-sm" onclick="setDepositPct(25)">25%</button>
+                            <button class="btn btn-outline-secondary btn-sm" onclick="setDepositPct(50)">50%</button>
+                            <button class="btn btn-outline-primary btn-sm" onclick="setDepositPct(100)">Full</button>
+                        </div>
+                        <div class="form-text">Invoice total: <strong id="depositModalTotal">$0.00</strong></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-success" onclick="submitDepositRequest()">
+                            <i class="fas fa-external-link-alt me-1"></i>Open Stripe Checkout
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Terms -->
         <div class="terms-section">
             <div class="card">
@@ -478,11 +520,62 @@ if (location.search.includes('debug')) {
             document.getElementById('invoiceContainer').innerHTML = html;
 
             // Totals
-            const tax = subtotal * 0.13;
+            var _iqp = {}; try { _iqp = JSON.parse(localStorage.getItem('ald_quote_prefs')||'{}'); } catch(e) {}
+            var _iTaxRate = (_iqp.taxRate !== undefined && _iqp.taxRate !== '') ? parseFloat(_iqp.taxRate)/100 : 0.13;
+            var _iTaxLabel = _iqp.taxLabel || 'HST';
+            const tax = subtotal * _iTaxRate;
             const total = subtotal + tax;
             document.getElementById('subtotalDisplay').textContent = '$' + subtotal.toFixed(2);
             document.getElementById('taxDisplay').textContent = '$' + tax.toFixed(2);
             document.getElementById('grandTotalDisplay').textContent = '$' + total.toFixed(2);
+            // Store total for deposit modal
+            window._invoiceTotal = total;
+            // Update deposit button visibility
+            var depBtn = document.getElementById('depositRequestBtn');
+            if (depBtn) depBtn.style.display = total > 0 ? 'block' : 'none';
+        }
+
+        function openDepositModal() {
+            var total = window._invoiceTotal || 0;
+            var half = (total * 0.5).toFixed(2);
+            document.getElementById('depositAmountInput').value = half;
+            document.getElementById('depositModalTotal').textContent = '$' + total.toFixed(2);
+            var modal = new bootstrap.Modal(document.getElementById('depositModal'));
+            modal.show();
+        }
+
+        function setDepositPct(pct) {
+            var total = window._invoiceTotal || 0;
+            document.getElementById('depositAmountInput').value = (total * pct / 100).toFixed(2);
+        }
+
+        async function submitDepositRequest() {
+            var amount = parseFloat(document.getElementById('depositAmountInput').value);
+            if (!amount || amount <= 0) { alert('Please enter a valid amount.'); return; }
+            var quoteId = invoiceData.supabaseId || invoiceData.id || '';
+            var clientName = invoiceData.clientName || 'Client';
+            var quoteNum = invoiceData.quoteNumber || '';
+            var description = 'Deposit for ' + clientName + (quoteNum ? ' (Quote #' + quoteNum + ')' : '') + ' — ALD Direct Inc.';
+            var successUrl = window.location.href + (window.location.href.includes('?') ? '&' : '?') + 'paid=1';
+            var cancelUrl = window.location.href;
+            try {
+                var resp = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/stripe-deposit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso' },
+                    body: JSON.stringify({ amount: Math.round(amount * 100), currency: 'cad', quoteId: quoteId, description: description, successUrl: successUrl, cancelUrl: cancelUrl })
+                });
+                var data = await resp.json();
+                if (data.url) {
+                    bootstrap.Modal.getInstance(document.getElementById('depositModal')).hide();
+                    document.getElementById('depositRequestedBadge').style.display = 'block';
+                    localStorage.setItem('deposit_requested_' + quoteId, JSON.stringify({ amount: amount, ts: Date.now() }));
+                    window.open(data.url, '_blank');
+                } else {
+                    alert('Stripe error: ' + (data.error || 'Unknown error'));
+                }
+            } catch(e) {
+                alert('Failed to create payment link: ' + e.message);
+            }
         }
 
         function renderTerms() {
