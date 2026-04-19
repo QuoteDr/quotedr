@@ -3248,18 +3248,20 @@ async function saveQuote() {
                     setTimeout(function() {
                         var notes = (window._loadedQuoteData && window._loadedQuoteData._roomNotes) || {};
                         var noteEntries = Object.entries(notes).filter(function(e) { return e[1] && e[1].trim(); });
+                        if (document.getElementById('clientNotesBanner')) return; // already shown
                         if (noteEntries.length > 0) {
-                            var html = '<div id="clientNotesBanner" style="background:#fff3cd;border:2px solid #ffc107;border-radius:10px;padding:16px;margin-bottom:16px;"><div class="d-flex justify-content-between align-items-start"><strong><i class="fas fa-comments me-2" style="color:#fd7e14;"></i>Client Notes to Address:</strong><button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById(\"clientNotesBanner\").remove()">✕</button></div><hr style="margin:8px 0;">';
+                            var html = '<div id="clientNotesBanner" class="container-fluid" style="padding:0 0 16px 0;"><div style="background:#fff3cd;border:2px solid #ffc107;border-radius:10px;padding:16px;"><div class="d-flex justify-content-between align-items-center mb-2"><strong><i class="fas fa-comments me-2" style="color:#fd7e14;"></i>Client Notes to Address:</strong><button class="btn btn-sm btn-outline-secondary py-0" onclick="document.getElementById(&quot;clientNotesBanner&quot;).remove()">&times; Dismiss</button></div>';
                             noteEntries.forEach(function(entry) {
                                 var idx = entry[0], note = entry[1];
                                 var roomName = (rooms[parseInt(idx)] && rooms[parseInt(idx)].name) || ('Room ' + (parseInt(idx)+1));
-                                html += '<div class="mb-2"><strong>' + roomName + ':</strong> ' + note.trim() + '</div>';
+                                html += '<div class="mb-1"><strong>' + roomName + ':</strong> ' + note.trim().replace(/\n/g,'<br>') + '</div>';
                             });
-                            html += '</div>';
-                            var container = document.getElementById('roomsContainer') || document.querySelector('.rooms-container') || document.querySelector('#rooms');
-                            if (container) container.insertAdjacentHTML('beforebegin', html);
+                            html += '</div></div>';
+                            // Insert at top of main content area
+                            var mainArea = document.querySelector('.container-fluid.py-4') || document.querySelector('.container-fluid') || document.body;
+                            mainArea.insertAdjacentHTML('afterbegin', html);
                         }
-                    }, 800);
+                    }, 1200);
                 }
             } catch(e) {
                 if (listEl) listEl.innerHTML = '<div class="alert alert-danger small py-2">Failed to load: ' + e.message + '</div>';
