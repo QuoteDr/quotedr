@@ -198,6 +198,9 @@ if (location.search.includes('debug')) {
             </div>
         </div>
 
+        <!-- Quote Expiry Notice -->
+        <div id="quoteExpiry" class="mb-3"></div>
+
         <!-- Project Info -->
         <div class="card mb-4">
             <div class="card-body">
@@ -462,6 +465,7 @@ if (location.search.includes('debug')) {
                 if (result && result.data && result.data.data) {
                     quoteData = result.data.data;
                     console.log('Loaded quote from Supabase:', quoteData);
+                    showExpiryNotice();
                     return;
                 } else {
                     alert('Quote not found or could not be loaded. The link may be invalid.');
@@ -834,6 +838,21 @@ if (location.search.includes('debug')) {
             sigCanvas.classList.remove('signed');
             sigHasStrokes = false;
         }
+        function showExpiryNotice() {
+            var el = document.getElementById('quoteExpiry');
+            if (!el) return;
+            var raw = quoteData.valid_until || quoteData.validUntil || quoteData.validUntilDate;
+            if (!raw) return;
+            var d = new Date(raw);
+            var now = new Date(); now.setHours(0,0,0,0);
+            var dateStr = d.toLocaleDateString('en-CA', { year:'numeric', month:'long', day:'numeric' });
+            if (d >= now) {
+                el.innerHTML = '<div class="alert alert-success py-2 mb-0"><i class="fas fa-check-circle me-2"></i>This quote is valid until <strong>' + dateStr + '</strong></div>';
+            } else {
+                el.innerHTML = '<div class="alert alert-danger py-2 mb-0"><i class="fas fa-exclamation-triangle me-2"></i><strong>This quote has expired.</strong> Please contact us for an updated quote.</div>';
+            }
+        }
+
         async function markQuoteViewed(quoteId) {
             try {
                 const sb = window._supabaseClient || (typeof supabase !== 'undefined' ? supabase : null);

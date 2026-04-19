@@ -2657,6 +2657,10 @@ if (location.search.includes('debug')) {
             };
             localStorage.setItem(invoiceId, JSON.stringify(invoiceData));
             localStorage.setItem('ald_last_preview_invoice', invoiceId);
+            // Update quote status to invoiced in Supabase
+            if (window._supabaseQuoteId && typeof _supabase !== 'undefined') {
+                _supabase.from('quotes').update({ status: 'invoiced', updated_at: new Date().toISOString() }).eq('id', window._supabaseQuoteId).then(function() {});
+            }
             const invoiceBaseUrl = window.location.href.split('?')[0].replace('quote-builder.html', 'invoice-viewer.html');
             const invoiceUrl = invoiceBaseUrl + '?invoice=' + invoiceId;
             // Use anchor with target=_blank to avoid popup blocker

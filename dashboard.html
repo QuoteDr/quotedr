@@ -101,8 +101,8 @@
             <div class="col-md-3 col-sm-6 mb-3">
                 <div class="card border-warning">
                     <div class="card-body text-center">
-                        <h5 class="card-title">Invoiced</h5>
-                        <p class="display-6" id="invoicedQuotesCount">0</p>
+                        <h5 class="card-title">In Review</h5>
+                        <p class="display-6" id="inReviewCount">0</p>
                     </div>
                 </div>
             </div>
@@ -214,13 +214,13 @@
         function updateStats(quotes) {
             const total = quotes.length;
             const accepted = quotes.filter(q => q.status === 'accepted').length;
-            const invoiced = quotes.filter(q => q.status === 'invoiced').length;
+            const inReview = quotes.filter(q => q.status === 'in_review').length;
             const revenue = quotes.reduce((sum, q) => sum + (parseFloat(q.total) || 0), 0);
 
             document.getElementById('totalQuotesCount').textContent = total;
             document.getElementById('acceptedQuotesCount').textContent = accepted;
-            document.getElementById('invoicedQuotesCount').textContent = invoiced;
-            document.getElementById('totalRevenue').textContent = '$' + revenue.toFixed(2);
+            document.getElementById('inReviewCount').textContent = inReview;
+            document.getElementById('totalRevenue').textContent = '$' + revenue.toLocaleString('en-CA', {minimumFractionDigits:0, maximumFractionDigits:0});
         }
 
         function renderQuotes(quotes) {
@@ -261,6 +261,8 @@
                     </div>
                     ${q.status === 'in_review' ? `
                     <button class="btn btn-warning btn-sm w-100 mt-2" onclick="openNotesReview('${q.id}', '${(q.client_name || '').replace(/'/g, "\\'")}')"><i class="fas fa-comments me-1"></i> Review Client Notes</button>` : ''}
+                    ${(q.status === 'sent' || q.status === 'viewed') ? `
+                    <button class="btn btn-outline-primary btn-sm w-100 mt-1" onclick="sendFollowUpReminder('${q.id}', '${(q.client_name || '').replace(/'/g, "\\'")}', '${(q.data && q.data.clientEmail) || ''}')"><i class="fas fa-bell me-1"></i> Send Follow-up</button>` : ''}
                 </div>
             `).join('');
         }
@@ -327,6 +329,29 @@
             await updateQuoteStatus(quoteId, 'sent');
             var modal = bootstrap.Modal.getInstance(document.getElementById('notesReviewModal'));
             if (modal) modal.hide();
+        }
+
+        async function sendFollowUpReminder(quoteId, clientName, savedEmail) {
+            var quote = allQuotes.find(function(q) { return q.id === quoteId; });
+            if (!quote) return;
+            var clientEmail = prompt('Send follow-up reminder to:', savedEmail || '');
+            if (!clientEmail || !clientEmail.includes('@')) { if (clientEmail !== null) alert('Invalid email'); return; }
+            var viewerUrl = window.location.origin + '/interactive-quote-viewer.html?id=' + quoteId;
+            var btn = event.target.closest('button');
+            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Sending...'; }
+            try {
+                var res = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/send-quote-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso' },
+                    body: JSON.stringify({ to: clientEmail, clientName: clientName, contractorName: '', companyName: '', quoteNumber: quote.quote_number || '', total: quote.total || 0, quoteUrl: viewerUrl, message: "Just following up on the quote I sent you! Let me know if you have any questions or if you're ready to proceed." })
+                });
+                var data = await res.json();
+                if (data.error) throw new Error(data.error);
+                if (btn) { btn.innerHTML = '<i class="fas fa-check me-1"></i>Sent!'; setTimeout(function() { btn.disabled = false; btn.innerHTML = '<i class="fas fa-bell me-1"></i> Send Follow-up'; }, 3000); }
+            } catch(e) {
+                alert('Failed to send: ' + e.message);
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-bell me-1"></i> Send Follow-up'; }
+            }
         }
 
         function copyNoteText(btn, text) {
