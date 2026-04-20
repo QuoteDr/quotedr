@@ -526,8 +526,8 @@ if (location.search.includes('debug')) {
                         <input type="text" id="mapAddressInput" class="form-control" placeholder="Enter property address..." style="max-width:380px;">
                         <button class="btn btn-primary btn-sm" onclick="searchMapAddress()"><i class="fas fa-search me-1"></i>Search</button>
                         <div class="vr mx-1"></div>
-                        <button class="btn btn-outline-secondary btn-sm" onclick="setDrawMode('polygon')" id="btnDrawPolygon"><i class="fas fa-draw-polygon me-1"></i>Draw Area</button>
-                        <button class="btn btn-outline-secondary btn-sm" onclick="setDrawMode('polyline')" id="btnDrawLine"><i class="fas fa-ruler me-1"></i>Draw Line</button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="setDrawMode('polygon')" id="btnDrawPolygon"><i class="fas fa-vector-square me-1"></i>Area Measure</button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="setDrawMode('polyline')" id="btnDrawLine"><i class="fas fa-ruler me-1"></i>Linear Measure</button>
                         <button class="btn btn-outline-danger btn-sm" onclick="clearMapShapes()"><i class="fas fa-trash me-1"></i>Clear</button>
                     </div>
                     <div id="measureMapContainer" style="flex:1;min-height:0;"></div>
@@ -2064,8 +2064,10 @@ if (location.search.includes('debug')) {
                     _drawingManager.setMap(_map);
                     google.maps.event.addListener(_drawingManager, 'overlaycomplete', function(e) {
                         _drawingManager.setDrawingMode(null);
-                        document.getElementById('btnDrawPolygon').className = 'btn btn-outline-secondary btn-sm';
-                        document.getElementById('btnDrawLine').className = 'btn btn-outline-secondary btn-sm';
+                        document.getElementById('btnDrawPolygon').className = 'btn btn-sm btn-outline-secondary';
+                        document.getElementById('btnDrawLine').className = 'btn btn-sm btn-outline-secondary';
+                        document.getElementById('btnDrawLine').innerHTML = '<i class="fas fa-ruler me-1"></i>Linear Measure';
+                        _linearActive = false;
                         var shape = e.overlay;
                         var label = prompt('Label this measurement (e.g. "Main Roof", "Back Patio"):') || ('Shape ' + (_mapShapes.length + 1));
                         shape._label = label; shape._type = e.type;
@@ -2118,11 +2120,32 @@ if (location.search.includes('debug')) {
             });
         }
 
+        var _linearActive = false;
+
         function setDrawMode(mode) {
             if (!_drawingManager) return;
-            _drawingManager.setDrawingMode(mode === 'polygon' ? google.maps.drawing.OverlayType.POLYGON : google.maps.drawing.OverlayType.POLYLINE);
-            document.getElementById('btnDrawPolygon').className = 'btn btn-sm ' + (mode === 'polygon' ? 'btn-primary' : 'btn-outline-secondary');
-            document.getElementById('btnDrawLine').className = 'btn btn-sm ' + (mode === 'polyline' ? 'btn-primary' : 'btn-outline-secondary');
+            if (mode === 'polyline') {
+                if (_linearActive) {
+                    _drawingManager.setDrawingMode(null);
+                    _linearActive = false;
+                    document.getElementById('btnDrawLine').className = 'btn btn-sm btn-outline-secondary';
+                    document.getElementById('btnDrawLine').innerHTML = '<i class="fas fa-ruler me-1"></i>Linear Measure';
+                } else {
+                    _drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYLINE);
+                    _linearActive = true;
+                    document.getElementById('btnDrawLine').className = 'btn btn-sm btn-primary';
+                    document.getElementById('btnDrawLine').innerHTML = '<i class="fas fa-stop-circle me-1"></i>Stop Measuring';
+                    document.getElementById('btnDrawPolygon').className = 'btn btn-sm btn-outline-secondary';
+                }
+            } else if (mode === 'polygon') {
+                if (_linearActive) {
+                    _linearActive = false;
+                    document.getElementById('btnDrawLine').className = 'btn btn-sm btn-outline-secondary';
+                    document.getElementById('btnDrawLine').innerHTML = '<i class="fas fa-ruler me-1"></i>Linear Measure';
+                }
+                _drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
+                document.getElementById('btnDrawPolygon').className = 'btn btn-sm btn-primary';
+            }
         }
 
         function clearMapShapes() {
