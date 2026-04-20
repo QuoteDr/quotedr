@@ -537,18 +537,11 @@ if (location.search.includes('debug')) {
                 <div class="modal-footer">
                     <div class="me-auto d-flex align-items-center gap-2 flex-wrap">
                         <select id="mapTargetRoom" class="form-select form-select-sm" style="max-width:180px;"><option value="">Add to room...</option></select>
-                        <select id="mapItemCategory" class="form-select form-select-sm" style="max-width:150px;">
-                            <option value="Miscellaneous">Category...</option>
-                            <option value="Roofing">Roofing</option>
-                            <option value="Flooring">Flooring</option>
-                            <option value="Tile">Tile</option>
-                            <option value="Painting">Painting</option>
-                            <option value="Drywall">Drywall</option>
-                            <option value="Decks &amp; Patios">Decks &amp; Patios</option>
-                            <option value="Landscaping">Landscaping</option>
-                        </select>
-                        <input type="text" id="mapItemName" class="form-control form-control-sm" placeholder="Item name e.g. Roof tear-off" style="max-width:200px;">
+                        <select id="mapItemCategory" class="form-select form-select-sm" style="max-width:150px;"><option value="">All Categories</option></select>
+                        <input type="text" id="mapItemName" class="form-control form-control-sm" list="mapItemSuggestions" placeholder="Item name e.g. Roof tear-off" style="max-width:200px;">
+                        <datalist id="mapItemSuggestions"></datalist>
                         <input type="number" id="mapItemRate" class="form-control form-control-sm" placeholder="Rate $" step="0.01" style="max-width:90px;">
+                        <input type="hidden" id="mapItemUnit">
                     </div>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                     <button type="button" class="btn btn-success" onclick="addMeasurementsToQuote()"><i class="fas fa-plus me-1"></i>Add to Quote</button>
@@ -1989,6 +1982,53 @@ if (location.search.includes('debug')) {
         // ── Google Maps Measurement ─────────────────────────────────────────
         var _map = null, _drawingManager = null, _mapShapes = [], _mapInited = false;
 
+        function populateMeasureModalCategories() {
+            var select = document.getElementById('mapItemCategory');
+            select.innerHTML = '<option value="">All Categories</option>';
+            Object.keys(customItems).sort().forEach(function(category) {
+                var option = document.createElement('option');
+                option.value = category;
+                option.textContent = category;
+                select.appendChild(option);
+            });
+        }
+
+        function populateMeasureItemSuggestions() {
+            var category = document.getElementById('mapItemCategory').value;
+            var datalist = document.getElementById('mapItemSuggestions');
+            datalist.innerHTML = '';
+            var items = [];
+            if (category && customItems[category]) {
+                items = customItems[category];
+            } else {
+                Object.values(customItems).forEach(function(catItems) { items = items.concat(catItems); });
+            }
+            items.forEach(function(item) {
+                var option = document.createElement('option');
+                option.value = item.name;
+                datalist.appendChild(option);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('mapItemCategory').addEventListener('change', populateMeasureItemSuggestions);
+            document.getElementById('mapItemName').addEventListener('input', function() {
+                var itemName = this.value;
+                var category = document.getElementById('mapItemCategory').value;
+                var items = [];
+                if (category && customItems[category]) {
+                    items = customItems[category];
+                } else {
+                    Object.values(customItems).forEach(function(catItems) { items = items.concat(catItems); });
+                }
+                var item = items.find(function(i) { return i.name === itemName; });
+                if (item) {
+                    document.getElementById('mapItemRate').value = item.rate;
+                    document.getElementById('mapItemUnit').value = item.unit || '';
+                }
+            });
+        });
+
         function initMeasureMap() { _mapInited = true; }
 
         function openMeasureModal() {
@@ -1999,6 +2039,8 @@ if (location.search.includes('debug')) {
                 opt.value = r.id; opt.textContent = r.name; sel.appendChild(opt);
             });
             if (rooms.length === 1) sel.value = rooms[0].id;
+            populateMeasureModalCategories();
+            populateMeasureItemSuggestions();
             var modal = bootstrap.Modal.getInstance(document.getElementById('measureMapModal')) || new bootstrap.Modal(document.getElementById('measureMapModal'));
             modal.show();
             setTimeout(function() {
