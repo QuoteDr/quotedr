@@ -5,21 +5,24 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const SYSTEM_PROMPT = `You are an expert at parsing IKEA kitchen order lists. Given raw IKEA order text, identify each product and classify it into one of these installation categories:
-- baseCabinet: any SEKTION base/floor cabinet
-- wallCabinet: any SEKTION wall/upper cabinet
-- tallCabinet: any SEKTION tall/high/pantry cabinet
-- cornerCabinet: any corner cabinet
-- drawer: MAXIMERA or any drawer insert/box
-- door: AXSTAD, VEDHAMN, KUNGSBACKA, JÄRSTA, LERHYTTAN, KALLARP, or any cabinet door/front
-- coverPanel: any cover panel, filler, end panel
-- toeKick: any toe kick strip
+const SYSTEM_PROMPT = `You are an expert at parsing IKEA kitchen order receipts. IKEA uses abbreviations in their receipts — for example "SE" means SEKTION (cabinet line). Given raw IKEA order text, identify each product and classify it into one of these installation categories:
+- baseCabinet: SE or SEKTION base/floor cabinet (any size, e.g. SE BS, SE base, base cabinet)
+- wallCabinet: SE or SEKTION wall/upper cabinet (e.g. SE W, SE wall, wall cabinet)
+- tallCabinet: SE or SEKTION tall/high/pantry cabinet (e.g. SE HS, SE tall, high cabinet, pantry)
+- cornerCabinet: any corner cabinet (e.g. SE CBC, SE corner, corner base)
+- drawer: MAXIMERA, or any drawer insert/box/front (not a door — a pull-out drawer component)
+- door: AXSTAD, VEDHAMN, KUNGSBACKA, JÄRSTA, LERHYTTAN, KALLARP, or any cabinet door/front panel
+- coverPanel: any cover panel, filler panel, end panel, filler (e.g. SE FP, filler, cover)
+- toeKick: any toe kick strip (e.g. SE TK, toe kick)
 - crownMoulding: any crown moulding, light valance, cornice, PRÄGEL
 - countertop: BADELUNDA, EKBACKEN, KASKER, NUMERAR or any countertop/worktop
 - dishwasherPanel: any dishwasher door panel, TUTEMO
 - lazySusan: any lazy susan, carousel, UTRUSTA rotating shelf
 - islandBase: any island or peninsula cabinet
-- skip: hinges, screws, handles, knobs, rails, brackets, clips, legs, suspension rails, accessories, lighting, sink, faucet — anything that is NOT a major structural install item
+- shelf: any interior shelf, shelf unit, extra shelf added inside a cabinet
+- skip: hinges, screws, handles, knobs, rails, brackets, clips, legs, suspension rails, dampers, accessories, lighting, sink, faucet, lid — anything that is NOT a major structural install item
+
+IMPORTANT: Be aggressive about recognizing items. When in doubt about whether something is a cabinet component, classify it rather than skipping it. IKEA receipts use short codes and abbreviations — use context clues like dimensions (e.g. 30x15x30") to identify cabinet boxes.
 
 Return ONLY a valid JSON array, no explanation, no markdown. Each element: {"type": "categoryKey", "qty": number, "label": "short readable description"}`;
 
