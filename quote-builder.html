@@ -291,6 +291,9 @@ if (location.search.includes('debug')) {
                     <a href="javascript:void(0)" onclick="generateInteractiveLink()" class="btn btn-primary btn-sm shadow-sm">
                         <i class="fas fa-share-square"></i> Send Quote
                     </a>
+                    <a href="javascript:void(0)" onclick="openMeasureModal()" class="btn btn-success btn-sm shadow-sm" title="Measure area from satellite map">
+                        <i class="fas fa-satellite me-1"></i> Measure
+                    </a>
                     <a href="javascript:void(0)" onclick="generateInvoiceLink()" class="btn btn-danger btn-sm shadow-sm">
                         <i class="fas fa-file-invoice-dollar"></i> Send Invoice
                     </a>
@@ -500,6 +503,55 @@ if (location.search.includes('debug')) {
                             <div id="profitReportContent" class="small"></div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Measure from Map Modal -->
+    <div class="modal fade" id="measureMapModal" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title"><i class="fas fa-satellite me-2"></i>Measure from Satellite Map</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0" style="height:70vh;display:flex;flex-direction:column;">
+                    <div class="p-3 bg-light border-bottom d-flex gap-2 align-items-center flex-wrap">
+                        <input type="text" id="mapAddressInput" class="form-control" placeholder="Enter property address..." style="max-width:380px;">
+                        <button class="btn btn-primary btn-sm" onclick="searchMapAddress()"><i class="fas fa-search me-1"></i>Search</button>
+                        <div class="vr mx-1"></div>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="setDrawMode('polygon')" id="btnDrawPolygon"><i class="fas fa-draw-polygon me-1"></i>Draw Area</button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="setDrawMode('polyline')" id="btnDrawLine"><i class="fas fa-ruler me-1"></i>Draw Line</button>
+                        <button class="btn btn-outline-danger btn-sm" onclick="clearMapShapes()"><i class="fas fa-trash me-1"></i>Clear</button>
+                    </div>
+                    <div id="measureMapContainer" style="flex:1;min-height:0;"></div>
+                    <div class="p-3 bg-light border-top" style="max-height:160px;overflow-y:auto;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <strong><i class="fas fa-ruler-combined me-1"></i>Measurements</strong>
+                            <small class="text-muted">Click a shape label to rename it</small>
+                        </div>
+                        <div id="measurementsList"><p class="text-muted small mb-0">Draw shapes on the map to measure areas and distances.</p></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <div class="me-auto d-flex align-items-center gap-2 flex-wrap">
+                        <select id="mapTargetRoom" class="form-select form-select-sm" style="max-width:180px;"><option value="">Add to room...</option></select>
+                        <select id="mapItemCategory" class="form-select form-select-sm" style="max-width:150px;">
+                            <option value="Miscellaneous">Category...</option>
+                            <option value="Roofing">Roofing</option>
+                            <option value="Flooring">Flooring</option>
+                            <option value="Tile">Tile</option>
+                            <option value="Painting">Painting</option>
+                            <option value="Drywall">Drywall</option>
+                            <option value="Decks &amp; Patios">Decks &amp; Patios</option>
+                            <option value="Landscaping">Landscaping</option>
+                        </select>
+                        <input type="text" id="mapItemName" class="form-control form-control-sm" placeholder="Item name e.g. Roof tear-off" style="max-width:200px;">
+                        <input type="number" id="mapItemRate" class="form-control form-control-sm" placeholder="Rate $" step="0.01" style="max-width:90px;">
+                    </div>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-success" onclick="addMeasurementsToQuote()"><i class="fas fa-plus me-1"></i>Add to Quote</button>
                 </div>
             </div>
         </div>
@@ -767,6 +819,7 @@ if (location.search.includes('debug')) {
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDI9f4VEsvoyujShtBtsCRppZIrP2ke5SA&libraries=drawing,geometry,places&callback=initMeasureMap" async defer></script>
     
     <script>
         // Pricing Database - Adam's Rates (ALD Direct Inc. 2026)
@@ -1931,6 +1984,135 @@ if (location.search.includes('debug')) {
             if (depositAmtEl) depositAmtEl.textContent = depositAmt.toFixed(2);
             if (remainingEl) remainingEl.textContent = remaining.toFixed(2);
             updateProfitReport();
+        }
+
+        // ── Google Maps Measurement ─────────────────────────────────────────
+        var _map = null, _drawingManager = null, _mapShapes = [], _mapInited = false;
+
+        function initMeasureMap() { _mapInited = true; }
+
+        function openMeasureModal() {
+            var sel = document.getElementById('mapTargetRoom');
+            sel.innerHTML = '<option value="">Add to room...</option>';
+            rooms.forEach(function(r) {
+                var opt = document.createElement('option');
+                opt.value = r.id; opt.textContent = r.name; sel.appendChild(opt);
+            });
+            if (rooms.length === 1) sel.value = rooms[0].id;
+            var modal = bootstrap.Modal.getInstance(document.getElementById('measureMapModal')) || new bootstrap.Modal(document.getElementById('measureMapModal'));
+            modal.show();
+            setTimeout(function() {
+                if (typeof google === 'undefined') { alert('Google Maps is loading, please try again in a moment.'); return; }
+                if (!_map) {
+                    _map = new google.maps.Map(document.getElementById('measureMapContainer'), {
+                        center: { lat: 43.6532, lng: -79.3832 },
+                        zoom: 19, mapTypeId: 'satellite', tilt: 0,
+                        fullscreenControl: true, streetViewControl: false, mapTypeControl: false
+                    });
+                    _drawingManager = new google.maps.drawing.DrawingManager({
+                        drawingMode: null, drawingControl: false,
+                        polygonOptions: { fillColor: '#00aaff', fillOpacity: 0.25, strokeColor: '#0055ff', strokeWeight: 2, editable: true },
+                        polylineOptions: { strokeColor: '#ff6600', strokeWeight: 3, editable: true }
+                    });
+                    _drawingManager.setMap(_map);
+                    google.maps.event.addListener(_drawingManager, 'overlaycomplete', function(e) {
+                        _drawingManager.setDrawingMode(null);
+                        document.getElementById('btnDrawPolygon').className = 'btn btn-outline-secondary btn-sm';
+                        document.getElementById('btnDrawLine').className = 'btn btn-outline-secondary btn-sm';
+                        var shape = e.overlay;
+                        var label = prompt('Label this measurement (e.g. "Main Roof", "Back Patio"):') || ('Shape ' + (_mapShapes.length + 1));
+                        shape._label = label; shape._type = e.type;
+                        _mapShapes.push(shape);
+                        google.maps.event.addListener(shape, 'click', function() {
+                            var nl = prompt('Rename:', shape._label); if (nl) { shape._label = nl; renderMeasurements(); }
+                        });
+                        renderMeasurements();
+                    });
+                    var addr = document.getElementById('projectAddress')?.value || '';
+                    if (addr) { document.getElementById('mapAddressInput').value = addr; searchMapAddress(); }
+                }
+                google.maps.event.trigger(_map, 'resize');
+            }, 500);
+        }
+
+        function searchMapAddress() {
+            var addr = document.getElementById('mapAddressInput').value.trim();
+            if (!addr || !_map) return;
+            new google.maps.Geocoder().geocode({ address: addr }, function(results, status) {
+                if (status === 'OK' && results[0]) { _map.setCenter(results[0].geometry.location); _map.setZoom(20); }
+                else alert('Address not found. Try a more specific address.');
+            });
+        }
+
+        function setDrawMode(mode) {
+            if (!_drawingManager) return;
+            _drawingManager.setDrawingMode(mode === 'polygon' ? google.maps.drawing.OverlayType.POLYGON : google.maps.drawing.OverlayType.POLYLINE);
+            document.getElementById('btnDrawPolygon').className = 'btn btn-sm ' + (mode === 'polygon' ? 'btn-primary' : 'btn-outline-secondary');
+            document.getElementById('btnDrawLine').className = 'btn btn-sm ' + (mode === 'polyline' ? 'btn-primary' : 'btn-outline-secondary');
+        }
+
+        function clearMapShapes() {
+            _mapShapes.forEach(function(s) { s.setMap(null); }); _mapShapes = []; renderMeasurements();
+        }
+
+        function removeMapShape(index) {
+            if (_mapShapes[index]) { _mapShapes[index].setMap(null); _mapShapes.splice(index, 1); } renderMeasurements();
+        }
+
+        function getShapeMeasurement(shape) {
+            if (shape._type === 'polygon' || shape._type === google.maps.drawing.OverlayType.POLYGON) {
+                var area = google.maps.geometry.spherical.computeArea(shape.getPath());
+                var sqft = Math.round(area * 10.7639);
+                return { value: sqft, unit: 'sq ft', display: sqft.toLocaleString() + ' sq ft', isArea: true };
+            } else {
+                var len = google.maps.geometry.spherical.computeLength(shape.getPath());
+                var lf = Math.round(len * 3.28084 * 10) / 10;
+                return { value: lf, unit: 'LF', display: lf.toLocaleString() + ' LF', isArea: false };
+            }
+        }
+
+        function renderMeasurements() {
+            var el = document.getElementById('measurementsList');
+            if (_mapShapes.length === 0) { el.innerHTML = '<p class="text-muted small mb-0">Draw shapes on the map to measure areas and distances.</p>'; return; }
+            var html = '<div class="d-flex flex-wrap gap-2">';
+            var totalSqft = 0;
+            _mapShapes.forEach(function(shape, i) {
+                var m = getShapeMeasurement(shape);
+                if (m.isArea) totalSqft += m.value;
+                html += '<span class="badge bg-' + (m.isArea ? 'primary' : 'warning text-dark') + ' fs-6 p-2">';
+                html += '<i class="fas fa-' + (m.isArea ? 'draw-polygon' : 'ruler') + ' me-1"></i>';
+                html += shape._label + ': <strong>' + m.display + '</strong> ';
+                html += '<span style="cursor:pointer;" onclick="removeMapShape(' + i + ')">&times;</span></span>';
+            });
+            html += '</div>';
+            if (totalSqft > 0) html += '<div class="mt-2 small text-muted">Total area: <strong>' + totalSqft.toLocaleString() + ' sq ft</strong></div>';
+            el.innerHTML = html;
+        }
+
+        function addMeasurementsToQuote() {
+            if (_mapShapes.length === 0) { alert('Draw at least one shape on the map first.'); return; }
+            var roomId = parseInt(document.getElementById('mapTargetRoom').value);
+            if (!roomId) { alert('Please select a room to add items to.'); return; }
+            var room = rooms.find(function(r) { return r.id === roomId; });
+            if (!room) return;
+            var itemName = document.getElementById('mapItemName').value.trim();
+            var rate = parseFloat(document.getElementById('mapItemRate').value) || 0;
+            var category = document.getElementById('mapItemCategory').value || 'Miscellaneous';
+            _mapShapes.forEach(function(shape) {
+                var m = getShapeMeasurement(shape);
+                room.items.push({
+                    description: itemName || shape._label,
+                    itemDescription: 'Measured from satellite map',
+                    category: category,
+                    quantity: m.value,
+                    unitType: m.unit,
+                    rate: rate,
+                    total: m.value * rate,
+                    materialCost: 0, supplierUrl: '', notes: ''
+                });
+            });
+            renderRooms(); calculateTotals(); markUnsaved();
+            bootstrap.Modal.getInstance(document.getElementById('measureMapModal')).hide();
         }
 
         // Toggle item description in quote builder rows
