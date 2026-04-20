@@ -99,6 +99,7 @@ if (location.search.includes('debug')) {
 					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('quotes',this);return false;"><i class="fas fa-file-invoice me-2" style="color:#1a56a0"></i>Quotes</a>
 					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('pricing',this);return false;"><i class="fas fa-boxes me-2" style="color:#1a56a0"></i>Pricing &amp; Data</a>
 					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('notifications',this);return false;"><i class="fas fa-bell me-2" style="color:#e87e2a"></i>Notifications</a>
+					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('payments',this);return false;"><i class="fas fa-credit-card me-2" style="color:#28a745"></i>Payments</a>
 					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('account',this);return false;"><i class="fas fa-user-circle me-2" style="color:#6f42c1"></i>Account</a>
 					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('feedback',this);return false;"><i class="fas fa-comment-alt me-2" style="color:#28a745"></i>Feedback</a>
 				</div>
@@ -564,6 +565,39 @@ Sarah Jones, 905-555-5678"></textarea>
 				</div><!-- /tab-feedback -->
 
 				<!-- ACCOUNT TAB -->
+				<div id="tab-payments" style="display:none;">
+					<h5 class="mb-3"><i class="fas fa-credit-card me-2" style="color:#28a745"></i>Payments</h5>
+					<div class="card border-0 shadow-sm p-4 mb-3">
+						<div class="form-check form-switch mb-3">
+							<input class="form-check-input" type="checkbox" id="stripeEnabledToggle" onchange="toggleStripeSettings()">
+							<label class="form-check-label fw-semibold" for="stripeEnabledToggle">Enable Stripe Payments</label>
+						</div>
+						<div id="paymentsDisabledMessage" class="alert alert-secondary small py-2">Payments disabled. Clients will not see payment buttons on quotes or invoices.</div>
+						<div id="stripeSettingsSection" style="display:none;">
+							<div class="mb-3">
+								<label class="form-label fw-semibold">Stripe Publishable Key</label>
+								<input type="text" class="form-control" id="stripePublishableKey" placeholder="pk_live_... or pk_test_...">
+								<div class="form-text">Find this in your Stripe Dashboard &rarr; Developers &rarr; API Keys. <strong>Never enter your secret key here.</strong></div>
+							</div>
+							<div class="mb-3" style="max-width:200px;">
+								<label class="form-label fw-semibold">Default Deposit %</label>
+								<input type="number" class="form-control" id="depositDefaultPct" min="1" max="100" value="50">
+							</div>
+							<div class="form-check mb-2">
+								<input class="form-check-input" type="checkbox" id="acceptDeposit" checked>
+								<label class="form-check-label" for="acceptDeposit">Show deposit payment button on quotes</label>
+							</div>
+							<div class="form-check mb-3">
+								<input class="form-check-input" type="checkbox" id="acceptFullPayment" checked>
+								<label class="form-check-label" for="acceptFullPayment">Show pay-in-full button on invoices</label>
+							</div>
+							<button class="btn btn-primary" onclick="savePaymentSettingsUI()"><i class="fas fa-save me-1"></i>Save Payment Settings</button>
+							<span class="saved-badge ms-2" id="paymentSaved" style="display:none;"><i class="fas fa-check-circle me-1"></i>Saved!</span>
+							<div class="alert alert-info mt-3 small py-2 mb-0"><i class="fas fa-info-circle me-1"></i>Stripe charges ~2.9% + 30&cent; per transaction. This is optional &mdash; clients can still pay by e-transfer, cash, or cheque.</div>
+						</div>
+					</div>
+				</div><!-- /tab-payments -->
+
 				<div id="tab-account" style="display:none;">
 					<div class="settings-card">
 						<h5><i class="fas fa-user-circle me-2" style="color:#6f42c1"></i>Account</h5>
@@ -600,6 +634,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			{ tab: 'pricing', keywords: ['pricing','items','materials','import','export','ai','csv','custom','clients','quickbooks'], label: 'Pricing & Data' },
 			{ tab: 'notifications', keywords: ['email','reminder','followup','follow-up','notification','auto','automatic','days','message'], label: 'Notifications & Reminders' },
 			{ tab: 'feedback', keywords: ['bug','report','feature','request','feedback','idea','problem','issue','broken'], label: 'Feedback & Bug Reports' },
+			{ tab: 'payments', keywords: ['payment','stripe','deposit','credit card','pay','invoice payment','checkout'], label: 'Payments' },
 			{ tab: 'account', keywords: ['account','subscription','billing','plan','upgrade','pro'], label: 'Account' },
 		];
 
@@ -732,6 +767,8 @@ Sarah Jones, 905-555-5678"></textarea>
 			showTab(lastTab, tabEl);
 			// Load notification settings
 			loadNotificationSettings();
+			// Load payment settings
+			loadPaymentSettingsUI();
 			// Populate username in nav
 			var userName = localStorage.getItem('ald_user_name') || '';
 			var userEl = document.getElementById('userName');
@@ -1451,6 +1488,42 @@ Sarah Jones, 905-555-5678"></textarea>
 				}
 			};
 			reader.readAsText(file);
+		}
+
+		// ── Payment Settings ──────────────────────────────────────────
+		function toggleStripeSettings() {
+			var enabled = document.getElementById('stripeEnabledToggle').checked;
+			document.getElementById('stripeSettingsSection').style.display = enabled ? 'block' : 'none';
+			document.getElementById('paymentsDisabledMessage').style.display = enabled ? 'none' : 'block';
+		}
+
+		function loadPaymentSettingsUI() {
+			if (typeof loadPaymentSettings !== 'function') return;
+			loadPaymentSettings().then(function(settings) {
+				if (!settings) settings = { stripe_enabled: false, stripe_publishable_key: '', deposit_default_pct: 50, accept_deposit: true, accept_full_payment: true };
+				document.getElementById('stripeEnabledToggle').checked = !!settings.stripe_enabled;
+				document.getElementById('stripePublishableKey').value = settings.stripe_publishable_key || '';
+				document.getElementById('depositDefaultPct').value = settings.deposit_default_pct || 50;
+				document.getElementById('acceptDeposit').checked = settings.accept_deposit !== false;
+				document.getElementById('acceptFullPayment').checked = settings.accept_full_payment !== false;
+				toggleStripeSettings();
+			});
+		}
+
+		function savePaymentSettingsUI() {
+			var settings = {
+				stripe_enabled: document.getElementById('stripeEnabledToggle').checked,
+				stripe_publishable_key: document.getElementById('stripePublishableKey').value.trim(),
+				deposit_default_pct: parseInt(document.getElementById('depositDefaultPct').value) || 50,
+				accept_deposit: document.getElementById('acceptDeposit').checked,
+				accept_full_payment: document.getElementById('acceptFullPayment').checked
+			};
+			if (typeof savePaymentSettings === 'function') {
+				savePaymentSettings(settings).then(function() {
+					var badge = document.getElementById('paymentSaved');
+					if (badge) { badge.style.display = 'inline'; setTimeout(function() { badge.style.display = 'none'; }, 2500); }
+				});
+			}
 		}
 	</script>
 

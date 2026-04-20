@@ -606,6 +606,32 @@ async function loadLogoFromSupabase() {
     return localStorage.getItem('ald_company_logo');
 }
 
+async function savePaymentSettings(settings) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    const result = await _supabase
+        .from('user_data')
+        .upsert({ user_id: user.id, key: 'payment_settings', value: settings, updated_at: new Date().toISOString() }, { onConflict: 'user_id,key' });
+    if (!result.error) localStorage.setItem('ald_payment_settings', JSON.stringify(settings));
+    return result;
+}
+
+async function loadPaymentSettings() {
+    const user = await getCurrentUser();
+    if (!user) return JSON.parse(localStorage.getItem('ald_payment_settings') || 'null');
+    const { data, error } = await _supabase
+        .from('user_data')
+        .select('value')
+        .eq('user_id', user.id)
+        .eq('key', 'payment_settings')
+        .maybeSingle();
+    if (!error && data && data.value) {
+        localStorage.setItem('ald_payment_settings', JSON.stringify(data.value));
+        return data.value;
+    }
+    return JSON.parse(localStorage.getItem('ald_payment_settings') || 'null');
+}
+
 // Supabase RLS policies needed:
 /*
 -- Allow anyone to read quotes (for sharing)

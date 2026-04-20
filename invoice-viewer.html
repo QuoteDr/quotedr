@@ -225,6 +225,17 @@ if (location.search.includes('debug')) {
             </div>
         </div>
 
+        <!-- Client Payment Section (shown when contractor has Stripe enabled) -->
+        <div id="clientPaymentSection" style="display:none;" class="mt-3 mb-4">
+            <div class="card border-0 shadow-sm p-4 text-center">
+                <h5 class="mb-3"><i class="fas fa-lock me-2 text-success"></i>Pay This Invoice</h5>
+                <div id="clientPaymentButtons"></div>
+                <div class="text-muted small mt-2"><i class="fab fa-stripe me-1"></i>Secure payment powered by Stripe</div>
+                <hr class="my-3">
+                <p class="text-muted small mb-0">Prefer e-transfer or cheque? Contact us directly.</p>
+            </div>
+        </div>
+
         <!-- Deposit Modal -->
         <div class="modal fade" id="depositModal" tabindex="-1">
             <div class="modal-dialog modal-dialog-centered">
@@ -401,6 +412,10 @@ if (location.search.includes('debug')) {
                     invoiceData = result.data.data || {};
                     renderInvoice();
                     renderTerms();
+                    // Init client payment section
+                    var contractorId = result.data.user_id;
+                    var invTotal = invoiceData.grandTotal || invoiceData.total || 0;
+                    if (contractorId && invTotal) initInvoicePaymentSection(contractorId, invTotal, supabaseId);
                 }).catch(function(e) {
                     document.getElementById('invoiceContainer').innerHTML = '<div class="alert alert-danger">Failed to load invoice: ' + e.message + '</div>';
                 });
@@ -617,6 +632,69 @@ if (location.search.includes('debug')) {
             });
             html += '</ul>';
             el.innerHTML = html;
+        }
+
+        // ── Client Invoice Payment (Stripe) ───────────────────────────────
+        var _invoicePaymentSettings = null;
+        var _invoiceTotalForPayment = 0;
+        var _invoiceIdForPayment = null;
+
+        async function loadContractorPaymentSettings(contractorUserId) {
+            try {
+                var sb = window._supabase;
+                if (!sb || !contractorUserId) return null;
+                var result = await sb.from('user_data').select('value').eq('user_id', contractorUserId).eq('key', 'payment_settings').maybeSingle();
+                return (result.data && result.data.value) ? result.data.value : null;
+            } catch(e) { return null; }
+        }
+
+        async function initInvoicePaymentSection(contractorUserId, total, invoiceId) {
+            _invoiceTotalForPayment = total || 0;
+            _invoiceIdForPayment = invoiceId;
+            if (!contractorUserId || !total) return;
+            _invoicePaymentSettings = await loadContractorPaymentSettings(contractorUserId);
+            if (!_invoicePaymentSettings || !_invoicePaymentSettings.stripe_enabled) return;
+            var s = _invoicePaymentSettings;
+            var html = '';
+            if (s.accept_full_payment) {
+                html += '<button class="btn btn-success btn-lg px-5 mb-2 w-100" onclick="handleClientInvoicePayment(' + Math.round(total * 100) + ', \"Pay Invoice in Full\")">';
+                html += '<i class="fas fa-credit-card me-2"></i>Pay Invoice in Full — $' + total.toFixed(2) + '</button>';
+            }
+            if (s.accept_deposit) {
+                var pct = s.deposit_default_pct || 50;
+                var depAmt = (total * pct / 100);
+                html += '<button class="btn btn-outline-success btn-lg px-5 mb-2 w-100 mt-2" onclick="handleClientInvoicePayment(' + Math.round(depAmt * 100) + ', \"Pay Deposit\")">';
+                html += '<i class="fas fa-credit-card me-2"></i>Pay ' + pct + '% Deposit — $' + depAmt.toFixed(2) + '</button>';
+            }
+            if (html) {
+                document.getElementById('clientPaymentButtons').innerHTML = html;
+                document.getElementById('clientPaymentSection').style.display = 'block';
+            }
+        }
+
+        async function handleClientInvoicePayment(amountCents, description) {
+            var btns = document.querySelectorAll('#clientPaymentButtons button');
+            btns.forEach(function(b) { b.disabled = true; });
+            try {
+                var resp = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/stripe-deposit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        amount: amountCents,
+                        currency: 'cad',
+                        quoteId: _invoiceIdForPayment,
+                        description: description,
+                        successUrl: window.location.href + '?payment=success',
+                        cancelUrl: window.location.href + '?payment=cancelled'
+                    })
+                });
+                var data = await resp.json();
+                if (data.url) { window.location.href = data.url; }
+                else { throw new Error(data.error || 'Payment failed'); }
+            } catch(e) {
+                alert('Payment error: ' + e.message);
+                btns.forEach(function(b) { b.disabled = false; });
+            }
         }
     </script>
 </body>

@@ -341,6 +341,20 @@ if (location.search.includes('debug')) {
             <p>Your upgrade selections have been submitted. We'll review and get back to you shortly!</p>
         </div>
 
+        <!-- Stripe Deposit Payment Section -->
+        <div id="stripeDepositSection" style="display:none;" class="mt-4 mb-4">
+            <div class="card border-0 shadow-sm p-4 text-center">
+                <h5 class="mb-3"><i class="fas fa-lock me-2 text-success"></i>Secure Your Project</h5>
+                <p class="text-muted mb-3" id="depositPromptText">Pay your deposit to confirm your project start date.</p>
+                <button id="payDepositBtn" class="btn btn-success btn-lg px-5 mb-2" onclick="handleDepositPayment()">
+                    <i class="fas fa-credit-card me-2"></i><span id="depositBtnLabel">Pay Deposit</span>
+                </button>
+                <div class="text-muted small mt-1"><i class="fab fa-stripe me-1"></i>Secure payment powered by Stripe</div>
+                <hr class="my-3">
+                <p class="text-muted small mb-0">Prefer to pay by e-transfer or cheque? Contact us directly.</p>
+            </div>
+        </div>
+
         <!-- Formspree Success Redirect (optional) -->
         <!-- Uncomment below if you want custom redirect after submission -->
         <!--
@@ -466,6 +480,10 @@ if (location.search.includes('debug')) {
                     quoteData = result.data.data;
                     console.log('Loaded quote from Supabase:', quoteData);
                     showExpiryNotice();
+                    // Init payment section after quote loads
+                    var contractorId = result.data.user_id;
+                    var quoteTotal = quoteData.grandTotal || quoteData.total || 0;
+                    if (contractorId && quoteTotal) initPaymentSection(contractorId, quoteTotal);
                     return;
                 } else {
                     alert('Quote not found or could not be loaded. The link may be invalid.');
@@ -826,6 +844,9 @@ if (location.search.includes('debug')) {
                 if (approveSection) approveSection.style.display = 'none';
                 var successMsg = document.getElementById('successMessage');
                 if (successMsg) successMsg.style.display = '';
+                // Show deposit payment button after acceptance
+                var depSection = document.getElementById('stripeDepositSection');
+                if (depSection && _paymentSettings && _paymentSettings.stripe_enabled && _paymentSettings.accept_deposit) depSection.style.display = 'block';
             } else {
                 // No changes — open signature/approval modal
                 openSignatureModal();
@@ -948,6 +969,9 @@ if (location.search.includes('debug')) {
             closeSignatureModal();
             submitUpgrades();
             document.getElementById('hiddenSubmitBtn').click();
+            // Show deposit payment button after signing
+            var depSection = document.getElementById('stripeDepositSection');
+            if (depSection && _paymentSettings && _paymentSettings.stripe_enabled && _paymentSettings.accept_deposit) depSection.style.display = 'block';
         }
 
         function submitUpgrades(event) {
@@ -1048,6 +1072,63 @@ if (location.search.includes('debug')) {
             html += '</ul>';
 
             termsContainer.innerHTML = html;
+        }
+
+        // ── Stripe Deposit Payment ───────────────────────────────────────
+        var _paymentSettings = null;
+        var _quoteTotal = 0;
+
+        async function loadContractorPaymentSettings(contractorUserId) {
+            try {
+                var sb = window._supabaseClient;
+                if (!sb || !contractorUserId) return null;
+                var result = await sb.from('user_data').select('value').eq('user_id', contractorUserId).eq('key', 'payment_settings').maybeSingle();
+                return (result.data && result.data.value) ? result.data.value : null;
+            } catch(e) { return null; }
+        }
+
+        async function initPaymentSection(contractorUserId, total) {
+            _quoteTotal = total || 0;
+            if (!contractorUserId || !total) return;
+            _paymentSettings = await loadContractorPaymentSettings(contractorUserId);
+            if (!_paymentSettings || !_paymentSettings.stripe_enabled || !_paymentSettings.accept_deposit) return;
+            var pct = _paymentSettings.deposit_default_pct || 50;
+            var depositAmt = (total * pct / 100).toFixed(2);
+            document.getElementById('depositBtnLabel').textContent = 'Pay ' + pct + '% Deposit \u2014 $' + depositAmt;
+            document.getElementById('depositPromptText').textContent = 'A ' + pct + '% deposit ($' + depositAmt + ') is required to confirm your project.';
+            document.getElementById('stripeDepositSection').style.display = 'block';
+        }
+
+        async function handleDepositPayment() {
+            if (!_paymentSettings || !_quoteTotal) return;
+            var pct = _paymentSettings.deposit_default_pct || 50;
+            var depositAmt = Math.round(_quoteTotal * pct / 100 * 100); // cents
+            var urlParams = new URLSearchParams(window.location.search);
+            var quoteId = urlParams.get('id');
+            var btn = document.getElementById('payDepositBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Redirecting to Stripe...';
+            try {
+                var resp = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/stripe-deposit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        amount: depositAmt,
+                        currency: 'cad',
+                        quoteId: quoteId,
+                        description: 'Project Deposit — Quote #' + (quoteData.quoteNumber || quoteId),
+                        successUrl: window.location.href + '?payment=success',
+                        cancelUrl: window.location.href + '?payment=cancelled'
+                    })
+                });
+                var data = await resp.json();
+                if (data.url) { window.location.href = data.url; }
+                else { throw new Error(data.error || 'Payment failed'); }
+            } catch(e) {
+                alert('Payment error: ' + e.message);
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-credit-card me-2"></i><span id="depositBtnLabel">Pay Deposit</span>';
+            }
         }
     </script>
 </body>
