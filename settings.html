@@ -100,6 +100,7 @@ if (location.search.includes('debug')) {
 					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('pricing',this);return false;"><i class="fas fa-boxes me-2" style="color:#1a56a0"></i>Pricing &amp; Data</a>
 					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('notifications',this);return false;"><i class="fas fa-bell me-2" style="color:#e87e2a"></i>Notifications</a>
 					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('account',this);return false;"><i class="fas fa-user-circle me-2" style="color:#6f42c1"></i>Account</a>
+					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('feedback',this);return false;"><i class="fas fa-comment-alt me-2" style="color:#28a745"></i>Feedback</a>
 				</div>
 			</div>
 
@@ -490,6 +491,78 @@ Sarah Jones, 905-555-5678"></textarea>
 					</div>
 				</div><!-- /tab-notifications -->
 
+				<!-- FEEDBACK TAB -->
+				<div id="tab-feedback" style="display:none;">
+					<div class="settings-card">
+						<h5><i class="fas fa-bug me-2" style="color:#dc3545"></i>Report a Bug</h5>
+						<p class="text-muted small">Something not working right? Let us know and we'll fix it fast.</p>
+						<div class="row g-3">
+							<div class="col-12">
+								<label class="form-label fw-bold">Which page did this happen on?</label>
+								<select class="form-select" id="bugPage">
+									<option value="">Select a page...</option>
+									<option value="Quote Builder">Quote Builder</option>
+									<option value="Dashboard">Dashboard</option>
+									<option value="Interactive Quote Viewer">Interactive Quote Viewer</option>
+									<option value="Invoice Viewer">Invoice Viewer</option>
+									<option value="Settings">Settings</option>
+									<option value="Other">Other</option>
+								</select>
+							</div>
+							<div class="col-sm-6">
+								<label class="form-label fw-bold">Severity</label>
+								<select class="form-select" id="bugSeverity">
+									<option value="minor">Minor &mdash; cosmetic issue</option>
+									<option value="annoying" selected>Annoying &mdash; affects workflow</option>
+									<option value="broken">Broken &mdash; can't use the feature</option>
+									<option value="critical">Critical &mdash; data loss / app crash</option>
+								</select>
+							</div>
+							<div class="col-12">
+								<label class="form-label fw-bold">Describe the bug</label>
+								<textarea class="form-control" id="bugDescription" rows="4" placeholder="What happened? What did you expect to happen? Steps to reproduce if you know them..."></textarea>
+							</div>
+						</div>
+						<div class="mt-3 d-flex align-items-center gap-3">
+							<button type="button" class="btn btn-danger" onclick="submitFeedback('bug')">
+								<i class="fas fa-bug me-1"></i> Submit Bug Report
+							</button>
+							<span id="bugSubmitResult" class="small"></span>
+						</div>
+					</div>
+
+					<div class="settings-card">
+						<h5><i class="fas fa-lightbulb me-2" style="color:#f0a500"></i>Request a Feature</h5>
+						<p class="text-muted small">Got an idea to make QuoteDr better? We'd love to hear it!</p>
+						<div class="row g-3">
+							<div class="col-sm-6">
+								<label class="form-label fw-bold">Which area does this relate to?</label>
+								<select class="form-select" id="featureArea">
+									<option value="">Select area...</option>
+									<option value="Quote Builder">Quote Builder</option>
+									<option value="Client Experience">Client Experience (viewer)</option>
+									<option value="Invoicing">Invoicing &amp; Payments</option>
+									<option value="Dashboard">Dashboard</option>
+									<option value="Reporting">Reports &amp; Analytics</option>
+									<option value="Settings">Settings</option>
+									<option value="Mobile">Mobile Experience</option>
+									<option value="Other">Other / New idea</option>
+								</select>
+							</div>
+							<div class="col-12">
+								<label class="form-label fw-bold">Describe your idea</label>
+								<textarea class="form-control" id="featureDescription" rows="4" placeholder="What would you like to see? How would it work? Why would it help your business?"></textarea>
+							</div>
+						</div>
+						<div class="mt-3 d-flex align-items-center gap-3">
+							<button type="button" class="btn btn-success" onclick="submitFeedback('feature')">
+								<i class="fas fa-lightbulb me-1"></i> Submit Feature Request
+							</button>
+							<span id="featureSubmitResult" class="small"></span>
+						</div>
+					</div>
+				</div><!-- /tab-feedback -->
+
 				<!-- ACCOUNT TAB -->
 				<div id="tab-account" style="display:none;">
 					<div class="settings-card">
@@ -526,6 +599,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			{ tab: 'quotes', keywords: ['quote','prefix','tax','valid','expiry','markup','terms','conditions','heading','number'], label: 'Quote Preferences & Terms' },
 			{ tab: 'pricing', keywords: ['pricing','items','materials','import','export','ai','csv','custom','clients','quickbooks'], label: 'Pricing & Data' },
 			{ tab: 'notifications', keywords: ['email','reminder','followup','follow-up','notification','auto','automatic','days','message'], label: 'Notifications & Reminders' },
+			{ tab: 'feedback', keywords: ['bug','report','feature','request','feedback','idea','problem','issue','broken'], label: 'Feedback & Bug Reports' },
 			{ tab: 'account', keywords: ['account','subscription','billing','plan','upgrade','pro'], label: 'Account' },
 		];
 
@@ -923,6 +997,41 @@ Sarah Jones, 905-555-5678"></textarea>
 			badge.innerHTML = '<i class="fas fa-check-circle me-1"></i>Saved!';
 			badge.style.display = 'inline';
 			setTimeout(function() { badge.style.display = 'none'; }, 3000);
+		}
+
+		async function submitFeedback(type) {
+			var isFeature = type === 'feature';
+			var description = document.getElementById(isFeature ? 'featureDescription' : 'bugDescription').value.trim();
+			var resultEl = document.getElementById(isFeature ? 'featureSubmitResult' : 'bugSubmitResult');
+			var page = isFeature ? document.getElementById('featureArea').value : document.getElementById('bugPage').value;
+			var severity = isFeature ? null : document.getElementById('bugSeverity').value;
+			if (!description) {
+				resultEl.innerHTML = '<span class="text-danger">Please describe the ' + (isFeature ? 'feature' : 'bug') + ' before submitting.</span>';
+				return;
+			}
+			resultEl.innerHTML = '<span class="text-muted"><i class="fas fa-spinner fa-spin me-1"></i>Submitting...</span>';
+			var user = null;
+			try { var u = await _supabase.auth.getUser(); user = u.data.user; } catch(e) {}
+			var payload = {
+				type: type,
+				description: description,
+				page: page || 'Not specified',
+				severity: severity || null,
+				user_id: user ? user.id : null,
+				user_email: user ? user.email : null,
+				created_at: new Date().toISOString()
+			};
+			try { await _supabase.from('feedback').insert(payload); } catch(e) { console.warn('Feedback DB error:', e); }
+			try {
+				var ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso';
+				await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/send-feedback-email', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY },
+					body: JSON.stringify(payload)
+				});
+			} catch(e) { console.warn('Feedback email error:', e); }
+			resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>Submitted! Thanks for the ' + (isFeature ? 'idea' : 'report') + ' 🙏</span>';
+			document.getElementById(isFeature ? 'featureDescription' : 'bugDescription').value = '';
 		}
 
 		function saveEmailTemplate() {
