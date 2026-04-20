@@ -1933,6 +1933,17 @@ if (location.search.includes('debug')) {
             updateProfitReport();
         }
 
+        // Toggle item description in quote builder rows
+        function toggleItemDesc(id) {
+            var descEl = document.getElementById(id);
+            var notesEl = document.getElementById(id + '_notes');
+            var iconEl = document.getElementById(id + '_icon');
+            var isOpen = descEl && descEl.style.display !== 'none';
+            if (descEl) descEl.style.display = isOpen ? 'none' : 'block';
+            if (notesEl) notesEl.style.display = isOpen ? 'none' : 'block';
+            if (iconEl) iconEl.innerHTML = isOpen ? '&#9660;' : '&#9650;';
+        }
+
         // Photo lightbox
         function openPhotoLightbox(src) {
             var existing = document.getElementById('photoLightbox');
@@ -2150,7 +2161,14 @@ if (location.search.includes('debug')) {
                             const rowStyle = isOptional ? ' style="border-left:3px dashed #0dcaf0;"' : '';
                             html += '<tr' + rowStyle + '>';
                             html += '<td style="width:30px">' + displayNum + (isOptional ? ' <span class="badge bg-info" style="font-size:0.6em;">opt</span>' : '') + '</td>';
-                            html += '<td><strong>' + item.description + '</strong>' + (item.itemDescription ? '<br><small class="text-muted fst-italic">' + item.itemDescription + '</small>' : '') + (item.notes ? '<br><small class="text-info"><i class="fas fa-info-circle"></i> ' + item.notes + '</small>' : '') + '</td>';
+                            var _hasDesc = !!(item.itemDescription || item.notes);
+                            var _descId = 'itemdesc_' + room.id + '_' + origIndex;
+                            html += '<td style="cursor:' + (_hasDesc ? 'pointer' : 'default') + ';" ' + (_hasDesc ? 'onclick="toggleItemDesc(\''+_descId+'\')" title="Click to expand description"' : '') + '>';
+                            html += '<strong>' + item.description + '</strong>';
+                            if (_hasDesc) html += ' <small class="text-muted" id="' + _descId + '_icon">&#9660;</small>';
+                            if (item.itemDescription) html += '<div id="' + _descId + '" style="display:none;"><small class="text-muted fst-italic">' + item.itemDescription + '</small></div>';
+                            if (item.notes) html += '<div id="' + _descId + '_notes" style="display:' + (item.itemDescription ? 'none' : 'none') + ';"><small class="text-info"><i class="fas fa-info-circle"></i> ' + item.notes + '</small></div>';
+                            html += '</td>';
                             html += '<td style="white-space:nowrap">' + item.quantity + ' ' + (item.unitType || '') + '</td>';
                             html += '<td style="white-space:nowrap">$' + displayRate.toFixed(2) + '</td>';
                             html += '<td style="white-space:nowrap"><strong>$' + displayTotal.toFixed(2) + '</strong></td>';
