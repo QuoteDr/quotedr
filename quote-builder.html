@@ -2070,11 +2070,30 @@ if (location.search.includes('debug')) {
                         });
                         renderMeasurements();
                     });
+                    initPlacesAutocomplete();
                     var addr = document.getElementById('projectAddress')?.value || '';
                     if (addr) { document.getElementById('mapAddressInput').value = addr; searchMapAddress(); }
+                    if (window.pendingPlace) { _map.panTo(window.pendingPlace.geometry.location); _map.setZoom(20); window.pendingPlace = null; }
                 }
                 google.maps.event.trigger(_map, 'resize');
             }, 500);
+        }
+
+        var _placesAutocomplete = null;
+        function initPlacesAutocomplete() {
+            if (_placesAutocomplete) return; // only init once
+            var input = document.getElementById('mapAddressInput');
+            _placesAutocomplete = new google.maps.places.Autocomplete(input, { types: ['address'] });
+            _placesAutocomplete.addListener('place_changed', function() {
+                var place = _placesAutocomplete.getPlace();
+                if (place.geometry) {
+                    if (_map) { _map.panTo(place.geometry.location); _map.setZoom(20); }
+                    else { window.pendingPlace = place; }
+                }
+            });
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') { e.preventDefault(); searchMapAddress(); }
+            });
         }
 
         function searchMapAddress() {
