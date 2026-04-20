@@ -124,12 +124,13 @@
         }
 
         @media print {
-            body { background: white; }
-            .no-print { display: none !important; }
-            .totals-section { box-shadow: none; border: 1px solid #dee2e6; }
+            .d-print-none, .no-print { display: none !important; }
+            body { background: white !important; }
+            .card { box-shadow: none !important; border: 1px solid #ddd !important; }
+            .totals-section { box-shadow: none !important; }
+            .warranty-section { break-inside: avoid; }
+            @page { margin: 1cm; }
         }
-
-        .no-print, .btn, nav, .navbar { display: none !important; }\n        body { background: white !important; }\n        @page { margin: 1cm; }\n    </style>
     </style>
 <!-- Eruda mobile console (only loads with ?debug in URL) -->
 <script>
@@ -145,9 +146,9 @@ if (location.search.includes('debug')) {
     <div class="container py-4" style="max-width: 860px;">
 
         <!-- Print / Save button -->
-        <div class="text-end mb-3 no-print">
-            <button onclick="window.print()" class="btn btn-outline-dark btn-sm">
-                <i class="fas fa-print"></i> Print / Save PDF
+        <div class="text-center mb-3 d-print-none">
+            <button onclick="window.print()" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-print me-1"></i> Print / Save as PDF
             </button>
         </div>
 
