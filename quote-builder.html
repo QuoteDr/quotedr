@@ -2768,23 +2768,8 @@ if (location.search.includes('debug')) {
             const invoiceBaseUrl = window.location.href.split('?')[0].replace('quote-builder.html', 'invoice-viewer.html');
             let invoiceUrl = invoiceBaseUrl + '?invoice=' + invoiceId; // fallback for offline
 
-            // Save to Supabase for cross-device sharing
-            try {
-                if (typeof saveInvoiceForSharing === 'function') {
-                    const result = await saveInvoiceForSharing(invoiceData);
-                    if (result && result.data && result.data.id) {
-                        invoiceUrl = invoiceBaseUrl + '?id=' + result.data.id;
-                        invoiceData.supabaseId = result.data.id;
-                        localStorage.setItem(invoiceId, JSON.stringify(invoiceData));
-                    }
-                }
-            } catch(e) {
-                console.warn('Could not save invoice to Supabase, using local link:', e);
-            }
-
-            // Show send modal (same pattern as quote send)
-            var existing = document.getElementById('sendInvoiceModal');
-            if (!existing) {
+            // Show modal immediately with local fallback URL
+            if (!document.getElementById('sendInvoiceModal')) {
                 document.body.insertAdjacentHTML('beforeend', `
                 <div class="modal fade" id="sendInvoiceModal" tabindex="-1">
                     <div class="modal-dialog modal-dialog-centered">
@@ -2794,6 +2779,7 @@ if (location.search.includes('debug')) {
                                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
+                                <div id="invoiceSavingNote" class="alert alert-info py-2 small mb-2"><i class="fas fa-spinner fa-spin me-1"></i>Saving for cross-device sharing...</div>
                                 <div style="border:1px solid #dee2e6; border-radius:8px; padding:14px; background:#f8f9fa; margin-bottom:12px;">
                                     <div class="fw-bold small mb-2"><i class="fas fa-envelope me-1" style="color:#1a56a0;"></i>Email invoice to client</div>
                                     <input type="email" id="sendInvoiceEmail" class="form-control form-control-sm mb-2" placeholder="Client email address">
@@ -2814,14 +2800,35 @@ if (location.search.includes('debug')) {
             document.getElementById('openInvoiceBtn').href = invoiceUrl;
             window._currentInvoiceUrl = invoiceUrl;
             window._currentInvoiceData = invoiceData;
-            // Pre-fill client email
             var clientEmail = document.getElementById('clientEmail')?.value.trim();
             var sendEmailEl = document.getElementById('sendInvoiceEmail');
             if (sendEmailEl) sendEmailEl.value = clientEmail || '';
             var resultEl = document.getElementById('sendInvoiceEmailResult');
             if (resultEl) resultEl.innerHTML = '';
+            var savingNote = document.getElementById('invoiceSavingNote');
+            if (savingNote) savingNote.style.display = 'block';
             var modal = bootstrap.Modal.getInstance(document.getElementById('sendInvoiceModal')) || new bootstrap.Modal(document.getElementById('sendInvoiceModal'));
             modal.show();
+
+            // Save to Supabase in background (after modal is visible)
+            if (typeof saveInvoiceForSharing === 'function') {
+                saveInvoiceForSharing(invoiceData).then(function(result) {
+                    if (result && result.data && result.data.id) {
+                        invoiceUrl = invoiceBaseUrl + '?id=' + result.data.id;
+                        invoiceData.supabaseId = result.data.id;
+                        localStorage.setItem(invoiceId, JSON.stringify(invoiceData));
+                        window._currentInvoiceUrl = invoiceUrl;
+                        var btn = document.getElementById('openInvoiceBtn');
+                        if (btn) btn.href = invoiceUrl;
+                    }
+                    if (savingNote) savingNote.style.display = 'none';
+                }).catch(function(e) {
+                    console.warn('Could not save invoice to Supabase:', e);
+                    if (savingNote) savingNote.style.display = 'none';
+                });
+            } else {
+                if (savingNote) savingNote.style.display = 'none';
+            }
         }
 
         async function sendInvoiceByEmail() {
