@@ -3123,6 +3123,8 @@ if (location.search.includes('debug')) {
             }
             rooms = data.rooms || [];
             roomCounter = data.roomCounter || rooms.length;
+            // Restore Supabase ID so autosave overwrites the correct record
+            if (data.supabaseId) window._supabaseQuoteId = data.supabaseId;
             renderRooms();
             initDone = wasInitDone;
             unsavedChanges = false; // clean slate after load
