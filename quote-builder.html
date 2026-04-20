@@ -566,6 +566,69 @@ if (location.search.includes('debug')) {
         </div>
     </div>
 
+    <!-- IKEA Quick Quote Modal -->
+    <div class="modal fade" id="ikeaQuickQuoteModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-utensils me-2 text-warning"></i>IKEA Quick Quote</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <ul class="nav nav-tabs mb-3" id="ikeaTabs">
+                        <li class="nav-item"><a class="nav-link active" href="#" onclick="showIkeaTab('parse',this);return false;">📋 Paste Order List</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" onclick="showIkeaTab('prices',this);return false;">💰 My Prices</a></li>
+                    </ul>
+
+                    <!-- Tab: Paste Order -->
+                    <div id="ikeaTab_parse">
+                        <p class="text-muted small">Paste your IKEA order list below. Copy it from your IKEA order confirmation email or kitchen planner export — just paste the whole thing, the parser will find what it needs.</p>
+                        <textarea id="ikeaOrderInput" class="form-control font-monospace" rows="10" placeholder="Paste IKEA order here...
+Example:
+2x SEKTION Base cabinet 30x24x30&quot;
+4x MAXIMERA Drawer, medium
+6x AXSTAD Door 15x30&quot;
+1x SEKTION High cabinet 18x24x80&quot;
+1x SEKTION Corner base cabinet
+2x SEKTION Toe kick
+..."></textarea>
+                        <div class="mt-2 d-flex gap-2">
+                            <button class="btn btn-warning text-dark" onclick="parseIkeaOrder()"><i class="fas fa-magic me-1"></i>Parse &amp; Quote</button>
+                            <button class="btn btn-outline-secondary btn-sm" onclick="showIkeaTab(\'prices\',document.querySelector(\'#ikeaTabs .nav-link:last-child\'))"><i class="fas fa-tag me-1"></i>My Prices</button>
+                        </div>
+                        <!-- Results -->
+                        <div id="ikeaResults" style="display:none;" class="mt-3">
+                            <div class="card border-0 bg-light p-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="fw-bold mb-0"><i class="fas fa-clipboard-check me-2"></i>Parsed Items</h6>
+                                    <span class="badge bg-warning text-dark" id="ikeaItemCount"></span>
+                                </div>
+                                <table class="table table-sm mb-2" id="ikeaResultsTable">
+                                    <thead><tr><th></th><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
+                                    <tbody id="ikeaResultsBody"></tbody>
+                                    <tfoot><tr><td colspan="4" class="text-end fw-bold">Total</td><td class="fw-bold" id="ikeaTotal">$0.00</td></tr></tfoot>
+                                </table>
+                                <div class="alert alert-info py-2 small" id="ikeaUnparsed" style="display:none;"></div>
+                                <div class="d-flex align-items-center gap-2 flex-wrap mt-2">
+                                    <select id="ikeaTargetRoom" class="form-select" style="max-width:220px;"></select>
+                                    <button class="btn btn-success" onclick="addIkeaToQuote()"><i class="fas fa-plus me-1"></i>Add to Quote</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab: My Prices -->
+                    <div id="ikeaTab_prices" style="display:none;">
+                        <p class="text-muted small">Set your installation rates for each IKEA cabinet type. These are your prices — what you charge the client. Pick from your saved items or enter manually.</p>
+                        <div id="ikeaPricingRows"></div>
+                        <button class="btn btn-success mt-2" onclick="saveIkeaPricing()"><i class="fas fa-save me-1"></i>Save My Prices</button>
+                        <span class="saved-badge ms-2" id="ikeaPricingSaved" style="display:none;"><i class="fas fa-check-circle me-1"></i>Saved!</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Material Estimator Modal -->
     <div class="modal fade" id="materialEstimatorModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
@@ -2089,6 +2152,224 @@ if (location.search.includes('debug')) {
             if (depositAmtEl) depositAmtEl.textContent = depositAmt.toFixed(2);
             if (remainingEl) remainingEl.textContent = remaining.toFixed(2);
             updateProfitReport();
+        }
+
+        // ── IKEA Quick Quote ──────────────────────────────────────────────
+        var IKEA_FIELDS = [
+            { key: 'baseCabinet',     label: 'Base Cabinet',        defaultRate: 119 },
+            { key: 'wallCabinet',     label: 'Wall Cabinet',         defaultRate: 119 },
+            { key: 'tallCabinet',     label: 'Tall / High Cabinet',  defaultRate: 177 },
+            { key: 'cornerCabinet',   label: 'Corner Cabinet',       defaultRate: 145 },
+            { key: 'drawer',          label: 'Drawer',               defaultRate: 25  },
+            { key: 'door',            label: 'Door',                 defaultRate: 15  },
+            { key: 'coverPanel',      label: 'Cover Panel',          defaultRate: 45  },
+            { key: 'toeKick',         label: 'Toe Kick',             defaultRate: 20  },
+            { key: 'crownMoulding',   label: 'Crown / Valance',      defaultRate: 20  },
+            { key: 'countertop',      label: 'Countertop',           defaultRate: 347 },
+            { key: 'dishwasherPanel', label: 'Dishwasher Panel',     defaultRate: 147 },
+            { key: 'lazySusan',       label: 'Lazy Susan / Carousel',defaultRate: 67  },
+            { key: 'islandBase',      label: 'Island / Peninsula',   defaultRate: 197 },
+        ];
+
+        // Keyword rules — order matters (more specific first)
+        var IKEA_RULES = [
+            { key: 'dishwasherPanel', words: ['dishwasher panel','tutemo','door on dishwasher'] },
+            { key: 'tallCabinet',     words: ['tall cabinet','high cabinet','sektion high','sektion tall','pantry cabinet'] },
+            { key: 'cornerCabinet',   words: ['corner base','corner wall','corner cabinet','corner'] },
+            { key: 'baseCabinet',     words: ['base cabinet','sektion base','base cab'] },
+            { key: 'wallCabinet',     words: ['wall cabinet','sektion wall','upper cabinet','wall cab'] },
+            { key: 'lazySusan',       words: ['lazy susan','carousel','utrusta rotating'] },
+            { key: 'drawer',          words: ['maximera','förvara','drawer insert','drawer'] },
+            { key: 'coverPanel',      words: ['cover panel','filler panel','sektion panel'] },
+            { key: 'toeKick',         words: ['toe kick','toekick','sektion toe'] },
+            { key: 'crownMoulding',   words: ['crown moulding','crown molding','light valance','valance','cornice','prägel'] },
+            { key: 'countertop',      words: ['countertop','counter top','badelunda','ekbacken','kasker','numerar'] },
+            { key: 'door',            words: ['axstad','vedhamn','kungsbacka','järsta','lerhyttan','kallarp','door'] },
+            { key: 'islandBase',      words: ['island','peninsula'] },
+        ];
+
+        function loadIkeaPricing() {
+            var saved = JSON.parse(localStorage.getItem('ald_ikea_pricing') || '{}');
+            var result = {};
+            IKEA_FIELDS.forEach(function(f) {
+                result[f.key] = (saved[f.key] !== undefined) ? saved[f.key] : f.defaultRate;
+            });
+            return result;
+        }
+
+        function saveIkeaPricing() {
+            var pricing = {};
+            IKEA_FIELDS.forEach(function(f) {
+                var el = document.getElementById('ikPrice_' + f.key);
+                pricing[f.key] = el ? (parseFloat(el.value) || 0) : f.defaultRate;
+            });
+            localStorage.setItem('ald_ikea_pricing', JSON.stringify(pricing));
+            if (typeof getCurrentUser !== 'undefined') {
+                getCurrentUser().then(function(u) {
+                    if (u && typeof _supabase !== 'undefined')
+                        _supabase.from('user_data').upsert({ user_id: u.id, key: 'ikea_pricing', value: pricing, updated_at: new Date().toISOString() }, { onConflict: 'user_id,key' });
+                });
+            }
+            var badge = document.getElementById('ikeaPricingSaved');
+            if (badge) { badge.style.display = 'inline'; setTimeout(function() { badge.style.display = 'none'; }, 2500); }
+        }
+
+        function showIkeaTab(tab, el) {
+            document.getElementById('ikeaTab_parse').style.display = tab === 'parse' ? 'block' : 'none';
+            document.getElementById('ikeaTab_prices').style.display = tab === 'prices' ? 'block' : 'none';
+            document.querySelectorAll('#ikeaTabs .nav-link').forEach(function(a) { a.classList.remove('active'); });
+            if (el) el.classList.add('active');
+            if (tab === 'prices') renderIkeaPricingForm();
+        }
+
+        function renderIkeaPricingForm() {
+            var pricing = loadIkeaPricing();
+            var html = '<div class="row g-2">';
+            IKEA_FIELDS.forEach(function(f) {
+                html += '<div class="col-md-6"><div class="d-flex align-items-center gap-2 mb-2">';
+                html += '<label class="form-label mb-0 flex-grow-1 small fw-semibold">' + f.label + '</label>';
+                // Saved items picker
+                html += '<select class="form-select form-select-sm" style="max-width:160px;" onchange="if(this.value){document.getElementById(\'ikPrice_' + f.key + '\').value=this.value}">';
+                html += '<option value="">Pick item...</option>';
+                Object.keys(customItems).forEach(function(cat) {
+                    customItems[cat].forEach(function(item) {
+                        if (item.rate > 0) html += '<option value="' + item.rate + '">' + item.name.substring(0,22) + ' ($' + item.rate + ')</option>';
+                    });
+                });
+                html += '</select>';
+                html += '<div class="input-group input-group-sm" style="max-width:100px;"><span class="input-group-text">$</span>';
+                html += '<input type="number" class="form-control" id="ikPrice_' + f.key + '" value="' + pricing[f.key] + '" step="0.01" min="0"></div>';
+                html += '</div></div>';
+            });
+            html += '</div>';
+            document.getElementById('ikeaPricingRows').innerHTML = html;
+        }
+
+        function openIkeaQuoteModal() {
+            document.getElementById('ikeaOrderInput').value = '';
+            document.getElementById('ikeaResults').style.display = 'none';
+            showIkeaTab('parse', document.querySelector('#ikeaTabs .nav-link'));
+            // Populate room dropdown
+            var sel = document.getElementById('ikeaTargetRoom');
+            sel.innerHTML = '<option value="__new__">+ Create new room (Kitchen)</option>';
+            rooms.forEach(function(r) {
+                var opt = document.createElement('option');
+                opt.value = r.id; opt.textContent = r.name; sel.appendChild(opt);
+            });
+            // Pre-select any room named Kitchen
+            var kitchenRoom = rooms.find(function(r) { return /kitchen/i.test(r.name); });
+            if (kitchenRoom) sel.value = kitchenRoom.id;
+            new bootstrap.Modal(document.getElementById('ikeaQuickQuoteModal')).show();
+        }
+
+        function parseIkeaOrder() {
+            var text = document.getElementById('ikeaOrderInput').value.trim();
+            if (!text) { alert('Please paste your IKEA order list first.'); return; }
+            var pricing = loadIkeaPricing();
+            var lines = text.split(/\n/);
+            var parsed = [];
+            var unparsed = [];
+
+            lines.forEach(function(line) {
+                line = line.trim();
+                if (!line) return;
+                // Extract quantity: leading number, Nx, xN, qty:N, N pcs, N pieces
+                var qty = 1;
+                var qtyMatch = line.match(/^(\d+)\s*[xX]\s*/)
+                    || line.match(/^[xX](\d+)\s*/)
+                    || line.match(/\bqty[:\s]+(\d+)/i)
+                    || line.match(/(\d+)\s*pcs?\b/i)
+                    || line.match(/(\d+)\s*pieces?\b/i);
+                if (qtyMatch) { qty = parseInt(qtyMatch[1] || qtyMatch[0]); }
+                var lower = line.toLowerCase();
+                var matched = false;
+                for (var i = 0; i < IKEA_RULES.length; i++) {
+                    var rule = IKEA_RULES[i];
+                    for (var j = 0; j < rule.words.length; j++) {
+                        if (lower.indexOf(rule.words[j]) !== -1) {
+                            var rate = pricing[rule.key] || 0;
+                            parsed.push({ key: rule.key, label: IKEA_FIELDS.find(function(f){return f.key===rule.key;}).label, qty: qty, rate: rate, total: qty * rate, lineText: line.trim() });
+                            matched = true; break;
+                        }
+                    }
+                    if (matched) break;
+                }
+                if (!matched && line.length > 3 && !/^[-=*#\s]+$/.test(line)) unparsed.push(line);
+            });
+
+            if (parsed.length === 0) { alert('Could not find any recognizable IKEA items. Try the My Prices tab to check item keywords, or paste more of the order text.'); return; }
+            renderIkeaResults(parsed, unparsed);
+        }
+
+        var _ikeaParsedItems = [];
+        function renderIkeaResults(items, unparsed) {
+            _ikeaParsedItems = items;
+            var total = 0;
+            var html = '';
+            items.forEach(function(item, i) {
+                total += item.total;
+                html += '<tr>';
+                html += '<td><input type="checkbox" class="form-check-input ikea-check" data-idx="' + i + '" checked></td>';
+                html += '<td><span class="small">' + item.label + '</span><br><span class="text-muted" style="font-size:0.75rem;">' + item.lineText.substring(0,60) + '</span></td>';
+                html += '<td><input type="number" class="form-control form-control-sm" value="' + item.qty + '" style="width:65px;" onchange="updateIkeaRow(' + i + ',this.value,null)"></td>';
+                html += '<td><div class="input-group input-group-sm" style="width:90px;"><span class="input-group-text">$</span><input type="number" class="form-control" value="' + item.rate + '" step="0.01" onchange="updateIkeaRow(' + i + ',null,this.value)"></div></td>';
+                html += '<td>$' + item.total.toFixed(2) + '</td>';
+                html += '</tr>';
+            });
+            document.getElementById('ikeaResultsBody').innerHTML = html;
+            document.getElementById('ikeaTotal').textContent = '$' + total.toFixed(2);
+            document.getElementById('ikeaItemCount').textContent = items.length + ' items found';
+            if (unparsed.length > 0) {
+                document.getElementById('ikeaUnparsed').style.display = 'block';
+                document.getElementById('ikeaUnparsed').innerHTML = '<i class="fas fa-info-circle me-1"></i><strong>' + unparsed.length + ' lines skipped</strong> (not recognized as IKEA install items — hardware, accessories, etc.): <br><span class="text-muted">' + unparsed.slice(0,5).map(function(l){return l.substring(0,60);}).join(', ') + '</span>';
+            } else { document.getElementById('ikeaUnparsed').style.display = 'none'; }
+            document.getElementById('ikeaResults').style.display = 'block';
+        }
+
+        function updateIkeaRow(idx, newQty, newRate) {
+            if (newQty !== null) _ikeaParsedItems[idx].qty = parseFloat(newQty) || 0;
+            if (newRate !== null) _ikeaParsedItems[idx].rate = parseFloat(newRate) || 0;
+            _ikeaParsedItems[idx].total = _ikeaParsedItems[idx].qty * _ikeaParsedItems[idx].rate;
+            // Update total cell
+            var rows = document.querySelectorAll('#ikeaResultsBody tr');
+            if (rows[idx]) rows[idx].querySelector('td:last-child').textContent = '$' + _ikeaParsedItems[idx].total.toFixed(2);
+            var grand = _ikeaParsedItems.reduce(function(s,item,i) {
+                var check = document.querySelector('.ikea-check[data-idx="' + i + '"]');
+                return s + (check && check.checked ? item.total : 0);
+            }, 0);
+            document.getElementById('ikeaTotal').textContent = '$' + grand.toFixed(2);
+        }
+
+        function addIkeaToQuote() {
+            var roomId = document.getElementById('ikeaTargetRoom').value;
+            var roomName = 'Kitchen';
+            if (roomId === '__new__') {
+                var newRoom = { id: Date.now(), name: roomName, items: [], notes: '', scopeNotes: '' };
+                rooms.push(newRoom);
+                roomId = newRoom.id;
+                renderRooms();
+            } else { roomId = parseInt(roomId); }
+            var room = rooms.find(function(r) { return r.id === roomId; });
+            if (!room) { alert('Room not found.'); return; }
+            var added = 0;
+            document.querySelectorAll('.ikea-check').forEach(function(chk) {
+                if (!chk.checked) return;
+                var item = _ikeaParsedItems[parseInt(chk.dataset.idx)];
+                room.items.push({
+                    category: 'Millwork & Cabinets',
+                    name: 'IKEA Install — ' + item.label,
+                    description: item.lineText,
+                    quantity: item.qty,
+                    unit: 'ea',
+                    rate: item.rate,
+                    total: item.total
+                });
+                added++;
+            });
+            renderRooms();
+            if (typeof saveQuoteToSupabase === 'function') saveQuoteToSupabase();
+            bootstrap.Modal.getInstance(document.getElementById('ikeaQuickQuoteModal')).hide();
+            showToast(added + ' IKEA install items added!', 'success');
         }
 
         // ── Material Estimator ─────────────────────────────────────────────
