@@ -244,6 +244,11 @@
         }
     }
 
+    /* Fix Google Places autocomplete dropdown appearing behind Bootstrap modal */
+    .pac-container {
+        z-index: 99999 !important;
+    }
+
 </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-v2.js"></script>
@@ -2081,10 +2086,17 @@ if (location.search.includes('debug')) {
 
         var _placesAutocomplete = null;
         function initPlacesAutocomplete() {
-            if (_placesAutocomplete) return; // bind once - input element persists in modal
             var input = document.getElementById('mapAddressInput');
             if (!input || typeof google === 'undefined' || !google.maps.places) return;
-            _placesAutocomplete = new google.maps.places.Autocomplete(input, { types: ['address'] });
+            // Destroy and recreate to ensure fresh binding each time modal opens
+            if (_placesAutocomplete) {
+                google.maps.event.clearInstanceListeners(_placesAutocomplete);
+                _placesAutocomplete = null;
+            }
+            _placesAutocomplete = new google.maps.places.Autocomplete(input, {
+                types: ['geocode'],
+                fields: ['geometry', 'formatted_address']
+            });
             _placesAutocomplete.addListener('place_changed', function() {
                 var place = _placesAutocomplete.getPlace();
                 if (place.geometry) {
