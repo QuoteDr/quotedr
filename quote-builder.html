@@ -5044,10 +5044,40 @@ async function saveQuote() {
                 // Skip session restore if loading a specific quote from URL
                 var _urlp = new URLSearchParams(window.location.search);
                 if (!_urlp.get('load') && !_urlp.get('shownotes')) {
-                    // Restore active quote ID immediately before session restore
                     var _savedActiveId = localStorage.getItem("ald_active_quote_id");
-                    if (_savedActiveId) window._supabaseQuoteId = _savedActiveId;
-                    startupContinueSession();
+                    if (_savedActiveId && typeof loadQuoteFromSupabase === "function") {
+                        // Reload the last opened quote from Supabase directly
+                        window._supabaseQuoteId = _savedActiveId;
+                        loadQuoteFromSupabase(_savedActiveId).then(function(result) {
+                            if (result && result.data && result.data.data) {
+                                var qData = result.data.data;
+                                qData.supabaseId = result.data.id;
+                                window._supabaseQuoteId = result.data.id;
+                                localStorage.setItem("ald_active_quote_id", result.data.id);
+                                applyQuoteData(qData);
+                                if (qData.quoteNumber) document.getElementById("quoteNumber").value = qData.quoteNumber || "";
+                                renderTermsCheckboxes();
+                                if (qData.terms && Array.isArray(qData.terms)) {
+                                    document.querySelectorAll("#termsCheckboxes input[type=checkbox]").forEach(function(cb) {
+                                        cb.checked = qData.terms.includes(cb.dataset.text);
+                                    });
+                                }
+                                unsavedChanges = false;
+                                clearTimeout(_autoSaveTimer);
+                                var el = document.getElementById("saveStatus");
+                                if (el) el.innerHTML = "<span style=\"color:#28a745;\"><i class=\"fas fa-cloud\"></i> Restored — " + (qData.clientName || "quote") + "</span>";
+                                updateDraftWarning();
+                            } else {
+                                // Quote not found — fall back to session restore
+                                localStorage.removeItem("ald_active_quote_id");
+                                startupContinueSession();
+                            }
+                        }).catch(function() {
+                            startupContinueSession();
+                        });
+                    } else {
+                        startupContinueSession();
+                    }
                 }
             }
             tryStartup();
