@@ -611,7 +611,14 @@ if (location.search.includes('debug')) {
                                 <div class="form-text">Each window adds 18 LF of casing trim</div>
                             </div>
                         </div>
-                        <button class="btn btn-info text-white w-100" onclick="calculateEstimate()"><i class="fas fa-calculator me-2"></i>Calculate</button>
+                        <div id="estPricingBanner" class="alert alert-warning py-2 small mb-2" style="display:none;">
+                            <i class="fas fa-tag me-1"></i> Rates not set up yet &mdash; items will be added with $0 rate.
+                            <a href="javascript:void(0)" onclick="openEstimatorPricing()" class="alert-link ms-1">Set up pricing &rarr;</a>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-info text-white flex-grow-1" onclick="calculateEstimate()"><i class="fas fa-calculator me-2"></i>Calculate</button>
+                            <button class="btn btn-outline-secondary btn-sm" onclick="openEstimatorPricing()" title="Set up pricing"><i class="fas fa-tag"></i></button>
+                        </div>
                     </div>
 
                     <!-- Step 2: Results -->
@@ -619,8 +626,9 @@ if (location.search.includes('debug')) {
                         <div class="card border-0 bg-light p-3 mb-3">
                             <h6 class="fw-bold mb-3"><i class="fas fa-clipboard-list me-2"></i>Estimated Materials — <span id="estResultRoomName"></span></h6>
                             <table class="table table-sm mb-0" id="estResultsTable">
-                                <thead><tr><th style="width:32px"></th><th>Item</th><th>Quantity</th><th>Unit</th></tr></thead>
+                                <thead><tr><th style="width:32px"></th><th>Item</th><th>Qty</th><th>Unit</th><th>Rate</th><th>Total</th></tr></thead>
                                 <tbody id="estResultsBody"></tbody>
+                                <tfoot><tr><td colspan="5" class="text-end fw-bold">Subtotal</td><td class="fw-bold" id="estSubtotal">$0.00</td></tr></tfoot>
                             </table>
                         </div>
                         <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -629,6 +637,26 @@ if (location.search.includes('debug')) {
                             <button class="btn btn-outline-secondary" onclick="document.getElementById('estResultsSection').style.display='none'; document.getElementById('estInputSection').style.display='block';"><i class="fas fa-redo me-1"></i>New Estimate</button>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estimator Pricing Setup Modal -->
+    <div class="modal fade" id="estimatorPricingModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-tag me-2 text-success"></i>Set Up Your Pricing</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small mb-3">Link each material type to your saved line items, or enter a manual rate. Saved once &mdash; auto-fills every estimate from then on.</p>
+                    <div id="estPricingRows"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Skip for now</button>
+                    <button type="button" class="btn btn-success" onclick="saveEstimatorPricing()"><i class="fas fa-save me-1"></i>Save Pricing</button>
                 </div>
             </div>
         </div>
@@ -2064,6 +2092,71 @@ if (location.search.includes('debug')) {
         }
 
         // ── Material Estimator ─────────────────────────────────────────────
+
+        var EST_FIELDS = [
+            { key: 'flooring',     label: 'Flooring',       unit: 'sqft', defaultRate: 0 },
+            { key: 'ceilingPaint', label: 'Ceiling Paint',  unit: 'sqft', defaultRate: 0 },
+            { key: 'wallPaint',    label: 'Wall Paint',     unit: 'sqft', defaultRate: 0 },
+            { key: 'baseboard',    label: 'Baseboard',      unit: 'LF',   defaultRate: 0 },
+            { key: 'doorCasing',   label: 'Door Casing',    unit: 'LF',   defaultRate: 0 },
+            { key: 'windowCasing', label: 'Window Casing',  unit: 'LF',   defaultRate: 0 },
+        ];
+
+        function loadEstimatorPricing() {
+            return JSON.parse(localStorage.getItem('ald_estimator_pricing') || '{}');
+        }
+
+        function saveEstimatorPricing() {
+            var pricing = {};
+            EST_FIELDS.forEach(function(f) {
+                var rateEl = document.getElementById('epRate_' + f.key);
+                var rate = rateEl ? parseFloat(rateEl.value) || 0 : 0;
+                pricing[f.key] = { rate: rate, unit: f.unit };
+            });
+            localStorage.setItem('ald_estimator_pricing', JSON.stringify(pricing));
+            // Also save to Supabase
+            if (typeof saveItemsToSupabase === 'function') {
+                getCurrentUser && getCurrentUser().then(function(u) {
+                    if (u && typeof _supabase !== 'undefined') {
+                        _supabase.from('user_data').upsert({ user_id: u.id, key: 'estimator_pricing', value: pricing, updated_at: new Date().toISOString() }, { onConflict: 'user_id,key' });
+                    }
+                });
+            }
+            bootstrap.Modal.getInstance(document.getElementById('estimatorPricingModal')).hide();
+            showToast('Pricing saved! Estimates will now auto-fill rates.', 'success');
+            // Refresh banner
+            document.getElementById('estPricingBanner').style.display = 'none';
+        }
+
+        function openEstimatorPricing() {
+            var saved = loadEstimatorPricing();
+            var html = '';
+            EST_FIELDS.forEach(function(f) {
+                var savedRate = (saved[f.key] && saved[f.key].rate) || '';
+                html += '<div class="row g-2 align-items-center mb-3">';
+                html += '<div class="col-5"><label class="form-label fw-semibold mb-0">' + f.label + '</label><div class="text-muted small">per ' + f.unit + '</div></div>';
+                html += '<div class="col-4">';
+                // Dropdown of matching saved items
+                html += '<select class="form-select form-select-sm" id="epItem_' + f.key + '" onchange="epItemSelected(\'' + f.key + '\')"><option value="">Pick from my items...</option>';
+                Object.keys(customItems).forEach(function(cat) {
+                    customItems[cat].forEach(function(item) {
+                        if (item.rate > 0) html += '<option value="' + item.rate + '">' + item.name + ' ($' + item.rate + '/' + (item.unitType || f.unit) + ')</option>';
+                    });
+                });
+                html += '</select></div>';
+                html += '<div class="col-3"><div class="input-group input-group-sm"><span class="input-group-text">$</span><input type="number" class="form-control" id="epRate_' + f.key + '" value="' + savedRate + '" placeholder="0.00" step="0.01" min="0"></div></div>';
+                html += '</div>';
+            });
+            document.getElementById('estPricingRows').innerHTML = html;
+            new bootstrap.Modal(document.getElementById('estimatorPricingModal')).show();
+        }
+
+        function epItemSelected(key) {
+            var sel = document.getElementById('epItem_' + key);
+            var rate = sel.value;
+            if (rate) document.getElementById('epRate_' + key).value = rate;
+        }
+
         function openMaterialEstimator() {
             // Reset to input state
             document.getElementById('estInputSection').style.display = 'block';
@@ -2083,6 +2176,9 @@ if (location.search.includes('debug')) {
                 opt.value = r.id; opt.textContent = r.name; sel.appendChild(opt);
             });
             if (rooms.length > 0) sel.value = rooms[rooms.length - 1].id;
+            // Show pricing banner if no pricing set up yet
+            var hasPricing = Object.keys(loadEstimatorPricing()).length > 0;
+            document.getElementById('estPricingBanner').style.display = hasPricing ? 'none' : 'block';
             new bootstrap.Modal(document.getElementById('materialEstimatorModal')).show();
         }
 
@@ -2107,28 +2203,41 @@ if (location.search.includes('debug')) {
             var perimeter = Math.round((2 * w + 2 * l) * 10) / 10;
             var doorCasing = doors * 35;
             var windowCasing = windows * 18;
-            var totalTrim = perimeter + doorCasing + windowCasing;
+
+            var pricing = loadEstimatorPricing();
+            var hasPricing = Object.keys(pricing).length > 0;
+            document.getElementById('estPricingBanner').style.display = hasPricing ? 'none' : 'block';
+
+            function getRate(key) { return (pricing[key] && pricing[key].rate) ? pricing[key].rate : 0; }
 
             document.getElementById('estResultRoomName').textContent = name;
             var rows = [
-                { id: 'est_floor',   label: 'Flooring',         qty: floorSqft,   unit: 'sqft', cat: 'Flooring',        itemName: 'Flooring — ' + name },
-                { id: 'est_ceil',    label: 'Ceiling Paint',     qty: floorSqft,   unit: 'sqft', cat: 'Painting',        itemName: 'Ceiling Paint — ' + name },
-                { id: 'est_wall',    label: 'Wall Paint',        qty: wallSqft,    unit: 'sqft', cat: 'Painting',        itemName: 'Wall Paint — ' + name },
-                { id: 'est_base',    label: 'Baseboard',         qty: perimeter,   unit: 'LF',   cat: 'Trim & Millwork', itemName: 'Baseboard — ' + name },
-                { id: 'est_door',    label: 'Door Casing',       qty: doorCasing,  unit: 'LF',   cat: 'Trim & Millwork', itemName: 'Door Casing — ' + name, hide: doors === 0 },
-                { id: 'est_window',  label: 'Window Casing',     qty: windowCasing,unit: 'LF',   cat: 'Trim & Millwork', itemName: 'Window Casing — ' + name, hide: windows === 0 },
+                { key: 'flooring',     label: 'Flooring',       qty: floorSqft,    unit: 'sqft', cat: 'Flooring',        itemName: 'Flooring — ' + name },
+                { key: 'ceilingPaint', label: 'Ceiling Paint',  qty: floorSqft,    unit: 'sqft', cat: 'Painting',        itemName: 'Ceiling Paint — ' + name },
+                { key: 'wallPaint',    label: 'Wall Paint',     qty: wallSqft,     unit: 'sqft', cat: 'Painting',        itemName: 'Wall Paint — ' + name },
+                { key: 'baseboard',    label: 'Baseboard',      qty: perimeter,    unit: 'LF',   cat: 'Trim & Millwork', itemName: 'Baseboard — ' + name },
+                { key: 'doorCasing',   label: 'Door Casing',    qty: doorCasing,   unit: 'LF',   cat: 'Trim & Millwork', itemName: 'Door Casing — ' + name, hide: doors === 0 },
+                { key: 'windowCasing', label: 'Window Casing',  qty: windowCasing, unit: 'LF',   cat: 'Trim & Millwork', itemName: 'Window Casing — ' + name, hide: windows === 0 },
             ];
 
             var html = '';
+            var subtotal = 0;
             rows.forEach(function(r) {
                 if (r.hide) return;
-                html += '<tr data-cat="' + r.cat + '" data-name="' + r.itemName + '" data-unit="' + r.unit + '" data-qty="' + r.qty + '">';
+                var rate = getRate(r.key);
+                var total = Math.round(r.qty * rate * 100) / 100;
+                subtotal += total;
+                html += '<tr data-cat="' + r.cat + '" data-name="' + r.itemName + '" data-unit="' + r.unit + '" data-qty="' + r.qty + '" data-rate="' + rate + '">';
                 html += '<td><input type="checkbox" class="form-check-input est-check" checked></td>';
                 html += '<td>' + r.label + '</td>';
-                html += '<td><strong>' + r.qty.toLocaleString() + '</strong></td>';
-                html += '<td class="text-muted">' + r.unit + '</td></tr>';
+                html += '<td>' + r.qty.toLocaleString() + '</td>';
+                html += '<td class="text-muted">' + r.unit + '</td>';
+                html += '<td>' + (rate > 0 ? '$' + rate.toFixed(2) : '<span class="text-muted">—</span>') + '</td>';
+                html += '<td>' + (total > 0 ? '$' + total.toFixed(2) : '<span class="text-muted">—</span>') + '</td>';
+                html += '</tr>';
             });
             document.getElementById('estResultsBody').innerHTML = html;
+            document.getElementById('estSubtotal').textContent = subtotal > 0 ? '$' + subtotal.toFixed(2) : '—';
             document.getElementById('estInputSection').style.display = 'none';
             document.getElementById('estResultsSection').style.display = 'block';
         }
@@ -2152,14 +2261,16 @@ if (location.search.includes('debug')) {
             var added = 0;
             checked.forEach(function(row) {
                 if (!row.querySelector('.est-check').checked) return;
+                var rate = parseFloat(row.dataset.rate) || 0;
+                var qty = parseFloat(row.dataset.qty) || 0;
                 var item = {
                     category: row.dataset.cat,
                     name: row.dataset.name,
                     description: '',
-                    quantity: parseFloat(row.dataset.qty),
+                    quantity: qty,
                     unit: row.dataset.unit,
-                    rate: 0,
-                    total: 0
+                    rate: rate,
+                    total: Math.round(qty * rate * 100) / 100
                 };
                 var room = rooms.find(function(r) { return r.id === roomId; });
                 if (room) { room.items.push(item); added++; }
