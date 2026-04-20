@@ -600,7 +600,7 @@ Example:
 6x AXSTAD Door 15x30&quot;
 ..."></textarea>
                         <div class="mt-2 d-flex gap-2">
-                            <button class="btn btn-warning text-dark" onclick="parseIkeaOrder()"><i class="fas fa-magic me-1"></i>Parse &amp; Quote</button>
+                            <button id="ikeaParseBtn" class="btn btn-warning text-dark" onclick="parseIkeaOrder()"><i class="fas fa-magic me-1"></i>Parse &amp; Quote</button>
                             <button class="btn btn-outline-secondary btn-sm" onclick="showIkeaTab('prices',document.querySelector('#ikeaTabs .nav-link:last-child'))"><i class="fas fa-tag me-1"></i>My Prices</button>
                         </div>
                         <!-- Results -->
@@ -2317,43 +2317,32 @@ Example:
             new bootstrap.Modal(document.getElementById('ikeaQuickQuoteModal')).show();
         }
 
-        function parseIkeaOrder() {
+        async function parseIkeaOrder() {
             var text = document.getElementById('ikeaOrderInput').value.trim();
             if (!text) { alert('Please paste your IKEA order list first.'); return; }
-            var pricing = loadIkeaPricing();
-            var lines = text.split(/\n/);
-            var parsed = [];
-            var unparsed = [];
-
-            lines.forEach(function(line) {
-                line = line.trim();
-                if (!line) return;
-                // Extract quantity: leading number, Nx, xN, qty:N, N pcs, N pieces
-                var qty = 1;
-                var qtyMatch = line.match(/^(\d+)\s*[xX]\s*/)
-                    || line.match(/^[xX](\d+)\s*/)
-                    || line.match(/\bqty[:\s]+(\d+)/i)
-                    || line.match(/(\d+)\s*pcs?\b/i)
-                    || line.match(/(\d+)\s*pieces?\b/i);
-                if (qtyMatch) { qty = parseInt(qtyMatch[1] || qtyMatch[0]); }
-                var lower = line.toLowerCase();
-                var matched = false;
-                for (var i = 0; i < IKEA_RULES.length; i++) {
-                    var rule = IKEA_RULES[i];
-                    for (var j = 0; j < rule.words.length; j++) {
-                        if (lower.indexOf(rule.words[j]) !== -1) {
-                            var rate = pricing[rule.key] || 0;
-                            parsed.push({ key: rule.key, label: IKEA_FIELDS.find(function(f){return f.key===rule.key;}).label, qty: qty, rate: rate, total: qty * rate, lineText: line.trim() });
-                            matched = true; break;
-                        }
-                    }
-                    if (matched) break;
-                }
-                if (!matched && line.length > 3 && !/^[-=*#\s]+$/.test(line)) unparsed.push(line);
-            });
-
-            if (parsed.length === 0) { alert('Could not find any recognizable IKEA items. Try the My Prices tab to check item keywords, or paste more of the order text.'); return; }
-            renderIkeaResults(parsed, unparsed);
+            var btn = document.getElementById('ikeaParseBtn');
+            var origHtml = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Parsing with AI...'; }
+            try {
+                var resp = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/ikea-parser', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso' },
+                    body: JSON.stringify({ text: text })
+                });
+                var data = await resp.json();
+                if (data.error) throw new Error(data.error);
+                if (!data.items || data.items.length === 0) { alert('AI could not find any recognizable IKEA install items in the order. Make sure you pasted the full order list.'); return; }
+                var pricing = loadIkeaPricing();
+                var parsed = data.items.map(function(item) {
+                    var rate = pricing[item.type] || 0;
+                    return { key: item.type, label: item.label, qty: item.qty, rate: rate, total: item.qty * rate, lineText: item.label };
+                });
+                renderIkeaResults(parsed, []);
+            } catch(e) {
+                alert('Parse error: ' + e.message);
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
+            }
         }
 
         var _ikeaParsedItems = [];
