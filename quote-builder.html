@@ -528,6 +528,7 @@ if (location.search.includes('debug')) {
                         <div class="vr mx-1"></div>
                         <button class="btn btn-outline-secondary btn-sm" onclick="setDrawMode('polygon')" id="btnDrawPolygon"><i class="fas fa-vector-square me-1"></i>Area Measure</button>
                         <button class="btn btn-outline-secondary btn-sm" onclick="setDrawMode('polyline')" id="btnDrawLine"><i class="fas fa-ruler me-1"></i>Linear Measure</button>
+                        <button class="btn btn-outline-danger btn-sm" onclick="undoLastPoint()" id="btnUndoPoint" disabled title="Undo last point"><i class="fas fa-undo me-1"></i>Undo</button>
                         <button class="btn btn-outline-danger btn-sm" onclick="clearMapShapes()"><i class="fas fa-trash me-1"></i>Clear</button>
                     </div>
                     <div id="measureMapContainer" style="flex:1;min-height:0;"></div>
@@ -2062,12 +2063,15 @@ if (location.search.includes('debug')) {
                         polylineOptions: { strokeColor: '#ff6600', strokeWeight: 3, editable: true }
                     });
                     _drawingManager.setMap(_map);
+                    attachDrawingListeners();
                     google.maps.event.addListener(_drawingManager, 'overlaycomplete', function(e) {
+                        clearActiveDrawing();
                         _drawingManager.setDrawingMode(null);
                         document.getElementById('btnDrawPolygon').className = 'btn btn-sm btn-outline-secondary';
                         document.getElementById('btnDrawLine').className = 'btn btn-sm btn-outline-secondary';
                         document.getElementById('btnDrawLine').innerHTML = '<i class="fas fa-ruler me-1"></i>Linear Measure';
                         _linearActive = false;
+                        document.getElementById('btnUndoPoint').disabled = true;
                         var shape = e.overlay;
                         var label = prompt('Label this measurement (e.g. "Main Roof", "Back Patio"):') || ('Shape ' + (_mapShapes.length + 1));
                         shape._label = label; shape._type = e.type;
@@ -2121,6 +2125,48 @@ if (location.search.includes('debug')) {
         }
 
         var _linearActive = false;
+        var _activePath = [], _previewShape = null, _currentDrawMode = null;
+
+        function attachDrawingListeners() {
+            _map.addListener('click', function(event) {
+                var mode = _drawingManager.getDrawingMode();
+                if (!mode) return;
+                _activePath.push(event.latLng);
+                _currentDrawMode = (mode === google.maps.drawing.OverlayType.POLYLINE) ? 'polyline' : 'polygon';
+                updatePreviewShape();
+                document.getElementById('btnUndoPoint').disabled = false;
+            });
+        }
+
+        function updatePreviewShape() {
+            if (_activePath.length === 0) { clearActiveDrawing(); return; }
+            var isPolygon = _currentDrawMode === 'polygon';
+            var color = isPolygon ? '#0055ff' : '#ff6600';
+            if (!_previewShape) {
+                _previewShape = isPolygon
+                    ? new google.maps.Polygon({ paths: [_activePath], strokeColor: color, strokeWeight: 2, fillColor: color, fillOpacity: 0.15, map: _map })
+                    : new google.maps.Polyline({ path: _activePath, strokeColor: color, strokeWeight: 2, map: _map });
+            } else {
+                isPolygon ? _previewShape.setPaths([_activePath]) : _previewShape.setPath(_activePath);
+            }
+        }
+
+        function undoLastPoint() {
+            if (_activePath.length === 0) return;
+            _activePath.pop();
+            if (_activePath.length === 0) {
+                clearActiveDrawing();
+                document.getElementById('btnUndoPoint').disabled = true;
+            } else {
+                updatePreviewShape();
+            }
+        }
+
+        function clearActiveDrawing() {
+            _activePath = [];
+            if (_previewShape) { _previewShape.setMap(null); _previewShape = null; }
+            _currentDrawMode = null;
+        }
 
         function setDrawMode(mode) {
             if (!_drawingManager) return;
