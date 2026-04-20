@@ -305,24 +305,13 @@ if (location.search.includes('debug')) {
 
 				<!-- PRICING TAB -->
 				<div id="tab-pricing" style="display:none;">
-				<!-- Custom Materials -->
+				<!-- Manage Items -->
 				<div class="settings-card">
-			<h5><i class="fas fa-boxes me-2" style="color:#1a56a0"></i>Custom Materials</h5>
-			<p class="text-muted small">Add materials to your quote builder.</p>
-			<div class="mb-3">
-				<button type="button" class="btn btn-outline-primary btn-sm" onclick="addCustomItem()">
-					<i class="fas fa-plus me-1"></i> Add Material
-				</button>
-			</div>
-			<div id="customItemsList">
-				<!-- Custom items will be rendered here -->
-			</div>
-			<div class="mt-3 d-flex align-items-center gap-3">
-				<button type="button" class="btn btn-save btn-primary" onclick="saveCustomItems()">
-					<i class="fas fa-save me-1"></i> Save Materials
-				</button>
-				<span class="saved-badge" id="itemsSaved"><i class="fas fa-check-circle me-1"></i>Saved!</span>
-			</div>
+			<h5><i class="fas fa-database me-2" style="color:#1a56a0"></i>Manage Items</h5>
+			<p class="text-muted small">Add and manage line items available in your quote builder.</p>
+			<button type="button" class="btn btn-primary btn-sm" onclick="openSettingsManageItems()">
+				<i class="fas fa-database me-1"></i> Manage Items
+			</button>
 		</div>
 
 		<!-- Import / Export Section -->
@@ -1290,6 +1279,242 @@ Sarah Jones, 905-555-5678"></textarea>
 			};
 			reader.readAsText(file);
 		}
+	// ── Manage Items Modal (Settings) ────────────────────────────────────────────
+
+	function openSettingsManageItems() {
+		sRenderItemsList();
+		// Populate category datalist
+		var dl = document.getElementById("sCategoryOptions");
+		if (dl) {
+			dl.innerHTML = "";
+			Object.keys(customItems || {}).forEach(function(cat) {
+				var opt = document.createElement("option");
+				opt.value = cat;
+				dl.appendChild(opt);
+			});
+		}
+		var modal = bootstrap.Modal.getInstance(document.getElementById("settingsManageItemsModal")) || new bootstrap.Modal(document.getElementById("settingsManageItemsModal"));
+		modal.show();
+	}
+
+	function sRenderItemsList() {
+		var el = document.getElementById("sCustomItemsList");
+		if (!el) return;
+		var filter = (document.getElementById("sItemSearchFilter")?.value || "").toLowerCase();
+		var html = "";
+		var db = customItems || {};
+		Object.entries(db).forEach(function([cat, items]) {
+			if (!Array.isArray(items)) return;
+			items.forEach(function(item, i) {
+				if (filter && !item.name.toLowerCase().includes(filter)) return;
+				var upgName = (item.upgrade && item.upgrade.name) ? item.upgrade.name : "";
+				var upgRate = (item.upgrade && item.upgrade.rate) ? item.upgrade.rate : "";
+				var upgDesc = (item.upgrade && item.upgrade.description) ? item.upgrade.description : "";
+				html += `
+				<div class="border rounded p-2 mb-2 bg-light" data-cat="${cat}" data-idx="${i}">
+					<div class="row g-2 align-items-center mb-1">
+						<div class="col-md-3"><small class="text-muted">Category</small><input type="text" class="form-control form-control-sm s-item-cat" value="${cat.replace(/"/g,"&quot;")}"></div>
+						<div class="col-md-3"><small class="text-muted">Name</small><input type="text" class="form-control form-control-sm s-item-name" value="${item.name.replace(/"/g,"&quot;")}"></div>
+						<div class="col-md-2"><small class="text-muted">Unit</small><input type="text" class="form-control form-control-sm s-item-unit" value="${(item.unitType||"").replace(/"/g,"&quot;")}"></div>
+						<div class="col-md-2"><small class="text-muted">Rate ($)</small><input type="number" class="form-control form-control-sm s-item-rate" step="0.01" value="${item.rate||0}"></div>
+						<div class="col-md-2 d-flex align-items-end gap-1">
+							<button class="btn btn-sm btn-success w-100" onclick="sSaveRow(this)"><i class="fas fa-save"></i></button>
+							<button class="btn btn-sm btn-danger" onclick="sDeleteItem(this)"><i class="fas fa-trash"></i></button>
+						</div>
+					</div>
+					<div class="row g-2 mb-1">
+						<div class="col-12"><small class="text-muted">Description</small><textarea class="form-control form-control-sm s-item-desc" rows="2">${item.itemDescription||""}</textarea></div>
+					</div>
+					<div class="row g-2">
+						<div class="col-md-4"><small class="text-muted">Mat. Cost ($/unit)</small><input type="number" class="form-control form-control-sm s-item-mat" step="0.01" value="${item.materialCost||0}"></div>
+						<div class="col-md-4"><small class="text-muted">Add-On Name</small><input type="text" class="form-control form-control-sm s-item-upg-name" value="${upgName.replace(/"/g,"&quot;")}"></div>
+						<div class="col-md-2"><small class="text-muted">Add-On Rate</small><input type="number" class="form-control form-control-sm s-item-upg-rate" step="0.01" value="${upgRate}"></div>
+						<div class="col-md-2"><small class="text-muted">Supplier URL</small><input type="url" class="form-control form-control-sm s-item-url" value="${(item.supplierUrl||"").replace(/"/g,"&quot;")}"></div>
+					</div>
+				</div>`;
+			});
+		});
+		if (!html) html = "<p class=\"text-muted text-center py-3\">No items yet. Add one above!</p>";
+		el.innerHTML = html;
+	}
+
+	function sFilterItems() { sRenderItemsList(); }
+
+	function sAddNewItem() {
+		var cat = document.getElementById("sNewItemCategory").value.trim();
+		var name = document.getElementById("sNewItemName").value.trim();
+		var unit = document.getElementById("sNewItemUnit").value.trim() || "sq ft";
+		var rate = parseFloat(document.getElementById("sNewItemRate").value) || 0;
+		var mat = parseFloat(document.getElementById("sNewItemMaterialCost").value) || 0;
+		var desc = document.getElementById("sNewItemDescription").value.trim();
+		var upgName = document.getElementById("sNewItemUpgradeName").value.trim();
+		var upgRate = parseFloat(document.getElementById("sNewItemUpgradeRate").value) || 0;
+		var upgDesc = document.getElementById("sNewItemUpgradeDesc").value.trim();
+		var url = document.getElementById("sNewItemSupplierUrl").value.trim();
+		if (!cat || !name) { alert("Category and Item Name are required."); return; }
+		if (!customItems) customItems = {};
+		if (!customItems[cat]) customItems[cat] = [];
+		var newItem = { name: name, unitType: unit, rate: rate, materialCost: mat, itemDescription: desc, supplierUrl: url };
+		if (upgName) newItem.upgrade = { name: upgName, rate: upgRate, description: upgDesc };
+		customItems[cat].push(newItem);
+		// Clear form
+		["sNewItemCategory","sNewItemName","sNewItemUnit","sNewItemRate","sNewItemMaterialCost","sNewItemDescription","sNewItemUpgradeName","sNewItemUpgradeRate","sNewItemUpgradeDesc","sNewItemSupplierUrl"].forEach(function(id) {
+			var el = document.getElementById(id); if (el) el.value = "";
+		});
+		sRenderItemsList();
+		sAutoSaveItems();
+	}
+
+	function sSaveRow(btn) {
+		var row = btn.closest("[data-cat]");
+		var oldCat = row.dataset.cat;
+		var idx = parseInt(row.dataset.idx);
+		var newCat = row.querySelector(".s-item-cat").value.trim() || oldCat;
+		var newName = row.querySelector(".s-item-name").value.trim();
+		var newUnit = row.querySelector(".s-item-unit").value.trim();
+		var newRate = parseFloat(row.querySelector(".s-item-rate").value) || 0;
+		var newDesc = row.querySelector(".s-item-desc").value.trim();
+		var newMat = parseFloat(row.querySelector(".s-item-mat").value) || 0;
+		var newUrl = row.querySelector(".s-item-url").value.trim();
+		var newUpgName = row.querySelector(".s-item-upg-name").value.trim();
+		var newUpgRate = parseFloat(row.querySelector(".s-item-upg-rate").value) || 0;
+		if (!customItems[oldCat] || !customItems[oldCat][idx]) return;
+		var item = customItems[oldCat][idx];
+		item.name = newName;
+		item.unitType = newUnit;
+		item.rate = newRate;
+		item.materialCost = newMat;
+		item.itemDescription = newDesc;
+		item.supplierUrl = newUrl;
+		item.upgrade = newUpgName ? { name: newUpgName, rate: newUpgRate, description: "" } : null;
+		// Handle category rename
+		if (newCat !== oldCat) {
+			customItems[oldCat].splice(idx, 1);
+			if (!customItems[newCat]) customItems[newCat] = [];
+			customItems[newCat].push(item);
+			if (customItems[oldCat].length === 0) delete customItems[oldCat];
+		}
+		row.style.background = "#d1e7dd";
+		setTimeout(function() { row.style.background = ""; sRenderItemsList(); }, 800);
+		sAutoSaveItems();
+	}
+
+	function sDeleteItem(btn) {
+		if (!confirm("Delete this item?")) return;
+		var row = btn.closest("[data-cat]");
+		var cat = row.dataset.cat;
+		var idx = parseInt(row.dataset.idx);
+		if (customItems[cat]) {
+			customItems[cat].splice(idx, 1);
+			if (customItems[cat].length === 0) delete customItems[cat];
+		}
+		sRenderItemsList();
+		sAutoSaveItems();
+	}
+
+	function sSaveAllItems() {
+		sAutoSaveItems();
+		var btn = document.querySelector("#settingsManageItemsModal .btn-success");
+		if (btn) { btn.innerHTML = "<i class=\"fas fa-check\"></i> Saved!"; setTimeout(function() { btn.innerHTML = "<i class=\"fas fa-save\"></i> Save All"; }, 2000); }
+	}
+
+	function sAutoSaveItems() {
+		localStorage.setItem("ald_custom_items", JSON.stringify(customItems));
+		if (typeof saveItemsToSupabase === "function") {
+			saveItemsToSupabase(customItems).catch(function(e) { console.warn("Items sync error:", e); });
+		}
+	}
 	</script>
+
+<!-- Manage Items Modal (Settings) -->
+<div class="modal fade" id="settingsManageItemsModal" tabindex="-1">
+	<div class="modal-dialog modal-lg modal-dialog-scrollable">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title"><i class="fas fa-database me-2"></i>Manage Items</h5>
+				<button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+			</div>
+			<div class="modal-body">
+				<h6 class="fw-bold mb-3"><i class="fas fa-plus-circle text-primary"></i> Add New Item</h6>
+				<div class="row g-2 mb-3 align-items-end">
+					<div class="col-md-3">
+						<label class="form-label"><strong>Category</strong></label>
+						<input type="text" id="sNewItemCategory" class="form-control" list="sCategoryOptions" placeholder="e.g., Tile, Flooring">
+						<datalist id="sCategoryOptions"></datalist>
+					</div>
+					<div class="col-md-3">
+						<label class="form-label"><strong>Item Name</strong></label>
+						<input type="text" id="sNewItemName" class="form-control" placeholder="e.g., Tile Installation">
+					</div>
+					<div class="col-md-2">
+						<label class="form-label"><strong>Unit Type</strong></label>
+						<input type="text" id="sNewItemUnit" class="form-control" list="sUnitOptions" placeholder="sq ft">
+						<datalist id="sUnitOptions">
+							<option value="sq ft">
+							<option value="LF">
+							<option value="each">
+							<option value="hourly">
+							<option value="sheet">
+							<option value="minimum">
+						</datalist>
+					</div>
+					<div class="col-md-2">
+						<label class="form-label"><strong>Rate ($)</strong></label>
+						<input type="number" id="sNewItemRate" class="form-control" step="0.01" min="0" placeholder="0.00">
+					</div>
+					<div class="col-md-2">
+						<label class="form-label"><strong>Mat. Cost ($/unit)</strong></label>
+						<input type="number" id="sNewItemMaterialCost" class="form-control" step="0.01" min="0" placeholder="0.00">
+					</div>
+				</div>
+				<div class="row g-2 mb-3">
+					<div class="col-12">
+						<label class="form-label"><strong>Description</strong> <span class="text-muted small">(optional — shown to clients)</span></label>
+						<textarea id="sNewItemDescription" class="form-control" rows="2" placeholder="e.g., Complete tile installation including setting, grouting and cleanup."></textarea>
+					</div>
+				</div>
+				<div class="row g-2 mb-3">
+					<div class="col-md-6">
+						<label class="form-label"><strong>Add-On Name</strong> <span class="text-muted small">(optional upgrade)</span></label>
+						<input type="text" id="sNewItemUpgradeName" class="form-control" placeholder="e.g., Large Format Tile">
+					</div>
+					<div class="col-md-2">
+						<label class="form-label"><strong>Add-On Rate ($)</strong></label>
+						<input type="number" id="sNewItemUpgradeRate" class="form-control" step="0.01" min="0" placeholder="0.00">
+					</div>
+					<div class="col-md-4">
+						<label class="form-label"><strong>Add-On Description</strong></label>
+						<input type="text" id="sNewItemUpgradeDesc" class="form-control" placeholder="Description of the upgrade">
+					</div>
+				</div>
+				<div class="row g-2 mb-3">
+					<div class="col-md-8">
+						<label class="form-label"><strong>Supplier URL</strong> <span class="text-muted small">(optional)</span></label>
+						<input type="url" id="sNewItemSupplierUrl" class="form-control" placeholder="https://www.homedepot.ca/...">
+					</div>
+					<div class="col-md-4 d-flex align-items-end">
+						<button onclick="sAddNewItem()" class="btn btn-primary w-100">
+							<i class="fas fa-plus"></i> Add Item
+						</button>
+					</div>
+				</div>
+				<hr>
+				<div class="d-flex justify-content-between align-items-center mb-2">
+					<h6 class="fw-bold mb-0"><i class="fas fa-list-alt text-secondary"></i> All Items</h6>
+					<div class="d-flex gap-2 align-items-center">
+						<input type="text" id="sItemSearchFilter" class="form-control form-control-sm" placeholder="🔍 Search..." oninput="sFilterItems()" style="max-width:200px;">
+						<button onclick="sSaveAllItems()" class="btn btn-sm btn-success"><i class="fas fa-save"></i> Save All</button>
+					</div>
+				</div>
+				<div id="sCustomItemsList" style="max-height:400px; overflow-y:auto;"></div>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn btn-success" onclick="sSaveAllItems()"><i class="fas fa-save"></i> Save All</button>
+				<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+			</div>
+		</div>
+	</div>
+</div>
+
 </body>
 </html><script src="ai-assistant.js"></script>
