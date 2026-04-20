@@ -367,34 +367,21 @@ async function listInvoices() {
     return { data };
 }
 
-// Save an invoice
-async function saveInvoice(invoiceData) {
+// Save an invoice for cross-device sharing (stored in quotes table)
+async function saveInvoiceForSharing(invoiceData) {
     const user = await getCurrentUser();
-    if (!user) return { error: 'Not authenticated' };
-    
     const { data, error } = await _supabase
-        .from('invoices')
+        .from('quotes')
         .upsert({
-            user_id: user.id,
-            id: invoiceData.id || '',
-            client_name: quoteData.clientName || '',
-            project_address: quoteData.projectAddress || '',
-            email: quoteData.email || '',
-            phone: quoteData.phone || '',
-            quote_number: quoteData.quoteNumber || '',
-            rooms: quoteData.rooms || [],
-            grand_total: quoteData.grandTotal || 0,
-            terms: quoteData.terms || [],
-            created_at: new Date().toISOString(),
+            id: invoiceData.supabaseId || undefined,
+            user_id: user ? user.id : null,
+            data: { ...invoiceData, _type: 'invoice' },
+            status: 'invoiced',
             updated_at: new Date().toISOString()
-        }, { onConflict: 'user_id,id' })
-        .select();
-        
-    if (error) {
-        console.error('Invoice save error:', error);
-        return { error };
-    }
-    return { data };
+        }, { onConflict: 'id' })
+        .select()
+        .single();
+    return { data, error };
 }
 
 // Save client to Supabase

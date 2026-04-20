@@ -2742,7 +2742,7 @@ if (location.search.includes('debug')) {
             openManageTemplates();
         }
 
-        function generateInvoiceLink() {
+        async function generateInvoiceLink() {
             if (rooms.length === 0) {
                 alert('Please add at least one room before generating an invoice.');
                 return;
@@ -2766,7 +2766,21 @@ if (location.search.includes('debug')) {
                 _supabase.from('quotes').update({ status: 'invoiced', updated_at: new Date().toISOString() }).eq('id', window._supabaseQuoteId).then(function() {});
             }
             const invoiceBaseUrl = window.location.href.split('?')[0].replace('quote-builder.html', 'invoice-viewer.html');
-            const invoiceUrl = invoiceBaseUrl + '?invoice=' + invoiceId;
+            let invoiceUrl = invoiceBaseUrl + '?invoice=' + invoiceId; // fallback for offline
+
+            // Save to Supabase for cross-device sharing
+            try {
+                if (typeof saveInvoiceForSharing === 'function') {
+                    const result = await saveInvoiceForSharing(invoiceData);
+                    if (result && result.data && result.data.id) {
+                        invoiceUrl = invoiceBaseUrl + '?id=' + result.data.id;
+                        invoiceData.supabaseId = result.data.id;
+                        localStorage.setItem(invoiceId, JSON.stringify(invoiceData));
+                    }
+                }
+            } catch(e) {
+                console.warn('Could not save invoice to Supabase, using local link:', e);
+            }
 
             // Show send modal (same pattern as quote send)
             var existing = document.getElementById('sendInvoiceModal');

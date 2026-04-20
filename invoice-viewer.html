@@ -381,18 +381,45 @@ if (location.search.includes('debug')) {
             if (tagEl && bizProfile.tagline) tagEl.textContent = bizProfile.tagline;
             else if (tagEl && !bizProfile.tagline) tagEl.style.display = 'none';
             loadInvoice();
-            renderInvoice();
-            renderTerms();
         });
 
         function loadInvoice() {
             const params = new URLSearchParams(window.location.search);
-            var invoiceId = params.get('invoice');
-            if (!invoiceId) invoiceId = localStorage.getItem('ald_last_preview_invoice');
-            if (!invoiceId) { alert('Invalid invoice link.'); return; }
-            const stored = localStorage.getItem(invoiceId);
-            if (!stored) { alert('Invoice not found. The link may have expired.'); return; }
-            invoiceData = JSON.parse(stored);
+            const supabaseId = params.get('id');
+            const localKey = params.get('invoice');
+
+            if (supabaseId) {
+                // Cross-device link — load from Supabase
+                loadQuoteForViewing(supabaseId).then(function(result) {
+                    if (result.error || !result.data) {
+                        document.getElementById('invoiceContainer').innerHTML = '<div class="alert alert-warning">Invoice not found.</div>';
+                        return;
+                    }
+                    invoiceData = result.data.data || {};
+                    renderInvoice();
+                    renderTerms();
+                }).catch(function(e) {
+                    document.getElementById('invoiceContainer').innerHTML = '<div class="alert alert-danger">Failed to load invoice: ' + e.message + '</div>';
+                });
+            } else if (localKey) {
+                // Same-device fallback
+                const stored = localStorage.getItem(localKey);
+                if (!stored) {
+                    document.getElementById('invoiceContainer').innerHTML = '<div class="alert alert-warning">Invoice not found. This link only works on the device it was created on.</div>';
+                    return;
+                }
+                invoiceData = JSON.parse(stored);
+                renderInvoice();
+                renderTerms();
+            } else {
+                // Try last preview
+                const lastKey = localStorage.getItem('ald_last_preview_invoice');
+                if (lastKey) {
+                    const stored = localStorage.getItem(lastKey);
+                    if (stored) { invoiceData = JSON.parse(stored); renderInvoice(); renderTerms(); return; }
+                }
+                document.getElementById('invoiceContainer').innerHTML = '<div class="alert alert-warning">No invoice found.</div>';
+            }
         }
 
         function renderInvoice() {
