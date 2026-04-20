@@ -192,7 +192,7 @@
                     setTimeout(async function() {
                         const retry = await listQuotesFromSupabase();
                         if (!retry.error) {
-                            allQuotes = retry.data || [];
+                            allQuotes = autocleanDuplicates(retry.data || []);
                             renderQuotes(allQuotes);
                             updateStats(allQuotes);
                         } else {
@@ -202,7 +202,7 @@
                     return;
                 }
                 if (error) throw error;
-                allQuotes = data || [];
+                allQuotes = autocleanDuplicates(data || []);
                 renderQuotes(allQuotes);
                 updateStats(allQuotes);
             } catch (err) {
@@ -223,6 +223,34 @@
             document.getElementById('totalRevenue').textContent = '$' + revenue.toLocaleString('en-CA', {minimumFractionDigits:0, maximumFractionDigits:0});
         }
 
+        function autocleanDuplicates(data) {
+            var seen = {};
+            var toDelete = [];
+            (data || []).forEach(function(q) {
+                if (q.status !== 'draft') return;
+                var key = (q.client_name || '') + '|' + (q.quote_number || '');
+                if (!key || key === '|') return;
+                if (seen[key]) {
+                    if (new Date(q.updated_at) > new Date(seen[key].updated_at)) {
+                        toDelete.push(seen[key].id);
+                        seen[key] = q;
+                    } else {
+                        toDelete.push(q.id);
+                    }
+                } else {
+                    seen[key] = q;
+                }
+            });
+            if (toDelete.length > 0) {
+                console.log('Auto-deleting', toDelete.length, 'duplicate drafts:', toDelete);
+                _supabase.from('quotes').delete().in('id', toDelete).then(function() {
+                    console.log('Duplicates cleaned up');
+                });
+                data = data.filter(function(q) { return toDelete.indexOf(q.id) === -1; });
+            }
+            return data;
+        }
+
         function renderQuotes(quotes) {
             const el = document.getElementById('quotesList');
             if (!quotes.length) {
@@ -236,10 +264,21 @@
                 </div>`;
                 return;
             }
-            el.innerHTML = quotes.map(q => `
+            // Pin last opened quote to top
+            var lastOpenedId = localStorage.getItem('ald_active_quote_id');
+            var sorted = quotes.slice();
+            if (lastOpenedId) {
+                sorted.sort(function(a, b) {
+                    if (a.id === lastOpenedId) return -1;
+                    if (b.id === lastOpenedId) return 1;
+                    return 0;
+                });
+            }
+            el.innerHTML = sorted.map(q => `
                 <div class="quote-card">
                     <div class="d-flex justify-content-between align-items-start">
                         <div onclick="openQuote('${q.id}')" style="flex:1; cursor:pointer;">
+                            ${q.id === lastOpenedId ? '<span class="badge bg-primary me-1" style="font-size:0.65rem; vertical-align:middle;">Last Opened</span>' : ''}
                             <div class="fw-bold">${q.client_name || 'Unnamed Client'}</div>
                             <div class="text-muted small">${q.quote_number ? '#' + q.quote_number + ' · ' : ''}${formatDate(q.quote_date)} · Updated ${timeAgo(q.updated_at)}</div>
                         </div>
@@ -452,7 +491,7 @@
                 if (result.error === 'Not authenticated' && attempts < 3) {
                     setTimeout(loadWithRetry, 800 * attempts);
                 } else if (!result.error) {
-                    allQuotes = result.data || [];
+                    allQuotes = autocleanDuplicates(result.data || []);
                     renderQuotes(allQuotes);
                     updateStats(allQuotes);
                 } else {
