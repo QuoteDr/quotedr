@@ -2950,7 +2950,8 @@ if (location.search.includes('debug')) {
                 
                 const supabaseId = result.data.id;
                 window._supabaseQuoteId = supabaseId;
-                
+                localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
+
                 const _base = window.location.href.split('?')[0].replace(/quote-builder(\.html)?$/, '');
                 const viewerUrl = _base + 'interactive-quote-viewer.html?id=' + supabaseId;
                 
@@ -3133,7 +3134,10 @@ if (location.search.includes('debug')) {
             rooms = data.rooms || [];
             roomCounter = data.roomCounter || rooms.length;
             // Restore Supabase ID so autosave overwrites the correct record
-            if (data.supabaseId) window._supabaseQuoteId = data.supabaseId;
+            if (data.supabaseId) {
+                window._supabaseQuoteId = data.supabaseId;
+                localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
+            }
             renderRooms();
             initDone = wasInitDone;
             unsavedChanges = false; // clean slate after load
@@ -3231,7 +3235,10 @@ async function saveQuote() {
                 saveQuoteToSupabase(qData2).then(function(result) {
                     if (result && result.data) {
                         var saved = Array.isArray(result.data) ? result.data[0] : result.data;
-                        if (saved && saved.id) window._supabaseQuoteId = saved.id;
+                        if (saved && saved.id) {
+                            window._supabaseQuoteId = saved.id;
+                            localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
+                        }
                     }
                 }).catch(function(){});
             }
@@ -3295,13 +3302,17 @@ async function saveQuote() {
             if (nameInput && nameInput.value.trim()) _saveDialogData.clientName = nameInput.value.trim();
             _saveDialogData.supabaseId = null; // Force new insert
             window._supabaseQuoteId = null;
+            localStorage.removeItem("ald_active_quote_id");
             var saveBtn = document.getElementById('saveAsNewBtn');
             if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...'; }
             try {
                 var result = await saveQuoteToSupabase(_saveDialogData);
                 if (result && !result.error && result.data) {
                     var saved = Array.isArray(result.data) ? result.data[0] : result.data;
-                    if (saved && saved.id) window._supabaseQuoteId = saved.id;
+                    if (saved && saved.id) {
+                        window._supabaseQuoteId = saved.id;
+                        localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
+                    }
                 }
                 unsavedChanges = false;
                 updateSaveStatus('saved', 'Saved to cloud ✓');
@@ -3323,6 +3334,7 @@ async function saveQuote() {
             if (!confirm('Are you sure you want to overwrite \u201c' + quoteName + '\u201d? This cannot be undone.')) return;
             _saveDialogData.supabaseId = _selectedOverwriteId;
             window._supabaseQuoteId = _selectedOverwriteId;
+            localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
             var owBtn = document.getElementById('overwriteBtn');
             if (owBtn) { owBtn.disabled = true; owBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...'; }
             try {
@@ -3459,6 +3471,7 @@ async function saveQuote() {
                 qData.quoteNumber = q.quote_number || qData.quoteNumber || '';
                 qData.grandTotal = q.total || 0;
                 window._supabaseQuoteId = q.id;
+                localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
                 applyQuoteData(qData);
                 window._loadedQuoteData = qData;
                 unsavedChanges = false;
@@ -3517,7 +3530,10 @@ async function saveQuote() {
                     if (result && result.data) {
                         // result.data may be an array (insert) or object (update)
                         var saved = Array.isArray(result.data) ? result.data[0] : result.data;
-                        if (saved && saved.id) window._supabaseQuoteId = saved.id;
+                        if (saved && saved.id) {
+                            window._supabaseQuoteId = saved.id;
+                            localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
+                        }
                     }
                 }).catch(function(){});
             }
@@ -3615,6 +3631,7 @@ async function saveQuote() {
                     } else if (data) {
                         const q = data.data || {};
                         window._supabaseQuoteId = data.id;
+                        localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
                         // Populate top-level fields
                         if (document.getElementById('clientName')) document.getElementById('clientName').value = data.client_name || q.clientName || '';
                         if (document.getElementById('quoteNumber')) document.getElementById('quoteNumber').value = data.quote_number || q.quoteNumber || '';
@@ -4431,6 +4448,8 @@ async function saveQuote() {
         }
 
         function startupNewQuote() {
+            localStorage.removeItem("ald_active_quote_id");
+            window._supabaseQuoteId = null;
             localStorage.removeItem('ald_session_quote');
             var modal = bootstrap.Modal.getInstance(document.getElementById('startupModal'));
             if (modal) modal.hide();
@@ -4495,7 +4514,10 @@ async function saveQuote() {
                         try {
                             var d = JSON.parse(ev.target.result);
                             applyQuoteData(d);
-                            if (d.supabaseId) window._supabaseQuoteId = d.supabaseId;
+                            if (d.supabaseId) {
+                                window._supabaseQuoteId = d.supabaseId;
+                                localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
+                            }
                             if (d.quoteNumber) document.getElementById('quoteNumber').value = d.quoteNumber;
                             updateSaveStatus('loaded', f.name);
                         } catch(e) { alert('Could not read file.'); }
@@ -4516,7 +4538,10 @@ async function saveQuote() {
                 const data = JSON.parse(await file.text());
                 saveFileHandle = handle;
                 applyQuoteData(data);
-                if (data.supabaseId) window._supabaseQuoteId = data.supabaseId;
+                if (data.supabaseId) {
+                    window._supabaseQuoteId = data.supabaseId;
+                    localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
+                }
                 if (data.quoteNumber) document.getElementById('quoteNumber').value = data.quoteNumber;
                 updateSaveStatus('loaded', file.name);
                 startAutoSave();
@@ -4973,6 +4998,7 @@ async function saveQuote() {
                                 var qData = result.data.data;
                                 qData.supabaseId = result.data.id;
                                 window._supabaseQuoteId = result.data.id;
+                                localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
                                 applyQuoteData(qData);
                                 if (qData.quoteNumber) document.getElementById('quoteNumber').value = qData.quoteNumber;
                                 renderTermsCheckboxes();
@@ -5003,6 +5029,9 @@ async function saveQuote() {
                 // Skip session restore if loading a specific quote from URL
                 var _urlp = new URLSearchParams(window.location.search);
                 if (!_urlp.get('load') && !_urlp.get('shownotes')) {
+                    // Restore active quote ID immediately before session restore
+                    var _savedActiveId = localStorage.getItem("ald_active_quote_id");
+                    if (_savedActiveId) window._supabaseQuoteId = _savedActiveId;
                     startupContinueSession();
                 }
             }
