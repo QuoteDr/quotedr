@@ -2127,6 +2127,7 @@ if (location.search.includes('debug')) {
             _linearActive = false;
             _drawingMode = null;
             document.getElementById('btnDrawPolygon').className = 'btn btn-sm btn-outline-secondary';
+            document.getElementById('btnDrawPolygon').innerHTML = '<i class="fas fa-vector-square me-1"></i>Area Measure';
             document.getElementById('btnDrawLine').className = 'btn btn-sm btn-outline-secondary';
             document.getElementById('btnDrawLine').innerHTML = '<i class="fas fa-ruler me-1"></i>Linear Measure';
             document.getElementById('btnUndoPoint').disabled = true;
@@ -2213,13 +2214,18 @@ if (location.search.includes('debug')) {
                     document.getElementById('btnDrawPolygon').className = 'btn btn-sm btn-outline-secondary';
                 }
             } else if (mode === 'polygon') {
-                stopDrawing();
-                _drawingMode = 'polygon';
-                _map.setOptions({ draggableCursor: 'crosshair' });
-                document.getElementById('btnDrawPolygon').className = 'btn btn-sm btn-primary';
-                document.getElementById('btnDrawLine').className = 'btn btn-sm btn-outline-secondary';
-                document.getElementById('btnDrawLine').innerHTML = '<i class="fas fa-ruler me-1"></i>Linear Measure';
-                _linearActive = false;
+                if (_drawingMode === 'polygon') {
+                    finishDrawing();
+                } else {
+                    stopDrawing();
+                    _drawingMode = 'polygon';
+                    _map.setOptions({ draggableCursor: 'crosshair' });
+                    document.getElementById('btnDrawPolygon').className = 'btn btn-sm btn-primary';
+                    document.getElementById('btnDrawPolygon').innerHTML = '<i class="fas fa-stop-circle me-1"></i>Stop Measuring';
+                    document.getElementById('btnDrawLine').className = 'btn btn-sm btn-outline-secondary';
+                    document.getElementById('btnDrawLine').innerHTML = '<i class="fas fa-ruler me-1"></i>Linear Measure';
+                    _linearActive = false;
+                }
             }
         }
 
