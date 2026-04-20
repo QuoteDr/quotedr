@@ -296,9 +296,16 @@ if (location.search.includes('debug')) {
                     <a href="javascript:void(0)" onclick="generateInteractiveLink()" class="btn btn-primary btn-sm shadow-sm">
                         <i class="fas fa-share-square"></i> Send Quote
                     </a>
-                    <a href="javascript:void(0)" onclick="openMeasureModal()" class="btn btn-success btn-sm shadow-sm" title="Measure area from satellite map">
-                        <i class="fas fa-satellite me-1"></i> Measure
-                    </a>
+                    <div class="dropdown d-inline-block">
+                        <a href="javascript:void(0)" class="btn btn-success btn-sm shadow-sm dropdown-toggle" data-bs-toggle="dropdown" title="Tools">
+                            <i class="fas fa-tools me-1"></i> Tools
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="openMeasureModal()"><i class="fas fa-satellite me-2 text-primary"></i>Satellite Measure</a></li>
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="openIkeaQuoteModal()"><i class="fas fa-utensils me-2 text-warning"></i>IKEA Quick Quote</a></li>
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="openMaterialEstimator()"><i class="fas fa-ruler-combined me-2 text-info"></i>Material Estimator</a></li>
+                        </ul>
+                    </div>
                     <a href="javascript:void(0)" onclick="generateInvoiceLink()" class="btn btn-danger btn-sm shadow-sm">
                         <i class="fas fa-file-invoice-dollar"></i> Send Invoice
                     </a>
@@ -417,6 +424,9 @@ if (location.search.includes('debug')) {
                 <div class="btn-group d-none d-md-flex" role="group">
                     <a href="javascript:void(0)" onclick="addRoom()" class="btn btn-sm btn-light text-dark">
                         <i class="fas fa-plus"></i> Add Room
+                    </a>
+                    <a href="javascript:void(0)" onclick="openMaterialEstimator()" class="btn btn-sm btn-info text-white" title="Estimate materials from room dimensions">
+                        <i class="fas fa-ruler-combined"></i> Quick Add Room
                     </a>
                     <a href="javascript:void(0)" onclick="saveTemplate()" class="btn btn-sm btn-info text-white" title="Save current rooms as a template">
                         <i class="fas fa-save"></i> Save Template
@@ -551,6 +561,74 @@ if (location.search.includes('debug')) {
                     </div>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                     <button type="button" class="btn btn-success" onclick="addMeasurementsToQuote()"><i class="fas fa-plus me-1"></i>Add to Quote</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Material Estimator Modal -->
+    <div class="modal fade" id="materialEstimatorModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-ruler-combined me-2 text-info"></i>Material Estimator</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Step 1: Inputs -->
+                    <div id="estInputSection">
+                        <div class="row g-3 mb-3">
+                            <div class="col-12">
+                                <label class="form-label fw-semibold">Room Name</label>
+                                <input type="text" id="estRoomName" class="form-control" placeholder="e.g. Master Bedroom, Kitchen...">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Width (ft)</label>
+                                <input type="number" id="estWidth" class="form-control" placeholder="12.5" step="0.1" min="0">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Length (ft)</label>
+                                <input type="number" id="estLength" class="form-control" placeholder="14" step="0.1" min="0">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-semibold">Ceiling Height</label>
+                                <div class="d-flex gap-3 flex-wrap align-items-center">
+                                    <div class="form-check"><input class="form-check-input" type="radio" name="ceilingHeight" id="ceil8" value="8" checked onchange="toggleCeilingCustom()"><label class="form-check-label" for="ceil8">8 ft</label></div>
+                                    <div class="form-check"><input class="form-check-input" type="radio" name="ceilingHeight" id="ceil9" value="9" onchange="toggleCeilingCustom()"><label class="form-check-label" for="ceil9">9 ft</label></div>
+                                    <div class="form-check"><input class="form-check-input" type="radio" name="ceilingHeight" id="ceil10" value="10" onchange="toggleCeilingCustom()"><label class="form-check-label" for="ceil10">10 ft</label></div>
+                                    <div class="form-check"><input class="form-check-input" type="radio" name="ceilingHeight" id="ceilCustom" value="custom" onchange="toggleCeilingCustom()"><label class="form-check-label" for="ceilCustom">Custom</label></div>
+                                    <input type="number" id="estCeilingCustom" class="form-control" style="max-width:90px;display:none;" placeholder="ft" step="0.1" min="0">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Number of Doors</label>
+                                <input type="number" id="estDoors" class="form-control" value="0" min="0">
+                                <div class="form-text">Each door adds 35 LF of casing trim</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Number of Windows</label>
+                                <input type="number" id="estWindows" class="form-control" value="0" min="0">
+                                <div class="form-text">Each window adds 18 LF of casing trim</div>
+                            </div>
+                        </div>
+                        <button class="btn btn-info text-white w-100" onclick="calculateEstimate()"><i class="fas fa-calculator me-2"></i>Calculate</button>
+                    </div>
+
+                    <!-- Step 2: Results -->
+                    <div id="estResultsSection" style="display:none;" class="mt-3">
+                        <div class="card border-0 bg-light p-3 mb-3">
+                            <h6 class="fw-bold mb-3"><i class="fas fa-clipboard-list me-2"></i>Estimated Materials — <span id="estResultRoomName"></span></h6>
+                            <table class="table table-sm mb-0" id="estResultsTable">
+                                <thead><tr><th style="width:32px"></th><th>Item</th><th>Quantity</th><th>Unit</th></tr></thead>
+                                <tbody id="estResultsBody"></tbody>
+                            </table>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <select id="estTargetRoom" class="form-select" style="max-width:220px;"></select>
+                            <button class="btn btn-success" onclick="addEstimateToQuote()"><i class="fas fa-plus me-1"></i>Add to Quote</button>
+                            <button class="btn btn-outline-secondary" onclick="document.getElementById('estResultsSection').style.display='none'; document.getElementById('estInputSection').style.display='block';"><i class="fas fa-redo me-1"></i>New Estimate</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1983,6 +2061,114 @@ if (location.search.includes('debug')) {
             if (depositAmtEl) depositAmtEl.textContent = depositAmt.toFixed(2);
             if (remainingEl) remainingEl.textContent = remaining.toFixed(2);
             updateProfitReport();
+        }
+
+        // ── Material Estimator ─────────────────────────────────────────────
+        function openMaterialEstimator() {
+            // Reset to input state
+            document.getElementById('estInputSection').style.display = 'block';
+            document.getElementById('estResultsSection').style.display = 'none';
+            document.getElementById('estRoomName').value = '';
+            document.getElementById('estWidth').value = '';
+            document.getElementById('estLength').value = '';
+            document.getElementById('estDoors').value = '0';
+            document.getElementById('estWindows').value = '0';
+            document.getElementById('ceil8').checked = true;
+            document.getElementById('estCeilingCustom').style.display = 'none';
+            // Populate room dropdown
+            var sel = document.getElementById('estTargetRoom');
+            sel.innerHTML = '<option value="__new__">+ Create new room</option>';
+            rooms.forEach(function(r) {
+                var opt = document.createElement('option');
+                opt.value = r.id; opt.textContent = r.name; sel.appendChild(opt);
+            });
+            if (rooms.length > 0) sel.value = rooms[rooms.length - 1].id;
+            new bootstrap.Modal(document.getElementById('materialEstimatorModal')).show();
+        }
+
+        function toggleCeilingCustom() {
+            var isCustom = document.getElementById('ceilCustom').checked;
+            document.getElementById('estCeilingCustom').style.display = isCustom ? 'inline-block' : 'none';
+        }
+
+        function calculateEstimate() {
+            var name = document.getElementById('estRoomName').value.trim() || 'Room';
+            var w = parseFloat(document.getElementById('estWidth').value);
+            var l = parseFloat(document.getElementById('estLength').value);
+            var doors = parseInt(document.getElementById('estDoors').value) || 0;
+            var windows = parseInt(document.getElementById('estWindows').value) || 0;
+            if (!w || !l || w <= 0 || l <= 0) { alert('Please enter valid width and length.'); return; }
+            var ceilVal = document.querySelector('input[name="ceilingHeight"]:checked').value;
+            var ceilH = ceilVal === 'custom' ? parseFloat(document.getElementById('estCeilingCustom').value) : parseFloat(ceilVal);
+            if (!ceilH || ceilH <= 0) { alert('Please enter a valid ceiling height.'); return; }
+
+            var floorSqft = Math.round(w * l * 10) / 10;
+            var wallSqft = Math.round((2 * w + 2 * l) * ceilH * 10) / 10;
+            var perimeter = Math.round((2 * w + 2 * l) * 10) / 10;
+            var doorCasing = doors * 35;
+            var windowCasing = windows * 18;
+            var totalTrim = perimeter + doorCasing + windowCasing;
+
+            document.getElementById('estResultRoomName').textContent = name;
+            var rows = [
+                { id: 'est_floor',   label: 'Flooring',         qty: floorSqft,   unit: 'sqft', cat: 'Flooring',        itemName: 'Flooring — ' + name },
+                { id: 'est_ceil',    label: 'Ceiling Paint',     qty: floorSqft,   unit: 'sqft', cat: 'Painting',        itemName: 'Ceiling Paint — ' + name },
+                { id: 'est_wall',    label: 'Wall Paint',        qty: wallSqft,    unit: 'sqft', cat: 'Painting',        itemName: 'Wall Paint — ' + name },
+                { id: 'est_base',    label: 'Baseboard',         qty: perimeter,   unit: 'LF',   cat: 'Trim & Millwork', itemName: 'Baseboard — ' + name },
+                { id: 'est_door',    label: 'Door Casing',       qty: doorCasing,  unit: 'LF',   cat: 'Trim & Millwork', itemName: 'Door Casing — ' + name, hide: doors === 0 },
+                { id: 'est_window',  label: 'Window Casing',     qty: windowCasing,unit: 'LF',   cat: 'Trim & Millwork', itemName: 'Window Casing — ' + name, hide: windows === 0 },
+            ];
+
+            var html = '';
+            rows.forEach(function(r) {
+                if (r.hide) return;
+                html += '<tr data-cat="' + r.cat + '" data-name="' + r.itemName + '" data-unit="' + r.unit + '" data-qty="' + r.qty + '">';
+                html += '<td><input type="checkbox" class="form-check-input est-check" checked></td>';
+                html += '<td>' + r.label + '</td>';
+                html += '<td><strong>' + r.qty.toLocaleString() + '</strong></td>';
+                html += '<td class="text-muted">' + r.unit + '</td></tr>';
+            });
+            document.getElementById('estResultsBody').innerHTML = html;
+            document.getElementById('estInputSection').style.display = 'none';
+            document.getElementById('estResultsSection').style.display = 'block';
+        }
+
+        async function addEstimateToQuote() {
+            var roomId = document.getElementById('estTargetRoom').value;
+            var roomName = document.getElementById('estResultRoomName').textContent;
+
+            if (roomId === '__new__') {
+                // Create new room with the estimator room name
+                var newRoom = { id: Date.now(), name: roomName, items: [], notes: '', scopeNotes: '' };
+                rooms.push(newRoom);
+                roomId = newRoom.id;
+                renderRooms();
+                if (typeof saveQuoteToSupabase === 'function') saveQuoteToSupabase();
+            } else {
+                roomId = parseInt(roomId);
+            }
+
+            var checked = document.querySelectorAll('#estResultsBody tr');
+            var added = 0;
+            checked.forEach(function(row) {
+                if (!row.querySelector('.est-check').checked) return;
+                var item = {
+                    category: row.dataset.cat,
+                    name: row.dataset.name,
+                    description: '',
+                    quantity: parseFloat(row.dataset.qty),
+                    unit: row.dataset.unit,
+                    rate: 0,
+                    total: 0
+                };
+                var room = rooms.find(function(r) { return r.id === roomId; });
+                if (room) { room.items.push(item); added++; }
+            });
+
+            renderRooms();
+            if (typeof saveQuoteToSupabase === 'function') saveQuoteToSupabase();
+            bootstrap.Modal.getInstance(document.getElementById('materialEstimatorModal')).hide();
+            showToast(added + ' items added to ' + roomName, 'success');
         }
 
         // ── Google Maps Measurement ─────────────────────────────────────────
