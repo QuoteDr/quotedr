@@ -421,6 +421,43 @@ Sarah Jones, 905-555-5678"></textarea>
 
 				<!-- NOTIFICATIONS TAB -->
 				<div id="tab-notifications" style="display:none;">
+					<!-- Email Template -->
+					<div class="settings-card">
+						<h5><i class="fas fa-envelope-open-text me-2" style="color:#1a56a0"></i>Email Template</h5>
+						<p class="text-muted small">Customize the email your clients receive when you send a quote or invoice.</p>
+						<div class="row g-3">
+							<div class="col-12">
+								<label class="form-label fw-bold">Subject Line</label>
+								<input type="text" class="form-control" id="emailSubject" placeholder="e.g. Your Quote from ALD Direct Inc.">
+								<div class="form-text">Variables: {quoteRef}, {company}, {total}</div>
+							</div>
+							<div class="col-12">
+								<label class="form-label fw-bold">Intro Message</label>
+								<textarea class="form-control" id="emailIntro" rows="3" placeholder="e.g. Please find your quote attached. Don't hesitate to reach out with any questions!"></textarea>
+								<div class="form-text">Shown at the top of the email, above the quote details.</div>
+							</div>
+							<div class="col-sm-6">
+								<label class="form-label fw-bold">Button Text</label>
+								<input type="text" class="form-control" id="emailButtonText" placeholder="View My Quote &#x2192;">
+							</div>
+							<div class="col-sm-6">
+								<label class="form-label fw-bold">Reply-To Email</label>
+								<input type="email" class="form-control" id="emailReplyTo" placeholder="your@email.com">
+								<div class="form-text">Clients hit Reply and it goes here.</div>
+							</div>
+							<div class="col-12">
+								<label class="form-label fw-bold">Footer Text</label>
+								<input type="text" class="form-control" id="emailFooter" placeholder="e.g. Licensed &amp; Insured &middot; Serving the GTA since 2010">
+							</div>
+						</div>
+						<div class="mt-3 d-flex align-items-center gap-3">
+							<button type="button" class="btn btn-primary" onclick="saveEmailTemplate()">
+								<i class="fas fa-save me-1"></i> Save Email Template
+							</button>
+							<span class="saved-badge" id="emailTemplateSaved" style="display:none;"><i class="fas fa-check-circle me-1"></i>Saved!</span>
+						</div>
+					</div>
+
 					<div class="settings-card">
 						<h5><i class="fas fa-paper-plane me-2" style="color:#e87e2a"></i>Follow-up Email</h5>
 						<p class="text-muted small">Customize the message sent when you follow up with a client on a quote.</p>
@@ -659,6 +696,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			if (document.getElementById('taxRate') && savedPrefs.taxRate !== undefined) document.getElementById('taxRate').value = savedPrefs.taxRate;
 			if (document.getElementById('taxLabel') && savedPrefs.taxLabel) document.getElementById('taxLabel').value = savedPrefs.taxLabel;
 			if (document.getElementById('currencySetting') && savedPrefs.currency) document.getElementById('currencySetting').value = savedPrefs.currency;
+			loadEmailTemplate();
 		});
 
 		async function saveProfile() {
@@ -885,6 +923,32 @@ Sarah Jones, 905-555-5678"></textarea>
 			badge.innerHTML = '<i class="fas fa-check-circle me-1"></i>Saved!';
 			badge.style.display = 'inline';
 			setTimeout(function() { badge.style.display = 'none'; }, 3000);
+		}
+
+		function saveEmailTemplate() {
+			var profile = {};
+			try { profile = JSON.parse(localStorage.getItem('ald_business_profile') || '{}'); } catch(e) {}
+			profile.emailSubject = document.getElementById('emailSubject')?.value.trim() || '';
+			profile.emailIntro = document.getElementById('emailIntro')?.value.trim() || '';
+			profile.emailButtonText = document.getElementById('emailButtonText')?.value.trim() || '';
+			profile.emailReplyTo = document.getElementById('emailReplyTo')?.value.trim() || '';
+			profile.emailFooter = document.getElementById('emailFooter')?.value.trim() || '';
+			localStorage.setItem('ald_business_profile', JSON.stringify(profile));
+			if (typeof saveBusinessProfile === 'function') {
+				saveBusinessProfile(profile).catch(function(e) { console.warn('Email template sync:', e); });
+			}
+			var badge = document.getElementById('emailTemplateSaved');
+			if (badge) { badge.style.display = 'inline'; setTimeout(function() { badge.style.display = 'none'; }, 3000); }
+		}
+
+		function loadEmailTemplate() {
+			var profile = {};
+			try { profile = JSON.parse(localStorage.getItem('ald_business_profile') || '{}'); } catch(e) {}
+			if (document.getElementById('emailSubject')) document.getElementById('emailSubject').value = profile.emailSubject || '';
+			if (document.getElementById('emailIntro')) document.getElementById('emailIntro').value = profile.emailIntro || '';
+			if (document.getElementById('emailButtonText')) document.getElementById('emailButtonText').value = profile.emailButtonText || '';
+			if (document.getElementById('emailReplyTo')) document.getElementById('emailReplyTo').value = profile.emailReplyTo || '';
+			if (document.getElementById('emailFooter')) document.getElementById('emailFooter').value = profile.emailFooter || '';
 		}
 
 		function resetOnboarding() {

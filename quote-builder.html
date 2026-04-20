@@ -2907,7 +2907,12 @@ if (location.search.includes('debug')) {
                         quoteUrl: invoiceUrl,
                         subject: 'Invoice from ' + (profile.companyName || profile.businessName || 'ALD Direct Inc.'),
                         message: msgEl ? msgEl.value.trim() : '',
-                        isInvoice: true
+                        isInvoice: true,
+                        emailSubject: profile.emailSubject || '',
+                        emailIntro: profile.emailIntro || '',
+                        emailButtonText: profile.emailButtonText || '',
+                        emailReplyTo: profile.emailReplyTo || '',
+                        emailFooter: profile.emailFooter || ''
                     })
                 });
                 var data = await res.json();
@@ -3085,7 +3090,12 @@ if (location.search.includes('debug')) {
                         quoteNumber: qData.quoteNumber || '',
                         total: qData.grandTotal || 0,
                         quoteUrl: quoteUrl,
-                        message: msgEl ? msgEl.value.trim() : ''
+                        message: msgEl ? msgEl.value.trim() : '',
+                        emailSubject: profile.emailSubject || '',
+                        emailIntro: profile.emailIntro || '',
+                        emailButtonText: profile.emailButtonText || '',
+                        emailReplyTo: profile.emailReplyTo || '',
+                        emailFooter: profile.emailFooter || ''
                     })
                 });
                 var data = await res.json();

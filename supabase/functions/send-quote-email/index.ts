@@ -11,7 +11,10 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { to, clientName, contractorName, companyName, quoteNumber, total, quoteUrl, message } = await req.json();
+    const {
+      to, clientName, contractorName, companyName, quoteNumber, total, quoteUrl, message, isInvoice,
+      emailSubject, emailIntro, emailButtonText, emailReplyTo, emailFooter
+    } = await req.json();
 
     if (!to || !quoteUrl) {
       return new Response(JSON.stringify({ error: 'Missing required fields: to, quoteUrl' }), {
@@ -28,9 +31,23 @@ Deno.serve(async (req) => {
 
     const fromName = companyName || contractorName || 'QuoteDr';
     const greeting = clientName ? `Hi ${clientName},` : 'Hi there,';
-    const quoteRef = quoteNumber ? `Quote #${quoteNumber}` : 'Your Quote';
+    const quoteRef = quoteNumber ? `${isInvoice ? 'Invoice' : 'Quote'} #${quoteNumber}` : (isInvoice ? 'Your Invoice' : 'Your Quote');
     const totalStr = total ? `$${parseFloat(total).toFixed(2)}` : '';
     const customMessage = message ? `<p style="color:#555; line-height:1.6;">${message.replace(/\n/g, '<br>')}</p>` : '';
+    const docType = isInvoice ? 'invoice' : 'quote';
+
+    // Custom template fields with defaults
+    const subject = emailSubject
+      ? emailSubject.replace('{quoteRef}', quoteRef).replace('{company}', fromName).replace('{total}', totalStr)
+      : `${quoteRef} from ${fromName}${totalStr ? ' — ' + totalStr : ''}`;
+
+    const introParagraph = emailIntro
+      ? `<p style="color:#555; line-height:1.6; margin:0 0 24px;">${emailIntro.replace(/\n/g, '<br>')}</p>`
+      : `<p style="color:#555; line-height:1.6; margin:0 0 24px;">${contractorName || 'Your contractor'} has sent you ${quoteRef}${totalStr ? ` for <strong>${totalStr}</strong>` : ''}. Click below to view your ${docType}, review all the details, and let us know if you'd like to proceed.</p>`;
+
+    const btnText = emailButtonText || (isInvoice ? 'View My Invoice →' : 'View My Quote →');
+    const replyTo = emailReplyTo || 'support@quotedr.io';
+    const footerExtra = emailFooter ? `<br>${emailFooter}` : '';
 
     const html = `
 <!DOCTYPE html>
@@ -51,23 +68,20 @@ Deno.serve(async (req) => {
         <tr><td style="padding:40px;">
           <p style="font-size:1.1rem; font-weight:600; color:#0f3460; margin:0 0 16px;">${greeting}</p>
           ${customMessage}
-          <p style="color:#555; line-height:1.6; margin:0 0 24px;">
-            ${contractorName || 'Your contractor'} has sent you ${quoteRef}${totalStr ? ` for <strong>${totalStr}</strong>` : ''}. 
-            Click below to view your quote, review all the details, and let us know if you'd like to proceed.
-          </p>
+          ${introParagraph}
 
           <!-- CTA Button -->
           <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:8px 0 32px;">
             <a href="${quoteUrl}" style="display:inline-block; background:#e87e2a; color:white; font-weight:700; font-size:1rem; padding:16px 40px; border-radius:50px; text-decoration:none; letter-spacing:0.3px;">
-              View My Quote →
+              ${btnText}
             </a>
           </td></tr></table>
 
-          <!-- Quote details box -->
+          <!-- Details box -->
           ${quoteNumber || totalStr ? `
           <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa; border-radius:8px; margin-bottom:24px;">
             <tr><td style="padding:20px;">
-              ${quoteNumber ? `<div style="margin-bottom:8px;"><span style="color:#999; font-size:0.85rem;">Quote Number</span><br><strong style="color:#333;">#${quoteNumber}</strong></div>` : ''}
+              ${quoteNumber ? `<div style="margin-bottom:8px;"><span style="color:#999; font-size:0.85rem;">${isInvoice ? 'Invoice' : 'Quote'} Number</span><br><strong style="color:#333;">#${quoteNumber}</strong></div>` : ''}
               ${totalStr ? `<div><span style="color:#999; font-size:0.85rem;">Total</span><br><strong style="color:#0f3460; font-size:1.2rem;">${totalStr} + tax</strong></div>` : ''}
             </td></tr>
           </table>` : ''}
@@ -82,7 +96,7 @@ Deno.serve(async (req) => {
         <tr><td style="background:#f8f9fa; padding:20px 40px; text-align:center; border-top:1px solid #eee;">
           <p style="color:#aaa; font-size:0.75rem; margin:0;">
             Sent via <a href="https://quotedr.io" style="color:#1a56a0; text-decoration:none;">QuoteDr.io</a> · 
-            Professional quoting for service businesses<br>
+            Professional quoting for service businesses${footerExtra}<br>
             © 2026 QuoteDr (ALD Direct Inc.)
           </p>
         </td></tr>
@@ -102,9 +116,9 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         from: `${fromName} via QuoteDr <quotes@quotedr.io>`,
         to: [to],
-        subject: `${quoteRef} from ${fromName}${totalStr ? ' — ' + totalStr : ''}`,
+        subject,
         html,
-        reply_to: 'support@quotedr.io',
+        reply_to: replyTo,
       }),
     });
 
@@ -118,7 +132,7 @@ Deno.serve(async (req) => {
     });
 
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
+    return new Response(JSON.stringify({ error: (err as Error).message }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
