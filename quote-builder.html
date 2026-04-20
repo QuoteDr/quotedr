@@ -5081,6 +5081,13 @@ async function saveQuote() {
                 }
             }
             tryStartup();
+            // Auto-open Manage Items modal if navigated from settings
+            if (window.location.hash === "#manage-items") {
+                setTimeout(function() {
+                    if (typeof openManageItemsModal === "function") openManageItemsModal();
+                    history.replaceState(null, "", window.location.pathname + window.location.search);
+                }, 1500);
+            }
         });
     </script>
     <!-- Mobile bottom action bar (hidden on desktop) -->
