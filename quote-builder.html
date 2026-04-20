@@ -252,6 +252,7 @@
 </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-v2.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <!-- Eruda mobile console (only loads with ?debug in URL) -->
 <script>
 if (location.search.includes('debug')) {
@@ -582,19 +583,25 @@ if (location.search.includes('debug')) {
 
                     <!-- Tab: Paste Order -->
                     <div id="ikeaTab_parse">
-                        <p class="text-muted small">Paste your IKEA order list below. Copy it from your IKEA order confirmation email or kitchen planner export — just paste the whole thing, the parser will find what it needs.</p>
-                        <textarea id="ikeaOrderInput" class="form-control font-monospace" rows="10" placeholder="Paste IKEA order here...
+                        <p class="text-muted small">Upload your IKEA order PDF, or paste the order text below.</p>
+                        <!-- Upload area -->
+                        <div id="ikeaUploadArea" class="border rounded p-3 text-center mb-3" style="border-style:dashed!important;cursor:pointer;background:#fafafa;" onclick="document.getElementById('ikeaPdfInput').click()" ondragover="event.preventDefault();this.style.background='#fff3cd';" ondragleave="this.style.background='#fafafa';" ondrop="ikeaHandleDrop(event)">
+                            <i class="fas fa-file-pdf fa-2x text-danger mb-2"></i>
+                            <div class="fw-semibold">Upload IKEA Order PDF</div>
+                            <div class="text-muted small">Click to browse or drag &amp; drop your PDF here</div>
+                            <input type="file" id="ikeaPdfInput" accept=".pdf" style="display:none;" onchange="ikeaHandlePdfUpload(this.files[0])">
+                        </div>
+                        <div id="ikeaPdfStatus" style="display:none;" class="alert alert-info py-2 small mb-2"><i class="fas fa-spinner fa-spin me-1"></i><span id="ikeaPdfStatusText">Reading PDF...</span></div>
+                        <div class="text-muted small mb-1">Or paste the order text manually:</div>
+                        <textarea id="ikeaOrderInput" class="form-control font-monospace" rows="6" placeholder="Paste IKEA order here...
 Example:
 2x SEKTION Base cabinet 30x24x30&quot;
 4x MAXIMERA Drawer, medium
 6x AXSTAD Door 15x30&quot;
-1x SEKTION High cabinet 18x24x80&quot;
-1x SEKTION Corner base cabinet
-2x SEKTION Toe kick
 ..."></textarea>
                         <div class="mt-2 d-flex gap-2">
                             <button class="btn btn-warning text-dark" onclick="parseIkeaOrder()"><i class="fas fa-magic me-1"></i>Parse &amp; Quote</button>
-                            <button class="btn btn-outline-secondary btn-sm" onclick="showIkeaTab(\'prices\',document.querySelector(\'#ikeaTabs .nav-link:last-child\'))"><i class="fas fa-tag me-1"></i>My Prices</button>
+                            <button class="btn btn-outline-secondary btn-sm" onclick="showIkeaTab('prices',document.querySelector('#ikeaTabs .nav-link:last-child'))"><i class="fas fa-tag me-1"></i>My Prices</button>
                         </div>
                         <!-- Results -->
                         <div id="ikeaResults" style="display:none;" class="mt-3">
@@ -2245,9 +2252,57 @@ Example:
             document.getElementById('ikeaPricingRows').innerHTML = html;
         }
 
+        async function ikeaExtractPdfText(file) {
+            if (typeof pdfjsLib === 'undefined') { throw new Error('PDF reader not loaded yet, try again in a moment.'); }
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+            var arrayBuffer = await file.arrayBuffer();
+            var pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            var text = '';
+            for (var i = 1; i <= pdf.numPages; i++) {
+                var page = await pdf.getPage(i);
+                var content = await page.getTextContent();
+                text += content.items.map(function(s) { return s.str; }).join(' ') + '\n';
+            }
+            return text;
+        }
+
+        async function ikeaHandlePdfUpload(file) {
+            if (!file) return;
+            var status = document.getElementById('ikeaPdfStatus');
+            var statusText = document.getElementById('ikeaPdfStatusText');
+            status.style.display = 'block';
+            statusText.textContent = 'Reading PDF — ' + file.name + '...';
+            document.getElementById('ikeaUploadArea').style.background = '#d4edda';
+            try {
+                var text = await ikeaExtractPdfText(file);
+                document.getElementById('ikeaOrderInput').value = text;
+                status.className = 'alert alert-success py-2 small mb-2';
+                statusText.innerHTML = '<i class="fas fa-check-circle me-1"></i>PDF read successfully — ' + file.name + '. Click <strong>Parse &amp; Quote</strong> to continue.';
+                document.getElementById('ikeaUploadArea').innerHTML = '<i class="fas fa-check-circle fa-2x text-success mb-2"></i><div class="fw-semibold text-success">' + file.name + '</div><div class="text-muted small">PDF loaded — click to replace</div><input type="file" id="ikeaPdfInput" accept=".pdf" style="display:none;" onchange="ikeaHandlePdfUpload(this.files[0])">';
+            } catch(e) {
+                status.className = 'alert alert-danger py-2 small mb-2';
+                statusText.innerHTML = '<i class="fas fa-exclamation-circle me-1"></i>Could not read PDF: ' + e.message + '. Try pasting the order text manually.';
+                document.getElementById('ikeaUploadArea').style.background = '#fafafa';
+            }
+        }
+
+        function ikeaHandleDrop(event) {
+            event.preventDefault();
+            document.getElementById('ikeaUploadArea').style.background = '#fafafa';
+            var file = event.dataTransfer.files[0];
+            if (file && file.type === 'application/pdf') {
+                ikeaHandlePdfUpload(file);
+            } else {
+                alert('Please drop a PDF file.');
+            }
+        }
+
         function openIkeaQuoteModal() {
             document.getElementById('ikeaOrderInput').value = '';
             document.getElementById('ikeaResults').style.display = 'none';
+            document.getElementById('ikeaPdfStatus').style.display = 'none';
+            document.getElementById('ikeaUploadArea').style.background = '#fafafa';
+            document.getElementById('ikeaUploadArea').innerHTML = '<i class="fas fa-file-pdf fa-2x text-danger mb-2"></i><div class="fw-semibold">Upload IKEA Order PDF</div><div class="text-muted small">Click to browse or drag &amp; drop your PDF here</div><input type="file" id="ikeaPdfInput" accept=".pdf" style="display:none;" onchange="ikeaHandlePdfUpload(this.files[0])">';
             showIkeaTab('parse', document.querySelector('#ikeaTabs .nav-link'));
             // Populate room dropdown
             var sel = document.getElementById('ikeaTargetRoom');
