@@ -1986,7 +1986,7 @@ if (location.search.includes('debug')) {
         }
 
         // ── Google Maps Measurement ─────────────────────────────────────────
-        var _map = null, _drawingManager = null, _mapShapes = [], _mapInited = false;
+        var _map = null, _mapShapes = [], _mapInited = false;
 
         function populateMeasureModalCategories() {
             var select = document.getElementById('mapItemCategory');
@@ -2057,29 +2057,22 @@ if (location.search.includes('debug')) {
                         zoom: 19, mapTypeId: 'satellite', tilt: 0,
                         fullscreenControl: true, streetViewControl: false, mapTypeControl: false
                     });
-                    _drawingManager = new google.maps.drawing.DrawingManager({
-                        drawingMode: null, drawingControl: false,
-                        polygonOptions: { fillColor: '#00aaff', fillOpacity: 0.25, strokeColor: '#0055ff', strokeWeight: 2, editable: true },
-                        polylineOptions: { strokeColor: '#ff6600', strokeWeight: 3, editable: true }
+                    // Manual click-to-draw (no DrawingManager - gives full undo/preview control)
+                    _map.addListener('click', function(event) {
+                        if (!_drawingMode) return;
+                        _activePath.push(event.latLng);
+                        redrawPreview(null);
+                        document.getElementById('btnUndoPoint').disabled = false;
                     });
-                    _drawingManager.setMap(_map);
-                    attachDrawingListeners();
-                    google.maps.event.addListener(_drawingManager, 'overlaycomplete', function(e) {
-                        clearActiveDrawing();
-                        _drawingManager.setDrawingMode(null);
-                        document.getElementById('btnDrawPolygon').className = 'btn btn-sm btn-outline-secondary';
-                        document.getElementById('btnDrawLine').className = 'btn btn-sm btn-outline-secondary';
-                        document.getElementById('btnDrawLine').innerHTML = '<i class="fas fa-ruler me-1"></i>Linear Measure';
-                        _linearActive = false;
-                        document.getElementById('btnUndoPoint').disabled = true;
-                        var shape = e.overlay;
-                        var label = prompt('Label this measurement (e.g. "Main Roof", "Back Patio"):') || ('Shape ' + (_mapShapes.length + 1));
-                        shape._label = label; shape._type = e.type;
-                        _mapShapes.push(shape);
-                        google.maps.event.addListener(shape, 'click', function() {
-                            var nl = prompt('Rename:', shape._label); if (nl) { shape._label = nl; renderMeasurements(); }
-                        });
-                        renderMeasurements();
+                    _map.addListener('mousemove', function(event) {
+                        if (!_drawingMode || _activePath.length === 0) return;
+                        redrawPreview(event.latLng);
+                    });
+                    _map.addListener('dblclick', function(event) {
+                        if (!_drawingMode) return;
+                        // remove the last point added by the click that preceded dblclick
+                        if (_activePath.length > 0) _activePath.pop();
+                        finishDrawing();
                     });
                     var addr = document.getElementById('projectAddress')?.value || '';
                     if (addr) { document.getElementById('mapAddressInput').value = addr; searchMapAddress(); }
@@ -2125,76 +2118,113 @@ if (location.search.includes('debug')) {
         }
 
         var _linearActive = false;
-        var _activePath = [], _previewShape = null, _currentDrawMode = null;
+        var _drawingMode = null;
+        var _activePath = [];
+        var _previewLine = null;   // dashed rubber-band line to cursor
+        var _previewPath = null;   // solid line of points placed so far
 
-        function attachDrawingListeners() {
-            _map.addListener('click', function(event) {
-                var mode = _drawingManager.getDrawingMode();
-                if (!mode) return;
-                _activePath.push(event.latLng);
-                _currentDrawMode = (mode === google.maps.drawing.OverlayType.POLYLINE) ? 'polyline' : 'polygon';
-                updatePreviewShape();
-                document.getElementById('btnUndoPoint').disabled = false;
-            });
+        function resetDrawButtons() {
+            _linearActive = false;
+            _drawingMode = null;
+            document.getElementById('btnDrawPolygon').className = 'btn btn-sm btn-outline-secondary';
+            document.getElementById('btnDrawLine').className = 'btn btn-sm btn-outline-secondary';
+            document.getElementById('btnDrawLine').innerHTML = '<i class="fas fa-ruler me-1"></i>Linear Measure';
+            document.getElementById('btnUndoPoint').disabled = true;
+            _map.setOptions({ draggableCursor: null });
         }
 
-        function updatePreviewShape() {
-            if (_activePath.length === 0) { clearActiveDrawing(); return; }
-            var isPolygon = _currentDrawMode === 'polygon';
-            var color = isPolygon ? '#0055ff' : '#ff6600';
-            if (!_previewShape) {
-                _previewShape = isPolygon
-                    ? new google.maps.Polygon({ paths: [_activePath], strokeColor: color, strokeWeight: 2, fillColor: color, fillOpacity: 0.15, map: _map })
-                    : new google.maps.Polyline({ path: _activePath, strokeColor: color, strokeWeight: 2, map: _map });
-            } else {
-                isPolygon ? _previewShape.setPaths([_activePath]) : _previewShape.setPath(_activePath);
+        function redrawPreview(cursorLatLng) {
+            // Draw solid path of placed points
+            var pathPoints = _activePath.slice();
+            if (_drawingMode === 'polygon' && pathPoints.length > 0) pathPoints.push(pathPoints[0]); // close preview
+            if (!_previewPath) {
+                _previewPath = new google.maps.Polyline({
+                    path: pathPoints,
+                    strokeColor: _drawingMode === 'polygon' ? '#0055ff' : '#ff6600',
+                    strokeWeight: 2, strokeOpacity: 0.9, map: _map
+                });
+            } else { _previewPath.setPath(pathPoints); }
+
+            // Draw dashed rubber-band from last point to cursor
+            if (cursorLatLng && _activePath.length > 0) {
+                var rubberPoints = [_activePath[_activePath.length - 1], cursorLatLng];
+                if (!_previewLine) {
+                    _previewLine = new google.maps.Polyline({
+                        path: rubberPoints,
+                        strokeColor: _drawingMode === 'polygon' ? '#0055ff' : '#ff6600',
+                        strokeWeight: 1, strokeOpacity: 0.5,
+                        icons: [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 2 }, offset: '0', repeat: '8px' }],
+                        map: _map
+                    });
+                } else { _previewLine.setPath(rubberPoints); }
+            } else if (_previewLine) {
+                _previewLine.setMap(null); _previewLine = null;
             }
+        }
+
+        function clearPreview() {
+            if (_previewPath) { _previewPath.setMap(null); _previewPath = null; }
+            if (_previewLine) { _previewLine.setMap(null); _previewLine = null; }
         }
 
         function undoLastPoint() {
             if (_activePath.length === 0) return;
             _activePath.pop();
-            if (_activePath.length === 0) {
-                clearActiveDrawing();
-                document.getElementById('btnUndoPoint').disabled = true;
-            } else {
-                updatePreviewShape();
-            }
+            redrawPreview(null);
+            if (_activePath.length === 0) { document.getElementById('btnUndoPoint').disabled = true; }
         }
 
-        function clearActiveDrawing() {
+        function finishDrawing() {
+            if (_activePath.length < 2) { stopDrawing(); return; }
+            clearPreview();
+            var label = prompt('Label this measurement (e.g. "Main Roof", "Back Fence"):') || ('Shape ' + (_mapShapes.length + 1));
+            var isPolygon = _drawingMode === 'polygon';
+            var shape = isPolygon
+                ? new google.maps.Polygon({ paths: [_activePath], strokeColor: '#0055ff', strokeWeight: 2, fillColor: '#00aaff', fillOpacity: 0.25, editable: true, map: _map })
+                : new google.maps.Polyline({ path: _activePath, strokeColor: '#ff6600', strokeWeight: 3, editable: true, map: _map });
+            shape._label = label;
+            shape._type = isPolygon ? 'polygon' : 'polyline';
+            _mapShapes.push(shape);
+            google.maps.event.addListener(shape, 'click', function() {
+                var nl = prompt('Rename:', shape._label); if (nl) { shape._label = nl; renderMeasurements(); }
+            });
+            stopDrawing();
+            renderMeasurements();
+        }
+
+        function stopDrawing() {
             _activePath = [];
-            if (_previewShape) { _previewShape.setMap(null); _previewShape = null; }
-            _currentDrawMode = null;
+            clearPreview();
+            resetDrawButtons();
         }
 
         function setDrawMode(mode) {
-            if (!_drawingManager) return;
+            if (!_map) return;
             if (mode === 'polyline') {
                 if (_linearActive) {
-                    _drawingManager.setDrawingMode(null);
-                    _linearActive = false;
-                    document.getElementById('btnDrawLine').className = 'btn btn-sm btn-outline-secondary';
-                    document.getElementById('btnDrawLine').innerHTML = '<i class="fas fa-ruler me-1"></i>Linear Measure';
+                    finishDrawing();
                 } else {
-                    _drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYLINE);
+                    stopDrawing();
+                    _drawingMode = 'polyline';
                     _linearActive = true;
+                    _map.setOptions({ draggableCursor: 'crosshair' });
                     document.getElementById('btnDrawLine').className = 'btn btn-sm btn-primary';
                     document.getElementById('btnDrawLine').innerHTML = '<i class="fas fa-stop-circle me-1"></i>Stop Measuring';
                     document.getElementById('btnDrawPolygon').className = 'btn btn-sm btn-outline-secondary';
                 }
             } else if (mode === 'polygon') {
-                if (_linearActive) {
-                    _linearActive = false;
-                    document.getElementById('btnDrawLine').className = 'btn btn-sm btn-outline-secondary';
-                    document.getElementById('btnDrawLine').innerHTML = '<i class="fas fa-ruler me-1"></i>Linear Measure';
-                }
-                _drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
+                stopDrawing();
+                _drawingMode = 'polygon';
+                _map.setOptions({ draggableCursor: 'crosshair' });
                 document.getElementById('btnDrawPolygon').className = 'btn btn-sm btn-primary';
+                document.getElementById('btnDrawLine').className = 'btn btn-sm btn-outline-secondary';
+                document.getElementById('btnDrawLine').innerHTML = '<i class="fas fa-ruler me-1"></i>Linear Measure';
+                _linearActive = false;
             }
         }
 
         function clearMapShapes() {
+            stopDrawing();
             _mapShapes.forEach(function(s) { s.setMap(null); }); _mapShapes = []; renderMeasurements();
         }
 
@@ -2203,12 +2233,15 @@ if (location.search.includes('debug')) {
         }
 
         function getShapeMeasurement(shape) {
-            if (shape._type === 'polygon' || shape._type === google.maps.drawing.OverlayType.POLYGON) {
-                var area = google.maps.geometry.spherical.computeArea(shape.getPath());
+            var isPolygon = (shape._type === 'polygon');
+            if (isPolygon) {
+                var path = shape.getPath ? shape.getPath() : new google.maps.MVCArray(shape._activePath);
+                var area = google.maps.geometry.spherical.computeArea(path);
                 var sqft = Math.round(area * 10.7639);
                 return { value: sqft, unit: 'sq ft', display: sqft.toLocaleString() + ' sq ft', isArea: true };
             } else {
-                var len = google.maps.geometry.spherical.computeLength(shape.getPath());
+                var path = shape.getPath ? shape.getPath() : new google.maps.MVCArray(shape._activePath);
+                var len = google.maps.geometry.spherical.computeLength(path);
                 var lf = Math.round(len * 3.28084 * 10) / 10;
                 return { value: lf, unit: 'LF', display: lf.toLocaleString() + ' LF', isArea: false };
             }
