@@ -2743,7 +2743,8 @@ if (location.search.includes('debug')) {
         }
 
         async function generateInvoiceLink() {
-            if (rooms.length === 0) {
+            try {
+            if (!rooms || rooms.length === 0) {
                 alert('Please add at least one room before generating an invoice.');
                 return;
             }
@@ -2807,7 +2808,11 @@ if (location.search.includes('debug')) {
             if (resultEl) resultEl.innerHTML = '';
             var savingNote = document.getElementById('invoiceSavingNote');
             if (savingNote) savingNote.style.display = 'block';
-            var modal = bootstrap.Modal.getInstance(document.getElementById('sendInvoiceModal')) || new bootstrap.Modal(document.getElementById('sendInvoiceModal'));
+            var modalEl = document.getElementById('sendInvoiceModal');
+            // Dispose any stuck instance before creating a fresh one
+            var oldInstance = bootstrap.Modal.getInstance(modalEl);
+            if (oldInstance) { oldInstance.dispose(); }
+            var modal = new bootstrap.Modal(modalEl);
             modal.show();
 
             // Save to Supabase in background (after modal is visible)
@@ -2828,6 +2833,10 @@ if (location.search.includes('debug')) {
                 });
             } else {
                 if (savingNote) savingNote.style.display = 'none';
+            }
+            } catch(err) {
+                console.error('generateInvoiceLink error:', err);
+                alert('Something went wrong generating the invoice. Please try again.');
             }
         }
 
