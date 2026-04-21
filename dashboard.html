@@ -160,6 +160,398 @@
 
                         
             <!-- View Toggle -->
+            <div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center cursor-pointer" data-bs-toggle="collapse" data-bs-target="#businessInsights">
+    <span>📊 Business Insights ▼</span>
+  </div>
+  <div id="businessInsights" class="collapse show">
+    <div class="card-body">
+      <div class="row">
+        <div class="col-md-2 col-6 mb-3">
+          <div class="text-muted small">Revenue This Month</div>
+          <div class="h5">$<span id="revenueThisMonth">0</span></div>
+        </div>
+        <div class="col-md-2 col-6 mb-3">
+          <div class="text-muted small">Revenue This Year</div>
+          <div class="h5">$<span id="revenueThisYear">0</span></div>
+        </div>
+        <div class="col-md-2 col-6 mb-3">
+          <div class="text-muted small">Avg Quote Value</div>
+          <div class="h5">$<span id="avgQuoteValue">0</span></div>
+        </div>
+        <div class="col-md-2 col-6 mb-3">
+          <div class="text-muted small">Acceptance Rate</div>
+          <div class="h5"><span id="acceptanceRate">0</span>%</div>
+        </div>
+        <div class="col-md-2 col-6 mb-3">
+          <div class="text-muted small">Top Client</div>
+          <div class="h5" id="topClient">-</div>
+        </div>
+        <div class="col-md-2 col-6 mb-3">
+          <div class="text-muted small">Best Category</div>
+          <div class="h5" id="bestCategory">-</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+            <div class="mb-3 d-flex justify-content-between align-items-center">
+                <div class="btn-group btn-group-sm" id="viewToggle">
+    <button class="btn btn-primary" id="listViewBtn" onclick="setView('list')"><i class="fas fa-list me-1"></i>List</button>
+    <button class="btn btn-outline-primary" id="kanbanViewBtn" onclick="setView('kanban')"><i class="fas fa-columns me-1"></i>Board</button>
+</div>
+            </div>
+
+            <div id="quotesList">
+                            <!-- Quotes will be rendered here -->
+                        </div>
+            <div id="kanbanBoard" style="display:none; overflow-x:auto;">
+    <div class="d-flex gap-3 pb-3" style="min-width:900px;" id="kanbanColumns"></div>
+</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="mt-5 text-center text-muted small">
+            <p>QuoteDr.io - Professional Quoting & Invoicing Software</p>
+            <p class="mt-2">
+                <a href="terms.html" class="text-decoration-none text-muted">Terms</a> | 
+                <a href="privacy.html" class="text-decoration-none text-muted">Privacy Policy</a>
+            </p>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-v2.js"></script>
+    <script>
+        // ─── DASHBOARD FUNCTIONS ─────────────────────────────────────────────────────
+
+        let allQuotes = []; // Store all quotes for client-side filtering
+
+        async function refreshQuotes() {
+            try {
+                const { data, error } = await listQuotesFromSupabase();
+                if (error === 'Not authenticated') {
+                    // Retry after delay — session may not be ready yet
+                    setTimeout(async function() {
+                        const retry = await listQuotesFromSupabase();
+                        if (!retry.error) {
+                            allQuotes = autocleanDuplicates(retry.data || []);
+                            renderQuotes(allQuotes);
+                            updateStats(allQuotes);
+                        } else {
+                            document.getElementById('quotesList').innerHTML = '<div class="alert alert-warning">Please <a href="login.html">log in</a> to see your quotes.</div>';
+                        }
+                    }, 1500);
+                    return;
+                }
+                if (error) throw error;
+                allQuotes = autocleanDuplicates(data || []);
+                renderQuotes(allQuotes);
+                updateStats(allQuotes);
+            } catch (err) {
+                console.error('Error loading quotes:', err.message || err);
+                document.getElementById('quotesList').innerHTML = '<div class="alert alert-danger">Error loading quotes: ' + (err.message || err) + '</div>';
+            }
+        }
+
+        function updateStats(quotes) {
+            const total = quotes.length;
+            const accepted = quotes.filter(q => q.status === 'accepted').length;
+            const inReview = quotes.filter(q => q.status === 'in_review').length;
+            const revenue = quotes.reduce((sum, q) => sum + (parseFloat(q.total) || 0), 0);
+
+            document.getElementById('totalQuotesCount').textContent = total;
+            document.getElementById('acceptedQuotesCount').textContent = accepted;
+            document.getElementById('inReviewCount').textContent = inReview;
+            document.getElementById('totalRevenue').textContent = '$' + revenue.toLocaleString('en-CA', {minimumFractionDigits:0, maximumFractionDigits:0});
+        }
+
+        function autocleanDuplicates(data) {
+            var seen = {};
+            var toDelete = [];
+            (data || []).forEach(function(q) {
+                if (q.status !== 'draft') return;
+                var key = (q.client_name || '') + '|' + (q.quote_number || '');
+                if (!key || key === '|') return;
+                if (seen[key]) {
+                    if (new Date(q.updated_at) > new Date(seen[key].updated_at)) {
+                        toDelete.push(seen[key].id);
+                        seen[key] = q;
+                    } else {
+                        toDelete.push(q.id);
+                    }
+                } else {
+                    seen[key] = q;
+                }
+            });
+            if (toDelete.length > 0) {
+                console.log('Auto-deleting', toDelete.length, 'duplicate drafts:', toDelete);
+                _supabase.from('quotes').delete().in('id', toDelete).then(function() {
+                    console.log('Duplicates cleaned up');
+                });
+                data = data.filter(function(q) { return toDelete.indexOf(q.id) === -1; });
+            }
+            return data;
+        }
+
+        function renderQuotes(quotes) {
+            window.currentQuotes = quotes; // keep kanban in sync
+            const el = document.getElementById('quotesList');
+            if (!quotes.length) {
+                el.innerHTML = `<div class="text-center py-5">
+                    <i class="fas fa-file-invoice fa-4x mb-4" style="color:#1a56a0; opacity:0.3;"></i>
+                    <h4 style="color:#444;">No quotes yet</h4>
+                    <p class="text-muted mb-4">Start building your first professional quote — it only takes a minute.</p>
+                    <a href="quote-builder.html" class="btn btn-lg" style="background:#e87e2a; color:#fff; font-weight:600;">
+                        <i class="fas fa-plus me-2"></i>Build Your First Quote
+                    </a>
+                </div>`;
+                return;
+            }
+            // Pin last opened quote to top
+            var lastOpenedId = localStorage.getItem('ald_active_quote_id');
+            var sorted = quotes.slice();
+            if (lastOpenedId) {
+                sorted.sort(function(a, b) {
+                    if (a.id === lastOpenedId) return -1;
+                    if (b.id === lastOpenedId) return 1;
+                    return 0;
+                });
+            }
+            el.innerHTML = sorted.map(q => {
+    const expiryDays = parseInt(localStorage.getItem('ald_quote_expiry_days') || '30');
+    const daysOld = (Date.now() - new Date(q.created_at)) / 86400000;
+    const isExpired = daysOld > expiryDays;
+    const expiresSoon = daysOld > (expiryDays - 3) && !isExpired;
+    
+    let expiryBadge = '';
+    let cardStyle = '';
+    
+    if (isExpired) {
+        expiryBadge = '<span class="badge bg-danger me-1">❌ Expired</span>';
+        cardStyle = 'opacity:0.7; border-left: 3px solid red;';
+    } else if (expiresSoon) {
+        const daysRemaining = Math.ceil(expiryDays - daysOld);
+        expiryBadge = `<span class="badge bg-warning me-1">⚠️ Expires in ${daysRemaining} days</span>`;
+    }
+    
+    const isOverdue14 = q.status === 'invoiced' && q.data?.invoiceDate && (Date.now() - new Date(q.data.invoiceDate)) > 1209600000; // 14 days
+    const isOverdue30 = q.status === 'invoiced' && q.data?.invoiceDate && (Date.now() - new Date(q.data.invoiceDate)) > 2592000000; // 30 days
+    
+    let overdueBadge = '';
+    if (isOverdue30) {
+        overdueBadge = '<span class="badge bg-danger me-1">🔴 Overdue 30d</span>';
+    } else if (isOverdue14) {
+        overdueBadge = '<span class="badge bg-warning me-1">⚠️ Overdue 14d</span>';
+    }
+    
+    const signatureHtml = q.data?.signature_url ? `
+        <div class="mt-2">
+            <small class="text-muted"><i class="fas fa-signature me-1"></i>Signed by ${q.data.signed_by} on ${formatDate(q.data.signed_at)}</small><br>
+            <img src="${q.data.signature_url}" style="max-width:150px; max-height:50px; border:1px solid #dee2e6; border-radius:4px; cursor:pointer;" onclick="window.open('${q.data.signature_url}', '_blank')" title="View full signature">
+        </div>
+    ` : '';
+    
+    return `
+        <div class="quote-card" style="${cardStyle}">
+            <div class="d-flex justify-content-between align-items-start">
+                <div onclick="openQuote('${q.id}')" style="flex:1; cursor:pointer;">
+                    ${expiryBadge}
+                    ${overdueBadge}
+                    ${q.id === lastOpenedId ? '<span class="badge bg-primary me-1" style="font-size:0.65rem; vertical-align:middle;">Last Opened</span>' : ''}
+                    <div class="fw-bold">${q.client_name || 'Unnamed Client'}</div>
+                    <div class="text-muted small">${q.quote_number ? '#' + q.quote_number + ' · ' : ''}${formatDate(q.quote_date)} · Updated ${timeAgo(q.updated_at)}</div>
+                </div>
+                <div class="text-end d-flex flex-column align-items-end gap-1">
+                    <div class="fw-bold">$${parseFloat(q.total || 0).toFixed(2)}</div>
+                    <select class="status-select status-${q.status}" onchange="updateQuoteStatus('${q.id}', this.value)">
+                        <option value="draft" ${q.status === 'draft' ? 'selected' : ''}>Draft</option>
+                        <option value="sent" ${q.status === 'sent' ? 'selected' : ''}>Sent</option>
+                        <option value="viewed" ${q.status === 'viewed' ? 'selected' : ''}>👁 Viewed</option>
+                        <option value="in_review" ${q.status === 'in_review' ? 'selected' : ''}>🔄 In Review</option>
+                        <option value="accepted" ${q.status === 'accepted' ? 'selected' : ''}>✅ Accepted</option>
+                        <option value="invoiced" ${q.status === 'invoiced' ? 'selected' : ''}>Invoiced</option>
+                        <option value="declined" ${q.status === 'declined' ? 'selected' : ''}>Declined</option>
+                    </select>
+                    <button class="btn btn-outline-danger" onclick="deleteQuote('${q.id}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+            ${signatureHtml}
+            ${q.status === 'in_review' ? `<button class="btn btn-warning btn-sm w-100 mt-2" onclick="openNotesReview('${q.id}', '${(q.client_name || '').replace(/'/g, "\'")}')"><i class="fas fa-comments me-1"></i> Review Client Notes</button>` : ''}
+            <button class="btn btn-outline-info btn-sm w-100 mt-1" onclick="shareClientPortal('${(q.client_name || '').replace(/'/g, "\'")}')" title="Share client portal"><i class="fas fa-external-link-alt me-1"></i> Client Portal</button>
+            ${q.status === 'paid' ? `<button class="btn btn-outline-success btn-sm w-100 mt-1" onclick="openWarrantyModal('${q.id}', '${(q.client_name||'').replace(/'/g,"\\'")}')"><i class="fas fa-certificate me-1"></i> Generate Warranty</button>` : ''}
+            ${(q.status === 'sent' || q.status === 'viewed') ? `<button class="btn btn-outline-primary btn-sm w-100 mt-1" onclick="sendFollowUpReminder('${q.id}', '${(q.client_name || '').replace(/'/g, "\'")}'", '${(q.data && q.data.clientEmail) || ''}')"><i class="fas fa-bell me-1"></i> Send Follow-up</button>` : ''}
+        </div>
+    `;
+}).join('');html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuoteDr.io - Dashboard</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+        .quote-card {
+            background: #fff;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            transition: box-shadow 0.2s, transform 0.2s;
+        }
+        .quote-card:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+        .status-draft { color: #6c757d; }
+        .status-sent { color: #0d6efd; }
+        .status-viewed { color: #0dcaf0; font-weight: 600; }
+        .status-in_review { color: #fd7e14; font-weight: 600; }
+        .status-accepted { color: #198754; }
+        .status-invoiced { color: #ffc107; }
+        .status-declined { color: #dc3545; }
+        .quote-card .status-select {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .quote-card .btn-outline-danger {
+            font-size: 0.7rem;
+            padding: 0.25rem 0.5rem;
+        }
+        @media (max-width: 768px) {
+            .quote-card {
+                padding: 0.75rem;
+            }
+            .quote-card .d-flex {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+            .quote-card .d-flex.justify-content-between {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .quote-card .text-end {
+                width: 100%;
+                flex-direction: row;
+                justify-content: space-between;
+                align-items: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-light px-4 py-2" style="background: #f0f4fa; border-bottom: 2px solid #d0dff0; position: relative; min-height: 64px;">
+        <div class="d-flex align-items-center gap-3">
+            <a href="quote-builder.html" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+            <a href="help.html" class="text-muted small ms-2" title="Help"><i class="fas fa-question-circle"></i> Help</a>
+        </div>
+        <div style="position: absolute; left: 50%; transform: translateX(-50%); font-weight: 700; font-size: 1.1rem; color: #0f3460;">QuoteDr.io</div>
+        <div class="d-flex align-items-center gap-2">
+            <span class="fw-bold small" id="userName"></span>
+            <a href="settings.html" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-cog"></i> Settings
+            </a>
+        </div>
+    </nav>
+    <div class="container py-4">
+
+        <!-- Stats Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3 col-sm-6 mb-3">
+                <div class="card border-primary">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">Total Quotes</h5>
+                        <p class="display-6" id="totalQuotesCount">0</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6 mb-3">
+                <div class="card border-success">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">Accepted</h5>
+                        <p class="display-6" id="acceptedQuotesCount">0</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6 mb-3">
+                <div class="card border-warning">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">In Review</h5>
+                        <p class="display-6" id="inReviewCount">0</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6 mb-3">
+                <div class="card border-info">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">Revenue</h5>
+                        <p class="display-6" id="totalRevenue">$0.00</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quotes List -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <h3 class="mb-0">Recent Quotes</h3>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="loadQuotes()" title="Refresh quotes"><i class="fas fa-sync-alt"></i></button>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="refreshQuotes()">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="exportQuotesToCSV()">
+                                <i class="fas fa-file-export"></i> Export CSV
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- Search and Filter Bar -->
+                        <div class="row mb-3">
+                            <div class="col-md-6 mb-2 mb-md-0">
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white">
+                                        <i class="fas fa-search text-muted"></i>
+                                    </span>
+                                    <input type="text" id="searchInput" class="form-control" placeholder="Search by client name or quote number..." oninput="filterQuotes()">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <select id="statusFilter" class="form-select" onchange="filterQuotes()">
+                                    <option value="all">All Statuses</option>
+                                    <option value="draft">Draft</option>
+                                    <option value="sent">Sent</option>
+                                    <option value="accepted">Accepted</option>
+                                    <option value="invoiced">Invoiced</option>
+                                    <option value="declined">Declined</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3 text-md-end">
+                                <span id="filteredCount" class="text-muted small"></span>
+                            </div>
+                        </div>
+
+                        
+            <!-- View Toggle -->
             <div class="mb-3 d-flex justify-content-between align-items-center">
                 <div class="btn-group btn-group-sm" id="viewToggle">
     <button class="btn btn-primary" id="listViewBtn" onclick="setView('list')"><i class="fas fa-list me-1"></i>List</button>
@@ -630,5 +1022,326 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="warrantyModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Generate Warranty Certificate</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Warranty Period</label>
+          <select id="warrantyPeriod" class="form-select">
+            <option value="1 year">1 Year</option>
+            <option value="2 years">2 Years</option>
+            <option value="3 years">3 Years</option>
+            <option value="5 years">5 Years</option>
+            <option value="Lifetime">Lifetime</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">What's Covered</label>
+          <textarea id="coveredText" class="form-control" rows="3"></textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">What's NOT Covered</label>
+          <textarea id="notCoveredText" class="form-control" rows="3">Normal wear and tear, acts of God, damage caused by others</textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Authorized by (Contractor Signature)</label>
+          <input type="text" id="contractorSignature" class="form-control" placeholder="Enter contractor name">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="generateWarrantyPDF()">Generate PDF</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- INSIGHTS JS -->
+<script>
+function renderBusinessInsights(quotes) {
+  if (!quotes || quotes.length === 0) return;
+
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+
+  let revenueThisMonth = 0;
+  let revenueThisYear = 0;
+  let totalQuotes = 0;
+  let acceptedQuotes = 0;
+  let paidQuotes = 0;
+  let clientSpend = {};
+  let categoryRevenue = {};
+
+  quotes.forEach(quote => {
+    const quoteDate = new Date(quote.date);
+    const quoteTotal = calculateQuoteTotal(quote);
+
+    if (quote.status === 'paid') {
+      if (quoteDate.getFullYear() === currentYear && quoteDate.getMonth() === currentMonth) {
+        revenueThisMonth += quoteTotal;
+      }
+      if (quoteDate.getFullYear() === currentYear) {
+        revenueThisYear += quoteTotal;
+      }
+    }
+
+    totalQuotes++;
+    if (quote.status === 'accepted') acceptedQuotes++;
+    if (quote.status === 'paid') paidQuotes++;
+
+    // Client spend
+    const client = quote.client || 'Unknown';
+    clientSpend[client] = (clientSpend[client] || 0) + quoteTotal;
+
+    // Category revenue
+    if (quote.rooms && Array.isArray(quote.rooms)) {
+      quote.rooms.forEach(room => {
+        if (room.items && Array.isArray(room.items)) {
+          room.items.forEach(item => {
+            const category = item.category || 'Uncategorized';
+            categoryRevenue[category] = (categoryRevenue[category] || 0) + (item.price || 0) * (item.quantity || 1);
+          });
+        }
+      });
+    }
+  });
+
+  // Calculate averages and rates
+  const avgQuoteValue = totalQuotes > 0 ? revenueThisYear / totalQuotes : 0;
+  const acceptanceRate = totalQuotes > 0 ? Math.round((acceptedQuotes / totalQuotes) * 100) : 0;
+
+  // Top client
+  let topClient = '-';
+  if (Object.keys(clientSpend).length > 0) {
+    topClient = Object.entries(clientSpend).reduce((a, b) => a[1] > b[1] ? a : b)[0];
+  }
+
+  // Best category
+  let bestCategory = '-';
+  if (Object.keys(categoryRevenue).length > 0) {
+    bestCategory = Object.entries(categoryRevenue).reduce((a, b) => a[1] > b[1] ? a : b)[0];
+  }
+
+  // Update DOM
+  document.getElementById('revenueThisMonth').textContent = revenueThisMonth.toFixed(2);
+  document.getElementById('revenueThisYear').textContent = revenueThisYear.toFixed(2);
+  document.getElementById('avgQuoteValue').textContent = avgQuoteValue.toFixed(2);
+  document.getElementById('acceptanceRate').textContent = acceptanceRate;
+  document.getElementById('topClient').textContent = topClient;
+  document.getElementById('bestCategory').textContent = bestCategory;
+}
+
+function calculateQuoteTotal(quote) {
+  let total = 0;
+  if (quote.rooms && Array.isArray(quote.rooms)) {
+    quote.rooms.forEach(room => {
+      if (room.items && Array.isArray(room.items)) {
+        room.items.forEach(item => {
+          const itemTotal = (item.price || 0) * (item.quantity || 1);
+          total += itemTotal;
+        });
+      }
+    });
+  }
+  return total;
+}
+
+// Initialize insights on load
+document.addEventListener('DOMContentLoaded', function() {
+  if (window.currentQuotes) {
+    renderBusinessInsights(window.currentQuotes);
+  }
+});
+
+        // === BUSINESS INSIGHTS ===
+        <script>
+        function renderBusinessInsights(quotes) {
+          if (!quotes || quotes.length === 0) return;
+        
+          const now = new Date();
+          const currentYear = now.getFullYear();
+          const currentMonth = now.getMonth();
+        
+          let revenueThisMonth = 0;
+          let revenueThisYear = 0;
+          let totalQuotes = 0;
+          let acceptedQuotes = 0;
+          let paidQuotes = 0;
+          let clientSpend = {};
+          let categoryRevenue = {};
+        
+          quotes.forEach(quote => {
+            const quoteDate = new Date(quote.date);
+            const quoteTotal = calculateQuoteTotal(quote);
+        
+            if (quote.status === 'paid') {
+              if (quoteDate.getFullYear() === currentYear && quoteDate.getMonth() === currentMonth) {
+                revenueThisMonth += quoteTotal;
+              }
+              if (quoteDate.getFullYear() === currentYear) {
+                revenueThisYear += quoteTotal;
+              }
+            }
+        
+            totalQuotes++;
+            if (quote.status === 'accepted') acceptedQuotes++;
+            if (quote.status === 'paid') paidQuotes++;
+        
+            // Client spend
+            const client = quote.client || 'Unknown';
+            clientSpend[client] = (clientSpend[client] || 0) + quoteTotal;
+        
+            // Category revenue
+            if (quote.rooms && Array.isArray(quote.rooms)) {
+              quote.rooms.forEach(room => {
+                if (room.items && Array.isArray(room.items)) {
+                  room.items.forEach(item => {
+                    const category = item.category || 'Uncategorized';
+                    categoryRevenue[category] = (categoryRevenue[category] || 0) + (item.price || 0) * (item.quantity || 1);
+                  });
+                }
+              });
+            }
+          });
+        
+          // Calculate averages and rates
+          const avgQuoteValue = totalQuotes > 0 ? revenueThisYear / totalQuotes : 0;
+          const acceptanceRate = totalQuotes > 0 ? Math.round((acceptedQuotes / totalQuotes) * 100) : 0;
+        
+          // Top client
+          let topClient = '-';
+          if (Object.keys(clientSpend).length > 0) {
+            topClient = Object.entries(clientSpend).reduce((a, b) => a[1] > b[1] ? a : b)[0];
+          }
+        
+          // Best category
+          let bestCategory = '-';
+          if (Object.keys(categoryRevenue).length > 0) {
+            bestCategory = Object.entries(categoryRevenue).reduce((a, b) => a[1] > b[1] ? a : b)[0];
+          }
+        
+          // Update DOM
+          document.getElementById('revenueThisMonth').textContent = revenueThisMonth.toFixed(2);
+          document.getElementById('revenueThisYear').textContent = revenueThisYear.toFixed(2);
+          document.getElementById('avgQuoteValue').textContent = avgQuoteValue.toFixed(2);
+          document.getElementById('acceptanceRate').textContent = acceptanceRate;
+          document.getElementById('topClient').textContent = topClient;
+          document.getElementById('bestCategory').textContent = bestCategory;
+        }
+        
+        function calculateQuoteTotal(quote) {
+          let total = 0;
+          if (quote.rooms && Array.isArray(quote.rooms)) {
+            quote.rooms.forEach(room => {
+              if (room.items && Array.isArray(room.items)) {
+                room.items.forEach(item => {
+                  const itemTotal = (item.price || 0) * (item.quantity || 1);
+                  total += itemTotal;
+                });
+              }
+            });
+          }
+          return total;
+        }
+        
+        // Initialize insights on load
+        document.addEventListener('DOMContentLoaded', function() {
+          if (window.currentQuotes) {
+            renderBusinessInsights(window.currentQuotes);
+          }
+        });
+        </script>
+
+        // === WARRANTY CERTIFICATE ===
+        <script>
+        let currentQuoteForWarranty = null;
+        
+        function openWarrantyModal(button) {
+          const quoteCard = button.closest('.card');
+          const quoteId = quoteCard.dataset.quoteId;
+          
+          // Find the quote in currentQuotes
+          const quote = window.currentQuotes.find(q => q.id === quoteId);
+          if (!quote || quote.status !== 'paid') return;
+        
+          currentQuoteForWarranty = quote;
+          
+          // Pre-fill the covered text from scope
+          document.getElementById('coveredText').value = quote.scope || '';
+          
+          // Show modal
+          const modal = new bootstrap.Modal(document.getElementById('warrantyModal'));
+          modal.show();
+        }
+        
+        function generateWarrantyPDF() {
+          if (!currentQuoteForWarranty) return;
+        
+          const period = document.getElementById('warrantyPeriod').value;
+          const covered = document.getElementById('coveredText').value;
+          const notCovered = document.getElementById('notCoveredText').value;
+          const contractor = document.getElementById('contractorSignature').value || 'Contractor Name';
+        
+          // Generate random certificate number
+          const certNumber = Math.floor(100000 + Math.random() * 900000);
+        
+          // Create PDF content
+          const printWindow = window.open('', '_blank');
+          printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <title>Warranty Certificate</title>
+              <style>
+                body { font-family: Arial, sans-serif; margin: 40px; }
+                .header { text-align: center; margin-bottom: 30px; }
+                .logo { width: 100px; height: auto; margin-bottom: 20px; }
+                h1 { color: #2c3e50; font-size: 24px; }
+                .section { margin-bottom: 20px; }
+                .highlight { font-weight: bold; }
+                .signature-line { margin-top: 60px; text-align: center; }
+                .cert-number { text-align: right; font-size: 12px; color: #7f8c8d; }
+              </style>
+            </head>
+            <body>
+              <div class="header">
+                <h1>LIMITED WARRANTY CERTIFICATE</h1>
+                <p class="cert-number">Certificate #: ${certNumber}</p>
+              </div>
+        
+              <div class="section">
+                <p><span class="highlight">Client:</span> ${currentQuoteForWarranty.client || 'N/A'}</p>
+                <p><span class="highlight">Project Address:</span> ${currentQuoteForWarranty.address || 'N/A'}</p>
+                <p><span class="highlight">Completion Date:</span> ${currentQuoteForWarranty.date || 'N/A'}</p>
+              </div>
+        
+              <div class="section">
+                <p><span class="highlight">Warranty Period:</span> ${period}</p>
+                <p><span class="highlight">Coverage:</span></p>
+                <p>${covered || 'N/A'}</p>
+                <p><span class="highlight">Not Covered:</span></p>
+                <p>${notCovered || 'N/A'}</p>
+              </div>
+        
+              <div class="signature-line">
+                <p>Authorized by: ${contractor}</p>
+                <p>Signature _________________________</p>
+              </div>
+            </body>
+            </html>
+          `);
+          printWindow.document.close();
+          printWindow.focus();
+          printWindow.print();
+        }
+        </script>
+        </script>
 </body>
 </html>
