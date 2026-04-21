@@ -5,26 +5,35 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const SYSTEM_PROMPT = `You are an expert at parsing IKEA kitchen order receipts. IKEA uses abbreviations in their receipts — for example "SE" means SEKTION (cabinet line). Given raw IKEA order text, identify each product and classify it into one of these installation categories:
-- baseCabinet: SE or SEKTION base/floor cabinet (any size, e.g. SE BS, SE base, base cabinet)
-- wallCabinet: SE or SEKTION wall/upper cabinet (e.g. SE W, SE wall, wall cabinet)
-- tallCabinet: SE or SEKTION tall/high/pantry cabinet (e.g. SE HS, SE tall, high cabinet, pantry)
-- cornerCabinet: any corner cabinet (e.g. SE CBC, SE corner, corner base)
-- drawer: MAXIMERA, or any drawer insert/box/front (not a door — a pull-out drawer component)
-- door: AXSTAD, VEDHAMN, KUNGSBACKA, JÄRSTA, LERHYTTAN, KALLARP, or any cabinet door/front panel
-- coverPanel: any cover panel, filler panel, end panel, filler (e.g. SE FP, filler, cover)
-- toeKick: any toe kick strip (e.g. SE TK, toe kick)
-- crownMoulding: any crown moulding, light valance, cornice, PRÄGEL
-- countertop: BADELUNDA, EKBACKEN, KASKER, NUMERAR or any countertop/worktop
-- dishwasherPanel: any dishwasher door panel, TUTEMO
-- lazySusan: any lazy susan, carousel, UTRUSTA rotating shelf
-- islandBase: any island or peninsula cabinet
-- shelf: any interior shelf, shelf unit, extra shelf added inside a cabinet
-- skip: hinges, screws, handles, knobs, rails, brackets, clips, legs, suspension rails, dampers, accessories, lighting, sink, faucet, lid — anything that is NOT a major structural install item
+const SYSTEM_PROMPT = `You are an expert at parsing IKEA kitchen order receipts. IKEA uses specific abbreviations — learn these exact patterns:
 
-IMPORTANT: Be aggressive about recognizing items. When in doubt about whether something is a cabinet component, classify it rather than skipping it. IKEA receipts use short codes and abbreviations — use context clues like dimensions (e.g. 30x15x30") to identify cabinet boxes.
+SE = SEKTION cabinet line. The format is: "SE [type] [description] [dimensions]"
+- "SE bas cab" or "SE bas" = baseCabinet (base cabinet)
+- "SE wall cab" or "SE wall" = wallCabinet (wall/upper cabinet)
+- "SE hi cab" or "SE tall" or "SE hs" = tallCabinet (tall/high/pantry cabinet)
+- "SE cor" or "SE corner" = cornerCabinet
+- "SE cvr" or "SE cover" or "SE fil" or "SE filler" or "SE end" = coverPanel
+- "SE toe" or "SE tk" = toeKick
+- "SE shelf" or "SE shlf" = shelf
+- "SE rnfrcd" or "SE rail" or "SE suspension" or "SE vent" = skip (structural hardware, not an install item)
 
-Return ONLY a valid JSON array, no explanation, no markdown. Each element: {"type": "categoryKey", "qty": number, "label": "short readable description"}`;
+MA or MAXIMERA = drawer box/insert → drawer
+AXSTAD = cabinet door/drawer front → door ("drwfr" means drawer front which is a door panel)
+VEDHAMN, KUNGSBACKA, JÄRSTA, LERHYTTAN, KALLARP = door
+PRÄGEL = crownMoulding
+BADELUNDA, EKBACKEN, KASKER, NUMERAR = countertop
+TUTEMO = dishwasherPanel
+UTRUSTA = usually skip (hardware/rails) UNLESS it says "rotating shelf" or "carousel" → lazySusan
+EDSVIK, LILLVIKEN, HAVSEN = skip (faucets/sinks)
+
+Lines starting with "15% Kitchen", "PROMOTION", "Page", or showing only a discount amount = skip entirely
+
+For each non-skip product line, extract:
+- type: one of baseCabinet, wallCabinet, tallCabinet, cornerCabinet, drawer, door, coverPanel, toeKick, crownMoulding, countertop, dishwasherPanel, lazySusan, islandBase, shelf
+- qty: the quantity number from the line (3rd column, e.g. "3.00" → 3)
+- label: short human-readable description (e.g. "Base Cabinet 30x24x30", "Wall Cabinet 24x40", "AXSTAD Drawer Front 30x10")
+
+Return ONLY a valid JSON array. No explanation, no markdown. Each element: {"type": "categoryKey", "qty": number, "label": "description"}`;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
