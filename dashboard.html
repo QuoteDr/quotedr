@@ -160,400 +160,6 @@
 
                         
             <!-- View Toggle -->
-            <div class="card mb-4">
-  <div class="card-header d-flex justify-content-between align-items-center cursor-pointer" data-bs-toggle="collapse" data-bs-target="#businessInsights">
-    <span>📊 Business Insights ▼</span>
-  </div>
-  <div id="businessInsights" class="collapse show">
-    <div class="card-body">
-      <div class="row">
-        <div class="col-md-2 col-6 mb-3">
-          <div class="text-muted small">Revenue This Month</div>
-          <div class="h5">$<span id="revenueThisMonth">0</span></div>
-        </div>
-        <div class="col-md-2 col-6 mb-3">
-          <div class="text-muted small">Revenue This Year</div>
-          <div class="h5">$<span id="revenueThisYear">0</span></div>
-        </div>
-        <div class="col-md-2 col-6 mb-3">
-          <div class="text-muted small">Avg Quote Value</div>
-          <div class="h5">$<span id="avgQuoteValue">0</span></div>
-        </div>
-        <div class="col-md-2 col-6 mb-3">
-          <div class="text-muted small">Acceptance Rate</div>
-          <div class="h5"><span id="acceptanceRate">0</span>%</div>
-        </div>
-        <div class="col-md-2 col-6 mb-3">
-          <div class="text-muted small">Top Client</div>
-          <div class="h5" id="topClient">-</div>
-        </div>
-        <div class="col-md-2 col-6 mb-3">
-          <div class="text-muted small">Best Category</div>
-          <div class="h5" id="bestCategory">-</div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-            <div class="mb-3 d-flex justify-content-between align-items-center">
-                <div class="btn-group btn-group-sm" id="viewToggle">
-    <button class="btn btn-primary" id="listViewBtn" onclick="setView('list')"><i class="fas fa-list me-1"></i>List</button>
-    <button class="btn btn-outline-primary" id="kanbanViewBtn" onclick="setView('kanban')"><i class="fas fa-columns me-1"></i>Board</button>
-</div>
-            </div>
-
-            <div id="quotesList">
-                            <!-- Quotes will be rendered here -->
-                        </div>
-            <div id="kanbanBoard" style="display:none; overflow-x:auto;">
-    <div class="d-flex gap-3 pb-3" style="min-width:900px;" id="kanbanColumns"></div>
-</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Footer -->
-        <div class="mt-5 text-center text-muted small">
-            <p>QuoteDr.io - Professional Quoting & Invoicing Software</p>
-            <p class="mt-2">
-                <a href="terms.html" class="text-decoration-none text-muted">Terms</a> | 
-                <a href="privacy.html" class="text-decoration-none text-muted">Privacy Policy</a>
-            </p>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-v2.js"></script>
-    <script>
-        // ─── DASHBOARD FUNCTIONS ─────────────────────────────────────────────────────
-
-        let allQuotes = []; // Store all quotes for client-side filtering
-
-        async function refreshQuotes() {
-            try {
-                const { data, error } = await listQuotesFromSupabase();
-                if (error === 'Not authenticated') {
-                    // Retry after delay — session may not be ready yet
-                    setTimeout(async function() {
-                        const retry = await listQuotesFromSupabase();
-                        if (!retry.error) {
-                            allQuotes = autocleanDuplicates(retry.data || []);
-                            renderQuotes(allQuotes);
-                            updateStats(allQuotes);
-                        } else {
-                            document.getElementById('quotesList').innerHTML = '<div class="alert alert-warning">Please <a href="login.html">log in</a> to see your quotes.</div>';
-                        }
-                    }, 1500);
-                    return;
-                }
-                if (error) throw error;
-                allQuotes = autocleanDuplicates(data || []);
-                renderQuotes(allQuotes);
-                updateStats(allQuotes);
-            } catch (err) {
-                console.error('Error loading quotes:', err.message || err);
-                document.getElementById('quotesList').innerHTML = '<div class="alert alert-danger">Error loading quotes: ' + (err.message || err) + '</div>';
-            }
-        }
-
-        function updateStats(quotes) {
-            const total = quotes.length;
-            const accepted = quotes.filter(q => q.status === 'accepted').length;
-            const inReview = quotes.filter(q => q.status === 'in_review').length;
-            const revenue = quotes.reduce((sum, q) => sum + (parseFloat(q.total) || 0), 0);
-
-            document.getElementById('totalQuotesCount').textContent = total;
-            document.getElementById('acceptedQuotesCount').textContent = accepted;
-            document.getElementById('inReviewCount').textContent = inReview;
-            document.getElementById('totalRevenue').textContent = '$' + revenue.toLocaleString('en-CA', {minimumFractionDigits:0, maximumFractionDigits:0});
-        }
-
-        function autocleanDuplicates(data) {
-            var seen = {};
-            var toDelete = [];
-            (data || []).forEach(function(q) {
-                if (q.status !== 'draft') return;
-                var key = (q.client_name || '') + '|' + (q.quote_number || '');
-                if (!key || key === '|') return;
-                if (seen[key]) {
-                    if (new Date(q.updated_at) > new Date(seen[key].updated_at)) {
-                        toDelete.push(seen[key].id);
-                        seen[key] = q;
-                    } else {
-                        toDelete.push(q.id);
-                    }
-                } else {
-                    seen[key] = q;
-                }
-            });
-            if (toDelete.length > 0) {
-                console.log('Auto-deleting', toDelete.length, 'duplicate drafts:', toDelete);
-                _supabase.from('quotes').delete().in('id', toDelete).then(function() {
-                    console.log('Duplicates cleaned up');
-                });
-                data = data.filter(function(q) { return toDelete.indexOf(q.id) === -1; });
-            }
-            return data;
-        }
-
-        function renderQuotes(quotes) {
-            window.currentQuotes = quotes; // keep kanban in sync
-            const el = document.getElementById('quotesList');
-            if (!quotes.length) {
-                el.innerHTML = `<div class="text-center py-5">
-                    <i class="fas fa-file-invoice fa-4x mb-4" style="color:#1a56a0; opacity:0.3;"></i>
-                    <h4 style="color:#444;">No quotes yet</h4>
-                    <p class="text-muted mb-4">Start building your first professional quote — it only takes a minute.</p>
-                    <a href="quote-builder.html" class="btn btn-lg" style="background:#e87e2a; color:#fff; font-weight:600;">
-                        <i class="fas fa-plus me-2"></i>Build Your First Quote
-                    </a>
-                </div>`;
-                return;
-            }
-            // Pin last opened quote to top
-            var lastOpenedId = localStorage.getItem('ald_active_quote_id');
-            var sorted = quotes.slice();
-            if (lastOpenedId) {
-                sorted.sort(function(a, b) {
-                    if (a.id === lastOpenedId) return -1;
-                    if (b.id === lastOpenedId) return 1;
-                    return 0;
-                });
-            }
-            el.innerHTML = sorted.map(q => {
-    const expiryDays = parseInt(localStorage.getItem('ald_quote_expiry_days') || '30');
-    const daysOld = (Date.now() - new Date(q.created_at)) / 86400000;
-    const isExpired = daysOld > expiryDays;
-    const expiresSoon = daysOld > (expiryDays - 3) && !isExpired;
-    
-    let expiryBadge = '';
-    let cardStyle = '';
-    
-    if (isExpired) {
-        expiryBadge = '<span class="badge bg-danger me-1">❌ Expired</span>';
-        cardStyle = 'opacity:0.7; border-left: 3px solid red;';
-    } else if (expiresSoon) {
-        const daysRemaining = Math.ceil(expiryDays - daysOld);
-        expiryBadge = `<span class="badge bg-warning me-1">⚠️ Expires in ${daysRemaining} days</span>`;
-    }
-    
-    const isOverdue14 = q.status === 'invoiced' && q.data?.invoiceDate && (Date.now() - new Date(q.data.invoiceDate)) > 1209600000; // 14 days
-    const isOverdue30 = q.status === 'invoiced' && q.data?.invoiceDate && (Date.now() - new Date(q.data.invoiceDate)) > 2592000000; // 30 days
-    
-    let overdueBadge = '';
-    if (isOverdue30) {
-        overdueBadge = '<span class="badge bg-danger me-1">🔴 Overdue 30d</span>';
-    } else if (isOverdue14) {
-        overdueBadge = '<span class="badge bg-warning me-1">⚠️ Overdue 14d</span>';
-    }
-    
-    const signatureHtml = q.data?.signature_url ? `
-        <div class="mt-2">
-            <small class="text-muted"><i class="fas fa-signature me-1"></i>Signed by ${q.data.signed_by} on ${formatDate(q.data.signed_at)}</small><br>
-            <img src="${q.data.signature_url}" style="max-width:150px; max-height:50px; border:1px solid #dee2e6; border-radius:4px; cursor:pointer;" onclick="window.open('${q.data.signature_url}', '_blank')" title="View full signature">
-        </div>
-    ` : '';
-    
-    return `
-        <div class="quote-card" style="${cardStyle}">
-            <div class="d-flex justify-content-between align-items-start">
-                <div onclick="openQuote('${q.id}')" style="flex:1; cursor:pointer;">
-                    ${expiryBadge}
-                    ${overdueBadge}
-                    ${q.id === lastOpenedId ? '<span class="badge bg-primary me-1" style="font-size:0.65rem; vertical-align:middle;">Last Opened</span>' : ''}
-                    <div class="fw-bold">${q.client_name || 'Unnamed Client'}</div>
-                    <div class="text-muted small">${q.quote_number ? '#' + q.quote_number + ' · ' : ''}${formatDate(q.quote_date)} · Updated ${timeAgo(q.updated_at)}</div>
-                </div>
-                <div class="text-end d-flex flex-column align-items-end gap-1">
-                    <div class="fw-bold">$${parseFloat(q.total || 0).toFixed(2)}</div>
-                    <select class="status-select status-${q.status}" onchange="updateQuoteStatus('${q.id}', this.value)">
-                        <option value="draft" ${q.status === 'draft' ? 'selected' : ''}>Draft</option>
-                        <option value="sent" ${q.status === 'sent' ? 'selected' : ''}>Sent</option>
-                        <option value="viewed" ${q.status === 'viewed' ? 'selected' : ''}>👁 Viewed</option>
-                        <option value="in_review" ${q.status === 'in_review' ? 'selected' : ''}>🔄 In Review</option>
-                        <option value="accepted" ${q.status === 'accepted' ? 'selected' : ''}>✅ Accepted</option>
-                        <option value="invoiced" ${q.status === 'invoiced' ? 'selected' : ''}>Invoiced</option>
-                        <option value="declined" ${q.status === 'declined' ? 'selected' : ''}>Declined</option>
-                    </select>
-                    <button class="btn btn-outline-danger" onclick="deleteQuote('${q.id}')">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            </div>
-            ${signatureHtml}
-            ${q.status === 'in_review' ? `<button class="btn btn-warning btn-sm w-100 mt-2" onclick="openNotesReview('${q.id}', '${(q.client_name || '').replace(/'/g, "\'")}')"><i class="fas fa-comments me-1"></i> Review Client Notes</button>` : ''}
-            <button class="btn btn-outline-info btn-sm w-100 mt-1" onclick="shareClientPortal('${(q.client_name || '').replace(/'/g, "\'")}')" title="Share client portal"><i class="fas fa-external-link-alt me-1"></i> Client Portal</button>
-            
-            ${(q.status === 'accepted' || q.status === 'invoiced') ? `<button class="btn btn-outline-warning btn-sm w-100 mt-1" onclick="openChangeOrderModal('${q.id}', '${(q.client_name||'').replace(/'/g,"\\'")}')" ><i class="fas fa-file-alt me-1"></i> Change Order</button>` : ''}
-            ${q.status === 'paid' ? `<button class="btn btn-outline-success btn-sm w-100 mt-1" onclick="openWarrantyModal('${q.id}', '${(q.client_name||'').replace(/'/g,"\\'")}')"><i class="fas fa-certificate me-1"></i> Generate Warranty</button>` : ''}
-            ${(q.status === 'sent' || q.status === 'viewed') ? `<button class="btn btn-outline-primary btn-sm w-100 mt-1" onclick="sendFollowUpReminder('${q.id}', '${(q.client_name || '').replace(/'/g, "\'")}'", '${(q.data && q.data.clientEmail) || ''}')"><i class="fas fa-bell me-1"></i> Send Follow-up</button>` : ''}
-        </div>
-    `;
-}).join('');html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QuoteDr.io - Dashboard</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        body {
-            background-color: #f8f9fa;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-        }
-        .quote-card {
-            background: #fff;
-            border: 1px solid #e9ecef;
-            border-radius: 8px;
-            padding: 1rem;
-            margin-bottom: 0.75rem;
-            transition: box-shadow 0.2s, transform 0.2s;
-        }
-        .quote-card:hover {
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            transform: translateY(-2px);
-        }
-        .status-draft { color: #6c757d; }
-        .status-sent { color: #0d6efd; }
-        .status-viewed { color: #0dcaf0; font-weight: 600; }
-        .status-in_review { color: #fd7e14; font-weight: 600; }
-        .status-accepted { color: #198754; }
-        .status-invoiced { color: #ffc107; }
-        .status-declined { color: #dc3545; }
-        .quote-card .status-select {
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-        .quote-card .btn-outline-danger {
-            font-size: 0.7rem;
-            padding: 0.25rem 0.5rem;
-        }
-        @media (max-width: 768px) {
-            .quote-card {
-                padding: 0.75rem;
-            }
-            .quote-card .d-flex {
-                flex-direction: column;
-                gap: 0.5rem;
-            }
-            .quote-card .d-flex.justify-content-between {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-            .quote-card .text-end {
-                width: 100%;
-                flex-direction: row;
-                justify-content: space-between;
-                align-items: center;
-            }
-        }
-    </style>
-</head>
-<body>
-    <nav class="navbar navbar-light px-4 py-2" style="background: #f0f4fa; border-bottom: 2px solid #d0dff0; position: relative; min-height: 64px;">
-        <div class="d-flex align-items-center gap-3">
-            <a href="quote-builder.html" class="btn btn-outline-secondary btn-sm">
-                <i class="fas fa-arrow-left"></i> Back
-            </a>
-            <a href="help.html" class="text-muted small ms-2" title="Help"><i class="fas fa-question-circle"></i> Help</a>
-        </div>
-        <div style="position: absolute; left: 50%; transform: translateX(-50%); font-weight: 700; font-size: 1.1rem; color: #0f3460;">QuoteDr.io</div>
-        <div class="d-flex align-items-center gap-2">
-            <span class="fw-bold small" id="userName"></span>
-            <a href="settings.html" class="btn btn-outline-secondary btn-sm">
-                <i class="fas fa-cog"></i> Settings
-            </a>
-        </div>
-    </nav>
-    <div class="container py-4">
-
-        <!-- Stats Cards -->
-        <div class="row mb-4">
-            <div class="col-md-3 col-sm-6 mb-3">
-                <div class="card border-primary">
-                    <div class="card-body text-center">
-                        <h5 class="card-title">Total Quotes</h5>
-                        <p class="display-6" id="totalQuotesCount">0</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3 col-sm-6 mb-3">
-                <div class="card border-success">
-                    <div class="card-body text-center">
-                        <h5 class="card-title">Accepted</h5>
-                        <p class="display-6" id="acceptedQuotesCount">0</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3 col-sm-6 mb-3">
-                <div class="card border-warning">
-                    <div class="card-body text-center">
-                        <h5 class="card-title">In Review</h5>
-                        <p class="display-6" id="inReviewCount">0</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3 col-sm-6 mb-3">
-                <div class="card border-info">
-                    <div class="card-body text-center">
-                        <h5 class="card-title">Revenue</h5>
-                        <p class="display-6" id="totalRevenue">$0.00</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Quotes List -->
-        <div class="row">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-                        <h3 class="mb-0">Recent Quotes</h3>
-                        <button class="btn btn-outline-secondary btn-sm" onclick="loadQuotes()" title="Refresh quotes"><i class="fas fa-sync-alt"></i></button>
-                        <div class="d-flex gap-2 flex-wrap">
-                            <button class="btn btn-sm btn-outline-secondary" onclick="refreshQuotes()">
-                                <i class="fas fa-sync-alt"></i> Refresh
-                            </button>
-                            <button class="btn btn-sm btn-outline-secondary" onclick="exportQuotesToCSV()">
-                                <i class="fas fa-file-export"></i> Export CSV
-                            </button>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <!-- Search and Filter Bar -->
-                        <div class="row mb-3">
-                            <div class="col-md-6 mb-2 mb-md-0">
-                                <div class="input-group">
-                                    <span class="input-group-text bg-white">
-                                        <i class="fas fa-search text-muted"></i>
-                                    </span>
-                                    <input type="text" id="searchInput" class="form-control" placeholder="Search by client name or quote number..." oninput="filterQuotes()">
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <select id="statusFilter" class="form-select" onchange="filterQuotes()">
-                                    <option value="all">All Statuses</option>
-                                    <option value="draft">Draft</option>
-                                    <option value="sent">Sent</option>
-                                    <option value="accepted">Accepted</option>
-                                    <option value="invoiced">Invoiced</option>
-                                    <option value="declined">Declined</option>
-                                </select>
-                            </div>
-                            <div class="col-md-3 text-md-end">
-                                <span id="filteredCount" class="text-muted small"></span>
-                            </div>
-                        </div>
-
-                        
-            <!-- View Toggle -->
             <div class="mb-3 d-flex justify-content-between align-items-center">
                 <div class="btn-group btn-group-sm" id="viewToggle">
     <button class="btn btn-primary" id="listViewBtn" onclick="setView('list')"><i class="fas fa-list me-1"></i>List</button>
@@ -809,74 +415,14 @@
             if (modal) modal.hide();
         }
 
-        <script>
-async function shareClientPortal(clientName) {
-  const userId = getCurrentUserId(); // Assuming this exists
-  const response = await supabase
-    .from('quotes')
-    .select('data.portal_pin')
-    .eq('client_name', clientName)
-    .eq('user_id', userId)
-    .single();
-  
-  let pin;
-  if (response.data && response.data.data && response.data.data.portal_pin) {
-    pin = response.data.data.portal_pin;
-  } else {
-    pin = Math.floor(Math.random() * 9000) + 1000; // 4-digit number
-  }
-  
-  await _savePortalPin(clientName, userId, pin);
-  
-  const portalUrl = `${window.location.origin}/client-portal.html?client=${encodeURIComponent(clientName)}&contractor=${userId}`;
-  
-  document.getElementById('portalClientName').textContent = clientName;
-  document.getElementById('portalUrlDisplay').value = portalUrl;
-  document.getElementById('portalPinDisplay').textContent = pin;
-  
-  const modal = new bootstrap.Modal(document.getElementById('portalShareModal'));
-  modal.show();
-}
-
-function copyPortalUrl() {
-  const urlInput = document.getElementById('portalUrlDisplay');
-  urlInput.select();
-  document.execCommand('copy');
-  showToast('Link copied to clipboard!');
-}
-
-function copyPortalBoth() {
-  const url = document.getElementById('portalUrlDisplay').value;
-  const pin = document.getElementById('portalPinDisplay').textContent;
-  const text = `Portal Link: ${url}\nYour PIN: ${pin}`;
-  navigator.clipboard.writeText(text).then(() => {
-    showToast('Link and PIN copied to clipboard!');
-  });
-}
-
-async function resetPortalPin() {
-  const clientName = document.getElementById('portalClientName').textContent;
-  const userId = getCurrentUserId();
-  const newPin = Math.floor(Math.random() * 9000) + 1000;
-  
-  await _savePortalPin(clientName, userId, newPin);
-  
-  document.getElementById('portalPinDisplay').textContent = newPin;
-}
-
-async function _savePortalPin(clientName, userId, pin) {
-  const { error } = await supabase
-    .from('quotes')
-    .update({ 'data.portal_pin': pin })
-    .eq('client_name', clientName)
-    .eq('user_id', userId);
-  
-  if (error) {
-    console.error('Error saving PIN:', error);
-    showToast('Failed to save PIN');
-  }
-}
-</script>
+        async function shareClientPortal(clientName) {
+            const { data } = await _supabase.auth.getSession();
+            const userId = data?.session?.user?.id;
+            if (!userId) { alert('Please log in first.'); return; }
+            const url = `https://quotedr.io/client-portal.html?client=${encodeURIComponent(clientName)}&contractor=${userId}`;
+            await navigator.clipboard.writeText(url).catch(() => {});
+            alert('Client portal link copied to clipboard!\n\n' + url);
+        }
 
         async function sendFollowUpReminder(quoteId, clientName, savedEmail) {
             var quote = allQuotes.find(function(q) { return q.id === quoteId; });
@@ -980,92 +526,887 @@ async function _savePortalPin(clientName, userId, pin) {
     </script>
     <script src="ai-assistant.js"></script>
     <script>
-        // === KANBAN VIEW ===
         window.currentQuotes = [];
-                
-                function setView(mode) {
-                    if (mode === 'list') {
-                        document.getElementById('quotesList').style.display = 'block';
-                        document.getElementById('kanbanBoard').style.display = 'none';
-                        document.getElementById('listViewBtn').classList.add('btn-primary');
-                        document.getElementById('listViewBtn').classList.remove('btn-outline-primary');
-                        document.getElementById('kanbanViewBtn').classList.add('btn-outline-primary');
-                        document.getElementById('kanbanViewBtn').classList.remove('btn-primary');
-                    } else {
-                        document.getElementById('quotesList').style.display = 'none';
-                        document.getElementById('kanbanBoard').style.display = 'block';
-                        document.getElementById('listViewBtn').classList.add('btn-outline-primary');
-                        document.getElementById('listViewBtn').classList.remove('btn-primary');
-                        document.getElementById('kanbanViewBtn').classList.add('btn-primary');
-                        document.getElementById('kanbanViewBtn').classList.remove('btn-outline-primary');
-                        renderKanban(window.currentQuotes);
-                    }
-                    localStorage.setItem('ald_dashboard_view', mode);
-                }
-                
-                function renderKanban(quotes) {
-                    const columns = [
-                        { status: 'draft', label: 'Draft', color: '#6c757d', icon: 'fa-pencil' },
-                        { status: 'sent', label: 'Sent', color: '#0d6efd', icon: 'fa-paper-plane' },
-                        { status: 'viewed', label: 'Viewed', color: '#6f42c1', icon: 'fa-eye' },
-                        { status: 'in_review', label: 'In Review', color: '#ffc107', icon: 'fa-comments' },
-                        { status: 'accepted', label: 'Accepted', color: '#198754', icon: 'fa-check-circle' },
-                        { status: 'invoiced', label: 'Invoiced', color: '#fd7e14', icon: 'fa-file-invoice-dollar' },
-                        { status: 'paid', label: 'Paid', color: '#006400', icon: 'fa-dollar-sign' }
-                    ];
-                
-                    const kanbanColumns = document.getElementById('kanbanColumns');
-                    kanbanColumns.innerHTML = '';
-                
-                    columns.forEach(col => {
-                        const statusQuotes = quotes.filter(q => q.status === col.status);
-                        const countBadge = `<span class="badge bg-white text-dark ms-1">${statusQuotes.length}</span>`;
                         
-                        let cardsHtml = '';
-                        if (statusQuotes.length === 0) {
-                            cardsHtml = '<div class="text-center text-muted small py-3">No quotes</div>';
-                        } else {
-                            statusQuotes.forEach(q => {
-                                const timeAgo = getTimeAgo(q.updated_at);
-                                cardsHtml += `
-                                    <div class="kanban-card mb-2 p-2 bg-white rounded shadow-sm" style="cursor:pointer; border-left:3px solid ${col.color};" onclick="openQuote('${q.id}')">
-                                        <div class="fw-semibold small">${q.client_name}</div>
-                                        <div class="text-muted" style="font-size:0.75rem;">#${q.quote_number} · $${q.total}</div>
-                                        <div class="text-muted" style="font-size:0.7rem;">${timeAgo}</div>
+                        function setView(mode) {
+                            if (mode === 'list') {
+                                document.getElementById('quotesList').style.display = 'block';
+                                document.getElementById('kanbanBoard').style.display = 'none';
+                                document.getElementById('listViewBtn').classList.add('btn-primary');
+                                document.getElementById('listViewBtn').classList.remove('btn-outline-primary');
+                                document.getElementById('kanbanViewBtn').classList.add('btn-outline-primary');
+                                document.getElementById('kanbanViewBtn').classList.remove('btn-primary');
+                            } else {
+                                document.getElementById('quotesList').style.display = 'none';
+                                document.getElementById('kanbanBoard').style.display = 'block';
+                                document.getElementById('listViewBtn').classList.add('btn-outline-primary');
+                                document.getElementById('listViewBtn').classList.remove('btn-primary');
+                                document.getElementById('kanbanViewBtn').classList.add('btn-primary');
+                                document.getElementById('kanbanViewBtn').classList.remove('btn-outline-primary');
+                                renderKanban(window.currentQuotes);
+                            }
+                            localStorage.setItem('ald_dashboard_view', mode);
+                        }
+                        
+                        function renderKanban(quotes) {
+                            const columns = [
+                                { status: 'draft', label: 'Draft', color: '#6c757d', icon: 'fa-pencil' },
+                                { status: 'sent', label: 'Sent', color: '#0d6efd', icon: 'fa-paper-plane' },
+                                { status: 'viewed', label: 'Viewed', color: '#6f42c1', icon: 'fa-eye' },
+                                { status: 'in_review', label: 'In Review', color: '#ffc107', icon: 'fa-comments' },
+                                { status: 'accepted', label: 'Accepted', color: '#198754', icon: 'fa-check-circle' },
+                                { status: 'invoiced', label: 'Invoiced', color: '#fd7e14', icon: 'fa-file-invoice-dollar' },
+                                { status: 'paid', label: 'Paid', color: '#006400', icon: 'fa-dollar-sign' }
+                            ];
+                        
+                            const kanbanColumns = document.getElementById('kanbanColumns');
+                            kanbanColumns.innerHTML = '';
+                        
+                            columns.forEach(col => {
+                                const statusQuotes = quotes.filter(q => q.status === col.status);
+                                const countBadge = `<span class="badge bg-white text-dark ms-1">${statusQuotes.length}</span>`;
+                                
+                                let cardsHtml = '';
+                                if (statusQuotes.length === 0) {
+                                    cardsHtml = '<div class="text-center text-muted small py-3">No quotes</div>';
+                                } else {
+                                    statusQuotes.forEach(q => {
+                                        const timeAgo = getTimeAgo(q.updated_at);
+                                        cardsHtml += `
+                                            <div class="kanban-card mb-2 p-2 bg-white rounded shadow-sm" style="cursor:pointer; border-left:3px solid ${col.color};" onclick="openQuote('${q.id}')">
+                                                <div class="fw-semibold small">${q.client_name}</div>
+                                                <div class="text-muted" style="font-size:0.75rem;">#${q.quote_number} · $${q.total}</div>
+                                                <div class="text-muted" style="font-size:0.7rem;">${timeAgo}</div>
+                                            </div>
+                                        `;
+                                    });
+                                }
+                        
+                                const columnHtml = `
+                                    <div class="kanban-col" style="min-width:200px; max-width:220px;">
+                                        <div class="kanban-col-header" style="background:${col.color}; color:white; border-radius:8px 8px 0 0; padding:8px 12px;">
+                                            <i class="fas ${col.icon} me-1"></i>${col.label} ${countBadge}
+                                        </div>
+                                        <div class="kanban-col-body" style="background:#f8f9fa; border:1px solid #dee2e6; border-top:none; border-radius:0 0 8px 8px; padding:8px; min-height:200px;">
+                                            ${cardsHtml}
+                                        </div>
                                     </div>
                                 `;
+                                kanbanColumns.innerHTML += columnHtml;
                             });
                         }
-                
-                        const columnHtml = `
-                            <div class="kanban-col" style="min-width:200px; max-width:220px;">
-                                <div class="kanban-col-header" style="background:${col.color}; color:white; border-radius:8px 8px 0 0; padding:8px 12px;">
-                                    <i class="fas ${col.icon} me-1"></i>${col.label} ${countBadge}
+                        
+                        function getTimeAgo(dateString) {
+                            const date = new Date(dateString);
+                            const now = new Date();
+                            const diffInHours = Math.floor((now - date) / (1000 * 60 * 60));
+                            
+                            if (diffInHours < 24) {
+                                return `${diffInHours}h ago`;
+                            } else {
+                                return date.toLocaleDateString();
+                            }
+                        }
+                        
+        
+            
+        
+                // ===== KANBAN + FEATURES =====
+                window.currentQuotes = [];
+                                                
+                                                function setView(mode) {
+                                                    if (mode === 'list') {
+                                                        document.getElementById('quotesList').style.display = 'block';
+                                                        document.getElementById('kanbanBoard').style.display = 'none';
+                                                        document.getElementById('listViewBtn').classList.add('btn-primary');
+                                                        document.getElementById('listViewBtn').classList.remove('btn-outline-primary');
+                                                        document.getElementById('kanbanViewBtn').classList.add('btn-outline-primary');
+                                                        document.getElementById('kanbanViewBtn').classList.remove('btn-primary');
+                                                    } else {
+                                                        document.getElementById('quotesList').style.display = 'none';
+                                                        document.getElementById('kanbanBoard').style.display = 'block';
+                                                        document.getElementById('listViewBtn').classList.add('btn-outline-primary');
+                                                        document.getElementById('listViewBtn').classList.remove('btn-primary');
+                                                        document.getElementById('kanbanViewBtn').classList.add('btn-primary');
+                                                        document.getElementById('kanbanViewBtn').classList.remove('btn-outline-primary');
+                                                        renderKanban(window.currentQuotes);
+                                                    }
+                                                    localStorage.setItem('ald_dashboard_view', mode);
+                                                }
+                                                
+                                                function renderKanban(quotes) {
+                                                    const columns = [
+                                                        { status: 'draft', label: 'Draft', color: '#6c757d', icon: 'fa-pencil' },
+                                                        { status: 'sent', label: 'Sent', color: '#0d6efd', icon: 'fa-paper-plane' },
+                                                        { status: 'viewed', label: 'Viewed', color: '#6f42c1', icon: 'fa-eye' },
+                                                        { status: 'in_review', label: 'In Review', color: '#ffc107', icon: 'fa-comments' },
+                                                        { status: 'accepted', label: 'Accepted', color: '#198754', icon: 'fa-check-circle' },
+                                                        { status: 'invoiced', label: 'Invoiced', color: '#fd7e14', icon: 'fa-file-invoice-dollar' },
+                                                        { status: 'paid', label: 'Paid', color: '#006400', icon: 'fa-dollar-sign' }
+                                                    ];
+                                                
+                                                    const kanbanColumns = document.getElementById('kanbanColumns');
+                                                    kanbanColumns.innerHTML = '';
+                                                
+                                                    columns.forEach(col => {
+                                                        const statusQuotes = quotes.filter(q => q.status === col.status);
+                                                        const countBadge = `<span class="badge bg-white text-dark ms-1">${statusQuotes.length}</span>`;
+                                                        
+                                                        let cardsHtml = '';
+                                                        if (statusQuotes.length === 0) {
+                                                            cardsHtml = '<div class="text-center text-muted small py-3">No quotes</div>';
+                                                        } else {
+                                                            statusQuotes.forEach(q => {
+                                                                const timeAgo = getTimeAgo(q.updated_at);
+                                                                cardsHtml += `
+                                                                    <div class="kanban-card mb-2 p-2 bg-white rounded shadow-sm" style="cursor:pointer; border-left:3px solid ${col.color};" onclick="openQuote('${q.id}')">
+                                                                        <div class="fw-semibold small">${q.client_name}</div>
+                                                                        <div class="text-muted" style="font-size:0.75rem;">#${q.quote_number} · $${q.total}</div>
+                                                                        <div class="text-muted" style="font-size:0.7rem;">${timeAgo}</div>
+                                                                    </div>
+                                                                `;
+                                                            });
+                                                        }
+                                                
+                                                        const columnHtml = `
+                                                            <div class="kanban-col" style="min-width:200px; max-width:220px;">
+                                                                <div class="kanban-col-header" style="background:${col.color}; color:white; border-radius:8px 8px 0 0; padding:8px 12px;">
+                                                                    <i class="fas ${col.icon} me-1"></i>${col.label} ${countBadge}
+                                                                </div>
+                                                                <div class="kanban-col-body" style="background:#f8f9fa; border:1px solid #dee2e6; border-top:none; border-radius:0 0 8px 8px; padding:8px; min-height:200px;">
+                                                                    ${cardsHtml}
+                                                                </div>
+                                                            </div>
+                                                        `;
+                                                        kanbanColumns.innerHTML += columnHtml;
+                                                    });
+                                                }
+                                                
+                                                function getTimeAgo(dateString) {
+                                                    const date = new Date(dateString);
+                                                    const now = new Date();
+                                                    const diffInHours = Math.floor((now - date) / (1000 * 60 * 60));
+                                                    
+                                                    if (diffInHours < 24) {
+                                                        return `${diffInHours}h ago`;
+                                                    } else {
+                                                        return date.toLocaleDateString();
+                                                    }
+                                                }
+                        
+                                function renderBusinessInsights(quotes) {
+                                  if (!quotes || quotes.length === 0) return;
+                                
+                                  const now = new Date();
+                                  const currentYear = now.getFullYear();
+                                  const currentMonth = now.getMonth();
+                                
+                                  let revenueThisMonth = 0;
+                                  let revenueThisYear = 0;
+                                  let totalQuotes = 0;
+                                  let acceptedQuotes = 0;
+                                  let paidQuotes = 0;
+                                  let clientSpend = {};
+                                  let categoryRevenue = {};
+                                
+                                  quotes.forEach(quote => {
+                                    const quoteDate = new Date(quote.date);
+                                    const quoteTotal = calculateQuoteTotal(quote);
+                                
+                                    if (quote.status === 'paid') {
+                                      if (quoteDate.getFullYear() === currentYear && quoteDate.getMonth() === currentMonth) {
+                                        revenueThisMonth += quoteTotal;
+                                      }
+                                      if (quoteDate.getFullYear() === currentYear) {
+                                        revenueThisYear += quoteTotal;
+                                      }
+                                    }
+                                
+                                    totalQuotes++;
+                                    if (quote.status === 'accepted') acceptedQuotes++;
+                                    if (quote.status === 'paid') paidQuotes++;
+                                
+                                    // Client spend
+                                    const client = quote.client || 'Unknown';
+                                    clientSpend[client] = (clientSpend[client] || 0) + quoteTotal;
+                                
+                                    // Category revenue
+                                    if (quote.rooms && Array.isArray(quote.rooms)) {
+                                      quote.rooms.forEach(room => {
+                                        if (room.items && Array.isArray(room.items)) {
+                                          room.items.forEach(item => {
+                                            const category = item.category || 'Uncategorized';
+                                            categoryRevenue[category] = (categoryRevenue[category] || 0) + (item.price || 0) * (item.quantity || 1);
+                                          });
+                                        }
+                                      });
+                                    }
+                                  });
+                                
+                                  // Calculate averages and rates
+                                  const avgQuoteValue = totalQuotes > 0 ? revenueThisYear / totalQuotes : 0;
+                                  const acceptanceRate = totalQuotes > 0 ? Math.round((acceptedQuotes / totalQuotes) * 100) : 0;
+                                
+                                  // Top client
+                                  let topClient = '-';
+                                  if (Object.keys(clientSpend).length > 0) {
+                                    topClient = Object.entries(clientSpend).reduce((a, b) => a[1] > b[1] ? a : b)[0];
+                                  }
+                                
+                                  // Best category
+                                  let bestCategory = '-';
+                                  if (Object.keys(categoryRevenue).length > 0) {
+                                    bestCategory = Object.entries(categoryRevenue).reduce((a, b) => a[1] > b[1] ? a : b)[0];
+                                  }
+                                
+                                  // Update DOM
+                                  document.getElementById('revenueThisMonth').textContent = revenueThisMonth.toFixed(2);
+                                  document.getElementById('revenueThisYear').textContent = revenueThisYear.toFixed(2);
+                                  document.getElementById('avgQuoteValue').textContent = avgQuoteValue.toFixed(2);
+                                  document.getElementById('acceptanceRate').textContent = acceptanceRate;
+                                  document.getElementById('topClient').textContent = topClient;
+                                  document.getElementById('bestCategory').textContent = bestCategory;
+                                }
+                                
+                                function calculateQuoteTotal(quote) {
+                                  let total = 0;
+                                  if (quote.rooms && Array.isArray(quote.rooms)) {
+                                    quote.rooms.forEach(room => {
+                                      if (room.items && Array.isArray(room.items)) {
+                                        room.items.forEach(item => {
+                                          const itemTotal = (item.price || 0) * (item.quantity || 1);
+                                          total += itemTotal;
+                                        });
+                                      }
+                                    });
+                                  }
+                                  return total;
+                                }
+                                
+                                // Initialize insights on load
+                                document.addEventListener('DOMContentLoaded', function() {
+                                  if (window.currentQuotes) {
+                                    renderBusinessInsights(window.currentQuotes);
+                                  }
+                                });
+                                
+                                        // === BUSINESS INSIGHTS ===
+function renderBusinessInsights(quotes) {
+                                          if (!quotes || quotes.length === 0) return;
+                                        
+                                          const now = new Date();
+                                          const currentYear = now.getFullYear();
+                                          const currentMonth = now.getMonth();
+                                        
+                                          let revenueThisMonth = 0;
+                                          let revenueThisYear = 0;
+                                          let totalQuotes = 0;
+                                          let acceptedQuotes = 0;
+                                          let paidQuotes = 0;
+                                          let clientSpend = {};
+                                          let categoryRevenue = {};
+                                        
+                                          quotes.forEach(quote => {
+                                            const quoteDate = new Date(quote.date);
+                                            const quoteTotal = calculateQuoteTotal(quote);
+                                        
+                                            if (quote.status === 'paid') {
+                                              if (quoteDate.getFullYear() === currentYear && quoteDate.getMonth() === currentMonth) {
+                                                revenueThisMonth += quoteTotal;
+                                              }
+                                              if (quoteDate.getFullYear() === currentYear) {
+                                                revenueThisYear += quoteTotal;
+                                              }
+                                            }
+                                        
+                                            totalQuotes++;
+                                            if (quote.status === 'accepted') acceptedQuotes++;
+                                            if (quote.status === 'paid') paidQuotes++;
+                                        
+                                            // Client spend
+                                            const client = quote.client || 'Unknown';
+                                            clientSpend[client] = (clientSpend[client] || 0) + quoteTotal;
+                                        
+                                            // Category revenue
+                                            if (quote.rooms && Array.isArray(quote.rooms)) {
+                                              quote.rooms.forEach(room => {
+                                                if (room.items && Array.isArray(room.items)) {
+                                                  room.items.forEach(item => {
+                                                    const category = item.category || 'Uncategorized';
+                                                    categoryRevenue[category] = (categoryRevenue[category] || 0) + (item.price || 0) * (item.quantity || 1);
+                                                  });
+                                                }
+                                              });
+                                            }
+                                          });
+                                        
+                                          // Calculate averages and rates
+                                          const avgQuoteValue = totalQuotes > 0 ? revenueThisYear / totalQuotes : 0;
+                                          const acceptanceRate = totalQuotes > 0 ? Math.round((acceptedQuotes / totalQuotes) * 100) : 0;
+                                        
+                                          // Top client
+                                          let topClient = '-';
+                                          if (Object.keys(clientSpend).length > 0) {
+                                            topClient = Object.entries(clientSpend).reduce((a, b) => a[1] > b[1] ? a : b)[0];
+                                          }
+                                        
+                                          // Best category
+                                          let bestCategory = '-';
+                                          if (Object.keys(categoryRevenue).length > 0) {
+                                            bestCategory = Object.entries(categoryRevenue).reduce((a, b) => a[1] > b[1] ? a : b)[0];
+                                          }
+                                        
+                                          // Update DOM
+                                          document.getElementById('revenueThisMonth').textContent = revenueThisMonth.toFixed(2);
+                                          document.getElementById('revenueThisYear').textContent = revenueThisYear.toFixed(2);
+                                          document.getElementById('avgQuoteValue').textContent = avgQuoteValue.toFixed(2);
+                                          document.getElementById('acceptanceRate').textContent = acceptanceRate;
+                                          document.getElementById('topClient').textContent = topClient;
+                                          document.getElementById('bestCategory').textContent = bestCategory;
+                                        }
+                                        
+                                        function calculateQuoteTotal(quote) {
+                                          let total = 0;
+                                          if (quote.rooms && Array.isArray(quote.rooms)) {
+                                            quote.rooms.forEach(room => {
+                                              if (room.items && Array.isArray(room.items)) {
+                                                room.items.forEach(item => {
+                                                  const itemTotal = (item.price || 0) * (item.quantity || 1);
+                                                  total += itemTotal;
+                                                });
+                                              }
+                                            });
+                                          }
+                                          return total;
+                                        }
+                                        
+                                        // Initialize insights on load
+                                        document.addEventListener('DOMContentLoaded', function() {
+                                          if (window.currentQuotes) {
+                                            renderBusinessInsights(window.currentQuotes);
+                                          }
+                                        });
+                        
+                                let currentQuoteForWarranty = null;
+                                        
+                                        function openWarrantyModal(button) {
+                                          const quoteCard = button.closest('.card');
+                                          const quoteId = quoteCard.dataset.quoteId;
+                                          
+                                          // Find the quote in currentQuotes
+                                          const quote = window.currentQuotes.find(q => q.id === quoteId);
+                                          if (!quote || quote.status !== 'paid') return;
+                                        
+                                          currentQuoteForWarranty = quote;
+                                          
+                                          // Pre-fill the covered text from scope
+                                          document.getElementById('coveredText').value = quote.scope || '';
+                                          
+                                          // Show modal
+                                          const modal = new bootstrap.Modal(document.getElementById('warrantyModal'));
+                                          modal.show();
+                                        }
+                                        
+                                        function generateWarrantyPDF() {
+                                          if (!currentQuoteForWarranty) return;
+                                        
+                                          const period = document.getElementById('warrantyPeriod').value;
+                                          const covered = document.getElementById('coveredText').value;
+                                          const notCovered = document.getElementById('notCoveredText').value;
+                                          const contractor = document.getElementById('contractorSignature').value || 'Contractor Name';
+                                        
+                                          // Generate random certificate number
+                                          const certNumber = Math.floor(100000 + Math.random() * 900000);
+                                        
+                                          // Create PDF content
+                                          const printWindow = window.open('', '_blank');
+                                          printWindow.document.write(`
+                                            <!DOCTYPE html>
+                                            <html>
+                                            <head>
+                                              <title>Warranty Certificate</title>
+                                              <style>
+                                                body { font-family: Arial, sans-serif; margin: 40px; }
+                                                .header { text-align: center; margin-bottom: 30px; }
+                                                .logo { width: 100px; height: auto; margin-bottom: 20px; }
+                                                h1 { color: #2c3e50; font-size: 24px; }
+                                                .section { margin-bottom: 20px; }
+                                                .highlight { font-weight: bold; }
+                                                .signature-line { margin-top: 60px; text-align: center; }
+                                                .cert-number { text-align: right; font-size: 12px; color: #7f8c8d; }
+                                              </style>
+                                            </head>
+                                            <body>
+                                              <div class="header">
+                                                <h1>LIMITED WARRANTY CERTIFICATE</h1>
+                                                <p class="cert-number">Certificate #: ${certNumber}</p>
+                                              </div>
+                                        
+                                              <div class="section">
+                                                <p><span class="highlight">Client:</span> ${currentQuoteForWarranty.client || 'N/A'}</p>
+                                                <p><span class="highlight">Project Address:</span> ${currentQuoteForWarranty.address || 'N/A'}</p>
+                                                <p><span class="highlight">Completion Date:</span> ${currentQuoteForWarranty.date || 'N/A'}</p>
+                                              </div>
+                                        
+                                              <div class="section">
+                                                <p><span class="highlight">Warranty Period:</span> ${period}</p>
+                                                <p><span class="highlight">Coverage:</span></p>
+                                                <p>${covered || 'N/A'}</p>
+                                                <p><span class="highlight">Not Covered:</span></p>
+                                                <p>${notCovered || 'N/A'}</p>
+                                              </div>
+                                        
+                                              <div class="signature-line">
+                                                <p>Authorized by: ${contractor}</p>
+                                                <p>Signature _________________________</p>
+                                              </div>
+                                            
+                                <div class="modal fade" id="changeOrderModal" tabindex="-1">
+                                  <div class="modal-dialog modal-lg">
+                                    <div class="modal-content">
+                                      <div class="modal-header">
+                                        <h5 class="modal-title">Change Order</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                      </div>
+                                      <div class="modal-body">
+                                        <ul class="nav nav-tabs" id="coTabs" role="tablist">
+                                          <li class="nav-item" role="presentation">
+                                            <button class="nav-link active" id="new-tab" data-bs-toggle="tab" data-bs-target="#new-co" type="button">New Change Order</button>
+                                          </li>
+                                          <li class="nav-item" role="presentation">
+                                            <button class="nav-link" id="view-tab" data-bs-toggle="tab" data-bs-target="#view-co" type="button">View Change Orders</button>
+                                          </li>
+                                        </ul>
+                                        <div class="tab-content mt-3" id="coTabsContent">
+                                          <!-- New CO Tab -->
+                                          <div class="tab-pane fade show active" id="new-co" role="tabpanel">
+                                            <form id="newCoForm">
+                                              <div class="mb-3">
+                                                <label class="form-label">Description</label>
+                                                <textarea class="form-control" id="coDescription" required></textarea>
+                                              </div>
+                                              <div class="mb-3">
+                                                <label class="form-label">Reason</label>
+                                                <select class="form-select" id="coReason" required>
+                                                  <option value="">Select reason</option>
+                                                  <option value="Client requested">Client requested</option>
+                                                  <option value="Unforeseen conditions">Unforeseen conditions</option>
+                                                  <option value="Design change">Design change</option>
+                                                  <option value="Other">Other</option>
+                                                </select>
+                                              </div>
+                                              <div class="mb-3">
+                                                <label class="form-label">Line Items</label>
+                                                <table class="table table-sm" id="coItemsTable">
+                                                  <thead>
+                                                    <tr>
+                                                      <th>Description</th>
+                                                      <th>Qty</th>
+                                                      <th>Unit</th>
+                                                      <th>Unit Price</th>
+                                                      <th>Total</th>
+                                                      <th>Action</th>
+                                                    </tr>
+                                                  </thead>
+                                                  <tbody id="coItemsBody">
+                                                    <tr>
+                                                      <td><input type="text" class="form-control item-desc" required></td>
+                                                      <td><input type="number" class="form-control item-qty" value="1" min="0"></td>
+                                                      <td><input type="text" class="form-control item-unit" value="each"></td>
+                                                      <td><input type="number" class="form-control item-price" min="0" step="0.01"></td>
+                                                      <td><input type="text" class="form-control item-total" readonly></td>
+                                                      <td><button type="button" class="btn btn-danger btn-sm" onclick="removeChangeOrderItem(this)">Remove</button></td>
+                                                    </tr>
+                                                  </tbody>
+                                                </table>
+                                                <button type="button" class="btn btn-secondary btn-sm" onclick="addChangeOrderItem()">Add Item</button>
+                                              </div>
+                                              <div class="mb-3">
+                                                <label class="form-label">Notes</label>
+                                                <textarea class="form-control" id="coNotes"></textarea>
+                                              </div>
+                                              <button type="submit" class="btn btn-primary">Add Change Order</button>
+                                            </form>
+                                          </div>
+                                          
+                                          <!-- View CO Tab -->
+                                          <div class="tab-pane fade" id="view-co" role="tabpanel">
+                                            <div id="coList"></div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
                                 </div>
-                                <div class="kanban-col-body" style="background:#f8f9fa; border:1px solid #dee2e6; border-top:none; border-radius:0 0 8px 8px; padding:8px; min-height:200px;">
-                                    ${cardsHtml}
+                                
+                                javascript
+                                
+                                <div class="modal fade" id="portalShareModal" tabindex="-1">
+                                  <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content">
+                                      <div class="modal-header" style="background:#1a2940; color:white;">
+                                        <h5 class="modal-title"><i class="fas fa-external-link-alt me-2"></i>Client Portal Access</h5>
+                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                      </div>
+                                      <div class="modal-body text-center">
+                                        <p class="text-muted mb-1">Share this link with <strong id="portalClientName"></strong>:</p>
+                                        <div class="input-group mb-3">
+                                          <input type="text" class="form-control form-control-sm" id="portalUrlDisplay" readonly>
+                                          <button class="btn btn-outline-secondary btn-sm" onclick="copyPortalUrl()"><i class="fas fa-copy"></i></button>
+                                        </div>
+                                        <div class="mb-3">
+                                          <div class="text-muted small mb-1">Client PIN (they need this to log in):</div>
+                                          <div id="portalPinDisplay" style="font-size:2.5rem; font-weight:bold; letter-spacing:0.5rem; color:#1a2940; background:#f8f9fa; border-radius:8px; padding:12px 24px; display:inline-block;"></div>
+                                        </div>
+                                        <div class="d-grid gap-2">
+                                          <button class="btn btn-primary" onclick="copyPortalBoth()"><i class="fas fa-copy me-1"></i>Copy Link + PIN</button>
+                                          <button class="btn btn-outline-secondary btn-sm" onclick="resetPortalPin()"><i class="fas fa-sync me-1"></i>Reset PIN (generate new)</button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
                                 </div>
-                            </div>
-                        `;
-                        kanbanColumns.innerHTML += columnHtml;
-                    });
-                }
-                
-                function getTimeAgo(dateString) {
-                    const date = new Date(dateString);
-                    const now = new Date();
-                    const diffInHours = Math.floor((now - date) / (1000 * 60 * 60));
-                    
-                    if (diffInHours < 24) {
-                        return `${diffInHours}h ago`;
-                    } else {
-                        return date.toLocaleDateString();
-                    }
-                }
-                
-
+                                </body>
+                                            </html>
+                                          `);
+                                          printWindow.document.close();
+                                          printWindow.focus();
+                                          printWindow.print();
+                                        }
+                        
+                                let currentQuoteId = '';
+                                        let currentClientName = '';
+                                        
+                                        function openChangeOrderModal(quoteId, clientName) {
+                                          currentQuoteId = quoteId;
+                                          currentClientName = clientName;
+                                          
+                                          window._supabase
+                                            .from('quotes')
+                                            .select('data')
+                                            .eq('id', quoteId)
+                                            .single()
+                                            .then(({ data, error }) => {
+                                              if (error) throw error;
+                                              
+                                              const quote = data;
+                                              const changeOrders = quote.data?.change_orders || [];
+                                              
+                                              // Load existing COs in View tab
+                                              renderChangeOrders(changeOrders);
+                                              
+                                              // Show modal
+                                              const modal = new bootstrap.Modal(document.getElementById('changeOrderModal'));
+                                              modal.show();
+                                            })
+                                            .catch(err => console.error(err));
+                                        }
+                                        
+                                        function addChangeOrderItem() {
+                                          const tbody = document.getElementById('coItemsBody');
+                                          const newRow = document.createElement('tr');
+                                          
+                                          newRow.innerHTML = `
+                                            <td><input type="text" class="form-control item-desc" required></td>
+                                            <td><input type="number" class="form-control item-qty" value="1" min="0"></td>
+                                            <td><input type="text" class="form-control item-unit" value="each"></td>
+                                            <td><input type="number" class="form-control item-price" min="0" step="0.01"></td>
+                                            <td><input type="text" class="form-control item-total" readonly></td>
+                                            <td><button type="button" class="btn btn-danger btn-sm" onclick="removeChangeOrderItem(this)">Remove</button></td>
+                                          `;
+                                          
+                                          tbody.appendChild(newRow);
+                                          
+                                          // Add event listeners for auto-calculation
+                                          const inputs = newRow.querySelectorAll('input');
+                                          inputs.forEach(input => {
+                                            if (input.classList.contains('item-qty') || input.classList.contains('item-price')) {
+                                              input.addEventListener('input', calculateItemTotal);
+                                            }
+                                          });
+                                        }
+                                        
+                                        function removeChangeOrderItem(btn) {
+                                          btn.closest('tr').remove();
+                                          calculateTotals();
+                                        }
+                                        
+                                        function calculateItemTotal() {
+                                          const row = this.closest('tr');
+                                          const qtyInput = row.querySelector('.item-qty');
+                                          const priceInput = row.querySelector('.item-price');
+                                          const totalInput = row.querySelector('.item-total');
+                                          
+                                          const qty = parseFloat(qtyInput.value) || 0;
+                                          const price = parseFloat(priceInput.value) || 0;
+                                          const total = qty * price;
+                                          
+                                          totalInput.value = total.toFixed(2);
+                                          calculateTotals();
+                                        }
+                                        
+                                        function calculateTotals() {
+                                          let subtotal = 0;
+                                          document.querySelectorAll('#coItemsBody tr').forEach(row => {
+                                            const totalInput = row.querySelector('.item-total');
+                                            const total = parseFloat(totalInput.value) || 0;
+                                            subtotal += total;
+                                          });
+                                          
+                                          // Update form's subtotal display if needed
+                                        }
+                                        
+                                        document.getElementById('newCoForm').addEventListener('submit', function(e) {
+                                          e.preventDefault();
+                                          submitChangeOrder(currentQuoteId);
+                                        });
+                                        
+                                        function submitChangeOrder(quoteId) {
+                                          const description = document.getElementById('coDescription').value;
+                                          const reason = document.getElementById('coReason').value;
+                                          const notes = document.getElementById('coNotes').value;
+                                          
+                                          // Collect items
+                                          const items = [];
+                                          let subtotal = 0;
+                                          
+                                          document.querySelectorAll('#coItemsBody tr').forEach(row => {
+                                            const desc = row.querySelector('.item-desc').value;
+                                            const qty = parseFloat(row.querySelector('.item-qty').value) || 0;
+                                            const unit = row.querySelector('.item-unit').value;
+                                            const price = parseFloat(row.querySelector('.item-price').value) || 0;
+                                            const total = qty * price;
+                                            
+                                            if (desc && !isNaN(qty) && !isNaN(price)) {
+                                              items.push({ description: desc, qty, unit, price, total });
+                                              subtotal += total;
+                                            }
+                                          });
+                                          
+                                          // Generate CO number
+                                          window._supabase
+                                            .from('quotes')
+                                            .select('data')
+                                            .eq('id', quoteId)
+                                            .single()
+                                            .then(({ data, error }) => {
+                                              if (error) throw error;
+                                              
+                                              const quote = data;
+                                              const changeOrders = quote.data?.change_orders || [];
+                                              const nextNumber = changeOrders.length + 1;
+                                              const coNumber = `CO-${String(nextNumber).padStart(3, '0')}`;
+                                              
+                                              const newCo = {
+                                                id: `co_${Date.now()}`,
+                                                number: coNumber,
+                                                created_at: new Date().toISOString(),
+                                                description,
+                                                reason,
+                                                items,
+                                                subtotal,
+                                                status: 'pending',
+                                                notes
+                                              };
+                                              
+                                              // Update quote with new CO
+                                              const updatedChangeOrders = [...changeOrders, newCo];
+                                              const updatedData = { ...quote.data, change_orders: updatedChangeOrders };
+                                              
+                                              return window._supabase
+                                                .from('quotes')
+                                                .update({ data: updatedData })
+                                                .eq('id', quoteId);
+                                            })
+                                            .then(() => {
+                                              // Reload view tab
+                                              window._supabase
+                                                .from('quotes')
+                                                .select('data')
+                                                .eq('id', quoteId)
+                                                .single()
+                                                .then(({ data, error }) => {
+                                                  if (error) throw error;
+                                                  const changeOrders = data.data?.change_orders || [];
+                                                  renderChangeOrders(changeOrders);
+                                                });
+                                              
+                                              // Reset form
+                                              document.getElementById('newCoForm').reset();
+                                              document.getElementById('coItemsBody').innerHTML = `
+                                                <tr>
+                                                  <td><input type="text" class="form-control item-desc" required></td>
+                                                  <td><input type="number" class="form-control item-qty" value="1" min="0"></td>
+                                                  <td><input type="text" class="form-control item-unit" value="each"></td>
+                                                  <td><input type="number" class="form-control item-price" min="0" step="0.01"></td>
+                                                  <td><input type="text" class="form-control item-total" readonly></td>
+                                                  <td><button type="button" class="btn btn-danger btn-sm" onclick="removeChangeOrderItem(this)">Remove</button></td>
+                                                </tr>
+                                              `;
+                                              
+                                              // Reattach event listeners
+                                              document.querySelectorAll('.item-qty, .item-price').forEach(input => {
+                                                input.addEventListener('input', calculateItemTotal);
+                                              });
+                                            })
+                                            .catch(err => console.error(err));
+                                        }
+                                        
+                                        function renderChangeOrders(changeOrders) {
+                                          const container = document.getElementById('coList');
+                                          
+                                          if (!changeOrders.length) {
+                                            container.innerHTML = '<p>No change orders found.</p>';
+                                            return;
+                                          }
+                                          
+                                          let html = '<div class="table-responsive">';
+                                          html += '<table class="table table-striped">';
+                                          html += '<thead><tr><th>CO Number</th><th>Description</th><th>Subtotal</th><th>Status</th><th>Action</th></tr></thead>';
+                                          html += '<tbody>';
+                                          
+                                          changeOrders.forEach(co => {
+                                            const statusBadge = co.status === 'approved' ? 'badge bg-success' : 
+                                                               co.status === 'declined' ? 'badge bg-danger' : 'badge bg-warning';
+                                            
+                                            let actionButtons = '';
+                                            if (co.status === 'pending') {
+                                              actionButtons = `
+                                                <button class="btn btn-sm btn-success" onclick="approveChangeOrder('${currentQuoteId}', '${co.id}')">Approve</button>
+                                                <button class="btn btn-sm btn-danger" onclick="declineChangeOrder('${currentQuoteId}', '${co.id}')">Decline</button>
+                                              `;
+                                            } else if (co.status === 'approved') {
+                                              const approvedDate = new Date(co.approved_at).toLocaleDateString();
+                                              actionButtons = `<span class="badge bg-success">Approved by ${co.approved_by} on ${approvedDate}</span>`;
+                                            }
+                                            
+                                            html += `
+                                              <tr>
+                                                <td>${co.number}</td>
+                                                <td>${co.description}</td>
+                                                <td>$${co.subtotal.toFixed(2)}</td>
+                                                <td><span class="${statusBadge}">${co.status.charAt(0).toUpperCase() + co.status.slice(1)}</span></td>
+                                                <td>${actionButtons}</td>
+                                              </tr>
+                                            `;
+                                          });
+                                          
+                                          html += '</tbody></table></div>';
+                                          container.innerHTML = html;
+                                        }
+                                        
+                                        function approveChangeOrder(quoteId, coId) {
+                                          const clientName = prompt("Client name for approval:");
+                                          if (!clientName) return;
+                                          
+                                          const now = new Date().toISOString();
+                                          
+                                          window._supabase
+                                            .from('quotes')
+                                            .select('data')
+                                            .eq('id', quoteId)
+                                            .single()
+                                            .then(({ data, error }) => {
+                                              if (error) throw error;
+                                              
+                                              const quote = data;
+                                              const changeOrders = quote.data?.change_orders || [];
+                                              
+                                              // Find and update CO
+                                              const updatedChangeOrders = changeOrders.map(co => {
+                                                if (co.id === coId) {
+                                                  return {
+                                                    ...co,
+                                                    status: 'approved',
+                                                    approved_by: clientName,
+                                                    approved_at: now
+                                                  };
+                                                }
+                                                return co;
+                                              });
+                                              
+                                              // Update quote total with approved COs
+                                              const newTotal = updatedChangeOrders.reduce((sum, co) => {
+                                                if (co.status === 'approved') {
+                                                  return sum + co.subtotal;
+                                                }
+                                                return sum;
+                                              }, quote.total || 0);
+                                              
+                                              const updatedData = { ...quote.data, change_orders: updatedChangeOrders };
+                                              
+                                              return window._supabase
+                                                .from('quotes')
+                                                .update({ data: updatedData, total: newTotal })
+                                                .eq('id', quoteId);
+                                            })
+                                            .then(() => {
+                                              // Reload view tab
+                                              window._supabase
+                                                .from('quotes')
+                                                .select('data')
+                                                .eq('id', quoteId)
+                                                .single()
+                                                .then(({ data, error }) => {
+                                                  if (error) throw error;
+                                                  const changeOrders = data.data?.change_orders || [];
+                                                  renderChangeOrders(changeOrders);
+                                                });
+                                            })
+                                            .catch(err => console.error(err));
+                                        }
+                                        
+                                        function declineChangeOrder(quoteId, coId) {
+                                          window._supabase
+                                            .from('quotes')
+                                            .select('data')
+                                            .eq('id', quoteId)
+                                            .single()
+                                            .then(({ data, error }) => {
+                                              if (error) throw error;
+                                              
+                                              const quote = data;
+                                              const changeOrders = quote.data?.change_orders || [];
+                                              
+                                              // Find and update CO
+                                              const updatedChangeOrders = changeOrders.map(co => {
+                                                if (co.id === coId) {
+                                                  return { ...co, status: 'declined' };
+                                                }
+                                                return co;
+                                              });
+                                              
+                                              const updatedData = { ...quote.data, change_orders: updatedChangeOrders };
+                                              
+                                              return window._supabase
+                                                .from('quotes')
+                                                .update({ data: updatedData })
+                                                .eq('id', quoteId);
+                                            })
+                                            .then(() => {
+                                              // Reload view tab
+                                              window._supabase
+                                                .from('quotes')
+                                                .select('data')
+                                                .eq('id', quoteId)
+                                                .single()
+                                                .then(({ data, error }) => {
+                                                  if (error) throw error;
+                                                  const changeOrders = data.data?.change_orders || [];
+                                                  renderChangeOrders(changeOrders);
+                                                });
+                                            })
+                                            .catch(err => console.error(err));
+                                        }
+                                        
+                                        // Initialize event listeners for existing items
+                                        document.addEventListener('DOMContentLoaded', function() {
+                                          document.querySelectorAll('.item-qty, .item-price').forEach(input => {
+                                            input.addEventListener('input', calculateItemTotal);
+                                          });
+                                        });
     </script>
-<!-- Client Notes Review Modal -->
+
 <div class="modal fade" id="notesReviewModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -1122,281 +1463,7 @@ async function _savePortalPin(clientName, userId, pin) {
       </div>
     </div>
   </div>
-</div>
 
-<!-- INSIGHTS JS -->
-<script>
-function renderBusinessInsights(quotes) {
-  if (!quotes || quotes.length === 0) return;
-
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth();
-
-  let revenueThisMonth = 0;
-  let revenueThisYear = 0;
-  let totalQuotes = 0;
-  let acceptedQuotes = 0;
-  let paidQuotes = 0;
-  let clientSpend = {};
-  let categoryRevenue = {};
-
-  quotes.forEach(quote => {
-    const quoteDate = new Date(quote.date);
-    const quoteTotal = calculateQuoteTotal(quote);
-
-    if (quote.status === 'paid') {
-      if (quoteDate.getFullYear() === currentYear && quoteDate.getMonth() === currentMonth) {
-        revenueThisMonth += quoteTotal;
-      }
-      if (quoteDate.getFullYear() === currentYear) {
-        revenueThisYear += quoteTotal;
-      }
-    }
-
-    totalQuotes++;
-    if (quote.status === 'accepted') acceptedQuotes++;
-    if (quote.status === 'paid') paidQuotes++;
-
-    // Client spend
-    const client = quote.client || 'Unknown';
-    clientSpend[client] = (clientSpend[client] || 0) + quoteTotal;
-
-    // Category revenue
-    if (quote.rooms && Array.isArray(quote.rooms)) {
-      quote.rooms.forEach(room => {
-        if (room.items && Array.isArray(room.items)) {
-          room.items.forEach(item => {
-            const category = item.category || 'Uncategorized';
-            categoryRevenue[category] = (categoryRevenue[category] || 0) + (item.price || 0) * (item.quantity || 1);
-          });
-        }
-      });
-    }
-  });
-
-  // Calculate averages and rates
-  const avgQuoteValue = totalQuotes > 0 ? revenueThisYear / totalQuotes : 0;
-  const acceptanceRate = totalQuotes > 0 ? Math.round((acceptedQuotes / totalQuotes) * 100) : 0;
-
-  // Top client
-  let topClient = '-';
-  if (Object.keys(clientSpend).length > 0) {
-    topClient = Object.entries(clientSpend).reduce((a, b) => a[1] > b[1] ? a : b)[0];
-  }
-
-  // Best category
-  let bestCategory = '-';
-  if (Object.keys(categoryRevenue).length > 0) {
-    bestCategory = Object.entries(categoryRevenue).reduce((a, b) => a[1] > b[1] ? a : b)[0];
-  }
-
-  // Update DOM
-  document.getElementById('revenueThisMonth').textContent = revenueThisMonth.toFixed(2);
-  document.getElementById('revenueThisYear').textContent = revenueThisYear.toFixed(2);
-  document.getElementById('avgQuoteValue').textContent = avgQuoteValue.toFixed(2);
-  document.getElementById('acceptanceRate').textContent = acceptanceRate;
-  document.getElementById('topClient').textContent = topClient;
-  document.getElementById('bestCategory').textContent = bestCategory;
-}
-
-function calculateQuoteTotal(quote) {
-  let total = 0;
-  if (quote.rooms && Array.isArray(quote.rooms)) {
-    quote.rooms.forEach(room => {
-      if (room.items && Array.isArray(room.items)) {
-        room.items.forEach(item => {
-          const itemTotal = (item.price || 0) * (item.quantity || 1);
-          total += itemTotal;
-        });
-      }
-    });
-  }
-  return total;
-}
-
-// Initialize insights on load
-document.addEventListener('DOMContentLoaded', function() {
-  if (window.currentQuotes) {
-    renderBusinessInsights(window.currentQuotes);
-  }
-});
-
-        // === BUSINESS INSIGHTS ===
-        <script>
-        function renderBusinessInsights(quotes) {
-          if (!quotes || quotes.length === 0) return;
-        
-          const now = new Date();
-          const currentYear = now.getFullYear();
-          const currentMonth = now.getMonth();
-        
-          let revenueThisMonth = 0;
-          let revenueThisYear = 0;
-          let totalQuotes = 0;
-          let acceptedQuotes = 0;
-          let paidQuotes = 0;
-          let clientSpend = {};
-          let categoryRevenue = {};
-        
-          quotes.forEach(quote => {
-            const quoteDate = new Date(quote.date);
-            const quoteTotal = calculateQuoteTotal(quote);
-        
-            if (quote.status === 'paid') {
-              if (quoteDate.getFullYear() === currentYear && quoteDate.getMonth() === currentMonth) {
-                revenueThisMonth += quoteTotal;
-              }
-              if (quoteDate.getFullYear() === currentYear) {
-                revenueThisYear += quoteTotal;
-              }
-            }
-        
-            totalQuotes++;
-            if (quote.status === 'accepted') acceptedQuotes++;
-            if (quote.status === 'paid') paidQuotes++;
-        
-            // Client spend
-            const client = quote.client || 'Unknown';
-            clientSpend[client] = (clientSpend[client] || 0) + quoteTotal;
-        
-            // Category revenue
-            if (quote.rooms && Array.isArray(quote.rooms)) {
-              quote.rooms.forEach(room => {
-                if (room.items && Array.isArray(room.items)) {
-                  room.items.forEach(item => {
-                    const category = item.category || 'Uncategorized';
-                    categoryRevenue[category] = (categoryRevenue[category] || 0) + (item.price || 0) * (item.quantity || 1);
-                  });
-                }
-              });
-            }
-          });
-        
-          // Calculate averages and rates
-          const avgQuoteValue = totalQuotes > 0 ? revenueThisYear / totalQuotes : 0;
-          const acceptanceRate = totalQuotes > 0 ? Math.round((acceptedQuotes / totalQuotes) * 100) : 0;
-        
-          // Top client
-          let topClient = '-';
-          if (Object.keys(clientSpend).length > 0) {
-            topClient = Object.entries(clientSpend).reduce((a, b) => a[1] > b[1] ? a : b)[0];
-          }
-        
-          // Best category
-          let bestCategory = '-';
-          if (Object.keys(categoryRevenue).length > 0) {
-            bestCategory = Object.entries(categoryRevenue).reduce((a, b) => a[1] > b[1] ? a : b)[0];
-          }
-        
-          // Update DOM
-          document.getElementById('revenueThisMonth').textContent = revenueThisMonth.toFixed(2);
-          document.getElementById('revenueThisYear').textContent = revenueThisYear.toFixed(2);
-          document.getElementById('avgQuoteValue').textContent = avgQuoteValue.toFixed(2);
-          document.getElementById('acceptanceRate').textContent = acceptanceRate;
-          document.getElementById('topClient').textContent = topClient;
-          document.getElementById('bestCategory').textContent = bestCategory;
-        }
-        
-        function calculateQuoteTotal(quote) {
-          let total = 0;
-          if (quote.rooms && Array.isArray(quote.rooms)) {
-            quote.rooms.forEach(room => {
-              if (room.items && Array.isArray(room.items)) {
-                room.items.forEach(item => {
-                  const itemTotal = (item.price || 0) * (item.quantity || 1);
-                  total += itemTotal;
-                });
-              }
-            });
-          }
-          return total;
-        }
-        
-        // Initialize insights on load
-        document.addEventListener('DOMContentLoaded', function() {
-          if (window.currentQuotes) {
-            renderBusinessInsights(window.currentQuotes);
-          }
-        });
-        </script>
-
-        // === WARRANTY CERTIFICATE ===
-        <script>
-        let currentQuoteForWarranty = null;
-        
-        function openWarrantyModal(button) {
-          const quoteCard = button.closest('.card');
-          const quoteId = quoteCard.dataset.quoteId;
-          
-          // Find the quote in currentQuotes
-          const quote = window.currentQuotes.find(q => q.id === quoteId);
-          if (!quote || quote.status !== 'paid') return;
-        
-          currentQuoteForWarranty = quote;
-          
-          // Pre-fill the covered text from scope
-          document.getElementById('coveredText').value = quote.scope || '';
-          
-          // Show modal
-          const modal = new bootstrap.Modal(document.getElementById('warrantyModal'));
-          modal.show();
-        }
-        
-        function generateWarrantyPDF() {
-          if (!currentQuoteForWarranty) return;
-        
-          const period = document.getElementById('warrantyPeriod').value;
-          const covered = document.getElementById('coveredText').value;
-          const notCovered = document.getElementById('notCoveredText').value;
-          const contractor = document.getElementById('contractorSignature').value || 'Contractor Name';
-        
-          // Generate random certificate number
-          const certNumber = Math.floor(100000 + Math.random() * 900000);
-        
-          // Create PDF content
-          const printWindow = window.open('', '_blank');
-          printWindow.document.write(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <title>Warranty Certificate</title>
-              <style>
-                body { font-family: Arial, sans-serif; margin: 40px; }
-                .header { text-align: center; margin-bottom: 30px; }
-                .logo { width: 100px; height: auto; margin-bottom: 20px; }
-                h1 { color: #2c3e50; font-size: 24px; }
-                .section { margin-bottom: 20px; }
-                .highlight { font-weight: bold; }
-                .signature-line { margin-top: 60px; text-align: center; }
-                .cert-number { text-align: right; font-size: 12px; color: #7f8c8d; }
-              </style>
-            </head>
-            <body>
-              <div class="header">
-                <h1>LIMITED WARRANTY CERTIFICATE</h1>
-                <p class="cert-number">Certificate #: ${certNumber}</p>
-              </div>
-        
-              <div class="section">
-                <p><span class="highlight">Client:</span> ${currentQuoteForWarranty.client || 'N/A'}</p>
-                <p><span class="highlight">Project Address:</span> ${currentQuoteForWarranty.address || 'N/A'}</p>
-                <p><span class="highlight">Completion Date:</span> ${currentQuoteForWarranty.date || 'N/A'}</p>
-              </div>
-        
-              <div class="section">
-                <p><span class="highlight">Warranty Period:</span> ${period}</p>
-                <p><span class="highlight">Coverage:</span></p>
-                <p>${covered || 'N/A'}</p>
-                <p><span class="highlight">Not Covered:</span></p>
-                <p>${notCovered || 'N/A'}</p>
-              </div>
-        
-              <div class="signature-line">
-                <p>Authorized by: ${contractor}</p>
-                <p>Signature _________________________</p>
-              </div>
-            
 <div class="modal fade" id="changeOrderModal" tabindex="-1">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
@@ -1470,12 +1537,6 @@ document.addEventListener('DOMContentLoaded', function() {
             <div id="coList"></div>
           </div>
         </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-javascript
 
 <div class="modal fade" id="portalShareModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
@@ -1500,351 +1561,6 @@ javascript
         </div>
       </div>
     </div>
-  </div>
-</div>
-</body>
-            </html>
-          `);
-          printWindow.document.close();
-          printWindow.focus();
-          printWindow.print();
-        }
-        </script>
-        
-        // === CHANGE ORDERS ===
-        <script>
-        let currentQuoteId = '';
-        let currentClientName = '';
-        
-        function openChangeOrderModal(quoteId, clientName) {
-          currentQuoteId = quoteId;
-          currentClientName = clientName;
-          
-          window._supabase
-            .from('quotes')
-            .select('data')
-            .eq('id', quoteId)
-            .single()
-            .then(({ data, error }) => {
-              if (error) throw error;
-              
-              const quote = data;
-              const changeOrders = quote.data?.change_orders || [];
-              
-              // Load existing COs in View tab
-              renderChangeOrders(changeOrders);
-              
-              // Show modal
-              const modal = new bootstrap.Modal(document.getElementById('changeOrderModal'));
-              modal.show();
-            })
-            .catch(err => console.error(err));
-        }
-        
-        function addChangeOrderItem() {
-          const tbody = document.getElementById('coItemsBody');
-          const newRow = document.createElement('tr');
-          
-          newRow.innerHTML = `
-            <td><input type="text" class="form-control item-desc" required></td>
-            <td><input type="number" class="form-control item-qty" value="1" min="0"></td>
-            <td><input type="text" class="form-control item-unit" value="each"></td>
-            <td><input type="number" class="form-control item-price" min="0" step="0.01"></td>
-            <td><input type="text" class="form-control item-total" readonly></td>
-            <td><button type="button" class="btn btn-danger btn-sm" onclick="removeChangeOrderItem(this)">Remove</button></td>
-          `;
-          
-          tbody.appendChild(newRow);
-          
-          // Add event listeners for auto-calculation
-          const inputs = newRow.querySelectorAll('input');
-          inputs.forEach(input => {
-            if (input.classList.contains('item-qty') || input.classList.contains('item-price')) {
-              input.addEventListener('input', calculateItemTotal);
-            }
-          });
-        }
-        
-        function removeChangeOrderItem(btn) {
-          btn.closest('tr').remove();
-          calculateTotals();
-        }
-        
-        function calculateItemTotal() {
-          const row = this.closest('tr');
-          const qtyInput = row.querySelector('.item-qty');
-          const priceInput = row.querySelector('.item-price');
-          const totalInput = row.querySelector('.item-total');
-          
-          const qty = parseFloat(qtyInput.value) || 0;
-          const price = parseFloat(priceInput.value) || 0;
-          const total = qty * price;
-          
-          totalInput.value = total.toFixed(2);
-          calculateTotals();
-        }
-        
-        function calculateTotals() {
-          let subtotal = 0;
-          document.querySelectorAll('#coItemsBody tr').forEach(row => {
-            const totalInput = row.querySelector('.item-total');
-            const total = parseFloat(totalInput.value) || 0;
-            subtotal += total;
-          });
-          
-          // Update form's subtotal display if needed
-        }
-        
-        document.getElementById('newCoForm').addEventListener('submit', function(e) {
-          e.preventDefault();
-          submitChangeOrder(currentQuoteId);
-        });
-        
-        function submitChangeOrder(quoteId) {
-          const description = document.getElementById('coDescription').value;
-          const reason = document.getElementById('coReason').value;
-          const notes = document.getElementById('coNotes').value;
-          
-          // Collect items
-          const items = [];
-          let subtotal = 0;
-          
-          document.querySelectorAll('#coItemsBody tr').forEach(row => {
-            const desc = row.querySelector('.item-desc').value;
-            const qty = parseFloat(row.querySelector('.item-qty').value) || 0;
-            const unit = row.querySelector('.item-unit').value;
-            const price = parseFloat(row.querySelector('.item-price').value) || 0;
-            const total = qty * price;
-            
-            if (desc && !isNaN(qty) && !isNaN(price)) {
-              items.push({ description: desc, qty, unit, price, total });
-              subtotal += total;
-            }
-          });
-          
-          // Generate CO number
-          window._supabase
-            .from('quotes')
-            .select('data')
-            .eq('id', quoteId)
-            .single()
-            .then(({ data, error }) => {
-              if (error) throw error;
-              
-              const quote = data;
-              const changeOrders = quote.data?.change_orders || [];
-              const nextNumber = changeOrders.length + 1;
-              const coNumber = `CO-${String(nextNumber).padStart(3, '0')}`;
-              
-              const newCo = {
-                id: `co_${Date.now()}`,
-                number: coNumber,
-                created_at: new Date().toISOString(),
-                description,
-                reason,
-                items,
-                subtotal,
-                status: 'pending',
-                notes
-              };
-              
-              // Update quote with new CO
-              const updatedChangeOrders = [...changeOrders, newCo];
-              const updatedData = { ...quote.data, change_orders: updatedChangeOrders };
-              
-              return window._supabase
-                .from('quotes')
-                .update({ data: updatedData })
-                .eq('id', quoteId);
-            })
-            .then(() => {
-              // Reload view tab
-              window._supabase
-                .from('quotes')
-                .select('data')
-                .eq('id', quoteId)
-                .single()
-                .then(({ data, error }) => {
-                  if (error) throw error;
-                  const changeOrders = data.data?.change_orders || [];
-                  renderChangeOrders(changeOrders);
-                });
-              
-              // Reset form
-              document.getElementById('newCoForm').reset();
-              document.getElementById('coItemsBody').innerHTML = `
-                <tr>
-                  <td><input type="text" class="form-control item-desc" required></td>
-                  <td><input type="number" class="form-control item-qty" value="1" min="0"></td>
-                  <td><input type="text" class="form-control item-unit" value="each"></td>
-                  <td><input type="number" class="form-control item-price" min="0" step="0.01"></td>
-                  <td><input type="text" class="form-control item-total" readonly></td>
-                  <td><button type="button" class="btn btn-danger btn-sm" onclick="removeChangeOrderItem(this)">Remove</button></td>
-                </tr>
-              `;
-              
-              // Reattach event listeners
-              document.querySelectorAll('.item-qty, .item-price').forEach(input => {
-                input.addEventListener('input', calculateItemTotal);
-              });
-            })
-            .catch(err => console.error(err));
-        }
-        
-        function renderChangeOrders(changeOrders) {
-          const container = document.getElementById('coList');
-          
-          if (!changeOrders.length) {
-            container.innerHTML = '<p>No change orders found.</p>';
-            return;
-          }
-          
-          let html = '<div class="table-responsive">';
-          html += '<table class="table table-striped">';
-          html += '<thead><tr><th>CO Number</th><th>Description</th><th>Subtotal</th><th>Status</th><th>Action</th></tr></thead>';
-          html += '<tbody>';
-          
-          changeOrders.forEach(co => {
-            const statusBadge = co.status === 'approved' ? 'badge bg-success' : 
-                               co.status === 'declined' ? 'badge bg-danger' : 'badge bg-warning';
-            
-            let actionButtons = '';
-            if (co.status === 'pending') {
-              actionButtons = `
-                <button class="btn btn-sm btn-success" onclick="approveChangeOrder('${currentQuoteId}', '${co.id}')">Approve</button>
-                <button class="btn btn-sm btn-danger" onclick="declineChangeOrder('${currentQuoteId}', '${co.id}')">Decline</button>
-              `;
-            } else if (co.status === 'approved') {
-              const approvedDate = new Date(co.approved_at).toLocaleDateString();
-              actionButtons = `<span class="badge bg-success">Approved by ${co.approved_by} on ${approvedDate}</span>`;
-            }
-            
-            html += `
-              <tr>
-                <td>${co.number}</td>
-                <td>${co.description}</td>
-                <td>$${co.subtotal.toFixed(2)}</td>
-                <td><span class="${statusBadge}">${co.status.charAt(0).toUpperCase() + co.status.slice(1)}</span></td>
-                <td>${actionButtons}</td>
-              </tr>
-            `;
-          });
-          
-          html += '</tbody></table></div>';
-          container.innerHTML = html;
-        }
-        
-        function approveChangeOrder(quoteId, coId) {
-          const clientName = prompt("Client name for approval:");
-          if (!clientName) return;
-          
-          const now = new Date().toISOString();
-          
-          window._supabase
-            .from('quotes')
-            .select('data')
-            .eq('id', quoteId)
-            .single()
-            .then(({ data, error }) => {
-              if (error) throw error;
-              
-              const quote = data;
-              const changeOrders = quote.data?.change_orders || [];
-              
-              // Find and update CO
-              const updatedChangeOrders = changeOrders.map(co => {
-                if (co.id === coId) {
-                  return {
-                    ...co,
-                    status: 'approved',
-                    approved_by: clientName,
-                    approved_at: now
-                  };
-                }
-                return co;
-              });
-              
-              // Update quote total with approved COs
-              const newTotal = updatedChangeOrders.reduce((sum, co) => {
-                if (co.status === 'approved') {
-                  return sum + co.subtotal;
-                }
-                return sum;
-              }, quote.total || 0);
-              
-              const updatedData = { ...quote.data, change_orders: updatedChangeOrders };
-              
-              return window._supabase
-                .from('quotes')
-                .update({ data: updatedData, total: newTotal })
-                .eq('id', quoteId);
-            })
-            .then(() => {
-              // Reload view tab
-              window._supabase
-                .from('quotes')
-                .select('data')
-                .eq('id', quoteId)
-                .single()
-                .then(({ data, error }) => {
-                  if (error) throw error;
-                  const changeOrders = data.data?.change_orders || [];
-                  renderChangeOrders(changeOrders);
-                });
-            })
-            .catch(err => console.error(err));
-        }
-        
-        function declineChangeOrder(quoteId, coId) {
-          window._supabase
-            .from('quotes')
-            .select('data')
-            .eq('id', quoteId)
-            .single()
-            .then(({ data, error }) => {
-              if (error) throw error;
-              
-              const quote = data;
-              const changeOrders = quote.data?.change_orders || [];
-              
-              // Find and update CO
-              const updatedChangeOrders = changeOrders.map(co => {
-                if (co.id === coId) {
-                  return { ...co, status: 'declined' };
-                }
-                return co;
-              });
-              
-              const updatedData = { ...quote.data, change_orders: updatedChangeOrders };
-              
-              return window._supabase
-                .from('quotes')
-                .update({ data: updatedData })
-                .eq('id', quoteId);
-            })
-            .then(() => {
-              // Reload view tab
-              window._supabase
-                .from('quotes')
-                .select('data')
-                .eq('id', quoteId)
-                .single()
-                .then(({ data, error }) => {
-                  if (error) throw error;
-                  const changeOrders = data.data?.change_orders || [];
-                  renderChangeOrders(changeOrders);
-                });
-            })
-            .catch(err => console.error(err));
-        }
-        
-        // Initialize event listeners for existing items
-        document.addEventListener('DOMContentLoaded', function() {
-          document.querySelectorAll('.item-qty, .item-price').forEach(input => {
-            input.addEventListener('input', calculateItemTotal);
-          });
-        });
-        </script>
-        </script>
+
 </body>
 </html>
