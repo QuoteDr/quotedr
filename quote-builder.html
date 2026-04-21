@@ -2940,7 +2940,7 @@ Example:
                 var m = getShapeMeasurement(shape);
                 var quantity = m.value;
                 var itemDescription = 'Measured from satellite map';
-                if (m.unit === 'sqft' && pitchMultiplier !== 1) {
+                if (m.isArea && pitchMultiplier !== 1) {
                     quantity = parseFloat((quantity * pitchMultiplier).toFixed(2));
                     itemDescription += ' (pitch ' + pitchMultiplier + 'x applied)';
                 }
