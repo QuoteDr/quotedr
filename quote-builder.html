@@ -2935,7 +2935,7 @@ Example:
 
         // Toggle item description in quote builder rows
         function toggleItemDesc(id) {
-            var descEl = document.getElementById(id);
+            var descEl = document.getElementById(id) || document.getElementById(id + '_notes');
             var notesEl = document.getElementById(id + '_notes');
             var iconEl = document.getElementById(id + '_icon');
             var isOpen = descEl && descEl.style.display !== 'none';
