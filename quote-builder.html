@@ -305,6 +305,10 @@ if (location.search.includes('debug')) {
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openMeasureModal()"><i class="fas fa-satellite me-2 text-primary"></i>Satellite Measure</a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openIkeaQuoteModal()"><i class="fas fa-utensils me-2 text-warning"></i>IKEA Quick Quote</a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openMaterialEstimator()"><i class="fas fa-ruler-combined me-2 text-info"></i>Material Estimator</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="openHardwoodCalc()"><i class="fas fa-rug me-2 text-warning"></i>Hardwood/LVP Calculator</a></li>
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="openPaintCalc()"><i class="fas fa-paint-brush me-2 text-danger"></i>Paint Calculator</a></li>
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="openDrywallCalc()"><i class="fas fa-border-all me-2 text-secondary"></i>Drywall Calculator</a></li>
                         </ul>
                     </div>
                     <a href="javascript:void(0)" onclick="generateInvoiceLink()" class="btn btn-danger btn-sm shadow-sm">
@@ -6213,3 +6217,840 @@ async function saveQuote() {
         </div>
     </div>
 <script src="ai-assistant.js"></script>
+
+
+<!-- Hardwood/LVP Calculator Modal -->
+<div class="modal fade" id="hardwoodCalcModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title"><i class="fas fa-rug me-2"></i>Hardwood/LVP Calculator</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <ul class="nav nav-tabs mb-3" id="hardwoodTab" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="manual-tab" data-bs-toggle="tab" data-bs-target="#manual-hardwood" type="button" role="tab">Manual Entry</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="scan-tab" data-bs-toggle="tab" data-bs-target="#scan-hardwood" type="button" role="tab">Scan Quote</button>
+                    </li>
+                </ul>
+                
+                <div class="tab-content" id="hardwoodTabContent">
+                    <!-- Manual Entry Tab -->
+                    <div class="tab-pane fade show active" id="manual-hardwood" role="tabpanel">
+                        <div class="mb-3">
+                            <label for="hardwoodRoomName" class="form-label">Room/Area Name</label>
+                            <input type="text" class="form-control" id="hardwoodRoomName" value="Floor">
+                        </div>
+                        
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="hardwoodToggleDimensions">
+                            <label class="form-check-label" for="hardwoodToggleDimensions">Enter Dimensions (ft) instead of Total Sqft</label>
+                        </div>
+                        
+                        <div id="hardwoodDimensionsGroup">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="hardwoodWidth" class="form-label">Width (ft)</label>
+                                    <input type="number" class="form-control" id="hardwoodWidth" placeholder="Width">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="hardwoodLength" class="form-label">Length (ft)</label>
+                                    <input type="number" class="form-control" id="hardwoodLength" placeholder="Length">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div id="hardwoodSqftGroup" class="d-none">
+                            <div class="mb-3">
+                                <label for="hardwoodTotalSqft" class="form-label">Total Square Feet</label>
+                                <input type="number" class="form-control" id="hardwoodTotalSqft" placeholder="Total sqft">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="hardwoodPlankWidth" class="form-label">Plank Width (inches)</label>
+                            <select class="form-select" id="hardwoodPlankWidth">
+                                <option value="3">3 inches</option>
+                                <option value="4" selected>4 inches</option>
+                                <option value="5">5 inches</option>
+                                <option value="6">6 inches</option>
+                                <option value="7">7 inches</option>
+                                <option value="8">8 inches</option>
+                            </select>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="hardwoodWaste" class="form-label">Waste %</label>
+                                <input type="number" class="form-control" id="hardwoodWaste" value="10" min="0" max="100">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="hardwoodSqftPerBox" class="form-label">Sqft per Box</label>
+                                <input type="number" class="form-control" id="hardwoodSqftPerBox" value="20" min="1">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="hardwoodCostPerBox" class="form-label">Cost per Box (optional)</label>
+                            <input type="number" class="form-control" id="hardwoodCostPerBox" placeholder="0.00" step="0.01">
+                        </div>
+                    </div>
+                    
+                    <!-- Scan Quote Tab -->
+                    <div class="tab-pane fade" id="scan-hardwood" role="tabpanel">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>Scanning quote for Flooring and Subflooring items...
+                        </div>
+                        <button type="button" class="btn btn-primary mb-3" onclick="scanHardwoodQuote()">Scan Quote</button>
+                        <div id="hardwoodScanResults" class="d-none">
+                            <div class="alert alert-success">
+                                Found <span id="hardwoodScanTotal">0</span> sqft across <span id="hardwoodScanRooms">0</span> rooms:
+                                <span id="hardwoodScanDetails"></span>
+                            </div>
+                            <div class="mb-3">
+                                <label for="hardwoodScanSqft" class="form-label">Total Square Feet (scanned)</label>
+                                <input type="number" class="form-control" id="hardwoodScanSqft" readonly>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="hardwoodResults" class="d-none mt-3">
+                    <div class="alert alert-primary">
+                        <h6>Calculation Results:</h6>
+                        <p id="hardwoodResultText"></p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-success" id="hardwoodAddToQuoteBtn" disabled onclick="addToHardwoodQuote()">Add to Quote</button>
+                <button type="button" class="btn btn-primary" id="hardwoodCalculateBtn" onclick="calculateHardwood()">Calculate</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Paint Calculator Modal -->
+<div class="modal fade" id="paintCalcModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title"><i class="fas fa-paint-brush me-2"></i>Paint Calculator</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <ul class="nav nav-tabs mb-3" id="paintTab" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="paintManual-tab" data-bs-toggle="tab" data-bs-target="#manual-paint" type="button" role="tab">Manual Entry</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="paintScan-tab" data-bs-toggle="tab" data-bs-target="#scan-paint" type="button" role="tab">Scan Quote</button>
+                    </li>
+                </ul>
+                
+                <div class="tab-content" id="paintTabContent">
+                    <!-- Manual Entry Tab -->
+                    <div class="tab-pane fade show active" id="manual-paint" role="tabpanel">
+                        <div class="mb-3">
+                            <label for="paintRoomName" class="form-label">Room/Area Name</label>
+                            <input type="text" class="form-control" id="paintRoomName" value="Living Room">
+                        </div>
+                        
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="paintToggleDimensions">
+                            <label class="form-check-label" for="paintToggleDimensions">Enter room dimensions instead of sqft</label>
+                        </div>
+                        
+                        <div id="paintDimensionsGroup">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="paintWidth" class="form-label">Width (ft)</label>
+                                    <input type="number" class="form-control" id="paintWidth" placeholder="Width">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="paintLength" class="form-label">Length (ft)</label>
+                                    <input type="number" class="form-control" id="paintLength" placeholder="Length">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="paintHeight" class="form-label">Ceiling Height (ft)</label>
+                                <input type="number" class="form-control" id="paintHeight" value="9" placeholder="Height">
+                            </div>
+                        </div>
+                        
+                        <div id="paintSqftGroup" class="d-none">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="paintWallSqft" class="form-label">Wall Square Feet</label>
+                                    <input type="number" class="form-control" id="paintWallSqft" placeholder="Wall sqft">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="paintCeilingSqft" class="form-label">Ceiling Square Feet (optional)</label>
+                                    <input type="number" class="form-control" id="paintCeilingSqft" placeholder="Ceiling sqft">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="paintDoors" class="form-label">Number of Doors</label>
+                                <input type="number" class="form-control" id="paintDoors" value="0" min="0">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="paintWindows" class="form-label">Number of Windows</label>
+                                <input type="number" class="form-control" id="paintWindows" value="0" min="0">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Coats of Paint</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="paintCoats" id="paintCoats1" value="1" checked>
+                                <label class="form-check-label" for="paintCoats1">1 Coat</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="paintCoats" id="paintCoats2" value="2">
+                                <label class="form-check-label" for="paintCoats2">2 Coats</label>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="paintIncludeCeiling" checked>
+                            <label class="form-check-label" for="paintIncludeCeiling">Include Ceiling</label>
+                        </div>
+                        
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="paintIncludePrimer">
+                            <label class="form-check-label" for="paintIncludePrimer">Include Primer Coat</label>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="paintCoverage" class="form-label">Coverage per Gallon (sqft)</label>
+                            <input type="number" class="form-control" id="paintCoverage" value="400" min="1">
+                        </div>
+                    </div>
+                    
+                    <!-- Scan Quote Tab -->
+                    <div class="tab-pane fade" id="scan-paint" role="tabpanel">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>Scanning quote for Painting items...
+                        </div>
+                        <button type="button" class="btn btn-primary mb-3" onclick="scanPaintQuote()">Scan Quote</button>
+                        <div id="paintScanResults" class="d-none">
+                            <div class="alert alert-success">
+                                Found <span id="paintScanTotal">0</span> sqft across <span id="paintScanRooms">0</span> rooms:
+                                <span id="paintScanDetails"></span>
+                            </div>
+                            <div class="mb-3">
+                                <label for="paintScanSqft" class="form-label">Total Square Feet (scanned)</label>
+                                <input type="number" class="form-control" id="paintScanSqft" readonly>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="paintResults" class="d-none mt-3">
+                    <div class="alert alert-primary">
+                        <h6>Calculation Results:</h6>
+                        <p id="paintResultText"></p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-success" id="paintAddToQuoteBtn" disabled onclick="addToPaintQuote()">Add to Quote</button>
+                <button type="button" class="btn btn-primary" id="paintCalculateBtn" onclick="calculatePaint()">Calculate</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Drywall Calculator Modal -->
+<div class="modal fade" id="drywallCalcModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title"><i class="fas fa-border-all me-2"></i>Drywall Calculator</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <ul class="nav nav-tabs mb-3" id="drywallTab" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="drywallManual-tab" data-bs-toggle="tab" data-bs-target="#manual-drywall" type="button" role="tab">Manual Entry</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="drywallScan-tab" data-bs-toggle="tab" data-bs-target="#scan-drywall" type="button" role="tab">Scan Quote</button>
+                    </li>
+                </ul>
+                
+                <div class="tab-content" id="drywallTabContent">
+                    <!-- Manual Entry Tab -->
+                    <div class="tab-pane fade show active" id="manual-drywall" role="tabpanel">
+                        <div class="mb-3">
+                            <label for="drywallRoomName" class="form-label">Room/Area Name</label>
+                            <input type="text" class="form-control" id="drywallRoomName" value="Living Room">
+                        </div>
+                        
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="drywallToggleDimensions">
+                            <label class="form-check-label" for="drywallToggleDimensions">Enter room dimensions instead of sqft</label>
+                        </div>
+                        
+                        <div id="drywallDimensionsGroup">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="drywallWidth" class="form-label">Width (ft)</label>
+                                    <input type="number" class="form-control" id="drywallWidth" placeholder="Width">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="drywallLength" class="form-label">Length (ft)</label>
+                                    <input type="number" class="form-control" id="drywallLength" placeholder="Length">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="drywallHeight" class="form-label">Ceiling Height (ft)</label>
+                                <input type="number" class="form-control" id="drywallHeight" value="9" placeholder="Height">
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="drywallDoors" class="form-label">Number of Doors</label>
+                                    <input type="number" class="form-control" id="drywallDoors" value="0" min="0">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="drywallWindows" class="form-label">Number of Windows</label>
+                                    <input type="number" class="form-control" id="drywallWindows" value="0" min="0">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div id="drywallSqftGroup" class="d-none">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="drywallWallSqft" class="form-label">Wall Square Feet</label>
+                                    <input type="number" class="form-control" id="drywallWallSqft" placeholder="Wall sqft">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="drywallCeilingSqft" class="form-label">Ceiling Square Feet (optional)</label>
+                                    <input type="number" class="form-control" id="drywallCeilingSqft" placeholder="Ceiling sqft">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="drywallIncludeCeiling" checked>
+                            <label class="form-check-label" for="drywallIncludeCeiling">Include Ceiling Drywall</label>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="drywallWaste" class="form-label">Waste %</label>
+                                <input type="number" class="form-control" id="drywallWaste" value="10" min="0" max="100">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Scan Quote Tab -->
+                    <div class="tab-pane fade" id="scan-drywall" role="tabpanel">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>Scanning quote for Drywall items...
+                        </div>
+                        <button type="button" class="btn btn-primary mb-3" onclick="scanDrywallQuote()">Scan Quote</button>
+                        <div id="drywallScanResults" class="d-none">
+                            <div class="alert alert-success">
+                                Found <span id="drywallScanTotal">0</span> sqft across <span id="drywallScanRooms">0</span> rooms:
+                                <span id="drywallScanDetails"></span>
+                            </div>
+                            <div class="mb-3">
+                                <label for="drywallScanSqft" class="form-label">Total Square Feet (scanned)</label>
+                                <input type="number" class="form-control" id="drywallScanSqft" readonly>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="drywallResults" class="d-none mt-3">
+                    <div class="alert alert-primary">
+                        <h6>Calculation Results:</h6>
+                        <p id="drywallResultText"></p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-success" id="drywallAddToQuoteBtn" disabled onclick="addToDrywallQuote()">Add to Quote</button>
+                <button type="button" class="btn btn-primary" id="drywallCalculateBtn" onclick="calculateDrywall()">Calculate</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// === MATERIAL CALCULATORS (Hardwood/LVP, Paint, Drywall) ===
+// Hardwood/LVP Calculator Functions
+function openHardwoodCalc() {
+    var modal = new bootstrap.Modal(document.getElementById('hardwoodCalcModal'));
+    modal.show();
+    
+    // Reset form
+    document.getElementById('hardwoodRoomName').value = 'Floor';
+    document.getElementById('hardwoodWidth').value = '';
+    document.getElementById('hardwoodLength').value = '';
+    document.getElementById('hardwoodTotalSqft').value = '';
+    document.getElementById('hardwoodPlankWidth').value = '4';
+    document.getElementById('hardwoodWaste').value = '10';
+    document.getElementById('hardwoodSqftPerBox').value = '20';
+    document.getElementById('hardwoodCostPerBox').value = '';
+    
+    // Reset results
+    document.getElementById('hardwoodResults').classList.add('d-none');
+    document.getElementById('hardwoodAddToQuoteBtn').disabled = true;
+    
+    // Reset scan results
+    document.getElementById('hardwoodScanResults').classList.add('d-none');
+    document.getElementById('hardwoodToggleDimensions').checked = false;
+    toggleHardwoodDimensions();
+}
+
+function toggleHardwoodDimensions() {
+    const dimensionsGroup = document.getElementById('hardwoodDimensionsGroup');
+    const sqftGroup = document.getElementById('hardwoodSqftGroup');
+    
+    if (document.getElementById('hardwoodToggleDimensions').checked) {
+        dimensionsGroup.classList.remove('d-none');
+        sqftGroup.classList.add('d-none');
+    } else {
+        dimensionsGroup.classList.add('d-none');
+        sqftGroup.classList.remove('d-none');
+    }
+}
+
+function calculateHardwood() {
+    let roomName = document.getElementById('hardwoodRoomName').value || 'Floor';
+    let width, length, totalSqft;
+    
+    if (document.getElementById('hardwoodToggleDimensions').checked) {
+        width = parseFloat(document.getElementById('hardwoodWidth').value) || 0;
+        length = parseFloat(document.getElementById('hardwoodLength').value) || 0;
+        totalSqft = width * length;
+    } else {
+        totalSqft = parseFloat(document.getElementById('hardwoodTotalSqft').value) || 0;
+    }
+    
+    if (totalSqft <= 0) {
+        alert("Please enter valid dimensions or square footage.");
+        return;
+    }
+    
+    const plankWidth = parseFloat(document.getElementById('hardwoodPlankWidth').value);
+    const wastePercent = parseFloat(document.getElementById('hardwoodWaste').value) || 10;
+    const sqftPerBox = parseFloat(document.getElementById('hardwoodSqftPerBox').value) || 20;
+    const costPerBox = parseFloat(document.getElementById('hardwoodCostPerBox').value) || 0;
+    
+    // Calculate with waste
+    const totalWithWaste = totalSqft * (1 + wastePercent / 100);
+    const boxesNeeded = Math.ceil(totalWithWaste / sqftPerBox);
+    const materialCost = costPerBox > 0 ? boxesNeeded * costPerBox : 0;
+    
+    // Display results
+    let resultText = `Total sqft (with ${wastePercent}% waste): ${totalWithWaste.toFixed(1)} sqft (${totalSqft.toFixed(1)} + ${wastePercent}% waste)<br>`;
+    resultText += `Boxes needed: ${boxesNeeded}<br>`;
+    
+    if (costPerBox > 0) {
+        resultText += `Material cost: $${materialCost.toFixed(2)}<br>`;
+    }
+    
+    document.getElementById('hardwoodResultText').innerHTML = resultText;
+    document.getElementById('hardwoodResults').classList.remove('d-none');
+    document.getElementById('hardwoodAddToQuoteBtn').disabled = false;
+}
+
+function addToHardwoodQuote() {
+    let roomName = document.getElementById('hardwoodRoomName').value || 'Floor';
+    const totalSqft = parseFloat(document.getElementById('hardwoodTotalSqft').value) || 
+                     (parseFloat(document.getElementById('hardwoodWidth').value) * parseFloat(document.getElementById('hardwoodLength').value));
+    
+    if (totalSqft <= 0) {
+        alert("Please calculate before adding to quote.");
+        return;
+    }
+    
+    // Find or create a room
+    var room = rooms[0];
+    if (!room) { alert('Please create a room in the quote first.'); return; }
+    
+    // Add item to room
+    room.items.push({
+        description: `Hardwood/LVP — ${roomName}`,
+        category: 'Flooring',
+        unitType: 'sqft',
+        quantity: totalSqft,
+        rate: 0,
+        total: 0,
+        notes: 'Auto-calculated',
+        itemDescription: ''
+    });
+    
+    renderQuote();
+    
+    // Close modal
+    var modal = bootstrap.Modal.getInstance(document.getElementById('hardwoodCalcModal'));
+    modal.hide();
+    
+    alert("Hardwood/LVP item added to quote!");
+}
+
+function scanHardwoodQuote() {
+    let totalSqft = 0;
+    let roomMap = {};
+    
+    rooms.forEach(room => {
+        room.items.forEach(item => {
+            if ((item.category === 'Flooring' || item.category === 'Subflooring') && 
+                item.unitType === 'sqft') {
+                totalSqft += item.quantity;
+                if (!roomMap[room.name]) {
+                    roomMap[room.name] = 0;
+                }
+                roomMap[room.name] += item.quantity;
+            }
+        });
+    });
+    
+    // Update UI
+    document.getElementById('hardwoodScanTotal').textContent = totalSqft.toFixed(1);
+    document.getElementById('hardwoodScanRooms').textContent = Object.keys(roomMap).length;
+    
+    let details = '';
+    for (let room in roomMap) {
+        details += `${room} (${roomMap[room].toFixed(1)}sqft), `;
+    }
+    document.getElementById('hardwoodScanDetails').textContent = details.slice(0, -2);
+    
+    // Set scanned value
+    document.getElementById('hardwoodScanSqft').value = totalSqft.toFixed(1);
+    
+    // Show results and switch to sqft mode
+    document.getElementById('hardwoodScanResults').classList.remove('d-none');
+    document.getElementById('hardwoodToggleDimensions').checked = false;
+    toggleHardwoodDimensions();
+}
+
+// Paint Calculator Functions
+function openPaintCalc() {
+    var modal = new bootstrap.Modal(document.getElementById('paintCalcModal'));
+    modal.show();
+    
+    // Reset form
+    document.getElementById('paintRoomName').value = 'Living Room';
+    document.getElementById('paintWidth').value = '';
+    document.getElementById('paintLength').value = '';
+    document.getElementById('paintHeight').value = '9';
+    document.getElementById('paintWallSqft').value = '';
+    document.getElementById('paintCeilingSqft').value = '';
+    document.getElementById('paintDoors').value = '0';
+    document.getElementById('paintWindows').value = '0';
+    document.getElementById('paintCoats1').checked = true;
+    document.getElementById('paintIncludeCeiling').checked = true;
+    document.getElementById('paintIncludePrimer').checked = false;
+    document.getElementById('paintCoverage').value = '400';
+    
+    // Reset results
+    document.getElementById('paintResults').classList.add('d-none');
+    document.getElementById('paintAddToQuoteBtn').disabled = true;
+    
+    // Reset scan results
+    document.getElementById('paintScanResults').classList.add('d-none');
+    document.getElementById('paintToggleDimensions').checked = false;
+    togglePaintDimensions();
+}
+
+function togglePaintDimensions() {
+    const dimensionsGroup = document.getElementById('paintDimensionsGroup');
+    const sqftGroup = document.getElementById('paintSqftGroup');
+    
+    if (document.getElementById('paintToggleDimensions').checked) {
+        dimensionsGroup.classList.remove('d-none');
+        sqftGroup.classList.add('d-none');
+    } else {
+        dimensionsGroup.classList.add('d-none');
+        sqftGroup.classList.remove('d-none');
+    }
+}
+
+function calculatePaint() {
+    let roomName = document.getElementById('paintRoomName').value || 'Living Room';
+    let wallSqft, ceilingSqft;
+    
+    if (document.getElementById('paintToggleDimensions').checked) {
+        const width = parseFloat(document.getElementById('paintWidth').value) || 0;
+        const length = parseFloat(document.getElementById('paintLength').value) || 0;
+        const height = parseFloat(document.getElementById('paintHeight').value) || 9;
+        const doors = parseInt(document.getElementById('paintDoors').value) || 0;
+        const windows = parseInt(document.getElementById('paintWindows').value) || 0;
+        
+        // Calculate wall area
+        wallSqft = 2 * (width + length) * height;
+        // Subtract doors and windows
+        wallSqft -= doors * 20;
+        wallSqft -= windows * 15;
+        if (wallSqft < 0) wallSqft = 0;
+        
+        ceilingSqft = width * length;
+    } else {
+        wallSqft = parseFloat(document.getElementById('paintWallSqft').value) || 0;
+        ceilingSqft = parseFloat(document.getElementById('paintCeilingSqft').value) || 0;
+    }
+    
+    if (wallSqft <= 0 && ceilingSqft <= 0) {
+        alert("Please enter valid dimensions or square footage.");
+        return;
+    }
+    
+    const coats = parseInt(document.querySelector('input[name="paintCoats"]:checked').value) || 1;
+    const includeCeiling = document.getElementById('paintIncludeCeiling').checked;
+    const includePrimer = document.getElementById('paintIncludePrimer').checked;
+    const coverage = parseFloat(document.getElementById('paintCoverage').value) || 400;
+    
+    // Calculate gallons needed
+    let wallGallons = 0;
+    if (wallSqft > 0) {
+        wallGallons = Math.ceil((wallSqft * coats) / coverage);
+    }
+    
+    let ceilingGallons = 0;
+    if (includeCeiling && ceilingSqft > 0) {
+        ceilingGallons = Math.ceil((ceilingSqft * coats) / coverage);
+    }
+    
+    let primerGallons = 0;
+    if (includePrimer) {
+        const totalSqft = wallSqft + ceilingSqft;
+        primerGallons = Math.ceil(totalSqft / coverage);
+    }
+    
+    const totalGallons = wallGallons + ceilingGallons + primerGallons;
+    
+    // Display results
+    let resultText = `Wall sqft: ${wallSqft.toFixed(1)}<br>`;
+    if (includeCeiling && ceilingSqft > 0) {
+        resultText += `Ceiling sqft: ${ceilingSqft.toFixed(1)}<br>`;
+    }
+    
+    if (wallGallons > 0) {
+        resultText += `Wall paint gallons needed: ${wallGallons}<br>`;
+    }
+    
+    if (ceilingGallons > 0) {
+        resultText += `Ceiling paint gallons needed: ${ceilingGallons}<br>`;
+    }
+    
+    if (primerGallons > 0) {
+        resultText += `Primer gallons needed: ${primerGallons}<br>`;
+    }
+    
+    resultText += `Total gallons needed: ${totalGallons}`;
+    
+    document.getElementById('paintResultText').innerHTML = resultText;
+    document.getElementById('paintResults').classList.remove('d-none');
+    document.getElementById('paintAddToQuoteBtn').disabled = false;
+}
+
+function addToPaintQuote() {
+    let roomName = document.getElementById('paintRoomName').value || 'Living Room';
+    const wallSqft = parseFloat(document.getElementById('paintWallSqft').value) || 
+                     (parseFloat(document.getElementById('paintWidth').value) * 2 * (parseFloat(document.getElementById('paintHeight').value) || 9) + 
+                      parseFloat(document.getElementById('paintLength').value) * 2 * (parseFloat(document.getElementById('paintHeight').value) || 9));
+    
+    if (wallSqft <= 0) {
+        alert("Please calculate before adding to quote.");
+        return;
+    }
+    
+    // Find or create a room
+    var room = rooms[0];
+    if (!room) { alert('Please create a room in the quote first.'); return; }
+    
+    // Add wall paint item
+    room.items.push({
+        description: `Wall Paint — ${roomName}`,
+        category: 'Painting',
+        unitType: 'sqft',
+        quantity: wallSqft,
+        rate: 0,
+        total: 0,
+        notes: 'Auto-calculated',
+        itemDescription: ''
+    });
+    
+    // Add ceiling paint if checked
+    if (document.getElementById('paintIncludeCeiling').checked) {
+        const ceilingSqft = parseFloat(document.getElementById('paintCeilingSqft').value) || 
+                           (parseFloat(document.getElementById('paintWidth').value) * parseFloat(document.getElementById('paintLength').value));
+        
+        room.items.push({
+            description: `Ceiling Paint — ${roomName}`,
+            category: 'Painting',
+            unitType: 'sqft',
+            quantity: ceilingSqft,
+            rate: 0,
+            total: 0,
+            notes: 'Auto-calculated',
+            itemDescription: ''
+        });
+    }
+    
+    renderQuote();
+    
+    // Close modal
+    var modal = bootstrap.Modal.getInstance(document.getElementById('paintCalcModal'));
+    modal.hide();
+    
+    alert("Paint items added to quote!");
+}
+
+function scanPaintQuote() {
+    let totalSqft = 0;
+    let roomMap = {};
+    
+    rooms.forEach(room => {
+        room.items.forEach(item => {
+            if (item.category === 'Painting' && item.unitType === 'sqft') {
+                totalSqft += item.quantity;
+                if (!roomMap[room.name]) {
+                    roomMap[room.name] = 0;
+                }
+                roomMap[room.name] += item.quantity;
+            }
+        });
+    });
+    
+    // Update UI
+    document.getElementById('paintScanTotal').textContent = totalSqft.toFixed(1);
+    document.getElementById('paintScanRooms').textContent = Object.keys(roomMap).length;
+    
+    let details = '';
+    for (let room in roomMap) {
+        details += `${room} (${roomMap[room].toFixed(1)}sqft), `;
+    }
+    document.getElementById('paintScanDetails').textContent = details.slice(0, -2);
+    
+    // Set scanned value
+    document.getElementById('paintScanSqft').value = totalSqft.toFixed(1);
+    
+    // Show results and switch to sqft mode
+    document.getElementById('paintScanResults').classList.remove('d-none');
+    document.getElementById('paintToggleDimensions').checked = false;
+    togglePaintDimensions();
+}
+
+// Drywall Calculator Functions
+function openDrywallCalc() {
+    var modal = new bootstrap.Modal(document.getElementById('drywallCalcModal'));
+    modal.show();
+    document.getElementById('drywallRoomName').value = 'Living Room';
+    document.getElementById('drywallWidth').value = '';
+    document.getElementById('drywallLength').value = '';
+    document.getElementById('drywallHeight').value = '9';
+    document.getElementById('drywallWallSqft').value = '';
+    document.getElementById('drywallCeilingSqft').value = '';
+    document.getElementById('drywallDoors').value = '0';
+    document.getElementById('drywallWindows').value = '0';
+    document.getElementById('drywallIncludeCeiling').checked = true;
+    document.getElementById('drywallWaste').value = '10';
+    document.getElementById('drywallResults').classList.add('d-none');
+    document.getElementById('drywallAddToQuoteBtn').disabled = true;
+    document.getElementById('drywallScanResults').classList.add('d-none');
+    document.getElementById('drywallToggleDimensions').checked = false;
+    toggleDrywallDimensions();
+}
+
+function toggleDrywallDimensions() {
+    var dim = document.getElementById('drywallDimensionsGroup');
+    var sqft = document.getElementById('drywallSqftGroup');
+    if (document.getElementById('drywallToggleDimensions').checked) {
+        dim.classList.remove('d-none'); sqft.classList.add('d-none');
+    } else {
+        dim.classList.add('d-none'); sqft.classList.remove('d-none');
+    }
+}
+
+function calculateDrywall() {
+    var wallSqft, ceilingSqft;
+    var doors = 0, windows = 0;
+    if (document.getElementById('drywallToggleDimensions').checked) {
+        var w = parseFloat(document.getElementById('drywallWidth').value) || 0;
+        var l = parseFloat(document.getElementById('drywallLength').value) || 0;
+        var h = parseFloat(document.getElementById('drywallHeight').value) || 9;
+        doors = parseInt(document.getElementById('drywallDoors').value) || 0;
+        windows = parseInt(document.getElementById('drywallWindows').value) || 0;
+        wallSqft = 2 * (w + l) * h - (doors * 20) - (windows * 15);
+        if (wallSqft < 0) wallSqft = 0;
+        ceilingSqft = w * l;
+    } else {
+        wallSqft = parseFloat(document.getElementById('drywallWallSqft').value) || 0;
+        ceilingSqft = parseFloat(document.getElementById('drywallCeilingSqft').value) || 0;
+        doors = parseInt(document.getElementById('drywallDoors').value) || 0;
+    }
+    var includeCeiling = document.getElementById('drywallIncludeCeiling').checked;
+    var waste = parseFloat(document.getElementById('drywallWaste').value) || 10;
+    var totalSqft = wallSqft + (includeCeiling ? ceilingSqft : 0);
+    if (totalSqft <= 0) { alert('Please enter valid dimensions or square footage.'); return; }
+    var totalWithWaste = totalSqft * (1 + waste / 100);
+    var sheets = Math.ceil(totalWithWaste / 32); // 4x8 = 32 sqft
+    var mudBuckets = Math.ceil(totalWithWaste / 400);
+    var tapeRolls = Math.ceil(totalWithWaste / 500);
+    var cornerBead = (doors * 2) + 4;
+    var screwBoxes = Math.ceil(totalWithWaste / 200);
+    var txt = 'Total drywall sqft (with ' + waste + '% waste): ' + totalWithWaste.toFixed(1) + ' sqft (' + totalSqft.toFixed(1) + ' + ' + waste + '% waste)<br>';
+    txt += 'Sheets of 4\u00d78 drywall: ' + sheets + '<br>';
+    txt += 'Buckets of joint compound (4.5 gal): ' + mudBuckets + '<br>';
+    txt += 'Rolls of paper tape: ' + tapeRolls + '<br>';
+    txt += 'Corner bead pieces (10ft): ' + cornerBead + '<br>';
+    txt += 'Boxes of screws (1lb): ' + screwBoxes;
+    document.getElementById('drywallResultText').innerHTML = txt;
+    document.getElementById('drywallResults').classList.remove('d-none');
+    document.getElementById('drywallAddToQuoteBtn').disabled = false;
+    // Store calculated sqft for addToQuote
+    document.getElementById('drywallCalcModal').dataset.calcSqft = totalSqft.toFixed(1);
+}
+
+function addToDrywallQuote() {
+    var roomName = document.getElementById('drywallRoomName').value || 'Room';
+    var totalSqft = parseFloat(document.getElementById('drywallCalcModal').dataset.calcSqft) || 0;
+    if (totalSqft <= 0) { alert('Please calculate before adding to quote.'); return; }
+    var room = rooms[0];
+    if (!room) { alert('Please create a room in the quote first.'); return; }
+    room.items.push({ description: 'Drywall Hang \u2014 ' + roomName, category: 'Drywall', unitType: 'sqft', quantity: totalSqft, rate: 0, total: 0, notes: 'Auto-calculated', itemDescription: '' });
+    room.items.push({ description: 'Drywall Mud & Tape \u2014 ' + roomName, category: 'Drywall', unitType: 'sqft', quantity: totalSqft, rate: 0, total: 0, notes: 'Auto-calculated', itemDescription: '' });
+    renderQuote();
+    bootstrap.Modal.getInstance(document.getElementById('drywallCalcModal')).hide();
+    alert('Drywall items added to quote!');
+}
+
+function scanDrywallQuote() {
+    var totalSqft = 0, roomMap = {};
+    rooms.forEach(function(room) {
+        room.items.forEach(function(item) {
+            if (item.category === 'Drywall' && item.unitType === 'sqft') {
+                totalSqft += item.quantity;
+                if (!roomMap[room.name]) roomMap[room.name] = 0;
+                roomMap[room.name] += item.quantity;
+            }
+        });
+    });
+    document.getElementById('drywallScanTotal').textContent = totalSqft.toFixed(1);
+    document.getElementById('drywallScanRooms').textContent = Object.keys(roomMap).length;
+    var details = Object.keys(roomMap).map(function(r) { return r + ' (' + roomMap[r].toFixed(1) + 'sqft)'; }).join(', ');
+    document.getElementById('drywallScanDetails').textContent = details;
+    document.getElementById('drywallScanSqft').value = totalSqft.toFixed(1);
+    document.getElementById('drywallScanResults').classList.remove('d-none');
+    document.getElementById('drywallToggleDimensions').checked = false;
+    toggleDrywallDimensions();
+}
+</script>
+</body>
+</html>
