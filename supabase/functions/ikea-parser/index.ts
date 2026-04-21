@@ -113,7 +113,14 @@ Deno.serve(async (req) => {
       throw new Error('Could not parse AI response: ' + content.substring(0, 300));
     }
 
-    if (!Array.isArray(parsed)) throw new Error('Unexpected AI format: ' + content.substring(0, 200));
+    // If GPT returned a single object instead of array, wrap it
+    if (!Array.isArray(parsed)) {
+      if (parsed && typeof parsed === 'object' && parsed.type) {
+        parsed = [parsed];
+      } else {
+        throw new Error('Unexpected AI format: ' + content.substring(0, 200));
+      }
+    }
 
     const items = parsed.filter((item: any) => item.type !== 'skip' && item.qty > 0);
 
