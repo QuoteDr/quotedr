@@ -146,9 +146,12 @@ if (location.search.includes('debug')) {
     <div class="container py-4" style="max-width: 860px;">
 
         <!-- Print / Save button -->
-        <div class="text-center mb-3 d-print-none">
+        <div class="text-center mb-3 d-print-none d-flex justify-content-center gap-2 flex-wrap">
             <button onclick="window.print()" class="btn btn-outline-secondary btn-sm">
                 <i class="fas fa-print me-1"></i> Print / Save as PDF
+            </button>
+            <button id="qbPushBtn" onclick="pushInvoiceToQB()" class="btn btn-outline-primary btn-sm" style="display:none;">
+                <i class="fas fa-sync me-1"></i> Send to QuickBooks
             </button>
         </div>
 
@@ -696,6 +699,70 @@ if (location.search.includes('debug')) {
                 btns.forEach(function(b) { b.disabled = false; });
             }
         }
+
+        // === QuickBooks Push ===
+        const SUPABASE_URL = 'https://axmoffknvblluibuitrq.supabase.co';
+        const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso';
+
+        async function checkQBConnected() {
+            try {
+                const { data } = await _supabase.auth.getSession();
+                const token = data?.session?.access_token;
+                if (!token) return;
+                const resp = await fetch(SUPABASE_URL + '/functions/v1/qb-oauth', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON },
+                    body: JSON.stringify({ action: 'status' })
+                });
+                const status = await resp.json();
+                if (status.connected) {
+                    document.getElementById('qbPushBtn').style.display = 'inline-block';
+                }
+            } catch(e) { console.warn('QB check:', e); }
+        }
+
+        async function pushInvoiceToQB() {
+            const btn = document.getElementById('qbPushBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Sending...';
+            try {
+                const { data } = await _supabase.auth.getSession();
+                const token = data?.session?.access_token;
+                const invoiceData = {
+                    clientName: document.getElementById('clientName')?.textContent || '',
+                    clientEmail: document.getElementById('clientEmail')?.textContent || '',
+                    invoiceNumber: document.getElementById('invoiceNumber')?.textContent || '',
+                    total: parseFloat(document.getElementById('grandTotal')?.textContent?.replace(/[^0-9.]/g,'')) || 0,
+                    items: Array.from(document.querySelectorAll('.line-item-row')).map(row => ({
+                        description: row.querySelector('.item-desc')?.textContent || '',
+                        quantity: parseFloat(row.querySelector('.item-qty')?.textContent) || 1,
+                        rate: parseFloat(row.querySelector('.item-rate')?.textContent?.replace(/[^0-9.]/g,'')) || 0,
+                        total: parseFloat(row.querySelector('.item-total')?.textContent?.replace(/[^0-9.]/g,'')) || 0
+                    }))
+                };
+                const resp = await fetch(SUPABASE_URL + '/functions/v1/qb-sync', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON },
+                    body: JSON.stringify({ action: 'push_invoice', invoice: invoiceData })
+                });
+                const result = await resp.json();
+                if (result.error) throw new Error(result.error);
+                btn.innerHTML = '<i class="fas fa-check me-1"></i> Sent to QuickBooks!';
+                btn.className = 'btn btn-success btn-sm';
+                if (result.qb_url) {
+                    setTimeout(() => window.open(result.qb_url, '_blank'), 500);
+                }
+            } catch(e) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-sync me-1"></i> Send to QuickBooks';
+                alert('Error sending to QuickBooks: ' + e.message);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(checkQBConnected, 1500);
+        });
+        // === End QuickBooks ===
     </script>
 </body>
 </html>
