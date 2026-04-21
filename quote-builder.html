@@ -7054,23 +7054,39 @@ function addToDrywallQuote() {
 
 function scanDrywallQuote() {
     var totalSqft = 0, roomMap = {};
+    var allCategories = new Set();
+    var foundItems = [];
+
     rooms.forEach(function(room) {
         room.items.forEach(function(item) {
-            var isDrywall = item.category === 'Drywall' || (item.description && /drywall/i.test(item.description));
-            var isSqft = !item.unitType || item.unitType === 'sqft' || item.unitType === 'sf' || item.unitType === 'Sqft';
+            allCategories.add(item.category || '');
+            var normalizedCategory = (item.category || '').trim().toLowerCase();
+            var isDrywall = normalizedCategory === 'drywall' || normalizedCategory.includes('drywall') ||
+                            (item.description && /drywall/i.test(item.description));
+            var normalizedUnitType = (item.unitType || '').trim().toLowerCase().replace(/\s+/g, '');
+            var isSqft = !item.unitType || normalizedUnitType === 'sqft' || normalizedUnitType === 'sf';
             if (isDrywall && isSqft) {
                 totalSqft += item.quantity;
                 if (!roomMap[room.name]) roomMap[room.name] = 0;
                 roomMap[room.name] += item.quantity;
+                foundItems.push(item);
             }
         });
     });
-    document.getElementById('drywallScanTotal').textContent = totalSqft.toFixed(1);
-    document.getElementById('drywallScanRooms').textContent = Object.keys(roomMap).length;
-    var details = Object.keys(roomMap).map(function(r) { return r + ' (' + roomMap[r].toFixed(1) + 'sqft)'; }).join(', ');
-    document.getElementById('drywallScanDetails').textContent = details;
-    document.getElementById('drywallScanSqft').value = totalSqft.toFixed(1);
-    document.getElementById('drywallScanResults').classList.remove('d-none');
+
+    if (totalSqft === 0 && foundItems.length === 0) {
+        var categoriesList = Array.from(allCategories).filter(function(c) { return c; }).join(', ') || 'None';
+        document.getElementById('drywallScanResults').innerHTML =
+            '<div class="alert alert-warning">No drywall items found. Categories in your quote: <strong>' + categoriesList + '</strong></div>';
+        document.getElementById('drywallScanResults').classList.remove('d-none');
+    } else {
+        document.getElementById('drywallScanTotal').textContent = totalSqft.toFixed(1);
+        document.getElementById('drywallScanRooms').textContent = Object.keys(roomMap).length;
+        var details = Object.keys(roomMap).map(function(r) { return r + ' (' + roomMap[r].toFixed(1) + 'sqft)'; }).join(', ');
+        document.getElementById('drywallScanDetails').textContent = details;
+        document.getElementById('drywallScanSqft').value = totalSqft.toFixed(1);
+        document.getElementById('drywallScanResults').classList.remove('d-none');
+    }
     document.getElementById('drywallToggleDimensions').checked = false;
     toggleDrywallDimensions();
 }
