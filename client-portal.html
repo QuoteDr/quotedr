@@ -122,6 +122,22 @@
   </style>
 </head>
 <body>
+<div id="pinGate" style="position:fixed;inset:0;background:#1a2940;z-index:9999;display:flex;align-items:center;justify-content:center;">
+  <div style="background:white;border-radius:16px;padding:2rem;max-width:340px;width:90%;text-align:center;">
+    <img src="quotedr-logo.svg" style="height:48px;margin-bottom:1rem;" onerror="this.style.display='none'">
+    <h4 style="color:#1a2940;">Client Portal</h4>
+    <p class="text-muted small">Enter the 4-digit PIN your contractor provided</p>
+    <div class="d-flex gap-2 justify-content-center mb-3" id="pinBoxes">
+      <input type="number" class="form-control text-center fw-bold fs-3" style="width:60px;height:60px;" maxlength="1" min="0" max="9" id="pin0" oninput="pinInput(this,0)">
+      <input type="number" class="form-control text-center fw-bold fs-3" style="width:60px;height:60px;" maxlength="1" min="0" max="9" id="pin1" oninput="pinInput(this,1)">
+      <input type="number" class="form-control text-center fw-bold fs-3" style="width:60px;height:60px;" maxlength="1" min="0" max="9" id="pin2" oninput="pinInput(this,2)">
+      <input type="number" class="form-control text-center fw-bold fs-3" style="width:60px;height:60px;" maxlength="1" min="0" max="9" id="pin3" oninput="pinInput(this,3)">
+    </div>
+    <div id="pinError" class="text-danger small mb-2" style="min-height:1.2rem;"></div>
+    <button class="btn btn-primary w-100" onclick="checkPin()" id="pinSubmitBtn">Unlock Portal</button>
+    <p class="text-muted mt-3" style="font-size:0.75rem;">Forgot your PIN? Contact your contractor to reset it.</p>
+  </div>
+</div>
   <!-- Header -->
   <header class="header-bg">
     <div class="container">
@@ -436,6 +452,87 @@
 
     // Initialize when page loads
     document.addEventListener('DOMContentLoaded', init);
-  </script>
+  
+    // === PIN GATE ===
+    <script>
+    function pinInput(el, idx) {
+      const nextIdx = idx + 1;
+      if (el.value.length === 1 && nextIdx < 4) {
+        document.getElementById(`pin${nextIdx}`).focus();
+      }
+      
+      if (idx === 3 && el.value.length === 1) {
+        checkPin();
+      }
+    }
+    
+    async function checkPin() {
+      const pin0 = document.getElementById('pin0').value;
+      const pin1 = document.getElementById('pin1').value;
+      const pin2 = document.getElementById('pin2').value;
+      const pin3 = document.getElementById('pin3').value;
+      
+      const enteredPin = pin0 + pin1 + pin2 + pin3;
+      
+      if (enteredPin.length !== 4 || !/^\d{4}$/.test(enteredPin)) {
+        shakeError();
+        return;
+      }
+      
+      const clientName = new URLSearchParams(window.location.search).get('client');
+      const contractorId = new URLSearchParams(window.location.search).get('contractor');
+      
+      // Check if already unlocked
+      const unlockKey = `portal_unlocked_${clientName}_${contractorId}`;
+      if (sessionStorage.getItem(unlockKey)) {
+        hidePinGate();
+        return;
+      }
+      
+      // Check PIN against Supabase
+      const response = await supabase
+        .from('quotes')
+        .select('data.portal_pin')
+        .eq('client_name', clientName)
+        .eq('user_id', contractorId)
+        .single();
+      
+      if (response.data && response.data.data && response.data.data.portal_pin === enteredPin) {
+        sessionStorage.setItem(unlockKey, 'true');
+        hidePinGate();
+      } else {
+        shakeError();
+        document.getElementById('pinError').textContent = 'Incorrect PIN';
+      }
+    }
+    
+    function shakeError() {
+      const errorDiv = document.getElementById('pinError');
+      errorDiv.textContent = 'Incorrect PIN';
+      errorDiv.style.animation = 'shake 0.5s';
+      setTimeout(() => {
+        errorDiv.style.animation = '';
+      }, 500);
+    }
+    
+    function hidePinGate() {
+      document.getElementById('pinGate').style.display = 'none';
+      document.getElementById('portalContent').style.display = 'block';
+    }
+    
+    // Check on load
+    window.addEventListener('load', () => {
+      const clientName = new URLSearchParams(window.location.search).get('client');
+      const contractorId = new URLSearchParams(window.location.search).get('contractor');
+      
+      if (!clientName || !contractorId) return;
+      
+      const unlockKey = `portal_unlocked_${clientName}_${contractorId}`;
+      if (sessionStorage.getItem(unlockKey)) {
+        hidePinGate();
+      }
+    });
+    </script>
+    </script>
 </body>
 </html>

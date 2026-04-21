@@ -809,14 +809,74 @@
             if (modal) modal.hide();
         }
 
-        async function shareClientPortal(clientName) {
-            const { data } = await _supabase.auth.getSession();
-            const userId = data?.session?.user?.id;
-            if (!userId) { alert('Please log in first.'); return; }
-            const url = `https://quotedr.io/client-portal.html?client=${encodeURIComponent(clientName)}&contractor=${userId}`;
-            await navigator.clipboard.writeText(url).catch(() => {});
-            alert('Client portal link copied to clipboard!\n\n' + url);
-        }
+        <script>
+async function shareClientPortal(clientName) {
+  const userId = getCurrentUserId(); // Assuming this exists
+  const response = await supabase
+    .from('quotes')
+    .select('data.portal_pin')
+    .eq('client_name', clientName)
+    .eq('user_id', userId)
+    .single();
+  
+  let pin;
+  if (response.data && response.data.data && response.data.data.portal_pin) {
+    pin = response.data.data.portal_pin;
+  } else {
+    pin = Math.floor(Math.random() * 9000) + 1000; // 4-digit number
+  }
+  
+  await _savePortalPin(clientName, userId, pin);
+  
+  const portalUrl = `${window.location.origin}/client-portal.html?client=${encodeURIComponent(clientName)}&contractor=${userId}`;
+  
+  document.getElementById('portalClientName').textContent = clientName;
+  document.getElementById('portalUrlDisplay').value = portalUrl;
+  document.getElementById('portalPinDisplay').textContent = pin;
+  
+  const modal = new bootstrap.Modal(document.getElementById('portalShareModal'));
+  modal.show();
+}
+
+function copyPortalUrl() {
+  const urlInput = document.getElementById('portalUrlDisplay');
+  urlInput.select();
+  document.execCommand('copy');
+  showToast('Link copied to clipboard!');
+}
+
+function copyPortalBoth() {
+  const url = document.getElementById('portalUrlDisplay').value;
+  const pin = document.getElementById('portalPinDisplay').textContent;
+  const text = `Portal Link: ${url}\nYour PIN: ${pin}`;
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('Link and PIN copied to clipboard!');
+  });
+}
+
+async function resetPortalPin() {
+  const clientName = document.getElementById('portalClientName').textContent;
+  const userId = getCurrentUserId();
+  const newPin = Math.floor(Math.random() * 9000) + 1000;
+  
+  await _savePortalPin(clientName, userId, newPin);
+  
+  document.getElementById('portalPinDisplay').textContent = newPin;
+}
+
+async function _savePortalPin(clientName, userId, pin) {
+  const { error } = await supabase
+    .from('quotes')
+    .update({ 'data.portal_pin': pin })
+    .eq('client_name', clientName)
+    .eq('user_id', userId);
+  
+  if (error) {
+    console.error('Error saving PIN:', error);
+    showToast('Failed to save PIN');
+  }
+}
+</script>
 
         async function sendFollowUpReminder(quoteId, clientName, savedEmail) {
             var quote = allQuotes.find(function(q) { return q.id === quoteId; });
@@ -1416,6 +1476,32 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 javascript
+
+<div class="modal fade" id="portalShareModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#1a2940; color:white;">
+        <h5 class="modal-title"><i class="fas fa-external-link-alt me-2"></i>Client Portal Access</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-center">
+        <p class="text-muted mb-1">Share this link with <strong id="portalClientName"></strong>:</p>
+        <div class="input-group mb-3">
+          <input type="text" class="form-control form-control-sm" id="portalUrlDisplay" readonly>
+          <button class="btn btn-outline-secondary btn-sm" onclick="copyPortalUrl()"><i class="fas fa-copy"></i></button>
+        </div>
+        <div class="mb-3">
+          <div class="text-muted small mb-1">Client PIN (they need this to log in):</div>
+          <div id="portalPinDisplay" style="font-size:2.5rem; font-weight:bold; letter-spacing:0.5rem; color:#1a2940; background:#f8f9fa; border-radius:8px; padding:12px 24px; display:inline-block;"></div>
+        </div>
+        <div class="d-grid gap-2">
+          <button class="btn btn-primary" onclick="copyPortalBoth()"><i class="fas fa-copy me-1"></i>Copy Link + PIN</button>
+          <button class="btn btn-outline-secondary btn-sm" onclick="resetPortalPin()"><i class="fas fa-sync me-1"></i>Reset PIN (generate new)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 </body>
             </html>
           `);
