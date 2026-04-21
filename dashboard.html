@@ -543,7 +543,7 @@
                         document.getElementById('listViewBtn').classList.remove('btn-primary');
                         document.getElementById('kanbanViewBtn').classList.add('btn-primary');
                         document.getElementById('kanbanViewBtn').classList.remove('btn-outline-primary');
-                        renderKanban(currentQuotes);
+                        renderKanban(window.currentQuotes);
                     }
                     localStorage.setItem('ald_dashboard_view', mode);
                 }
@@ -608,16 +608,7 @@
                     }
                 }
                 
-                function loadQuotes() {
-                    // existing code to fetch quotes...
-                    fetch('/api/quotes')
-                        .then(response => response.json())
-                        .then(data => {
-                            window.currentQuotes = data;
-                            var savedView = localStorage.getItem('ald_dashboard_view') || 'list';
-                            if (typeof setView === 'function') setView(savedView); else renderQuotes(data);
-                        });
-                }
+
     </script>
 <!-- Client Notes Review Modal -->
 <div class="modal fade" id="notesReviewModal" tabindex="-1">
