@@ -8,50 +8,47 @@ const corsHeaders = {
 const SYSTEM_PROMPT = `You are an expert at parsing IKEA kitchen order receipts. Use these EXACT abbreviation rules to classify each line:
 
 == CABINET BOXES (SE = SEKTION line) ==
-- "SE bas cab" → baseCabinet
-- "SE wall cab" → wallCabinet
-- "SE hi cab", "SE tall", "SE hs" → tallCabinet
-- "SE cor" or any "corner" → cornerCabinet
-- "SE susp rl", "SE N leg", "SE rnfrcd", "SE vent", "SE rail" → skip (hardware)
+- "SE bas cab" = baseCabinet
+- "SE wall cab" = wallCabinet
+- "SE hi cab", "SE tall", "SE hs" = tallCabinet
+- "SE cor" or any "corner" = cornerCabinet
+- "SE susp rl", "SE N leg", "SE rnfrcd", "SE vent", "SE rail" = skip
 
 == DOORS ==
-- "AXSTAD dr" (any variant: gls dr, dr, drwfr) → door (ALL AXSTAD items with "dr" are doors)
-- VEDHAMN, KUNGSBACKA, JÄRSTA, LERHYTTAN, KALLARP → door
+- "AXSTAD dr" (any variant: gls dr, dr, drwfr) = door
+- VEDHAMN, KUNGSBACKA, KALLARP, LERHYTTAN = door
 
 == DRAWERS ==
-- "MA drw" or "MAXIMERA" → drawer
+- "MA drw" or "MAXIMERA" = drawer
 
-== FÖRBÄTTRA line ==
-- "FÖRBÄTTRA Toe kick" or "FÖRBÄTTRA toe" → toeKick
-- "FÖRBÄTTRA N cvr pnl" or "FÖRBÄTTRA cvr" or "FÖRBÄTTRA cover" → coverPanel
-- "FÖRBÄTTRA rnd deco strip" or "FÖRBÄTTRA deco" or "FÖRBÄTTRA strip" → crownMoulding
-- "FÖRBÄTTRA light val" or "FÖRBÄTTRA valance" → crownMoulding
+== FORBATTRA line ==
+- "FORBATTRA Toe kick" or "FORBATTRA toe" = toeKick
+- "FORBATTRA N cvr pnl" or "FORBATTRA cvr" = coverPanel
+- "FORBATTRA rnd deco strip" or "FORBATTRA deco" or "FORBATTRA strip" = crownMoulding
 
 == UTRUSTA line ==
-- "UTRUSTA shlf" or "UTRUSTA shelf" → shelf (interior shelf, installable)
-- "UTRUSTA hinge", "UTRUSTA NN hinge", "UTRUSTA dmpr", "UTRUSTA conn rail", "UTRUSTA pull-out" → skip
-- "UTRUSTA rotating shelf" or "UTRUSTA carousel" → lazySusan
-- When unsure about UTRUSTA: skip it
+- "UTRUSTA shlf" or "UTRUSTA shelf" = shelf
+- "UTRUSTA rotating shelf" or "UTRUSTA carousel" = lazySusan
+- All other UTRUSTA = skip
 
 == COUNTERTOPS ==
-- BADELUNDA, EKBACKEN, KASKER, NUMERAR → countertop
+- BADELUNDA, EKBACKEN, KASKER, NUMERAR = countertop
 
 == DISHWASHER PANEL ==
-- TUTEMO → dishwasherPanel
+- TUTEMO = dishwasherPanel
 
 == ALWAYS SKIP ==
-- Any line starting with "15% Kitchen", "PROMOTION", "Page", "delivery"
-- EDSVIK, LILLVIKEN, HAVSEN, VRESJÖN (faucets/sinks)
+- Lines starting with: 15% Kitchen, PROMOTION, Page, delivery
+- EDSVIK, LILLVIKEN, HAVSEN, VRESJON (faucets/sinks)
 - VARIERA (accessories)
-- SE N leg, SE susp rl (legs and rails)
-- Anything with: hinge, dmpr, screw, handle, knob, rail, bracket, clip, leg, delivery, sink, faucet, lid, strainer, stopper
+- Anything with: hinge, dmpr, screw, handle, knob, rail, bracket, clip, leg, sink, faucet, lid, strainer, stopper
 
-For each recognized (non-skip) line:
-- type: baseCabinet | wallCabinet | tallCabinet | cornerCabinet | drawer | door | coverPanel | toeKick | crownMoulding | countertop | dishwasherPanel | lazySusan | islandBase | shelf
-- qty: integer quantity from the line (e.g. "2.00" → 2)
-- label: short readable label with dimensions if visible (e.g. "Wall Cabinet 36x40", "AXSTAD Glass Door 18x40", "FÖRBÄTTRA Toe Kick 84")
+For each recognized line return:
+- type: baseCabinet, wallCabinet, tallCabinet, cornerCabinet, drawer, door, coverPanel, toeKick, crownMoulding, countertop, dishwasherPanel, lazySusan, islandBase, or shelf
+- qty: integer quantity (e.g. "2.00" becomes 2)
+- label: short readable description with dimensions
 
-Return ONLY a JSON array. No markdown, no explanation. Format: [{"type":"...","qty":1,"label":"..."}]`;
+IMPORTANT: Return a JSON array even if there is only one item. Always use array format: [{"type":"...","qty":1,"label":"..."}]`;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -59,8 +56,9 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { text } = await req.json();
-    if (!text || typeof text !== 'string' || text.trim().length < 5) {
+    const body = await req.json();
+    const text = body.text;
+    if (!text || text.trim().length < 5) {
       return new Response(JSON.stringify({ error: 'No order text provided' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -83,10 +81,9 @@ Deno.serve(async (req) => {
         model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: text.substring(0, 8000) }, // cap at 8k chars
+          { role: 'user', content: text.substring(0, 8000) },
         ],
         temperature: 0,
-        response_format: { type: 'json_object' },
       }),
     });
 
@@ -98,28 +95,33 @@ Deno.serve(async (req) => {
     const data = await response.json();
     let content = data.choices[0].message.content;
 
-    // Parse — strip fences then try array or wrapped object
-    content = content.replace(/```json?/g, '').replace(/```/g, '').trim();
-    let parsed: any;
+    content = content.replace(/```json/g, '').replace(/```/g, '').trim();
+
+    let parsed;
     try {
-      const obj = JSON.parse(content);
-      if (Array.isArray(obj)) {
-        parsed = obj;
-      } else {
-        parsed = obj.items || obj.result || obj.data || obj.products || obj.kitchen_items
-          || (Object.values(obj).find((v: any) => Array.isArray(v)) as any[]);
-      }
+      parsed = JSON.parse(content);
     } catch(e) {
       throw new Error('Could not parse AI response: ' + content.substring(0, 300));
     }
 
-    // If GPT returned a single object instead of array, wrap it
     if (!Array.isArray(parsed)) {
-      if (parsed && typeof parsed === 'object' && parsed.type) {
-        parsed = [parsed];
-      } else {
-        throw new Error('Unexpected AI format: ' + content.substring(0, 200));
+      if (parsed && typeof parsed === 'object') {
+        if (parsed.type) {
+          parsed = [parsed];
+        } else {
+          const keys = Object.keys(parsed);
+          for (const key of keys) {
+            if (Array.isArray(parsed[key])) {
+              parsed = parsed[key];
+              break;
+            }
+          }
+        }
       }
+    }
+
+    if (!Array.isArray(parsed)) {
+      throw new Error('AI did not return an array: ' + content.substring(0, 200));
     }
 
     const items = parsed.filter((item: any) => item.type !== 'skip' && item.qty > 0);
