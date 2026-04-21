@@ -6589,6 +6589,13 @@ async function saveQuote() {
                                 <label for="drywallWaste" class="form-label">Waste %</label>
                                 <input type="number" class="form-control" id="drywallWaste" value="10" min="0" max="100">
                             </div>
+                            <div class="col-md-6">
+                                <label for="drywallFinishLevel" class="form-label">Finish Level</label>
+                                <select class="form-select" id="drywallFinishLevel">
+                                    <option value="standard" selected>Standard (3-coat)</option>
+                                    <option value="level5">Level 5 (skim coat)</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                     
@@ -7049,24 +7056,28 @@ function calculateDrywall() {
     }
     var includeCeiling = document.getElementById('drywallIncludeCeiling').checked;
     var waste = parseFloat(document.getElementById('drywallWaste').value) || 10;
+    var finishLevel = document.getElementById('drywallFinishLevel') ? document.getElementById('drywallFinishLevel').value : 'standard';
+    var roomName = document.getElementById('drywallRoomName').value || 'Room';
     var totalSqft = wallSqft + (includeCeiling ? ceilingSqft : 0);
     if (totalSqft <= 0) { alert('Please enter valid dimensions or square footage.'); return; }
     var totalWithWaste = totalSqft * (1 + waste / 100);
-    var sheets = Math.ceil(totalWithWaste / 32); // 4x8 = 32 sqft
-    var mudBuckets = Math.ceil(totalWithWaste / 400);
+    var sheets = Math.ceil(totalWithWaste / 32);
+    var mudBuckets = finishLevel === 'level5' ? Math.ceil(totalWithWaste / 600) : Math.ceil(totalWithWaste / 950);
     var tapeRolls = Math.ceil(totalWithWaste / 500);
-    var cornerBead = (doors * 2) + 4;
+    var cornerBead = (doors * 2) + (windows * 4) + 2;
     var screwBoxes = Math.ceil(totalWithWaste / 200);
-    var txt = 'Total drywall sqft (with ' + waste + '% waste): ' + totalWithWaste.toFixed(1) + ' sqft (' + totalSqft.toFixed(1) + ' + ' + waste + '% waste)<br>';
-    txt += 'Sheets of 4\u00d78 drywall: ' + sheets + '<br>';
-    txt += 'Buckets of joint compound (4.5 gal): ' + mudBuckets + '<br>';
-    txt += 'Rolls of paper tape: ' + tapeRolls + '<br>';
-    txt += 'Corner bead pieces (10ft): ' + cornerBead + '<br>';
-    txt += 'Boxes of screws (1lb): ' + screwBoxes;
+    var txt = '<table class="table table-sm table-bordered mb-0">';
+    txt += '<tr><th colspan="2">Drywall Materials &mdash; ' + roomName + ' (' + (finishLevel === 'level5' ? 'Level 5 finish' : 'Standard 3-coat') + ')</th></tr>';
+    txt += '<tr><td>Total sqft (with ' + waste + '% waste)</td><td><strong>' + totalWithWaste.toFixed(1) + ' sqft</strong> <small class="text-muted">(' + totalSqft.toFixed(1) + ' base)</small></td></tr>';
+    txt += '<tr><td>Sheets of 4&times;8 drywall</td><td><strong>' + sheets + ' sheets</strong></td></tr>';
+    txt += '<tr><td>Joint compound (4.5 gal buckets)</td><td><strong>' + mudBuckets + ' buckets</strong></td></tr>';
+    txt += '<tr><td>Paper tape rolls (500ft)</td><td><strong>' + tapeRolls + ' rolls</strong></td></tr>';
+    txt += '<tr><td>Corner bead pieces (8ft)</td><td><strong>' + cornerBead + ' pieces</strong></td></tr>';
+    txt += '<tr><td>Drywall screws (1lb boxes)</td><td><strong>' + screwBoxes + ' boxes</strong></td></tr>';
+    txt += '</table>';
     document.getElementById('drywallResultText').innerHTML = txt;
     document.getElementById('drywallResults').classList.remove('d-none');
     document.getElementById('drywallAddToQuoteBtn').disabled = false;
-    // Store calculated sqft for addToQuote
     document.getElementById('drywallCalcModal').dataset.calcSqft = totalSqft.toFixed(1);
 }
 
