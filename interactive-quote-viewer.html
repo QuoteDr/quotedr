@@ -289,15 +289,15 @@ if (location.search.includes('debug')) {
             </button>
         </div>
 
-        <!-- Hidden Formspree form (submitted programmatically) -->
-        <form action="https://formspree.io/f/xlgokven" method="POST" id="upgradeForm" onsubmit="submitUpgrades(event)" style="display:none;">
-            <input type="hidden" name="quoteId" id="quoteId">
-            <input type="hidden" name="termsAccepted" id="termsAccepted">
-            <input type="hidden" name="clientSignature" id="clientSignature">
-            <input type="hidden" name="approvedBy" id="approvedBy">
-            <input type="hidden" name="approvedAt" id="approvedAt">
-            <button type="submit" id="hiddenSubmitBtn"></button>
-        </form>
+        <!-- Hidden fields for signature data (Formspree removed - signature saved to Supabase Storage) -->
+        <div style="display:none;">
+            <input type="hidden" id="quoteId">
+            <input type="hidden" id="termsAccepted">
+            <input type="hidden" id="clientSignature">
+            <input type="hidden" id="approvedBy">
+            <input type="hidden" id="approvedAt">
+            <button id="hiddenSubmitBtn"></button>
+        </div>
 
         <!-- Signature Modal -->
         <div class="sig-modal-overlay" id="sigModalOverlay">
@@ -937,7 +937,41 @@ if (location.search.includes('debug')) {
             } catch(e) { console.warn('Could not mark quote accepted:', e); }
         }
 
-        function confirmApproval() {
+                function dataURLtoBlob(dataUrl) {
+            const arr = dataUrl.split(',');
+            const mime = arr[0].match(/:(.*?);/)[1];
+            const bstr = atob(arr[1]);
+            let n = bstr.length;
+            const u8arr = new Uint8Array(n);
+            while(n--) u8arr[n] = bstr.charCodeAt(n);
+            return new Blob([u8arr], { type: mime });
+        }
+
+        async function saveSignatureToSupabase(quoteId, sigDataUrl, name) {
+            try {
+                const blob = dataURLtoBlob(sigDataUrl);
+                const fileName = `${quoteId}/${Date.now()}.png`;
+        
+                const { error: uploadError } = await _supabase.storage
+                    .from('signatures')
+                    .upload(fileName, blob, { contentType: 'image/png' });
+            
+                if (uploadError) throw uploadError;
+        
+                const { data: urlData, error: urlError } = await _supabase.storage
+                    .from('signatures')
+                    .getPublicUrl(fileName);
+            
+                if (urlError) throw urlError;
+        
+                return urlData.publicUrl;
+            } catch (error) {
+                console.warn('Failed to upload signature to Supabase Storage, falling back to base64:', error);
+                return null;
+            }
+        }
+
+        async function confirmApproval() {
             const name = document.getElementById('signerName').value.trim();
             if (!name) { alert('Please enter your full name.'); return; }
             if (!sigHasStrokes) { alert('Please draw your signature.'); return; }
@@ -947,31 +981,72 @@ if (location.search.includes('debug')) {
             const now = new Date();
             const dateStr = now.toLocaleDateString('en-CA', { year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit' });
 
-            // Store in hidden fields for form submission
+            const urlParams = new URLSearchParams(window.location.search);
+            const quoteId = urlParams.get('id');
+    
+            let signatureUrl = null;
+            if (quoteId) {
+                signatureUrl = await saveSignatureToSupabase(quoteId, sigDataUrl, name);
+            }
+
             document.getElementById('clientSignature').value = sigDataUrl;
             document.getElementById('approvedBy').value = name;
             document.getElementById('approvedAt').value = now.toISOString();
 
-            // Show approval banner
             document.getElementById('approvalSigPreview').src = sigDataUrl;
             document.getElementById('approvalMeta').textContent = 'Signed by ' + name + ' on ' + dateStr;
             document.getElementById('approvalBanner').classList.add('visible');
 
-            // Update status to accepted in Supabase
-            const urlParams = new URLSearchParams(window.location.search);
-            const quoteId = urlParams.get('id');
             if (quoteId) {
-                markQuoteAccepted(quoteId, name);
+                const { data: existingQuote, error } = await _supabase
+                    .from('quotes')
+                    .select('data')
+                    .eq('id', quoteId)
+                    .single();
+            
+                if (error) console.warn('Failed to fetch existing quote data:', error);
+        
+                const existingData = existingQuote?.data || {};
+                const updateData = {
+                    status: 'accepted',
+                    client_name: name,
+                    data: {
+                        ...existingData,
+                        signature_url: signatureUrl,
+                        signed_by: name,
+                        signed_at: now.toISOString()
+                    }
+                };
+        
+                await _supabase.from('quotes').update(updateData).eq('id', quoteId);
             }
 
-            // Hide approve section and auto-submit
             document.getElementById('approveSection').style.display = 'none';
             closeSignatureModal();
             submitUpgrades();
             document.getElementById('hiddenSubmitBtn').click();
-            // Show deposit payment button after signing
+    
             var depSection = document.getElementById('stripeDepositSection');
-            if (depSection && _paymentSettings && _paymentSettings.stripe_enabled && _paymentSettings.accept_deposit) depSection.style.display = 'block';
+            if (depSection && _paymentSettings && _paymentSettings.stripe_enabled && _paymentSettings.accept_deposit) {
+                depSection.style.display = 'block';
+            }
+    
+            if (signatureUrl) {
+                const toast = document.createElement('div');
+                toast.textContent = '✓ Signature saved';
+                toast.style.cssText = `
+                    position: fixed;
+                    bottom: 20px;
+                    right: 20px;
+                    background: #4CAF50;
+                    color: white;
+                    padding: 10px 15px;
+                    border-radius: 4px;
+                    z-index: 1000;
+                `;
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 3000);
+            }
         }
 
         function submitUpgrades(event) {
