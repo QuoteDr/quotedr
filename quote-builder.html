@@ -562,6 +562,20 @@ if (location.search.includes('debug')) {
                         <input type="text" id="mapItemName" class="form-control form-control-sm" list="mapItemSuggestions" placeholder="Item name e.g. Roof tear-off" style="max-width:200px;">
                         <datalist id="mapItemSuggestions"></datalist>
                         <input type="number" id="mapItemRate" class="form-control form-control-sm" placeholder="Rate $" step="0.01" style="max-width:90px;">
+                        <select id="mapRoofPitch" class="form-select form-select-sm" style="max-width:130px;" title="Roof pitch correction (for roofing only)">
+                            <option value="1">No pitch (flat)</option>
+                            <option value="1.014">2/12 pitch</option>
+                            <option value="1.031">3/12 pitch</option>
+                            <option value="1.054">4/12 pitch</option>
+                            <option value="1.083">5/12 pitch</option>
+                            <option value="1.118" selected>6/12 pitch</option>
+                            <option value="1.158">7/12 pitch</option>
+                            <option value="1.202">8/12 pitch</option>
+                            <option value="1.250">9/12 pitch</option>
+                            <option value="1.302">10/12 pitch</option>
+                            <option value="1.357">11/12 pitch</option>
+                            <option value="1.414">12/12 pitch</option>
+                        </select>
                         <input type="hidden" id="mapItemUnit">
                     </div>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -2921,16 +2935,23 @@ Example:
             var itemName = document.getElementById('mapItemName').value.trim();
             var rate = parseFloat(document.getElementById('mapItemRate').value) || 0;
             var category = document.getElementById('mapItemCategory').value || 'Miscellaneous';
+            var pitchMultiplier = parseFloat(document.getElementById('mapRoofPitch').value) || 1;
             _mapShapes.forEach(function(shape) {
                 var m = getShapeMeasurement(shape);
+                var quantity = m.value;
+                var itemDescription = 'Measured from satellite map';
+                if (m.unit === 'sqft' && pitchMultiplier !== 1) {
+                    quantity = parseFloat((quantity * pitchMultiplier).toFixed(2));
+                    itemDescription += ' (pitch ' + pitchMultiplier + 'x applied)';
+                }
                 room.items.push({
                     description: itemName || shape._label,
-                    itemDescription: 'Measured from satellite map',
+                    itemDescription: itemDescription,
                     category: category,
-                    quantity: m.value,
+                    quantity: quantity,
                     unitType: m.unit,
                     rate: rate,
-                    total: m.value * rate,
+                    total: quantity * rate,
                     materialCost: 0, supplierUrl: '', notes: ''
                 });
             });
@@ -6730,8 +6751,10 @@ function scanHardwoodQuote() {
     
     rooms.forEach(room => {
         room.items.forEach(item => {
-            var isFlooring = item.category === 'Flooring' || item.category === 'Subflooring' || (item.description && /flooring|hardwood|lvp|laminate|vinyl|tile/i.test(item.description));
-            var isSqft = !item.unitType || item.unitType === 'sqft' || item.unitType === 'sf' || item.unitType === 'Sqft';
+            var normalizedCatF = (item.category || '').trim().toLowerCase();
+            var isFlooring = normalizedCatF === 'flooring' || normalizedCatF === 'subflooring' || normalizedCatF.includes('floor') || (item.description && /flooring|hardwood|lvp|laminate|vinyl|tile/i.test(item.description));
+            var normalizedUnitF = (item.unitType || '').trim().toLowerCase().replace(/\s+/g, '');
+            var isSqft = !item.unitType || normalizedUnitF === 'sqft' || normalizedUnitF === 'sf';
             if (isFlooring && isSqft) {
                 totalSqft += item.quantity;
                 if (!roomMap[room.name]) {
@@ -6943,8 +6966,10 @@ function scanPaintQuote() {
     
     rooms.forEach(room => {
         room.items.forEach(item => {
-            var isPainting = item.category === 'Painting' || (item.description && /paint/i.test(item.description));
-            var isSqftP = !item.unitType || item.unitType === 'sqft' || item.unitType === 'sf' || item.unitType === 'Sqft';
+            var normalizedCatP = (item.category || '').trim().toLowerCase();
+            var isPainting = normalizedCatP === 'painting' || normalizedCatP.includes('paint') || (item.description && /paint/i.test(item.description));
+            var normalizedUnitP = (item.unitType || '').trim().toLowerCase().replace(/\s+/g, '');
+            var isSqftP = !item.unitType || normalizedUnitP === 'sqft' || normalizedUnitP === 'sf';
             if (isPainting && isSqftP) {
                 totalSqft += item.quantity;
                 if (!roomMap[room.name]) {
