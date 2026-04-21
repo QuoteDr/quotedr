@@ -386,6 +386,8 @@
             ${signatureHtml}
             ${q.status === 'in_review' ? `<button class="btn btn-warning btn-sm w-100 mt-2" onclick="openNotesReview('${q.id}', '${(q.client_name || '').replace(/'/g, "\'")}')"><i class="fas fa-comments me-1"></i> Review Client Notes</button>` : ''}
             <button class="btn btn-outline-info btn-sm w-100 mt-1" onclick="shareClientPortal('${(q.client_name || '').replace(/'/g, "\'")}')" title="Share client portal"><i class="fas fa-external-link-alt me-1"></i> Client Portal</button>
+            
+            ${(q.status === 'accepted' || q.status === 'invoiced') ? `<button class="btn btn-outline-warning btn-sm w-100 mt-1" onclick="openChangeOrderModal('${q.id}', '${(q.client_name||'').replace(/'/g,"\\'")}')" ><i class="fas fa-file-alt me-1"></i> Change Order</button>` : ''}
             ${q.status === 'paid' ? `<button class="btn btn-outline-success btn-sm w-100 mt-1" onclick="openWarrantyModal('${q.id}', '${(q.client_name||'').replace(/'/g,"\\'")}')"><i class="fas fa-certificate me-1"></i> Generate Warranty</button>` : ''}
             ${(q.status === 'sent' || q.status === 'viewed') ? `<button class="btn btn-outline-primary btn-sm w-100 mt-1" onclick="sendFollowUpReminder('${q.id}', '${(q.client_name || '').replace(/'/g, "\'")}'", '${(q.data && q.data.clientEmail) || ''}')"><i class="fas fa-bell me-1"></i> Send Follow-up</button>` : ''}
         </div>
@@ -1334,13 +1336,428 @@ document.addEventListener('DOMContentLoaded', function() {
                 <p>Authorized by: ${contractor}</p>
                 <p>Signature _________________________</p>
               </div>
-            </body>
+            
+<div class="modal fade" id="changeOrderModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Change Order</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <ul class="nav nav-tabs" id="coTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="new-tab" data-bs-toggle="tab" data-bs-target="#new-co" type="button">New Change Order</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="view-tab" data-bs-toggle="tab" data-bs-target="#view-co" type="button">View Change Orders</button>
+          </li>
+        </ul>
+        <div class="tab-content mt-3" id="coTabsContent">
+          <!-- New CO Tab -->
+          <div class="tab-pane fade show active" id="new-co" role="tabpanel">
+            <form id="newCoForm">
+              <div class="mb-3">
+                <label class="form-label">Description</label>
+                <textarea class="form-control" id="coDescription" required></textarea>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Reason</label>
+                <select class="form-select" id="coReason" required>
+                  <option value="">Select reason</option>
+                  <option value="Client requested">Client requested</option>
+                  <option value="Unforeseen conditions">Unforeseen conditions</option>
+                  <option value="Design change">Design change</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Line Items</label>
+                <table class="table table-sm" id="coItemsTable">
+                  <thead>
+                    <tr>
+                      <th>Description</th>
+                      <th>Qty</th>
+                      <th>Unit</th>
+                      <th>Unit Price</th>
+                      <th>Total</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="coItemsBody">
+                    <tr>
+                      <td><input type="text" class="form-control item-desc" required></td>
+                      <td><input type="number" class="form-control item-qty" value="1" min="0"></td>
+                      <td><input type="text" class="form-control item-unit" value="each"></td>
+                      <td><input type="number" class="form-control item-price" min="0" step="0.01"></td>
+                      <td><input type="text" class="form-control item-total" readonly></td>
+                      <td><button type="button" class="btn btn-danger btn-sm" onclick="removeChangeOrderItem(this)">Remove</button></td>
+                    </tr>
+                  </tbody>
+                </table>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="addChangeOrderItem()">Add Item</button>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Notes</label>
+                <textarea class="form-control" id="coNotes"></textarea>
+              </div>
+              <button type="submit" class="btn btn-primary">Add Change Order</button>
+            </form>
+          </div>
+          
+          <!-- View CO Tab -->
+          <div class="tab-pane fade" id="view-co" role="tabpanel">
+            <div id="coList"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+javascript
+</body>
             </html>
           `);
           printWindow.document.close();
           printWindow.focus();
           printWindow.print();
         }
+        </script>
+        
+        // === CHANGE ORDERS ===
+        <script>
+        let currentQuoteId = '';
+        let currentClientName = '';
+        
+        function openChangeOrderModal(quoteId, clientName) {
+          currentQuoteId = quoteId;
+          currentClientName = clientName;
+          
+          window._supabase
+            .from('quotes')
+            .select('data')
+            .eq('id', quoteId)
+            .single()
+            .then(({ data, error }) => {
+              if (error) throw error;
+              
+              const quote = data;
+              const changeOrders = quote.data?.change_orders || [];
+              
+              // Load existing COs in View tab
+              renderChangeOrders(changeOrders);
+              
+              // Show modal
+              const modal = new bootstrap.Modal(document.getElementById('changeOrderModal'));
+              modal.show();
+            })
+            .catch(err => console.error(err));
+        }
+        
+        function addChangeOrderItem() {
+          const tbody = document.getElementById('coItemsBody');
+          const newRow = document.createElement('tr');
+          
+          newRow.innerHTML = `
+            <td><input type="text" class="form-control item-desc" required></td>
+            <td><input type="number" class="form-control item-qty" value="1" min="0"></td>
+            <td><input type="text" class="form-control item-unit" value="each"></td>
+            <td><input type="number" class="form-control item-price" min="0" step="0.01"></td>
+            <td><input type="text" class="form-control item-total" readonly></td>
+            <td><button type="button" class="btn btn-danger btn-sm" onclick="removeChangeOrderItem(this)">Remove</button></td>
+          `;
+          
+          tbody.appendChild(newRow);
+          
+          // Add event listeners for auto-calculation
+          const inputs = newRow.querySelectorAll('input');
+          inputs.forEach(input => {
+            if (input.classList.contains('item-qty') || input.classList.contains('item-price')) {
+              input.addEventListener('input', calculateItemTotal);
+            }
+          });
+        }
+        
+        function removeChangeOrderItem(btn) {
+          btn.closest('tr').remove();
+          calculateTotals();
+        }
+        
+        function calculateItemTotal() {
+          const row = this.closest('tr');
+          const qtyInput = row.querySelector('.item-qty');
+          const priceInput = row.querySelector('.item-price');
+          const totalInput = row.querySelector('.item-total');
+          
+          const qty = parseFloat(qtyInput.value) || 0;
+          const price = parseFloat(priceInput.value) || 0;
+          const total = qty * price;
+          
+          totalInput.value = total.toFixed(2);
+          calculateTotals();
+        }
+        
+        function calculateTotals() {
+          let subtotal = 0;
+          document.querySelectorAll('#coItemsBody tr').forEach(row => {
+            const totalInput = row.querySelector('.item-total');
+            const total = parseFloat(totalInput.value) || 0;
+            subtotal += total;
+          });
+          
+          // Update form's subtotal display if needed
+        }
+        
+        document.getElementById('newCoForm').addEventListener('submit', function(e) {
+          e.preventDefault();
+          submitChangeOrder(currentQuoteId);
+        });
+        
+        function submitChangeOrder(quoteId) {
+          const description = document.getElementById('coDescription').value;
+          const reason = document.getElementById('coReason').value;
+          const notes = document.getElementById('coNotes').value;
+          
+          // Collect items
+          const items = [];
+          let subtotal = 0;
+          
+          document.querySelectorAll('#coItemsBody tr').forEach(row => {
+            const desc = row.querySelector('.item-desc').value;
+            const qty = parseFloat(row.querySelector('.item-qty').value) || 0;
+            const unit = row.querySelector('.item-unit').value;
+            const price = parseFloat(row.querySelector('.item-price').value) || 0;
+            const total = qty * price;
+            
+            if (desc && !isNaN(qty) && !isNaN(price)) {
+              items.push({ description: desc, qty, unit, price, total });
+              subtotal += total;
+            }
+          });
+          
+          // Generate CO number
+          window._supabase
+            .from('quotes')
+            .select('data')
+            .eq('id', quoteId)
+            .single()
+            .then(({ data, error }) => {
+              if (error) throw error;
+              
+              const quote = data;
+              const changeOrders = quote.data?.change_orders || [];
+              const nextNumber = changeOrders.length + 1;
+              const coNumber = `CO-${String(nextNumber).padStart(3, '0')}`;
+              
+              const newCo = {
+                id: `co_${Date.now()}`,
+                number: coNumber,
+                created_at: new Date().toISOString(),
+                description,
+                reason,
+                items,
+                subtotal,
+                status: 'pending',
+                notes
+              };
+              
+              // Update quote with new CO
+              const updatedChangeOrders = [...changeOrders, newCo];
+              const updatedData = { ...quote.data, change_orders: updatedChangeOrders };
+              
+              return window._supabase
+                .from('quotes')
+                .update({ data: updatedData })
+                .eq('id', quoteId);
+            })
+            .then(() => {
+              // Reload view tab
+              window._supabase
+                .from('quotes')
+                .select('data')
+                .eq('id', quoteId)
+                .single()
+                .then(({ data, error }) => {
+                  if (error) throw error;
+                  const changeOrders = data.data?.change_orders || [];
+                  renderChangeOrders(changeOrders);
+                });
+              
+              // Reset form
+              document.getElementById('newCoForm').reset();
+              document.getElementById('coItemsBody').innerHTML = `
+                <tr>
+                  <td><input type="text" class="form-control item-desc" required></td>
+                  <td><input type="number" class="form-control item-qty" value="1" min="0"></td>
+                  <td><input type="text" class="form-control item-unit" value="each"></td>
+                  <td><input type="number" class="form-control item-price" min="0" step="0.01"></td>
+                  <td><input type="text" class="form-control item-total" readonly></td>
+                  <td><button type="button" class="btn btn-danger btn-sm" onclick="removeChangeOrderItem(this)">Remove</button></td>
+                </tr>
+              `;
+              
+              // Reattach event listeners
+              document.querySelectorAll('.item-qty, .item-price').forEach(input => {
+                input.addEventListener('input', calculateItemTotal);
+              });
+            })
+            .catch(err => console.error(err));
+        }
+        
+        function renderChangeOrders(changeOrders) {
+          const container = document.getElementById('coList');
+          
+          if (!changeOrders.length) {
+            container.innerHTML = '<p>No change orders found.</p>';
+            return;
+          }
+          
+          let html = '<div class="table-responsive">';
+          html += '<table class="table table-striped">';
+          html += '<thead><tr><th>CO Number</th><th>Description</th><th>Subtotal</th><th>Status</th><th>Action</th></tr></thead>';
+          html += '<tbody>';
+          
+          changeOrders.forEach(co => {
+            const statusBadge = co.status === 'approved' ? 'badge bg-success' : 
+                               co.status === 'declined' ? 'badge bg-danger' : 'badge bg-warning';
+            
+            let actionButtons = '';
+            if (co.status === 'pending') {
+              actionButtons = `
+                <button class="btn btn-sm btn-success" onclick="approveChangeOrder('${currentQuoteId}', '${co.id}')">Approve</button>
+                <button class="btn btn-sm btn-danger" onclick="declineChangeOrder('${currentQuoteId}', '${co.id}')">Decline</button>
+              `;
+            } else if (co.status === 'approved') {
+              const approvedDate = new Date(co.approved_at).toLocaleDateString();
+              actionButtons = `<span class="badge bg-success">Approved by ${co.approved_by} on ${approvedDate}</span>`;
+            }
+            
+            html += `
+              <tr>
+                <td>${co.number}</td>
+                <td>${co.description}</td>
+                <td>$${co.subtotal.toFixed(2)}</td>
+                <td><span class="${statusBadge}">${co.status.charAt(0).toUpperCase() + co.status.slice(1)}</span></td>
+                <td>${actionButtons}</td>
+              </tr>
+            `;
+          });
+          
+          html += '</tbody></table></div>';
+          container.innerHTML = html;
+        }
+        
+        function approveChangeOrder(quoteId, coId) {
+          const clientName = prompt("Client name for approval:");
+          if (!clientName) return;
+          
+          const now = new Date().toISOString();
+          
+          window._supabase
+            .from('quotes')
+            .select('data')
+            .eq('id', quoteId)
+            .single()
+            .then(({ data, error }) => {
+              if (error) throw error;
+              
+              const quote = data;
+              const changeOrders = quote.data?.change_orders || [];
+              
+              // Find and update CO
+              const updatedChangeOrders = changeOrders.map(co => {
+                if (co.id === coId) {
+                  return {
+                    ...co,
+                    status: 'approved',
+                    approved_by: clientName,
+                    approved_at: now
+                  };
+                }
+                return co;
+              });
+              
+              // Update quote total with approved COs
+              const newTotal = updatedChangeOrders.reduce((sum, co) => {
+                if (co.status === 'approved') {
+                  return sum + co.subtotal;
+                }
+                return sum;
+              }, quote.total || 0);
+              
+              const updatedData = { ...quote.data, change_orders: updatedChangeOrders };
+              
+              return window._supabase
+                .from('quotes')
+                .update({ data: updatedData, total: newTotal })
+                .eq('id', quoteId);
+            })
+            .then(() => {
+              // Reload view tab
+              window._supabase
+                .from('quotes')
+                .select('data')
+                .eq('id', quoteId)
+                .single()
+                .then(({ data, error }) => {
+                  if (error) throw error;
+                  const changeOrders = data.data?.change_orders || [];
+                  renderChangeOrders(changeOrders);
+                });
+            })
+            .catch(err => console.error(err));
+        }
+        
+        function declineChangeOrder(quoteId, coId) {
+          window._supabase
+            .from('quotes')
+            .select('data')
+            .eq('id', quoteId)
+            .single()
+            .then(({ data, error }) => {
+              if (error) throw error;
+              
+              const quote = data;
+              const changeOrders = quote.data?.change_orders || [];
+              
+              // Find and update CO
+              const updatedChangeOrders = changeOrders.map(co => {
+                if (co.id === coId) {
+                  return { ...co, status: 'declined' };
+                }
+                return co;
+              });
+              
+              const updatedData = { ...quote.data, change_orders: updatedChangeOrders };
+              
+              return window._supabase
+                .from('quotes')
+                .update({ data: updatedData })
+                .eq('id', quoteId);
+            })
+            .then(() => {
+              // Reload view tab
+              window._supabase
+                .from('quotes')
+                .select('data')
+                .eq('id', quoteId)
+                .single()
+                .then(({ data, error }) => {
+                  if (error) throw error;
+                  const changeOrders = data.data?.change_orders || [];
+                  renderChangeOrders(changeOrders);
+                });
+            })
+            .catch(err => console.error(err));
+        }
+        
+        // Initialize event listeners for existing items
+        document.addEventListener('DOMContentLoaded', function() {
+          document.querySelectorAll('.item-qty, .item-price').forEach(input => {
+            input.addEventListener('input', calculateItemTotal);
+          });
+        });
         </script>
         </script>
 </body>
