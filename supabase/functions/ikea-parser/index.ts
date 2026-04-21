@@ -5,35 +5,53 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const SYSTEM_PROMPT = `You are an expert at parsing IKEA kitchen order receipts. IKEA uses specific abbreviations — learn these exact patterns:
+const SYSTEM_PROMPT = `You are an expert at parsing IKEA kitchen order receipts. Use these EXACT abbreviation rules to classify each line:
 
-SE = SEKTION cabinet line. The format is: "SE [type] [description] [dimensions]"
-- "SE bas cab" or "SE bas" = baseCabinet (base cabinet)
-- "SE wall cab" or "SE wall" = wallCabinet (wall/upper cabinet)
-- "SE hi cab" or "SE tall" or "SE hs" = tallCabinet (tall/high/pantry cabinet)
-- "SE cor" or "SE corner" = cornerCabinet
-- "SE cvr" or "SE cover" or "SE fil" or "SE filler" or "SE end" = coverPanel
-- "SE toe" or "SE tk" = toeKick
-- "SE shelf" or "SE shlf" = shelf
-- "SE rnfrcd" or "SE rail" or "SE suspension" or "SE vent" = skip (structural hardware, not an install item)
+== CABINET BOXES (SE = SEKTION line) ==
+- "SE bas cab" → baseCabinet
+- "SE wall cab" → wallCabinet
+- "SE hi cab", "SE tall", "SE hs" → tallCabinet
+- "SE cor" or any "corner" → cornerCabinet
+- "SE susp rl", "SE N leg", "SE rnfrcd", "SE vent", "SE rail" → skip (hardware)
 
-MA or MAXIMERA = drawer box/insert → drawer
-AXSTAD = cabinet door/drawer front → door ("drwfr" means drawer front which is a door panel)
-VEDHAMN, KUNGSBACKA, JÄRSTA, LERHYTTAN, KALLARP = door
-PRÄGEL = crownMoulding
-BADELUNDA, EKBACKEN, KASKER, NUMERAR = countertop
-TUTEMO = dishwasherPanel
-UTRUSTA = usually skip (hardware/rails) UNLESS it says "rotating shelf" or "carousel" → lazySusan
-EDSVIK, LILLVIKEN, HAVSEN = skip (faucets/sinks)
+== DOORS ==
+- "AXSTAD dr" (any variant: gls dr, dr, drwfr) → door (ALL AXSTAD items with "dr" are doors)
+- VEDHAMN, KUNGSBACKA, JÄRSTA, LERHYTTAN, KALLARP → door
 
-Lines starting with "15% Kitchen", "PROMOTION", "Page", or showing only a discount amount = skip entirely
+== DRAWERS ==
+- "MA drw" or "MAXIMERA" → drawer
 
-For each non-skip product line, extract:
-- type: one of baseCabinet, wallCabinet, tallCabinet, cornerCabinet, drawer, door, coverPanel, toeKick, crownMoulding, countertop, dishwasherPanel, lazySusan, islandBase, shelf
-- qty: the quantity number from the line (3rd column, e.g. "3.00" → 3)
-- label: short human-readable description (e.g. "Base Cabinet 30x24x30", "Wall Cabinet 24x40", "AXSTAD Drawer Front 30x10")
+== FÖRBÄTTRA line ==
+- "FÖRBÄTTRA Toe kick" or "FÖRBÄTTRA toe" → toeKick
+- "FÖRBÄTTRA N cvr pnl" or "FÖRBÄTTRA cvr" or "FÖRBÄTTRA cover" → coverPanel
+- "FÖRBÄTTRA rnd deco strip" or "FÖRBÄTTRA deco" or "FÖRBÄTTRA strip" → crownMoulding
+- "FÖRBÄTTRA light val" or "FÖRBÄTTRA valance" → crownMoulding
 
-Return ONLY a valid JSON array. No explanation, no markdown. Each element: {"type": "categoryKey", "qty": number, "label": "description"}`;
+== UTRUSTA line ==
+- "UTRUSTA shlf" or "UTRUSTA shelf" → shelf (interior shelf, installable)
+- "UTRUSTA hinge", "UTRUSTA NN hinge", "UTRUSTA dmpr", "UTRUSTA conn rail", "UTRUSTA pull-out" → skip
+- "UTRUSTA rotating shelf" or "UTRUSTA carousel" → lazySusan
+- When unsure about UTRUSTA: skip it
+
+== COUNTERTOPS ==
+- BADELUNDA, EKBACKEN, KASKER, NUMERAR → countertop
+
+== DISHWASHER PANEL ==
+- TUTEMO → dishwasherPanel
+
+== ALWAYS SKIP ==
+- Any line starting with "15% Kitchen", "PROMOTION", "Page", "delivery"
+- EDSVIK, LILLVIKEN, HAVSEN, VRESJÖN (faucets/sinks)
+- VARIERA (accessories)
+- SE N leg, SE susp rl (legs and rails)
+- Anything with: hinge, dmpr, screw, handle, knob, rail, bracket, clip, leg, delivery, sink, faucet, lid, strainer, stopper
+
+For each recognized (non-skip) line:
+- type: baseCabinet | wallCabinet | tallCabinet | cornerCabinet | drawer | door | coverPanel | toeKick | crownMoulding | countertop | dishwasherPanel | lazySusan | islandBase | shelf
+- qty: integer quantity from the line (e.g. "2.00" → 2)
+- label: short readable label with dimensions if visible (e.g. "Wall Cabinet 36x40", "AXSTAD Glass Door 18x40", "FÖRBÄTTRA Toe Kick 84")
+
+Return ONLY a JSON array. No markdown, no explanation. Format: [{"type":"...","qty":1,"label":"..."}]`;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
