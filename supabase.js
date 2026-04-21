@@ -437,12 +437,44 @@ async function saveQuoteForSharing(quoteData) {
 
 // Load a quote from Supabase for viewing
 async function loadQuoteForViewing(supabaseId) {
+    // Try invoices table first (invoice viewer), then quotes table (quote viewer)
+    const { data: invData, error: invError } = await _supabase
+        .from('invoices')
+        .select('*')
+        .eq('id', supabaseId)
+        .single();
+    if (!invError && invData) return { data: { data: invData, user_id: invData.user_id }, error: null };
+
     const { data, error } = await _supabase
         .from('quotes')
         .select('*')
         .eq('id', supabaseId)
         .single();
     return { data, error };
+}
+
+async function saveInvoiceForSharing(invoiceData) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    const { data, error } = await _supabase
+        .from('invoices')
+        .upsert({
+            user_id: user.id,
+            client_name: invoiceData.clientName || '',
+            project_address: invoiceData.projectAddress || '',
+            email: invoiceData.email || '',
+            phone: invoiceData.phone || '',
+            quote_number: invoiceData.quoteNumber || '',
+            rooms: invoiceData.rooms || [],
+            grand_total: invoiceData.grandTotal || 0,
+            terms: invoiceData.terms || [],
+            data: invoiceData,
+            created_at: new Date().toISOString()
+        }, { onConflict: 'id' })
+        .select()
+        .single();
+    if (error) { console.error('saveInvoiceForSharing error:', error); return { error }; }
+    return { data };
 }
 
 // Supabase RLS policies needed:

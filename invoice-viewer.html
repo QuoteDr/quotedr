@@ -412,11 +412,17 @@ if (location.search.includes('debug')) {
                         document.getElementById('invoiceContainer').innerHTML = '<div class="alert alert-warning">Invoice not found.</div>';
                         return;
                     }
-                    invoiceData = result.data.data || {};
+                    // result.data may be raw invoices row or a wrapped {data, user_id} object
+                    var row = result.data;
+                    invoiceData = row.data || row; // invoices row has .data jsonb, or IS the data
+                    // Normalise: invoices table stores flat fields too
+                    if (!invoiceData.clientName && row.client_name) invoiceData.clientName = row.client_name;
+                    if (!invoiceData.rooms && row.rooms) invoiceData.rooms = row.rooms;
+                    if (!invoiceData.grandTotal && row.grand_total) invoiceData.grandTotal = row.grand_total;
+                    if (!invoiceData.terms && row.terms) invoiceData.terms = row.terms;
                     renderInvoice();
                     renderTerms();
-                    // Init client payment section
-                    var contractorId = result.data.user_id;
+                    var contractorId = row.user_id;
                     var invTotal = invoiceData.grandTotal || invoiceData.total || 0;
                     if (contractorId && invTotal) initInvoicePaymentSection(contractorId, invTotal, supabaseId);
                 }).catch(function(e) {
