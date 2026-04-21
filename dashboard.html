@@ -264,6 +264,7 @@
         }
 
         function renderQuotes(quotes) {
+            window.currentQuotes = quotes; // keep kanban in sync
             const el = document.getElementById('quotesList');
             if (!quotes.length) {
                 el.innerHTML = `<div class="text-center py-5">
