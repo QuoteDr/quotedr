@@ -6709,8 +6709,9 @@ function scanHardwoodQuote() {
     
     rooms.forEach(room => {
         room.items.forEach(item => {
-            if ((item.category === 'Flooring' || item.category === 'Subflooring') && 
-                item.unitType === 'sqft') {
+            var isFlooring = item.category === 'Flooring' || item.category === 'Subflooring' || (item.description && /flooring|hardwood|lvp|laminate|vinyl|tile/i.test(item.description));
+            var isSqft = !item.unitType || item.unitType === 'sqft' || item.unitType === 'sf' || item.unitType === 'Sqft';
+            if (isFlooring && isSqft) {
                 totalSqft += item.quantity;
                 if (!roomMap[room.name]) {
                     roomMap[room.name] = 0;
@@ -6918,7 +6919,9 @@ function scanPaintQuote() {
     
     rooms.forEach(room => {
         room.items.forEach(item => {
-            if (item.category === 'Painting' && item.unitType === 'sqft') {
+            var isPainting = item.category === 'Painting' || (item.description && /paint/i.test(item.description));
+            var isSqftP = !item.unitType || item.unitType === 'sqft' || item.unitType === 'sf' || item.unitType === 'Sqft';
+            if (isPainting && isSqftP) {
                 totalSqft += item.quantity;
                 if (!roomMap[room.name]) {
                     roomMap[room.name] = 0;
@@ -7035,7 +7038,9 @@ function scanDrywallQuote() {
     var totalSqft = 0, roomMap = {};
     rooms.forEach(function(room) {
         room.items.forEach(function(item) {
-            if (item.category === 'Drywall' && item.unitType === 'sqft') {
+            var isDrywall = item.category === 'Drywall' || (item.description && /drywall/i.test(item.description));
+            var isSqft = !item.unitType || item.unitType === 'sqft' || item.unitType === 'sf' || item.unitType === 'Sqft';
+            if (isDrywall && isSqft) {
                 totalSqft += item.quantity;
                 if (!roomMap[room.name]) roomMap[room.name] = 0;
                 roomMap[room.name] += item.quantity;
