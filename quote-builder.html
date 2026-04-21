@@ -6722,6 +6722,9 @@ function addToHardwoodQuote() {
 }
 
 function scanHardwoodQuote() {
+    if (!rooms || rooms.length === 0) {
+        try { var s = JSON.parse(localStorage.getItem('ald_session_quote')); if (s && s.rooms && s.rooms.length > 0) { rooms = s.rooms; } } catch(e) {}
+    }
     let totalSqft = 0;
     let roomMap = {};
     
@@ -6932,6 +6935,9 @@ function addToPaintQuote() {
 }
 
 function scanPaintQuote() {
+    if (!rooms || rooms.length === 0) {
+        try { var s = JSON.parse(localStorage.getItem('ald_session_quote')); if (s && s.rooms && s.rooms.length > 0) { rooms = s.rooms; } } catch(e) {}
+    }
     let totalSqft = 0;
     let roomMap = {};
     
@@ -7053,6 +7059,16 @@ function addToDrywallQuote() {
 }
 
 function scanDrywallQuote() {
+    // If rooms not loaded yet, try pulling from session storage
+    if (!rooms || rooms.length === 0) {
+        try {
+            var session = JSON.parse(localStorage.getItem('ald_session_quote'));
+            if (session && session.rooms && session.rooms.length > 0) {
+                rooms = session.rooms;
+                roomCounter = session.roomCounter || rooms.length;
+            }
+        } catch(e) {}
+    }
     var totalSqft = 0, roomMap = {};
     var allCategories = new Set();
     var foundItems = [];
