@@ -4857,23 +4857,40 @@ async function saveQuote() {
             const safeId = (cat + '_' + name).replace(/[^a-z0-9]/gi,'_');
             const row = document.getElementById('row_' + safeId);
             if (!row) return;
-            
+
             // Get new name if it was changed
             const newName = row.querySelector('input.item-name-input')?.value.trim() || name;
+
+            // Handle renaming
+            if (newName !== name) {
+                if (customItems[cat]) {
+                    const ci = customItems[cat].find(i => i.name === name);
+                    if (ci) {
+                        ci.name = newName;
+                        saveCustomItems();
+                        const pi = pricingDatabase[cat]?.find(i => i._custom && i.name === name);
+                        if (pi) pi.name = newName;
+                    }
+                } else {
+                    alert('Built-in items cannot be renamed. Add a custom item instead.');
+                    return;
+                }
+            }
+
             const inputs = row.querySelectorAll('input.item-input');
             const unitType    = inputs[0].value.trim();
             const rate        = parseFloat(inputs[1].value) || 0;
             const matCost     = parseFloat(inputs[2].value) || 0;
             const supplierUrl = inputs[3].value.trim();
-            saveItemFieldEdit(cat, name, 'unitType',     unitType);
-            saveItemFieldEdit(cat, name, 'rate',         rate);
-            saveItemFieldEdit(cat, name, 'materialCost', matCost);
-            saveItemFieldEdit(cat, name, 'supplierUrl',  supplierUrl);
+            saveItemFieldEdit(cat, newName, 'unitType',     unitType);
+            saveItemFieldEdit(cat, newName, 'rate',         rate);
+            saveItemFieldEdit(cat, newName, 'materialCost', matCost);
+            saveItemFieldEdit(cat, newName, 'supplierUrl',  supplierUrl);
             // Save description from collapse row
             const descRow = document.getElementById('desc_' + safeId);
             if (descRow) {
                 const itemDesc = descRow.querySelector('.item-description-textarea')?.value.trim() || '';
-                saveItemFieldEdit(cat, name, 'itemDescription', itemDesc);
+                saveItemFieldEdit(cat, newName, 'itemDescription', itemDesc);
             }
             // Save upgrade fields from collapse row
             const collapseRow = document.getElementById('upg_' + safeId);
@@ -4882,7 +4899,7 @@ async function saveQuote() {
                 const upgRate = parseFloat(collapseRow.querySelector('.upgrade-rate')?.value) || 0;
                 const upgDesc = collapseRow.querySelector('.upgrade-desc')?.value.trim() || '';
                 const upgrade = upgName ? { name: upgName, rate: upgRate, description: upgDesc } : null;
-                saveItemFieldEdit(cat, name, 'upgrade', upgrade);
+                saveItemFieldEdit(cat, newName, 'upgrade', upgrade);
             }
             // Flash row green to confirm
             row.style.transition = 'background 0.3s';
