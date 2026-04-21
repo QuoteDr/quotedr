@@ -300,8 +300,9 @@
                     </div>
                     ${q.status === 'in_review' ? `
                     <button class="btn btn-warning btn-sm w-100 mt-2" onclick="openNotesReview('${q.id}', '${(q.client_name || '').replace(/'/g, "\\'")}')"><i class="fas fa-comments me-1"></i> Review Client Notes</button>` : ''}
+                    <button class="btn btn-outline-info btn-sm w-100 mt-1" onclick="shareClientPortal('${(q.client_name || '').replace(/'/g, "\\'")}')" title="Share client portal"><i class="fas fa-external-link-alt me-1"></i> Client Portal</button>
                     ${(q.status === 'sent' || q.status === 'viewed') ? `
-                    <button class="btn btn-outline-primary btn-sm w-100 mt-1" onclick="sendFollowUpReminder('${q.id}', '${(q.client_name || '').replace(/'/g, "\\'")}', '${(q.data && q.data.clientEmail) || ''}')"><i class="fas fa-bell me-1"></i> Send Follow-up</button>` : ''}
+                    <button class="btn btn-outline-primary btn-sm w-100 mt-1" onclick="sendFollowUpReminder('${q.id}', '${(q.client_name || '').replace(/'/g, "\\'")}'", '${(q.data && q.data.clientEmail) || ''}')"><i class="fas fa-bell me-1"></i> Send Follow-up</button>` : ''}
                 </div>
             `).join('');
         }
@@ -399,6 +400,15 @@
             await updateQuoteStatus(quoteId, 'sent');
             var modal = bootstrap.Modal.getInstance(document.getElementById('notesReviewModal'));
             if (modal) modal.hide();
+        }
+
+        async function shareClientPortal(clientName) {
+            const { data } = await _supabase.auth.getSession();
+            const userId = data?.session?.user?.id;
+            if (!userId) { alert('Please log in first.'); return; }
+            const url = `https://quotedr.io/client-portal.html?client=${encodeURIComponent(clientName)}&contractor=${userId}`;
+            await navigator.clipboard.writeText(url).catch(() => {});
+            alert('Client portal link copied to clipboard!\n\n' + url);
         }
 
         async function sendFollowUpReminder(quoteId, clientName, savedEmail) {
