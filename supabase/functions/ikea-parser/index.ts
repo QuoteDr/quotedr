@@ -98,18 +98,22 @@ Deno.serve(async (req) => {
     const data = await response.json();
     let content = data.choices[0].message.content;
 
-    // Parse — model returns either array directly or wrapped in object
-    let parsed;
+    // Parse — strip fences then try array or wrapped object
+    content = content.replace(/```json?/g, '').replace(/```/g, '').trim();
+    let parsed: any;
     try {
       const obj = JSON.parse(content);
-      parsed = Array.isArray(obj) ? obj : (obj.items || obj.result || Object.values(obj)[0]);
+      if (Array.isArray(obj)) {
+        parsed = obj;
+      } else {
+        parsed = obj.items || obj.result || obj.data || obj.products || obj.kitchen_items
+          || (Object.values(obj).find((v: any) => Array.isArray(v)) as any[]);
+      }
     } catch(e) {
-      // Strip markdown fences if present
-      content = content.replace(/```json?/g, '').replace(/```/g, '').trim();
-      parsed = JSON.parse(content);
+      throw new Error('Could not parse AI response: ' + content.substring(0, 300));
     }
 
-    if (!Array.isArray(parsed)) throw new Error('Unexpected response format from AI');
+    if (!Array.isArray(parsed)) throw new Error('Unexpected AI format: ' + content.substring(0, 200));
 
     const items = parsed.filter((item: any) => item.type !== 'skip' && item.qty > 0);
 
