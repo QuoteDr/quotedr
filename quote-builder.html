@@ -2432,6 +2432,13 @@ Example:
             return JSON.parse(localStorage.getItem('ald_estimator_pricing') || '{}');
         }
 
+        // Re-open estimator after pricing modal closes
+        document.addEventListener('hidden.bs.modal', function(e) {
+            if (e.target.id === 'estimatorPricingModal') {
+                setTimeout(function() { openMaterialEstimator(); }, 200);
+            }
+        });
+
         function saveEstimatorPricing() {
             var pricing = {};
             EST_FIELDS.forEach(function(f) {
@@ -2474,7 +2481,12 @@ Example:
                 html += '</div>';
             });
             document.getElementById('estPricingRows').innerHTML = html;
-            new bootstrap.Modal(document.getElementById('estimatorPricingModal')).show();
+            // Close estimator first (Bootstrap blocks stacked modals)
+            var estModal = bootstrap.Modal.getInstance(document.getElementById('materialEstimatorModal'));
+            if (estModal) estModal.hide();
+            setTimeout(function() {
+                new bootstrap.Modal(document.getElementById('estimatorPricingModal')).show();
+            }, 300);
         }
 
         function epItemSelected(key) {
