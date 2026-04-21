@@ -1958,8 +1958,8 @@ Example:
             const roomIndex = rooms.findIndex(r => r.id === roomId);
             if (roomIndex !== -1) {
                 // If editing existing item, update it; otherwise add new
-                if (editingItemIndex !== null && room[roomIndex].items[editingItemIndex]) {
-                    const item = room[roomIndex].items[editingItemIndex];
+                if (editingItemIndex !== null && rooms[roomIndex].items[editingItemIndex]) {
+                    const item = rooms[roomIndex].items[editingItemIndex];
                     item.description = description;
                     item.category = category;
                     item.serviceName = document.getElementById('lineService').value;
@@ -4692,7 +4692,7 @@ async function saveQuote() {
                             roomCounter = 0;
                             loadedRooms.forEach(room => {
                                 roomCounter++;
-                                rooms.push({ id: roomCounter, name: room.name, items: JSON.parse(JSON.stringify(room.items || [])), colorIndex: room.colorIndex || 0, markup: room.markup || 0 });
+                                rooms.push({ id: roomCounter, name: room.name, items: JSON.parse(JSON.stringify(room.items || [])), colorIndex: room.colorIndex || 0, markup: room.markup || 0, icon: room.icon || null, scopeNotes: room.scopeNotes || '' });
                             });
                             renderRooms();
                         }
