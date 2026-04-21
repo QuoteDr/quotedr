@@ -1196,6 +1196,7 @@ Example:
             var room = rooms.find(function(r) { return r.id === roomId; });
             if (!room) return;
             room.icon = iconClass;
+            try { localStorage.setItem('ald_session_quote', JSON.stringify(collectQuoteData())); } catch(e) {}
             markUnsaved();
             // Update icon in header without full re-render
             var iconEl = document.querySelector('.room-icon-btn[data-room-id="' + roomId + '"]');
