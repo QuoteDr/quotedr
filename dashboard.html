@@ -523,108 +523,102 @@
             loadWithRetry();
         });
     </script>
-    <script src="ai-assistant.js">
+    <script src="ai-assistant.js"></script>
+    <script>
         // === KANBAN VIEW ===
-        var currentQuotes = [];
-        
-        function setView(mode) {
-            if (mode === 'list') {
-                document.getElementById('quotesList').style.display = 'block';
-                document.getElementById('kanbanBoard').style.display = 'none';
-                document.getElementById('listViewBtn').classList.add('btn-primary');
-                document.getElementById('listViewBtn').classList.remove('btn-outline-primary');
-                document.getElementById('kanbanViewBtn').classList.add('btn-outline-primary');
-                document.getElementById('kanbanViewBtn').classList.remove('btn-primary');
-            } else {
-                document.getElementById('quotesList').style.display = 'none';
-                document.getElementById('kanbanBoard').style.display = 'block';
-                document.getElementById('listViewBtn').classList.add('btn-outline-primary');
-                document.getElementById('listViewBtn').classList.remove('btn-primary');
-                document.getElementById('kanbanViewBtn').classList.add('btn-primary');
-                document.getElementById('kanbanViewBtn').classList.remove('btn-outline-primary');
-                renderKanban(currentQuotes);
-            }
-            localStorage.setItem('ald_dashboard_view', mode);
-        }
-        
-        function renderKanban(quotes) {
-            const columns = [
-                { status: 'draft', label: 'Draft', color: '#6c757d', icon: 'fa-pencil' },
-                { status: 'sent', label: 'Sent', color: '#0d6efd', icon: 'fa-paper-plane' },
-                { status: 'viewed', label: 'Viewed', color: '#6f42c1', icon: 'fa-eye' },
-                { status: 'in_review', label: 'In Review', color: '#ffc107', icon: 'fa-comments' },
-                { status: 'accepted', label: 'Accepted', color: '#198754', icon: 'fa-check-circle' },
-                { status: 'invoiced', label: 'Invoiced', color: '#fd7e14', icon: 'fa-file-invoice-dollar' },
-                { status: 'paid', label: 'Paid', color: '#006400', icon: 'fa-dollar-sign' }
-            ];
-        
-            const kanbanColumns = document.getElementById('kanbanColumns');
-            kanbanColumns.innerHTML = '';
-        
-            columns.forEach(col => {
-                const statusQuotes = quotes.filter(q => q.status === col.status);
-                const countBadge = `<span class="badge bg-white text-dark ms-1">${statusQuotes.length}</span>`;
+        window.currentQuotes = [];
                 
-                let cardsHtml = '';
-                if (statusQuotes.length === 0) {
-                    cardsHtml = '<div class="text-center text-muted small py-3">No quotes</div>';
-                } else {
-                    statusQuotes.forEach(q => {
-                        const timeAgo = getTimeAgo(q.updated_at);
-                        cardsHtml += `
-                            <div class="kanban-card mb-2 p-2 bg-white rounded shadow-sm" style="cursor:pointer; border-left:3px solid ${col.color};" onclick="openQuote('${q.id}')">
-                                <div class="fw-semibold small">${q.client_name}</div>
-                                <div class="text-muted" style="font-size:0.75rem;">#${q.quote_number} · $${q.total}</div>
-                                <div class="text-muted" style="font-size:0.7rem;">${timeAgo}</div>
+                function setView(mode) {
+                    if (mode === 'list') {
+                        document.getElementById('quotesList').style.display = 'block';
+                        document.getElementById('kanbanBoard').style.display = 'none';
+                        document.getElementById('listViewBtn').classList.add('btn-primary');
+                        document.getElementById('listViewBtn').classList.remove('btn-outline-primary');
+                        document.getElementById('kanbanViewBtn').classList.add('btn-outline-primary');
+                        document.getElementById('kanbanViewBtn').classList.remove('btn-primary');
+                    } else {
+                        document.getElementById('quotesList').style.display = 'none';
+                        document.getElementById('kanbanBoard').style.display = 'block';
+                        document.getElementById('listViewBtn').classList.add('btn-outline-primary');
+                        document.getElementById('listViewBtn').classList.remove('btn-primary');
+                        document.getElementById('kanbanViewBtn').classList.add('btn-primary');
+                        document.getElementById('kanbanViewBtn').classList.remove('btn-outline-primary');
+                        renderKanban(currentQuotes);
+                    }
+                    localStorage.setItem('ald_dashboard_view', mode);
+                }
+                
+                function renderKanban(quotes) {
+                    const columns = [
+                        { status: 'draft', label: 'Draft', color: '#6c757d', icon: 'fa-pencil' },
+                        { status: 'sent', label: 'Sent', color: '#0d6efd', icon: 'fa-paper-plane' },
+                        { status: 'viewed', label: 'Viewed', color: '#6f42c1', icon: 'fa-eye' },
+                        { status: 'in_review', label: 'In Review', color: '#ffc107', icon: 'fa-comments' },
+                        { status: 'accepted', label: 'Accepted', color: '#198754', icon: 'fa-check-circle' },
+                        { status: 'invoiced', label: 'Invoiced', color: '#fd7e14', icon: 'fa-file-invoice-dollar' },
+                        { status: 'paid', label: 'Paid', color: '#006400', icon: 'fa-dollar-sign' }
+                    ];
+                
+                    const kanbanColumns = document.getElementById('kanbanColumns');
+                    kanbanColumns.innerHTML = '';
+                
+                    columns.forEach(col => {
+                        const statusQuotes = quotes.filter(q => q.status === col.status);
+                        const countBadge = `<span class="badge bg-white text-dark ms-1">${statusQuotes.length}</span>`;
+                        
+                        let cardsHtml = '';
+                        if (statusQuotes.length === 0) {
+                            cardsHtml = '<div class="text-center text-muted small py-3">No quotes</div>';
+                        } else {
+                            statusQuotes.forEach(q => {
+                                const timeAgo = getTimeAgo(q.updated_at);
+                                cardsHtml += `
+                                    <div class="kanban-card mb-2 p-2 bg-white rounded shadow-sm" style="cursor:pointer; border-left:3px solid ${col.color};" onclick="openQuote('${q.id}')">
+                                        <div class="fw-semibold small">${q.client_name}</div>
+                                        <div class="text-muted" style="font-size:0.75rem;">#${q.quote_number} · $${q.total}</div>
+                                        <div class="text-muted" style="font-size:0.7rem;">${timeAgo}</div>
+                                    </div>
+                                `;
+                            });
+                        }
+                
+                        const columnHtml = `
+                            <div class="kanban-col" style="min-width:200px; max-width:220px;">
+                                <div class="kanban-col-header" style="background:${col.color}; color:white; border-radius:8px 8px 0 0; padding:8px 12px;">
+                                    <i class="fas ${col.icon} me-1"></i>${col.label} ${countBadge}
+                                </div>
+                                <div class="kanban-col-body" style="background:#f8f9fa; border:1px solid #dee2e6; border-top:none; border-radius:0 0 8px 8px; padding:8px; min-height:200px;">
+                                    ${cardsHtml}
+                                </div>
                             </div>
                         `;
+                        kanbanColumns.innerHTML += columnHtml;
                     });
                 }
-        
-                const columnHtml = `
-                    <div class="kanban-col" style="min-width:200px; max-width:220px;">
-                        <div class="kanban-col-header" style="background:${col.color}; color:white; border-radius:8px 8px 0 0; padding:8px 12px;">
-                            <i class="fas ${col.icon} me-1"></i>${col.label} ${countBadge}
-                        </div>
-                        <div class="kanban-col-body" style="background:#f8f9fa; border:1px solid #dee2e6; border-top:none; border-radius:0 0 8px 8px; padding:8px; min-height:200px;">
-                            ${cardsHtml}
-                        </div>
-                    </div>
-                `;
-                kanbanColumns.innerHTML += columnHtml;
-            });
-        }
-        
-        function getTimeAgo(dateString) {
-            const date = new Date(dateString);
-            const now = new Date();
-            const diffInHours = Math.floor((now - date) / (1000 * 60 * 60));
-            
-            if (diffInHours < 24) {
-                return `${diffInHours}h ago`;
-            } else {
-                return date.toLocaleDateString();
-            }
-        }
-        
-        function loadQuotes() {
-            // existing code to fetch quotes...
-            fetch('/api/quotes')
-                .then(response => response.json())
-                .then(data => {
-                    currentQuotes = data;
-                    const savedView = localStorage.getItem('ald_dashboard_view') || 'list';
-                    if (savedView === 'kanban') {
-                        setView('kanban');
+                
+                function getTimeAgo(dateString) {
+                    const date = new Date(dateString);
+                    const now = new Date();
+                    const diffInHours = Math.floor((now - date) / (1000 * 60 * 60));
+                    
+                    if (diffInHours < 24) {
+                        return `${diffInHours}h ago`;
                     } else {
-                        currentQuotes = data;
-                        var savedView = localStorage.getItem('ald_dashboard_view') || 'list';
-                        setView(savedView);
+                        return date.toLocaleDateString();
                     }
-                });
-        }
-
-        </script>
+                }
+                
+                function loadQuotes() {
+                    // existing code to fetch quotes...
+                    fetch('/api/quotes')
+                        .then(response => response.json())
+                        .then(data => {
+                            window.currentQuotes = data;
+                            var savedView = localStorage.getItem('ald_dashboard_view') || 'list';
+                            if (typeof setView === 'function') setView(savedView); else renderQuotes(data);
+                        });
+                }
+    </script>
 <!-- Client Notes Review Modal -->
 <div class="modal fade" id="notesReviewModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
