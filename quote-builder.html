@@ -7062,7 +7062,9 @@ function calculateDrywall() {
     if (totalSqft <= 0) { alert('Please enter valid dimensions or square footage.'); return; }
     var totalWithWaste = totalSqft * (1 + waste / 100);
     var sheets = Math.ceil(totalWithWaste / 32);
-    var mudBuckets = finishLevel === 'level5' ? Math.ceil(totalWithWaste / 600) : Math.ceil(totalWithWaste / 950);
+    // Standard 3-coat: 4.5 gal bucket covers ~950 sqft total
+    // Level 5 finish: 0.05 gal/sqft = 4.5 gal covers ~90 sqft
+    var mudBuckets = finishLevel === 'level5' ? Math.ceil(totalWithWaste * 0.05 / 4.5) : Math.ceil(totalWithWaste / 950);
     var tapeRolls = Math.ceil(totalWithWaste / 500);
     var cornerBead = (doors * 2) + (windows * 4) + 2;
     var screwBoxes = Math.ceil(totalWithWaste / 200);
