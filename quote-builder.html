@@ -278,30 +278,29 @@ if (location.search.includes('debug')) {
             </div>
             <!-- Toolbar right -->
             <div style="flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
-                <div class="d-flex flex-wrap justify-content-end gap-1">
-                    <a href="javascript:void(0)" onclick="newQuote()" class="btn btn-sm shadow-sm" style="background:#e87e2a; color:#fff; border-color:#e87e2a;" title="Start a fresh new quote">
-                        <i class="fas fa-plus"></i> New
-                    </a>
-                    <a href="javascript:void(0)" onclick="startVoiceQuote()" class="btn btn-sm shadow-sm" style="background:#7c3aed; color:#fff;" title="Generate quote by voice using AI">
-                        <i class="fas fa-microphone"></i> AI Quote
-                    </a>
-                    <a href="javascript:void(0)" onclick="saveQuote()" class="btn btn-warning btn-sm shadow-sm" title="Save quote (Ctrl+S)">
-                        <i class="fas fa-save"></i> Save
-                    </a>
-                    <a href="javascript:void(0)" onclick="loadQuoteFromFile()" class="btn btn-secondary btn-sm shadow-sm" title="Open a saved quote">
-                        <i class="fas fa-folder-open"></i> Open
-                    </a>
-                    <a href="javascript:void(0)" onclick="exportToPDF()" class="btn btn-success btn-sm shadow-sm">
-                        <i class="fas fa-download"></i> PDF
-                    </a>
-                    <a href="javascript:void(0)" onclick="generateInteractiveLink()" class="btn btn-primary btn-sm shadow-sm">
-                        <i class="fas fa-share-square"></i> Send Quote
-                    </a>
+                <div class="d-flex flex-wrap justify-content-end gap-1 align-items-center">
+
+                    <!-- File dropdown -->
                     <div class="dropdown d-inline-block">
-                        <a href="javascript:void(0)" class="btn btn-success btn-sm shadow-sm dropdown-toggle" data-bs-toggle="dropdown" title="Tools">
-                            <i class="fas fa-tools me-1"></i> Tools
-                        </a>
+                        <button class="btn btn-outline-secondary btn-sm shadow-sm dropdown-toggle" data-bs-toggle="dropdown" title="File">
+                            <i class="fas fa-folder me-1"></i> File
+                        </button>
                         <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="newQuote()"><i class="fas fa-plus me-2 text-warning"></i>New Quote</a></li>
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="saveQuote()"><i class="fas fa-save me-2 text-warning"></i>Save <span class="text-muted small">(Ctrl+S)</span></a></li>
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="loadQuoteFromFile()"><i class="fas fa-folder-open me-2 text-secondary"></i>Open</a></li>
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="exportToPDF()"><i class="fas fa-download me-2 text-success"></i>Export PDF</a></li>
+                        </ul>
+                    </div>
+
+                    <!-- Tools dropdown -->
+                    <div class="dropdown d-inline-block">
+                        <button class="btn btn-success btn-sm shadow-sm dropdown-toggle" data-bs-toggle="dropdown" title="Tools">
+                            <i class="fas fa-tools me-1"></i> Tools
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="startVoiceQuote()"><i class="fas fa-microphone me-2" style="color:#7c3aed"></i>AI Quote</a></li>
+                            <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openMeasureModal()"><i class="fas fa-satellite me-2 text-primary"></i>Satellite Measure</a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openIkeaQuoteModal()"><i class="fas fa-utensils me-2 text-warning"></i>IKEA Quick Quote</a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openMaterialEstimator()"><i class="fas fa-ruler-combined me-2 text-info"></i>Material Estimator</a></li>
@@ -311,22 +310,30 @@ if (location.search.includes('debug')) {
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openDrywallCalc()"><i class="fas fa-border-all me-2 text-secondary"></i>Drywall Calculator</a></li>
                         </ul>
                     </div>
+
+                    <!-- Always visible: Send Quote + Send Invoice -->
+                    <a href="javascript:void(0)" onclick="generateInteractiveLink()" class="btn btn-primary btn-sm shadow-sm">
+                        <i class="fas fa-share-square me-1"></i>Send Quote
+                    </a>
                     <a href="javascript:void(0)" onclick="generateInvoiceLink()" class="btn btn-danger btn-sm shadow-sm">
-                        <i class="fas fa-file-invoice-dollar"></i> Send Invoice
+                        <i class="fas fa-file-invoice-dollar me-1"></i>Send Invoice
                     </a>
-                    <a href="dashboard.html" class="btn btn-outline-secondary btn-sm shadow-sm" title="Dashboard" onclick="if(unsavedChanges && !confirm('You have unsaved changes. Leave anyway?')) return false; saveSessionQuote();">
-                        <i class="fas fa-th-large"></i>
-                    </a>
-                    <a href="pricing.html" class="btn btn-sm shadow-sm" style="background:#e87e2a;color:white;font-weight:600;">⭐ Upgrade</a>
-                    <a href="settings.html" class="btn btn-outline-secondary btn-sm shadow-sm" title="Settings" onclick="if(unsavedChanges && !confirm('You have unsaved changes. Leave anyway?')) return false; saveSessionQuote();">
-                        <i class="fas fa-cog"></i>
-                    </a>
-                    <a href="help.html" class="btn btn-outline-secondary btn-sm shadow-sm" title="Help">
-                        <i class="fas fa-question-circle"></i>
-                    </a>
-                    <a href="javascript:void(0)" onclick="if(unsavedChanges && !confirm('You have unsaved changes. Leave anyway?')) return; signOut();" class="btn btn-outline-danger btn-sm shadow-sm" title="Sign out">
-                        <i class="fas fa-sign-out-alt"></i>
-                    </a>
+
+                    <!-- Account dropdown -->
+                    <div class="dropdown d-inline-block">
+                        <button class="btn btn-outline-secondary btn-sm shadow-sm dropdown-toggle" data-bs-toggle="dropdown" title="Account">
+                            <i class="fas fa-user-circle me-1"></i> Account
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="dashboard.html" onclick="if(unsavedChanges && !confirm('You have unsaved changes. Leave anyway?')) return false; saveSessionQuote();"><i class="fas fa-th-large me-2 text-secondary"></i>Dashboard</a></li>
+                            <li><a class="dropdown-item" href="settings.html" onclick="if(unsavedChanges && !confirm('You have unsaved changes. Leave anyway?')) return false; saveSessionQuote();"><i class="fas fa-cog me-2 text-secondary"></i>Settings</a></li>
+                            <li><a class="dropdown-item" href="help.html"><i class="fas fa-question-circle me-2 text-secondary"></i>Help</a></li>
+                            <li><a class="dropdown-item" href="pricing.html"><i class="fas fa-star me-2 text-warning"></i>Upgrade ⭐</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger" href="javascript:void(0)" onclick="if(unsavedChanges && !confirm('You have unsaved changes. Leave anyway?')) return; signOut();"><i class="fas fa-sign-out-alt me-2"></i>Sign Out</a></li>
+                        </ul>
+                    </div>
+
                 </div>
                 <div class="d-flex align-items-center gap-2">
                     <div id="saveStatus" class="text-muted small" style="min-height: 1.2em;"></div>
