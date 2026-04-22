@@ -4938,6 +4938,7 @@ async function saveQuote() {
 
         function openManageItemsModal() {
             const catSelect = document.getElementById('newItemCategory');
+            if (!catSelect) { console.error('newItemCategory not found'); return; }
             catSelect.innerHTML = '';
             Object.keys(pricingDatabase).forEach(cat => {
                 const opt = document.createElement('option');
