@@ -1556,11 +1556,22 @@ Example:
             if (!q || q.length < 2) { dropdown.style.display = 'none'; return; }
 
             const matches = [];
-            Object.entries(pricingDatabase).forEach(([cat, items]) => {
-                items.forEach(item => {
-                    if (item.name.toLowerCase().includes(q) || cat.toLowerCase().includes(q)) {
-                        matches.push({ cat, item });
-                    }
+            // Search pricingDatabase first, then also search customItems directly (catches async load race)
+            const searchSources = [pricingDatabase];
+            if (typeof customItems === 'object') searchSources.push(customItems);
+            const seen = new Set();
+            searchSources.forEach(db => {
+                Object.entries(db).forEach(([cat, items]) => {
+                    if (!Array.isArray(items)) return;
+                    items.forEach(item => {
+                        if (!item || !item.name) return;
+                        const key = cat + '|' + item.name;
+                        if (seen.has(key)) return;
+                        if (item.name.toLowerCase().includes(q) || cat.toLowerCase().includes(q)) {
+                            matches.push({ cat, item });
+                            seen.add(key);
+                        }
+                    });
                 });
             });
 
