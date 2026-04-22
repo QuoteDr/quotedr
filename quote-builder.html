@@ -5233,33 +5233,7 @@ async function saveQuote() {
 
             container.innerHTML = html || '<p class="text-muted">No items found.</p>';
 
-            // Attach event listeners
-            container.querySelectorAll('.item-save-btn').forEach(btn => {
-                btn.addEventListener('click', () => saveItemRow(btn.dataset.cat, btn.dataset.name));
-            });
-            container.querySelectorAll('.item-delete-btn').forEach(btn => {
-                btn.addEventListener('click', () => deleteCustomItem(btn.dataset.cat, btn.dataset.name));
-            });
-            container.querySelectorAll('.upgrade-toggle-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const target = document.getElementById(btn.dataset.target);
-                    if (target) {
-                        const isOpen = target.style.display !== 'none';
-                        target.style.display = isOpen ? 'none' : 'table-row';
-                    }
-                });
-            });
-            container.querySelectorAll('.description-toggle-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const target = document.getElementById(btn.dataset.target);
-                    if (target) {
-                        const isOpen = target.style.display !== 'none';
-                        target.style.display = isOpen ? 'none' : 'table-row';
-                        btn.classList.toggle('btn-info', isOpen);
-                        btn.classList.toggle('btn-secondary', !isOpen);
-                    }
-                });
-            });
+            // Event listeners handled via delegation on #customItemsList (see DOMContentLoaded)
         }
 
         function saveItemFieldEdit(category, name, field, value) {
@@ -5565,7 +5539,12 @@ async function saveQuote() {
                     var descBtn = e.target.closest('.description-toggle-btn');
                     if (descBtn) {
                         var target = document.getElementById(descBtn.dataset.target);
-                        if (target) target.style.display = target.style.display === 'none' ? 'table-row' : 'none';
+                        if (target) {
+                            var isOpen = target.style.display !== 'none';
+                            target.style.display = isOpen ? 'none' : 'table-row';
+                            descBtn.classList.toggle('btn-info', isOpen);
+                            descBtn.classList.toggle('btn-secondary', !isOpen);
+                        }
                         return;
                     }
                 });
