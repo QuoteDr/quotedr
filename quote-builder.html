@@ -1050,20 +1050,21 @@ Example:
 
         function _pushUndo() {
             if (_undoPaused) return;
-            _undoStack.push(JSON.stringify({ rooms: rooms, roomCounter: roomCounter }));
+            _undoStack.push(JSON.stringify({ rooms: JSON.parse(JSON.stringify(rooms)), roomCounter: roomCounter }));
             if (_undoStack.length > _UNDO_LIMIT) _undoStack.shift();
             _updateUndoBtn();
         }
 
         function undoLastAction() {
-            if (_undoStack.length === 0) return;
+            if (_undoStack.length === 0) { alert('Nothing to undo!'); return; }
             const state = JSON.parse(_undoStack.pop());
             _undoPaused = true;
-            rooms = state.rooms;
+            rooms = JSON.parse(JSON.stringify(state.rooms)); // deep clone
             roomCounter = state.roomCounter;
             renderRooms();
             if (typeof calculateTotals === 'function') calculateTotals();
             _undoPaused = false;
+            // Re-query buttons after renderRooms rebuilt the DOM
             _updateUndoBtn();
         }
 
