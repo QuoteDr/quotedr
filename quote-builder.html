@@ -285,9 +285,6 @@ if (location.search.includes('debug')) {
                     <a href="javascript:void(0)" onclick="startVoiceQuote()" class="btn btn-sm shadow-sm" style="background:#7c3aed; color:#fff;" title="Generate quote by voice using AI">
                         <i class="fas fa-microphone"></i> AI Quote
                     </a>
-                    <a href="javascript:void(0)" onclick="undoLastAction()" id="undoBtn" class="btn btn-outline-secondary btn-sm shadow-sm" title="Undo (Ctrl+Z)" disabled>
-                        <i class="fas fa-undo"></i> Undo
-                    </a>
                     <a href="javascript:void(0)" onclick="saveQuote()" class="btn btn-warning btn-sm shadow-sm" title="Save quote (Ctrl+S)">
                         <i class="fas fa-save"></i> Save
                     </a>
@@ -1071,11 +1068,11 @@ Example:
         }
 
         function _updateUndoBtn() {
-            var btn = document.getElementById('undoBtn');
-            if (btn) {
+            var btns = document.querySelectorAll('#undoBtn, [id="undoBtn"]');
+            btns.forEach(function(btn) {
                 btn.disabled = _undoStack.length === 0;
-                btn.title = _undoStack.length === 0 ? 'Nothing to undo' : 'Undo (' + _undoStack.length + ' steps)';
-            }
+                btn.title = _undoStack.length === 0 ? 'Nothing to undo (Ctrl+Z)' : 'Undo (' + _undoStack.length + ' steps) — Ctrl+Z';
+            });
         }
 
         document.addEventListener('keydown', function(e) {
@@ -3174,6 +3171,8 @@ Example:
                 html += '<i class="fas fa-trash"></i> Delete Room</button>';
                 html += '<button onclick="saveRoomAsTemplate(' + room.id + ')" class="btn btn-sm btn-info text-white ms-1" title="Save this room as a template">';
                 html += '<i class="fas fa-bookmark"></i></button>';
+                html += '<button onclick="undoLastAction()" class="btn btn-sm btn-outline-secondary ms-1" title="Undo last action (Ctrl+Z)" id="undoBtn">';
+                html += '<i class="fas fa-undo"></i></button>';
                 html += '</div>';
                 
                 // Per-room notes/scope section
