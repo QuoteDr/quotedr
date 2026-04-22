@@ -4876,39 +4876,29 @@ async function saveQuote() {
 
             var localIsEmpty = Object.keys(customItems).length === 0;
 
-            // If localStorage is empty, try cloud backup first (fastest full restore)
-            if (localIsEmpty && typeof restoreItemsFromCloud === 'function') {
+            // Always sync from cloud snapshot on load (localStorage is cache, cloud is source of truth)
+            if (typeof restoreItemsFromCloud === 'function') {
                 restoreItemsFromCloud().then(function(result) {
                     if (!result.error && result.data && Object.keys(result.data).length > 0) {
-                        console.log('[Restore] Items restored from cloud backup:', Object.keys(result.data).length, 'categories');
+                        // Cloud snapshot wins — it has all saves from all devices/sessions
+                        console.log('[Restore] Items loaded from cloud snapshot:', Object.keys(result.data).length, 'categories');
                         customItems = result.data;
                         localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
+                        // Clear and re-inject pricingDatabase from fresh snapshot
+                        Object.keys(pricingDatabase).forEach(function(k) { delete pricingDatabase[k]; });
                         _injectItemsIntoPricingDB(customItems);
-                        // Show a subtle toast
-                        var toast = document.createElement('div');
-                        toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#198754;color:white;padding:10px 18px;border-radius:8px;z-index:9999;font-size:0.9rem;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
-                        toast.innerHTML = '<i class="fas fa-cloud-download-alt me-2"></i>Items restored from cloud backup!';
-                        document.body.appendChild(toast);
-                        setTimeout(function(){ toast.remove(); }, 4000);
+                        if (localIsEmpty) {
+                            var toast = document.createElement('div');
+                            toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#198754;color:white;padding:10px 18px;border-radius:8px;z-index:9999;font-size:0.9rem;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
+                            toast.innerHTML = '<i class="fas fa-cloud-download-alt me-2"></i>Items restored from cloud!';
+                            document.body.appendChild(toast);
+                            setTimeout(function(){ toast.remove(); }, 4000);
+                        }
                     }
                 }).catch(function(){});
             }
 
-            // Also merge from Supabase items table
-            if (typeof listItems === 'function') {
-                listItems().then(function(result) {
-                    if (result.error || !result.data || !result.data.length) return;
-                    result.data.forEach(function(row) {
-                        var cat = row.category || 'Custom';
-                        if (!customItems[cat]) customItems[cat] = [];
-                        if (!customItems[cat].find(function(i) { return i.name === row.name; })) {
-                            customItems[cat].push({ name: row.name, unitType: row.unit_type || '', rate: row.rate || 0, materialCost: row.material_cost || 0, supplierUrl: row.supplier_url || '', itemDescription: '' });
-                        }
-                    });
-                    localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
-                    _injectItemsIntoPricingDB(customItems);
-                }).catch(function(){});
-            }
+            // NOTE: items table sync removed - snapshot backup (quotes table) is the source of truth
             try {
                 categoryStyles = JSON.parse(localStorage.getItem('ald_category_styles') || '{}');
             } catch (e) {
@@ -4929,17 +4919,7 @@ async function saveQuote() {
         function saveCustomItems() {
             localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
             localStorage.setItem('ald_category_styles', JSON.stringify(categoryStyles));
-            // Sync each item to Supabase items table (proper upsert by user_id,name)
-            if (typeof saveItem === 'function') {
-                Object.entries(customItems).forEach(function([cat, items]) {
-                    if (!Array.isArray(items)) return;
-                    items.forEach(function(item) {
-                        if (!item || !item.name) return;
-                        saveItem({ ...item, category: cat }).catch(function(){});
-                    });
-                });
-            }
-            // Also backup full snapshot to Supabase (bulletproof failsafe)
+            // Backup full snapshot to Supabase quotes table (single source of truth)
             if (typeof backupItemsToCloud === 'function') {
                 backupItemsToCloud(customItems).catch(function(){});
             }
