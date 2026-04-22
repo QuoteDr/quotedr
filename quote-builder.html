@@ -963,7 +963,7 @@ Example:
                         </button>
                     </div>
 
-                    <div id="customItemsList" style="max-height:460px; overflow-y:auto;">
+                    <div id="customItemsList" style="max-height:460px; overflow-y:auto; touch-action:pan-y;">
                         <!-- Populated dynamically -->
                     </div>
                     <div id="itemListBottomAnchor"></div>
@@ -5195,9 +5195,9 @@ async function saveQuote() {
                         <td><input type="url" class="form-control form-control-sm item-input" value="${supplier}" placeholder="https://..." oninput="markPricingDirty()"></td>
                         <td>
                             <div class="d-flex gap-1">
-                                <button class="btn btn-sm btn-info description-toggle-btn" data-target="desc_${safeId}" title="Show/edit description"><i class="fas fa-align-left"></i> Desc</button>
-                                <button class="btn btn-sm btn-success item-save-btn" data-cat="${catE}" data-name="${nameE}" title="Save this row"><i class="fas fa-save"></i></button>
-                                ${isCustom ? `<button class="btn btn-sm btn-danger item-delete-btn" data-cat="${catE}" data-name="${nameE}" title="Delete"><i class="fas fa-trash"></i></button>` : ''}
+                                <button class="btn btn-sm btn-info description-toggle-btn" data-target="desc_${safeId}" title="Show/edit description" style="touch-action:manipulation"><i class="fas fa-align-left"></i> Desc</button>
+                                <button class="btn btn-sm btn-success item-save-btn" data-cat="${catE}" data-name="${nameE}" title="Save this row" style="touch-action:manipulation"><i class="fas fa-save"></i></button>
+                                ${isCustom ? `<button class="btn btn-sm btn-danger item-delete-btn" data-cat="${catE}" data-name="${nameE}" title="Delete" style="touch-action:manipulation"><i class="fas fa-trash"></i></button>` : ''}
                             </div>
                         </td>
                     </tr>
