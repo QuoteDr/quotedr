@@ -267,22 +267,20 @@ if (location.search.includes('debug')) {
 <body>
     <div class="container-fluid py-4">
         <!-- Professional Header -->
-        <div class="d-flex align-items-center justify-content-between mb-2" style="overflow: visible; padding-top: 8px; padding-bottom: 8px; flex-wrap: wrap;">
-            <!-- User logo left -->
-            <div style="flex: 0 0 auto; display: flex; align-items: center;">
-                <img id="userLogoImg" src="" alt="Your Logo" style="height: 80px; width: auto; max-width: 180px; display: none; border-radius: 6px;">
-            </div>
+        <div class="d-flex flex-column align-items-center mb-2" style="overflow: visible; padding-top: 8px; padding-bottom: 8px;">
+            <!-- Hidden user logo (kept for JS compatibility) -->
+            <img id="userLogoImg" src="" alt="Your Logo" style="height: 80px; width: auto; max-width: 180px; display: none; border-radius: 6px; margin-bottom: 6px;">
             <!-- QuoteDr logo center -->
-            <div style="flex: 1; display: flex; justify-content: center; align-items: center;">
+            <div style="display: flex; justify-content: center; align-items: center; width: 100%;">
                 <img src="quotedr-logo.svg" alt="QuoteDr" style="height: 200px; width: auto; margin-top: -60px; margin-bottom: -60px; max-width: 100%;">
             </div>
-            <!-- Toolbar right -->
-            <div style="flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
-                <div class="d-flex flex-wrap justify-content-end gap-1 align-items-center">
+            <!-- Toolbar full width -->
+            <div style="width: 100%;">
+                <div class="d-flex gap-1 align-items-center w-100">
 
                     <!-- File dropdown -->
-                    <div class="dropdown d-inline-block">
-                        <button class="btn btn-outline-secondary btn-sm shadow-sm dropdown-toggle" data-bs-toggle="dropdown" title="File">
+                    <div class="dropdown flex-grow-1">
+                        <button class="btn btn-outline-secondary btn-sm shadow-sm dropdown-toggle w-100" data-bs-toggle="dropdown" title="File">
                             <i class="fas fa-folder"></i>
                         </button>
                         <ul class="dropdown-menu">
@@ -294,8 +292,8 @@ if (location.search.includes('debug')) {
                     </div>
 
                     <!-- Tools dropdown -->
-                    <div class="dropdown d-inline-block">
-                        <button class="btn btn-success btn-sm shadow-sm dropdown-toggle" data-bs-toggle="dropdown" title="Tools">
+                    <div class="dropdown flex-grow-1">
+                        <button class="btn btn-success btn-sm shadow-sm dropdown-toggle w-100" data-bs-toggle="dropdown" title="Tools">
                             <i class="fas fa-tools"></i>
                         </button>
                         <ul class="dropdown-menu">
@@ -312,16 +310,16 @@ if (location.search.includes('debug')) {
                     </div>
 
                     <!-- Always visible: Send Quote + Send Invoice -->
-                    <a href="javascript:void(0)" onclick="generateInteractiveLink()" class="btn btn-primary btn-sm shadow-sm">
+                    <a href="javascript:void(0)" onclick="generateInteractiveLink()" class="btn btn-primary btn-sm shadow-sm flex-grow-1 text-center">
                         <i class="fas fa-share-square me-1"></i>Send Quote
                     </a>
-                    <a href="javascript:void(0)" onclick="generateInvoiceLink()" class="btn btn-danger btn-sm shadow-sm">
+                    <a href="javascript:void(0)" onclick="generateInvoiceLink()" class="btn btn-danger btn-sm shadow-sm flex-grow-1 text-center">
                         <i class="fas fa-file-invoice-dollar me-1"></i>Send Invoice
                     </a>
 
                     <!-- Account dropdown -->
-                    <div class="dropdown d-inline-block">
-                        <button class="btn btn-outline-secondary btn-sm shadow-sm dropdown-toggle" data-bs-toggle="dropdown" title="Account">
+                    <div class="dropdown flex-grow-1">
+                        <button class="btn btn-outline-secondary btn-sm shadow-sm dropdown-toggle w-100" data-bs-toggle="dropdown" title="Account">
                             <i class="fas fa-user-circle"></i>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end">
@@ -335,7 +333,7 @@ if (location.search.includes('debug')) {
                     </div>
 
                 </div>
-                <div class="d-flex align-items-center gap-2">
+                <div class="d-flex align-items-center gap-2 mt-1">
                     <div id="saveStatus" class="text-muted small" style="min-height: 1.2em;"></div>
                     <div class="form-check form-switch mb-0 ms-2" style="font-size:0.78rem;" title="Auto-save writes your file instantly when you make changes. Turning this off is not recommended.">
                         <input class="form-check-input" type="checkbox" id="autoSaveToggle" style="cursor:pointer;">
