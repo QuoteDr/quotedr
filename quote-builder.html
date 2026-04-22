@@ -4916,12 +4916,30 @@ async function saveQuote() {
             loadItemOverrides();
         }
 
-        function saveCustomItems() {
+        function saveCustomItems(showToast) {
             localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
             localStorage.setItem('ald_category_styles', JSON.stringify(categoryStyles));
             // Backup full snapshot to Supabase quotes table (single source of truth)
             if (typeof backupItemsToCloud === 'function') {
-                backupItemsToCloud(customItems).catch(function(){});
+                backupItemsToCloud(customItems).then(function(result) {
+                    if (showToast) {
+                        var msg = result && result.error ? '❌ Cloud save failed — saved locally only' : '✅ Items saved to cloud!';
+                        var color = result && result.error ? '#dc3545' : '#198754';
+                        var toast = document.createElement('div');
+                        toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:' + color + ';color:white;padding:10px 18px;border-radius:8px;z-index:9999;font-size:0.9rem;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
+                        toast.innerHTML = msg;
+                        document.body.appendChild(toast);
+                        setTimeout(function(){ toast.remove(); }, 3000);
+                    }
+                }).catch(function(){
+                    if (showToast) {
+                        var toast = document.createElement('div');
+                        toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#dc3545;color:white;padding:10px 18px;border-radius:8px;z-index:9999;font-size:0.9rem;';
+                        toast.innerHTML = '❌ Cloud save failed — saved locally only';
+                        document.body.appendChild(toast);
+                        setTimeout(function(){ toast.remove(); }, 3000);
+                    }
+                });
             }
         }
 
@@ -5059,7 +5077,7 @@ async function saveQuote() {
             const pi = pricingDatabase[cat].find(i => i.name === name);
             if (pi) { Object.assign(pi, ci, { _custom: true }); }
 
-            saveCustomItems();
+            saveCustomItems(true);
 
             // Flash row green
             row.style.transition = 'background 0.3s';

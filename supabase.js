@@ -492,16 +492,23 @@ async function backupItemsToCloud(customItems) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
     const snapshot = JSON.stringify(customItems || {});
+    // Delete any existing backup rows first to avoid duplicate .single() failures
+    await _supabase
+        .from('quotes')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('quote_number', '__ITEMS_BACKUP__');
+    // Insert fresh backup
     const { data, error } = await _supabase
         .from('quotes')
-        .upsert({
+        .insert({
             user_id: user.id,
             client_name: '__ITEMS_BACKUP__',
             quote_number: '__ITEMS_BACKUP__',
             status: 'backup',
             data: { items_snapshot: snapshot, backed_up_at: new Date().toISOString() },
             updated_at: new Date().toISOString()
-        }, { onConflict: 'user_id,quote_number' })
+        })
         .select();
     if (error) { console.error('Items backup error:', error); return { error }; }
     console.log('[Backup] Items backed up to cloud:', Object.keys(customItems || {}).length, 'categories');
