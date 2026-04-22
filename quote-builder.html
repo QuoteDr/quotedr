@@ -285,6 +285,9 @@ if (location.search.includes('debug')) {
                     <a href="javascript:void(0)" onclick="startVoiceQuote()" class="btn btn-sm shadow-sm" style="background:#7c3aed; color:#fff;" title="Generate quote by voice using AI">
                         <i class="fas fa-microphone"></i> AI Quote
                     </a>
+                    <a href="javascript:void(0)" onclick="undoLastAction()" id="undoBtn" class="btn btn-outline-secondary btn-sm shadow-sm" title="Undo (Ctrl+Z)" disabled>
+                        <i class="fas fa-undo"></i> Undo
+                    </a>
                     <a href="javascript:void(0)" onclick="saveQuote()" class="btn btn-warning btn-sm shadow-sm" title="Save quote (Ctrl+S)">
                         <i class="fas fa-save"></i> Save
                     </a>
@@ -1042,6 +1045,48 @@ Example:
 
         let rooms = [];
         let roomCounter = 0;
+
+        // ── Undo system ──────────────────────────────────────────────────────────
+        const _undoStack = [];
+        const _UNDO_LIMIT = 50;
+        let _undoPaused = false;
+
+        function _pushUndo() {
+            if (_undoPaused) return;
+            _undoStack.push(JSON.stringify({ rooms: rooms, roomCounter: roomCounter }));
+            if (_undoStack.length > _UNDO_LIMIT) _undoStack.shift();
+            _updateUndoBtn();
+        }
+
+        function undoLastAction() {
+            if (_undoStack.length === 0) return;
+            const state = JSON.parse(_undoStack.pop());
+            _undoPaused = true;
+            rooms = state.rooms;
+            roomCounter = state.roomCounter;
+            renderRooms();
+            recalcAll();
+            _undoPaused = false;
+            _updateUndoBtn();
+        }
+
+        function _updateUndoBtn() {
+            var btn = document.getElementById('undoBtn');
+            if (btn) {
+                btn.disabled = _undoStack.length === 0;
+                btn.title = _undoStack.length === 0 ? 'Nothing to undo' : 'Undo (' + _undoStack.length + ' steps)';
+            }
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+                // Don't fire if user is typing in an input
+                if (['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) return;
+                e.preventDefault();
+                undoLastAction();
+            }
+        });
+        // ─────────────────────────────────────────────────────────────────────────
         let customItems = {};
         let categoryStyles = {}; // { "Tile & Stone": { icon: "fa-border-all", color: "#f0f4ff" } }
 
@@ -3066,6 +3111,7 @@ Example:
         }
 
         function renderRooms() {
+            _pushUndo(); // snapshot before every render for undo
             const container = document.getElementById('roomsContainer');
             
             if (rooms.length === 0) {
