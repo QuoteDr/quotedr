@@ -484,3 +484,44 @@ CREATE POLICY "Public quote viewing" ON quotes FOR SELECT USING (true);
 -- Allow authenticated users to insert/update their own quotes  
 CREATE POLICY "Users manage own quotes" ON quotes FOR ALL USING (auth.uid() = user_id);
 */
+// ── Item Backup/Restore System ───────────────────────────────────────────────
+// Stores full ald_custom_items snapshot in Supabase as a safety net.
+// Uses the quotes table with a special marker so no extra table needed.
+
+async function backupItemsToCloud(customItems) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    const snapshot = JSON.stringify(customItems || {});
+    const { data, error } = await _supabase
+        .from('quotes')
+        .upsert({
+            user_id: user.id,
+            client_name: '__ITEMS_BACKUP__',
+            quote_number: '__ITEMS_BACKUP__',
+            status: 'backup',
+            data: { items_snapshot: snapshot, backed_up_at: new Date().toISOString() },
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id,quote_number' })
+        .select();
+    if (error) { console.error('Items backup error:', error); return { error }; }
+    console.log('[Backup] Items backed up to cloud:', Object.keys(customItems || {}).length, 'categories');
+    return { data };
+}
+
+async function restoreItemsFromCloud() {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    const { data, error } = await _supabase
+        .from('quotes')
+        .select('data, updated_at')
+        .eq('user_id', user.id)
+        .eq('quote_number', '__ITEMS_BACKUP__')
+        .single();
+    if (error || !data) return { error: error || 'No backup found' };
+    try {
+        const snapshot = JSON.parse(data.data.items_snapshot || '{}');
+        return { data: snapshot, backed_up_at: data.data.backed_up_at };
+    } catch(e) {
+        return { error: 'Could not parse backup: ' + e.message };
+    }
+}

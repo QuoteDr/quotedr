@@ -425,6 +425,7 @@ var listItemsFromSupabase = listItems;
 
 // Save/load aliases
 var saveQuoteToSupabase = saveQuote;
+var saveInvoice = saveInvoiceForSharing; // alias — saveInvoice was missing from v2
 var saveInvoiceToSupabase = saveInvoice;
 var loadQuoteFromSupabase = function(quoteId) {
     return listQuotes().then(function(result) {

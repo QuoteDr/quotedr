@@ -4826,13 +4826,45 @@ async function saveQuote() {
             }
         }
 
+                function _injectItemsIntoPricingDB(itemsObj) {
+            for (var cat in itemsObj) {
+                if (!pricingDatabase[cat]) pricingDatabase[cat] = [];
+                itemsObj[cat].forEach(function(item) {
+                    if (!pricingDatabase[cat].find(function(e) { return e._custom && e.name === item.name; })) {
+                        pricingDatabase[cat].push(Object.assign({}, item, { _custom: true }));
+                    }
+                });
+            }
+        }
+
         function loadCustomItems() {
             try {
                 customItems = JSON.parse(localStorage.getItem('ald_custom_items') || '{}');
             } catch (e) {
                 customItems = {};
             }
-            // Also load from Supabase and merge (cloud wins for items not in localStorage)
+
+            var localIsEmpty = Object.keys(customItems).length === 0;
+
+            // If localStorage is empty, try cloud backup first (fastest full restore)
+            if (localIsEmpty && typeof restoreItemsFromCloud === 'function') {
+                restoreItemsFromCloud().then(function(result) {
+                    if (!result.error && result.data && Object.keys(result.data).length > 0) {
+                        console.log('[Restore] Items restored from cloud backup:', Object.keys(result.data).length, 'categories');
+                        customItems = result.data;
+                        localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
+                        _injectItemsIntoPricingDB(customItems);
+                        // Show a subtle toast
+                        var toast = document.createElement('div');
+                        toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#198754;color:white;padding:10px 18px;border-radius:8px;z-index:9999;font-size:0.9rem;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
+                        toast.innerHTML = '<i class="fas fa-cloud-download-alt me-2"></i>Items restored from cloud backup!';
+                        document.body.appendChild(toast);
+                        setTimeout(function(){ toast.remove(); }, 4000);
+                    }
+                }).catch(function(){});
+            }
+
+            // Also merge from Supabase items table
             if (typeof listItems === 'function') {
                 listItems().then(function(result) {
                     if (result.error || !result.data || !result.data.length) return;
@@ -4844,15 +4876,7 @@ async function saveQuote() {
                         }
                     });
                     localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
-                    // Re-inject into pricingDatabase
-                    for (var cat2 in customItems) {
-                        if (!pricingDatabase[cat2]) pricingDatabase[cat2] = [];
-                        customItems[cat2].forEach(function(item) {
-                            if (!pricingDatabase[cat2].find(function(e) { return e._custom && e.name === item.name; })) {
-                                pricingDatabase[cat2].push(Object.assign({}, item, { _custom: true }));
-                            }
-                        });
-                    }
+                    _injectItemsIntoPricingDB(customItems);
                 }).catch(function(){});
             }
             try {
@@ -4874,9 +4898,9 @@ async function saveQuote() {
         function saveCustomItems() {
             localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
             localStorage.setItem('ald_category_styles', JSON.stringify(categoryStyles));
-            // Also sync to Supabase cloud
-            if (typeof saveItemsToSupabase === 'function') {
-                saveItemsToSupabase({ customItems, itemOverrides: itemOverrides || {}, categoryStyles }).catch(function(){});
+            // Backup full snapshot to Supabase (bulletproof failsafe)
+            if (typeof backupItemsToCloud === 'function') {
+                backupItemsToCloud(customItems).catch(function(){});
             }
         }
 
