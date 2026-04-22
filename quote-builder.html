@@ -2111,11 +2111,16 @@ Example:
                 if (!items[category]) items[category] = [];
                 // Don't add duplicate
                 if (!items[category].find(i => i.name === desc)) {
-                    items[category].push({ name: desc, unitType: unitType, rate: rate, materialCost: materialCost, supplierUrl: '', itemDescription: '', upgrade: null });
+                    var newItem = { name: desc, unitType: unitType, rate: rate, materialCost: materialCost, supplierUrl: '', itemDescription: '', upgrade: null };
+                    items[category].push(newItem);
                     localStorage.setItem('ald_custom_items', JSON.stringify(items));
                     // Update pricingDatabase in memory
                     if (!pricingDatabase[category]) pricingDatabase[category] = [];
-                    pricingDatabase[category].push({ name: desc, unitType: unitType, rate: rate, materialCost: materialCost, supplierUrl: '', itemDescription: '', upgrade: null });
+                    pricingDatabase[category].push(newItem);
+                    // Also save to Supabase cloud
+                    if (typeof saveItem === 'function') {
+                        saveItem({ name: desc, category: category, unitType: unitType, rate: rate, materialCost: materialCost, supplierUrl: '' }).catch(function(){});
+                    }
                 }
             } catch(e) { console.error('Error saving item:', e); }
             const saveNewItemBtn = document.getElementById('saveNewItemBtn');
@@ -4826,6 +4831,29 @@ async function saveQuote() {
                 customItems = JSON.parse(localStorage.getItem('ald_custom_items') || '{}');
             } catch (e) {
                 customItems = {};
+            }
+            // Also load from Supabase and merge (cloud wins for items not in localStorage)
+            if (typeof listItems === 'function') {
+                listItems().then(function(result) {
+                    if (result.error || !result.data || !result.data.length) return;
+                    result.data.forEach(function(row) {
+                        var cat = row.category || 'Custom';
+                        if (!customItems[cat]) customItems[cat] = [];
+                        if (!customItems[cat].find(function(i) { return i.name === row.name; })) {
+                            customItems[cat].push({ name: row.name, unitType: row.unit_type || '', rate: row.rate || 0, materialCost: row.material_cost || 0, supplierUrl: row.supplier_url || '', itemDescription: '' });
+                        }
+                    });
+                    localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
+                    // Re-inject into pricingDatabase
+                    for (var cat2 in customItems) {
+                        if (!pricingDatabase[cat2]) pricingDatabase[cat2] = [];
+                        customItems[cat2].forEach(function(item) {
+                            if (!pricingDatabase[cat2].find(function(e) { return e._custom && e.name === item.name; })) {
+                                pricingDatabase[cat2].push(Object.assign({}, item, { _custom: true }));
+                            }
+                        });
+                    }
+                }).catch(function(){});
             }
             try {
                 categoryStyles = JSON.parse(localStorage.getItem('ald_category_styles') || '{}');
