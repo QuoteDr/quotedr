@@ -124,6 +124,9 @@
                         <h3 class="mb-0">Recent Quotes</h3>
                         <button class="btn btn-outline-secondary btn-sm" onclick="loadQuotes()" title="Refresh quotes"><i class="fas fa-sync-alt"></i></button>
                         <div class="d-flex gap-2 flex-wrap">
+                            <button class="btn btn-sm btn-primary" onclick="openNewQuoteModal()">
+                                <i class="fas fa-plus me-1"></i> New Quote
+                            </button>
                             <button class="btn btn-sm btn-outline-secondary" onclick="refreshQuotes()">
                                 <i class="fas fa-sync-alt"></i> Refresh
                             </button>
@@ -271,9 +274,9 @@
                     <i class="fas fa-file-invoice fa-4x mb-4" style="color:#1a56a0; opacity:0.3;"></i>
                     <h4 style="color:#444;">No quotes yet</h4>
                     <p class="text-muted mb-4">Start building your first professional quote — it only takes a minute.</p>
-                    <a href="quote-builder.html" class="btn btn-lg" style="background:#e87e2a; color:#fff; font-weight:600;">
+                    <button onclick="openNewQuoteModal()" class="btn btn-lg" style="background:#e87e2a; color:#fff; font-weight:600;">
                         <i class="fas fa-plus me-2"></i>Build Your First Quote
-                    </a>
+                    </button>
                 </div>`;
                 return;
             }
@@ -1405,6 +1408,82 @@ function renderBusinessInsights(quotes) {
                                             input.addEventListener('input', calculateItemTotal);
                                           });
                                         });
+
+        // === NEW QUOTE MODAL ===
+        function openNewQuoteModal() {
+            document.getElementById('newQuoteClientName').value = '';
+            document.getElementById('newQuoteAddress').value = '';
+            document.getElementById('newQuoteNumber').value = '';
+            document.getElementById('newQuoteError').textContent = '';
+            var btn = document.getElementById('newQuoteCreateBtn');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-arrow-right me-1"></i>Create & Open Builder';
+            new bootstrap.Modal(document.getElementById('newQuoteModal')).show();
+            setTimeout(function() { document.getElementById('newQuoteClientName').focus(); }, 400);
+        }
+
+        async function createAndOpenQuote() {
+            var clientName = document.getElementById('newQuoteClientName').value.trim();
+            var address = document.getElementById('newQuoteAddress').value.trim();
+            var quoteNum = document.getElementById('newQuoteNumber').value.trim();
+            var errEl = document.getElementById('newQuoteError');
+            var btn = document.getElementById('newQuoteCreateBtn');
+
+            if (!clientName) {
+                errEl.textContent = 'Client name is required.';
+                document.getElementById('newQuoteClientName').focus();
+                return;
+            }
+            errEl.textContent = '';
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Creating...';
+
+            // Auto-generate quote number if blank
+            if (!quoteNum) {
+                var maxNum = 0;
+                (allQuotes || []).forEach(function(q) {
+                    var m = String(q.quote_number || '').match(/(\d+)$/);
+                    if (m) maxNum = Math.max(maxNum, parseInt(m[1]));
+                });
+                quoteNum = 'Q-' + (maxNum + 1).toString().padStart(3, '0');
+            }
+
+            try {
+                var result = await saveQuoteToSupabase({
+                    clientName: clientName,
+                    projectAddress: address,
+                    quoteNumber: quoteNum,
+                    rooms: [],
+                    grandTotal: 0,
+                    status: 'draft',
+                    data: { clientName: clientName, projectAddress: address, quoteNumber: quoteNum, rooms: [] }
+                });
+
+                if (result.error) throw new Error(result.error.message || 'Save failed');
+
+                var saved = Array.isArray(result.data) ? result.data[0] : result.data;
+                if (!saved || !saved.id) throw new Error('No ID returned from Supabase');
+
+                localStorage.setItem('ald_active_quote_id', saved.id);
+                bootstrap.Modal.getInstance(document.getElementById('newQuoteModal')).hide();
+                window.location.href = 'quote-builder.html?load=' + saved.id;
+
+            } catch(e) {
+                errEl.textContent = 'Error: ' + e.message;
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-arrow-right me-1"></i>Create & Open Builder';
+            }
+        }
+
+        // Allow Enter key to submit
+        document.addEventListener('DOMContentLoaded', function() {
+            ['newQuoteClientName','newQuoteAddress','newQuoteNumber'].forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) el.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') createAndOpenQuote();
+                });
+            });
+        });
     </script>
 
 <div class="modal fade" id="notesReviewModal" tabindex="-1">
@@ -1561,6 +1640,40 @@ function renderBusinessInsights(quotes) {
         </div>
       </div>
     </div>
+
+<!-- New Quote Modal -->
+<div class="modal fade" id="newQuoteModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#1a56a0; color:white;">
+        <h5 class="modal-title"><i class="fas fa-file-invoice me-2"></i>Start a New Quote</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small mb-3">Give this quote a name so it saves to the cloud right away. You can always change these in the builder.</p>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Client Name <span class="text-danger">*</span></label>
+          <input type="text" id="newQuoteClientName" class="form-control" placeholder="e.g. John Smith" autofocus>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Project Address <span class="text-muted fw-normal">(optional)</span></label>
+          <input type="text" id="newQuoteAddress" class="form-control" placeholder="e.g. 123 Main St">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Quote Number <span class="text-muted fw-normal">(optional — auto-assigned if blank)</span></label>
+          <input type="text" id="newQuoteNumber" class="form-control" placeholder="e.g. Q-2026-042">
+        </div>
+        <div id="newQuoteError" class="text-danger small" style="min-height:1.2rem;"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="newQuoteCreateBtn" onclick="createAndOpenQuote()">
+          <i class="fas fa-arrow-right me-1"></i>Create &amp; Open Builder
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
