@@ -5196,7 +5196,7 @@ async function saveQuote() {
                         <td>
                             <div class="d-flex gap-1">
                                 <button class="btn btn-sm btn-info description-toggle-btn" data-target="desc_${safeId}" title="Show/edit description"><i class="fas fa-align-left"></i> Desc</button>
-                                <button class="btn btn-sm btn-success item-save-btn" data-cat="${catE}" data-name="${nameE}" title="Save this row" onclick="saveItemRow('${catE}','${nameE}')"><i class="fas fa-save"></i></button>
+                                <button class="btn btn-sm btn-success item-save-btn" data-cat="${catE}" data-name="${nameE}" title="Save this row"><i class="fas fa-save"></i></button>
                                 ${isCustom ? `<button class="btn btn-sm btn-danger item-delete-btn" data-cat="${catE}" data-name="${nameE}" title="Delete"><i class="fas fa-trash"></i></button>` : ''}
                             </div>
                         </td>
@@ -5552,6 +5552,29 @@ async function saveQuote() {
     <script>
         // These run independently of auth — always fire on page load
         document.addEventListener('DOMContentLoaded', function() {
+            // Event delegation for Manage Items modal buttons (handles dynamically rendered rows)
+            var ciList = document.getElementById('customItemsList');
+            if (ciList) {
+                ciList.addEventListener('click', function(e) {
+                    var saveBtn = e.target.closest('.item-save-btn');
+                    if (saveBtn) { saveItemRow(saveBtn.dataset.cat, saveBtn.dataset.name); return; }
+                    var delBtn = e.target.closest('.item-delete-btn');
+                    if (delBtn) { deleteCustomItem(delBtn.dataset.cat, delBtn.dataset.name); return; }
+                    var upgBtn = e.target.closest('.upgrade-toggle-btn');
+                    if (upgBtn) {
+                        var target = document.getElementById(upgBtn.dataset.target);
+                        if (target) target.style.display = target.style.display === 'none' ? 'table-row' : 'none';
+                        return;
+                    }
+                    var descBtn = e.target.closest('.description-toggle-btn');
+                    if (descBtn) {
+                        var target = document.getElementById(descBtn.dataset.target);
+                        if (target) target.style.display = target.style.display === 'none' ? 'table-row' : 'none';
+                        return;
+                    }
+                });
+            }
+
             // Auto-save: catch all changes including dynamic room inputs
             document.addEventListener('input', function(e) {
                 if (e.target.closest('.modal')) return;
