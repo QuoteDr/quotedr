@@ -492,26 +492,32 @@ async function backupItemsToCloud(customItems) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
     const snapshot = JSON.stringify(customItems || {});
-    // Delete any existing backup rows first to avoid duplicate .single() failures
-    await _supabase
+    const payload = {
+        user_id: user.id,
+        client_name: '__ITEMS_BACKUP__',
+        quote_number: '__ITEMS_BACKUP__',
+        status: 'backup',
+        data: { items_snapshot: snapshot, backed_up_at: new Date().toISOString() },
+        updated_at: new Date().toISOString()
+    };
+    // Try update first — if no rows updated, insert
+    const { data: upd, error: updErr } = await _supabase
         .from('quotes')
-        .delete()
+        .update(payload)
         .eq('user_id', user.id)
-        .eq('quote_number', '__ITEMS_BACKUP__');
-    // Insert fresh backup
+        .eq('quote_number', '__ITEMS_BACKUP__')
+        .select();
+    if (!updErr && upd && upd.length > 0) {
+        console.log('[Backup] Items backup updated:', Object.keys(customItems || {}).length, 'categories');
+        return { data: upd };
+    }
+    // No existing row — insert
     const { data, error } = await _supabase
         .from('quotes')
-        .insert({
-            user_id: user.id,
-            client_name: '__ITEMS_BACKUP__',
-            quote_number: '__ITEMS_BACKUP__',
-            status: 'backup',
-            data: { items_snapshot: snapshot, backed_up_at: new Date().toISOString() },
-            updated_at: new Date().toISOString()
-        })
+        .insert(payload)
         .select();
     if (error) { console.error('Items backup error:', error); return { error }; }
-    console.log('[Backup] Items backed up to cloud:', Object.keys(customItems || {}).length, 'categories');
+    console.log('[Backup] Items backup created:', Object.keys(customItems || {}).length, 'categories');
     return { data };
 }
 

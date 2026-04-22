@@ -4876,24 +4876,20 @@ async function saveQuote() {
 
             var localIsEmpty = Object.keys(customItems).length === 0;
 
-            // Always sync from cloud snapshot on load (localStorage is cache, cloud is source of truth)
-            if (typeof restoreItemsFromCloud === 'function') {
+            // Only restore from cloud if localStorage is empty (cloud is fallback, localStorage is primary)
+            if (localIsEmpty && typeof restoreItemsFromCloud === 'function') {
                 restoreItemsFromCloud().then(function(result) {
                     if (!result.error && result.data && Object.keys(result.data).length > 0) {
-                        // Cloud snapshot wins — it has all saves from all devices/sessions
-                        console.log('[Restore] Items loaded from cloud snapshot:', Object.keys(result.data).length, 'categories');
+                        console.log('[Restore] Items restored from cloud (localStorage was empty):', Object.keys(result.data).length, 'categories');
                         customItems = result.data;
                         localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
-                        // Clear and re-inject pricingDatabase from fresh snapshot
                         Object.keys(pricingDatabase).forEach(function(k) { delete pricingDatabase[k]; });
                         _injectItemsIntoPricingDB(customItems);
-                        if (localIsEmpty) {
-                            var toast = document.createElement('div');
-                            toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#198754;color:white;padding:10px 18px;border-radius:8px;z-index:9999;font-size:0.9rem;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
-                            toast.innerHTML = '<i class="fas fa-cloud-download-alt me-2"></i>Items restored from cloud!';
-                            document.body.appendChild(toast);
-                            setTimeout(function(){ toast.remove(); }, 4000);
-                        }
+                        var toast = document.createElement('div');
+                        toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#198754;color:white;padding:10px 18px;border-radius:8px;z-index:9999;font-size:0.9rem;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
+                        toast.innerHTML = '<i class="fas fa-cloud-download-alt me-2"></i>Items restored from cloud!';
+                        document.body.appendChild(toast);
+                        setTimeout(function(){ toast.remove(); }, 4000);
                     }
                 }).catch(function(){});
             }
