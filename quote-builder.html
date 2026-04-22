@@ -5181,7 +5181,7 @@ async function saveQuote() {
                     html += `<tr id="row_${safeId}">
                         <td>
                             <input type="text" class="form-control form-control-sm item-name-input" style="margin-bottom:6px;" value="${item.name.replace(/"/g,'&quot;')}" placeholder="Item name" oninput="markPricingDirty()">
-                            <button class="btn btn-xs btn-sm btn-outline-warning upgrade-toggle-btn" data-target="${collapseId}" title="${hasUpgrade ? 'Edit upgrade option' : 'Add upgrade option'}" style="font-size:0.65em; padding:1px 6px;">
+                            <button class="btn btn-xs btn-sm btn-outline-warning upgrade-toggle-btn" data-target="${collapseId}" title="${hasUpgrade ? 'Edit upgrade option' : 'Add upgrade option'}" style="font-size:0.65em; padding:1px 6px; touch-action:manipulation;">
                                 ${hasUpgrade ? '⬆ Edit Upgrade' : '+ Add Upgrade'}
                             </button>
                         </td>
@@ -5552,9 +5552,8 @@ async function saveQuote() {
             var ciList = document.getElementById('customItemsList');
             if (ciList) {
                 ciList.addEventListener('click', function(e) {
-                    console.log('[ItemsList] click on:', e.target.tagName, e.target.className);
                     var saveBtn = e.target.closest('.item-save-btn');
-                    if (saveBtn) { console.log('[ItemsList] save btn clicked', saveBtn.dataset.cat, saveBtn.dataset.name); saveItemRow(saveBtn.dataset.cat, saveBtn.dataset.name); return; }
+                    if (saveBtn) { saveItemRow(saveBtn.dataset.cat, saveBtn.dataset.name); return; }
                     var delBtn = e.target.closest('.item-delete-btn');
                     if (delBtn) { deleteCustomItem(delBtn.dataset.cat, delBtn.dataset.name); return; }
                     var upgBtn = e.target.closest('.upgrade-toggle-btn');
