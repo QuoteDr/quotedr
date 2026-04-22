@@ -5118,6 +5118,7 @@ async function saveQuote() {
                 </div>`;
                 html += '<table class="table table-sm table-bordered mb-2"><thead class="table-light"><tr><th>Name</th><th style="width:80px">Unit</th><th style="width:90px">Rate ($)</th><th style="width:100px">Mat. Cost ($)</th><th>Supplier URL</th><th style="width:110px"></th></tr></thead><tbody>';
                 items.forEach(item => {
+                    if (!item || !item.name) return; // skip malformed items
                     const safeId = (cat + '_' + item.name).replace(/[^a-z0-9]/gi,'_');
                     const isCustom = !!item._custom;
                     const rate = parseFloat(item.rate || 0).toFixed(2);
