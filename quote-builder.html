@@ -4301,6 +4301,7 @@ Example:
 
         function newQuote() {
             if (!confirm('Start a new quote? Any unsaved changes will be lost.')) return;
+            window._quoteFullyLoaded = true; // new quote — intentionally empty, allow save
             // Clear all fields
             ['clientName','clientEmail','projectAddress','quoteNotes'].forEach(function(id) {
                 var el = document.getElementById(id);
@@ -4643,6 +4644,12 @@ async function saveQuote() {
             // Cloud save to Supabase — always runs regardless of file handle
             if (typeof saveQuoteToSupabase === 'function') {
                 var qData = collectQuoteData();
+                // SAFETY GUARD: never overwrite cloud data with empty rooms unless we know the quote is intentionally empty
+                // _quoteFullyLoaded is set true only after a successful Supabase load
+                if (!window._quoteFullyLoaded && (!qData.rooms || qData.rooms.length === 0)) {
+                    console.warn('[AutoSave] Skipping cloud save — rooms empty and quote not confirmed loaded from cloud');
+                    return;
+                }
                 saveQuoteToSupabase(qData).then(function(result) {
                     if (result && result.data) {
                         // result.data may be an array (insert) or object (update)
@@ -4767,6 +4774,7 @@ async function saveQuote() {
                             renderRooms();
                         }
                         unsavedChanges = false;
+                        window._quoteFullyLoaded = true; // allow autosave now
                         updateSaveStatus('saved', 'Quote loaded ✓');
                         updateDraftWarning();
                         // Show client notes banner if ?shownotes=1
