@@ -226,11 +226,23 @@ if (location.search.includes('debug')) {
                             localStorage.setItem('ald_onboarding_complete', '1');
                             window.location.href = 'quote-builder.html';
                         } else {
-                            window.location.href = 'onboarding.html';
+                            // Double-check: if they have existing quotes, they're not new — skip onboarding
+                            const { data: existingQuotes } = await _supabase
+                                .from('quotes')
+                                .select('id')
+                                .eq('user_id', session.user.id)
+                                .limit(1);
+                            if (existingQuotes && existingQuotes.length > 0) {
+                                localStorage.setItem('ald_onboarding_complete', '1');
+                                window.location.href = 'quote-builder.html';
+                            } else {
+                                window.location.href = 'onboarding.html';
+                            }
                         }
                     } catch(e) {
-                        // If Supabase check fails, fall back to onboarding
-                        window.location.href = 'onboarding.html';
+                        // If Supabase check fails, go to builder (safer than onboarding which can wipe items)
+                        console.warn('Onboarding check failed, going to builder:', e);
+                        window.location.href = 'quote-builder.html';
                     }
                 }
             });
