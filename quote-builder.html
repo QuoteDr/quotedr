@@ -4929,7 +4929,17 @@ async function saveQuote() {
         function saveCustomItems() {
             localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
             localStorage.setItem('ald_category_styles', JSON.stringify(categoryStyles));
-            // Backup full snapshot to Supabase (bulletproof failsafe)
+            // Sync each item to Supabase items table (proper upsert by user_id,name)
+            if (typeof saveItem === 'function') {
+                Object.entries(customItems).forEach(function([cat, items]) {
+                    if (!Array.isArray(items)) return;
+                    items.forEach(function(item) {
+                        if (!item || !item.name) return;
+                        saveItem({ ...item, category: cat }).catch(function(){});
+                    });
+                });
+            }
+            // Also backup full snapshot to Supabase (bulletproof failsafe)
             if (typeof backupItemsToCloud === 'function') {
                 backupItemsToCloud(customItems).catch(function(){});
             }
