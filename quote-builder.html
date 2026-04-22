@@ -221,6 +221,16 @@
         .container-fluid > .d-flex.align-items-center.justify-content-between > div:last-child { width: 100% !important; }
     }
 
+    /* Logo area: portrait vs landscape */
+    #logo-header { display: flex; justify-content: center; align-items: center; width: 100%; }
+    #userLogoImg { display: none; }
+    @media (orientation: landscape) and (max-width: 900px) {
+        #logo-header { flex-direction: row; justify-content: space-between; }
+        #userLogoImg[src]:not([src='']) { display: block !important; }
+        #quotedr-logo { order: 2; }
+        #userLogoImg { order: 1; }
+    }
+
     /* Full screen modals in landscape on mobile */
     @media (max-height: 500px) and (orientation: landscape) {
         .modal-dialog {
@@ -268,11 +278,10 @@ if (location.search.includes('debug')) {
     <div class="container-fluid py-4">
         <!-- Professional Header -->
         <div class="d-flex flex-column align-items-center mb-2" style="overflow: visible; padding-top: 8px; padding-bottom: 8px;">
-            <!-- Hidden user logo (kept for JS compatibility) -->
-            <img id="userLogoImg" src="" alt="Your Logo" style="height: 80px; width: auto; max-width: 180px; display: none; border-radius: 6px; margin-bottom: 6px;">
-            <!-- QuoteDr logo center -->
-            <div style="display: flex; justify-content: center; align-items: center; width: 100%;">
-                <img src="quotedr-logo.svg" alt="QuoteDr" style="height: 200px; width: auto; margin-top: -60px; margin-bottom: -60px; max-width: 100%;">
+            <!-- Logo header: portrait=centered, landscape=user left / quotedr right -->
+            <div id="logo-header">
+                <img id="userLogoImg" src="" alt="Your Logo" style="height: 80px; width: auto; max-width: 180px; border-radius: 6px;">
+                <img id="quotedr-logo" src="quotedr-logo.svg" alt="QuoteDr" style="height: 200px; width: auto; margin-top: -60px; margin-bottom: -60px; max-width: 100%;">
             </div>
             <!-- Toolbar full width -->
             <div style="width: 100%;">
