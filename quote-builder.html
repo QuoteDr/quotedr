@@ -4691,7 +4691,7 @@ async function saveQuote() {
 
             // Check for ?load=ID in URL — load quote from Supabase
             const urlParams = new URLSearchParams(window.location.search);
-            const loadId = urlParams.get('load');
+            const loadId = urlParams.get('load') || localStorage.getItem('ald_active_quote_id');
             if (loadId && typeof loadQuoteFromSupabase === 'function') {
                 try {
                     const { data, error } = await loadQuoteFromSupabase(loadId);
