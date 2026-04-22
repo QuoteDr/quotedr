@@ -4828,6 +4828,7 @@ async function saveQuote() {
 
                 function _injectItemsIntoPricingDB(itemsObj) {
             for (var cat in itemsObj) {
+                if (!Array.isArray(itemsObj[cat])) continue; // skip corrupted entries
                 if (!pricingDatabase[cat]) pricingDatabase[cat] = [];
                 itemsObj[cat].forEach(function(item) {
                     if (!pricingDatabase[cat].find(function(e) { return e._custom && e.name === item.name; })) {
@@ -4885,6 +4886,7 @@ async function saveQuote() {
                 categoryStyles = {};
             }
             for (const [category, items] of Object.entries(customItems)) {
+                if (!Array.isArray(items)) continue; // skip corrupted entries
                 if (!pricingDatabase[category]) pricingDatabase[category] = [];
                 items.forEach(item => {
                     if (!pricingDatabase[category].find(e => e._custom && e.name === item.name)) {
@@ -6172,6 +6174,7 @@ async function saveQuote() {
                         if (result.data && result.data.length > 0) {
                             // Merge Supabase clients with localStorage
                             var existing = JSON.parse(localStorage.getItem('ald_clients') || '[]');
+                            if (!Array.isArray(existing)) existing = []; // fix corrupted data
                             result.data.forEach(function(sc) {
                                 if (!existing.find(function(c){ return c.name === sc.name; })) {
                                     existing.push({ name: sc.name, phone: sc.phone, email: sc.email, address: sc.address, city: sc.city, notes: sc.notes });
