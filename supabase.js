@@ -500,7 +500,7 @@ async function backupItemsToCloud(customItems) {
         data: { items_snapshot: snapshot, backed_up_at: new Date().toISOString() },
         updated_at: new Date().toISOString()
     };
-    // Try update first — if no rows updated, insert
+    // Try update first
     const { data: upd, error: updErr } = await _supabase
         .from('quotes')
         .update(payload)
@@ -509,6 +509,12 @@ async function backupItemsToCloud(customItems) {
         .select();
     if (!updErr && upd && upd.length > 0) {
         console.log('[Backup] Items backup updated:', Object.keys(customItems || {}).length, 'categories');
+        // Fire-and-forget versioned history entry
+        _supabase.from('item_history').insert({
+            user_id: user.id,
+            snapshot: customItems,
+            created_at: new Date().toISOString()
+        }).then(() => {}).catch(() => {});
         return { data: upd };
     }
     // No existing row — insert
@@ -518,23 +524,54 @@ async function backupItemsToCloud(customItems) {
         .select();
     if (error) { console.error('Items backup error:', error); return { error }; }
     console.log('[Backup] Items backup created:', Object.keys(customItems || {}).length, 'categories');
+    // Fire-and-forget versioned history entry
+    _supabase.from('item_history').insert({
+        user_id: user.id,
+        snapshot: customItems,
+        created_at: new Date().toISOString()
+    }).then(() => {}).catch(() => {});
     return { data };
 }
 
 async function restoreItemsFromCloud() {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
+    // Try main backup row first
     const { data, error } = await _supabase
         .from('quotes')
         .select('data, updated_at')
         .eq('user_id', user.id)
         .eq('quote_number', '__ITEMS_BACKUP__')
         .single();
-    if (error || !data) return { error: error || 'No backup found' };
-    try {
-        const snapshot = JSON.parse(data.data.items_snapshot || '{}');
-        return { data: snapshot, backed_up_at: data.data.backed_up_at };
-    } catch(e) {
-        return { error: 'Could not parse backup: ' + e.message };
+    if (!error && data) {
+        try {
+            const snapshot = JSON.parse(data.data.items_snapshot || '{}');
+            if (Object.keys(snapshot).length > 0) return { data: snapshot, backed_up_at: data.data.backed_up_at };
+        } catch(e) {}
     }
+    // Fall back to most recent item_history row
+    const { data: hist, error: histErr } = await _supabase
+        .from('item_history')
+        .select('snapshot, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+    if (!histErr && hist && hist.snapshot) {
+        console.log('[Restore] Falling back to item_history, saved at:', hist.created_at);
+        return { data: hist.snapshot, backed_up_at: hist.created_at };
+    }
+    return { error: 'No backup found' };
+}
+
+async function getItemHistory(limit = 10) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    const { data, error } = await _supabase
+        .from('item_history')
+        .select('id, created_at, snapshot')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+    return error ? { error } : { data };
 }
