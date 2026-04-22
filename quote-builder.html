@@ -1062,7 +1062,7 @@ Example:
             rooms = state.rooms;
             roomCounter = state.roomCounter;
             renderRooms();
-            recalcAll();
+            if (typeof calculateTotals === 'function') calculateTotals();
             _undoPaused = false;
             _updateUndoBtn();
         }
@@ -1519,7 +1519,7 @@ Example:
         function confirmAddRoom() {
             const name = document.getElementById('newRoomName').value.trim();
             if (!name) return;
-            
+            _pushUndo();
             roomCounter++;
             rooms.push({
                 id: roomCounter,
@@ -2014,6 +2014,7 @@ Example:
             
             const roomIndex = rooms.findIndex(r => r.id === roomId);
             if (roomIndex !== -1) {
+                _pushUndo(); // snapshot before save
                 // If editing existing item, update it; otherwise add new
                 if (editingItemIndex !== null && rooms[roomIndex].items[editingItemIndex]) {
                     const item = rooms[roomIndex].items[editingItemIndex];
@@ -2140,6 +2141,7 @@ Example:
 
         function deleteRoom(roomId) {
             if (confirm('Delete this room? All items will be lost.')) {
+                _pushUndo();
                 rooms = rooms.filter(r => r.id !== roomId);
                 renderRooms();
             }
@@ -2173,6 +2175,7 @@ Example:
         function deleteItem(roomId, itemIndex) {
             const room = rooms.find(r => r.id === roomId);
             if (room) {
+                _pushUndo();
                 room.items.splice(itemIndex, 1);
                 renderRooms();
             }
@@ -3108,7 +3111,6 @@ Example:
         }
 
         function renderRooms() {
-            _pushUndo(); // snapshot before every render for undo
             const container = document.getElementById('roomsContainer');
             
             if (rooms.length === 0) {
