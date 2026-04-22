@@ -1645,6 +1645,10 @@ Example:
 
         function addLine(roomId) {
             document.getElementById('currentRoomId').value = roomId;
+            // Re-inject custom items into pricingDatabase in case Supabase load was async
+            if (typeof customItems === 'object' && typeof _injectItemsIntoPricingDB === 'function') {
+                _injectItemsIntoPricingDB(customItems);
+            }
             const modal = new bootstrap.Modal(document.getElementById('addLineModal'));
             
             // Reset form fields
