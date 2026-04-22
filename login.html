@@ -231,6 +231,7 @@ if (location.search.includes('debug')) {
                                 .from('quotes')
                                 .select('id')
                                 .eq('user_id', session.user.id)
+                                .neq('quote_number', '__ITEMS_BACKUP__')
                                 .limit(1);
                             if (existingQuotes && existingQuotes.length > 0) {
                                 localStorage.setItem('ald_onboarding_complete', '1');

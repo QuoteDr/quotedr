@@ -80,10 +80,10 @@ async function updateUserProfile(profileData) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
     
+    // Use upsert so it works even if the user_data row doesn't exist yet
     const { data, error } = await _supabase
         .from('user_data')
-        .update(profileData)
-        .eq('id', user.id);
+        .upsert({ id: user.id, ...profileData }, { onConflict: 'id' });
         
     if (error) {
         console.error('Profile update error:', error);
