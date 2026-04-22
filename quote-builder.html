@@ -5247,18 +5247,25 @@ async function saveQuote() {
 
         function saveItemFieldEdit(category, name, field, value) {
             // For custom items: update customItems store
-            if (customItems[category]) {
-                const ci = customItems[category].find(i => i.name === name);
-                if (ci) {
-                    ci[field] = value;
-                    saveCustomItems();
-                    // Also update live pricingDatabase
-                    const pi = pricingDatabase[category]?.find(i => i._custom && i.name === name);
-                    if (pi) pi[field] = value;
-                    return;
+            if (!customItems[category]) customItems[category] = [];
+            let ci = customItems[category].find(i => i.name === name);
+            // If not in customItems yet but exists in pricingDatabase as custom, adopt it
+            if (!ci) {
+                const pi = pricingDatabase[category]?.find(i => i.name === name);
+                if (pi) {
+                    ci = { name: pi.name, unitType: pi.unitType || '', rate: pi.rate || 0, materialCost: pi.materialCost || 0, supplierUrl: pi.supplierUrl || '', itemDescription: pi.itemDescription || '' };
+                    customItems[category].push(ci);
                 }
             }
-            // For built-in items: use overrides
+            if (ci) {
+                ci[field] = value;
+                saveCustomItems();
+                // Also update live pricingDatabase
+                const pi = pricingDatabase[category]?.find(i => i.name === name);
+                if (pi) pi[field] = value;
+                return;
+            }
+            // For truly built-in items: use overrides
             saveItemOverride(category, name, { [field]: value });
         }
 
