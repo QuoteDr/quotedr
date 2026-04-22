@@ -4974,6 +4974,10 @@ async function saveQuote() {
         }
 
         function openManageItemsModal() {
+            // Always re-inject customItems into pricingDatabase before rendering
+            if (typeof customItems === 'object' && typeof _injectItemsIntoPricingDB === 'function') {
+                _injectItemsIntoPricingDB(customItems);
+            }
             const catSelect = document.getElementById('newItemCategory');
             if (!catSelect) { console.error('newItemCategory not found'); return; }
             catSelect.innerHTML = '';
@@ -5192,7 +5196,7 @@ async function saveQuote() {
                         <td>
                             <div class="d-flex gap-1">
                                 <button class="btn btn-sm btn-info description-toggle-btn" data-target="desc_${safeId}" title="Show/edit description"><i class="fas fa-align-left"></i> Desc</button>
-                                <button class="btn btn-sm btn-success item-save-btn" data-cat="${catE}" data-name="${nameE}" title="Save this row"><i class="fas fa-save"></i></button>
+                                <button class="btn btn-sm btn-success item-save-btn" data-cat="${catE}" data-name="${nameE}" title="Save this row" onclick="saveItemRow('${catE}','${nameE}')"><i class="fas fa-save"></i></button>
                                 ${isCustom ? `<button class="btn btn-sm btn-danger item-delete-btn" data-cat="${catE}" data-name="${nameE}" title="Delete"><i class="fas fa-trash"></i></button>` : ''}
                             </div>
                         </td>
