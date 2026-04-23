@@ -6346,6 +6346,12 @@ async function saveQuote() {
                             if (result && result.data && result.data.data) {
                                 var qData = result.data.data;
                                 qData.supabaseId = result.data.id;
+                                // Map top-level Supabase columns into qData so applyQuoteData can find them
+                                qData.clientName = result.data.client_name || qData.clientName || '';
+                                qData.quoteNumber = result.data.quote_number || qData.quoteNumber || '';
+                                qData.projectAddress = qData.project_address || qData.projectAddress || '';
+                                qData.clientEmail = qData.email || qData.clientEmail || '';
+                                qData.clientPhone = qData.phone || qData.clientPhone || '';
                                 window._supabaseQuoteId = result.data.id;
                                 localStorage.setItem("ald_active_quote_id", result.data.id);
                                 applyQuoteData(qData);

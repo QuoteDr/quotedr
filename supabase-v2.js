@@ -335,13 +335,18 @@ async function saveQuote(quoteData) {
         status: quoteData.status || 'draft',
         quote_date: quoteData.savedAt || now,
         data: {
+            clientName: quoteData.clientName || '',
+            projectAddress: quoteData.projectAddress || '',
             project_address: quoteData.projectAddress || '',
-            email: quoteData.email || '',
-            phone: quoteData.phone || '',
+            clientEmail: quoteData.clientEmail || quoteData.email || '',
+            email: quoteData.clientEmail || quoteData.email || '',
+            clientPhone: quoteData.clientPhone || quoteData.phone || '',
+            phone: quoteData.clientPhone || quoteData.phone || '',
             rooms: quoteData.rooms || [],
             terms: quoteData.terms || [],
             style: quoteData.style || {},
-            notes: quoteData.notes || ''
+            notes: quoteData.notes || '',
+            quoteNumber: quoteData.quoteNumber || ''
         },
         updated_at: now
     };
