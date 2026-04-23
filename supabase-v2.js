@@ -85,20 +85,41 @@ async function getUserProfile() {
     return data;
 }
 
-// Update user's profile
+// Update user's profile (legacy — kept for compatibility)
 async function updateUserProfile(profileData) {
+    // If called with onboarding_complete, route to the proper KV save
+    if ('onboarding_complete' in profileData) {
+        return saveOnboardingComplete(profileData.onboarding_complete);
+    }
+    return { error: 'updateUserProfile: unsupported fields' };
+}
+
+// Save onboarding complete flag to user_data key/value store
+async function saveOnboardingComplete(value) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
-    
+    const result = await _supabase
+        .from('user_data')
+        .upsert({ user_id: user.id, key: 'onboarding_complete', value: { complete: value }, updated_at: new Date().toISOString() }, { onConflict: 'user_id,key' });
+    if (!result.error) localStorage.setItem('ald_onboarding_complete', value ? '1' : '');
+    return result;
+}
+
+// Load onboarding complete flag from user_data
+async function loadOnboardingComplete() {
+    const user = await getCurrentUser();
+    if (!user) return false;
     const { data, error } = await _supabase
         .from('user_data')
-        .upsert({ ...profileData, id: user.id });
-        
-    if (error) {
-        console.error('Profile update error:', error);
-        return { error };
+        .select('value')
+        .eq('user_id', user.id)
+        .eq('key', 'onboarding_complete')
+        .maybeSingle();
+    if (!error && data && data.value && data.value.complete) {
+        localStorage.setItem('ald_onboarding_complete', '1');
+        return true;
     }
-    return { data };
+    return false;
 }
 
 // Get all templates for current user

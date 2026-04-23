@@ -1228,7 +1228,7 @@ Sarah Jones, 905-555-5678"></textarea>
 
 		async function resetOnboarding() {
 			if (!confirm('Redo onboarding? This will walk you through the setup again.')) return;
-			await updateUserProfile({ onboarding_complete: false });
+			if (typeof saveOnboardingComplete === 'function') await saveOnboardingComplete(false);
 			localStorage.removeItem('ald_onboarding_complete');
 			window.location.href = 'onboarding.html';
 		}

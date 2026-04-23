@@ -215,14 +215,15 @@ if (location.search.includes('debug')) {
                         window.location.href = 'quote-builder.html';
                         return;
                     }
-                    // Check Supabase profile (cross-device)
+                    // Check Supabase for onboarding_complete (cross-device, key/value store)
                     try {
-                        const { data: profile } = await _supabase
+                        const { data: kvRow } = await _supabase
                             .from('user_data')
-                            .select('onboarding_complete')
-                            .eq('id', session.user.id)
-                            .single();
-                        if (profile && profile.onboarding_complete) {
+                            .select('value')
+                            .eq('user_id', session.user.id)
+                            .eq('key', 'onboarding_complete')
+                            .maybeSingle();
+                        if (kvRow && kvRow.value && kvRow.value.complete) {
                             localStorage.setItem('ald_onboarding_complete', '1');
                             window.location.href = 'quote-builder.html';
                         } else {
