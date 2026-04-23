@@ -626,6 +626,8 @@ Sarah Jones, 905-555-5678"></textarea>
 						<h5><i class="fas fa-user-circle me-2" style="color:#6f42c1"></i>Account</h5>
 						<p class="text-muted">Subscription &amp; billing settings coming soon.</p>
 						<a href="pricing.html" class="btn btn-outline-primary"><i class="fas fa-arrow-up me-1"></i>View Plans</a>
+						<br>
+						<button onclick="resetOnboarding()" class="btn btn-outline-secondary mt-2"><i class="fas fa-redo me-1"></i>Redo Onboarding</button>
 					</div>
 				</div><!-- /tab-account -->
 
@@ -1220,11 +1222,11 @@ Sarah Jones, 905-555-5678"></textarea>
 			if (document.getElementById('emailFooter')) document.getElementById('emailFooter').value = profile.emailFooter || '';
 		}
 
-		function resetOnboarding() {
+		async function resetOnboarding() {
+			if (!confirm('Redo onboarding? This will walk you through the setup again.')) return;
+			await updateUserProfile({ onboarding_complete: false });
 			localStorage.removeItem('ald_onboarding_complete');
-			if (confirm('Onboarding reset! Go to onboarding now?')) {
-				window.location.href = 'onboarding.html';
-			}
+			window.location.href = 'onboarding.html';
 		}
 		function signOut() {
 			localStorage.clear();

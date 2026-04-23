@@ -92,8 +92,7 @@ async function updateUserProfile(profileData) {
     
     const { data, error } = await _supabase
         .from('user_data')
-        .update(profileData)
-        .eq('id', user.id);
+        .upsert({ ...profileData, id: user.id });
         
     if (error) {
         console.error('Profile update error:', error);
