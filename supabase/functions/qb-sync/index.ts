@@ -6,6 +6,16 @@ const QB_CLIENT_ID = Deno.env.get("QB_CLIENT_ID") ?? "";
 const QB_CLIENT_SECRET = Deno.env.get("QB_CLIENT_SECRET") ?? "";
 const QB_BASE_URL = "https://quickbooks.api.intuit.com/v3/company";
 
+// Log intuit_tid from every QB API response (helps Intuit debug issues)
+function logQBResponse(action: string, response: Response) {
+  const tid = response.headers.get('intuit_tid') || 'none';
+  if (!response.ok) {
+    console.error(`[QB ERROR] ${action} | intuit_tid: ${tid} | status: ${response.status}`);
+  } else {
+    console.log(`[QB] ${action} | intuit_tid: ${tid} | status: ${response.status}`);
+  }
+}
+
 // Supabase configuration
 const SUPABASE_URL = "https://axmoffknvblluibuitrq.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso";
@@ -180,6 +190,7 @@ async function handlePushInvoice(userId: string, invoiceData: any) {
           }
         );
 
+        logQBResponse('createCustomer', createCustomerResponse);
         if (!createCustomerResponse.ok) {
           const errorText = await createCustomerResponse.text();
           throw new Error(`Failed to create customer: ${errorText}`);
@@ -287,6 +298,7 @@ async function handlePushInvoice(userId: string, invoiceData: any) {
       }
     );
 
+    logQBResponse('createInvoice', createInvoiceResponse);
     if (!createInvoiceResponse.ok) {
       const errorText = await createInvoiceResponse.text();
       throw new Error(`Failed to create invoice: ${errorText}`);
