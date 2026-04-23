@@ -59,8 +59,10 @@ serve(async (req) => {
     const action = body.action;
 
     switch (action) {
+      case "get_auth_url":
+        return await handleGetAuthUrl(userId);
       case "exchange":
-        return await handleExchange(userId, body.code, body.realmId);
+        return await handleExchange(userId, body.code, body.realmId, body.state);
       case "refresh":
         return await handleRefresh(userId);
       case "status":
@@ -82,7 +84,30 @@ serve(async (req) => {
   }
 });
 
-async function handleExchange(userId: string, code: string, realmId: string) {
+async function handleGetAuthUrl(userId: string) {
+  const state = crypto.randomUUID();
+  const { error } = await supabase
+    .from('user_data')
+    .upsert({ user_id: userId, key: 'qb_oauth_state', value: { state, created_at: new Date().toISOString() } }, { onConflict: 'user_id,key' });
+  if (error) return new Response(JSON.stringify({ error: 'Failed to save state' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+  const authUrl = QB_AUTH_URL +
+    "?client_id=" + QB_CLIENT_ID +
+    "&redirect_uri=" + encodeURIComponent(QB_REDIRECT_URI) +
+    "&response_type=code" +
+    "&scope=com.intuit.quickbooks.accounting" +
+    "&state=" + state;
+  return new Response(JSON.stringify({ auth_url: authUrl }), { headers: { 'Content-Type': 'application/json' } });
+}
+
+async function handleExchange(userId: string, code: string, realmId: string, state: string) {
+  // Validate CSRF state
+  const { data: storedStateData, error: stateErr } = await supabase
+    .from('user_data').select('value').eq('user_id', userId).eq('key', 'qb_oauth_state').single();
+  if (stateErr || !storedStateData || storedStateData.value.state !== state) {
+    return new Response(JSON.stringify({ error: 'Invalid state parameter - possible CSRF attack' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+  }
+  // Delete used state (one-time use)
+  await supabase.from('user_data').delete().eq('user_id', userId).eq('key', 'qb_oauth_state');
   try {
     // Exchange authorization code for tokens
     const tokenResponse = await fetch(QB_TOKEN_URL, {
