@@ -327,21 +327,26 @@ async function saveQuote(quoteData) {
     if (!user) return { error: 'Not authenticated' };
 
     const now = new Date().toISOString();
+    const clientEmail = quoteData.clientEmail || quoteData.email || '';
+    const clientPhone = quoteData.clientPhone || quoteData.phone || '';
+    const projectAddress = quoteData.projectAddress || '';
     const payload = {
         user_id: user.id,
         client_name: quoteData.clientName || '',
+        client_email: clientEmail,
+        client_phone: clientPhone,
+        project_address: projectAddress,
         quote_number: quoteData.quoteNumber || '',
         total: quoteData.grandTotal || 0,
         status: quoteData.status || 'draft',
         quote_date: quoteData.savedAt || now,
         data: {
             clientName: quoteData.clientName || '',
-            projectAddress: quoteData.projectAddress || '',
-            project_address: quoteData.projectAddress || '',
-            clientEmail: quoteData.clientEmail || quoteData.email || '',
-            email: quoteData.clientEmail || quoteData.email || '',
-            clientPhone: quoteData.clientPhone || quoteData.phone || '',
-            phone: quoteData.clientPhone || quoteData.phone || '',
+            projectAddress: projectAddress,
+            clientEmail: clientEmail,
+            clientPhone: clientPhone,
+            email: clientEmail,
+            phone: clientPhone,
             rooms: quoteData.rooms || [],
             terms: quoteData.terms || [],
             style: quoteData.style || {},
