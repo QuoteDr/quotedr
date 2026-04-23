@@ -4878,23 +4878,33 @@ async function saveQuote() {
 
             var localIsEmpty = Object.keys(customItems).length === 0;
 
-            // Only restore from cloud if localStorage is empty (cloud is fallback, localStorage is primary)
-            if (localIsEmpty && typeof restoreItemsFromCloud === 'function') {
-                restoreItemsFromCloud().then(function(result) {
-                    if (!result.error && result.data && Object.keys(result.data).length > 0) {
-                        console.log('[Restore] Items restored from cloud (localStorage was empty):', Object.keys(result.data).length, 'categories');
-                        customItems = result.data;
+            // Always sync from cloud on load - cloud is source of truth
+            _doRestoreItemsFromCloud().then(function(result) {
+                if (!result.error && result.data && Object.keys(result.data).length > 0) {
+                    var cloudItems = result.data;
+                    var changed = false;
+                    // Merge: cloud categories win, but keep any local-only categories
+                    Object.keys(cloudItems).forEach(function(cat) {
+                        if (!customItems[cat] || JSON.stringify(customItems[cat]) !== JSON.stringify(cloudItems[cat])) {
+                            customItems[cat] = cloudItems[cat];
+                            changed = true;
+                        }
+                    });
+                    if (changed) {
+                        console.log('[Restore] Synced from cloud:', Object.keys(cloudItems).length, 'categories');
                         localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
                         Object.keys(pricingDatabase).forEach(function(k) { delete pricingDatabase[k]; });
                         _injectItemsIntoPricingDB(customItems);
-                        var toast = document.createElement('div');
-                        toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#198754;color:white;padding:10px 18px;border-radius:8px;z-index:9999;font-size:0.9rem;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
-                        toast.innerHTML = '<i class="fas fa-cloud-download-alt me-2"></i>Items restored from cloud!';
-                        document.body.appendChild(toast);
-                        setTimeout(function(){ toast.remove(); }, 4000);
+                        if (localIsEmpty) {
+                            var toast = document.createElement('div');
+                            toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#198754;color:white;padding:10px 18px;border-radius:8px;z-index:9999;font-size:0.9rem;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
+                            toast.innerHTML = '<i class="fas fa-cloud-download-alt me-2"></i>Items restored from cloud!';
+                            document.body.appendChild(toast);
+                            setTimeout(function(){ toast.remove(); }, 4000);
+                        }
                     }
-                }).catch(function(){});
-            }
+                }
+            }).catch(function(){});
 
             // NOTE: items table sync removed - snapshot backup (quotes table) is the source of truth
             try {
@@ -5090,6 +5100,20 @@ async function saveQuote() {
             document.body.appendChild(toast);
             setTimeout(function(){ toast.remove(); }, 2000);
             clearPricingDirty();
+        }
+
+        // Inline restore function
+        async function _doRestoreItemsFromCloud() {
+            const { data: { user }, error: authErr } = await _supabase.auth.getUser();
+            if (authErr || !user) return { error: 'Not authenticated' };
+            const { data, error } = await _supabase.from('quotes').select('data,updated_at').eq('user_id', user.id).eq('quote_number', '__ITEMS_BACKUP__').single();
+            if (!error && data) {
+                try {
+                    const snapshot = JSON.parse(data.data.items_snapshot || '{}');
+                    if (Object.keys(snapshot).length > 0) return { data: snapshot };
+                } catch(e) {}
+            }
+            return { error: 'No backup found' };
         }
 
         // Inline backup function - guaranteed available regardless of supabase-v2.js load order
