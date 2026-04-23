@@ -971,7 +971,6 @@ Example:
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-success" onclick="saveAllPricingRows()"><i class="fas fa-save"></i> Save All Changes</button>
-                    <button type="button" class="btn btn-info" onclick="testBackup()">🔍 Test Cloud Save</button>
                     <button type="button" class="btn btn-secondary" onclick="closeManageItemsModal()">Close</button>
                 </div>
             </div>
@@ -5123,22 +5122,6 @@ async function saveQuote() {
             if (error) { console.error('[Backup] error:', error); return { error }; }
             console.log('[Backup] saved:', Object.keys(itemsObj || {}).length, 'categories');
             return { data };
-        }
-
-        async function testBackup() {
-            var user = await getCurrentUser();
-            alert('User: ' + (user ? user.email : 'NOT LOGGED IN'));
-            if (!user) return;
-            alert('Calling backup now...');
-            try {
-                var result = await Promise.race([
-                    _doBackupItemsToCloud(customItems),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT after 10s')), 10000))
-                ]);
-                alert('Backup result: ' + JSON.stringify(result));
-            } catch(e) {
-                alert('Backup ERROR: ' + e.message);
-            }
         }
 
         function saveAllPricingRows() {
