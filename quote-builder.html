@@ -6001,6 +6001,13 @@ async function saveQuote() {
         function loadSavedClients() {
             try { savedClients = JSON.parse(localStorage.getItem('ald_clients') || '{}'); }
             catch(e) { savedClients = {}; }
+            // Fix corrupted array format → convert to object keyed by name
+            if (Array.isArray(savedClients)) {
+                var obj = {};
+                savedClients.forEach(function(c) { if (c && c.name) obj[c.name] = c; });
+                savedClients = obj;
+                localStorage.setItem('ald_clients', JSON.stringify(savedClients));
+            }
             // One-time migration: import legacy clients that aren't already saved
             let migrated = false;
             LEGACY_CLIENTS.forEach(name => {
@@ -6256,15 +6263,22 @@ async function saveQuote() {
                 if (typeof loadClientsFromSupabase === 'function') {
                     loadClientsFromSupabase().then(function(result) {
                         if (result.data && result.data.length > 0) {
-                            // Merge Supabase clients with localStorage
-                            var existing = JSON.parse(localStorage.getItem('ald_clients') || '[]');
-                            if (!Array.isArray(existing)) existing = []; // fix corrupted data
+                            // Merge Supabase clients with localStorage (object keyed by name)
+                            var existing = {};
+                            try { existing = JSON.parse(localStorage.getItem('ald_clients') || '{}'); } catch(e) { existing = {}; }
+                            // Fix if corrupted to array
+                            if (Array.isArray(existing)) {
+                                var obj = {};
+                                existing.forEach(function(c) { if (c && c.name) obj[c.name] = c; });
+                                existing = obj;
+                            }
                             result.data.forEach(function(sc) {
-                                if (!existing.find(function(c){ return c.name === sc.name; })) {
-                                    existing.push({ name: sc.name, phone: sc.phone, email: sc.email, address: sc.address, city: sc.city, notes: sc.notes });
+                                if (sc.name && !existing[sc.name]) {
+                                    existing[sc.name] = { name: sc.name, phone: sc.phone || '', email: sc.email || '', address: sc.address || '', city: sc.city || '', notes: sc.notes || '' };
                                 }
                             });
                             localStorage.setItem('ald_clients', JSON.stringify(existing));
+                            loadSavedClients(); // refresh in-memory client list
                         }
                     }).catch(function(e){ console.warn('Client load error:', e); });
                 }
