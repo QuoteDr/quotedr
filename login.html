@@ -336,17 +336,32 @@ if (location.search.includes('debug')) {
 
         async function checkOnboardingAndRedirect(user) {
             try {
-                const { data } = await _supabase.from('user_data').select('onboarding_complete').eq('id', user.id).single();
-                if (data && data.onboarding_complete) {
+                const { data } = await _supabase
+                    .from('user_data')
+                    .select('value')
+                    .eq('user_id', user.id)
+                    .eq('key', 'onboarding_complete')
+                    .maybeSingle();
+                if (data && data.value && data.value.complete) {
                     localStorage.setItem('ald_onboarding_complete', '1');
                     window.location.href = 'quote-builder.html';
                     return;
                 }
             } catch(e) { console.warn('Onboarding check error:', e); }
-            if (localStorage.getItem('ald_onboarding_complete')) {
-                window.location.href = 'quote-builder.html';
-                return;
-            }
+            // Fallback: if they have existing quotes, skip onboarding
+            try {
+                const { data: existingQuotes } = await _supabase
+                    .from('quotes')
+                    .select('id')
+                    .eq('user_id', user.id)
+                    .neq('quote_number', '__ITEMS_BACKUP__')
+                    .limit(1);
+                if (existingQuotes && existingQuotes.length > 0) {
+                    localStorage.setItem('ald_onboarding_complete', '1');
+                    window.location.href = 'quote-builder.html';
+                    return;
+                }
+            } catch(e) { console.warn('Quotes fallback check error:', e); }
             window.location.href = 'onboarding.html';
         }
 
