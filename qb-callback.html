@@ -48,12 +48,12 @@
         const urlParams = new URLSearchParams(window.location.search);
         const code = urlParams.get('code');
         const realmId = urlParams.get('realmId');
+        const state = urlParams.get('state');
 
         if (!code || !realmId) {
             document.getElementById('loading').classList.add('d-none');
             document.getElementById('error').classList.remove('d-none');
             document.getElementById('error-message').textContent = 'Missing required parameters from QuickBooks.';
-            return;
         }
 
         // Get current user session
@@ -76,7 +76,8 @@
                     body: JSON.stringify({
                         action: 'exchange',
                         code: code,
-                        realmId: realmId
+                        realmId: realmId,
+                        state: state
                     })
                 });
 
