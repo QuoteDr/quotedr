@@ -5122,11 +5122,9 @@ async function saveQuote() {
             if (authErr || !user) return { error: 'Not authenticated' };
             const snapshot = JSON.stringify(itemsObj || {});
             const payload = { user_id: user.id, client_name: '__ITEMS_BACKUP__', quote_number: '__ITEMS_BACKUP__', status: 'backup', data: { items_snapshot: snapshot, backed_up_at: new Date().toISOString() }, updated_at: new Date().toISOString() };
-            const { data: upd, error: updErr } = await _supabase.from('quotes').update(payload).eq('user_id', user.id).eq('quote_number', '__ITEMS_BACKUP__').select();
-            if (!updErr && upd && upd.length > 0) { console.log('[Backup] updated'); return { data: upd }; }
-            const { data, error } = await _supabase.from('quotes').insert(payload).select();
+            const { data, error } = await _supabase.from('quotes').upsert(payload, { onConflict: 'user_id,quote_number' }).select();
             if (error) { console.error('[Backup] error:', error); return { error }; }
-            console.log('[Backup] created');
+            console.log('[Backup] saved:', Object.keys(itemsObj || {}).length, 'categories');
             return { data };
         }
 
