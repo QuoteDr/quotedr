@@ -4917,9 +4917,8 @@ async function saveQuote() {
         function saveCustomItems(showToast) {
             localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
             localStorage.setItem('ald_category_styles', JSON.stringify(categoryStyles));
-            // Backup full snapshot to Supabase quotes table (single source of truth)
-            if (typeof backupItemsToCloud === 'function') {
-                backupItemsToCloud(customItems).then(function(result) {
+            // Backup using inline function (guaranteed available)
+            _doBackupItemsToCloud(customItems).then(function(result) {
                     if (showToast) {
                         var msg = result && result.error ? '❌ Cloud save failed — saved locally only' : '✅ Items saved to cloud!';
                         var color = result && result.error ? '#dc3545' : '#198754';
@@ -4938,7 +4937,6 @@ async function saveQuote() {
                         setTimeout(function(){ toast.remove(); }, 3000);
                     }
                 });
-            }
         }
 
         function addNewCategory() {
@@ -5094,6 +5092,20 @@ async function saveQuote() {
             clearPricingDirty();
         }
 
+        // Inline backup function - guaranteed available regardless of supabase-v2.js load order
+        async function _doBackupItemsToCloud(itemsObj) {
+            const { data: { user }, error: authErr } = await _supabase.auth.getUser();
+            if (authErr || !user) return { error: 'Not authenticated' };
+            const snapshot = JSON.stringify(itemsObj || {});
+            const payload = { user_id: user.id, client_name: '__ITEMS_BACKUP__', quote_number: '__ITEMS_BACKUP__', status: 'backup', data: { items_snapshot: snapshot, backed_up_at: new Date().toISOString() }, updated_at: new Date().toISOString() };
+            const { data: upd, error: updErr } = await _supabase.from('quotes').update(payload).eq('user_id', user.id).eq('quote_number', '__ITEMS_BACKUP__').select();
+            if (!updErr && upd && upd.length > 0) { console.log('[Backup] updated'); return { data: upd }; }
+            const { data, error } = await _supabase.from('quotes').insert(payload).select();
+            if (error) { console.error('[Backup] error:', error); return { error }; }
+            console.log('[Backup] created');
+            return { data };
+        }
+
         async function testBackup() {
             var user = await getCurrentUser();
             alert('User: ' + (user ? user.email : 'NOT LOGGED IN'));
@@ -5101,7 +5113,7 @@ async function saveQuote() {
             alert('Calling backup now...');
             try {
                 var result = await Promise.race([
-                    backupItemsToCloud(customItems),
+                    _doBackupItemsToCloud(customItems),
                     new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT after 10s')), 10000))
                 ]);
                 alert('Backup result: ' + JSON.stringify(result));
@@ -5126,8 +5138,7 @@ async function saveQuote() {
             clearPricingDirty();
             // Single cloud backup with toast after all rows saved
             localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
-            if (typeof backupItemsToCloud === 'function') {
-                backupItemsToCloud(customItems).then(function(result) {
+            _doBackupItemsToCloud(customItems).then(function(result) {
                     var ok = result && !result.error;
                     var toast = document.createElement('div');
                     toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:' + (ok ? '#198754' : '#dc3545') + ';color:white;padding:12px 20px;border-radius:8px;z-index:9999;font-size:0.95rem;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
