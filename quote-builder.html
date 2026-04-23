@@ -971,6 +971,7 @@ Example:
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-success" onclick="saveAllPricingRows()"><i class="fas fa-save"></i> Save All Changes</button>
+                    <button type="button" class="btn btn-info" onclick="testBackup()">🔍 Test Cloud Save</button>
                     <button type="button" class="btn btn-secondary" onclick="closeManageItemsModal()">Close</button>
                 </div>
             </div>
@@ -5091,6 +5092,14 @@ async function saveQuote() {
             document.body.appendChild(toast);
             setTimeout(function(){ toast.remove(); }, 2000);
             clearPricingDirty();
+        }
+
+        async function testBackup() {
+            var user = await getCurrentUser();
+            alert('User: ' + (user ? user.email : 'NOT LOGGED IN'));
+            if (!user) return;
+            var result = await backupItemsToCloud(customItems);
+            alert('Backup result: ' + JSON.stringify(result));
         }
 
         function saveAllPricingRows() {
