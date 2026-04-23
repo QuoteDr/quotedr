@@ -1,9 +1,9 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 
-// QuickBooks configuration
-const QB_CLIENT_ID = "ABzLzJgnopNHJpFlQAASaTKS8T2Jmvy43Vo8V3TwUxFtT3cnG1";
-const QB_CLIENT_SECRET = "iTPALtc0nKWJWoip2NHwI2PG9EWFQWitQlxzyIop";
+// QuickBooks configuration — secrets stored in Supabase vault, never hardcoded
+const QB_CLIENT_ID = Deno.env.get("QB_CLIENT_ID") ?? "";
+const QB_CLIENT_SECRET = Deno.env.get("QB_CLIENT_SECRET") ?? "";
 const QB_REDIRECT_URI = "https://quotedr.io/qb-callback.html";
 const QB_TOKEN_URL = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer";
 const QB_AUTH_URL = "https://appcenter.intuit.com/connect/oauth2";
