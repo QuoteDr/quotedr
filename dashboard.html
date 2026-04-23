@@ -318,7 +318,7 @@
                         <div onclick="openQuote('${q.id}')" style="flex:1; cursor:pointer;">
                             ${q.id === lastOpenedId ? '<span class="badge bg-primary me-1" style="font-size:0.65rem; vertical-align:middle;">Last Opened</span>' : ''}
                             <div class="fw-bold">${q.client_name || 'Unnamed Client'}</div>
-                            <div class="text-muted small">${q.quote_number ? '#' + q.quote_number + ' · ' : ''}${formatDate(q.quote_date || q.created_at)} · Updated ${timeAgo(q.updated_at)}</div>
+                            <div class="text-muted small">${q.quote_number ? '#' + q.quote_number + ' · ' : ''}${formatDate((q.data && q.data.savedAt) || q.created_at)} · Updated ${timeAgo(q.updated_at)}</div>
                         </div>
                         <div class="text-end d-flex flex-column align-items-end gap-1">
                             <div class="fw-bold">$${parseFloat(q.total || 0).toFixed(2)}</div>

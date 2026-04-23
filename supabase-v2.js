@@ -336,7 +336,6 @@ async function saveQuote(quoteData) {
         quote_number: quoteData.quoteNumber || '',
         total: quoteData.grandTotal || 0,
         status: quoteData.status || 'draft',
-        quote_date: quoteData.savedAt || now,
         data: {
             clientName: quoteData.clientName || '',
             quoteNumber: quoteData.quoteNumber || '',
@@ -346,7 +345,8 @@ async function saveQuote(quoteData) {
             rooms: quoteData.rooms || [],
             terms: quoteData.terms || [],
             style: quoteData.style || {},
-            notes: quoteData.notes || ''
+            notes: quoteData.notes || '',
+            savedAt: quoteData.savedAt || now
         },
         updated_at: now
     };
