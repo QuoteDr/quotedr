@@ -4806,9 +4806,9 @@ async function saveQuote() {
                         // Populate top-level fields
                         if (document.getElementById('clientName')) document.getElementById('clientName').value = data.client_name || q.clientName || '';
                         if (document.getElementById('quoteNumber')) document.getElementById('quoteNumber').value = data.quote_number || q.quoteNumber || '';
-                        if (document.getElementById('projectAddress')) document.getElementById('projectAddress').value = data.project_address || q.projectAddress || q.project_address || '';
-                        if (document.getElementById('clientEmail')) document.getElementById('clientEmail').value = data.client_email || q.clientEmail || q.email || '';
-                        if (document.getElementById('clientPhone')) document.getElementById('clientPhone').value = data.client_phone || q.clientPhone || q.phone || '';
+                        if (document.getElementById('projectAddress')) document.getElementById('projectAddress').value = q.projectAddress || q.project_address || '';
+                        if (document.getElementById('clientEmail')) document.getElementById('clientEmail').value = q.clientEmail || q.email || '';
+                        if (document.getElementById('clientPhone')) document.getElementById('clientPhone').value = q.clientPhone || q.phone || '';
                         // Load rooms
                         const loadedRooms = q.rooms || [];
                         if (loadedRooms.length > 0) {
@@ -6346,13 +6346,13 @@ async function saveQuote() {
                             if (result && result.data && result.data.data) {
                                 var qData = result.data.data;
                                 qData.supabaseId = result.data.id;
-                                // Map top-level Supabase columns into qData so applyQuoteData can find them
+                                // Map fields — client_name lives at row level, rest in data JSON
                                 var row = result.data;
                                 qData.clientName = row.client_name || qData.clientName || '';
                                 qData.quoteNumber = row.quote_number || qData.quoteNumber || '';
-                                qData.projectAddress = row.project_address || qData.project_address || qData.projectAddress || '';
-                                qData.clientEmail = row.client_email || qData.clientEmail || qData.email || '';
-                                qData.clientPhone = row.client_phone || qData.clientPhone || qData.phone || '';
+                                if (!qData.projectAddress) qData.projectAddress = qData.project_address || '';
+                                if (!qData.clientEmail) qData.clientEmail = qData.email || '';
+                                if (!qData.clientPhone) qData.clientPhone = qData.phone || '';
                                 window._supabaseQuoteId = result.data.id;
                                 localStorage.setItem("ald_active_quote_id", result.data.id);
                                 applyQuoteData(qData);

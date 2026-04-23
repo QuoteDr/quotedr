@@ -333,25 +333,20 @@ async function saveQuote(quoteData) {
     const payload = {
         user_id: user.id,
         client_name: quoteData.clientName || '',
-        client_email: clientEmail,
-        client_phone: clientPhone,
-        project_address: projectAddress,
         quote_number: quoteData.quoteNumber || '',
         total: quoteData.grandTotal || 0,
         status: quoteData.status || 'draft',
         quote_date: quoteData.savedAt || now,
         data: {
             clientName: quoteData.clientName || '',
+            quoteNumber: quoteData.quoteNumber || '',
             projectAddress: projectAddress,
             clientEmail: clientEmail,
             clientPhone: clientPhone,
-            email: clientEmail,
-            phone: clientPhone,
             rooms: quoteData.rooms || [],
             terms: quoteData.terms || [],
             style: quoteData.style || {},
-            notes: quoteData.notes || '',
-            quoteNumber: quoteData.quoteNumber || ''
+            notes: quoteData.notes || ''
         },
         updated_at: now
     };
