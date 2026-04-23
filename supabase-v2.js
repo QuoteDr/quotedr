@@ -640,3 +640,78 @@ CREATE POLICY "Public quote viewing" ON quotes FOR SELECT USING (true);
 -- Allow authenticated users to insert/update their own quotes  
 CREATE POLICY "Users manage own quotes" ON quotes FOR ALL USING (auth.uid() = user_id);
 */
+// ============================================================
+// Items Cloud Backup (moved from supabase.js - available in quote-builder)
+// ============================================================
+async function backupItemsToCloud(customItems) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    const snapshot = JSON.stringify(customItems || {});
+    const payload = {
+        user_id: user.id,
+        client_name: '__ITEMS_BACKUP__',
+        quote_number: '__ITEMS_BACKUP__',
+        status: 'backup',
+        data: { items_snapshot: snapshot, backed_up_at: new Date().toISOString() },
+        updated_at: new Date().toISOString()
+    };
+    const { data: upd, error: updErr } = await _supabase
+        .from('quotes')
+        .update(payload)
+        .eq('user_id', user.id)
+        .eq('quote_number', '__ITEMS_BACKUP__')
+        .select();
+    if (!updErr && upd && upd.length > 0) {
+        console.log('[Backup] Items backup updated:', Object.keys(customItems || {}).length, 'categories');
+        _supabase.from('item_history').insert({ user_id: user.id, snapshot: customItems, created_at: new Date().toISOString() }).then(() => {}).catch(() => {});
+        return { data: upd };
+    }
+    const { data, error } = await _supabase
+        .from('quotes')
+        .insert(payload)
+        .select();
+    if (error) { console.error('Items backup error:', error); return { error }; }
+    console.log('[Backup] Items backup created:', Object.keys(customItems || {}).length, 'categories');
+    _supabase.from('item_history').insert({ user_id: user.id, snapshot: customItems, created_at: new Date().toISOString() }).then(() => {}).catch(() => {});
+    return { data };
+}
+
+async function restoreItemsFromCloud() {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    const { data, error } = await _supabase
+        .from('quotes')
+        .select('data, updated_at')
+        .eq('user_id', user.id)
+        .eq('quote_number', '__ITEMS_BACKUP__')
+        .single();
+    if (!error && data) {
+        try {
+            const snapshot = JSON.parse(data.data.items_snapshot || '{}');
+            if (Object.keys(snapshot).length > 0) return { data: snapshot, backed_up_at: data.data.backed_up_at };
+        } catch(e) {}
+    }
+    const { data: hist, error: histErr } = await _supabase
+        .from('item_history')
+        .select('snapshot, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+    if (!histErr && hist && hist.snapshot) {
+        return { data: hist.snapshot, backed_up_at: hist.created_at };
+    }
+    return { error: 'No backup found' };
+}
+
+async function getItemHistory(limit = 10) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    const { data, error } = await _supabase
+        .from('item_history')
+        .select('id, created_at, snapshot')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+    return error ? { error } : { data };
+}
