@@ -644,8 +644,9 @@ CREATE POLICY "Users manage own quotes" ON quotes FOR ALL USING (auth.uid() = us
 // Items Cloud Backup (moved from supabase.js - available in quote-builder)
 // ============================================================
 async function backupItemsToCloud(customItems) {
-    const user = await getCurrentUser();
-    if (!user) return { error: 'Not authenticated' };
+    // Use getUser() directly to ensure fresh session token is used
+    const { data: { user }, error: authErr } = await _supabase.auth.getUser();
+    if (authErr || !user) return { error: 'Not authenticated' };
     const snapshot = JSON.stringify(customItems || {});
     const payload = {
         user_id: user.id,

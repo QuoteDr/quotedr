@@ -5098,8 +5098,16 @@ async function saveQuote() {
             var user = await getCurrentUser();
             alert('User: ' + (user ? user.email : 'NOT LOGGED IN'));
             if (!user) return;
-            var result = await backupItemsToCloud(customItems);
-            alert('Backup result: ' + JSON.stringify(result));
+            alert('Calling backup now...');
+            try {
+                var result = await Promise.race([
+                    backupItemsToCloud(customItems),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT after 10s')), 10000))
+                ]);
+                alert('Backup result: ' + JSON.stringify(result));
+            } catch(e) {
+                alert('Backup ERROR: ' + e.message);
+            }
         }
 
         function saveAllPricingRows() {
