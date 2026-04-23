@@ -1476,11 +1476,21 @@ Sarah Jones, 905-555-5678"></textarea>
 
 		function exportMaterialsToFile() {
 			var items = {};
-			try { items = JSON.parse(localStorage.getItem('ald_custom_items') || '{}'); } catch(e) {}
-			var rows = [['Category','Name','Unit','Rate','Material Cost']];
+			// Try window.customItems first (most up to date), then localStorage
+			if (window.customItems && Object.keys(window.customItems).length > 0) {
+				items = window.customItems;
+			} else {
+				try { items = JSON.parse(localStorage.getItem('ald_custom_items') || '{}'); } catch(e) {}
+			}
+			if (!items || Object.keys(items).length === 0) {
+				alert('No items to export. Make sure your items are loaded first.');
+				return;
+			}
+			var rows = [['Category','Name','Unit','Rate','Material Cost','Description']];
 			Object.entries(items).forEach(function(entry) {
+				if (!Array.isArray(entry[1])) return;
 				entry[1].forEach(function(item) {
-					rows.push([entry[0], item.name||'', item.unitType||'', item.rate||0, item.materialCost||0]);
+					rows.push([entry[0], item.name||'', item.unitType||'', item.rate||0, item.materialCost||0, item.itemDescription||'']);
 				});
 			});
 			var csv = rows.map(function(r) { return r.map(function(v) { return '"'+String(v).replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
