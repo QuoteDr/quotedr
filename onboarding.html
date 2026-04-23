@@ -297,13 +297,14 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-v2.js"></script>
     <script>
         // DOMContentLoaded check for authentication
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
             // Check if user is authenticated
-            if (typeof requireAuth === 'function') {
-                requireAuth();
-            }
+            const { data: { session } } = await _supabase.auth.getSession();
+            if (!session) { window.location.href = 'login.html'; return; }
         });
 
         let currentStep = 1;
