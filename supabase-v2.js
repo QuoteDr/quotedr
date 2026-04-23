@@ -326,12 +326,14 @@ async function saveQuote(quoteData) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
 
+    const now = new Date().toISOString();
     const payload = {
         user_id: user.id,
         client_name: quoteData.clientName || '',
         quote_number: quoteData.quoteNumber || '',
         total: quoteData.grandTotal || 0,
         status: quoteData.status || 'draft',
+        quote_date: quoteData.savedAt || now,
         data: {
             project_address: quoteData.projectAddress || '',
             email: quoteData.email || '',
@@ -341,7 +343,7 @@ async function saveQuote(quoteData) {
             style: quoteData.style || {},
             notes: quoteData.notes || ''
         },
-        updated_at: new Date().toISOString()
+        updated_at: now
     };
 
     let data, error;
