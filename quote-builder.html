@@ -422,14 +422,20 @@ if (location.search.includes('debug')) {
                         <input type="email" id="clientEmail" class="form-control" spellcheck="true" placeholder="client@email.com">
                     </div>
 
-                    <!-- Terms & Conditions Section -->
+                    <!-- Terms & Conditions Section (Collapsible) -->
                     <div class="col-md-12 mt-3">
-                        <label><strong>Terms & Conditions:</strong></label>
-                        <div id="termsCheckboxes">
-                            <!-- Populated dynamically from ald_custom_terms -->
+                        <div onclick="var el=document.getElementById('termsCollapse'); var icon=this.querySelector('.fa-chevron-down,.fa-chevron-right'); if(el.style.display==='none'){el.style.display='';icon.className='fas fa-chevron-down me-1';}else{el.style.display='none';icon.className='fas fa-chevron-right me-1';}" style="cursor:pointer; user-select:none;" class="d-flex align-items-center">
+                            <i class="fas fa-chevron-right me-1 text-muted" style="font-size:0.75rem; width:12px;"></i>
+                            <strong>Terms & Conditions</strong>
+                            <span id="termsCount" class="badge bg-secondary ms-2" style="font-size:0.7rem;"></span>
                         </div>
-                        <div class="mt-2">
-                            <a href="settings.html" class="text-muted small" style="font-size:0.8rem;"><i class="fas fa-cog me-1"></i>Manage terms in Settings</a>
+                        <div id="termsCollapse" style="display:none; margin-top:8px;">
+                            <div id="termsCheckboxes">
+                                <!-- Populated dynamically from ald_custom_terms -->
+                            </div>
+                            <div class="mt-2">
+                                <a href="settings.html" class="text-muted small" style="font-size:0.8rem;"><i class="fas fa-cog me-1"></i>Manage terms in Settings</a>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -3414,12 +3420,20 @@ Example:
             var terms = JSON.parse(localStorage.getItem('ald_custom_terms') || 'null') || defaultTerms;
             container.innerHTML = terms.map(function(t) {
                 return '<div class="form-check mb-1">' +
-                    '<input class="form-check-input" type="checkbox" id="term_' + t.id + '" data-text="' + t.text.replace(/"/g, '&quot;') + '"' + (t.defaultOn ? ' checked' : '') + '>' +
+                    '<input class="form-check-input" type="checkbox" id="term_' + t.id + '" data-text="' + t.text.replace(/"/g, '&quot;') + '"' + (t.defaultOn ? ' checked' : '') + ' onchange="updateTermsCount()">' +
                     '<label class="form-check-label" for="term_' + t.id + '">' + t.label + '</label>' +
                     '</div>';
             }).join('');
+            updateTermsCount();
         }
         
+        function updateTermsCount() {
+            var total = document.querySelectorAll('#termsCheckboxes input[type="checkbox"]').length;
+            var checked = document.querySelectorAll('#termsCheckboxes input[type="checkbox"]:checked').length;
+            var badge = document.getElementById('termsCount');
+            if (badge) badge.textContent = checked + '/' + total + ' selected';
+        }
+
         function exportToPDF() {
             // Simple export - print to PDF
             window.print();
