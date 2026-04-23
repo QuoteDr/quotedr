@@ -4287,10 +4287,10 @@ Example:
         function applyQuoteData(data) {
             var wasInitDone = initDone;
             initDone = false; // suppress markUnsaved during load
-            if (document.getElementById('clientName'))     document.getElementById('clientName').value     = data.clientName     || '';
-            if (document.getElementById('projectAddress')) document.getElementById('projectAddress').value = data.projectAddress || '';
-            if (document.getElementById('clientPhone'))    document.getElementById('clientPhone').value    = data.clientPhone    || '';
-            if (document.getElementById('clientEmail'))    document.getElementById('clientEmail').value    = data.clientEmail    || '';
+            if (document.getElementById('clientName'))     document.getElementById('clientName').value     = data.clientName || data.client_name || '';
+            if (document.getElementById('projectAddress')) document.getElementById('projectAddress').value = data.projectAddress || data.project_address || '';
+            if (document.getElementById('clientPhone'))    document.getElementById('clientPhone').value    = data.clientPhone || data.phone || '';
+            if (document.getElementById('clientEmail'))    document.getElementById('clientEmail').value    = data.clientEmail || data.email || '';
             renderTermsCheckboxes();
             if (data.terms && Array.isArray(data.terms)) {
                 document.querySelectorAll('#termsCheckboxes input[type="checkbox"]').forEach(function(cb) {
