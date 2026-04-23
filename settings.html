@@ -846,7 +846,11 @@ Sarah Jones, 905-555-5678"></textarea>
 			if (p.tagline !== undefined) document.getElementById('bizTagline').value = p.tagline;
 		}
 
-		document.addEventListener('DOMContentLoaded', function() {
+		document.addEventListener('DOMContentLoaded', async function() {
+			// Auth check — redirect to login if not signed in
+			const { data: { session } } = await _supabase.auth.getSession();
+			if (!session) { window.location.href = 'login.html'; return; }
+			window.currentUser = session.user;
 			// Restore last active tab
 			var lastTab = localStorage.getItem('ald_settings_tab') || 'business';
 			var tabEl = document.querySelector('#settingsTabs [onclick*="\'' + lastTab + '\'"]');

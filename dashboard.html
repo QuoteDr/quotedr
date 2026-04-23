@@ -528,6 +528,10 @@
 
         // Load user name
         document.addEventListener('DOMContentLoaded', async () => {
+            // Auth check — redirect to login if not signed in
+            const { data: { session } } = await _supabase.auth.getSession();
+            if (!session) { window.location.href = 'login.html'; return; }
+            window.currentUser = session.user;
             const userName = localStorage.getItem('ald_user_name') || 'User';
             document.getElementById('userName').textContent = userName;
             var mob = document.getElementById('userNameMobile');

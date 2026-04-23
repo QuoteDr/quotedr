@@ -4730,11 +4730,9 @@ async function saveQuote() {
 
         document.addEventListener('DOMContentLoaded', async function() {
             // Auth check — redirect to login if not signed in
-            if (typeof requireAuth === 'function') {
-                const user = await requireAuth();
-                if (user) window.currentUser = user;
-                // Don't return on no user — let page load regardless (auth handled at login)
-            }
+            const { data: { session } } = await _supabase.auth.getSession();
+            if (!session) { window.location.href = 'login.html'; return; }
+            window.currentUser = session.user;
 
             // Subscription status check — show banner if trial ended
             var sub = JSON.parse(localStorage.getItem('ald_subscription') || '{}');
