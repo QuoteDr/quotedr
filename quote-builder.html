@@ -2318,6 +2318,19 @@ Example:
             return result;
         }
 
+        // Load IKEA pricing from Supabase on startup (cloud → localStorage)
+        (function loadIkeaPricingFromCloud() {
+            if (typeof getCurrentUser === 'undefined' || typeof _supabase === 'undefined') return;
+            getCurrentUser().then(function(u) {
+                if (!u) return;
+                _supabase.from('user_data').select('value').eq('user_id', u.id).eq('key', 'ikea_pricing').maybeSingle().then(function(res) {
+                    if (res.data && res.data.value && Object.keys(res.data.value).length > 0) {
+                        localStorage.setItem('ald_ikea_pricing', JSON.stringify(res.data.value));
+                    }
+                });
+            }).catch(function() {});
+        })();
+
         function saveIkeaPricing() {
             var pricing = {};
             IKEA_FIELDS.forEach(function(f) {
