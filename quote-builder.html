@@ -2282,6 +2282,7 @@ Example:
             { key: 'toeKick',         label: 'Toe Kick',                  defaultRate: 20  },
             { key: 'crownMoulding',   label: 'Crown / Valance / Deco Strip', defaultRate: 43  },
             { key: 'scribeFiller',    label: 'Scribe / Ceiling Filler (per LF)', defaultRate: 14.25 },
+            { key: 'scribeSideFiller', label: 'Scribe Side Filler Strip (each)', defaultRate: 33 },
             { key: 'customCut',       label: 'Custom Cabinet Cut',        defaultRate: 113 },
             { key: 'customPanel',     label: 'Custom Cover Panel (Paint Match)', defaultRate: 0 },
             { key: 'shelf',           label: 'Interior Shelf',         defaultRate: 10  },
@@ -2557,6 +2558,7 @@ Example:
             document.body.appendChild(backdrop);
             var messages = [
                 { text: "\u26a0\ufe0f Don\u2019t forget: charge for scribe/filler panels against ceiling or walls (per LF)! Scroll to bottom to add items.", bg: '#856404' },
+                { text: "\u26a0\ufe0f Any scribe side filler strips needed? ($33 each) Scroll to bottom to add items.", bg: '#856404' },
                 { text: "\ud83c\udfa8 Any custom cover panels that need to be made and paint-matched? Scroll to bottom to add items.", bg: '#0d6efd' }
             ];
             var idx = 0;
@@ -2604,9 +2606,10 @@ Example:
             var pricing = loadIkeaPricing();
             // Append reminder items (qty 0) for scribing, custom cuts, paint-match panels
             var reminderItems = [
-                { key: 'scribeFiller', label: '⚠️ Scribe / Ceiling Filler (per LF)', lineText: 'Set qty if scribing filler panels to ceiling/wall', qty: 0, rate: pricing['scribeFiller'] || 14.25, total: 0, reminder: true },
-                { key: 'customCut',    label: '⚠️ Custom Cabinet Cut',               lineText: 'Set qty if any cabinets need custom cutting', qty: 0, rate: pricing['customCut'] || 113, total: 0, reminder: true },
-                { key: 'customPanel',  label: '⚠️ Custom Cover Panel (Paint Match)',  lineText: 'Set qty + price if custom panels need painting', qty: 0, rate: pricing['customPanel'] || 0, total: 0, reminder: true },
+                { key: 'scribeFiller',    label: '⚠️ Scribe / Ceiling Filler (per LF)',    lineText: 'Set qty if scribing filler panels to ceiling/wall', qty: 0, rate: pricing['scribeFiller'] || 14.25, total: 0, reminder: true },
+                { key: 'scribeSideFiller', label: '⚠️ Scribe Side Filler Strip',             lineText: 'Set qty for side filler strips — $33 each', qty: 0, rate: pricing['scribeSideFiller'] || 33, total: 0, reminder: true },
+                { key: 'customCut',       label: '⚠️ Custom Cabinet Cut',                    lineText: 'Set qty if any cabinets need custom cutting', qty: 0, rate: pricing['customCut'] || 113, total: 0, reminder: true },
+                { key: 'customPanel',     label: '⚠️ Custom Cover Panel (Paint Match)',       lineText: 'Set qty + price if custom panels need painting', qty: 0, rate: pricing['customPanel'] || 0, total: 0, reminder: true },
             ];
             var allItems = items.concat(reminderItems);
             _ikeaParsedItems = allItems;
