@@ -2552,7 +2552,7 @@ Example:
             return consolidated;
         }
 
-        function showIkeaReminders() {
+        function showIkeaReminders(hasCountertop) {
             var backdrop = document.createElement('div');
             backdrop.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:10000;';
             document.body.appendChild(backdrop);
@@ -2560,6 +2560,9 @@ Example:
                 { text: "\u26a0\ufe0f Don\u2019t forget: charge for scribe/filler panels against ceiling or walls (per LF)! Scroll to bottom to add items.", bg: '#856404' },
                 { text: "\ud83c\udfa8 Any custom cover panels that need to be made and paint-matched? Scroll to bottom to add items.", bg: '#0d6efd' }
             ];
+            if (hasCountertop) {
+                messages.unshift({ text: "\ud83d\udccf Countertops detected in this order! You must measure the linear footage on site and enter it manually. Scroll to bottom to add.", bg: '#6f42c1' });
+            }
             var idx = 0;
             function showNext() {
                 if (idx >= messages.length) { document.body.removeChild(backdrop); return; }
@@ -2591,8 +2594,9 @@ Example:
                     var rate = pricing[item.type] || 0;
                     return { key: item.type, label: item.label, qty: item.qty, rate: rate, total: item.qty * rate, lineText: item.label };
                 });
+                var hasCountertop = parsed.some(function(it) { return it.key === 'countertop'; });
                 renderIkeaResults(parsed, []);
-                setTimeout(showIkeaReminders, 400);
+                setTimeout(function() { showIkeaReminders(hasCountertop); }, 400);
             } catch(e) {
                 alert('Parse error: ' + e.message);
             } finally {
@@ -2603,14 +2607,21 @@ Example:
         var _ikeaParsedItems = [];
         function renderIkeaResults(items, unparsed) {
             var pricing = loadIkeaPricing();
-            // Append reminder items (qty 0) for scribing, custom cuts, paint-match panels
-            var reminderItems = [
+            // Pull countertop items out of main list — convert to reminder items
+            var hasCountertop = items.some(function(it) { return it.key === 'countertop'; });
+            var mainItems = items.filter(function(it) { return it.key !== 'countertop'; });
+            // Append reminder items (qty 0) for items needing manual input
+            var reminderItems = [];
+            if (hasCountertop) {
+                reminderItems.push({ key: 'countertop', label: '⚠️ Laminate Countertop / Butcher Block (per LF)', lineText: 'Countertops detected — measure & enter linear footage manually', qty: 0, rate: pricing['countertop'] || 25, total: 0, reminder: true });
+            }
+            reminderItems = reminderItems.concat([
                 { key: 'scribeFiller',    label: '⚠️ Scribe / Ceiling Filler (per LF)',    lineText: 'Set qty if scribing filler panels to ceiling/wall', qty: 0, rate: pricing['scribeFiller'] || 14.25, total: 0, reminder: true },
-                { key: 'scribeSideFiller', label: '⚠️ Scribe Side Filler Strip',             lineText: 'Set qty for side filler strips — $33 each', qty: 0, rate: pricing['scribeSideFiller'] || 33, total: 0, reminder: true },
-                { key: 'customCut',       label: '⚠️ Custom Cabinet Cut',                    lineText: 'Set qty if any cabinets need custom cutting', qty: 0, rate: pricing['customCut'] || 113, total: 0, reminder: true },
-                { key: 'customPanel',     label: '⚠️ Custom Cover Panel (Paint Match)',       lineText: 'Set qty + price if custom panels need painting', qty: 0, rate: pricing['customPanel'] || 0, total: 0, reminder: true },
-            ];
-            var allItems = items.concat(reminderItems);
+                { key: 'scribeSideFiller', label: '⚠️ Scribe Side Filler Strip',            lineText: 'Set qty for side filler strips — $33 each', qty: 0, rate: pricing['scribeSideFiller'] || 33, total: 0, reminder: true },
+                { key: 'customCut',       label: '⚠️ Custom Cabinet Cut',                   lineText: 'Set qty if any cabinets need custom cutting', qty: 0, rate: pricing['customCut'] || 113, total: 0, reminder: true },
+                { key: 'customPanel',     label: '⚠️ Custom Cover Panel (Paint Match)',      lineText: 'Set qty + price if custom panels need painting', qty: 0, rate: pricing['customPanel'] || 0, total: 0, reminder: true },
+            ]);
+            var allItems = mainItems.concat(reminderItems);
             _ikeaParsedItems = allItems;
             var total = 0;
             var html = '';
