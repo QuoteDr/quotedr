@@ -397,17 +397,24 @@ async function listInvoices() {
 // Save an invoice for cross-device sharing (stored in quotes table)
 async function saveInvoiceForSharing(invoiceData) {
     const user = await getCurrentUser();
-    const { data, error } = await _supabase
-        .from('quotes')
-        .upsert({
-            id: invoiceData.supabaseId || undefined,
-            user_id: user ? user.id : null,
-            data: { ...invoiceData, _type: 'invoice' },
-            status: 'invoiced',
-            updated_at: new Date().toISOString()
-        }, { onConflict: 'id' })
-        .select()
-        .single();
+    const now = new Date().toISOString();
+    const payload = {
+        user_id: user ? user.id : null,
+        data: { ...invoiceData, _type: 'invoice' },
+        client_name: invoiceData.clientName || '',
+        quote_number: invoiceData.quoteNumber || '',
+        total: invoiceData.grandTotal || 0,
+        status: 'invoiced',
+        updated_at: now
+    };
+    let data, error;
+    if (invoiceData.supabaseId) {
+        ({ data, error } = await _supabase.from('quotes').update(payload).eq('id', invoiceData.supabaseId).select().single());
+    } else {
+        payload.created_at = now;
+        ({ data, error } = await _supabase.from('quotes').insert(payload).select().single());
+    }
+    if (error) console.error('saveInvoiceForSharing error:', error);
     return { data, error };
 }
 

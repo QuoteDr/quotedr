@@ -485,7 +485,8 @@ if (location.search.includes('debug')) {
             }
 
             if (!invoiceData.rooms || !invoiceData.rooms.length) {
-                document.getElementById('invoiceContainer').innerHTML = '<div class="alert alert-warning">No invoice data.</div>';
+                console.error('Invoice data has no rooms:', JSON.stringify(invoiceData).substring(0, 500));
+                document.getElementById('invoiceContainer').innerHTML = '<div class="alert alert-warning">No invoice data found. Please regenerate the invoice from the quote builder.</div>';
                 return;
             }
 
@@ -536,9 +537,9 @@ if (location.search.includes('debug')) {
 
                     catItems.forEach(item => {
                     const isUpgraded = !!item.upgraded;
-                    const activeRate = isUpgraded && item.upgrade ? item.upgrade.rate : item.rate;
-                    const itemTotal = item.quantity * activeRate;
-                    const displayName = isUpgraded && item.upgrade ? item.upgrade.name : item.description;
+                    const activeRate = isUpgraded && item.upgrade ? item.upgrade.rate : (item.rate || 0);
+                    const itemTotal = (item.quantity || 0) * activeRate;
+                    const displayName = isUpgraded && item.upgrade ? item.upgrade.name : (item.description || item.name || 'Item');
                     const displayDesc = isUpgraded && item.upgrade?.description
                         ? item.upgrade.description
                         : (item.itemDescription || '');
@@ -551,7 +552,7 @@ if (location.search.includes('debug')) {
                                     ${displayDesc ? `<div class="item-desc">${displayDesc}</div>` : ''}
                                     ${item.notes ? `<div class="item-desc"><i class="fas fa-info-circle"></i> ${item.notes}</div>` : ''}
                                 </td>
-                                <td style="text-align:center; vertical-align:top; padding-top:10px;">${item.quantity} ${item.unitType}</td>
+                                <td style="text-align:center; vertical-align:top; padding-top:10px;">${item.quantity || 0} ${item.unitType || ''}</td>
                                 <td style="text-align:right; vertical-align:top; padding-top:10px;">$${activeRate.toFixed(2)}</td>
                                 <td style="text-align:right; vertical-align:top; padding-top:10px; font-weight:600;">$${itemTotal.toFixed(2)}</td>
                             </tr>`;
