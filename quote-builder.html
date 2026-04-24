@@ -2432,9 +2432,8 @@ Example:
                 var opt = document.createElement('option');
                 opt.value = r.id; opt.textContent = r.name; sel.appendChild(opt);
             });
-            // Pre-select any room named Kitchen
-            var kitchenRoom = rooms.find(function(r) { return /kitchen/i.test(r.name); });
-            if (kitchenRoom) sel.value = kitchenRoom.id;
+            // Always default to "Create new room"
+            sel.value = '__new__';
             new bootstrap.Modal(document.getElementById('ikeaQuickQuoteModal')).show();
         }
 
