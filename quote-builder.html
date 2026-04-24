@@ -2566,6 +2566,8 @@ Example:
                     return { key: item.type, label: item.label, qty: item.qty, rate: rate, total: item.qty * rate, lineText: item.label };
                 });
                 renderIkeaResults(parsed, []);
+                setTimeout(function() { showToast('⚠️ Don’t forget: charge for scribe/filler panels against ceiling or walls (per LF)! Scroll to bottom to add items.', 'warning'); }, 400);
+                setTimeout(function() { showToast('🎨 Any custom cover panels that need to be made and paint-matched? Scroll to bottom to add items.', 'warning'); }, 1800);
             } catch(e) {
                 alert('Parse error: ' + e.message);
             } finally {
@@ -2651,8 +2653,6 @@ Example:
             if (typeof saveQuoteToSupabase === 'function') saveQuoteToSupabase();
             bootstrap.Modal.getInstance(document.getElementById('ikeaQuickQuoteModal')).hide();
             showToast(added + ' IKEA install items added!', 'success');
-            setTimeout(function() { showToast('⚠️ Don’t forget: charge for scribe/filler panels against ceiling or walls (per LF)!', 'warning'); }, 800);
-            setTimeout(function() { showToast('🎨 Any custom cover panels that need to be made and paint-matched?', 'warning'); }, 2000);
         }
 
         // ── Material Estimator ─────────────────────────────────────────────
