@@ -630,7 +630,7 @@ if (location.search.includes('debug')) {
                             <div class="text-muted small">Click to browse or drag &amp; drop your PDF here</div>
                             <input type="file" id="ikeaPdfInput" accept=".pdf" style="display:none;" onchange="ikeaHandlePdfUpload(this.files[0])">
                         </div>
-                        <div id="ikeaPdfStatus" style="display:none;" class="alert alert-info py-2 small mb-2"><i class="fas fa-spinner fa-spin me-1"></i><span id="ikeaPdfStatusText">Reading PDF...</span></div>
+                        <div id="ikeaPdfStatus" style="display:none;" class="alert alert-info py-2 small mb-2"><span id="ikeaPdfStatusText"><i class="fas fa-spinner fa-spin me-1"></i>Reading PDF...</span></div>
                         <div class="text-muted small mb-1">Or paste the order text manually:</div>
                         <textarea id="ikeaOrderInput" class="form-control font-monospace" rows="6" placeholder="Paste IKEA order here...
 Example:
