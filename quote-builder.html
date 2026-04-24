@@ -2349,17 +2349,6 @@ Example:
             IKEA_FIELDS.forEach(function(f) {
                 html += '<div class="col-md-6"><div class="d-flex align-items-center gap-2 mb-2">';
                 html += '<label class="form-label mb-0 flex-grow-1 small fw-semibold">' + f.label + '</label>';
-                // Saved items picker
-                html += '<select class="form-select form-select-sm" style="max-width:160px;" onchange="if(this.value){document.getElementById(\'ikPrice_' + f.key + '\').value=this.value}">';
-                html += '<option value="">Pick item...</option>';
-                Object.keys(customItems).forEach(function(cat) {
-                    var catItems = customItems[cat];
-                    if (!Array.isArray(catItems)) return;
-                    catItems.forEach(function(item) {
-                        if (item && item.rate > 0) html += '<option value="' + item.rate + '">' + item.name.substring(0,22) + ' ($' + item.rate + ')</option>';
-                    });
-                });
-                html += '</select>';
                 html += '<div class="input-group input-group-sm" style="max-width:100px;"><span class="input-group-text">$</span>';
                 html += '<input type="number" class="form-control" id="ikPrice_' + f.key + '" value="' + pricing[f.key] + '" step="0.01" min="0"></div>';
                 html += '</div></div>';
