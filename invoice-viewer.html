@@ -400,52 +400,74 @@ if (location.search.includes('debug')) {
             loadInvoice();
         });
 
+        function tryLocalStorageFallback() {
+            // Try ?invoice= param, then last preview key
+            var params = new URLSearchParams(window.location.search);
+            var localKey = params.get('invoice');
+            if (localKey) {
+                var stored = localStorage.getItem(localKey);
+                if (stored) { invoiceData = JSON.parse(stored); renderInvoice(); renderTerms(); return true; }
+            }
+            var lastKey = localStorage.getItem('ald_last_preview_invoice');
+            if (lastKey) {
+                var stored2 = localStorage.getItem(lastKey);
+                if (stored2) { invoiceData = JSON.parse(stored2); renderInvoice(); renderTerms(); return true; }
+            }
+            return false;
+        }
+
         function loadInvoice() {
             const params = new URLSearchParams(window.location.search);
             const supabaseId = params.get('id');
             const localKey = params.get('invoice');
 
             if (supabaseId) {
-                // Cross-device link — load from Supabase
+                // Try Supabase first, fall back to localStorage if it fails
                 loadQuoteForViewing(supabaseId).then(function(result) {
                     if (result.error || !result.data) {
-                        document.getElementById('invoiceContainer').innerHTML = '<div class="alert alert-warning">Invoice not found.</div>';
+                        console.warn('Supabase invoice load failed, trying localStorage fallback...');
+                        if (!tryLocalStorageFallback()) {
+                            document.getElementById('invoiceContainer').innerHTML = '<div class="alert alert-warning">Invoice not found.</div>';
+                        }
                         return;
                     }
-                    // result.data may be raw invoices row or a wrapped {data, user_id} object
                     var row = result.data;
-                    invoiceData = row.data || row; // invoices row has .data jsonb, or IS the data
-                    // Normalise: invoices table stores flat fields too
+                    invoiceData = row.data || row;
                     if (!invoiceData.clientName && row.client_name) invoiceData.clientName = row.client_name;
                     if (!invoiceData.rooms && row.rooms) invoiceData.rooms = row.rooms;
                     if (!invoiceData.grandTotal && row.grand_total) invoiceData.grandTotal = row.grand_total;
                     if (!invoiceData.terms && row.terms) invoiceData.terms = row.terms;
+                    // If Supabase row has no rooms, try localStorage
+                    if (!invoiceData.rooms || !invoiceData.rooms.length) {
+                        console.warn('Supabase invoice has no rooms, trying localStorage fallback...');
+                        if (tryLocalStorageFallback()) return;
+                    }
                     renderInvoice();
                     renderTerms();
                     var contractorId = row.user_id;
                     var invTotal = invoiceData.grandTotal || invoiceData.total || 0;
                     if (contractorId && invTotal) initInvoicePaymentSection(contractorId, invTotal, supabaseId);
                 }).catch(function(e) {
-                    document.getElementById('invoiceContainer').innerHTML = '<div class="alert alert-danger">Failed to load invoice: ' + e.message + '</div>';
+                    console.error('Supabase invoice load error:', e);
+                    if (!tryLocalStorageFallback()) {
+                        document.getElementById('invoiceContainer').innerHTML = '<div class="alert alert-danger">Failed to load invoice: ' + e.message + '</div>';
+                    }
                 });
             } else if (localKey) {
-                // Same-device fallback
-                const stored = localStorage.getItem(localKey);
+                var stored = localStorage.getItem(localKey);
                 if (!stored) {
-                    document.getElementById('invoiceContainer').innerHTML = '<div class="alert alert-warning">Invoice not found. This link only works on the device it was created on.</div>';
+                    if (!tryLocalStorageFallback()) {
+                        document.getElementById('invoiceContainer').innerHTML = '<div class="alert alert-warning">Invoice not found. This link only works on the device it was created on.</div>';
+                    }
                     return;
                 }
                 invoiceData = JSON.parse(stored);
                 renderInvoice();
                 renderTerms();
             } else {
-                // Try last preview
-                const lastKey = localStorage.getItem('ald_last_preview_invoice');
-                if (lastKey) {
-                    const stored = localStorage.getItem(lastKey);
-                    if (stored) { invoiceData = JSON.parse(stored); renderInvoice(); renderTerms(); return; }
+                if (!tryLocalStorageFallback()) {
+                    document.getElementById('invoiceContainer').innerHTML = '<div class="alert alert-warning">No invoice found.</div>';
                 }
-                document.getElementById('invoiceContainer').innerHTML = '<div class="alert alert-warning">No invoice found.</div>';
             }
         }
 

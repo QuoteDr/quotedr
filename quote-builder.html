@@ -4149,7 +4149,7 @@ Example:
             if (typeof saveInvoiceForSharing === 'function') {
                 saveInvoiceForSharing(invoiceData).then(function(result) {
                     if (result && result.data && result.data.id) {
-                        invoiceUrl = invoiceBaseUrl + '?id=' + result.data.id;
+                        invoiceUrl = invoiceBaseUrl + '?id=' + result.data.id + '&invoice=' + invoiceId;
                         invoiceData.supabaseId = result.data.id;
                         localStorage.setItem(invoiceId, JSON.stringify(invoiceData));
                         window._currentInvoiceUrl = invoiceUrl;
