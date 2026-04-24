@@ -2566,8 +2566,18 @@ Example:
                     return { key: item.type, label: item.label, qty: item.qty, rate: rate, total: item.qty * rate, lineText: item.label };
                 });
                 renderIkeaResults(parsed, []);
-                setTimeout(function() { showToast('⚠️ Don’t forget: charge for scribe/filler panels against ceiling or walls (per LF)! Scroll to bottom to add items.', 'warning'); }, 400);
-                setTimeout(function() { showToast('🎨 Any custom cover panels that need to be made and paint-matched? Scroll to bottom to add items.', 'warning'); }, 1800);
+                setTimeout(function() {
+                    var t = document.createElement('div');
+                    t.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#856404;color:white;padding:12px 18px;border-radius:8px;z-index:9999;font-size:0.9rem;box-shadow:0 2px 8px rgba(0,0,0,0.25);max-width:320px;';
+                    t.innerHTML = '⚠️ Don’t forget: charge for scribe/filler panels against ceiling or walls (per LF)! <strong>Scroll to bottom to add items.</strong>';
+                    document.body.appendChild(t); setTimeout(function(){ t.remove(); }, 6000);
+                }, 400);
+                setTimeout(function() {
+                    var t = document.createElement('div');
+                    t.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#0d6efd;color:white;padding:12px 18px;border-radius:8px;z-index:9999;font-size:0.9rem;box-shadow:0 2px 8px rgba(0,0,0,0.25);max-width:320px;';
+                    t.innerHTML = '🎨 Any custom cover panels that need to be made and paint-matched? <strong>Scroll to bottom to add items.</strong>';
+                    document.body.appendChild(t); setTimeout(function(){ t.remove(); }, 7500);
+                }, 2200);
             } catch(e) {
                 alert('Parse error: ' + e.message);
             } finally {
@@ -2652,7 +2662,10 @@ Example:
             renderRooms();
             if (typeof saveQuoteToSupabase === 'function') saveQuoteToSupabase();
             bootstrap.Modal.getInstance(document.getElementById('ikeaQuickQuoteModal')).hide();
-            showToast(added + ' IKEA install items added!', 'success');
+            var t2 = document.createElement('div');
+            t2.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#198754;color:white;padding:10px 18px;border-radius:8px;z-index:9999;font-size:0.9rem;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
+            t2.innerHTML = '<i class="fas fa-check me-2"></i>' + added + ' IKEA install items added!';
+            document.body.appendChild(t2); setTimeout(function(){ t2.remove(); }, 3500);
         }
 
         // ── Material Estimator ─────────────────────────────────────────────
@@ -2694,7 +2707,10 @@ Example:
                 });
             }
             bootstrap.Modal.getInstance(document.getElementById('estimatorPricingModal')).hide();
-            showToast('Pricing saved! Estimates will now auto-fill rates.', 'success');
+            var t3 = document.createElement('div');
+            t3.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#198754;color:white;padding:10px 18px;border-radius:8px;z-index:9999;font-size:0.9rem;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
+            t3.innerHTML = '<i class="fas fa-save me-2"></i>Pricing saved! Estimates will now auto-fill rates.';
+            document.body.appendChild(t3); setTimeout(function(){ t3.remove(); }, 3500);
             // Refresh banner
             document.getElementById('estPricingBanner').style.display = 'none';
         }
