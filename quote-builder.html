@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body { background-color: #eef4fb; }
-        .room-header { 
+        .room-header {
             background: linear-gradient(135deg, #2d2d2d 0%, #111111 100%);
             color: white;
             padding: 1rem;
@@ -31,14 +31,14 @@
         .icon-picker-wrap .icon-opt { width:42px; height:42px; display:flex; align-items:center; justify-content:center; border-radius:8px; cursor:pointer; font-size:1.15rem; color:#343a40; border:2px solid transparent; transition:all 0.1s; }
         .icon-picker-wrap .icon-opt:hover { background:#e8f0fe; border-color:#1a56a0; color:#1a56a0; }
         .icon-picker-wrap .icon-opt.active { background:#1a56a0; color:#fff; border-color:#1a56a0; }
-        .line-item { 
+        .line-item {
             background: white;
             border-left: 4px solid #1a56a0;
             padding: 1rem;
             margin-bottom: 0.5rem;
             border-radius: 4px;
         }
-        .room-total { 
+        .room-total {
             font-size: 1.2rem;
             font-weight: bold;
             color: #28a745;
@@ -201,11 +201,11 @@
             .container-fluid > .d-flex:first-child .btn { padding: 3px 6px !important; font-size: 0.7rem !important; }
             /* Top header toolbar: icon-only on mobile */
             .container-fluid > div > div[style*="flex-direction: column"] .btn span,
-            .container-fluid > div > div[style*="flex-direction: column"] .btn-sm { 
-                font-size: 0 !important; 
+            .container-fluid > div > div[style*="flex-direction: column"] .btn-sm {
+                font-size: 0 !important;
             }
-            .container-fluid > div > div[style*="flex-direction: column"] .btn-sm i { 
-                font-size: 0.85rem !important; 
+            .container-fluid > div > div[style*="flex-direction: column"] .btn-sm i {
+                font-size: 0.85rem !important;
             }
             /* Prevent any horizontal overflow */
             .container-fluid { max-width: 100%; }
@@ -356,7 +356,7 @@ if (location.search.includes('debug')) {
     <!-- Draft warning banner -->
     <div id="draftWarningBanner" style="display:none; background:#fd7e14; color:#fff; text-align:center; padding:6px 12px; font-size:0.85rem; font-weight:600;">
         <i class="fas fa-exclamation-triangle me-2"></i>
-        Your work is only saved in browser storage — not to a file. Browser data can be lost.
+        Your work is only saved in browser storage - not to a file. Browser data can be lost.
         <button onclick="saveQuote()" class="btn btn-sm btn-light ms-3" style="font-size:0.8rem; padding:2px 10px; font-weight:600;">
             <i class="fas fa-save me-1"></i>Save to File Now
         </button>
@@ -388,7 +388,7 @@ if (location.search.includes('debug')) {
                             <span id="quoteNumWarning" style="display:none; color:#dc3545; font-size:0.85rem;"><i class="fas fa-exclamation-triangle"></i> Already used!</span>
                         </div>
                     </div>
-                    
+
                     <!-- Client Information Section -->
                     <div class="col-md-12 autocomplete-container">
                         <div class="d-flex justify-content-between align-items-center mb-1">
@@ -406,17 +406,17 @@ if (location.search.includes('debug')) {
                                onkeyup="showClientSuggestions()" onblur="hideClientDropdown()">
                         <div id="clientDropdown" class="autocomplete-dropdown"></div>
                     </div>
-                    
+
                     <div class="col-md-6 mt-3">
                         <label><strong>Project Address:</strong></label>
                         <input type="text" id="projectAddress" class="form-control" spellcheck="true" placeholder="123 Main St, Toronto">
                     </div>
-                    
+
                     <div class="col-md-6 mt-3">
                         <label><strong>Phone Number:</strong></label>
                         <input type="tel" id="clientPhone" class="form-control" spellcheck="true" placeholder="(416) 555-0123">
                     </div>
-                    
+
                     <div class="col-md-12 mt-3">
                         <label><strong>Email Address:</strong></label>
                         <input type="email" id="clientEmail" class="form-control" spellcheck="true" placeholder="client@email.com">
@@ -530,11 +530,11 @@ if (location.search.includes('debug')) {
                         <div class="mt-2"><strong>Deposit Amount:</strong> $<span id="depositAmountDisplay">0.00</span></div>
                         <div><strong>Remaining Balance:</strong> $<span id="remainingBalanceDisplay">0.00</span></div>
                     </div>
-                    
+
                     <button onclick="toggleDepositSection()" class="btn btn-sm btn-outline-primary mb-2" style="display:none;" id="depositToggleBtn">
                         <i class="fas fa-calculator"></i> Deposit Calculator
                     </button>
-                    
+
                     <div id="grandTotalDisplay" style="font-size: 2rem; font-weight: bold; margin-top: 0.5rem;">TOTAL: $0.00</div>
                     <div class="mt-3">
                         <button class="btn btn-outline-secondary btn-sm w-100" type="button" data-bs-toggle="collapse" data-bs-target="#profitReport" aria-expanded="false">
@@ -666,7 +666,7 @@ Example:
 
                     <!-- Tab: My Prices -->
                     <div id="ikeaTab_prices" style="display:none;">
-                        <p class="text-muted small">Set your installation rates for each IKEA cabinet type. These are your prices — what you charge the client. Pick from your saved items or enter manually.</p>
+                        <p class="text-muted small">Set your installation rates for each IKEA cabinet type. These are your prices - what you charge the client. Pick from your saved items or enter manually.</p>
                         <div id="ikeaPricingRows"></div>
                         <button class="btn btn-success mt-2" onclick="saveIkeaPricing()"><i class="fas fa-save me-1"></i>Save My Prices</button>
                         <span class="saved-badge ms-2" id="ikeaPricingSaved" style="display:none;"><i class="fas fa-check-circle me-1"></i>Saved!</span>
@@ -734,7 +734,7 @@ Example:
                     <!-- Step 2: Results -->
                     <div id="estResultsSection" style="display:none;" class="mt-3">
                         <div class="card border-0 bg-light p-3 mb-3">
-                            <h6 class="fw-bold mb-3"><i class="fas fa-clipboard-list me-2"></i>Estimated Materials — <span id="estResultRoomName"></span></h6>
+                            <h6 class="fw-bold mb-3"><i class="fas fa-clipboard-list me-2"></i>Estimated Materials - <span id="estResultRoomName"></span></h6>
                             <table class="table table-sm mb-0" id="estResultsTable">
                                 <thead><tr><th style="width:32px"></th><th>Item</th><th>Qty</th><th>Unit</th><th>Rate</th><th>Total</th></tr></thead>
                                 <tbody id="estResultsBody"></tbody>
@@ -930,7 +930,7 @@ Example:
                     </div>
                     <div class="row g-2 mb-3">
                         <div class="col-12">
-                            <label class="form-label"><strong>Description</strong> <span class="text-muted small">(optional — shown to clients on interactive quote)</span></label>
+                            <label class="form-label"><strong>Description</strong> <span class="text-muted small">(optional - shown to clients on interactive quote)</span></label>
                             <textarea id="newItemDescription" class="form-control" rows="2" placeholder="e.g., Complete drywall installation including hanging, mudding, taping, sanding and priming. Professional finish ready for paint." spellcheck="true"></textarea>
                         </div>
                     </div>
@@ -940,7 +940,7 @@ Example:
                             <input type="number" id="newItemMaterialCost" class="form-control" step="0.01" min="0" placeholder="0.00">
                         </div>
                         <div class="col-md-7">
-                            <label class="form-label"><strong>Supplier URL</strong> <span class="text-muted small">(optional — paste product link)</span></label>
+                            <label class="form-label"><strong>Supplier URL</strong> <span class="text-muted small">(optional - paste product link)</span></label>
                             <input type="url" id="newItemSupplierUrl" class="form-control" placeholder="https://www.homedepot.ca/...">
                         </div>
                         <div class="col-md-2">
@@ -951,7 +951,7 @@ Example:
                     </div>
                     <hr>
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h6 class="fw-bold mb-0"><i class="fas fa-list-alt text-secondary"></i> All Items — edit fields, then hit 💾 to save each row</h6>
+                        <h6 class="fw-bold mb-0"><i class="fas fa-list-alt text-secondary"></i> All Items - edit fields, then hit 💾 to save each row</h6>
                         <div class="d-flex align-items-center gap-2">
                             <span id="pricingUnsavedIndicator" class="badge bg-warning text-dark" style="display:none;">⚠️ Unsaved changes</span>
                             <button onclick="saveAllPricingRows()" class="btn btn-sm btn-success"><i class="fas fa-save"></i> Save All</button>
@@ -1035,10 +1035,10 @@ Example:
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD7acqRI6KsoUDTEkyMx36eDNRuuPXdqIA&libraries=drawing,geometry,places&callback=initMeasureMap" async defer></script>
-    
+
     <script>
         // Pricing Database - Adam's Rates (ALD Direct Inc. 2026)
-        // pricingDatabase is now empty — all services live in localStorage (ald_custom_items)
+        // pricingDatabase is now empty - all services live in localStorage (ald_custom_items)
         // Adam's services were migrated on first load via migrateLegacyPricing()
         const pricingDatabase = {};
 
@@ -1046,7 +1046,7 @@ Example:
         const LEGACY_PRICING = {};
 
         function migrateLegacyPricing() {
-            // Merge legacy pricing into localStorage — skip items that already exist by name
+            // Merge legacy pricing into localStorage - skip items that already exist by name
             let existing = {};
             try { existing = JSON.parse(localStorage.getItem('ald_custom_items') || '{}'); } catch(e) {}
             let changed = false;
@@ -1094,7 +1094,7 @@ Example:
             var btns = document.querySelectorAll('#undoBtn, [id="undoBtn"]');
             btns.forEach(function(btn) {
                 btn.disabled = _undoStack.length === 0;
-                btn.title = _undoStack.length === 0 ? 'Nothing to undo (Ctrl+Z)' : 'Undo (' + _undoStack.length + ' steps) — Ctrl+Z';
+                btn.title = _undoStack.length === 0 ? 'Nothing to undo (Ctrl+Z)' : 'Undo (' + _undoStack.length + ' steps) - Ctrl+Z';
             });
         }
 
@@ -1112,7 +1112,7 @@ Example:
 
         // Timeline feature - show/hide toggle
         let showTimelines = true;
-        
+
         // ── Room Icon Picker ──────────────────────────────────────────
         var _iconPickerRoomId = null;
         var ROOM_ICONS = [
@@ -1233,7 +1233,7 @@ Example:
                     _iconPickerHTML(roomId, currentIcon);
                 document.body.appendChild(sheet);
             } else {
-                // Desktop popover — smart positioned
+                // Desktop popover - smart positioned
                 var picker = document.createElement('div');
                 picker.id = 'roomIconPicker';
                 picker.className = 'icon-picker-wrap';
@@ -1533,7 +1533,7 @@ Example:
             document.body.classList.remove('modal-open');
             document.body.style.removeProperty('overflow');
             document.body.style.removeProperty('padding-right');
-            
+
             var roomModal = new bootstrap.Modal(document.getElementById('addRoomModal'));
             document.getElementById('newRoomName').value = '';
             roomModal.show();
@@ -1549,9 +1549,9 @@ Example:
                 name: name,
                 items: []
             });
-            
+
             renderRooms();
-            
+
             // Close modal
             const modalEl = document.getElementById('addRoomModal');
             const modal = bootstrap.Modal.getInstance(modalEl);
@@ -1590,7 +1590,7 @@ Example:
             }
 
             dropdown.innerHTML = matches.slice(0, 12).map(({ cat, item }) => `
-                <div class="item-search-result" data-cat="${cat.replace(/"/g,'&quot;')}" data-name="${item.name.replace(/"/g,'&quot;')}" 
+                <div class="item-search-result" data-cat="${cat.replace(/"/g,'&quot;')}" data-name="${item.name.replace(/"/g,'&quot;')}"
                      style="padding:8px 14px; cursor:pointer; border-bottom:1px solid #f0f0f0; display:flex; justify-content:space-between; align-items:center;">
                     <div>
                         <strong>${item.name}</strong>
@@ -1640,7 +1640,7 @@ Example:
             sel.innerHTML = '';
             // Blank default option first
             const blankCatOpt = document.createElement('option');
-            blankCatOpt.value = ''; blankCatOpt.text = '— Select a category —'; blankCatOpt.disabled = true;
+            blankCatOpt.value = ''; blankCatOpt.text = '- Select a category -'; blankCatOpt.disabled = true;
             if (!selectedCat) blankCatOpt.selected = true;
             sel.appendChild(blankCatOpt);
             // Add New Category option
@@ -1669,7 +1669,7 @@ Example:
                 _injectItemsIntoPricingDB(customItems);
             }
             const modal = new bootstrap.Modal(document.getElementById('addLineModal'));
-            
+
             // Reset form fields
             document.getElementById('lineDescription').value = '';
             document.getElementById('lineQuantity').value = '1';
@@ -1684,10 +1684,10 @@ Example:
             const qd = document.getElementById('itemSearchDropdown');
             if (qd) qd.style.display = 'none';
 
-            // Populate category dropdown dynamically — no pre-selection so placeholder shows
+            // Populate category dropdown dynamically - no pre-selection so placeholder shows
             populateCategoryDropdown(null);
-            // Don't call updatePricingOptions() here — let user pick category first
-            
+            // Don't call updatePricingOptions() here - let user pick category first
+
             modal.show();
         }
 
@@ -1711,16 +1711,16 @@ Example:
         function updatePricingOptions() {
             const category = document.getElementById('lineCategory').value;
             const serviceSelect = document.getElementById('lineService');
-            
+
             // Clear existing options
             serviceSelect.innerHTML = '';
-            
+
             // Get services for this category
             const services = pricingDatabase[category] || [];
 
             // Blank default option first
             const blankOpt = document.createElement('option');
-            blankOpt.value = ''; blankOpt.text = '— Select a service —'; blankOpt.disabled = true; blankOpt.selected = true;
+            blankOpt.value = ''; blankOpt.text = '- Select a service -'; blankOpt.disabled = true; blankOpt.selected = true;
             serviceSelect.appendChild(blankOpt);
             // Add New Service option
             const addSvcOpt = document.createElement('option');
@@ -1747,7 +1747,7 @@ Example:
                     } else { serviceSelect.selectedIndex = 1; }
                 } else { autoFillPricing(); }
             };
-            
+
             if (services.length === 0) {
                 // No predefined services, add a generic option
                 const option = document.createElement('option');
@@ -1768,7 +1768,7 @@ Example:
                     serviceSelect.appendChild(option);
                 });
             }
-            
+
             // Auto-fill if first service selected
             if (services.length > 0) {
                 autoFillPricing();
@@ -1778,7 +1778,7 @@ Example:
         function autoFillPricing() {
             const serviceSelect = document.getElementById('lineService');
             const selectedOption = serviceSelect.options[serviceSelect.selectedIndex];
-            
+
             if (selectedOption && selectedOption.dataset.unitType) {
                 document.getElementById('lineUnitType').value = selectedOption.dataset.unitType;
                 document.getElementById('lineRate').value = selectedOption.dataset.rate;
@@ -1801,7 +1801,7 @@ Example:
 
         // Global variables for deposit calculator
         let depositPercentage = 50; // Default 50% deposit
-        
+
         function getUsedQuoteNumbers() {
             return JSON.parse(localStorage.getItem('ald_used_quote_numbers') || '[]');
         }
@@ -1885,9 +1885,9 @@ Example:
             var warning = document.getElementById('quoteNumWarning');
             if (warning) warning.style.display = (val && used.includes(val)) ? 'inline' : 'none';
         }
-        
+
         // Room header color presets (label, gradient)
-        // Trade category display order — from start of job to end
+        // Trade category display order - from start of job to end
         const CATEGORY_ORDER = [
             'Demolition',
             'Asbestos / Hazmat',
@@ -1988,15 +1988,15 @@ Example:
         function editLineItem(roomId, itemIndex) {
             const room = rooms.find(r => r.id === roomId);
             if (!room || !room.items[itemIndex]) return;
-            
+
             const item = room.items[itemIndex];
-            
+
             // Populate form with existing data
             document.getElementById('currentRoomId').value = roomId;
             document.getElementById('lineDescription').value = item.description;
             populateCategoryDropdown(item.category);
             updatePricingOptions();
-            
+
             // Find and select matching service
             const services = pricingDatabase[item.category];
             if (services) {
@@ -2005,7 +2005,7 @@ Example:
                     document.getElementById('lineService').value = matchedService.name;
                 }
             }
-            
+
             document.getElementById('lineUnitType').value = item.unitType;
             document.getElementById('lineQuantity').value = item.quantity;
             document.getElementById('lineRate').value = item.rate;
@@ -2019,7 +2019,7 @@ Example:
             } else if (linkBtn) {
                 linkBtn.style.display = 'none';
             }
-            
+
             // Change modal title and button text
             const modalTitle = document.querySelector('#addLineModal .modal-title');
             if (modalTitle) {
@@ -2029,10 +2029,10 @@ Example:
             if (saveBtn) {
                 saveBtn.textContent = 'Save Changes';
             }
-            
+
             // Set editing flag
             editingItemIndex = itemIndex;
-            
+
             // Show modal
             const modal = new bootstrap.Modal(document.getElementById('addLineModal'));
             modal.show();
@@ -2047,9 +2047,9 @@ Example:
             const rate = parseFloat(document.getElementById('lineRate').value) || 0;
             const notes = document.getElementById('lineNotes').value.trim();
             const materialCost = parseFloat(document.getElementById('lineMaterialCost').value) || 0;
-            
+
             if (!description) return;
-            
+
             const roomIndex = rooms.findIndex(r => r.id === roomId);
             if (roomIndex !== -1) {
                 _pushUndo(); // snapshot before save
@@ -2089,7 +2089,7 @@ Example:
                         total: quantity * rate
                     });
                 }
-                
+
                 // Reset editing state
                 editingItemIndex = null;
                 const modalTitle = document.querySelector('#addLineModal .modal-title');
@@ -2100,9 +2100,9 @@ Example:
                 if (saveBtn) {
                     saveBtn.textContent = 'Add Line Item';
                 }
-                
+
                 renderRooms();
-                
+
                 // Prompt to save if this is a new item
                 const savNewItemBtn = document.getElementById('saveNewItemBtn');
                 if (savNewItemBtn && savNewItemBtn.style.display !== 'none') {
@@ -2111,7 +2111,7 @@ Example:
                         saveLineItemToDatabase();
                     }
                 }
-                
+
                 // Close modal
                 const modalEl = document.getElementById('addLineModal');
                 const modal = bootstrap.Modal.getInstance(modalEl);
@@ -2296,7 +2296,7 @@ Example:
             { key: 'pushOpen',        label: 'Push-to-Open',          defaultRate: 15  },
         ];
 
-        // Keyword rules — order matters (more specific first)
+        // Keyword rules - order matters (more specific first)
         var IKEA_RULES = [
             { key: 'dishwasherPanel', words: ['dishwasher panel','tutemo','door on dishwasher'] },
             { key: 'tallCabinet',     words: ['tall cabinet','high cabinet','sektion high','sektion tall','pantry cabinet'] },
@@ -2393,14 +2393,14 @@ Example:
             var status = document.getElementById('ikeaPdfStatus');
             var statusText = document.getElementById('ikeaPdfStatusText');
             status.style.display = 'block';
-            statusText.textContent = 'Reading PDF — ' + file.name + '...';
+            statusText.textContent = 'Reading PDF - ' + file.name + '...';
             document.getElementById('ikeaUploadArea').style.background = '#d4edda';
             try {
                 var text = await ikeaExtractPdfText(file);
                 document.getElementById('ikeaOrderInput').value = text;
                 status.className = 'alert alert-success py-2 small mb-2';
-                statusText.innerHTML = '<i class="fas fa-check-circle me-1"></i>PDF read successfully — ' + file.name + '. Click <strong>Parse &amp; Quote</strong> to continue.';
-                document.getElementById('ikeaUploadArea').innerHTML = '<i class="fas fa-check-circle fa-2x text-success mb-2"></i><div class="fw-semibold text-success">' + file.name + '</div><div class="text-muted small">PDF loaded — click to replace</div><input type="file" id="ikeaPdfInput" accept=".pdf" style="display:none;" onchange="ikeaHandlePdfUpload(this.files[0])">';
+                statusText.innerHTML = '<i class="fas fa-check-circle me-1"></i>PDF read successfully - ' + file.name + '. Click <strong>Parse &amp; Quote</strong> to continue.';
+                document.getElementById('ikeaUploadArea').innerHTML = '<i class="fas fa-check-circle fa-2x text-success mb-2"></i><div class="fw-semibold text-success">' + file.name + '</div><div class="text-muted small">PDF loaded - click to replace</div><input type="file" id="ikeaPdfInput" accept=".pdf" style="display:none;" onchange="ikeaHandlePdfUpload(this.files[0])">';
             } catch(e) {
                 status.className = 'alert alert-danger py-2 small mb-2';
                 statusText.innerHTML = '<i class="fas fa-exclamation-circle me-1"></i>Could not read PDF: ' + e.message + '. Try pasting the order text manually.';
@@ -2536,7 +2536,7 @@ Example:
                     else if (productName === 'VARIERA') { subType = 'accessory'; subLabel = 'VARIERA organizer'; }
                     // Interior lighting
                     else if (['OMLOPP','IRSTA','MITTLED','STRIMLED','STRIMLEAD','YTBERG'].indexOf(productName) !== -1) { subType = 'lighting'; subLabel = productName + ' lighting'; }
-                    // Glass doors — check door products for glass
+                    // Glass doors - check door products for glass
                     if (!subType && /gls\s*dr|glass\s*door|glass\s*panel|vitrine/i.test(description)) { subType = 'glassPanel'; subLabel = productName + ' glass door'; }
                     if (subType) items.push({ type: subType, qty: qty, label: subLabel });
                 }
@@ -2549,6 +2549,31 @@ Example:
                 else { seen[key] = consolidated.length; consolidated.push({ type: items[ci].type, qty: items[ci].qty, label: items[ci].label }); }
             }
             return consolidated;
+        }
+
+        function showIkeaReminders() {
+            var backdrop = document.createElement('div');
+            backdrop.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:10000;';
+            document.body.appendChild(backdrop);
+            var messages = [
+                { text: "\u26a0\ufe0f Don\u2019t forget: charge for scribe/filler panels against ceiling or walls (per LF)! Scroll to bottom to add items.", bg: '#856404' },
+                { text: "\ud83c\udfa8 Any custom cover panels that need to be made and paint-matched? Scroll to bottom to add items.", bg: '#0d6efd' }
+            ];
+            var idx = 0;
+            function showNext() {
+                if (idx >= messages.length) { document.body.removeChild(backdrop); return; }
+                var msg = messages[idx];
+                var box = document.createElement('div');
+                box.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:' + msg.bg + ';color:white;padding:30px 36px;border-radius:12px;font-size:1.1rem;font-weight:bold;text-align:center;z-index:10001;max-width:420px;box-shadow:0 4px 24px rgba(0,0,0,0.4);';
+                box.appendChild(document.createTextNode(msg.text));
+                var ok = document.createElement('button');
+                ok.textContent = 'OK';
+                ok.style.cssText = 'display:block;margin:20px auto 0;padding:10px 32px;font-size:1rem;font-weight:bold;background:white;color:' + msg.bg + ';border:none;border-radius:6px;cursor:pointer;';
+                ok.onclick = function() { document.body.removeChild(box); idx++; showNext(); };
+                box.appendChild(ok);
+                document.body.appendChild(box);
+            }
+            showNext();
         }
 
         function parseIkeaOrder() {
@@ -2566,18 +2591,7 @@ Example:
                     return { key: item.type, label: item.label, qty: item.qty, rate: rate, total: item.qty * rate, lineText: item.label };
                 });
                 renderIkeaResults(parsed, []);
-                setTimeout(function() {
-                    var t = document.createElement('div');
-                    t.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#856404;color:white;padding:12px 18px;border-radius:8px;z-index:9999;font-size:0.9rem;box-shadow:0 2px 8px rgba(0,0,0,0.25);max-width:320px;';
-                    t.innerHTML = '⚠️ Don’t forget: charge for scribe/filler panels against ceiling or walls (per LF)! <strong>Scroll to bottom to add items.</strong>';
-                    document.body.appendChild(t); setTimeout(function(){ t.remove(); }, 6000);
-                }, 400);
-                setTimeout(function() {
-                    var t = document.createElement('div');
-                    t.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#0d6efd;color:white;padding:12px 18px;border-radius:8px;z-index:9999;font-size:0.9rem;box-shadow:0 2px 8px rgba(0,0,0,0.25);max-width:320px;';
-                    t.innerHTML = '🎨 Any custom cover panels that need to be made and paint-matched? <strong>Scroll to bottom to add items.</strong>';
-                    document.body.appendChild(t); setTimeout(function(){ t.remove(); }, 7500);
-                }, 2200);
+                setTimeout(showIkeaReminders, 400);
             } catch(e) {
                 alert('Parse error: ' + e.message);
             } finally {
@@ -2614,7 +2628,7 @@ Example:
             document.getElementById('ikeaItemCount').textContent = items.length + ' items found';
             if (unparsed.length > 0) {
                 document.getElementById('ikeaUnparsed').style.display = 'block';
-                document.getElementById('ikeaUnparsed').innerHTML = '<i class="fas fa-info-circle me-1"></i><strong>' + unparsed.length + ' lines skipped</strong> (not recognized as IKEA install items — hardware, accessories, etc.): <br><span class="text-muted">' + unparsed.slice(0,5).map(function(l){return l.substring(0,60);}).join(', ') + '</span>';
+                document.getElementById('ikeaUnparsed').innerHTML = '<i class="fas fa-info-circle me-1"></i><strong>' + unparsed.length + ' lines skipped</strong> (not recognized as IKEA install items - hardware, accessories, etc.): <br><span class="text-muted">' + unparsed.slice(0,5).map(function(l){return l.substring(0,60);}).join(', ') + '</span>';
             } else { document.getElementById('ikeaUnparsed').style.display = 'none'; }
             document.getElementById('ikeaResults').style.display = 'block';
         }
@@ -2650,7 +2664,7 @@ Example:
                 var item = _ikeaParsedItems[parseInt(chk.dataset.idx)];
                 room.items.push({
                     category: 'Millwork & Cabinets',
-                    name: 'IKEA Install — ' + item.label,
+                    name: 'IKEA Install - ' + item.label,
                     description: item.lineText,
                     quantity: item.qty,
                     unitType: 'each',
@@ -2804,12 +2818,12 @@ Example:
 
             document.getElementById('estResultRoomName').textContent = name;
             var rows = [
-                { key: 'flooring',     label: 'Flooring',       qty: floorSqft,    unit: 'sqft', cat: 'Flooring',        itemName: 'Flooring — ' + name },
-                { key: 'ceilingPaint', label: 'Ceiling Paint',  qty: floorSqft,    unit: 'sqft', cat: 'Painting',        itemName: 'Ceiling Paint — ' + name },
-                { key: 'wallPaint',    label: 'Wall Paint',     qty: wallSqft,     unit: 'sqft', cat: 'Painting',        itemName: 'Wall Paint — ' + name },
-                { key: 'baseboard',    label: 'Baseboard',      qty: perimeter,    unit: 'LF',   cat: 'Trim & Millwork', itemName: 'Baseboard — ' + name },
-                { key: 'doorCasing',   label: 'Door Casing',    qty: doorCasing,   unit: 'LF',   cat: 'Trim & Millwork', itemName: 'Door Casing — ' + name, hide: doors === 0 },
-                { key: 'windowCasing', label: 'Window Casing',  qty: windowCasing, unit: 'LF',   cat: 'Trim & Millwork', itemName: 'Window Casing — ' + name, hide: windows === 0 },
+                { key: 'flooring',     label: 'Flooring',       qty: floorSqft,    unit: 'sqft', cat: 'Flooring',        itemName: 'Flooring - ' + name },
+                { key: 'ceilingPaint', label: 'Ceiling Paint',  qty: floorSqft,    unit: 'sqft', cat: 'Painting',        itemName: 'Ceiling Paint - ' + name },
+                { key: 'wallPaint',    label: 'Wall Paint',     qty: wallSqft,     unit: 'sqft', cat: 'Painting',        itemName: 'Wall Paint - ' + name },
+                { key: 'baseboard',    label: 'Baseboard',      qty: perimeter,    unit: 'LF',   cat: 'Trim & Millwork', itemName: 'Baseboard - ' + name },
+                { key: 'doorCasing',   label: 'Door Casing',    qty: doorCasing,   unit: 'LF',   cat: 'Trim & Millwork', itemName: 'Door Casing - ' + name, hide: doors === 0 },
+                { key: 'windowCasing', label: 'Window Casing',  qty: windowCasing, unit: 'LF',   cat: 'Trim & Millwork', itemName: 'Window Casing - ' + name, hide: windows === 0 },
             ];
 
             var html = '';
@@ -2824,12 +2838,12 @@ Example:
                 html += '<td>' + r.label + '</td>';
                 html += '<td>' + r.qty.toLocaleString() + '</td>';
                 html += '<td class="text-muted">' + r.unit + '</td>';
-                html += '<td>' + (rate > 0 ? '$' + rate.toFixed(2) : '<span class="text-muted">—</span>') + '</td>';
-                html += '<td>' + (total > 0 ? '$' + total.toFixed(2) : '<span class="text-muted">—</span>') + '</td>';
+                html += '<td>' + (rate > 0 ? '$' + rate.toFixed(2) : '<span class="text-muted">-</span>') + '</td>';
+                html += '<td>' + (total > 0 ? '$' + total.toFixed(2) : '<span class="text-muted">-</span>') + '</td>';
                 html += '</tr>';
             });
             document.getElementById('estResultsBody').innerHTML = html;
-            document.getElementById('estSubtotal').textContent = subtotal > 0 ? '$' + subtotal.toFixed(2) : '—';
+            document.getElementById('estSubtotal').textContent = subtotal > 0 ? '$' + subtotal.toFixed(2) : '-';
             document.getElementById('estInputSection').style.display = 'none';
             document.getElementById('estResultsSection').style.display = 'block';
         }
@@ -3301,13 +3315,13 @@ Example:
 
         function renderRooms() {
             const container = document.getElementById('roomsContainer');
-            
+
             if (rooms.length === 0) {
                 container.innerHTML = `
                 <div class="text-center py-5" style="color:#adb5bd">
                     <div style="font-size:4rem; margin-bottom:1rem;">🏠</div>
                     <h4 style="color:#6c757d; font-weight:700;">No rooms yet</h4>
-                    <p class="mb-4" style="max-width:360px; margin:0 auto 1.5rem;">Break your quote into rooms or areas — Kitchen, Basement, Bathroom — to keep things organized and easy to read.</p>
+                    <p class="mb-4" style="max-width:360px; margin:0 auto 1.5rem;">Break your quote into rooms or areas - Kitchen, Basement, Bathroom - to keep things organized and easy to read.</p>
                     <button onclick="addRoom()" class="btn btn-primary btn-lg px-5 shadow-sm" style="border-radius:30px;">
                         <i class="fas fa-plus"></i> Add Your First Room
                     </button>
@@ -3315,9 +3329,9 @@ Example:
                 calculateTotals();
                 return;
             }
-            
+
             let html = '';
-            
+
             rooms.forEach(room => {
                 // Apply room markup if set
                 const roomMarkup = room.markup || 0;
@@ -3325,7 +3339,7 @@ Example:
                 if (roomMarkup > 0) {
                     roomTotal = roomTotal * (1 + roomMarkup / 100);
                 }
-                
+
                 const colorIdx = (room.colorIndex !== undefined) ? room.colorIndex : 0;
                 const headerBg = ROOM_COLORS[colorIdx].gradient;
                 html += '<div class="room-card" data-room-id="' + room.id + '">';
@@ -3343,7 +3357,7 @@ Example:
                 });
                 html += '</div>';
                 html += '</div>'; // end flex row
-                
+
                 // Timeline input field (shown when showTimelines is true)
                 if (showTimelines) {
                     const timelineValue = room.timeline || '';
@@ -3365,14 +3379,14 @@ Example:
                 html += '<button onclick="undoLastAction()" class="btn btn-sm btn-warning ms-1" title="Undo last action (Ctrl+Z)" id="undoBtn">';
                 html += '<i class="fas fa-undo"></i> Undo</button>';
                 html += '</div>';
-                
+
                 // Per-room notes/scope section
                 const roomNotes = room.scopeNotes || '';
                 html += '<div class="mt-2 mb-2">';
                 html += '<label><small><i class="fas fa-clipboard-list"></i> <strong>Scope / Notes</strong> <span class="text-muted">(visible to client)</span></small></label>';
                 html += '<textarea id="scopeNotes_' + room.id + '" class="form-control form-control-sm" rows="3" placeholder="Describe the scope of work for this room... e.g., Sometimes this comes up easy, usually not haha." onchange="updateRoomScopeNotes(' + room.id + ')">' + roomNotes + '</textarea>';
                 html += '</div>';
-                
+
                 if (room.items.length > 0) {
                     const hasMaterialCosts = room.items.some(item => item.materialCost > 0);
                     const markupFactor = 1 + (room.markup || 0) / 100;
@@ -3478,7 +3492,7 @@ Example:
                 html += '</div>';
                 html += '</div>'; // close room-card
             });
-            
+
             // Capture timeline values back into room data
             if (showTimelines) {
                 rooms.forEach(room => {
@@ -3488,7 +3502,7 @@ Example:
                     }
                 });
             }
-            
+
             // Add "Add another room" button at the bottom
             html += `<div class="text-center py-3">
                 <button onclick="addRoom()" class="btn btn-outline-primary px-4" style="border-radius:30px; border-style:dashed;">
@@ -3521,7 +3535,7 @@ Example:
                 });
             }
 
-            // Category-level drag — one Sortable per room's cat-groups-container
+            // Category-level drag - one Sortable per room's cat-groups-container
             document.querySelectorAll('.cat-groups-container').forEach(catContainer => {
                 const roomId = parseInt(catContainer.dataset.roomId);
                 Sortable.create(catContainer, {
@@ -3573,7 +3587,7 @@ Example:
             }).join('');
             updateTermsCount();
         }
-        
+
         function updateTermsCount() {
             var total = document.querySelectorAll('#termsCheckboxes input[type="checkbox"]').length;
             var checked = document.querySelectorAll('#termsCheckboxes input[type="checkbox"]:checked').length;
@@ -3589,7 +3603,7 @@ Example:
         function toggleTimelines() {
             showTimelines = !showTimelines;
             renderRooms();
-            
+
             // Update button text/icon based on state
             const btn = document.getElementById('toggleTimelinesBtn');
             if (btn) {
@@ -3616,7 +3630,7 @@ Example:
             } else {
                 room.hideMarkup = true; // Default to hidden
             }
-            
+
             // Update icon
             const icon = document.getElementById('markupIcon_' + roomId);
             if (icon) {
@@ -3631,30 +3645,30 @@ Example:
         function applyGlobalMarkup() {
             const markupPercent = prompt('Enter markup percentage to apply to entire quote (0-100%):');
             if (markupPercent === null) return; // Cancelled
-            
+
             const percent = parseFloat(markupPercent);
             if (isNaN(percent) || percent < 0 || percent > 100) {
                 alert('Please enter a valid percentage between 0 and 100.');
                 return;
             }
-            
+
             // Apply to all rooms
             rooms.forEach(room => {
                 room.markup = percent;
                 room.hideMarkup = true; // Default to hidden from client
             });
-            
+
             renderRooms();
             alert('Markup of ' + percent + '% applied to all rooms!');
         }
 
         // Template Management Functions
         let currentTemplateIndex = null;
-        
+
         // Auto-save draft functionality
         const DRAFT_KEY = 'ald_current_draft';
         const RECENT_QUOTES_KEY = 'ald_recent_quotes';
-        
+
         // Track the Supabase ID for the currently loaded quote
         let currentSupabaseId = null;
 
@@ -3663,7 +3677,7 @@ Example:
                 alert('No rooms to save. Add at least one room first.');
                 return;
             }
-            
+
             const draftData = {
                 id: currentSupabaseId || Date.now(),
                 supabaseId: currentSupabaseId || null,
@@ -3682,7 +3696,7 @@ Example:
                 status: 'draft',
                 savedAt: new Date().toISOString()
             };
-            
+
             // Always save to localStorage first (local backup)
             localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
             let recentQuotes = JSON.parse(localStorage.getItem(RECENT_QUOTES_KEY) || '[]');
@@ -3713,15 +3727,15 @@ Example:
             }
             renderRecentQuotesSection();
         }
-        
+
         function loadRecentQuotes() {
             const recentQuotes = JSON.parse(localStorage.getItem(RECENT_QUOTES_KEY) || '[]');
-            
+
             if (recentQuotes.length === 0) {
                 alert('No recent quotes found. Save your current work first!');
                 return;
             }
-            
+
             // Build dropdown/modal with recent quotes
             let html = '<div class="dropdown-menu show" style="position: absolute; top: 100%; left: 0; z-index: 1000;">';
             recentQuotes.forEach((quote, index) => {
@@ -3733,7 +3747,7 @@ Example:
                 `;
             });
             html += '</div>';
-            
+
             const container = document.getElementById('recentQuotesDropdownContainer');
             if (container) {
                 container.innerHTML = html;
@@ -3745,23 +3759,23 @@ Example:
                 container.innerHTML = html;
             }
         }
-        
+
         function loadRecentQuote(index) {
             const recentQuotes = JSON.parse(localStorage.getItem(RECENT_QUOTES_KEY) || '[]');
             const quote = recentQuotes[index];
-            
+
             if (!quote) {
                 alert('Quote not found.');
                 return;
             }
-            
+
             // Load client info
             if (document.getElementById('clientName')) document.getElementById('clientName').value = quote.clientName || '';
             if (document.getElementById('quoteNumber')) document.getElementById('quoteNumber').value = quote.quoteNumber || '';
             if (document.getElementById('projectAddress')) document.getElementById('projectAddress').value = quote.projectAddress || '';
             if (document.getElementById('clientEmail')) document.getElementById('clientEmail').value = quote.email || '';
             if (document.getElementById('clientPhone')) document.getElementById('clientPhone').value = quote.phone || '';
-            
+
             // Load rooms
             rooms = [];
             roomCounter = 0;
@@ -3774,23 +3788,23 @@ Example:
                 };
                 rooms.push(newRoom);
             });
-            
+
             renderRooms();
             alert(`Loaded quote from ${new Date(quote.savedAt).toLocaleString()}!`);
         }
-        
+
         function loadDraft() {
             const draftData = localStorage.getItem(DRAFT_KEY);
             if (!draftData) return false;
-            
+
             const quote = JSON.parse(draftData);
-            
+
             // Load client info
             if (document.getElementById('clientName')) document.getElementById('clientName').value = quote.clientName || '';
             if (document.getElementById('projectAddress')) document.getElementById('projectAddress').value = quote.projectAddress || '';
             if (document.getElementById('clientEmail')) document.getElementById('clientEmail').value = quote.email || '';
             if (document.getElementById('clientPhone')) document.getElementById('clientPhone').value = quote.phone || '';
-            
+
             // Load rooms
             rooms = [];
             roomCounter = 0;
@@ -3803,15 +3817,15 @@ Example:
                 };
                 rooms.push(newRoom);
             });
-            
+
             renderRooms();
             return true;
         }
-        
+
         function autoSaveDraft() {
             // Save current state as draft automatically
             if (rooms.length === 0) return;
-            
+
             const draftData = {
                 id: Date.now(),
                 clientName: document.getElementById('clientName')?.value || 'Client',
@@ -3822,26 +3836,26 @@ Example:
                 grandTotal: parseFloat(document.getElementById('grandTotalDisplay').textContent.replace(/[^0-9.]/g, '')) || 0,
                 savedAt: new Date().toISOString()
             };
-            
+
             localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
         }
-        
+
         function renderRecentQuotesSection() {
             const recentQuotes = JSON.parse(localStorage.getItem(RECENT_QUOTES_KEY) || '[]');
             const draftContainer = document.getElementById('draftSectionContainer');
-            
+
             if (recentQuotes.length > 0) {
                 draftContainer.style.display = 'block';
             } else {
                 draftContainer.style.display = 'none';
             }
         }
-        
+
         // Auto-save on any change
         function setupAutoSave() {
             const inputs = document.querySelectorAll('input, select, textarea');
             let saveTimeout;
-            
+
             inputs.forEach(input => {
                 input.addEventListener('change', () => {
                     clearTimeout(saveTimeout);
@@ -3849,22 +3863,22 @@ Example:
                 });
             });
         }
-        
+
         function saveTemplate() {
             if (rooms.length === 0) {
                 alert('Please add at least one room before saving a template.');
                 return;
             }
-            
+
             const templateName = prompt('Enter a name for this template:');
             if (!templateName || !templateName.trim()) {
                 alert('Template name cannot be empty.');
                 return;
             }
-            
+
             // Get current templates
             let templates = JSON.parse(localStorage.getItem('ald_quote_templates') || '{}');
-            
+
             // Save the template with timestamp
             const quoteData = {
                 id: Date.now(),
@@ -3872,10 +3886,10 @@ Example:
                 rooms: JSON.parse(JSON.stringify(rooms)), // Deep copy
                 createdAt: new Date().toISOString()
             };
-            
+
             templates[quoteData.id] = quoteData;
             localStorage.setItem('ald_quote_templates', JSON.stringify(templates));
-            
+
             alert(`Template "${templateName}" saved successfully!`);
             if (typeof renderTemplateDropdown === 'function') renderTemplateDropdown();
         }
@@ -3903,7 +3917,7 @@ Example:
             localStorage.setItem('ald_quote_templates', JSON.stringify(arr));
         }
 
-        // Open dropdown on button click — toggle if already open
+        // Open dropdown on button click - toggle if already open
         function openTemplatesMenu(btn) {
             var existing = document.getElementById('_templateDropdown');
             if (existing) { existing.remove(); return; }
@@ -4255,14 +4269,14 @@ Example:
             try {
                 const result = await saveQuoteForSharing(quoteData);
                 if (result.error) throw result.error;
-                
+
                 const supabaseId = result.data.id;
                 window._supabaseQuoteId = supabaseId;
                 localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
 
                 const _base = window.location.href.split('?')[0].replace(/quote-builder(\.html)?$/, '');
                 const viewerUrl = _base + 'interactive-quote-viewer.html?id=' + supabaseId;
-                
+
                 if (saveStatus) saveStatus.innerHTML = '<span style="color:green;"><i class="fas fa-check"></i> Quote saved!</span>';
 
                 // Show the link modal
@@ -4497,7 +4511,7 @@ Example:
 
         function newQuote() {
             if (!confirm('Start a new quote? Any unsaved changes will be lost.')) return;
-            window._quoteFullyLoaded = true; // new quote — intentionally empty, allow save
+            window._quoteFullyLoaded = true; // new quote - intentionally empty, allow save
             // Clear all fields
             ['clientName','clientEmail','projectAddress','quoteNotes'].forEach(function(id) {
                 var el = document.getElementById(id);
@@ -4517,7 +4531,7 @@ async function saveQuote() {
             // Always show save dialog first
             var qData = collectQuoteData();
             if (!qData.clientName && !qData.rooms.length) {
-                alert('Nothing to save yet — add a client name or some rooms first.');
+                alert('Nothing to save yet - add a client name or some rooms first.');
                 return;
             }
             showSaveDialog(qData);
@@ -4837,13 +4851,13 @@ async function saveQuote() {
                     if (el) el.innerHTML = '<span style="color:#dc3545;"><i class="fas fa-exclamation-triangle"></i> Auto-save failed</span>';
                 }
             }
-            // Cloud save to Supabase — always runs regardless of file handle
+            // Cloud save to Supabase - always runs regardless of file handle
             if (typeof saveQuoteToSupabase === 'function') {
                 var qData = collectQuoteData();
                 // SAFETY GUARD: never overwrite cloud data with empty rooms unless we know the quote is intentionally empty
                 // _quoteFullyLoaded is set true only after a successful Supabase load
                 if (!window._quoteFullyLoaded && (!qData.rooms || qData.rooms.length === 0)) {
-                    console.warn('[AutoSave] Skipping cloud save — rooms empty and quote not confirmed loaded from cloud');
+                    console.warn('[AutoSave] Skipping cloud save - rooms empty and quote not confirmed loaded from cloud');
                     return;
                 }
                 saveQuoteToSupabase(qData).then(function(result) {
@@ -4890,12 +4904,12 @@ async function saveQuote() {
         });
 
         document.addEventListener('DOMContentLoaded', async function() {
-            // Auth check — redirect to login if not signed in
+            // Auth check - redirect to login if not signed in
             const { data: { session } } = await _supabase.auth.getSession();
             if (!session) { window.location.href = 'login.html'; return; }
             window.currentUser = session.user;
 
-            // Subscription status check — show banner if trial ended
+            // Subscription status check - show banner if trial ended
             var sub = JSON.parse(localStorage.getItem('ald_subscription') || '{}');
             if (sub.status && sub.status !== 'active' && sub.status !== 'trialing') {
                 var banner = document.createElement('div');
@@ -4910,7 +4924,7 @@ async function saveQuote() {
                 var logoImg = document.getElementById('userLogoImg');
                 if (logoImg) { logoImg.src = savedLogo; logoImg.style.display = 'block'; }
             }
-            
+
             // Load logo from Supabase if available
             if (typeof loadLogoFromSupabase === 'function') {
                 try {
@@ -4923,7 +4937,7 @@ async function saveQuote() {
                     console.warn('Failed to load logo from Supabase:', e);
                 }
             }
-            
+
             // Load business profile from Supabase
             if (typeof loadBusinessProfile === 'function') {
                 try {
@@ -4938,7 +4952,7 @@ async function saveQuote() {
 
             // (delegated listeners moved to standalone script block to guarantee they attach)
 
-            // Check for ?load=ID in URL — load quote from Supabase
+            // Check for ?load=ID in URL - load quote from Supabase
             const urlParams = new URLSearchParams(window.location.search);
             const loadId = urlParams.get('load');
             if (loadId && typeof loadQuoteFromSupabase === 'function') {
@@ -5088,7 +5102,7 @@ async function saveQuote() {
             // Backup using inline function (guaranteed available)
             _doBackupItemsToCloud(customItems).then(function(result) {
                     if (showToast) {
-                        var msg = result && result.error ? '❌ Cloud save failed — saved locally only' : '✅ Items saved to cloud!';
+                        var msg = result && result.error ? '❌ Cloud save failed - saved locally only' : '✅ Items saved to cloud!';
                         var color = result && result.error ? '#dc3545' : '#198754';
                         var toast = document.createElement('div');
                         toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:' + color + ';color:white;padding:10px 18px;border-radius:8px;z-index:9999;font-size:0.9rem;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
@@ -5126,7 +5140,7 @@ async function saveQuote() {
         }
 
         function handleCategoryChange() {
-            // Just a placeholder — can be used for future logic
+            // Just a placeholder - can be used for future logic
         }
 
         function openManageItemsModal() {
@@ -5211,7 +5225,7 @@ async function saveQuote() {
             // Find existing item by original name
             let ci = customItems[cat].find(i => i.name === name);
             if (!ci) {
-                // Not in customItems yet — check pricingDatabase and adopt it
+                // Not in customItems yet - check pricingDatabase and adopt it
                 const pi = pricingDatabase[cat]?.find(i => i.name === name);
                 if (pi) {
                     ci = { name: pi.name, unitType: pi.unitType || '', rate: pi.rate || 0, materialCost: pi.materialCost || 0, supplierUrl: pi.supplierUrl || '', itemDescription: pi.itemDescription || '' };
@@ -5303,7 +5317,7 @@ async function saveQuote() {
                     var ok = result && !result.error;
                     var toast = document.createElement('div');
                     toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:' + (ok ? '#198754' : '#dc3545') + ';color:white;padding:12px 20px;border-radius:8px;z-index:9999;font-size:0.95rem;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
-                    toast.innerHTML = ok ? '\u2705 All items saved to cloud!' : '\u274c Saved locally — cloud sync failed';
+                    toast.innerHTML = ok ? '\u2705 All items saved to cloud!' : '\u274c Saved locally - cloud sync failed';
                     document.body.appendChild(toast);
                     setTimeout(function(){ toast.remove(); }, 3500);
                 });
@@ -5316,7 +5330,7 @@ async function saveQuote() {
             const end = direction === 'top' ? 0 : el.scrollHeight;
             const distance = end - start;
             if (distance === 0) return;
-            const duration = 380; // ms — fast enough to "whizz", slow enough to see it fly
+            const duration = 380; // ms - fast enough to "whizz", slow enough to see it fly
             const startTime = performance.now();
             // Ease-in-out cubic for a satisfying whizz
             function easeInOutCubic(t) {
@@ -5338,7 +5352,7 @@ async function saveQuote() {
             container.querySelectorAll('table').forEach(table => {
                 let anyVisible = false;
                 table.querySelectorAll('tbody tr').forEach(row => {
-                    // Skip hidden desc/upgrade collapse rows — never touch them
+                    // Skip hidden desc/upgrade collapse rows - never touch them
                     const isCollapse = row.id && (row.id.startsWith('desc_') || row.id.startsWith('upg_'));
                     if (isCollapse) return;
 
@@ -5435,7 +5449,7 @@ async function saveQuote() {
                                     </div>
                                     <div class="col-md-6">
                                         <label class="form-label" style="font-size:0.75em">Description (shown to client)</label>
-                                        <input type="text" class="form-control form-control-sm upgrade-desc" value="${upgDesc}" placeholder="e.g., Premium 5.5&quot; tall baseboard — a luxurious finishing touch" oninput="markPricingDirty()">
+                                        <input type="text" class="form-control form-control-sm upgrade-desc" value="${upgDesc}" placeholder="e.g., Premium 5.5&quot; tall baseboard - a luxurious finishing touch" oninput="markPricingDirty()">
                                     </div>
                                 </div>
                                 <small class="text-muted">Leave name blank to remove upgrade option. Save the row above to save upgrade too.</small>
@@ -5535,17 +5549,17 @@ async function saveQuote() {
         loadCustomItems();
 
         // Initialize with one room
-        // Start with clean slate — no default room
+        // Start with clean slate - no default room
 
         // Set up initial pricing options
         updatePricingOptions();
         renderRooms();
-        
+
         // Auto-generate quote number on load if not already set
         if (!document.getElementById('quoteNumber').value) {
             document.getElementById('quoteNumber').value = generateQuoteNumber();
         }
-        
+
         if (typeof renderTemplateDropdown === 'function') renderTemplateDropdown();
         renderTermsCheckboxes();
         // ============================================================
@@ -5610,7 +5624,7 @@ async function saveQuote() {
                             _voiceRecognition = _createRecognition();
                             try {
                                 _voiceRecognition.start();
-                                if (el) el.textContent = '🎙️ Recording — speak your quote';
+                                if (el) el.textContent = '🎙️ Recording - speak your quote';
                             } catch(e) {
                                 // Back off and retry once more
                                 setTimeout(function() {
@@ -5680,7 +5694,7 @@ async function saveQuote() {
                         'Content-Type': 'application/json',
                         'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso'
                     },
-                    body: JSON.stringify({ 
+                    body: JSON.stringify({
                         transcript: transcript,
                         customItems: (function() {
                             try { return JSON.parse(localStorage.getItem('ald_custom_items') || '{}'); } catch(e) { return {}; }
@@ -5725,7 +5739,7 @@ async function saveQuote() {
             calculateTotals();
             markUnsaved();
             var saveStatus = document.getElementById('saveStatus');
-            if (saveStatus) saveStatus.innerHTML = '<span style="color:#7c3aed;"><i class="fas fa-magic"></i> AI quote generated — review and adjust prices!</span>';
+            if (saveStatus) saveStatus.innerHTML = '<span style="color:#7c3aed;"><i class="fas fa-magic"></i> AI quote generated - review and adjust prices!</span>';
             setTimeout(function() { if (saveStatus) saveStatus.innerHTML = ''; }, 5000);
         }
 
@@ -5735,7 +5749,7 @@ async function saveQuote() {
     </script>
 
     <script>
-        // These run independently of auth — always fire on page load
+        // These run independently of auth - always fire on page load
         document.addEventListener('DOMContentLoaded', function() {
             // Event delegation for Manage Items modal buttons (handles dynamically rendered rows)
             var ciList = document.getElementById('customItemsList');
@@ -5800,7 +5814,7 @@ async function saveQuote() {
             }
         });
 
-        // Clean up Bootstrap modal backdrop — needed on iOS Safari where backdrop lingers
+        // Clean up Bootstrap modal backdrop - needed on iOS Safari where backdrop lingers
         function cleanupModalBackdrop() {
             setTimeout(function() {
                 document.querySelectorAll('.modal-backdrop').forEach(function(el){ el.remove(); });
@@ -5820,13 +5834,13 @@ async function saveQuote() {
 
             var html = '<div id="clientNotesBanner" style="background:#fff3cd;border:2px solid #ffc107;border-radius:10px;padding:16px;margin:0 12px 16px;">';
             html += '<div class="d-flex justify-content-between align-items-center mb-3">';
-            html += '<strong style="color:#856404;"><i class="fas fa-comments me-2"></i>Client Feedback — review and address each item:</strong>';
+            html += '<strong style="color:#856404;"><i class="fas fa-comments me-2"></i>Client Feedback - review and address each item:</strong>';
             html += '<button class="btn btn-sm btn-outline-secondary py-0" onclick="document.getElementById(\'clientNotesBanner\').remove()">&times; Dismiss</button>';
             html += '</div>';
 
             // Upgrades
             if (upgrades.length > 0) {
-                html += '<div class="mb-3"><div class="fw-bold small text-success mb-1"><i class="fas fa-arrow-up me-1"></i>Client chose these upgrades — apply them in the quote:</div>';
+                html += '<div class="mb-3"><div class="fw-bold small text-success mb-1"><i class="fas fa-arrow-up me-1"></i>Client chose these upgrades - apply them in the quote:</div>';
                 upgrades.forEach(function(u, i) {
                     var cbId = 'upgradeCheck_' + i;
                     html += '<div class="d-flex align-items-center gap-2 mb-1 p-2 rounded" style="background:rgba(25,135,84,0.07);" id="upgradeRow_' + i + '">';
@@ -5887,7 +5901,7 @@ async function saveQuote() {
             var session = null;
             try { session = JSON.parse(localStorage.getItem('ald_session_quote')); } catch(e) {}
             if (!session) {
-                // No saved session — just start fresh, no alert needed
+                // No saved session - just start fresh, no alert needed
                 updateDraftWarning();
                 return;
             }
@@ -5903,12 +5917,12 @@ async function saveQuote() {
                     cb.checked = session.terms.includes(cb.dataset.text);
                 });
             }
-            // Cancel any autosave triggered during restore — we just loaded, nothing is actually unsaved
+            // Cancel any autosave triggered during restore - we just loaded, nothing is actually unsaved
             unsavedChanges = false;
             clearTimeout(_autoSaveTimer);
             var el = document.getElementById('saveStatus');
             if (window._supabaseQuoteId) {
-                if (el) el.innerHTML = '<span style="color:#28a745;"><i class="fas fa-cloud"></i> Restored — ' + (session.clientName || 'quote') + '</span>';
+                if (el) el.innerHTML = '<span style="color:#28a745;"><i class="fas fa-cloud"></i> Restored - ' + (session.clientName || 'quote') + '</span>';
             } else {
                 if (el) el.innerHTML = '<span style="color:#1a56a0;"><i class="fas fa-history"></i> Session restored</span>';
             }
@@ -5926,7 +5940,7 @@ async function saveQuote() {
             if (!document.getElementById('quoteNumber').value) {
                 document.getElementById('quoteNumber').value = nextQuoteNumberValue();
             }
-            // On mobile (no File System API), skip the file picker — just start fresh
+            // On mobile (no File System API), skip the file picker - just start fresh
             if (window.showSaveFilePicker) {
                 setTimeout(async function() {
                     try {
@@ -5958,7 +5972,7 @@ async function saveQuote() {
                     });
                 }
                 var el = document.getElementById('saveStatus');
-                if (el) el.innerHTML = '<span style="color:#fd7e14;"><i class="fas fa-history"></i> Draft recovered — save to file to keep it safe</span>';
+                if (el) el.innerHTML = '<span style="color:#fd7e14;"><i class="fas fa-history"></i> Draft recovered - save to file to keep it safe</span>';
                 updateDraftWarning();
             } catch(e) { alert('Could not recover draft.'); }
         }
@@ -5968,7 +5982,7 @@ async function saveQuote() {
             var modal = bootstrap.Modal.getInstance(document.getElementById('startupModal'));
             if (modal) modal.hide();
             cleanupModalBackdrop();
-            
+
             // On mobile: use simple file input (no File System API)
             if (!window.showOpenFilePicker) {
                 var input = document.createElement('input');
@@ -6020,7 +6034,7 @@ async function saveQuote() {
             }
         }
     </script>
-    
+
     <!-- Client Autocomplete System -->
     <style>
         .autocomplete-dropdown {
@@ -6068,10 +6082,10 @@ async function saveQuote() {
         }
 
 </style>
-    
+
     <script>
         // Client database from past quotes
-        // clientDatabase is now empty — all clients live in localStorage (ald_clients)
+        // clientDatabase is now empty - all clients live in localStorage (ald_clients)
         // Legacy clients were migrated on first load via loadSavedClients()
         const clientDatabase = {};
 
@@ -6082,10 +6096,10 @@ async function saveQuote() {
         function fuzzyMatch(query, text) {
             query = query.toLowerCase().trim();
             text = text.toLowerCase().trim();
-            
+
             if (query === text) return { score: 100, exact: true };
             if (text.includes(query)) return { score: 90, exact: false };
-            
+
             const distances = [];
             for (let i = 0; i < text.length; i++) {
                 let j = 0;
@@ -6094,7 +6108,7 @@ async function saveQuote() {
                 }
                 if (j > 0) distances.push(j);
             }
-            
+
             const maxMatch = Math.max(...distances, 0);
             return { score: (maxMatch / query.length) * 100, exact: false };
         }
@@ -6118,23 +6132,23 @@ async function saveQuote() {
             const query = document.getElementById('clientName').value;
             const results = searchClients(query);
             const dropdown = document.getElementById('clientDropdown');
-            
+
             if (results.length > 0) {
                 dropdown.innerHTML = '';
                 results.forEach(client => {
                     const item = document.createElement('div');
                     item.className = 'autocomplete-item';
-                    
+
                     let displayName = client.name;
                     if (!client.exact) {
                         const idx = displayName.toLowerCase().indexOf(query.toLowerCase());
                         if (idx >= 0) {
-                            displayName = displayName.substring(0, idx) + 
-                                         '<strong>' + displayName.substring(idx, idx + query.length) + '</strong>' + 
+                            displayName = displayName.substring(0, idx) +
+                                         '<strong>' + displayName.substring(idx, idx + query.length) + '</strong>' +
                                          displayName.substring(idx + query.length);
                         }
                     }
-                    
+
                     const subtitle = client.address ? client.address : (client.filename ? 'From: ' + client.filename : '');
                     item.innerHTML = `<span>${displayName}</span><small class="text-muted">${subtitle}</small>`;
                     item.onclick = function() {
@@ -6182,7 +6196,7 @@ async function saveQuote() {
 
         function persistClients() {
             localStorage.setItem('ald_clients', JSON.stringify(savedClients));
-            
+
             // Also sync to Supabase if available
             if (typeof saveClientToSupabase === 'function') {
                 savedClients.forEach(function(client) {
@@ -6192,7 +6206,7 @@ async function saveQuote() {
         }
 
         function getAllClients() {
-            // All clients live in savedClients — no hardcoded list
+            // All clients live in savedClients - no hardcoded list
             const merged = {};
             Object.entries(savedClients).forEach(([name, data]) => {
                 merged[name] = { ...data, name };
@@ -6282,9 +6296,9 @@ async function saveQuote() {
                 const escapedName = c.name.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
                 html += `<tr>
                     <td><strong>${c.name.replace(/&/g,'&amp;')}</strong></td>
-                    <td>${c.phone || '<span class="text-muted">—</span>'}</td>
-                    <td>${c.email || '<span class="text-muted">—</span>'}</td>
-                    <td>${c.address || '<span class="text-muted">—</span>'}</td>
+                    <td>${c.phone || '<span class="text-muted">-</span>'}</td>
+                    <td>${c.email || '<span class="text-muted">-</span>'}</td>
+                    <td>${c.address || '<span class="text-muted">-</span>'}</td>
                     <td>
                         <div class="d-flex gap-1">
                             <button class="btn btn-sm btn-outline-primary client-edit-btn" data-name="${escapedName}" title="Edit"><i class="fas fa-edit"></i></button>
@@ -6349,7 +6363,7 @@ async function saveQuote() {
                         <label class="form-label fw-bold">Preview</label>
                         <div id="stylePreview" style="border-radius:8px;padding:12px;border:1px solid #eee;">
                             <div id="previewHeader" style="padding:8px 12px;border-radius:6px 6px 0 0;margin:-12px -12px 10px -12px;color:white;font-weight:700;font-size:0.9rem;">Quote Preview</div>
-                            <div style="font-size:0.8rem;color:#555;">Client Name — 123 Main Street</div>
+                            <div style="font-size:0.8rem;color:#555;">Client Name - 123 Main Street</div>
                             <div id="previewTotal" style="margin-top:8px;padding:6px 10px;border-radius:4px;color:white;font-weight:700;font-size:0.85rem;display:inline-block;">Total: $12,450.00</div>
                         </div>
                     </div>
@@ -6366,7 +6380,7 @@ async function saveQuote() {
 
     <!-- Startup Modal removed - was causing iOS backdrop blocking issue -->
     <script>
-        // Runs on load — independent of auth. Handles session restore + startup modal.
+        // Runs on load - independent of auth. Handles session restore + startup modal.
         // Global safety net: always clean up backdrop when any modal hides
         document.addEventListener('hidden.bs.modal', function() {
             cleanupModalBackdrop();
@@ -6418,7 +6432,7 @@ async function saveQuote() {
                     setTimeout(tryStartup, 80);
                     return;
                 }
-                
+
                 // NOTE: loadItemsFromSupabase (items table) disabled - conflicts with snapshot backup system
                 // Items are managed via backupItemsToCloud/restoreItemsFromCloud (quotes table snapshot)
                 if (typeof loadClientsFromSupabase === 'function') {
@@ -6443,7 +6457,7 @@ async function saveQuote() {
                         }
                     }).catch(function(e){ console.warn('Client load error:', e); });
                 }
-                
+
                 // Check if opening a specific cloud quote from dashboard
                 var cloudQuoteId = localStorage.getItem('ald_open_cloud_quote');
                 if (cloudQuoteId) {
@@ -6471,7 +6485,7 @@ async function saveQuote() {
                         return; // Don't show modal while loading
                     }
                 }
-                
+
                 // Show Continue button if session exists
                 var session = null;
                 try { session = JSON.parse(localStorage.getItem('ald_session_quote')); } catch(e) {}
@@ -6481,7 +6495,7 @@ async function saveQuote() {
                 // Show Recover Draft button if draft exists
                 var recoverBtn = document.getElementById('recoverDraftBtn');
                 if (recoverBtn) recoverBtn.style.display = localStorage.getItem('ald_autosave_draft') ? 'inline-block' : 'none';
-                // Startup modal disabled — using draft warning banner instead
+                // Startup modal disabled - using draft warning banner instead
                 // Skip session restore if loading a specific quote from URL
                 var _urlp = new URLSearchParams(window.location.search);
                 if (!_urlp.get('load') && !_urlp.get('shownotes')) {
@@ -6493,7 +6507,7 @@ async function saveQuote() {
                             if (result && result.data && result.data.data) {
                                 var qData = result.data.data;
                                 qData.supabaseId = result.data.id;
-                                // Map fields — client_name lives at row level, rest in data JSON
+                                // Map fields - client_name lives at row level, rest in data JSON
                                 var row = result.data;
                                 qData.clientName = row.client_name || qData.clientName || '';
                                 qData.quoteNumber = row.quote_number || qData.quoteNumber || '';
@@ -6513,10 +6527,10 @@ async function saveQuote() {
                                 unsavedChanges = false;
                                 clearTimeout(_autoSaveTimer);
                                 var el = document.getElementById("saveStatus");
-                                if (el) el.innerHTML = "<span style=\"color:#28a745;\"><i class=\"fas fa-cloud\"></i> Restored — " + (qData.clientName || "quote") + "</span>";
+                                if (el) el.innerHTML = "<span style=\"color:#28a745;\"><i class=\"fas fa-cloud\"></i> Restored - " + (qData.clientName || "quote") + "</span>";
                                 updateDraftWarning();
                             } else {
-                                // Quote not found — fall back to session restore
+                                // Quote not found - fall back to session restore
                                 localStorage.removeItem("ald_active_quote_id");
                                 startupContinueSession();
                             }
@@ -6652,7 +6666,7 @@ async function saveQuote() {
                         <button class="nav-link" id="scan-tab" data-bs-toggle="tab" data-bs-target="#scan-hardwood" type="button" role="tab">Scan Quote</button>
                     </li>
                 </ul>
-                
+
                 <div class="tab-content" id="hardwoodTabContent">
                     <!-- Manual Entry Tab -->
                     <div class="tab-pane fade show active" id="manual-hardwood" role="tabpanel">
@@ -6660,12 +6674,12 @@ async function saveQuote() {
                             <label for="hardwoodRoomName" class="form-label">Room/Area Name</label>
                             <input type="text" class="form-control" id="hardwoodRoomName" value="Floor">
                         </div>
-                        
+
                         <div class="form-check form-switch mb-3">
                             <input class="form-check-input" type="checkbox" id="hardwoodToggleDimensions">
                             <label class="form-check-label" for="hardwoodToggleDimensions">Enter Dimensions (ft) instead of Total Sqft</label>
                         </div>
-                        
+
                         <div id="hardwoodDimensionsGroup">
                             <div class="row mb-3">
                                 <div class="col-md-6">
@@ -6678,14 +6692,14 @@ async function saveQuote() {
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div id="hardwoodSqftGroup" class="d-none">
                             <div class="mb-3">
                                 <label for="hardwoodTotalSqft" class="form-label">Total Square Feet</label>
                                 <input type="number" class="form-control" id="hardwoodTotalSqft" placeholder="Total sqft">
                             </div>
                         </div>
-                        
+
                         <div class="mb-3">
                             <label for="hardwoodPlankWidth" class="form-label">Plank Width (inches)</label>
                             <select class="form-select" id="hardwoodPlankWidth">
@@ -6697,7 +6711,7 @@ async function saveQuote() {
                                 <option value="8">8 inches</option>
                             </select>
                         </div>
-                        
+
                         <div class="row mb-3">
                             <div class="col-md-6">
                                 <label for="hardwoodWaste" class="form-label">Waste %</label>
@@ -6708,13 +6722,13 @@ async function saveQuote() {
                                 <input type="number" class="form-control" id="hardwoodSqftPerBox" value="20" min="1">
                             </div>
                         </div>
-                        
+
                         <div class="mb-3">
                             <label for="hardwoodCostPerBox" class="form-label">Cost per Box (optional)</label>
                             <input type="number" class="form-control" id="hardwoodCostPerBox" placeholder="0.00" step="0.01">
                         </div>
                     </div>
-                    
+
                     <!-- Scan Quote Tab -->
                     <div class="tab-pane fade" id="scan-hardwood" role="tabpanel">
                         <div class="alert alert-info">
@@ -6733,7 +6747,7 @@ async function saveQuote() {
                         </div>
                     </div>
                 </div>
-                
+
                 <div id="hardwoodResults" class="d-none mt-3">
                     <div class="alert alert-primary">
                         <h6>Calculation Results:</h6>
@@ -6767,7 +6781,7 @@ async function saveQuote() {
                         <button class="nav-link" id="paintScan-tab" data-bs-toggle="tab" data-bs-target="#scan-paint" type="button" role="tab">Scan Quote</button>
                     </li>
                 </ul>
-                
+
                 <div class="tab-content" id="paintTabContent">
                     <!-- Manual Entry Tab -->
                     <div class="tab-pane fade show active" id="manual-paint" role="tabpanel">
@@ -6775,12 +6789,12 @@ async function saveQuote() {
                             <label for="paintRoomName" class="form-label">Room/Area Name</label>
                             <input type="text" class="form-control" id="paintRoomName" value="Living Room">
                         </div>
-                        
+
                         <div class="form-check form-switch mb-3">
                             <input class="form-check-input" type="checkbox" id="paintToggleDimensions">
                             <label class="form-check-label" for="paintToggleDimensions">Enter room dimensions instead of sqft</label>
                         </div>
-                        
+
                         <div id="paintDimensionsGroup">
                             <div class="row mb-3">
                                 <div class="col-md-6">
@@ -6797,7 +6811,7 @@ async function saveQuote() {
                                 <input type="number" class="form-control" id="paintHeight" value="9" placeholder="Height">
                             </div>
                         </div>
-                        
+
                         <div id="paintSqftGroup" class="d-none">
                             <div class="row mb-3">
                                 <div class="col-md-6">
@@ -6810,7 +6824,7 @@ async function saveQuote() {
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div class="row mb-3">
                             <div class="col-md-6">
                                 <label for="paintDoors" class="form-label">Number of Doors</label>
@@ -6821,7 +6835,7 @@ async function saveQuote() {
                                 <input type="number" class="form-control" id="paintWindows" value="0" min="0">
                             </div>
                         </div>
-                        
+
                         <div class="mb-3">
                             <label class="form-label">Coats of Paint</label>
                             <div class="form-check">
@@ -6833,23 +6847,23 @@ async function saveQuote() {
                                 <label class="form-check-label" for="paintCoats2">2 Coats</label>
                             </div>
                         </div>
-                        
+
                         <div class="mb-3 form-check">
                             <input type="checkbox" class="form-check-input" id="paintIncludeCeiling" checked>
                             <label class="form-check-label" for="paintIncludeCeiling">Include Ceiling</label>
                         </div>
-                        
+
                         <div class="mb-3 form-check">
                             <input type="checkbox" class="form-check-input" id="paintIncludePrimer">
                             <label class="form-check-label" for="paintIncludePrimer">Include Primer Coat</label>
                         </div>
-                        
+
                         <div class="mb-3">
                             <label for="paintCoverage" class="form-label">Coverage per Gallon (sqft)</label>
                             <input type="number" class="form-control" id="paintCoverage" value="400" min="1">
                         </div>
                     </div>
-                    
+
                     <!-- Scan Quote Tab -->
                     <div class="tab-pane fade" id="scan-paint" role="tabpanel">
                         <div class="alert alert-info">
@@ -6868,7 +6882,7 @@ async function saveQuote() {
                         </div>
                     </div>
                 </div>
-                
+
                 <div id="paintResults" class="d-none mt-3">
                     <div class="alert alert-primary">
                         <h6>Calculation Results:</h6>
@@ -6902,7 +6916,7 @@ async function saveQuote() {
                         <button class="nav-link" id="drywallScan-tab" data-bs-toggle="tab" data-bs-target="#scan-drywall" type="button" role="tab">Scan Quote</button>
                     </li>
                 </ul>
-                
+
                 <div class="tab-content" id="drywallTabContent">
                     <!-- Manual Entry Tab -->
                     <div class="tab-pane fade show active" id="manual-drywall" role="tabpanel">
@@ -6910,12 +6924,12 @@ async function saveQuote() {
                             <label for="drywallRoomName" class="form-label">Room/Area Name</label>
                             <input type="text" class="form-control" id="drywallRoomName" value="Living Room">
                         </div>
-                        
+
                         <div class="form-check form-switch mb-3">
                             <input class="form-check-input" type="checkbox" id="drywallToggleDimensions">
                             <label class="form-check-label" for="drywallToggleDimensions">Enter room dimensions instead of sqft</label>
                         </div>
-                        
+
                         <div id="drywallDimensionsGroup">
                             <div class="row mb-3">
                                 <div class="col-md-6">
@@ -6942,7 +6956,7 @@ async function saveQuote() {
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div id="drywallSqftGroup" class="d-none">
                             <div class="row mb-3">
                                 <div class="col-md-6">
@@ -6955,12 +6969,12 @@ async function saveQuote() {
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div class="mb-3 form-check">
                             <input type="checkbox" class="form-check-input" id="drywallIncludeCeiling" checked>
                             <label class="form-check-label" for="drywallIncludeCeiling">Include Ceiling Drywall</label>
                         </div>
-                        
+
                         <div class="row mb-3">
                             <div class="col-md-6">
                                 <label for="drywallWaste" class="form-label">Waste %</label>
@@ -6975,7 +6989,7 @@ async function saveQuote() {
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- Scan Quote Tab -->
                     <div class="tab-pane fade" id="scan-drywall" role="tabpanel">
                         <div class="alert alert-info">
@@ -6994,7 +7008,7 @@ async function saveQuote() {
                         </div>
                     </div>
                 </div>
-                
+
                 <div id="drywallResults" class="d-none mt-3">
                     <div class="alert alert-primary">
                         <h6>Calculation Results:</h6>
@@ -7017,7 +7031,7 @@ async function saveQuote() {
 function openHardwoodCalc() {
     var modal = new bootstrap.Modal(document.getElementById('hardwoodCalcModal'));
     modal.show();
-    
+
     // Reset form
     document.getElementById('hardwoodRoomName').value = 'Floor';
     document.getElementById('hardwoodWidth').value = '';
@@ -7027,11 +7041,11 @@ function openHardwoodCalc() {
     document.getElementById('hardwoodWaste').value = '10';
     document.getElementById('hardwoodSqftPerBox').value = '20';
     document.getElementById('hardwoodCostPerBox').value = '';
-    
+
     // Reset results
     document.getElementById('hardwoodResults').classList.add('d-none');
     document.getElementById('hardwoodAddToQuoteBtn').disabled = true;
-    
+
     // Reset scan results
     document.getElementById('hardwoodScanResults').classList.add('d-none');
     document.getElementById('hardwoodToggleDimensions').checked = false;
@@ -7041,7 +7055,7 @@ function openHardwoodCalc() {
 function toggleHardwoodDimensions() {
     const dimensionsGroup = document.getElementById('hardwoodDimensionsGroup');
     const sqftGroup = document.getElementById('hardwoodSqftGroup');
-    
+
     if (document.getElementById('hardwoodToggleDimensions').checked) {
         dimensionsGroup.classList.remove('d-none');
         sqftGroup.classList.add('d-none');
@@ -7054,7 +7068,7 @@ function toggleHardwoodDimensions() {
 function calculateHardwood() {
     let roomName = document.getElementById('hardwoodRoomName').value || 'Floor';
     let width, length, totalSqft;
-    
+
     if (document.getElementById('hardwoodToggleDimensions').checked) {
         width = parseFloat(document.getElementById('hardwoodWidth').value) || 0;
         length = parseFloat(document.getElementById('hardwoodLength').value) || 0;
@@ -7062,30 +7076,30 @@ function calculateHardwood() {
     } else {
         totalSqft = parseFloat(document.getElementById('hardwoodTotalSqft').value) || 0;
     }
-    
+
     if (totalSqft <= 0) {
         alert("Please enter valid dimensions or square footage.");
         return;
     }
-    
+
     const plankWidth = parseFloat(document.getElementById('hardwoodPlankWidth').value);
     const wastePercent = parseFloat(document.getElementById('hardwoodWaste').value) || 10;
     const sqftPerBox = parseFloat(document.getElementById('hardwoodSqftPerBox').value) || 20;
     const costPerBox = parseFloat(document.getElementById('hardwoodCostPerBox').value) || 0;
-    
+
     // Calculate with waste
     const totalWithWaste = totalSqft * (1 + wastePercent / 100);
     const boxesNeeded = Math.ceil(totalWithWaste / sqftPerBox);
     const materialCost = costPerBox > 0 ? boxesNeeded * costPerBox : 0;
-    
+
     // Display results
     let resultText = `Total sqft (with ${wastePercent}% waste): ${totalWithWaste.toFixed(1)} sqft (${totalSqft.toFixed(1)} + ${wastePercent}% waste)<br>`;
     resultText += `Boxes needed: ${boxesNeeded}<br>`;
-    
+
     if (costPerBox > 0) {
         resultText += `Material cost: $${materialCost.toFixed(2)}<br>`;
     }
-    
+
     document.getElementById('hardwoodResultText').innerHTML = resultText;
     document.getElementById('hardwoodResults').classList.remove('d-none');
     document.getElementById('hardwoodAddToQuoteBtn').disabled = false;
@@ -7093,21 +7107,21 @@ function calculateHardwood() {
 
 function addToHardwoodQuote() {
     let roomName = document.getElementById('hardwoodRoomName').value || 'Floor';
-    const totalSqft = parseFloat(document.getElementById('hardwoodTotalSqft').value) || 
+    const totalSqft = parseFloat(document.getElementById('hardwoodTotalSqft').value) ||
                      (parseFloat(document.getElementById('hardwoodWidth').value) * parseFloat(document.getElementById('hardwoodLength').value));
-    
+
     if (totalSqft <= 0) {
         alert("Please calculate before adding to quote.");
         return;
     }
-    
+
     // Find or create a room
     var room = rooms[0];
     if (!room) { alert('Please create a room in the quote first.'); return; }
-    
+
     // Add item to room
     room.items.push({
-        description: `Hardwood/LVP — ${roomName}`,
+        description: `Hardwood/LVP - ${roomName}`,
         category: 'Flooring',
         unitType: 'sqft',
         quantity: totalSqft,
@@ -7116,13 +7130,13 @@ function addToHardwoodQuote() {
         notes: 'Auto-calculated',
         itemDescription: ''
     });
-    
+
     renderQuote();
-    
+
     // Close modal
     var modal = bootstrap.Modal.getInstance(document.getElementById('hardwoodCalcModal'));
     modal.hide();
-    
+
     alert("Hardwood/LVP item added to quote!");
 }
 
@@ -7132,7 +7146,7 @@ function scanHardwoodQuote() {
     }
     let totalSqft = 0;
     let roomMap = {};
-    
+
     rooms.forEach(room => {
         room.items.forEach(item => {
             var normalizedCatF = (item.category || '').trim().toLowerCase();
@@ -7148,20 +7162,20 @@ function scanHardwoodQuote() {
             }
         });
     });
-    
+
     // Update UI
     document.getElementById('hardwoodScanTotal').textContent = totalSqft.toFixed(1);
     document.getElementById('hardwoodScanRooms').textContent = Object.keys(roomMap).length;
-    
+
     let details = '';
     for (let room in roomMap) {
         details += `${room} (${roomMap[room].toFixed(1)}sqft), `;
     }
     document.getElementById('hardwoodScanDetails').textContent = details.slice(0, -2);
-    
+
     // Set scanned value
     document.getElementById('hardwoodScanSqft').value = totalSqft.toFixed(1);
-    
+
     // Show results and switch to sqft mode
     document.getElementById('hardwoodScanResults').classList.remove('d-none');
     document.getElementById('hardwoodToggleDimensions').checked = false;
@@ -7172,7 +7186,7 @@ function scanHardwoodQuote() {
 function openPaintCalc() {
     var modal = new bootstrap.Modal(document.getElementById('paintCalcModal'));
     modal.show();
-    
+
     // Reset form
     document.getElementById('paintRoomName').value = 'Living Room';
     document.getElementById('paintWidth').value = '';
@@ -7186,11 +7200,11 @@ function openPaintCalc() {
     document.getElementById('paintIncludeCeiling').checked = true;
     document.getElementById('paintIncludePrimer').checked = false;
     document.getElementById('paintCoverage').value = '400';
-    
+
     // Reset results
     document.getElementById('paintResults').classList.add('d-none');
     document.getElementById('paintAddToQuoteBtn').disabled = true;
-    
+
     // Reset scan results
     document.getElementById('paintScanResults').classList.add('d-none');
     document.getElementById('paintToggleDimensions').checked = false;
@@ -7200,7 +7214,7 @@ function openPaintCalc() {
 function togglePaintDimensions() {
     const dimensionsGroup = document.getElementById('paintDimensionsGroup');
     const sqftGroup = document.getElementById('paintSqftGroup');
-    
+
     if (document.getElementById('paintToggleDimensions').checked) {
         dimensionsGroup.classList.remove('d-none');
         sqftGroup.classList.add('d-none');
@@ -7213,76 +7227,76 @@ function togglePaintDimensions() {
 function calculatePaint() {
     let roomName = document.getElementById('paintRoomName').value || 'Living Room';
     let wallSqft, ceilingSqft;
-    
+
     if (document.getElementById('paintToggleDimensions').checked) {
         const width = parseFloat(document.getElementById('paintWidth').value) || 0;
         const length = parseFloat(document.getElementById('paintLength').value) || 0;
         const height = parseFloat(document.getElementById('paintHeight').value) || 9;
         const doors = parseInt(document.getElementById('paintDoors').value) || 0;
         const windows = parseInt(document.getElementById('paintWindows').value) || 0;
-        
+
         // Calculate wall area
         wallSqft = 2 * (width + length) * height;
         // Subtract doors and windows
         wallSqft -= doors * 20;
         wallSqft -= windows * 15;
         if (wallSqft < 0) wallSqft = 0;
-        
+
         ceilingSqft = width * length;
     } else {
         wallSqft = parseFloat(document.getElementById('paintWallSqft').value) || 0;
         ceilingSqft = parseFloat(document.getElementById('paintCeilingSqft').value) || 0;
     }
-    
+
     if (wallSqft <= 0 && ceilingSqft <= 0) {
         alert("Please enter valid dimensions or square footage.");
         return;
     }
-    
+
     const coats = parseInt(document.querySelector('input[name="paintCoats"]:checked').value) || 1;
     const includeCeiling = document.getElementById('paintIncludeCeiling').checked;
     const includePrimer = document.getElementById('paintIncludePrimer').checked;
     const coverage = parseFloat(document.getElementById('paintCoverage').value) || 400;
-    
+
     // Calculate gallons needed
     let wallGallons = 0;
     if (wallSqft > 0) {
         wallGallons = Math.ceil((wallSqft * coats) / coverage);
     }
-    
+
     let ceilingGallons = 0;
     if (includeCeiling && ceilingSqft > 0) {
         ceilingGallons = Math.ceil((ceilingSqft * coats) / coverage);
     }
-    
+
     let primerGallons = 0;
     if (includePrimer) {
         const totalSqft = wallSqft + ceilingSqft;
         primerGallons = Math.ceil(totalSqft / coverage);
     }
-    
+
     const totalGallons = wallGallons + ceilingGallons + primerGallons;
-    
+
     // Display results
     let resultText = `Wall sqft: ${wallSqft.toFixed(1)}<br>`;
     if (includeCeiling && ceilingSqft > 0) {
         resultText += `Ceiling sqft: ${ceilingSqft.toFixed(1)}<br>`;
     }
-    
+
     if (wallGallons > 0) {
         resultText += `Wall paint gallons needed: ${wallGallons}<br>`;
     }
-    
+
     if (ceilingGallons > 0) {
         resultText += `Ceiling paint gallons needed: ${ceilingGallons}<br>`;
     }
-    
+
     if (primerGallons > 0) {
         resultText += `Primer gallons needed: ${primerGallons}<br>`;
     }
-    
+
     resultText += `Total gallons needed: ${totalGallons}`;
-    
+
     document.getElementById('paintResultText').innerHTML = resultText;
     document.getElementById('paintResults').classList.remove('d-none');
     document.getElementById('paintAddToQuoteBtn').disabled = false;
@@ -7290,22 +7304,22 @@ function calculatePaint() {
 
 function addToPaintQuote() {
     let roomName = document.getElementById('paintRoomName').value || 'Living Room';
-    const wallSqft = parseFloat(document.getElementById('paintWallSqft').value) || 
-                     (parseFloat(document.getElementById('paintWidth').value) * 2 * (parseFloat(document.getElementById('paintHeight').value) || 9) + 
+    const wallSqft = parseFloat(document.getElementById('paintWallSqft').value) ||
+                     (parseFloat(document.getElementById('paintWidth').value) * 2 * (parseFloat(document.getElementById('paintHeight').value) || 9) +
                       parseFloat(document.getElementById('paintLength').value) * 2 * (parseFloat(document.getElementById('paintHeight').value) || 9));
-    
+
     if (wallSqft <= 0) {
         alert("Please calculate before adding to quote.");
         return;
     }
-    
+
     // Find or create a room
     var room = rooms[0];
     if (!room) { alert('Please create a room in the quote first.'); return; }
-    
+
     // Add wall paint item
     room.items.push({
-        description: `Wall Paint — ${roomName}`,
+        description: `Wall Paint - ${roomName}`,
         category: 'Painting',
         unitType: 'sqft',
         quantity: wallSqft,
@@ -7314,14 +7328,14 @@ function addToPaintQuote() {
         notes: 'Auto-calculated',
         itemDescription: ''
     });
-    
+
     // Add ceiling paint if checked
     if (document.getElementById('paintIncludeCeiling').checked) {
-        const ceilingSqft = parseFloat(document.getElementById('paintCeilingSqft').value) || 
+        const ceilingSqft = parseFloat(document.getElementById('paintCeilingSqft').value) ||
                            (parseFloat(document.getElementById('paintWidth').value) * parseFloat(document.getElementById('paintLength').value));
-        
+
         room.items.push({
-            description: `Ceiling Paint — ${roomName}`,
+            description: `Ceiling Paint - ${roomName}`,
             category: 'Painting',
             unitType: 'sqft',
             quantity: ceilingSqft,
@@ -7331,13 +7345,13 @@ function addToPaintQuote() {
             itemDescription: ''
         });
     }
-    
+
     renderQuote();
-    
+
     // Close modal
     var modal = bootstrap.Modal.getInstance(document.getElementById('paintCalcModal'));
     modal.hide();
-    
+
     alert("Paint items added to quote!");
 }
 
@@ -7347,7 +7361,7 @@ function scanPaintQuote() {
     }
     let totalSqft = 0;
     let roomMap = {};
-    
+
     rooms.forEach(room => {
         room.items.forEach(item => {
             var normalizedCatP = (item.category || '').trim().toLowerCase();
@@ -7363,20 +7377,20 @@ function scanPaintQuote() {
             }
         });
     });
-    
+
     // Update UI
     document.getElementById('paintScanTotal').textContent = totalSqft.toFixed(1);
     document.getElementById('paintScanRooms').textContent = Object.keys(roomMap).length;
-    
+
     let details = '';
     for (let room in roomMap) {
         details += `${room} (${roomMap[room].toFixed(1)}sqft), `;
     }
     document.getElementById('paintScanDetails').textContent = details.slice(0, -2);
-    
+
     // Set scanned value
     document.getElementById('paintScanSqft').value = totalSqft.toFixed(1);
-    
+
     // Show results and switch to sqft mode
     document.getElementById('paintScanResults').classList.remove('d-none');
     document.getElementById('paintToggleDimensions').checked = false;
