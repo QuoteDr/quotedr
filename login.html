@@ -443,6 +443,15 @@ if (location.search.includes('debug')) {
             setLoading('signupBtn', false);
             if (result.error) { showMessage('signupMessage', result.error.message); return; }
             showMessage('signupMessage', 'Account created! Check your email to verify, then sign in.', 'success');
+            // Send welcome email (fire and forget)
+            fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/send-welcome-email', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso'
+                },
+                body: JSON.stringify({ email: email, name: email.split('@')[0] })
+            }).catch(function() {}); // Silent fail — don't block signup on email failure
         }
 
         async function handleForgotPassword() {
