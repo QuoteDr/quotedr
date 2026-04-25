@@ -1,5 +1,5 @@
 # QuoteDr Session Handoff
-*Last updated: 2026-04-24 — Written by Sonic for the next session*
+*Last updated: 2026-04-25 — Updated by Sonic*
 
 ---
 
@@ -189,6 +189,30 @@ curl "https://axmoffknvblluibuitrq.supabase.co/rest/v1/error_logs?order=created_
 | — `client_email`/`client_phone` breaking saves | Same issue — columns may not exist | Removed from payload, all client info in `data` JSON only |
 | — Browser serving stale JS | `_headers` had `max-age=3600` for JS; phone cached old supabase-v2.js | Changed to `no-cache, must-revalidate`; added cache-buster `?v=` to all script tags |
 | Redo Onboarding not available | No UI to re-trigger onboarding | Added button in Settings → Account tab; `resetOnboarding()` clears Supabase + localStorage |
+
+---
+
+## Pre-Launch Security & Data Audit — 2026-04-25
+
+### 🔴 HIGH PRIORITY
+- [x] **Client Portal PIN** — generate/display/reset PIN in dashboard modal; server-side validation via new `verify-portal-pin` edge function (no PIN exposed to browser)
+  - ⚠️ Edge function must be manually deployed in Supabase Dashboard (code is in repo at `supabase/functions/verify-portal-pin/index.ts`)
+  - ⚠️ Need to create `room-photos` Supabase Storage bucket (public) for room photo uploads
+- [x] **Room photos → Supabase Storage** — photos now upload to `room-photos` bucket instead of base64 in DB row. Backwards compatible with old base64 photos.
+- [x] **Security headers** — CSP, X-Frame-Options, X-Content-Type-Options added to `_headers`
+- [x] **Quote templates cloud sync** — templates now save/restore/delete from Supabase `templates` table
+
+### 🟡 MEDIUM PRIORITY
+- [ ] **Settings cloud sync** — `ald_category_styles`, `ald_hidden_categories`, `ald_item_overrides` are still localStorage-only (lost on new device)
+- [ ] **Two Manage Items modals** — one in quote-builder.html (active), one in settings.html (old/stale) — consolidate or remove settings one
+- [ ] **Used quote numbers cloud sync** — `ald_used_quote_numbers` local only; multi-device users could create duplicate quote numbers
+- [ ] **Email routing** — `support@quotedr.io`, `privacy@quotedr.io`, `quotes@quotedr.io` need Cloudflare Email Routing set up
+- [ ] **Login brute force protection** — no lockout after failed attempts
+
+### 🟢 LOWER PRIORITY
+- [ ] **Centralize anon key** — currently hardcoded in 15+ files; should reference from one place
+- [ ] **Signup email domain blocking** — for when monetization/plan gating is needed
+- [ ] **IKEA parser deep-count validation** — compare parsed item count vs PDF line items
 
 ---
 

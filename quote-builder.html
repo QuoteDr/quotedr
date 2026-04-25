@@ -1446,6 +1446,7 @@ Example:
             categoryStyles[cat].icon = iconClass;
             markPricingDirty();
             localStorage.setItem('ald_category_styles', JSON.stringify(categoryStyles));
+            _saveCategoryStylesToCloud().catch(function(){});
             renderAllItemsList();
             renderRooms();
             // Re-open picker on new button position
@@ -1457,6 +1458,7 @@ Example:
             categoryStyles[cat].color = color;
             markPricingDirty();
             localStorage.setItem('ald_category_styles', JSON.stringify(categoryStyles));
+            _saveCategoryStylesToCloud().catch(function(){});
             renderAllItemsList();
             renderRooms();
             closeCategoryPicker();
@@ -5109,7 +5111,82 @@ async function saveQuote() {
         // ── Item overrides: edits to built-in items saved to localStorage ────────
         let itemOverrides = {}; // { "Category::Item Name": { rate, materialCost, supplierUrl, unitType } }
 
-        function loadItemOverrides() {
+        // ── Cloud sync helpers for settings ──────────────────────────────────────
+        async function _saveCategoryStylesToCloud() {
+            try {
+                var user = await _supabase.auth.getUser();
+                if (!user.data?.user) return;
+                await _supabase.from('user_data').upsert(
+                    { user_id: user.data.user.id, key: 'category_styles', value: categoryStyles, updated_at: new Date().toISOString() },
+                    { onConflict: 'user_id,key' }
+                );
+            } catch(e) { console.warn('Category styles cloud save failed:', e); }
+        }
+        async function _restoreCategoryStylesFromCloud() {
+            try {
+                var user = await _supabase.auth.getUser();
+                if (!user.data?.user) return;
+                var { data } = await _supabase.from('user_data').select('value').eq('user_id', user.data.user.id).eq('key', 'category_styles').single();
+                if (data?.value && Object.keys(data.value).length > 0) {
+                    Object.assign(categoryStyles, data.value);
+                    localStorage.setItem('ald_category_styles', JSON.stringify(categoryStyles));
+                }
+            } catch(e) { console.warn('Category styles cloud restore failed:', e); }
+        }
+        async function _saveHiddenCategoriesToCloud(arr) {
+            try {
+                var user = await _supabase.auth.getUser();
+                if (!user.data?.user) return;
+                await _supabase.from('user_data').upsert(
+                    { user_id: user.data.user.id, key: 'hidden_categories', value: arr, updated_at: new Date().toISOString() },
+                    { onConflict: 'user_id,key' }
+                );
+            } catch(e) { console.warn('Hidden categories cloud save failed:', e); }
+        }
+        async function _restoreHiddenCategoriesFromCloud() {
+            try {
+                var user = await _supabase.auth.getUser();
+                if (!user.data?.user) return;
+                var { data } = await _supabase.from('user_data').select('value').eq('user_id', user.data.user.id).eq('key', 'hidden_categories').single();
+                if (data?.value && Array.isArray(data.value) && data.value.length > 0) {
+                    var localHidden = JSON.parse(localStorage.getItem('ald_hidden_categories') || '[]');
+                    if (localHidden.length === 0) {
+                        localStorage.setItem('ald_hidden_categories', JSON.stringify(data.value));
+                    }
+                }
+            } catch(e) { console.warn('Hidden categories cloud restore failed:', e); }
+        }
+        async function _saveItemOverridesToCloud() {
+            try {
+                var user = await _supabase.auth.getUser();
+                if (!user.data?.user) return;
+                await _supabase.from('user_data').upsert(
+                    { user_id: user.data.user.id, key: 'item_overrides', value: itemOverrides, updated_at: new Date().toISOString() },
+                    { onConflict: 'user_id,key' }
+                );
+            } catch(e) { console.warn('Item overrides cloud save failed:', e); }
+        }
+        async function _restoreItemOverridesFromCloud() {
+            try {
+                var user = await _supabase.auth.getUser();
+                if (!user.data?.user) return;
+                var { data } = await _supabase.from('user_data').select('value').eq('user_id', user.data.user.id).eq('key', 'item_overrides').single();
+                if (data?.value && Object.keys(data.value).length > 0) {
+                    Object.assign(itemOverrides, data.value);
+                    localStorage.setItem('ald_item_overrides', JSON.stringify(itemOverrides));
+                    Object.entries(itemOverrides).forEach(([key, overrides]) => {
+                        const [cat, name] = key.split('::');
+                        if (pricingDatabase[cat]) {
+                            const item = pricingDatabase[cat].find(i => i.name === name);
+                            if (item) Object.assign(item, overrides);
+                        }
+                    });
+                }
+            } catch(e) { console.warn('Item overrides cloud restore failed:', e); }
+        }
+        // ─────────────────────────────────────────────────────────────────────────
+
+        async function loadItemOverrides() {
             try {
                 itemOverrides = JSON.parse(localStorage.getItem('ald_item_overrides') || '{}');
             } catch(e) { itemOverrides = {}; }
@@ -5121,6 +5198,8 @@ async function saveQuote() {
                     if (item) Object.assign(item, overrides);
                 }
             });
+            // Restore from cloud (fire and forget — don't block startup)
+            _restoreItemOverridesFromCloud().catch(function(){});
         }
 
         function saveItemOverride(category, name, fields) {
@@ -5132,6 +5211,8 @@ async function saveQuote() {
                 const item = pricingDatabase[category].find(i => i.name === name);
                 if (item) Object.assign(item, fields);
             }
+            // Save to cloud (fire and forget)
+            _saveItemOverridesToCloud().catch(function(){});
         }
 
                 function _injectItemsIntoPricingDB(itemsObj) {
@@ -5192,6 +5273,9 @@ async function saveQuote() {
             } catch (e) {
                 categoryStyles = {};
             }
+            // Restore from cloud (fire and forget)
+            _restoreCategoryStylesFromCloud().catch(function(){});
+            _restoreHiddenCategoriesFromCloud().catch(function(){});
             for (const [category, items] of Object.entries(customItems)) {
                 if (!Array.isArray(items)) continue; // skip corrupted entries
                 if (!pricingDatabase[category]) pricingDatabase[category] = [];
@@ -5207,6 +5291,7 @@ async function saveQuote() {
         function saveCustomItems(showToast) {
             localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
             localStorage.setItem('ald_category_styles', JSON.stringify(categoryStyles));
+            _saveCategoryStylesToCloud().catch(function(){});
             // Backup using inline function (guaranteed available)
             _doBackupItemsToCloud(customItems).then(function(result) {
                     if (showToast) {
