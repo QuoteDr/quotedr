@@ -5157,6 +5157,49 @@ async function saveQuote() {
             // Just a placeholder - can be used for future logic
         }
 
+        function handleItemPhotoUpload(input) {
+            var file = input.files[0];
+            if (!file) return;
+            var cat = input.dataset.cat, name = input.dataset.name, field = input.dataset.field || 'photo';
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                var img = new Image();
+                img.onload = function() {
+                    var maxDim = 600;
+                    var w = img.width, h = img.height;
+                    if (w > maxDim || h > maxDim) {
+                        if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+                        else { w = Math.round(w * maxDim / h); h = maxDim; }
+                    }
+                    var canvas = document.createElement('canvas');
+                    canvas.width = w; canvas.height = h;
+                    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                    var dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                    // Find item in customItems and pricingDatabase
+                    var targets = [customItems, pricingDatabase];
+                    targets.forEach(function(db) {
+                        if (!db[cat]) return;
+                        var item = db[cat].find(function(it) { return it && it.name === name; });
+                        if (!item) return;
+                        if (field === 'upgradePhoto') {
+                            if (!item.upgrade) item.upgrade = {};
+                            item.upgrade.photo = dataUrl;
+                        } else {
+                            item.photo = dataUrl;
+                        }
+                    });
+                    markPricingDirty();
+                    renderAllItemsList();
+                    var t = document.createElement('div');
+                    t.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#198754;color:white;padding:10px 18px;border-radius:8px;z-index:9999;font-size:0.9rem;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
+                    t.innerHTML = '<i class="fas fa-camera me-2"></i>Photo added! Don\'t forget to save.';
+                    document.body.appendChild(t); setTimeout(function(){ t.remove(); }, 3000);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
         function openManageItemsModal() {
             // Always re-inject customItems into pricingDatabase before rendering
             if (typeof customItems === 'object' && typeof _injectItemsIntoPricingDB === 'function') {
@@ -5258,7 +5301,17 @@ async function saveQuote() {
             ci.materialCost    = matCost;
             ci.supplierUrl     = supplierUrl;
             ci.itemDescription = itemDescription;
-            if (upgrade !== null) ci.upgrade = upgrade;
+            if (upgrade !== null) {
+                // Preserve upgrade photo from previous state
+                var oldUpgPhoto = pricingDatabase[cat]?.find(function(i){return i.name===name||i.name===newName;})?.upgrade?.photo;
+                if (!upgrade.photo && oldUpgPhoto) upgrade.photo = oldUpgPhoto;
+                ci.upgrade = upgrade;
+            }
+            // Preserve item photo from previous state
+            if (!ci.photo) {
+                var oldPhoto = pricingDatabase[cat]?.find(function(i){return i.name===name||i.name===newName;})?.photo;
+                if (oldPhoto) ci.photo = oldPhoto;
+            }
 
             // Mirror into pricingDatabase
             if (!pricingDatabase[cat]) pricingDatabase[cat] = [];
@@ -5433,11 +5486,13 @@ async function saveQuote() {
                         <td><input type="number" class="form-control form-control-sm item-input" value="${matCost}" step="0.01" min="0" oninput="markPricingDirty()"></td>
                         <td><input type="url" class="form-control form-control-sm item-input" value="${supplier}" placeholder="https://..." oninput="markPricingDirty()"></td>
                         <td>
-                            <div class="d-flex gap-1">
+                            <div class="d-flex gap-1 flex-wrap">
+                                <button class="btn btn-sm btn-outline-secondary item-photo-btn" data-cat="${catE}" data-name="${nameE}" data-field="photo" title="Add photo" style="touch-action:manipulation;font-size:0.75em;"><i class="fas fa-camera"></i></button>
                                 <button class="btn btn-sm btn-info description-toggle-btn" data-target="desc_${safeId}" title="Show/edit description" style="touch-action:manipulation"><i class="fas fa-align-left"></i> Desc</button>
                                 <button class="btn btn-sm btn-success item-save-btn" data-cat="${catE}" data-name="${nameE}" title="Save this row" style="touch-action:manipulation"><i class="fas fa-save"></i></button>
                                 ${isCustom ? `<button class="btn btn-sm btn-danger item-delete-btn" data-cat="${catE}" data-name="${nameE}" title="Delete" style="touch-action:manipulation"><i class="fas fa-trash"></i></button>` : ''}
                             </div>
+                            ${item.photo ? `<img src="${item.photo}" class="mt-1 rounded" style="max-width:60px;max-height:40px;cursor:pointer;" onclick="window.open(this.src)" title="Click to enlarge">` : ''}
                         </td>
                     </tr>
                     <tr id="desc_${safeId}" style="display:none; background:#e7f3ff;">
@@ -5465,6 +5520,10 @@ async function saveQuote() {
                                         <label class="form-label" style="font-size:0.75em">Description (shown to client)</label>
                                         <input type="text" class="form-control form-control-sm upgrade-desc" value="${upgDesc}" placeholder="e.g., Premium 5.5&quot; tall baseboard - a luxurious finishing touch" oninput="markPricingDirty()">
                                     </div>
+                                </div>
+                                <div class="mt-2">
+                                    <button class="btn btn-sm btn-outline-secondary item-photo-btn" data-cat="${catE}" data-name="${nameE}" data-field="upgradePhoto" title="Add upgrade photo" style="font-size:0.75em;"><i class="fas fa-camera me-1"></i>Upgrade Photo</button>
+                                    ${upg.photo ? `<img src="${upg.photo}" class="ms-2 rounded" style="max-width:80px;max-height:50px;cursor:pointer;vertical-align:middle;" onclick="window.open(this.src)" title="Click to enlarge">` : ''}
                                 </div>
                                 <small class="text-muted">Leave name blank to remove upgrade option. Save the row above to save upgrade too.</small>
                             </div>
@@ -5788,6 +5847,17 @@ async function saveQuote() {
                             descBtn.classList.toggle('btn-info', isOpen);
                             descBtn.classList.toggle('btn-secondary', !isOpen);
                         }
+                        return;
+                    }
+                    var photoBtn = e.target.closest('.item-photo-btn');
+                    if (photoBtn) {
+                        var inp = document.createElement('input');
+                        inp.type = 'file'; inp.accept = 'image/*';
+                        inp.dataset.cat = photoBtn.dataset.cat;
+                        inp.dataset.name = photoBtn.dataset.name;
+                        inp.dataset.field = photoBtn.dataset.field || 'photo';
+                        inp.onchange = function() { handleItemPhotoUpload(this); };
+                        inp.click();
                         return;
                     }
                 });

@@ -645,6 +645,7 @@ if (location.search.includes('debug')) {
                             <div class="d-flex justify-content-between align-items-baseline mb-1">
                                 <div style="flex:1;">
                                     <strong>${isUpgraded && item.upgrade ? item.upgrade.name : (item.description || item.name || 'Item')}</strong>
+                                    ${item.photo && !isUpgraded ? `<div class="mt-1"><img src="${item.photo}" style="max-width:120px;max-height:80px;border-radius:6px;cursor:pointer;" onclick="window.open(this.src)" alt="Item photo"></div>` : ''}
                                     ${isOptional ? '<span class="badge bg-info ms-2" style="font-size:0.65em;">Optional</span>' : ''}
                                 </div>
                                 <div style="text-align:right; min-width:140px; padding-left:16px;">
@@ -658,6 +659,7 @@ if (location.search.includes('debug')) {
                                 ${hasUpgrade ? `
                                 <div>
                                     ${!isUpgraded ? `<div class="text-muted mb-1" style="font-size:0.88rem;"><i class="fas fa-arrow-up" style="color:#f0ad4e;"></i> <strong>Upgrade available:</strong> ${item.upgrade.name}</div>` : ''}
+                                    ${item.upgrade.photo ? `<div class="mb-2"><img src="${item.upgrade.photo}" style="max-width:200px;max-height:150px;border-radius:8px;border:2px solid #f0ad4e;cursor:pointer;" onclick="window.open(this.src)" alt="Upgrade preview"></div>` : ''}
                                     <button class="btn btn-sm ${isUpgraded ? 'btn-warning' : 'btn-outline-warning'}" onclick="toggleViewerUpgrade(${roomIdx}, ${itemIndex})" style="font-size:0.85rem;">
                                         <i class="fas fa-arrow-up"></i> ${isUpgraded ? 'Upgraded ✓' : 'Upgrade: ' + item.upgrade.name}
                                     </button>
