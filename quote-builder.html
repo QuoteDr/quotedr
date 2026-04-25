@@ -3254,28 +3254,62 @@ Example:
             input.type = 'file';
             input.accept = 'image/*';
             input.multiple = true;
-            input.onchange = function() {
+            input.onchange = async function() {
                 var room = rooms.find(function(r) { return r.id === roomId; });
                 if (!room) return;
                 if (!room.photos) room.photos = [];
                 var files = Array.from(input.files);
-                var pending = files.length;
-                files.forEach(function(file) {
-                    var reader = new FileReader();
-                    reader.onload = function(e) {
-                        room.photos.push(e.target.result);
-                        pending--;
-                        if (pending === 0) { renderRooms(); calculateTotals(); unsavedChanges = true; }
-                    };
-                    reader.readAsDataURL(file);
-                });
+                try {
+                    var userRes = await _supabase.auth.getUser();
+                    var userId = userRes.data?.user?.id;
+                    var quoteId = localStorage.getItem('ald_active_quote_id') || 'unsaved';
+                    for (var i = 0; i < files.length; i++) {
+                        var file = files[i];
+                        var timestamp = Date.now() + i;
+                        var path = (userId || 'anon') + '/' + quoteId + '/' + roomId + '/' + timestamp + '.jpg';
+                        var uploaded = false;
+                        if (userId) {
+                            try {
+                                var uploadRes = await _supabase.storage.from('room-photos').upload(path, file, { contentType: file.type, upsert: true });
+                                if (!uploadRes.error) {
+                                    var publicUrl = _supabase.storage.from('room-photos').getPublicUrl(path).data.publicUrl;
+                                    room.photos.push(publicUrl);
+                                    uploaded = true;
+                                }
+                            } catch(uploadErr) {
+                                console.warn('Storage upload failed, falling back to base64:', uploadErr);
+                            }
+                        }
+                        if (!uploaded) {
+                            await new Promise(function(resolve) {
+                                var reader = new FileReader();
+                                reader.onload = function(e) { room.photos.push(e.target.result); resolve(); };
+                                reader.readAsDataURL(file);
+                            });
+                        }
+                    }
+                } catch(e) {
+                    console.warn('Photo upload error:', e);
+                }
+                renderRooms(); calculateTotals(); unsavedChanges = true;
             };
             input.click();
+        }
+
+        function _getRoomPhotoStoragePath(url) {
+            var marker = '/room-photos/';
+            var idx = url.indexOf(marker);
+            return idx >= 0 ? url.substring(idx + marker.length) : null;
         }
 
         function removeRoomPhoto(roomId, photoIndex) {
             var room = rooms.find(function(r) { return r.id === roomId; });
             if (!room || !room.photos) return;
+            var photoUrl = room.photos[photoIndex];
+            if (photoUrl && photoUrl.startsWith('https://')) {
+                var path = _getRoomPhotoStoragePath(photoUrl);
+                if (path) { _supabase.storage.from('room-photos').remove([path]).catch(function(){}); }
+            }
             room.photos.splice(photoIndex, 1);
             renderRooms();
             calculateTotals();
