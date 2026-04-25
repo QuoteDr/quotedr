@@ -1816,7 +1816,33 @@ Example:
             if (!used.includes(num)) {
                 used.push(num);
                 localStorage.setItem('ald_used_quote_numbers', JSON.stringify(used));
+                // Save to cloud (fire and forget)
+                _saveUsedQuoteNumbersToCloud(used).catch(function(){});
             }
+        }
+
+        async function _saveUsedQuoteNumbersToCloud(nums) {
+            try {
+                var user = await _supabase.auth.getUser();
+                if (!user.data?.user) return;
+                await _supabase.from('user_data').upsert(
+                    { user_id: user.data.user.id, key: 'used_quote_numbers', value: nums, updated_at: new Date().toISOString() },
+                    { onConflict: 'user_id,key' }
+                );
+            } catch(e) { console.warn('Used quote numbers cloud save failed:', e); }
+        }
+
+        async function _syncUsedQuoteNumbersFromCloud() {
+            try {
+                var user = await _supabase.auth.getUser();
+                if (!user.data?.user) return;
+                var { data } = await _supabase.from('user_data').select('value').eq('user_id', user.data.user.id).eq('key', 'used_quote_numbers').single();
+                if (data?.value && Array.isArray(data.value)) {
+                    var local = JSON.parse(localStorage.getItem('ald_used_quote_numbers') || '[]');
+                    var merged = Array.from(new Set([...local, ...data.value]));
+                    localStorage.setItem('ald_used_quote_numbers', JSON.stringify(merged));
+                }
+            } catch(e) { console.warn('Used quote numbers cloud sync failed:', e); }
         }
 
         function generateQuoteNumber() {
@@ -5266,6 +5292,9 @@ async function saveQuote() {
 
             // Restore templates from cloud (merge with local, cloud fills in missing ones)
             _restoreTemplatesFromCloud().catch(function(){});
+
+            // Sync used quote numbers from cloud (prevents duplicates across devices)
+            _syncUsedQuoteNumbersFromCloud().catch(function(){});
 
             // NOTE: items table sync removed - snapshot backup (quotes table) is the source of truth
             try {
