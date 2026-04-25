@@ -218,7 +218,7 @@ curl "https://axmoffknvblluibuitrq.supabase.co/rest/v1/error_logs?order=created_
 
 ## Known Issues / Still To Do
 
-### 🔴 QuickBooks Integration (Not Working Yet)
+### 🟡 QuickBooks Integration (Code Fixed — Needs Deploy + End-to-End Test)
 - QB OAuth flow is built (`qb-callback.html`, `qb-oauth` and `qb-sync` edge functions)
 - QB credentials stored as Supabase Edge Function secrets (rotated — was hardcoded in repo!)
 - CSRF state validation added
