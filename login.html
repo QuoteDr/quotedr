@@ -309,7 +309,45 @@ if (location.search.includes('debug')) {
                 : (btnId === 'signinBtn' ? 'Sign In' : 'Create Account');
         }
 
+        // Brute force protection — 5 attempts per session, 15 min lockout
+        var _loginAttempts = parseInt(sessionStorage.getItem('ald_login_attempts') || '0');
+        var _lockoutUntil = parseInt(sessionStorage.getItem('ald_lockout_until') || '0');
+
+        function _checkLockout() {
+            _lockoutUntil = parseInt(sessionStorage.getItem('ald_lockout_until') || '0');
+            if (_lockoutUntil && Date.now() < _lockoutUntil) {
+                var secsLeft = Math.ceil((_lockoutUntil - Date.now()) / 1000);
+                var minsLeft = Math.ceil(secsLeft / 60);
+                showMessage('signinMessage', 'Too many failed attempts. Try again in ' + minsLeft + ' minute' + (minsLeft !== 1 ? 's' : '') + '.');
+                document.getElementById('signinBtn').disabled = true;
+                return true;
+            }
+            // Lockout expired — reset
+            if (_lockoutUntil && Date.now() >= _lockoutUntil) {
+                sessionStorage.removeItem('ald_login_attempts');
+                sessionStorage.removeItem('ald_lockout_until');
+                _loginAttempts = 0;
+                document.getElementById('signinBtn').disabled = false;
+            }
+            return false;
+        }
+
+        function _recordFailedAttempt() {
+            _loginAttempts = parseInt(sessionStorage.getItem('ald_login_attempts') || '0') + 1;
+            sessionStorage.setItem('ald_login_attempts', _loginAttempts);
+            if (_loginAttempts >= 5) {
+                var until = Date.now() + 15 * 60 * 1000; // 15 min
+                sessionStorage.setItem('ald_lockout_until', until);
+                _checkLockout();
+            } else {
+                var remaining = 5 - _loginAttempts;
+                showMessage('signinMessage', 'Incorrect email or password. ' + remaining + ' attempt' + (remaining !== 1 ? 's' : '') + ' remaining.');
+            }
+        }
+
         async function handleSignIn() {
+            if (_checkLockout()) return;
+
             var email = document.getElementById('signinEmail').value.trim();
             var password = document.getElementById('signinPassword').value;
             if (!email || !password) { showMessage('signinMessage', 'Please fill in all fields.'); return; }
@@ -327,7 +365,13 @@ if (location.search.includes('debug')) {
             setLoading('signinBtn', true);
             var result = await _supabase.auth.signInWithPassword({ email: email, password: password });
             setLoading('signinBtn', false);
-            if (result.error) { showMessage('signinMessage', result.error.message); return; }
+            if (result.error) {
+                _recordFailedAttempt();
+                return;
+            }
+            // Successful login — clear attempt counters
+            sessionStorage.removeItem('ald_login_attempts');
+            sessionStorage.removeItem('ald_lockout_until');
             // Preload items + clients into localStorage before redirect
             await preloadUserData(result.data.user);
             // Check onboarding from Supabase (source of truth)
@@ -408,6 +452,9 @@ if (location.search.includes('debug')) {
             if (result.error) { showMessage('signinMessage', result.error.message); return; }
             showMessage('signinMessage', 'Password reset email sent! Check your inbox.', 'success');
         }
+
+        // Check lockout state on page load (refresh shouldn't bypass it)
+        _checkLockout();
 
         // Pre-fill remembered email
         if (localStorage.getItem('ald_remember_me') === 'true') {

@@ -203,9 +203,9 @@ curl "https://axmoffknvblluibuitrq.supabase.co/rest/v1/error_logs?order=created_
 - [x] **Quote templates cloud sync** — templates now save/restore/delete from Supabase `templates` table
 
 ### 🟡 MEDIUM PRIORITY
-- [ ] **Settings cloud sync** — `ald_category_styles`, `ald_hidden_categories`, `ald_item_overrides` are still localStorage-only (lost on new device)
-- [ ] **Two Manage Items modals** — one in quote-builder.html (active), one in settings.html (old/stale) — consolidate or remove settings one
-- [ ] **Used quote numbers cloud sync** — `ald_used_quote_numbers` local only; multi-device users could create duplicate quote numbers
+- [x] **Settings cloud sync** — `ald_category_styles`, `ald_hidden_categories`, `ald_item_overrides` now sync via `user_data` table
+- [x] **Two Manage Items modals** — removed dead modal from settings.html; quote-builder.html is the single source
+- [x] **Used quote numbers cloud sync** — merged from cloud on startup, saved on each new quote number
 - [ ] **Email routing** — `support@quotedr.io`, `privacy@quotedr.io`, `quotes@quotedr.io` need Cloudflare Email Routing set up
 - [ ] **Login brute force protection** — no lockout after failed attempts
 
