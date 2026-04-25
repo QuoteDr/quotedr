@@ -489,20 +489,29 @@
         return;
       }
       
-      // Check PIN against Supabase
-      const response = await supabase
-        .from('quotes')
-        .select('data.portal_pin')
-        .eq('client_name', clientName)
-        .eq('user_id', contractorId)
-        .single();
-      
-      if (response.data && response.data.data && response.data.data.portal_pin === enteredPin) {
-        sessionStorage.setItem(unlockKey, 'true');
-        hidePinGate();
-      } else {
+      // Validate PIN server-side (never expose the stored PIN to the browser)
+      try {
+        const res = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/verify-portal-pin', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + supabaseKey
+          },
+          body: JSON.stringify({ clientName, contractorId, pin: enteredPin })
+        });
+        const result = await res.json();
+        if (result.valid) {
+          sessionStorage.setItem(unlockKey, 'true');
+          hidePinGate();
+        } else if (result.noPinSet) {
+          document.getElementById('pinError').textContent = 'This portal has not been activated yet. Contact your contractor.';
+        } else {
+          shakeError();
+          document.getElementById('pinError').textContent = 'Incorrect PIN';
+        }
+      } catch(e) {
         shakeError();
-        document.getElementById('pinError').textContent = 'Incorrect PIN';
+        document.getElementById('pinError').textContent = 'Connection error. Please try again.';
       }
     }
     

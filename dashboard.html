@@ -441,12 +441,73 @@
         }
 
         async function shareClientPortal(clientName) {
-            const { data } = await _supabase.auth.getSession();
-            const userId = data?.session?.user?.id;
+            const session = await _supabase.auth.getSession();
+            const userId = session.data?.session?.user?.id;
             if (!userId) { alert('Please log in first.'); return; }
+
+            // Look for existing PIN across all quotes for this client
+            var { data: quotes } = await _supabase.from('quotes').select('id, data').eq('user_id', userId).ilike('client_name', clientName);
+            var pin = null;
+            if (quotes && quotes.length > 0) {
+                for (var q of quotes) {
+                    if (q.data && q.data.portal_pin) { pin = q.data.portal_pin; break; }
+                }
+            }
+
+            // Generate new PIN if none found
+            if (!pin) {
+                pin = Math.floor(1000 + Math.random() * 9000).toString();
+                if (quotes && quotes.length > 0) {
+                    for (var q of quotes) {
+                        var newData = Object.assign({}, q.data || {}, { portal_pin: pin });
+                        await _supabase.from('quotes').update({ data: newData }).eq('id', q.id);
+                    }
+                }
+            }
+
+            // Build URL and populate modal
             const url = `https://quotedr.io/client-portal.html?client=${encodeURIComponent(clientName)}&contractor=${userId}`;
-            await navigator.clipboard.writeText(url).catch(() => {});
-            alert('Client portal link copied to clipboard!\n\n' + url);
+            document.getElementById('portalClientName').textContent = clientName;
+            document.getElementById('portalUrlDisplay').value = url;
+            document.getElementById('portalPinDisplay').textContent = pin;
+            window._currentPortalClient = clientName;
+
+            var modal = new bootstrap.Modal(document.getElementById('portalShareModal'));
+            modal.show();
+        }
+
+        function copyPortalUrl() {
+            var url = document.getElementById('portalUrlDisplay').value;
+            navigator.clipboard.writeText(url).catch(function(){});
+            var btn = event.target.closest('button');
+            if (btn) { var orig = btn.innerHTML; btn.innerHTML = '<i class="fas fa-check"></i>'; setTimeout(function(){ btn.innerHTML = orig; }, 1500); }
+        }
+
+        function copyPortalBoth() {
+            var url = document.getElementById('portalUrlDisplay').value;
+            var pin = document.getElementById('portalPinDisplay').textContent;
+            navigator.clipboard.writeText('Client Portal: ' + url + '\nPIN: ' + pin).catch(function(){});
+            var btn = event.target.closest('button');
+            if (btn) { var orig = btn.innerHTML; btn.innerHTML = '<i class="fas fa-check me-1"></i>Copied!'; setTimeout(function(){ btn.innerHTML = orig; }, 1500); }
+        }
+
+        async function resetPortalPin() {
+            var clientName = window._currentPortalClient;
+            if (!clientName) return;
+            var session = await _supabase.auth.getSession();
+            var userId = session.data?.session?.user?.id;
+            if (!userId) return;
+            var newPin = Math.floor(1000 + Math.random() * 9000).toString();
+            var { data: quotes } = await _supabase.from('quotes').select('id, data').eq('user_id', userId).ilike('client_name', clientName);
+            if (quotes && quotes.length > 0) {
+                for (var q of quotes) {
+                    var newData = Object.assign({}, q.data || {}, { portal_pin: newPin });
+                    await _supabase.from('quotes').update({ data: newData }).eq('id', q.id);
+                }
+            }
+            document.getElementById('portalPinDisplay').textContent = newPin;
+            var btn = event.target.closest('button');
+            if (btn) { var orig = btn.innerHTML; btn.innerHTML = '<i class="fas fa-check me-1"></i>PIN Reset!'; setTimeout(function(){ btn.innerHTML = orig; }, 1500); }
         }
 
         async function sendFollowUpReminder(quoteId, clientName, savedEmail) {
