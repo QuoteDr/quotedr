@@ -17,10 +17,12 @@ function logQBResponse(action: string, response: Response) {
 }
 
 // Supabase configuration
-const SUPABASE_URL = "https://axmoffknvblluibuitrq.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "https://axmoffknvblluibuitrq.supabase.co";
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 interface QBToken {
   access_token: string;
@@ -85,7 +87,7 @@ serve(async (req) => {
 async function handlePushInvoice(userId: string, invoiceData: any) {
   try {
     // Get QB tokens
-    const { data: tokensData, error: fetchError } = await supabase
+    const { data: tokensData, error: fetchError } = await supabaseAdmin
       .from("user_data")
       .select("value")
       .eq("user_id", userId)
@@ -122,7 +124,7 @@ async function handlePushInvoice(userId: string, invoiceData: any) {
       }
       
       // Get updated tokens
-      const { data: updatedTokensData } = await supabase
+      const { data: updatedTokensData } = await supabaseAdmin
         .from("user_data")
         .select("value")
         .eq("user_id", userId)
@@ -330,7 +332,7 @@ async function handlePushInvoice(userId: string, invoiceData: any) {
 async function handleGetCustomers(userId: string) {
   try {
     // Get QB tokens
-    const { data: tokensData, error: fetchError } = await supabase
+    const { data: tokensData, error: fetchError } = await supabaseAdmin
       .from("user_data")
       .select("value")
       .eq("user_id", userId)
@@ -367,7 +369,7 @@ async function handleGetCustomers(userId: string) {
       }
       
       // Get updated tokens
-      const { data: updatedTokensData } = await supabase
+      const { data: updatedTokensData } = await supabaseAdmin
         .from("user_data")
         .select("value")
         .eq("user_id", userId)
@@ -423,7 +425,7 @@ async function handleGetCustomers(userId: string) {
 async function handleGetInvoiceStatus(userId: string, invoiceId: string) {
   try {
     // Get QB tokens
-    const { data: tokensData, error: fetchError } = await supabase
+    const { data: tokensData, error: fetchError } = await supabaseAdmin
       .from("user_data")
       .select("value")
       .eq("user_id", userId)
@@ -460,7 +462,7 @@ async function handleGetInvoiceStatus(userId: string, invoiceId: string) {
       }
       
       // Get updated tokens
-      const { data: updatedTokensData } = await supabase
+      const { data: updatedTokensData } = await supabaseAdmin
         .from("user_data")
         .select("value")
         .eq("user_id", userId)

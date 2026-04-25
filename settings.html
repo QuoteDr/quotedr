@@ -676,16 +676,24 @@ Sarah Jones, 905-555-5678"></textarea>
 			} catch(e) { console.warn('QB status check failed:', e); }
 		}
 
-		function connectQuickBooks() {
-			const state = Math.random().toString(36).substring(2);
-			sessionStorage.setItem('qb_state', state);
-			const url = 'https://appcenter.intuit.com/connect/oauth2' +
-				'?client_id=' + QB_CLIENT_ID +
-				'&redirect_uri=' + encodeURIComponent(QB_REDIRECT_URI) +
-				'&response_type=code' +
-				'&scope=' + encodeURIComponent(QB_SCOPE) +
-				'&state=' + state;
-			window.location.href = url;
+		async function connectQuickBooks() {
+			try {
+				const headers = await getQBAuthHeader();
+				if (!headers) { alert('Please sign in first.'); return; }
+				// Ask the edge function to generate the auth URL + save state to user_data
+				const res = await fetch(SUPABASE_URL + '/functions/v1/qb-oauth', {
+					method: 'POST',
+					headers,
+					body: JSON.stringify({ action: 'get_auth_url' })
+				});
+				const data = await res.json();
+				if (data.error) throw new Error(data.error);
+				if (!data.url) throw new Error('No auth URL returned');
+				// Redirect to QuickBooks OAuth
+				window.location.href = data.url;
+			} catch(e) {
+				alert('Error starting QuickBooks connection: ' + e.message);
+			}
 		}
 
 		async function disconnectQuickBooks() {

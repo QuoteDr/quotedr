@@ -9,10 +9,13 @@ const QB_TOKEN_URL = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer"
 const QB_AUTH_URL = "https://appcenter.intuit.com/connect/oauth2";
 
 // Supabase configuration
-const SUPABASE_URL = "https://axmoffknvblluibuitrq.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "https://axmoffknvblluibuitrq.supabase.co";
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
+// Use anon client for auth validation only; service role client for DB writes (bypasses RLS correctly)
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 interface QBToken {
   access_token: string;
@@ -86,7 +89,7 @@ serve(async (req) => {
 
 async function handleGetAuthUrl(userId: string) {
   const state = crypto.randomUUID();
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from('user_data')
     .upsert({ user_id: userId, key: 'qb_oauth_state', value: { state, created_at: new Date().toISOString() } }, { onConflict: 'user_id,key' });
   if (error) return new Response(JSON.stringify({ error: 'Failed to save state' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
@@ -101,13 +104,13 @@ async function handleGetAuthUrl(userId: string) {
 
 async function handleExchange(userId: string, code: string, realmId: string, state: string) {
   // Validate CSRF state
-  const { data: storedStateData, error: stateErr } = await supabase
+  const { data: storedStateData, error: stateErr } = await supabaseAdmin
     .from('user_data').select('value').eq('user_id', userId).eq('key', 'qb_oauth_state').single();
   if (stateErr || !storedStateData || storedStateData.value.state !== state) {
     return new Response(JSON.stringify({ error: 'Invalid state parameter - possible CSRF attack' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
   }
   // Delete used state (one-time use)
-  await supabase.from('user_data').delete().eq('user_id', userId).eq('key', 'qb_oauth_state');
+  await supabaseAdmin.from('user_data').delete().eq('user_id', userId).eq('key', 'qb_oauth_state');
   try {
     // Exchange authorization code for tokens
     const tokenResponse = await fetch(QB_TOKEN_URL, {
