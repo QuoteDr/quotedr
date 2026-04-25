@@ -402,17 +402,27 @@ async function saveInvoiceForSharing(invoiceData) {
         user_id: user ? user.id : null,
         data: { ...invoiceData, _type: 'invoice' },
         client_name: invoiceData.clientName || '',
-        quote_number: invoiceData.quoteNumber || '',
+        quote_number: (invoiceData.quoteNumber || '') + '-INV',
         total: invoiceData.grandTotal || 0,
         status: 'invoiced',
         updated_at: now
     };
     let data, error;
     if (invoiceData.supabaseId) {
+        // Update existing invoice row
         ({ data, error } = await _supabase.from('quotes').update(payload).eq('id', invoiceData.supabaseId).select().single());
     } else {
+        // Insert new invoice row
         payload.created_at = now;
         ({ data, error } = await _supabase.from('quotes').insert(payload).select().single());
+        // If unique constraint hit (same quote number), update existing instead
+        if (error && error.code === '23505') {
+            console.warn('Invoice row exists, updating instead...');
+            var existing = await _supabase.from('quotes').select('id').eq('user_id', payload.user_id).eq('quote_number', payload.quote_number).single();
+            if (existing.data) {
+                ({ data, error } = await _supabase.from('quotes').update(payload).eq('id', existing.data.id).select().single());
+            }
+        }
     }
     if (error) console.error('saveInvoiceForSharing error:', error);
     return { data, error };

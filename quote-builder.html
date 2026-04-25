@@ -4096,8 +4096,9 @@ Example:
             if (window._supabaseQuoteId && typeof _supabase !== 'undefined') {
                 _supabase.from('quotes').update({ status: 'invoiced', updated_at: new Date().toISOString() }).eq('id', window._supabaseQuoteId).then(function() {});
             }
-            const invoiceBaseUrl = window.location.href.split('?')[0].replace(/quote-builder(\.html)?$/, 'invoice-viewer.html');
-            let invoiceUrl = invoiceBaseUrl + '?invoice=' + invoiceId; // fallback for offline
+            const invoiceBaseUrl = window.location.href.split('?')[0].split('#')[0].replace(/quote-builder(\.html)?\/?$/, 'invoice-viewer');
+            let invoiceUrl = invoiceBaseUrl + '?invoice=' + invoiceId;
+            console.log('Invoice URL:', invoiceUrl);
 
             // Show modal immediately with local fallback URL
             if (!document.getElementById('sendInvoiceModal')) {
