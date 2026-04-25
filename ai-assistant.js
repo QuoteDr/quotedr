@@ -57,6 +57,20 @@ function init() {
     overflow: hidden;
     border: 1px solid #e5e7eb;
   }
+  @media (max-width: 600px) {
+    #qdAiPanel {
+      bottom: 0 !important;
+      right: 0 !important;
+      left: 0 !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      border-radius: 16px 16px 0 0;
+      max-height: 75vh;
+    }
+    #qdAiBtn {
+      bottom: 16px;
+    }
+  }
   #qdAiPanel.open {
     display: flex;
   }
@@ -184,7 +198,7 @@ function init() {
       </div>
       <div id="qdSuggestions"></div>
       <div id="qdAiInputRow">
-        <input id="qdAiInput" type="text" placeholder="Ask anything..." onkeypress="if(event.key==='Enter') window._qdAiSend()">
+        <input id="qdAiInput" type="text" placeholder="Ask anything..." onkeypress="if(event.key==='Enter') window._qdAiSend()" autocomplete="off" autocorrect="off" spellcheck="false">
         <button id="qdAiSend" onclick="window._qdAiSend()">&#10148;</button>
       </div>
       <div style="text-align:center; padding: 6px 0 2px; font-size: 0.75rem;">
@@ -195,6 +209,18 @@ function init() {
   var div = document.createElement('div');
   div.innerHTML = html;
   document.body.appendChild(div);
+
+  // Mobile keyboard: push panel above keyboard when input focused
+  var qdInput = document.getElementById('qdAiInput');
+  var qdPanel = document.getElementById('qdAiPanel');
+  qdInput.addEventListener('focus', function() {
+    if (window.innerWidth <= 600) {
+      // Let keyboard open, then scroll panel into view
+      setTimeout(function() {
+        qdInput.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 300);
+    }
+  });
 
   // Render suggestions
   var sugEl = document.getElementById('qdSuggestions');
