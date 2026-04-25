@@ -4290,8 +4290,8 @@ Example:
                 window._supabaseQuoteId = supabaseId;
                 localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
 
-                const _base = window.location.href.split('?')[0].replace(/quote-builder(\.html)?$/, '');
-                const viewerUrl = _base + 'interactive-quote-viewer.html?id=' + supabaseId;
+                const _base = window.location.href.split('?')[0].split('#')[0].replace(/quote-builder(\.html)?\/?$/, '');
+                const viewerUrl = _base + 'interactive-quote-viewer?id=' + supabaseId;
 
                 if (saveStatus) saveStatus.innerHTML = '<span style="color:green;"><i class="fas fa-check"></i> Quote saved!</span>';
 
@@ -5515,7 +5515,7 @@ async function saveQuote() {
                                 <button class="btn btn-sm btn-success item-save-btn" data-cat="${catE}" data-name="${nameE}" title="Save this row" style="touch-action:manipulation"><i class="fas fa-save"></i></button>
                                 ${isCustom ? `<button class="btn btn-sm btn-danger item-delete-btn" data-cat="${catE}" data-name="${nameE}" title="Delete" style="touch-action:manipulation"><i class="fas fa-trash"></i></button>` : ''}
                             </div>
-                            ${item.photo ? `<img src="${item.photo}" class="mt-1 rounded" style="max-width:60px;max-height:40px;cursor:pointer;" onclick="window.open(this.src)" title="Click to enlarge">` : ''}
+                            ${item.photo ? `<img src="${item.photo}" class="mt-1 rounded" style="max-width:60px;max-height:40px;cursor:pointer;" onclick="openPhotoLightbox(this.src)" title="Click to enlarge">` : ''}
                         </td>
                     </tr>
                     <tr id="desc_${safeId}" style="display:none; background:#e7f3ff;">
@@ -5546,7 +5546,7 @@ async function saveQuote() {
                                 </div>
                                 <div class="mt-2">
                                     <button class="btn btn-sm btn-outline-secondary item-photo-btn" data-cat="${catE}" data-name="${nameE}" data-field="upgradePhoto" title="Add upgrade photo" style="font-size:0.75em;"><i class="fas fa-camera me-1"></i>Upgrade Photo</button>
-                                    ${upg.photo ? `<img src="${upg.photo}" class="ms-2 rounded" style="max-width:80px;max-height:50px;cursor:pointer;vertical-align:middle;" onclick="window.open(this.src)" title="Click to enlarge">` : ''}
+                                    ${upg.photo ? `<img src="${upg.photo}" class="ms-2 rounded" style="max-width:80px;max-height:50px;cursor:pointer;vertical-align:middle;" onclick="openPhotoLightbox(this.src)" title="Click to enlarge">` : ''}
                                 </div>
                                 <small class="text-muted">Leave name blank to remove upgrade option. Save the row above to save upgrade too.</small>
                             </div>

@@ -416,6 +416,19 @@ if (location.search.includes('debug')) {
             return false;
         }
 
+        function openPhotoLightbox(src) {
+            var existing = document.getElementById('photoLightbox');
+            if (!existing) {
+                document.body.insertAdjacentHTML('beforeend',
+                    '<div id="photoLightbox" onclick="this.style.display=\'none\'" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.92);z-index:99999;align-items:center;justify-content:center;cursor:zoom-out;">'
+                    + '<img id="photoLightboxImg" style="max-width:95vw;max-height:90vh;object-fit:contain;border-radius:8px;box-shadow:0 4px 32px rgba(0,0,0,0.7);">'
+                    + '<button onclick="event.stopPropagation();document.getElementById(\'photoLightbox\').style.display=\'none\'" style="position:absolute;top:16px;right:20px;background:none;border:none;color:white;font-size:2rem;cursor:pointer;line-height:1;">&times;</button>'
+                    + '</div>');
+            }
+            document.getElementById('photoLightboxImg').src = src;
+            document.getElementById('photoLightbox').style.display = 'flex';
+        }
+
         function loadInvoice() {
             const params = new URLSearchParams(window.location.search);
             const supabaseId = params.get('id');

@@ -645,7 +645,7 @@ if (location.search.includes('debug')) {
                             <div class="d-flex justify-content-between align-items-baseline mb-1">
                                 <div style="flex:1;">
                                     <strong>${isUpgraded && item.upgrade ? item.upgrade.name : (item.description || item.name || 'Item')}</strong>
-                                    ${item.photo && !isUpgraded ? `<div class="mt-1"><img src="${item.photo}" style="max-width:120px;max-height:80px;border-radius:6px;cursor:pointer;" onclick="window.open(this.src)" alt="Item photo"></div>` : ''}
+                                    ${item.photo && !isUpgraded ? `<div class="mt-1 photo-container"><img src="${item.photo}" style="max-width:120px;max-height:80px;border-radius:6px;cursor:pointer;display:block;" onclick="openPhotoLightbox(this.src)" alt="Item photo"><button class="btn btn-sm btn-outline-secondary mt-1" onclick="openPhotoLightbox(this.parentElement.querySelector('img').src)" style="font-size:0.7rem;"><i class="fas fa-expand me-1"></i>View Photo</button></div>` : ''}
                                     ${isOptional ? '<span class="badge bg-info ms-2" style="font-size:0.65em;">Optional</span>' : ''}
                                 </div>
                                 <div style="text-align:right; min-width:140px; padding-left:16px;">
@@ -659,7 +659,7 @@ if (location.search.includes('debug')) {
                                 ${hasUpgrade ? `
                                 <div>
                                     ${!isUpgraded ? `<div class="text-muted mb-1" style="font-size:0.88rem;"><i class="fas fa-arrow-up" style="color:#f0ad4e;"></i> <strong>Upgrade available:</strong> ${item.upgrade.name}</div>` : ''}
-                                    ${item.upgrade.photo ? `<div class="mb-2"><img src="${item.upgrade.photo}" style="max-width:200px;max-height:150px;border-radius:8px;border:2px solid #f0ad4e;cursor:pointer;" onclick="window.open(this.src)" alt="Upgrade preview"></div>` : ''}
+                                    ${item.upgrade.photo ? `<div class="mb-2 photo-container"><img src="${item.upgrade.photo}" style="max-width:200px;max-height:150px;border-radius:8px;border:2px solid #f0ad4e;cursor:pointer;display:block;" onclick="openPhotoLightbox(this.src)" alt="Upgrade preview"><button class="btn btn-sm btn-outline-warning mt-1" onclick="openPhotoLightbox(this.parentElement.querySelector('img').src)" style="font-size:0.75rem;"><i class="fas fa-camera me-1"></i>View Upgrade Photo</button></div>` : ''}
                                     <button class="btn btn-sm ${isUpgraded ? 'btn-warning' : 'btn-outline-warning'}" onclick="toggleViewerUpgrade(${roomIdx}, ${itemIndex})" style="font-size:0.85rem;">
                                         <i class="fas fa-arrow-up"></i> ${isUpgraded ? 'Upgraded ✓' : 'Upgrade: ' + item.upgrade.name}
                                     </button>
@@ -1206,6 +1206,20 @@ if (location.search.includes('debug')) {
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fas fa-credit-card me-2"></i><span id="depositBtnLabel">Pay Deposit</span>';
             }
+        }
+
+        function openPhotoLightbox(src) {
+            var existing = document.getElementById('photoLightbox');
+            if (!existing) {
+                document.body.insertAdjacentHTML('beforeend',
+                    '<div id="photoLightbox" onclick="this.style.display=\'none\'" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.92);z-index:99999;align-items:center;justify-content:center;cursor:zoom-out;">'
+                    + '<img id="photoLightboxImg" style="max-width:95vw;max-height:90vh;object-fit:contain;border-radius:8px;box-shadow:0 4px 32px rgba(0,0,0,0.7);">'
+                    + '<button onclick="event.stopPropagation();document.getElementById(\'photoLightbox\').style.display=\'none\'" style="position:absolute;top:16px;right:20px;background:none;border:none;color:white;font-size:2rem;cursor:pointer;line-height:1;">&times;</button>'
+                    + '</div>');
+            }
+            var lb = document.getElementById('photoLightbox');
+            document.getElementById('photoLightboxImg').src = src;
+            lb.style.display = 'flex';
         }
     </script>
 </body>
