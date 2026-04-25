@@ -416,25 +416,16 @@ if (location.search.includes('debug')) {
             return false;
         }
 
-        function debugLog(msg) {
-            var d = document.getElementById('debugInfo');
-            if (!d) { d = document.createElement('div'); d.id = 'debugInfo'; d.style.cssText = 'background:#1a1a2e;color:#0f0;padding:10px;font-family:monospace;font-size:12px;max-height:300px;overflow:auto;margin:10px;border-radius:8px;'; document.body.prepend(d); }
-            d.innerHTML += msg + '<br>';
-        }
-
         function loadInvoice() {
             const params = new URLSearchParams(window.location.search);
             const supabaseId = params.get('id');
             const localKey = params.get('invoice');
-            debugLog('URL params: id=' + supabaseId + ', invoice=' + localKey);
 
             if (supabaseId) {
                 // Try Supabase first, fall back to localStorage if it fails
-                debugLog('Trying Supabase load: ' + supabaseId);
                 loadQuoteForViewing(supabaseId).then(function(result) {
-                    debugLog('Supabase result: error=' + JSON.stringify(result.error) + ', hasData=' + !!result.data);
                     if (result.error || !result.data) {
-                        debugLog('Supabase failed, trying localStorage...');
+                        console.warn('Supabase invoice load failed, trying localStorage...');
                         if (!tryLocalStorageFallback()) {
                             document.getElementById('invoiceContainer').innerHTML = '<div class="alert alert-warning">Invoice not found.</div>';
                         }
@@ -442,11 +433,6 @@ if (location.search.includes('debug')) {
                     }
                     var row = result.data;
                     invoiceData = row.data || row;
-                    debugLog('invoiceData keys: ' + Object.keys(invoiceData).join(', '));
-                    debugLog('rooms: ' + (invoiceData.rooms ? invoiceData.rooms.length + ' rooms' : 'MISSING'));
-                    if (invoiceData.rooms && invoiceData.rooms.length > 0) {
-                        debugLog('Room 0: ' + invoiceData.rooms[0].name + ', items: ' + (invoiceData.rooms[0].items ? invoiceData.rooms[0].items.length : 'MISSING'));
-                    }
                     if (!invoiceData.clientName && row.client_name) invoiceData.clientName = row.client_name;
                     if (!invoiceData.rooms && row.rooms) invoiceData.rooms = row.rooms;
                     if (!invoiceData.grandTotal && row.grand_total) invoiceData.grandTotal = row.grand_total;
@@ -744,17 +730,18 @@ if (location.search.includes('debug')) {
         }
 
         // === QuickBooks Push ===
-        const SUPABASE_URL = 'https://axmoffknvblluibuitrq.supabase.co';
-        const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso';
+        // SUPABASE_URL and SUPABASE_ANON_KEY already declared in supabase-v2.js
+        var _QB_SUPABASE_URL = typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : 'https://axmoffknvblluibuitrq.supabase.co';
+        var _QB_ANON = typeof SUPABASE_ANON_KEY !== 'undefined' ? SUPABASE_ANON_KEY : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso';
 
         async function checkQBConnected() {
             try {
                 const { data } = await _supabase.auth.getSession();
                 const token = data?.session?.access_token;
                 if (!token) return;
-                const resp = await fetch(SUPABASE_URL + '/functions/v1/qb-oauth', {
+                const resp = await fetch(_QB_SUPABASE_URL + '/functions/v1/qb-oauth', {
                     method: 'POST',
-                    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON },
+                    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', 'apikey': _QB_ANON },
                     body: JSON.stringify({ action: 'status' })
                 });
                 const status = await resp.json();
@@ -783,9 +770,9 @@ if (location.search.includes('debug')) {
                         total: parseFloat(row.querySelector('.item-total')?.textContent?.replace(/[^0-9.]/g,'')) || 0
                     }))
                 };
-                const resp = await fetch(SUPABASE_URL + '/functions/v1/qb-sync', {
+                const resp = await fetch(_QB_SUPABASE_URL + '/functions/v1/qb-sync', {
                     method: 'POST',
-                    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON },
+                    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', 'apikey': _QB_ANON },
                     body: JSON.stringify({ action: 'push_invoice', invoice: invoiceData })
                 });
                 const result = await resp.json();
