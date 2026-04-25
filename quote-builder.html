@@ -3879,6 +3879,49 @@ Example:
             });
         }
 
+        async function _syncTemplateToCloud(name, rooms) {
+            try {
+                var user = await _supabase.auth.getUser();
+                if (!user.data?.user) return;
+                await _supabase.from('templates').upsert({
+                    user_id: user.data.user.id,
+                    name: name,
+                    rooms: rooms,
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'user_id,name' });
+            } catch(e) {
+                console.warn('Cloud template sync failed:', e);
+            }
+        }
+
+        async function _restoreTemplatesFromCloud() {
+            try {
+                var user = await _supabase.auth.getUser();
+                if (!user.data?.user) return;
+                var { data: cloudTemplates } = await _supabase
+                    .from('templates')
+                    .select('name, rooms, updated_at')
+                    .eq('user_id', user.data.user.id)
+                    .order('updated_at', { ascending: false });
+                if (!cloudTemplates || cloudTemplates.length === 0) return;
+                var localTemplates = _getTemplates();
+                var localNames = localTemplates.map(function(t) { return t.name; });
+                var added = 0;
+                cloudTemplates.forEach(function(ct) {
+                    if (!localNames.includes(ct.name)) {
+                        localTemplates.push({ id: Date.now() + added++, name: ct.name, rooms: ct.rooms || [], createdAt: ct.updated_at });
+                    }
+                });
+                if (added > 0) {
+                    _saveTemplates(localTemplates);
+                    if (typeof renderTemplateDropdown === 'function') renderTemplateDropdown();
+                    console.log('[Templates] Restored', added, 'from cloud');
+                }
+            } catch(e) {
+                console.warn('Cloud template restore failed:', e);
+            }
+        }
+
         function saveTemplate() {
             if (rooms.length === 0) {
                 alert('Please add at least one room before saving a template.');
@@ -3904,6 +3947,9 @@ Example:
 
             templates[quoteData.id] = quoteData;
             localStorage.setItem('ald_quote_templates', JSON.stringify(templates));
+
+            // Also sync to cloud (fire and forget)
+            _syncTemplateToCloud(quoteData.name, quoteData.rooms).catch(function(){});
 
             alert(`Template "${templateName}" saved successfully!`);
             if (typeof renderTemplateDropdown === 'function') renderTemplateDropdown();
@@ -4069,8 +4115,17 @@ Example:
 
         function deleteTemplateById(id) {
             if (!confirm('Delete this template?')) return;
-            var templates = _getTemplates().filter(function(t){ return t.id !== id; });
+            var allTemplates = _getTemplates();
+            var deleted = allTemplates.find(function(t){ return t.id === id; });
+            var templates = allTemplates.filter(function(t){ return t.id !== id; });
             _saveTemplates(templates);
+            // Also delete from cloud
+            if (deleted) {
+                _supabase.auth.getUser().then(function(r) {
+                    if (!r.data?.user) return;
+                    _supabase.from('templates').delete().eq('user_id', r.data.user.id).eq('name', deleted.name).catch(function(){});
+                }).catch(function(){});
+            }
             openManageTemplates();
         }
 
@@ -5093,6 +5148,9 @@ async function saveQuote() {
                     }
                 }
             }).catch(function(){});
+
+            // Restore templates from cloud (merge with local, cloud fills in missing ones)
+            _restoreTemplatesFromCloud().catch(function(){});
 
             // NOTE: items table sync removed - snapshot backup (quotes table) is the source of truth
             try {
