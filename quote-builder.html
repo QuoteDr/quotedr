@@ -5246,7 +5246,7 @@ async function saveQuote() {
             if (undoStack.length >= 20) undoStack.shift();
             undoStack.push(JSON.parse(JSON.stringify(customItems)));
             var btn = document.getElementById('undoManageItemsBtn');
-            if (btn) btn.disabled = false;
+            if (btn) { btn.disabled = false; btn.className = 'btn btn-sm btn-danger ms-auto me-2'; }
         }
         function undoManageItems() {
             if (undoStack.length > 0) {
@@ -5255,7 +5255,10 @@ async function saveQuote() {
                 renderAllItemsList();
                 saveCustomItems();
                 var btn = document.getElementById('undoManageItemsBtn');
-                if (btn) btn.disabled = undoStack.length === 0;
+                if (btn) {
+                    btn.disabled = undoStack.length === 0;
+                    btn.className = undoStack.length === 0 ? 'btn btn-sm btn-outline-secondary ms-auto me-2' : 'btn btn-sm btn-danger ms-auto me-2';
+                }
             }
         }
 
