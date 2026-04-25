@@ -416,16 +416,25 @@ if (location.search.includes('debug')) {
             return false;
         }
 
+        function debugLog(msg) {
+            var d = document.getElementById('debugInfo');
+            if (!d) { d = document.createElement('div'); d.id = 'debugInfo'; d.style.cssText = 'background:#1a1a2e;color:#0f0;padding:10px;font-family:monospace;font-size:12px;max-height:300px;overflow:auto;margin:10px;border-radius:8px;'; document.body.prepend(d); }
+            d.innerHTML += msg + '<br>';
+        }
+
         function loadInvoice() {
             const params = new URLSearchParams(window.location.search);
             const supabaseId = params.get('id');
             const localKey = params.get('invoice');
+            debugLog('URL params: id=' + supabaseId + ', invoice=' + localKey);
 
             if (supabaseId) {
                 // Try Supabase first, fall back to localStorage if it fails
+                debugLog('Trying Supabase load: ' + supabaseId);
                 loadQuoteForViewing(supabaseId).then(function(result) {
+                    debugLog('Supabase result: error=' + JSON.stringify(result.error) + ', hasData=' + !!result.data);
                     if (result.error || !result.data) {
-                        console.warn('Supabase invoice load failed, trying localStorage fallback...');
+                        debugLog('Supabase failed, trying localStorage...');
                         if (!tryLocalStorageFallback()) {
                             document.getElementById('invoiceContainer').innerHTML = '<div class="alert alert-warning">Invoice not found.</div>';
                         }
@@ -433,6 +442,11 @@ if (location.search.includes('debug')) {
                     }
                     var row = result.data;
                     invoiceData = row.data || row;
+                    debugLog('invoiceData keys: ' + Object.keys(invoiceData).join(', '));
+                    debugLog('rooms: ' + (invoiceData.rooms ? invoiceData.rooms.length + ' rooms' : 'MISSING'));
+                    if (invoiceData.rooms && invoiceData.rooms.length > 0) {
+                        debugLog('Room 0: ' + invoiceData.rooms[0].name + ', items: ' + (invoiceData.rooms[0].items ? invoiceData.rooms[0].items.length : 'MISSING'));
+                    }
                     if (!invoiceData.clientName && row.client_name) invoiceData.clientName = row.client_name;
                     if (!invoiceData.rooms && row.rooms) invoiceData.rooms = row.rooms;
                     if (!invoiceData.grandTotal && row.grand_total) invoiceData.grandTotal = row.grand_total;
