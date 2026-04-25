@@ -311,6 +311,7 @@ if (location.search.includes('debug')) {
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openMeasureModal()"><i class="fas fa-satellite me-2 text-primary"></i>Satellite Measure</a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openIkeaQuoteModal()"><i class="fas fa-utensils me-2 text-warning"></i>IKEA Quick Quote</a></li>
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="openFloorPlanModal()"><i class="fas fa-drafting-compass me-2 text-info"></i>Floor Plan Scanner</a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openMaterialEstimator()"><i class="fas fa-ruler-combined me-2 text-info"></i>Material Estimator</a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openHardwoodCalc()"><i class="fas fa-rug me-2 text-warning"></i>Hardwood/LVP Calculator</a></li>
@@ -604,6 +605,21 @@ if (location.search.includes('debug')) {
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- Floor Plan Scanner Modal -->
+    <div class="modal fade" id="floorPlanModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header" style="background:#1a56a0; color:white;">
+            <h5 class="modal-title"><i class="fas fa-drafting-compass me-2"></i>Floor Plan Scanner</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body" id="floorPlanModalBody">
+            <!-- Steps rendered by JS -->
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- IKEA Quick Quote Modal -->
@@ -2449,6 +2465,326 @@ Example:
                 alert('Please drop a PDF file.');
             }
         }
+
+        // ── Floor Plan Scanner ─────────────────────────────────────────────────
+        var _fpImageBase64 = null;
+        var _fpMimeType = 'image/jpeg';
+        var _fpResults = null;
+
+        function openFloorPlanModal() {
+            _fpImageBase64 = null;
+            _fpMimeType = 'image/jpeg';
+            _fpResults = null;
+            _fpRenderStep1();
+            var modal = new bootstrap.Modal(document.getElementById('floorPlanModal'));
+            modal.show();
+        }
+
+        function _fpRenderStep1() {
+            document.getElementById('floorPlanModalBody').innerHTML = `
+                <div class="text-center mb-3">
+                    <div class="d-flex justify-content-center gap-2 mb-3">
+                        <span class="badge bg-primary">1 Upload</span>
+                        <span class="badge bg-secondary">2 Settings</span>
+                        <span class="badge bg-secondary">3 Review</span>
+                    </div>
+                    <p class="text-muted small">Upload a photo or PDF of your floor plan. Clear photos of drawings work best.</p>
+                </div>
+                <div id="fpDropZone" onclick="document.getElementById('fpFileInput').click()" style="border:2px dashed #1a56a0;border-radius:12px;padding:40px 20px;text-align:center;cursor:pointer;background:#f8f9ff;transition:background 0.2s;"
+                    ondragover="event.preventDefault();this.style.background='#e8f0ff'" ondragleave="this.style.background='#f8f9ff'" ondrop="event.preventDefault();_fpHandleFile(event.dataTransfer.files[0])">
+                    <i class="fas fa-cloud-upload-alt fa-3x mb-3" style="color:#1a56a0;"></i>
+                    <div class="fw-semibold">Click or drag & drop your floor plan</div>
+                    <div class="text-muted small mt-1">Supports JPG, PNG, WebP, PDF</div>
+                    <input type="file" id="fpFileInput" accept="image/*,application/pdf" style="display:none" onchange="_fpHandleFile(this.files[0])">
+                </div>
+                <div id="fpPreviewArea" style="display:none;" class="mt-3 text-center">
+                    <img id="fpPreviewImg" style="max-width:100%;max-height:300px;border-radius:8px;border:1px solid #dee2e6;" alt="Floor plan preview">
+                    <div class="mt-2 text-success small" id="fpPreviewLabel"></div>
+                </div>
+                <div id="fpStep1Error" class="alert alert-danger mt-3" style="display:none;"></div>
+                <div class="d-flex justify-content-end mt-3">
+                    <button class="btn btn-primary" id="fpNext1Btn" onclick="_fpGoToStep2()" disabled>
+                        Next <i class="fas fa-arrow-right ms-1"></i>
+                    </button>
+                </div>
+            `;
+        }
+
+        async function _fpHandleFile(file) {
+            if (!file) return;
+            var errEl = document.getElementById('fpStep1Error');
+            errEl.style.display = 'none';
+
+            if (file.type === 'application/pdf') {
+                // Convert PDF page 1 to image using PDF.js
+                try {
+                    if (!window.pdfjsLib) {
+                        await new Promise(function(resolve, reject) {
+                            var s = document.createElement('script');
+                            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+                            s.onload = resolve; s.onerror = reject;
+                            document.head.appendChild(s);
+                        });
+                        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                    }
+                    var arrayBuffer = await file.arrayBuffer();
+                    var pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                    var page = await pdf.getPage(1);
+                    var viewport = page.getViewport({ scale: 2.0 }); // high res
+                    var canvas = document.createElement('canvas');
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+                    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+                    _fpImageBase64 = canvas.toDataURL('image/jpeg', 0.92).split(',')[1];
+                    _fpMimeType = 'image/jpeg';
+                    document.getElementById('fpPreviewImg').src = canvas.toDataURL('image/jpeg', 0.92);
+                    document.getElementById('fpPreviewLabel').textContent = 'PDF page 1 extracted \u2714 (' + pdf.numPages + ' page' + (pdf.numPages !== 1 ? 's' : '') + ' total)';
+                } catch(e) {
+                    errEl.textContent = 'Could not read PDF: ' + e.message + '. Try saving as an image (screenshot) instead.';
+                    errEl.style.display = '';
+                    return;
+                }
+            } else if (file.type.startsWith('image/')) {
+                _fpMimeType = file.type;
+                var reader = new FileReader();
+                reader.onload = function(e) {
+                    var dataUrl = e.target.result;
+                    _fpImageBase64 = dataUrl.split(',')[1];
+                    document.getElementById('fpPreviewImg').src = dataUrl;
+                    document.getElementById('fpPreviewLabel').textContent = file.name + ' ready \u2714';
+                    document.getElementById('fpPreviewArea').style.display = '';
+                    document.getElementById('fpNext1Btn').disabled = false;
+                };
+                reader.readAsDataURL(file);
+                return;
+            } else {
+                errEl.textContent = 'Please upload an image (JPG, PNG, WebP) or PDF file.';
+                errEl.style.display = '';
+                return;
+            }
+            document.getElementById('fpPreviewArea').style.display = '';
+            document.getElementById('fpNext1Btn').disabled = false;
+        }
+
+        function _fpGoToStep2() {
+            if (!_fpImageBase64) return;
+            document.getElementById('floorPlanModalBody').innerHTML = `
+                <div class="text-center mb-3">
+                    <div class="d-flex justify-content-center gap-2 mb-3">
+                        <span class="badge bg-secondary">1 Upload</span>
+                        <span class="badge bg-primary">2 Settings</span>
+                        <span class="badge bg-secondary">3 Review</span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Drawing Scale</label>
+                    <select class="form-select" id="fpScale">
+                        <option value="Dimensions labeled on drawing">Dimensions labeled on drawing (most accurate)</option>
+                        <option value="1/4 inch = 1 foot" selected>1/4&quot; = 1&apos; (most common residential)</option>
+                        <option value="1/8 inch = 1 foot">1/8&quot; = 1&apos;</option>
+                        <option value="3/16 inch = 1 foot">3/16&quot; = 1&apos;</option>
+                        <option value="3/8 inch = 1 foot">3/8&quot; = 1&apos;</option>
+                        <option value="1/2 inch = 1 foot">1/2&quot; = 1&apos;</option>
+                        <option value="3/4 inch = 1 foot">3/4&quot; = 1&apos;</option>
+                        <option value="1 inch = 1 foot">1&quot; = 1&apos;</option>
+                        <option value="1:50">1:50 (metric)</option>
+                        <option value="1:100">1:100 (metric)</option>
+                        <option value="Not sure - AI will estimate">Not sure (AI will estimate)</option>
+                    </select>
+                    <div class="text-muted small mt-1"><i class="fas fa-lightbulb text-warning me-1"></i>If dimensions are written on the drawing, choose the first option for the best accuracy.</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Ceiling Height (feet)</label>
+                    <input type="number" class="form-control" id="fpCeilingHeight" value="9" min="6" max="20" step="0.5" style="max-width:120px;">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">What to Estimate</label>
+                    <div class="row g-2">
+                        <div class="col-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="fpTradeFlooring" checked><label class="form-check-label" for="fpTradeFlooring">Flooring (sqft)</label></div></div>
+                        <div class="col-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="fpTradeDrywall" checked><label class="form-check-label" for="fpTradeDrywall">Drywall (sqft)</label></div></div>
+                        <div class="col-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="fpTradePaint" checked><label class="form-check-label" for="fpTradePaint">Paint (sqft)</label></div></div>
+                        <div class="col-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="fpTradeFraming" checked><label class="form-check-label" for="fpTradeFraming">Framing (linear ft)</label></div></div>
+                        <div class="col-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="fpTradeTile"><label class="form-check-label" for="fpTradeTile">Tile (sqft) <span class="text-muted small">if applicable</span></label></div></div>
+                    </div>
+                </div>
+                <div class="d-flex justify-content-between mt-3">
+                    <button class="btn btn-outline-secondary" onclick="_fpRenderStep1()"><i class="fas fa-arrow-left me-1"></i>Back</button>
+                    <button class="btn btn-primary" onclick="_fpAnalyze()"><i class="fas fa-magic me-1"></i>Analyze Drawing</button>
+                </div>
+            `;
+        }
+
+        async function _fpAnalyze() {
+            var scale = document.getElementById('fpScale').value;
+            var ceilingHeight = parseFloat(document.getElementById('fpCeilingHeight').value) || 9;
+            var trades = [];
+            if (document.getElementById('fpTradeFlooring').checked) trades.push('flooring');
+            if (document.getElementById('fpTradeDrywall').checked) trades.push('drywall');
+            if (document.getElementById('fpTradePaint').checked) trades.push('paint');
+            if (document.getElementById('fpTradeFraming').checked) trades.push('framing');
+            if (document.getElementById('fpTradeTile').checked) trades.push('tile');
+
+            // Show loading
+            document.getElementById('floorPlanModalBody').innerHTML = `
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary mb-3" style="width:3rem;height:3rem;"></div>
+                    <div class="fw-semibold">Analyzing your floor plan...</div>
+                    <div class="text-muted small mt-1">GPT-4o Vision is reading the drawing. This takes 10-20 seconds.</div>
+                    <div class="text-muted small mt-3" id="fpStatusMsg"></div>
+                </div>
+            `;
+
+            // Fun status messages
+            var msgs = ['Reading room dimensions...', 'Identifying rooms...', 'Calculating material quantities...', 'Almost done...'];
+            var msgIdx = 0;
+            var msgTimer = setInterval(function() {
+                var el = document.getElementById('fpStatusMsg');
+                if (el && msgIdx < msgs.length) { el.textContent = msgs[msgIdx++]; }
+                else clearInterval(msgTimer);
+            }, 4000);
+
+            try {
+                var ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso';
+                var res = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/analyze-floor-plan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ANON_KEY },
+                    body: JSON.stringify({
+                        imageBase64: _fpImageBase64,
+                        mimeType: _fpMimeType,
+                        scale: scale,
+                        ceilingHeight: ceilingHeight,
+                        trades: trades,
+                        customItems: customItems
+                    })
+                });
+                clearInterval(msgTimer);
+                var data = await res.json();
+                if (data.error) throw new Error(data.error);
+                _fpResults = data;
+                _fpRenderStep3(data);
+            } catch(e) {
+                clearInterval(msgTimer);
+                document.getElementById('floorPlanModalBody').innerHTML = `
+                    <div class="text-center py-4">
+                        <i class="fas fa-exclamation-triangle fa-3x text-danger mb-3"></i>
+                        <div class="fw-semibold text-danger">Analysis Failed</div>
+                        <div class="text-muted small mt-1">${e.message}</div>
+                        <button class="btn btn-primary mt-3" onclick="_fpGoToStep2()">Try Again</button>
+                    </div>
+                `;
+            }
+        }
+
+        function _fpRenderStep3(data) {
+            var roomsHtml = '';
+            (data.rooms || []).forEach(function(room, ri) {
+                var itemsHtml = '';
+                (room.items || []).forEach(function(item, ii) {
+                    itemsHtml += `
+                        <div class="d-flex align-items-center gap-2 py-1 border-bottom">
+                            <input type="checkbox" class="form-check-input fp-item-check" id="fpItem_${ri}_${ii}" checked style="flex-shrink:0;">
+                            <div style="flex:1;">
+                                <span class="badge bg-secondary me-1" style="font-size:0.7rem;">${item.category}</span>
+                                <span class="small">${item.description}</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-1">
+                                <input type="number" class="form-control form-control-sm" id="fpQty_${ri}_${ii}" value="${item.quantity}" style="width:75px;" min="0">
+                                <span class="text-muted small">${item.unitType}</span>
+                            </div>
+                        </div>`;
+                });
+                var dims = room.dimensions;
+                var dimBadge = dims ? `${dims.length}\' &times; ${dims.width}\' = ${dims.area} sqft` : '';
+                roomsHtml += `
+                    <div class="card mb-2">
+                        <div class="card-header py-2 d-flex align-items-center gap-2" style="background:#f0f4ff;">
+                            <input type="checkbox" class="form-check-input fp-room-check" id="fpRoom_${ri}" checked onchange="_fpToggleRoom(${ri}, this.checked)">
+                            <input type="text" class="form-control form-control-sm fw-semibold" id="fpRoomName_${ri}" value="${room.name}" style="border:none;background:transparent;font-weight:600;">
+                            ${dimBadge ? `<span class="badge bg-light text-dark ms-auto" style="font-size:0.7rem;">${dimBadge}</span>` : ''}
+                        </div>
+                        <div class="card-body py-2" id="fpRoomItems_${ri}">${itemsHtml}</div>
+                    </div>`;
+            });
+
+            var warningsHtml = '';
+            if (data.warnings && data.warnings.length > 0) {
+                warningsHtml = `<div class="alert alert-warning py-2 small"><i class="fas fa-exclamation-triangle me-1"></i><strong>Notes:</strong> ${data.warnings.join(' &bull; ')}</div>`;
+            }
+
+            document.getElementById('floorPlanModalBody').innerHTML = `
+                <div class="text-center mb-2">
+                    <div class="d-flex justify-content-center gap-2 mb-2">
+                        <span class="badge bg-secondary">1 Upload</span>
+                        <span class="badge bg-secondary">2 Settings</span>
+                        <span class="badge bg-primary">3 Review</span>
+                    </div>
+                    <div class="text-muted small">Review the extracted rooms and quantities. Click any value to edit before adding to your quote.</div>
+                </div>
+                ${warningsHtml}
+                <div style="max-height:380px;overflow-y:auto;">${roomsHtml}</div>
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                    <button class="btn btn-outline-secondary btn-sm" onclick="_fpGoToStep2()"><i class="fas fa-arrow-left me-1"></i>Back</button>
+                    <div class="text-muted small">${(data.rooms||[]).length} rooms &bull; ~${data.totalArea || '?'} sqft total</div>
+                    <button class="btn btn-success" onclick="_fpAddToQuote()"><i class="fas fa-check me-1"></i>Add All to Quote</button>
+                </div>
+            `;
+        }
+
+        function _fpToggleRoom(ri, checked) {
+            var itemsDiv = document.getElementById('fpRoomItems_' + ri);
+            if (itemsDiv) {
+                itemsDiv.querySelectorAll('.fp-item-check').forEach(function(cb) { cb.checked = checked; cb.disabled = !checked; });
+            }
+        }
+
+        function _fpAddToQuote() {
+            if (!_fpResults || !_fpResults.rooms) return;
+            var addedCount = 0;
+            _fpResults.rooms.forEach(function(room, ri) {
+                var roomCheck = document.getElementById('fpRoom_' + ri);
+                if (!roomCheck || !roomCheck.checked) return;
+                var roomName = document.getElementById('fpRoomName_' + ri).value || room.name;
+                // Create new room
+                var newRoom = { id: roomCounter++, name: roomName, items: [], notes: '', photos: [] };
+                (room.items || []).forEach(function(item, ii) {
+                    var itemCheck = document.getElementById('fpItem_' + ri + '_' + ii);
+                    if (!itemCheck || !itemCheck.checked) return;
+                    var qty = parseFloat(document.getElementById('fpQty_' + ri + '_' + ii).value) || item.quantity;
+                    newRoom.items.push({
+                        description: item.description,
+                        category: item.category,
+                        quantity: qty,
+                        unitType: item.unitType || 'sqft',
+                        rate: item.rate || 0,
+                        total: qty * (item.rate || 0),
+                        notes: item.notes || '',
+                        isOptional: false
+                    });
+                });
+                if (newRoom.items.length > 0) {
+                    rooms.push(newRoom);
+                    addedCount++;
+                }
+            });
+            bootstrap.Modal.getInstance(document.getElementById('floorPlanModal')).hide();
+            if (addedCount > 0) {
+                renderRooms();
+                calculateTotals();
+                unsavedChanges = true;
+                // Scroll to first new room
+                setTimeout(function() {
+                    var roomEls = document.querySelectorAll('.room-card');
+                    if (roomEls.length > 0) roomEls[roomEls.length - addedCount].scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 300);
+                // Toast
+                var toast = document.createElement('div');
+                toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#198754;color:white;padding:12px 20px;border-radius:8px;z-index:9999;font-size:0.9rem;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
+                toast.innerHTML = '<i class="fas fa-check-circle me-2"></i>' + addedCount + ' room' + (addedCount !== 1 ? 's' : '') + ' added to your quote!';
+                document.body.appendChild(toast);
+                setTimeout(function() { toast.remove(); }, 4000);
+            }
+        }
+        // ── End Floor Plan Scanner ────────────────────────────────────────────────
 
         function openIkeaQuoteModal() {
             document.getElementById('ikeaOrderInput').value = '';
