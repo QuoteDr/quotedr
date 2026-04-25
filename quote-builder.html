@@ -892,6 +892,7 @@ Example:
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title"><i class="fas fa-database"></i> Manage Line Items</h5>
+                    <button id="undoManageItemsBtn" class="btn btn-sm btn-outline-secondary ms-auto me-2" onclick="undoManageItems()" disabled title="Undo last change"><i class="fas fa-undo me-1"></i>Undo</button>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -5240,6 +5241,23 @@ async function saveQuote() {
 
         let pricingDirty = false; // tracks unsaved changes in Manage Items modal
         let lastDeletedItem = null; // for undo functionality
+        var undoStack = [];
+        function pushUndoState() {
+            if (undoStack.length >= 20) undoStack.shift();
+            undoStack.push(JSON.parse(JSON.stringify(customItems)));
+            var btn = document.getElementById('undoManageItemsBtn');
+            if (btn) btn.disabled = false;
+        }
+        function undoManageItems() {
+            if (undoStack.length > 0) {
+                customItems = undoStack.pop();
+                _injectItemsIntoPricingDB(customItems);
+                renderAllItemsList();
+                saveCustomItems();
+                var btn = document.getElementById('undoManageItemsBtn');
+                if (btn) btn.disabled = undoStack.length === 0;
+            }
+        }
 
         function markPricingDirty() {
             pricingDirty = true;
@@ -5254,6 +5272,7 @@ async function saveQuote() {
         }
 
         function saveItemRow(cat, name) {
+            pushUndoState();
             const safeId = (cat + '_' + name).replace(/[^a-z0-9]/gi,'_');
             const row = document.getElementById('row_' + safeId);
             if (!row) return;
@@ -5601,6 +5620,7 @@ async function saveQuote() {
         }
 
         function deleteCustomItem(category, name) {
+            pushUndoState();
             if (!customItems[category]) return;
             customItems[category] = customItems[category].filter(i => i.name !== name);
             if (customItems[category].length === 0) delete customItems[category];
