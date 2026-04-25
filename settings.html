@@ -1443,42 +1443,6 @@ Sarah Jones, 905-555-5678"></textarea>
 			var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'quotedr-clients.csv'; a.click();
 		}
 
-		function openManageItemsInline() {
-			var items = {};
-			try { items = JSON.parse(localStorage.getItem('ald_custom_items') || '{}'); } catch(e) {}
-			var html = '';
-			var cats = Object.keys(items);
-			if (cats.length === 0) {
-				html = '<div class="text-center text-muted py-4"><i class="fas fa-box-open fa-2x mb-2"></i><br>No saved items yet.<br><small>Add items in the Quote Builder using the "Save New Item" button.</small></div>';
-			} else {
-				cats.forEach(function(cat) {
-					if (!Array.isArray(items[cat]) || items[cat].length === 0) return;
-					html += '<div class="mb-3"><div class="fw-bold border-bottom pb-1 mb-2" style="color:#1a56a0"><i class="fas fa-tag me-1"></i>' + cat + ' <span class="badge bg-secondary">' + items[cat].length + '</span></div>';
-					items[cat].forEach(function(item, idx) {
-						html += '<div class="d-flex justify-content-between align-items-center py-1 border-bottom">';
-						html += '<div><strong>' + (item.name||'') + '</strong> <span class="text-muted small">' + (item.unitType||'') + ' · $' + parseFloat(item.rate||0).toFixed(2) + '</span></div>';
-						html += '<button class="btn btn-outline-danger btn-sm" onclick="deleteSettingsItem(' + JSON.stringify(cat) + ',' + idx + ')"><i class="fas fa-trash"></i></button>';
-						html += '</div>';
-					});
-					html += '</div>';
-				});
-			}
-			document.getElementById('manageItemsBody').innerHTML = html;
-			new bootstrap.Modal(document.getElementById('manageItemsModal')).show();
-		}
-
-		function deleteSettingsItem(cat, idx) {
-			var items = {};
-			try { items = JSON.parse(localStorage.getItem('ald_custom_items') || '{}'); } catch(e) {}
-			if (items[cat] && Array.isArray(items[cat])) {
-				items[cat].splice(idx, 1);
-				if (items[cat].length === 0) delete items[cat];
-				localStorage.setItem('ald_custom_items', JSON.stringify(items));
-				// Also delete from Supabase
-				if (typeof deleteItem === 'function') deleteItem(items[cat] && items[cat][idx] ? items[cat][idx].name : '').catch(function(){});
-			}
-			openManageItemsInline(); // re-render
-		}
 
 		function exportMaterialsToFile() {
 			var items = {};
@@ -1706,22 +1670,7 @@ Sarah Jones, 905-555-5678"></textarea>
 
     <script src="ai-assistant.js"></script>
 
-<!-- Manage Items Modal -->
-<div class="modal fade" id="manageItemsModal" tabindex="-1">
-  <div class="modal-dialog modal-lg modal-dialog-scrollable">
-    <div class="modal-content">
-      <div class="modal-header" style="background:#1a56a0; color:white;">
-        <h5 class="modal-title"><i class="fas fa-database me-2"></i>Manage Saved Items</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body" id="manageItemsBody"></div>
-      <div class="modal-footer">
-        <button class="btn btn-outline-secondary btn-sm" onclick="exportMaterialsToFile()"><i class="fas fa-download me-1"></i>Export CSV</button>
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-      </div>
-    </div>
-  </div>
-</div>
+<!-- Manage Items is handled in quote-builder.html via the Manage Items modal there -->
 
 </body>
 </html>
