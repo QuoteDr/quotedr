@@ -839,7 +839,6 @@ if (location.search.includes('debug')) {
             if (hasNotes || hasUpgrades) {
                 // Save upgrades + notes to Supabase, mark as in_review
                 submitUpgrades();
-                document.getElementById('hiddenSubmitBtn').click();
                 var urlParams = new URLSearchParams(window.location.search);
                 var quoteId = urlParams.get('id');
                 if (quoteId) {
@@ -1031,7 +1030,6 @@ if (location.search.includes('debug')) {
             document.getElementById('approveSection').style.display = 'none';
             closeSignatureModal();
             submitUpgrades();
-            document.getElementById('hiddenSubmitBtn').click();
     
             var depSection = document.getElementById('stripeDepositSection');
             if (depSection && _paymentSettings && _paymentSettings.stripe_enabled && _paymentSettings.accept_deposit) {
@@ -1057,53 +1055,6 @@ if (location.search.includes('debug')) {
         }
 
         function submitUpgrades(event) {
-            // Clear any previously injected hidden fields
-            document.querySelectorAll('#upgradeForm .dynamic-field').forEach(el => el.remove());
-
-            const form = document.getElementById('upgradeForm');
-
-            // Helper to add a hidden textarea field
-            function addField(name, value) {
-                const el = document.createElement('textarea');
-                el.name = name;
-                el.value = value;
-                el.className = 'dynamic-field';
-                el.style.display = 'none';
-                form.appendChild(el);
-            }
-
-            // Upgrades selected
-            const upgradeLines = [];
-            (quoteData.rooms || []).forEach(room => {
-                room.items.forEach(item => {
-                    if (item.upgraded && item.upgrade) {
-                        upgradeLines.push(`${room.name} → ${item.upgrade.name} (+$${((item.upgrade.rate - (item._baseRate || item.rate)) * item.quantity).toFixed(2)})`);
-                    }
-                });
-            });
-            addField('upgrades_selected', upgradeLines.length ? upgradeLines.join('\n') : 'No upgrades selected');
-
-            // Removed items
-            const removedLines = [];
-            (quoteData.rooms || []).forEach(room => {
-                room.items.forEach(item => {
-                    if (item._removed) removedLines.push(`${room.name} → ${item.description}`);
-                });
-            });
-            if (removedLines.length) addField('removed_items', removedLines.join('\n'));
-
-            // Room notes
-            const noteLines = [];
-            if (quoteData._roomNotes) {
-                Object.entries(quoteData._roomNotes).forEach(([idx, note]) => {
-                    if (note && note.trim()) {
-                        const roomName = quoteData.rooms[idx]?.name || ('Room ' + idx);
-                        noteLines.push(`${roomName}:\n${note.trim()}`);
-                    }
-                });
-            }
-            if (noteLines.length) addField('client_notes', noteLines.join('\n\n'));
-
             // Build upgrade summary for Supabase
             var _clientUpgrades = [];
             var _clientRemovals = [];
