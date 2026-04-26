@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { imageBase64, mimeType, scale, ceilingHeight, trades, customItems } = await req.json();
+    const { imageBase64, mimeType, scale, ceilingHeight, trades, customItems, buildingWidth, buildingDepth } = await req.json();
 
     if (!imageBase64) {
       return new Response(JSON.stringify({ error: 'Missing required field: imageBase64' }), {
@@ -29,6 +29,9 @@ Deno.serve(async (req) => {
     const tradesRequested = trades || ['flooring', 'drywall', 'paint', 'framing'];
     const ceilingHt = ceilingHeight || 9;
     const scaleInfo = scale || 'Dimensions labeled on drawing';
+    const buildingDimsInfo = (buildingWidth && buildingDepth)
+      ? `KNOWN BUILDING DIMENSIONS: The overall building footprint is ${buildingWidth}' wide × ${buildingDepth}' deep. Use this as your anchor — all room dimensions must add up to these totals (accounting for wall thicknesses of ~6 inches per wall). If string dimensions on the drawing don't match individual room labels, trust these overall dimensions and divide proportionally.`
+      : '';
 
     const systemPrompt = `You are an expert construction estimator who analyzes architectural floor plans and extracts room dimensions to calculate material quantities for renovation quotes.
 
@@ -36,6 +39,7 @@ TASK: Analyze the provided floor plan image and extract all rooms with their dim
 
 SCALE INFORMATION: ${scaleInfo}
 CEILING HEIGHT: ${ceilingHt} feet
+${buildingDimsInfo}
 
 INSTRUCTIONS:
 1. Identify every room and area in the floor plan (bedrooms, bathrooms, kitchen, living room, hallways, etc.)
