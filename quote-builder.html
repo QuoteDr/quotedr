@@ -2466,57 +2466,59 @@ Example:
             }
         }
 
-        // ── Floor Plan Scanner ─────────────────────────────────────────────────
+        // ── Floor Plan Scanner ──────────────────────────────────────────────────────
         var _fpImageBase64 = null;
         var _fpMimeType = 'image/jpeg';
         var _fpResults = null;
         var _fpPdfDoc = null;
         var _fpCurrentPage = 1;
+        var _fpRooms = [];
+        var _fpSettings = { ceilingHeight: 9, trades: ['flooring','drywall','paint','framing'] };
+
+        function _fpStepBadges(active) {
+            var steps = ['1 Upload','2 Measure','3 Settings','4 Review'];
+            return steps.map(function(s, i) {
+                return '<span class="badge ' + (i+1 === active ? 'bg-primary' : 'bg-secondary') + ' me-1">' + s + '</span>';
+            }).join('');
+        }
 
         function openFloorPlanModal() {
             _fpImageBase64 = null;
             _fpMimeType = 'image/jpeg';
             _fpResults = null;
+            _fpRooms = [];
             _fpRenderStep1();
             var modal = new bootstrap.Modal(document.getElementById('floorPlanModal'));
             modal.show();
         }
 
         function _fpRenderStep1() {
-            document.getElementById('floorPlanModalBody').innerHTML = `
-                <div class="text-center mb-3">
-                    <div class="d-flex justify-content-center gap-2 mb-3">
-                        <span class="badge bg-primary">1 Upload</span>
-                        <span class="badge bg-secondary">2 Settings</span>
-                        <span class="badge bg-secondary">3 Review</span>
-                    </div>
-                    <p class="text-muted small">Upload a photo or PDF of your floor plan. Clear photos of drawings work best.</p>
-                </div>
-                <div id="fpDropZone" onclick="document.getElementById('fpFileInput').click()" style="border:2px dashed #1a56a0;border-radius:12px;padding:40px 20px;text-align:center;cursor:pointer;background:#f8f9ff;transition:background 0.2s;"
-                    ondragover="event.preventDefault();this.style.background='#e8f0ff'" ondragleave="this.style.background='#f8f9ff'" ondrop="event.preventDefault();_fpHandleFile(event.dataTransfer.files[0])">
-                    <i class="fas fa-cloud-upload-alt fa-3x mb-3" style="color:#1a56a0;"></i>
-                    <div class="fw-semibold">Click or drag & drop your floor plan</div>
-                    <div class="text-muted small mt-1">Supports JPG, PNG, WebP, PDF</div>
-                    <input type="file" id="fpFileInput" accept="image/*,application/pdf" style="display:none" onchange="_fpHandleFile(this.files[0])">
-                </div>
-                <div id="fpPreviewArea" style="display:none;" class="mt-3 text-center">
-                    <img id="fpPreviewImg" style="max-width:100%;max-height:300px;border-radius:8px;border:1px solid #dee2e6;" alt="Floor plan preview">
-                    <div class="mt-2 text-success small" id="fpPreviewLabel"></div>
-                    <div id="fpPagePicker" style="display:none;" class="mt-2 d-flex align-items-center justify-content-center gap-2">
-                        <button class="btn btn-outline-secondary btn-sm" onclick="_fpChangePage(-1)"><i class="fas fa-chevron-left"></i></button>
-                        <span class="small">Page</span>
-                        <input type="number" id="fpPageInput" class="form-control form-control-sm text-center" style="width:60px;" min="1" value="1" onchange="_fpChangePage(0, parseInt(this.value))">
-                        <span class="small" id="fpPageTotal">of ?</span>
-                        <button class="btn btn-outline-secondary btn-sm" onclick="_fpChangePage(1)"><i class="fas fa-chevron-right"></i></button>
-                    </div>
-                </div>
-                <div id="fpStep1Error" class="alert alert-danger mt-3" style="display:none;"></div>
-                <div class="d-flex justify-content-end mt-3">
-                    <button class="btn btn-primary" id="fpNext1Btn" onclick="_fpGoToStep2()" disabled>
-                        Next <i class="fas fa-arrow-right ms-1"></i>
-                    </button>
-                </div>
-            `;
+            document.getElementById('floorPlanModalBody').innerHTML =
+                '<div class="text-center mb-3">' +
+                '<div class="d-flex justify-content-center gap-1 mb-3">' + _fpStepBadges(1) + '</div>' +
+                '<p class="text-muted small">Upload a photo or PDF of your floor plan. Clear photos of drawings work best.</p>' +
+                '</div>' +
+                '<div id="fpDropZone" onclick="document.getElementById(\'fpFileInput\').click()" style="border:2px dashed #1a56a0;border-radius:12px;padding:40px 20px;text-align:center;cursor:pointer;background:#f8f9ff;transition:background 0.2s;" ondragover="event.preventDefault();this.style.background=\'#e8f0ff\'" ondragleave="this.style.background=\'#f8f9ff\'" ondrop="event.preventDefault();_fpHandleFile(event.dataTransfer.files[0])">' +
+                '<i class="fas fa-cloud-upload-alt fa-3x mb-3" style="color:#1a56a0;"></i>' +
+                '<div class="fw-semibold">Click or drag &amp; drop your floor plan</div>' +
+                '<div class="text-muted small mt-1">Supports JPG, PNG, WebP, PDF</div>' +
+                '<input type="file" id="fpFileInput" accept="image/*,application/pdf" style="display:none" onchange="_fpHandleFile(this.files[0])">' +
+                '</div>' +
+                '<div id="fpPreviewArea" style="display:none;" class="mt-3 text-center">' +
+                '<img id="fpPreviewImg" style="max-width:100%;max-height:280px;border-radius:8px;border:1px solid #dee2e6;" alt="Floor plan preview">' +
+                '<div class="mt-2 text-success small" id="fpPreviewLabel"></div>' +
+                '<div id="fpPagePicker" style="display:none;" class="mt-2 d-flex align-items-center justify-content-center gap-2">' +
+                '<button class="btn btn-outline-secondary btn-sm" onclick="_fpChangePage(-1)"><i class="fas fa-chevron-left"></i></button>' +
+                '<span class="small">Page</span>' +
+                '<input type="number" id="fpPageInput" class="form-control form-control-sm text-center" style="width:60px;" min="1" value="1" onchange="_fpChangePage(0, parseInt(this.value))">' +
+                '<span class="small" id="fpPageTotal">of ?</span>' +
+                '<button class="btn btn-outline-secondary btn-sm" onclick="_fpChangePage(1)"><i class="fas fa-chevron-right"></i></button>' +
+                '</div>' +
+                '</div>' +
+                '<div id="fpStep1Error" class="alert alert-danger mt-3" style="display:none;"></div>' +
+                '<div class="d-flex justify-content-end mt-3">' +
+                '<button class="btn btn-primary" id="fpNext1Btn" onclick="_fpGoToStep2()" disabled>Next <i class="fas fa-arrow-right ms-1"></i></button>' +
+                '</div>';
         }
 
         async function _fpHandleFile(file) {
@@ -2539,7 +2541,6 @@ Example:
                     _fpPdfDoc = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
                     _fpCurrentPage = 1;
                     await _fpRenderPdfPage(_fpCurrentPage);
-                    // Show page picker UI
                     document.getElementById('fpPreviewArea').style.display = '';
                     document.getElementById('fpNext1Btn').disabled = false;
                     return;
@@ -2587,7 +2588,7 @@ Example:
             var pageInput = document.getElementById('fpPageInput');
             var pageTotalEl = document.getElementById('fpPageTotal');
             if (imgEl) imgEl.src = dataUrl;
-            if (labelEl) labelEl.textContent = 'Page ' + pageNum + ' of ' + _fpPdfDoc.numPages + ' — scroll to find your floor plan';
+            if (labelEl) labelEl.textContent = 'Page ' + pageNum + ' of ' + _fpPdfDoc.numPages + ' \u2014 navigate to your floor plan page';
             if (pickerEl) pickerEl.style.display = _fpPdfDoc.numPages > 1 ? 'flex' : 'none';
             if (pageInput) pageInput.value = pageNum;
             if (pageInput) pageInput.max = _fpPdfDoc.numPages;
@@ -2604,188 +2605,220 @@ Example:
             }
             if (newPage === _fpCurrentPage && absolute === undefined) return;
             _fpCurrentPage = newPage;
-            // Show mini spinner in label while rendering
             var labelEl = document.getElementById('fpPreviewLabel');
             if (labelEl) labelEl.textContent = 'Loading page ' + newPage + '...';
             await _fpRenderPdfPage(newPage);
         }
 
-        function _fpGoToStep2() {
+        async function _fpGoToStep2() {
             if (!_fpImageBase64) return;
-            document.getElementById('floorPlanModalBody').innerHTML = `
-                <div class="text-center mb-3">
-                    <div class="d-flex justify-content-center gap-2 mb-3">
-                        <span class="badge bg-secondary">1 Upload</span>
-                        <span class="badge bg-primary">2 Settings</span>
-                        <span class="badge bg-secondary">3 Review</span>
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Drawing Scale</label>
-                    <select class="form-select" id="fpScale">
-                        <option value="Dimensions labeled on drawing">Dimensions labeled on drawing (most accurate)</option>
-                        <option value="1/4 inch = 1 foot" selected>1/4&quot; = 1&apos; (most common residential)</option>
-                        <option value="1/8 inch = 1 foot">1/8&quot; = 1&apos;</option>
-                        <option value="3/16 inch = 1 foot">3/16&quot; = 1&apos;</option>
-                        <option value="3/8 inch = 1 foot">3/8&quot; = 1&apos;</option>
-                        <option value="1/2 inch = 1 foot">1/2&quot; = 1&apos;</option>
-                        <option value="3/4 inch = 1 foot">3/4&quot; = 1&apos;</option>
-                        <option value="1 inch = 1 foot">1&quot; = 1&apos;</option>
-                        <option value="1:50">1:50 (metric)</option>
-                        <option value="1:100">1:100 (metric)</option>
-                        <option value="Not sure - AI will estimate">Not sure (AI will estimate)</option>
-                    </select>
-                    <div class="text-muted small mt-1"><i class="fas fa-lightbulb text-warning me-1"></i>If dimensions are written on the drawing, choose the first option for the best accuracy.</div>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Ceiling Height (feet)</label>
-                    <input type="number" class="form-control" id="fpCeilingHeight" value="9" min="6" max="20" step="0.5" style="max-width:120px;">
-                </div>
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Overall Building Dimensions <span class="text-muted fw-normal">(optional)</span></label>
-                    <div class="text-muted small mb-2"><i class="fas fa-info-circle me-1"></i>Required for accuracy if your drawing only has <strong>string dimensions on the outside</strong> (no per-room labels). Enter the total width and depth of the floor plan.</div>
-                    <div class="d-flex align-items-center gap-2">
-                        <input type="number" class="form-control" id="fpBuildingWidth" placeholder="Width (ft)" min="0" step="0.5" style="max-width:110px;">
-                        <span class="text-muted">wide &times;</span>
-                        <input type="number" class="form-control" id="fpBuildingDepth" placeholder="Depth (ft)" min="0" step="0.5" style="max-width:110px;">
-                        <span class="text-muted">deep</span>
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">What to Estimate</label>
-                    <div class="row g-2">
-                        <div class="col-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="fpTradeFlooring" checked><label class="form-check-label" for="fpTradeFlooring">Flooring (sqft)</label></div></div>
-                        <div class="col-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="fpTradeDrywall" checked><label class="form-check-label" for="fpTradeDrywall">Drywall (sqft)</label></div></div>
-                        <div class="col-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="fpTradePaint" checked><label class="form-check-label" for="fpTradePaint">Paint (sqft)</label></div></div>
-                        <div class="col-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="fpTradeFraming" checked><label class="form-check-label" for="fpTradeFraming">Framing (linear ft)</label></div></div>
-                        <div class="col-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="fpTradeTile"><label class="form-check-label" for="fpTradeTile">Tile (sqft) <span class="text-muted small">if applicable</span></label></div></div>
-                    </div>
-                </div>
-                <div class="d-flex justify-content-between mt-3">
-                    <button class="btn btn-outline-secondary" onclick="_fpRenderStep1()"><i class="fas fa-arrow-left me-1"></i>Back</button>
-                    <button class="btn btn-primary" onclick="_fpAnalyze()"><i class="fas fa-magic me-1"></i>Analyze Drawing</button>
-                </div>
-            `;
+            // Show loading state while AI fetches room names
+            document.getElementById('floorPlanModalBody').innerHTML =
+                '<div class="text-center py-5">' +
+                '<div class="spinner-border text-primary mb-3" style="width:2.5rem;height:2.5rem;"></div>' +
+                '<div class="fw-semibold">Identifying rooms...</div>' +
+                '<div class="text-muted small mt-1">This takes just a few seconds</div>' +
+                '</div>';
+
+            var roomNames = ['Living Room','Kitchen','Dining','Bathroom','Bedroom'];
+            try {
+                var ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso';
+                var res = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/analyze-floor-plan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ANON_KEY },
+                    body: JSON.stringify({ mode: 'rooms_only', imageBase64: _fpImageBase64, mimeType: _fpMimeType })
+                });
+                var data = await res.json();
+                if (data.rooms && Array.isArray(data.rooms) && data.rooms.length > 0) {
+                    roomNames = data.rooms;
+                }
+            } catch(e) {
+                // silently fall back to defaults
+            }
+            _fpRenderMeasureStep(roomNames);
         }
 
-        async function _fpAnalyze() {
-            var scale = document.getElementById('fpScale').value;
+        function _fpRenderMeasureStep(roomNames) {
+            var imgSrc = 'data:' + _fpMimeType + ';base64,' + _fpImageBase64;
+            var tableRows = '';
+            roomNames.forEach(function(name, i) {
+                tableRows += _fpRoomRowHtml(i, name);
+            });
+
+            document.getElementById('floorPlanModalBody').innerHTML =
+                '<div class="d-flex justify-content-center gap-1 mb-3">' + _fpStepBadges(2) + '</div>' +
+                '<div class="row g-3">' +
+                '  <div class="col-12 col-md-6">' +
+                '    <div class="text-muted small mb-1"><i class="fas fa-search-plus me-1"></i>Your floor plan — measure each room and enter dimensions on the right</div>' +
+                '    <div style="max-height:480px;overflow-y:auto;border:1px solid #dee2e6;border-radius:8px;">' +
+                '      <img src="' + imgSrc + '" style="width:100%;display:block;" alt="Floor plan">' +
+                '    </div>' +
+                '  </div>' +
+                '  <div class="col-12 col-md-6">' +
+                '    <div class="fw-semibold mb-1">Room Dimensions</div>' +
+                '    <div class="text-muted small mb-2">AI identified these rooms. Edit names, add/remove rooms, then enter each room\'s length and width from your drawing.</div>' +
+                '    <div style="max-height:380px;overflow-y:auto;">' +
+                '      <table class="table table-sm align-middle mb-0" id="fpRoomTable">' +
+                '        <thead><tr><th style="width:24px;"></th><th>Room</th><th style="width:70px;">L</th><th style="width:10px;">×</th><th style="width:70px;">W</th><th style="width:30px;"></th></tr></thead>' +
+                '        <tbody id="fpRoomTableBody">' + tableRows + '</tbody>' +
+                '      </table>' +
+                '    </div>' +
+                '    <button class="btn btn-outline-secondary btn-sm mt-2" onclick="_fpAddMeasureRow()"><i class="fas fa-plus me-1"></i>Add Room</button>' +
+                '    <div class="text-muted small mt-2"><i class="fas fa-lightbulb text-warning me-1"></i>Include hallways and stair areas — they need drywall and paint too!</div>' +
+                '  </div>' +
+                '</div>' +
+                '<div class="d-flex justify-content-between mt-3">' +
+                '  <button class="btn btn-outline-secondary" onclick="_fpRenderStep1()"><i class="fas fa-arrow-left me-1"></i>Back</button>' +
+                '  <button class="btn btn-primary" onclick="_fpGoToStep3()">Settings <i class="fas fa-arrow-right ms-1"></i></button>' +
+                '</div>';
+        }
+
+        function _fpRoomRowHtml(i, name) {
+            return '<tr id="fpRR_' + i + '">' +
+                '<td><input type="checkbox" class="form-check-input" id="fpRRChk_' + i + '" checked></td>' +
+                '<td><input type="text" class="form-control form-control-sm" id="fpRRName_' + i + '" value="' + name + '" style="min-width:90px;"></td>' +
+                '<td><input type="number" class="form-control form-control-sm" id="fpRRL_' + i + '" placeholder="ft" min="0" step="0.5" style="width:65px;"></td>' +
+                '<td class="text-center text-muted">&times;</td>' +
+                '<td><input type="number" class="form-control form-control-sm" id="fpRRW_' + i + '" placeholder="ft" min="0" step="0.5" style="width:65px;"></td>' +
+                '<td><button class="btn btn-link text-danger p-0" onclick="document.getElementById(\'fpRR_' + i + '\').remove()"><i class="fas fa-times"></i></button></td>' +
+                '</tr>';
+        }
+
+        function _fpAddMeasureRow() {
+            var tbody = document.getElementById('fpRoomTableBody');
+            if (!tbody) return;
+            var i = Date.now();
+            var tr = document.createElement('tr');
+            tr.id = 'fpRR_' + i;
+            tr.innerHTML =
+                '<td><input type="checkbox" class="form-check-input" id="fpRRChk_' + i + '" checked></td>' +
+                '<td><input type="text" class="form-control form-control-sm" id="fpRRName_' + i + '" placeholder="Room name" style="min-width:90px;"></td>' +
+                '<td><input type="number" class="form-control form-control-sm" id="fpRRL_' + i + '" placeholder="ft" min="0" step="0.5" style="width:65px;"></td>' +
+                '<td class="text-center text-muted">&times;</td>' +
+                '<td><input type="number" class="form-control form-control-sm" id="fpRRW_' + i + '" placeholder="ft" min="0" step="0.5" style="width:65px;"></td>' +
+                '<td><button class="btn btn-link text-danger p-0" onclick="document.getElementById(\'fpRR_' + i + '\').remove()"><i class="fas fa-times"></i></button></td>';
+            tbody.appendChild(tr);
+            document.getElementById('fpRRName_' + i).focus();
+        }
+
+        function _fpGoToStep3() {
+            // Read room table
+            var rows = document.querySelectorAll('#fpRoomTableBody tr');
+            _fpRooms = [];
+            rows.forEach(function(row) {
+                var rid = row.id.replace('fpRR_', '');
+                var chk = document.getElementById('fpRRChk_' + rid);
+                var nameEl = document.getElementById('fpRRName_' + rid);
+                var lEl = document.getElementById('fpRRL_' + rid);
+                var wEl = document.getElementById('fpRRW_' + rid);
+                if (!nameEl) return;
+                _fpRooms.push({
+                    id: rid,
+                    name: nameEl.value.trim() || 'Room',
+                    length: parseFloat(lEl.value) || 0,
+                    width: parseFloat(wEl.value) || 0,
+                    checked: chk ? chk.checked : true
+                });
+            });
+
+            document.getElementById('floorPlanModalBody').innerHTML =
+                '<div class="d-flex justify-content-center gap-1 mb-3">' + _fpStepBadges(3) + '</div>' +
+                '<div class="mb-3">' +
+                '  <label class="form-label fw-semibold">Ceiling Height (feet)</label>' +
+                '  <input type="number" class="form-control" id="fpCeilingHeight" value="' + _fpSettings.ceilingHeight + '" min="6" max="20" step="0.5" style="max-width:120px;">' +
+                '</div>' +
+                '<div class="mb-3">' +
+                '  <label class="form-label fw-semibold">What to Estimate</label>' +
+                '  <div class="row g-2">' +
+                '    <div class="col-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="fpTradeFlooring"' + (_fpSettings.trades.indexOf('flooring') >= 0 ? ' checked' : '') + '><label class="form-check-label" for="fpTradeFlooring">Flooring (sqft)</label></div></div>' +
+                '    <div class="col-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="fpTradeDrywall"' + (_fpSettings.trades.indexOf('drywall') >= 0 ? ' checked' : '') + '><label class="form-check-label" for="fpTradeDrywall">Drywall (sheets)</label></div></div>' +
+                '    <div class="col-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="fpTradePaint"' + (_fpSettings.trades.indexOf('paint') >= 0 ? ' checked' : '') + '><label class="form-check-label" for="fpTradePaint">Paint (sqft)</label></div></div>' +
+                '    <div class="col-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="fpTradeFraming"' + (_fpSettings.trades.indexOf('framing') >= 0 ? ' checked' : '') + '><label class="form-check-label" for="fpTradeFraming">Framing (linear ft)</label></div></div>' +
+                '    <div class="col-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="fpTradeTile"><label class="form-check-label" for="fpTradeTile">Tile (sqft)</label></div></div>' +
+                '  </div>' +
+                '</div>' +
+                '<div class="d-flex justify-content-between mt-3">' +
+                '  <button class="btn btn-outline-secondary" onclick="_fpRenderMeasureStep(_fpRooms.map(function(r){return r.name;}))"><i class="fas fa-arrow-left me-1"></i>Back</button>' +
+                '  <button class="btn btn-primary" onclick="_fpGoToStep4()">Calculate <i class="fas fa-calculator ms-1"></i></button>' +
+                '</div>';
+        }
+
+        function _fpGoToStep4() {
             var ceilingHeight = parseFloat(document.getElementById('fpCeilingHeight').value) || 9;
-            var buildingWidth = parseFloat(document.getElementById('fpBuildingWidth').value) || null;
-            var buildingDepth = parseFloat(document.getElementById('fpBuildingDepth').value) || null;
             var trades = [];
             if (document.getElementById('fpTradeFlooring').checked) trades.push('flooring');
             if (document.getElementById('fpTradeDrywall').checked) trades.push('drywall');
             if (document.getElementById('fpTradePaint').checked) trades.push('paint');
             if (document.getElementById('fpTradeFraming').checked) trades.push('framing');
             if (document.getElementById('fpTradeTile').checked) trades.push('tile');
+            _fpSettings = { ceilingHeight: ceilingHeight, trades: trades };
 
-            // Show loading
-            document.getElementById('floorPlanModalBody').innerHTML = `
-                <div class="text-center py-5">
-                    <div class="spinner-border text-primary mb-3" style="width:3rem;height:3rem;"></div>
-                    <div class="fw-semibold">Analyzing your floor plan...</div>
-                    <div class="text-muted small mt-1">GPT-4o Vision is reading the drawing. This takes 10-20 seconds.</div>
-                    <div class="text-muted small mt-3" id="fpStatusMsg"></div>
-                </div>
-            `;
+            // Calculate quantities in pure JS — zero API calls
+            var skipped = 0;
+            var computed = _fpRooms.map(function(room) {
+                if (!room.checked || room.length <= 0 || room.width <= 0) { skipped++; return null; }
+                var area = room.length * room.width;
+                var perimeter = 2 * (room.length + room.width);
+                var wallArea = perimeter * ceilingHeight;
+                var items = [];
+                if (trades.indexOf('flooring') >= 0) {
+                    items.push({ category: 'Flooring', description: 'Flooring supply and install', quantity: Math.ceil(area * 1.10), unitType: 'sqft', rate: 0, notes: Math.round(area) + ' sqft + 10% waste' });
+                }
+                if (trades.indexOf('drywall') >= 0) {
+                    var dwSqft = Math.max(0, Math.ceil((wallArea * 1.12) - (2 * 21) - (1 * 15)));
+                    items.push({ category: 'Drywall', description: 'Drywall supply and install', quantity: Math.ceil(dwSqft / 32), unitType: 'sheets', rate: 0, notes: dwSqft + ' sqft / 32 sqft per sheet' });
+                }
+                if (trades.indexOf('paint') >= 0) {
+                    items.push({ category: 'Paint', description: 'Paint walls and ceiling', quantity: Math.ceil(wallArea + area), unitType: 'sqft', rate: 0, notes: 'Walls + ceiling' });
+                }
+                if (trades.indexOf('framing') >= 0) {
+                    items.push({ category: 'Framing', description: 'Framing supply and install', quantity: Math.ceil(perimeter), unitType: 'lf', rate: 0, notes: 'Perimeter linear ft' });
+                }
+                if (trades.indexOf('tile') >= 0) {
+                    items.push({ category: 'Tile', description: 'Tile supply and install', quantity: Math.ceil(area * 1.10), unitType: 'sqft', rate: 0, notes: Math.round(area) + ' sqft + 10% waste' });
+                }
+                return { name: room.name, dimensions: { length: room.length, width: room.width, area: Math.round(area), perimeter: Math.round(perimeter) }, items: items };
+            }).filter(function(r) { return r !== null; });
 
-            // Fun status messages
-            var msgs = ['Reading room dimensions...', 'Identifying rooms...', 'Calculating material quantities...', 'Almost done...'];
-            var msgIdx = 0;
-            var msgTimer = setInterval(function() {
-                var el = document.getElementById('fpStatusMsg');
-                if (el && msgIdx < msgs.length) { el.textContent = msgs[msgIdx++]; }
-                else clearInterval(msgTimer);
-            }, 4000);
+            _fpResults = { rooms: computed, totalArea: computed.reduce(function(sum, r) { return sum + r.dimensions.area; }, 0) };
 
-            try {
-                var ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso';
-                var res = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/analyze-floor-plan', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ANON_KEY },
-                    body: JSON.stringify({
-                        imageBase64: _fpImageBase64,
-                        mimeType: _fpMimeType,
-                        scale: scale,
-                        ceilingHeight: ceilingHeight,
-                        trades: trades,
-                        customItems: customItems,
-                        buildingWidth: buildingWidth,
-                        buildingDepth: buildingDepth
-                    })
-                });
-                clearInterval(msgTimer);
-                var data = await res.json();
-                if (data.error) throw new Error(data.error);
-                _fpResults = data;
-                _fpRenderStep3(data);
-            } catch(e) {
-                clearInterval(msgTimer);
-                document.getElementById('floorPlanModalBody').innerHTML = `
-                    <div class="text-center py-4">
-                        <i class="fas fa-exclamation-triangle fa-3x text-danger mb-3"></i>
-                        <div class="fw-semibold text-danger">Analysis Failed</div>
-                        <div class="text-muted small mt-1">${e.message}</div>
-                        <button class="btn btn-primary mt-3" onclick="_fpGoToStep2()">Try Again</button>
-                    </div>
-                `;
-            }
-        }
+            var warningsHtml = skipped > 0 ? '<div class="alert alert-warning py-2 small mb-2"><i class="fas fa-exclamation-triangle me-1"></i>Skipped ' + skipped + ' room(s) with missing dimensions.</div>' : '';
 
-        function _fpRenderStep3(data) {
             var roomsHtml = '';
-            (data.rooms || []).forEach(function(room, ri) {
+            computed.forEach(function(room, ri) {
                 var itemsHtml = '';
-                (room.items || []).forEach(function(item, ii) {
-                    itemsHtml += `
-                        <div class="d-flex align-items-center gap-2 py-1 border-bottom">
-                            <input type="checkbox" class="form-check-input fp-item-check" id="fpItem_${ri}_${ii}" checked style="flex-shrink:0;">
-                            <div style="flex:1;">
-                                <span class="badge bg-secondary me-1" style="font-size:0.7rem;">${item.category}</span>
-                                <span class="small">${item.description}</span>
-                            </div>
-                            <div class="d-flex align-items-center gap-1">
-                                <input type="number" class="form-control form-control-sm" id="fpQty_${ri}_${ii}" value="${item.quantity}" style="width:75px;" min="0">
-                                <span class="text-muted small">${item.unitType}</span>
-                            </div>
-                        </div>`;
+                room.items.forEach(function(item, ii) {
+                    itemsHtml +=
+                        '<div class="d-flex align-items-center gap-2 py-1 border-bottom">' +
+                        '<input type="checkbox" class="form-check-input fp-item-check" id="fpItem_' + ri + '_' + ii + '" checked style="flex-shrink:0;">' +
+                        '<div style="flex:1;"><span class="badge bg-secondary me-1" style="font-size:0.7rem;">' + item.category + '</span><span class="small">' + item.description + '</span>' +
+                        (item.notes ? '<span class="text-muted small ms-1">(' + item.notes + ')</span>' : '') + '</div>' +
+                        '<div class="d-flex align-items-center gap-1">' +
+                        '<input type="number" class="form-control form-control-sm" id="fpQty_' + ri + '_' + ii + '" value="' + item.quantity + '" style="width:75px;" min="0">' +
+                        '<span class="text-muted small">' + item.unitType + '</span></div></div>';
                 });
-                var dims = room.dimensions;
-                var dimBadge = dims ? `${dims.length}\' &times; ${dims.width}\' = ${dims.area} sqft` : '';
-                roomsHtml += `
-                    <div class="card mb-2">
-                        <div class="card-header py-2 d-flex align-items-center gap-2" style="background:#f0f4ff;">
-                            <input type="checkbox" class="form-check-input fp-room-check" id="fpRoom_${ri}" checked onchange="_fpToggleRoom(${ri}, this.checked)">
-                            <input type="text" class="form-control form-control-sm fw-semibold" id="fpRoomName_${ri}" value="${room.name}" style="border:none;background:transparent;font-weight:600;">
-                            ${dimBadge ? `<span class="badge bg-light text-dark ms-auto" style="font-size:0.7rem;">${dimBadge}</span>` : ''}
-                        </div>
-                        <div class="card-body py-2" id="fpRoomItems_${ri}">${itemsHtml}</div>
-                    </div>`;
+                var d = room.dimensions;
+                roomsHtml +=
+                    '<div class="card mb-2">' +
+                    '<div class="card-header py-2 d-flex align-items-center gap-2" style="background:#f0f4ff;">' +
+                    '<input type="checkbox" class="form-check-input fp-room-check" id="fpRoom_' + ri + '" checked onchange="_fpToggleRoom(' + ri + ', this.checked)">' +
+                    '<input type="text" class="form-control form-control-sm fw-semibold" id="fpRoomName_' + ri + '" value="' + room.name + '" style="border:none;background:transparent;font-weight:600;">' +
+                    '<span class="badge bg-light text-dark ms-auto" style="font-size:0.7rem;">' + d.length + '\' &times; ' + d.width + '\' = ' + d.area + ' sqft</span>' +
+                    '</div>' +
+                    '<div class="card-body py-2" id="fpRoomItems_' + ri + '">' + itemsHtml + '</div>' +
+                    '</div>';
             });
 
-            var warningsHtml = '';
-            if (data.warnings && data.warnings.length > 0) {
-                warningsHtml = `<div class="alert alert-warning py-2 small"><i class="fas fa-exclamation-triangle me-1"></i><strong>Notes:</strong> ${data.warnings.join(' &bull; ')}</div>`;
-            }
-
-            document.getElementById('floorPlanModalBody').innerHTML = `
-                <div class="text-center mb-2">
-                    <div class="d-flex justify-content-center gap-2 mb-2">
-                        <span class="badge bg-secondary">1 Upload</span>
-                        <span class="badge bg-secondary">2 Settings</span>
-                        <span class="badge bg-primary">3 Review</span>
-                    </div>
-                    <div class="text-muted small">Review the extracted rooms and quantities. Click any value to edit before adding to your quote.</div>
-                </div>
-                ${warningsHtml}
-                <div style="max-height:380px;overflow-y:auto;">${roomsHtml}</div>
-                <div class="d-flex justify-content-between align-items-center mt-3">
-                    <button class="btn btn-outline-secondary btn-sm" onclick="_fpGoToStep2()"><i class="fas fa-arrow-left me-1"></i>Back</button>
-                    <div class="text-muted small">${(data.rooms||[]).length} rooms &bull; ~${data.totalArea || '?'} sqft total</div>
-                    <button class="btn btn-success" onclick="_fpAddToQuote()"><i class="fas fa-check me-1"></i>Add All to Quote</button>
-                </div>
-            `;
+            document.getElementById('floorPlanModalBody').innerHTML =
+                '<div class="d-flex justify-content-center gap-1 mb-2">' + _fpStepBadges(4) + '</div>' +
+                '<div class="text-muted small text-center mb-2">Review quantities. Edit any value before adding to your quote.</div>' +
+                warningsHtml +
+                '<div style="max-height:400px;overflow-y:auto;">' + roomsHtml + '</div>' +
+                '<div class="d-flex justify-content-between align-items-center mt-3">' +
+                '<button class="btn btn-outline-secondary btn-sm" onclick="_fpGoToStep3()"><i class="fas fa-arrow-left me-1"></i>Back</button>' +
+                '<div class="text-muted small">' + computed.length + ' rooms &bull; ~' + _fpResults.totalArea + ' sqft total</div>' +
+                '<button class="btn btn-success" onclick="_fpAddToQuote()"><i class="fas fa-check me-1"></i>Add All to Quote</button>' +
+                '</div>';
         }
 
         function _fpToggleRoom(ri, checked) {
@@ -2802,9 +2835,8 @@ Example:
                 var roomCheck = document.getElementById('fpRoom_' + ri);
                 if (!roomCheck || !roomCheck.checked) return;
                 var roomName = document.getElementById('fpRoomName_' + ri).value || room.name;
-                // Create new room
                 var newRoom = { id: roomCounter++, name: roomName, items: [], notes: '', photos: [] };
-                (room.items || []).forEach(function(item, ii) {
+                room.items.forEach(function(item, ii) {
                     var itemCheck = document.getElementById('fpItem_' + ri + '_' + ii);
                     if (!itemCheck || !itemCheck.checked) return;
                     var qty = parseFloat(document.getElementById('fpQty_' + ri + '_' + ii).value) || item.quantity;
@@ -2829,12 +2861,10 @@ Example:
                 renderRooms();
                 calculateTotals();
                 unsavedChanges = true;
-                // Scroll to first new room
                 setTimeout(function() {
                     var roomEls = document.querySelectorAll('.room-card');
                     if (roomEls.length > 0) roomEls[roomEls.length - addedCount].scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }, 300);
-                // Toast
                 var toast = document.createElement('div');
                 toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#198754;color:white;padding:12px 20px;border-radius:8px;z-index:9999;font-size:0.9rem;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
                 toast.innerHTML = '<i class="fas fa-check-circle me-2"></i>' + addedCount + ' room' + (addedCount !== 1 ? 's' : '') + ' added to your quote!';

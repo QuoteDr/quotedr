@@ -1,5 +1,5 @@
 # QuoteDr Session Handoff
-*Last updated: 2026-04-25 — Updated by Sonic*
+*Last updated: 2026-04-26 — Updated by Sonic*
 
 ---
 
@@ -27,7 +27,7 @@
 | `interactive-quote-viewer.html` | Client-facing quote view |
 | `invoice-viewer.html` | Invoice view with Stripe deposit button |
 | `supabase-v2.js` | Supabase client + all auth/DB helpers (cache-busted with ?v= query string) |
-| `supabase.js` | Old helpers — mostly superseded, still loaded on some pages |
+| `supabase.js` | Old helpers — NOT loaded on any page (confirmed audit 2026-04-25) |
 | `ai-assistant.js` | AI assistant panel |
 | `error-reporter.js` | Global JS error catcher → logs to `error_logs` Supabase table |
 | `_headers` | Cloudflare cache headers — HTML/JS/CSS all set to no-cache, must-revalidate |
@@ -56,6 +56,28 @@
 - **Terms & Conditions** — collapsible section, collapsed by default, badge shows "X/Y selected"
 - **Client autocomplete** — type client name, autofills phone/email/address from saved clients
 - **Auth guard** — redirects to login.html if no session (no more guest browsing)
+- **IKEA Quick Quote** — Tools menu item, parses IKEA order PDF
+- **Floor Plan Scanner** — Tools menu item (see below ⬇️)
+
+### Floor Plan Scanner (NEW — 2026-04-26)
+**What it does:** Upload a floor plan photo or PDF → AI reads dimensions → auto-populates rooms + material quantities into the quote builder.
+
+**How it works:**
+1. **Step 1 — Upload:** JPG/PNG/WebP or PDF. For PDFs with multiple pages, a page picker (← Page X of Y →) lets you navigate to the right floor plan page before analyzing.
+2. **Step 2 — Settings:** Scale (dropdown, 10 options), ceiling height, trades to estimate (flooring, drywall, paint, framing, tile), and **Overall Building Dimensions** (optional width × depth fields).
+3. **Step 3 — Review:** Extracted rooms with editable names, quantities, and checkboxes. Add selected rooms to quote with one click.
+
+**Edge function:** `analyze-floor-plan` deployed on Supabase. Uses **GPT-4o Vision** (`detail: 'high'`). Requires `OPENAI_API_KEY` Supabase secret.
+
+**Known accuracy limitation:** Plans with only string dimensions on the outside (no per-room labels) are harder for the AI. The "Overall Building Dimensions" field was added to anchor the AI — enter total width × depth from the drawing for better results. Even with this, small rooms (kitchen, bath) may be slightly off. The user should always review and edit before adding to quote.
+
+**Next improvement idea:** Swap GPT-4o for Claude Vision (Anthropic) — early testing suggests Claude reads architectural drawings more accurately at the same cost. Requires adding `ANTHROPIC_API_KEY` as a Supabase secret and updating the edge function to call `https://api.anthropic.com/v1/messages`.
+
+**Files changed:**
+- `quote-builder.html` — Floor Plan Scanner modal + all JS functions (`openFloorPlanModal`, `_fpRenderStep1`, `_fpHandleFile`, `_fpRenderPdfPage`, `_fpChangePage`, `_fpGoToStep2`, `_fpAnalyze`, `_fpRenderStep3`, `_fpToggleRoom`, `_fpAddToQuote`)
+- `supabase/functions/analyze-floor-plan/index.ts` — edge function
+
+**Commits:** `2cd9ed0`, `b2c693e`, `18d1661`
 
 ### Dashboard (`dashboard.html`)
 - Saved quotes list + Kanban board view
@@ -74,7 +96,22 @@
 - **Warranty Certificate** generator
 - **Invoice viewer** with Stripe deposit button + print/PDF
 - **Send Quote / Send Invoice** modal with email flow (via Resend API)
+- **Welcome email** on signup — `send-welcome-email` edge function deployed, fires on new user registration
 - **pg_cron** daily 9am UTC for quote-followup edge function
+
+---
+
+## Supabase Edge Functions (Deployed)
+
+| Function | Purpose |
+|----------|---------|
+| `send-quote-email` | Sends quote to client via Resend |
+| `send-invoice-email` | Sends invoice to client via Resend |
+| `send-welcome-email` | Welcome email on new user signup (uses `RESEND_API_KEY`) |
+| `verify-portal-pin` | Server-side PIN validation for client portal |
+| `qb-oauth` | QuickBooks OAuth token exchange |
+| `qb-sync` | Push quote data to QuickBooks |
+| `analyze-floor-plan` | GPT-4o Vision floor plan analysis (uses `OPENAI_API_KEY`) |
 
 ---
 
@@ -119,19 +156,8 @@ Used for:
 - `key='ikea_pricing'` → IKEA estimator data
 - `key='estimator_pricing'` → material estimator data
 
-**⚠️ This is NOT a flat table.** `updateUserProfile()` now proxies onboarding calls to `saveOnboardingComplete()`. All reads/writes use the key/value pattern with `user_id + key`.
-
-### `items` table
-❌ **DO NOT USE** for per-item saves. Schema is wrong (only `id, user_id, data jsonb`). Was causing items to be overwritten with empty data on startup.
-
-### `item_history` table
-Versioned snapshots of items (20 per user, auto-trimmed via trigger). For future restore UI.
-
 ### `error_logs` table
-Populated by `error-reporter.js` — catches unhandled JS errors and promise rejections. Query with:
-```
-curl "https://axmoffknvblluibuitrq.supabase.co/rest/v1/error_logs?order=created_at.desc&limit=20" -H "apikey: <anon_key>" -H "Authorization: Bearer <anon_key>"
-```
+Populated by `error-reporter.js` — catches unhandled JS errors and promise rejections.
 
 ### RLS Policies on `quotes`
 - `"Public quote viewing"` — SELECT USING (true) — anyone can read
@@ -155,101 +181,40 @@ curl "https://axmoffknvblluibuitrq.supabase.co/rest/v1/error_logs?order=created_
 3. Merges cloud categories into `customItems` (cloud wins on conflict)
 4. Updates localStorage
 
-**Why inlined?** External function calls (`backupItemsToCloud` from `supabase-v2.js`) were silently "not defined" due to load order/scope issues. Inlining guarantees availability.
-
----
-
-## Client Info Persistence — How It Works Now
-
-**Save:** `collectQuoteData()` gathers `clientName`, `clientEmail`, `clientPhone`, `projectAddress` from form inputs. `saveQuote()` in supabase-v2.js stores them in the `data` JSON column (NOT top-level columns which may not exist).
-
-**Load on refresh:** Startup code reads `ald_active_quote_id` from localStorage → calls `loadQuoteFromSupabase()` → maps `data.clientEmail`/`data.clientPhone`/`data.projectAddress` → calls `applyQuoteData()` which sets the form inputs. Falls back to alternate field names (`email`/`phone`/`project_address`) for older quotes.
-
-**Client autocomplete:** Saved client data lives in `ald_clients` localStorage as an **object keyed by name** (NOT an array). Cloud merge from Supabase `clients` table converts to object format and calls `loadSavedClients()` after merge.
-
-**⚠️ GOTCHA:** `ald_clients` was corrupted to array format at one point. `loadSavedClients()` now auto-detects and fixes this.
-
----
-
-## Problems Fixed This Session (2026-04-23/24)
-
-| Problem | Root Cause | Fix |
-|---------|-----------|-----|
-| Test Cloud Save button in UI | Leftover debug button | Removed button + `testBackup()` function |
-| Onboarding re-triggers after clearing cookies | `onboarding_complete` never saved to Supabase | Added Supabase CDN + supabase-v2.js to onboarding.html |
-| `updateUserProfile` silently failing | `user_data` table is key/value but function tried flat column write | Created `saveOnboardingComplete()`/`loadOnboardingComplete()` using key/value pattern |
-| `checkOnboardingAndRedirect` using wrong query | Second onboarding check in login.html still used flat-column query | Fixed to use `key='onboarding_complete'` key/value query + quotes fallback |
-| Unauthenticated users can use the app | No auth guard on pages | Added `_supabase.auth.getSession()` check to quote-builder, dashboard, settings, onboarding — redirects to login.html |
-| Dashboard dates show Dec 31, 1969 | `quote_date` column never saved (and may not exist in DB) | Moved date to `data.savedAt` in JSON; dashboard falls back to `created_at` |
-| Client names showing as numbers | Cloud merge saved `ald_clients` as array; `Object.entries` returned indexes as keys | Fixed merge to write as object; `loadSavedClients` auto-repairs arrays |
-| Terms & Conditions cluttering the builder | Long list of checkboxes always visible | Made section collapsible (collapsed by default) with badge showing selected count |
-| Client email/phone disappearing on refresh | Multiple causes (see below) | Multi-step fix |
-| — email/phone not in save payload | `saveQuote` stored as `email`/`phone` in data JSON but `applyQuoteData` read `clientEmail`/`clientPhone` | Standardized: save stores `clientEmail`/`clientPhone`, load checks both field names |
-| — `quote_date` breaking saves | Column likely doesn't exist; PostgREST rejects unknown columns with 400 | Removed `quote_date` from payload, stored in `data.savedAt` instead |
-| — `client_email`/`client_phone` breaking saves | Same issue — columns may not exist | Removed from payload, all client info in `data` JSON only |
-| — Browser serving stale JS | `_headers` had `max-age=3600` for JS; phone cached old supabase-v2.js | Changed to `no-cache, must-revalidate`; added cache-buster `?v=` to all script tags |
-| Redo Onboarding not available | No UI to re-trigger onboarding | Added button in Settings → Account tab; `resetOnboarding()` clears Supabase + localStorage |
-
----
-
-## Pre-Launch Security & Data Audit — 2026-04-25
-
-### 🔴 HIGH PRIORITY
-- [x] **Client Portal PIN** — generate/display/reset PIN in dashboard modal; server-side validation via new `verify-portal-pin` edge function (no PIN exposed to browser)
-  - ⚠️ Edge function must be manually deployed in Supabase Dashboard (code is in repo at `supabase/functions/verify-portal-pin/index.ts`)
-  - ⚠️ Need to create `room-photos` Supabase Storage bucket (public) for room photo uploads
-- [x] **Room photos → Supabase Storage** — photos now upload to `room-photos` bucket instead of base64 in DB row. Backwards compatible with old base64 photos.
-- [x] **Security headers** — CSP, X-Frame-Options, X-Content-Type-Options added to `_headers`
-- [x] **Quote templates cloud sync** — templates now save/restore/delete from Supabase `templates` table
-
-### 🟡 MEDIUM PRIORITY
-- [x] **Settings cloud sync** — `ald_category_styles`, `ald_hidden_categories`, `ald_item_overrides` now sync via `user_data` table
-- [x] **Two Manage Items modals** — removed dead modal from settings.html; quote-builder.html is the single source
-- [x] **Used quote numbers cloud sync** — merged from cloud on startup, saved on each new quote number
-- [ ] **Email routing** — `support@quotedr.io`, `privacy@quotedr.io`, `quotes@quotedr.io` need Cloudflare Email Routing set up
-- [ ] **Login brute force protection** — no lockout after failed attempts
-
-### 🟢 LOWER PRIORITY
-- [ ] **Centralize anon key** — currently hardcoded in 15+ files; should reference from one place
-- [ ] **Signup email domain blocking** — for when monetization/plan gating is needed
-- [ ] **IKEA parser deep-count validation** — compare parsed item count vs PDF line items
-
 ---
 
 ## Known Issues / Still To Do
 
+### 🔴 Floor Plan Scanner — Accuracy (In Progress)
+- GPT-4o Vision gets room-level dimensions wrong on plans with only string dimensions (no per-room labels)
+- **Next fix:** Swap edge function to use **Claude Vision** (Anthropic API) — same cost, better spatial accuracy
+- To implement: add `ANTHROPIC_API_KEY` as Supabase secret, update `analyze-floor-plan/index.ts` to call `https://api.anthropic.com/v1/messages` with `claude-sonnet-4-6` model and image base64 input
+- Alternative if Claude still struggles: two-pass approach (pass 1: extract raw dimension strings, pass 2: assign to rooms)
+
 ### 🟡 QuickBooks Integration (Code Fixed — Needs Deploy + End-to-End Test)
 - QB OAuth flow is built (`qb-callback.html`, `qb-oauth` and `qb-sync` edge functions)
-- QB credentials stored as Supabase Edge Function secrets (rotated — was hardcoded in repo!)
+- QB credentials stored as Supabase Edge Function secrets
 - CSRF state validation added
 - `intuit_tid` logging added
-- Compliance questionnaire completed on developer.intuit.com
 - **BUT: never fully tested end-to-end with sandbox**
-- Next step: test the OAuth flow, then test syncing a quote to QB sandbox
-
-### 🟡 Two Manage Items Modals
-- One in `quote-builder.html` (the real one, being actively developed)
-- One in `settings.html` (old, not updated)
-- They conflict — Adam kept accidentally using the settings one
-- Should either consolidate or remove the settings one
-
-### 🟡 Confirm Supabase Schema
-- Need to verify which columns actually exist on the `quotes` table
-- Run `SELECT column_name FROM information_schema.columns WHERE table_name = 'quotes'` in Supabase SQL editor
-- If `client_email`, `client_phone`, `project_address`, `quote_date` don't exist, either create them or leave everything in `data` JSON (current approach)
+- Next step: deploy `qb-oauth` and `qb-sync`, then test the OAuth flow
 
 ### 🟡 Email Routing
 - `support@quotedr.io`, `privacy@quotedr.io`, `quotes@quotedr.io` need Cloudflare Email Routing set up
 
-### 🟡 Cache-Buster Maintenance
-- All HTML files reference `supabase-v2.js?v1776989215`
-- When making significant JS changes, update the version string or automate it in deploy
-- `_headers` now sets all JS/CSS to `no-cache, must-revalidate` which helps but adds a round-trip on each page load
+### 🟡 Confirm Supabase Schema
+- Run `SELECT column_name FROM information_schema.columns WHERE table_name = 'quotes'` in Supabase SQL editor
+- Verify which columns actually exist vs what code assumes
 
-### 🟢 Future: QuoteDr Scan
-- Mobile app companion — scan a room with phone camera, auto-populate sq footage into active quote
-- Flutter + ARKit/ARCore + Supabase
-- After QuoteDr has paying customers
+### 🟡 Stripe Test → Live Key Swap
+- Still on test keys — swap before real users
+
+### 🟢 Future Features
+- **Subscription/billing gate** — Stripe paywall
+- **Quote expiry reminders** — pg_cron "quote expires in 48h" client emails
+- **Centralize anon key** — currently hardcoded in 15+ files
+- **Terms of Service / Privacy Policy** — fill with real legal content
+- **QuoteDr Scan** — mobile companion app, scan room with phone camera → auto-populate sqft (Flutter + ARKit/ARCore)
 
 ---
 
@@ -259,8 +224,9 @@ curl "https://axmoffknvblluibuitrq.supabase.co/rest/v1/error_logs?order=created_
 2. **Cloudflare caches JS aggressively** — even with `_headers`, browsers hold on to old JS. Use cache-buster query strings on script tags.
 3. **`user_data` is a key/value table** — not a flat profile table. Always use `user_id + key` pattern.
 4. **`ald_clients` must be an object** (keyed by name), NOT an array. Array format breaks `Object.entries` → client names show as numbers.
-5. **`applyQuoteData` field names must match save format** — the save and load must agree on `clientEmail` vs `email`, etc.
-6. **Test button cleanup** — remove debug UI before shipping.
+5. **Deno bundler hates apostrophes in template literals** — `you're`, `let's` inside HTML inside JS template literal → unexpected EOF. Use string array concatenation instead.
+6. **`supabaseAdmin` (service role) required in edge functions** — RLS with anon key blocks writes since `auth.uid()` is null server-side.
+7. **PDF.js renders one page at a time** — for multi-page PDFs, store the `pdf` doc object and re-render on page change. Don't reload the file.
 
 ---
 
@@ -270,17 +236,14 @@ curl "https://axmoffknvblluibuitrq.supabase.co/rest/v1/error_logs?order=created_
 - **Sonic (Claude) orchestrates, Qwen executes**
 - After every code change: run syntax check before committing
 - Always `git add -A && git commit -m "..." && git push` after changes
-- Verify Cloudflare is serving latest code after deploy: `curl -s "https://quotedr.io/supabase-v2.js" | grep "some_new_string"`
+- Verify Cloudflare is serving latest code after deploy
 
 ---
 
 ## How to Pick Up
 1. Read this file
-2. Items cloud sync is working ✅
-3. Client info persistence is working ✅ (email/phone/address now save to data JSON)
-4. Auth guards on all protected pages ✅
-5. Onboarding flow fixed ✅
-6. QB OAuth needs end-to-end test
-7. Consolidate Manage Items modals
-8. Verify actual Supabase schema vs assumed schema
-9. Ask Adam what he wants to tackle next!
+2. Floor Plan Scanner is live and working — accuracy improvement (Claude Vision swap) is the next coding task
+3. QB OAuth needs end-to-end test after deploying updated edge functions
+4. Welcome email is live ✅
+5. All pre-launch security work from 2026-04-25 is complete ✅
+6. Ask Adam what he wants to tackle next!
