@@ -68,7 +68,7 @@ function init() {
       max-height: 75vh;
     }
     #qdAiBtn {
-      bottom: 72px;
+      bottom: 130px;
     }
   }
   #qdAiPanel.open {
