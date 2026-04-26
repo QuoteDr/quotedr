@@ -339,6 +339,8 @@ if (location.search.includes('debug')) {
                             <li><a class="dropdown-item" href="help.html"><i class="fas fa-question-circle me-2 text-secondary"></i>Help</a></li>
                             <li><a class="dropdown-item" href="pricing.html"><i class="fas fa-star me-2 text-warning"></i>Upgrade ⭐</a></li>
                             <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="_toggleAiBtn()" id="aiToggleMenuItem"><i class="fas fa-robot me-2 text-secondary"></i>Hide AI Assistant</a></li>
+                            <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item text-danger" href="javascript:void(0)" onclick="if(unsavedChanges && !confirm('You have unsaved changes. Leave anyway?')) return; signOut();"><i class="fas fa-sign-out-alt me-2"></i>Sign Out</a></li>
                         </ul>
                     </div>
@@ -8367,6 +8369,37 @@ function scanDrywallQuote() {
     document.getElementById('drywallToggleDimensions').checked = false;
     toggleDrywallDimensions();
 }
+
+        function _toggleAiBtn() {
+            var btn = document.getElementById('qdAiBtn');
+            var panel = document.getElementById('qdAiPanel');
+            var menuItem = document.getElementById('aiToggleMenuItem');
+            if (!btn) return;
+            var hidden = btn.style.display === 'none';
+            btn.style.display = hidden ? '' : 'none';
+            if (panel && !hidden) panel.style.display = 'none';
+            if (menuItem) menuItem.innerHTML = hidden
+                ? '<i class="fas fa-robot me-2 text-secondary"></i>Hide AI Assistant'
+                : '<i class="fas fa-robot me-2 text-secondary"></i>Show AI Assistant';
+            try { localStorage.setItem('ald_ai_btn_hidden', hidden ? '0' : '1'); } catch(e) {}
+        }
+
+        // Restore AI button visibility on load
+        (function() {
+            try {
+                if (localStorage.getItem('ald_ai_btn_hidden') === '1') {
+                    var check = setInterval(function() {
+                        var btn = document.getElementById('qdAiBtn');
+                        var menuItem = document.getElementById('aiToggleMenuItem');
+                        if (btn) {
+                            btn.style.display = 'none';
+                            if (menuItem) menuItem.innerHTML = '<i class="fas fa-robot me-2 text-secondary"></i>Show AI Assistant';
+                            clearInterval(check);
+                        }
+                    }, 200);
+                }
+            } catch(e) {}
+        })();
 </script>
 </body>
 </html>
