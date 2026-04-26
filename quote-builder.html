@@ -2473,32 +2473,151 @@ Example:
         var _fpPdfDoc = null;
         var _fpCurrentPage = 1;
         var _fpRooms = [];
-        var _fpSettings = { ceilingHeight: 9, trades: ['flooring','drywall','paint','framing'] };
+        var _fpMapping = null;
 
-        function _fpStepBadges(active) {
-            var steps = ['1 Upload','2 Measure','3 Settings','4 Review'];
-            return steps.map(function(s, i) {
-                return '<span class="badge ' + (i+1 === active ? 'bg-primary' : 'bg-secondary') + ' me-1">' + s + '</span>';
+        var _fpTradeConfig = [
+            { key: 'flooring', label: 'Flooring', icon: 'fa-layer-group' },
+            { key: 'drywall',  label: 'Drywall',  icon: 'fa-border-all' },
+            { key: 'paint',    label: 'Paint',    icon: 'fa-paint-roller' },
+            { key: 'framing',  label: 'Framing',  icon: 'fa-ruler-combined' },
+            { key: 'tile',     label: 'Tile',     icon: 'fa-th-large' }
+        ];
+
+        function _fpStepBadges(active, labels) {
+            return labels.map(function(s, i) {
+                return '<span class="badge ' + (i+1 === active ? 'bg-primary' : 'bg-secondary') + ' me-1">' + (i+1) + ' ' + s + '</span>';
             }).join('');
         }
 
-        function openFloorPlanModal() {
-            _fpImageBase64 = null;
-            _fpMimeType = 'image/jpeg';
-            _fpResults = null;
-            _fpRooms = [];
-            _fpRenderStep1();
-            var modal = new bootstrap.Modal(document.getElementById('floorPlanModal'));
-            modal.show();
+        function _fpAllItems() {
+            var all = [];
+            var seen = {};
+            function addFrom(db) {
+                for (var cat in db) {
+                    if (!db.hasOwnProperty(cat)) continue;
+                    (db[cat] || []).forEach(function(item) {
+                        var key = cat + '||' + item.name;
+                        if (!seen[key]) { seen[key] = true; all.push(Object.assign({ category: cat }, item)); }
+                    });
+                }
+            }
+            if (typeof customItems === 'object') addFrom(customItems);
+            if (typeof pricingDatabase === 'object') addFrom(pricingDatabase);
+            return all;
         }
 
+        // ── Open modal ──
+        function openFloorPlanModal() {
+            _fpImageBase64 = null; _fpMimeType = 'image/jpeg'; _fpResults = null; _fpRooms = [];
+            var modal = new bootstrap.Modal(document.getElementById('floorPlanModal'));
+            modal.show();
+            // Load mapping
+            _supabase.auth.getUser().then(function(r) {
+                var uid = r.data && r.data.user ? r.data.user.id : null;
+                if (!uid) { _fpRenderSetup(1); return; }
+                _supabase.from('user_data').select('value').eq('user_id', uid).eq('key', 'fp_scanner_mapping').maybeSingle()
+                    .then(function(res) {
+                        if (res.data && res.data.value) {
+                            try { _fpMapping = typeof res.data.value === 'string' ? JSON.parse(res.data.value) : res.data.value; }
+                            catch(e) { _fpMapping = null; }
+                        }
+                        if (!_fpMapping) { _fpRenderSetup(1); } else { _fpRenderStep1(); }
+                    }).catch(function() { _fpRenderSetup(1); });
+            });
+        }
+
+        function openFpScannerSetup() {
+            var modal = new bootstrap.Modal(document.getElementById('floorPlanModal'));
+            modal.show();
+            _fpRenderSetup(1);
+        }
+
+        // ── Setup Wizard ──
+        var _fpSetupCurrent = 1;
+
+        function _fpRenderSetup(step) {
+            _fpSetupCurrent = step;
+            if (!_fpMapping) _fpMapping = { flooring:[], drywall:[], paint:[], framing:[], tile:[] };
+            var tc = _fpTradeConfig[step-1];
+            var stepLabels = _fpTradeConfig.map(function(t) { return t.label; });
+            var isLast = step === _fpTradeConfig.length;
+
+            document.getElementById('floorPlanModalBody').innerHTML =
+                '<div class="d-flex justify-content-center gap-1 mb-3">' + _fpStepBadges(step, stepLabels) + '</div>' +
+                '<h5><i class="fas ' + tc.icon + ' me-2 text-primary"></i>' + tc.label + ' — link your line items</h5>' +
+                '<p class="text-muted small">Select all items you use for ' + tc.label.toLowerCase() + '. You can link multiple (e.g. supply + labour).</p>' +
+                '<input type="text" class="form-control form-control-sm mb-2" id="fpSetupSearch" placeholder="Search items..." oninput="_fpSetupRenderList(' + step + ')">' +
+                '<div id="fpSetupList" style="max-height:calc(100vh - 340px);overflow-y:auto;border:1px solid #dee2e6;border-radius:8px;padding:8px;"></div>' +
+                '<p class="text-muted small mt-3"><i class="fas fa-info-circle me-1"></i>These settings can be changed later in <strong>Settings &rarr; Floor Plan Scanner</strong></p>' +
+                '<div class="d-flex justify-content-between mt-3">' +
+                (step > 1 ? '<button class="btn btn-outline-secondary" onclick="_fpRenderSetup(' + (step-1) + ')"><i class="fas fa-arrow-left me-1"></i>Back</button>' : '<div></div>') +
+                (isLast
+                    ? '<button class="btn btn-success" onclick="_fpSetupSave()"><i class="fas fa-check me-1"></i>Save &amp; Start</button>'
+                    : '<button class="btn btn-primary" onclick="_fpRenderSetup(' + (step+1) + ')">Next <i class="fas fa-arrow-right ms-1"></i></button>') +
+                '</div>';
+            _fpSetupRenderList(step);
+        }
+
+        function _fpSetupRenderList(step) {
+            var tc = _fpTradeConfig[step-1];
+            var filter = (document.getElementById('fpSetupSearch') ? document.getElementById('fpSetupSearch').value : '').toLowerCase();
+            var linked = (_fpMapping[tc.key] || []).map(function(i) { return i.category + '||' + i.name; });
+            var items = _fpAllItems().filter(function(i) {
+                return !filter || (i.name + ' ' + i.category).toLowerCase().indexOf(filter) >= 0;
+            });
+            // Sort: linked items first
+            items.sort(function(a, b) {
+                var aL = linked.indexOf(a.category+'||'+a.name) >= 0;
+                var bL = linked.indexOf(b.category+'||'+b.name) >= 0;
+                return aL === bL ? 0 : aL ? -1 : 1;
+            });
+            var html = items.map(function(item) {
+                var key = item.category + '||' + item.name;
+                var chk = linked.indexOf(key) >= 0 ? ' checked' : '';
+                var safeKey = key.replace(/'/g, "\\'");
+                return '<div class="d-flex align-items-center gap-2 py-1 border-bottom">' +
+                    '<input type="checkbox" class="form-check-input"' + chk + ' onchange="_fpSetupToggle(\'' + tc.key + '\',\'' + safeKey + '\',this.checked)">' +
+                    '<span class="badge bg-light text-dark me-1" style="font-size:0.7rem;">' + item.category + '</span>' +
+                    '<span class="small flex-grow-1">' + item.name + '</span>' +
+                    '<span class="text-muted small">$' + (item.rate||0) + '/' + (item.unitType||'sqft') + '</span>' +
+                    '</div>';
+            }).join('');
+            document.getElementById('fpSetupList').innerHTML = html || '<p class="text-muted small p-2">No items found. Add items in the quote builder first.</p>';
+        }
+
+        function _fpSetupToggle(tradeKey, itemKey, checked) {
+            if (!_fpMapping[tradeKey]) _fpMapping[tradeKey] = [];
+            var parts = itemKey.split('||');
+            var cat = parts[0], name = parts.slice(1).join('||');
+            if (checked) {
+                var item = _fpAllItems().find(function(i) { return i.category === cat && i.name === name; });
+                if (item && !_fpMapping[tradeKey].find(function(i) { return i.category === cat && i.name === name; })) {
+                    _fpMapping[tradeKey].push(item);
+                }
+            } else {
+                _fpMapping[tradeKey] = _fpMapping[tradeKey].filter(function(i) { return !(i.category === cat && i.name === name); });
+            }
+        }
+
+        function _fpSetupSave() {
+            _supabase.auth.getUser().then(function(r) {
+                var uid = r.data && r.data.user ? r.data.user.id : null;
+                if (!uid) { _fpRenderStep1(); return; }
+                _supabase.from('user_data').upsert(
+                    { user_id: uid, key: 'fp_scanner_mapping', value: _fpMapping, updated_at: new Date().toISOString() },
+                    { onConflict: 'user_id,key' }
+                ).then(function() { _fpRenderStep1(); });
+            });
+        }
+
+        // ── Step 1: Upload ──
         function _fpRenderStep1() {
             document.getElementById('floorPlanModalBody').innerHTML =
                 '<div class="text-center mb-3">' +
-                '<div class="d-flex justify-content-center gap-1 mb-3">' + _fpStepBadges(1) + '</div>' +
+                '<div class="d-flex justify-content-center gap-1 mb-3">' + _fpStepBadges(1, ['Upload','Measure','Review']) + '</div>' +
                 '<p class="text-muted small">Upload a photo or PDF of your floor plan. Clear photos of drawings work best.</p>' +
                 '</div>' +
-                '<div id="fpDropZone" onclick="document.getElementById(\'fpFileInput\').click()" style="border:2px dashed #1a56a0;border-radius:12px;padding:40px 20px;text-align:center;cursor:pointer;background:#f8f9ff;transition:background 0.2s;" ondragover="event.preventDefault();this.style.background=\'#e8f0ff\'" ondragleave="this.style.background=\'#f8f9ff\'" ondrop="event.preventDefault();_fpHandleFile(event.dataTransfer.files[0])">' +
+                '<div id="fpDropZone" onclick="document.getElementById(\'fpFileInput\').click()" style="border:2px dashed #1a56a0;border-radius:12px;padding:40px 20px;text-align:center;cursor:pointer;background:#f8f9ff;" ondragover="event.preventDefault();this.style.background=\'#e8f0ff\'" ondragleave="this.style.background=\'#f8f9ff\'" ondrop="event.preventDefault();_fpHandleFile(event.dataTransfer.files[0])">' +
                 '<i class="fas fa-cloud-upload-alt fa-3x mb-3" style="color:#1a56a0;"></i>' +
                 '<div class="fw-semibold">Click or drag &amp; drop your floor plan</div>' +
                 '<div class="text-muted small mt-1">Supports JPG, PNG, WebP, PDF</div>' +
@@ -2516,7 +2635,8 @@ Example:
                 '</div>' +
                 '</div>' +
                 '<div id="fpStep1Error" class="alert alert-danger mt-3" style="display:none;"></div>' +
-                '<div class="d-flex justify-content-end mt-3">' +
+                '<div class="d-flex justify-content-between mt-3">' +
+                '<button class="btn btn-outline-secondary btn-sm" onclick="openFpScannerSetup()"><i class="fas fa-cog me-1"></i>Reconfigure items</button>' +
                 '<button class="btn btn-primary" id="fpNext1Btn" onclick="_fpGoToStep2()" disabled>Next <i class="fas fa-arrow-right ms-1"></i></button>' +
                 '</div>';
         }
@@ -2525,7 +2645,6 @@ Example:
             if (!file) return;
             var errEl = document.getElementById('fpStep1Error');
             errEl.style.display = 'none';
-
             if (file.type === 'application/pdf') {
                 try {
                     if (!window.pdfjsLib) {
@@ -2545,9 +2664,8 @@ Example:
                     document.getElementById('fpNext1Btn').disabled = false;
                     return;
                 } catch(e) {
-                    errEl.textContent = 'Could not read PDF: ' + e.message + '. Try saving as an image (screenshot) instead.';
-                    errEl.style.display = '';
-                    return;
+                    errEl.textContent = 'Could not read PDF: ' + e.message;
+                    errEl.style.display = ''; return;
                 }
             } else if (file.type.startsWith('image/')) {
                 _fpMimeType = file.type;
@@ -2560,15 +2678,11 @@ Example:
                     document.getElementById('fpPreviewArea').style.display = '';
                     document.getElementById('fpNext1Btn').disabled = false;
                 };
-                reader.readAsDataURL(file);
-                return;
+                reader.readAsDataURL(file); return;
             } else {
-                errEl.textContent = 'Please upload an image (JPG, PNG, WebP) or PDF file.';
-                errEl.style.display = '';
-                return;
+                errEl.textContent = 'Please upload an image or PDF.';
+                errEl.style.display = ''; return;
             }
-            document.getElementById('fpPreviewArea').style.display = '';
-            document.getElementById('fpNext1Btn').disabled = false;
         }
 
         async function _fpRenderPdfPage(pageNum) {
@@ -2576,12 +2690,10 @@ Example:
             var page = await _fpPdfDoc.getPage(pageNum);
             var viewport = page.getViewport({ scale: 2.0 });
             var canvas = document.createElement('canvas');
-            canvas.width = viewport.width;
-            canvas.height = viewport.height;
+            canvas.width = viewport.width; canvas.height = viewport.height;
             await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
             var dataUrl = canvas.toDataURL('image/jpeg', 0.92);
-            _fpImageBase64 = dataUrl.split(',')[1];
-            _fpMimeType = 'image/jpeg';
+            _fpImageBase64 = dataUrl.split(',')[1]; _fpMimeType = 'image/jpeg';
             var imgEl = document.getElementById('fpPreviewImg');
             var labelEl = document.getElementById('fpPreviewLabel');
             var pickerEl = document.getElementById('fpPagePicker');
@@ -2590,19 +2702,15 @@ Example:
             if (imgEl) imgEl.src = dataUrl;
             if (labelEl) labelEl.textContent = 'Page ' + pageNum + ' of ' + _fpPdfDoc.numPages + ' \u2014 navigate to your floor plan page';
             if (pickerEl) pickerEl.style.display = _fpPdfDoc.numPages > 1 ? 'flex' : 'none';
-            if (pageInput) pageInput.value = pageNum;
-            if (pageInput) pageInput.max = _fpPdfDoc.numPages;
+            if (pageInput) { pageInput.value = pageNum; pageInput.max = _fpPdfDoc.numPages; }
             if (pageTotalEl) pageTotalEl.textContent = 'of ' + _fpPdfDoc.numPages;
         }
 
         async function _fpChangePage(delta, absolute) {
             if (!_fpPdfDoc) return;
             var newPage;
-            if (absolute !== undefined) {
-                newPage = Math.max(1, Math.min(_fpPdfDoc.numPages, absolute));
-            } else {
-                newPage = Math.max(1, Math.min(_fpPdfDoc.numPages, _fpCurrentPage + delta));
-            }
+            if (absolute !== undefined) { newPage = Math.max(1, Math.min(_fpPdfDoc.numPages, absolute)); }
+            else { newPage = Math.max(1, Math.min(_fpPdfDoc.numPages, _fpCurrentPage + delta)); }
             if (newPage === _fpCurrentPage && absolute === undefined) return;
             _fpCurrentPage = newPage;
             var labelEl = document.getElementById('fpPreviewLabel');
@@ -2610,16 +2718,13 @@ Example:
             await _fpRenderPdfPage(newPage);
         }
 
+        // ── Step 2: Measure ──
         async function _fpGoToStep2() {
             if (!_fpImageBase64) return;
-            // Show loading state while AI fetches room names
             document.getElementById('floorPlanModalBody').innerHTML =
-                '<div class="text-center py-5">' +
-                '<div class="spinner-border text-primary mb-3" style="width:2.5rem;height:2.5rem;"></div>' +
+                '<div class="text-center py-5"><div class="spinner-border text-primary mb-3"></div>' +
                 '<div class="fw-semibold">Identifying rooms...</div>' +
-                '<div class="text-muted small mt-1">This takes just a few seconds</div>' +
-                '</div>';
-
+                '<div class="text-muted small mt-1">Just a few seconds</div></div>';
             var roomNames = ['Living Room','Kitchen','Dining','Bathroom','Bedroom'];
             try {
                 var ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso';
@@ -2629,203 +2734,193 @@ Example:
                     body: JSON.stringify({ mode: 'rooms_only', imageBase64: _fpImageBase64, mimeType: _fpMimeType })
                 });
                 var data = await res.json();
-                if (data.rooms && Array.isArray(data.rooms) && data.rooms.length > 0) {
-                    roomNames = data.rooms;
-                }
-            } catch(e) {
-                // silently fall back to defaults
-            }
-            _fpRenderMeasureStep(roomNames);
-        }
-
-        function _fpRenderMeasureStep(roomNames) {
-            var imgSrc = 'data:' + _fpMimeType + ';base64,' + _fpImageBase64;
-            var tableRows = '';
-            roomNames.forEach(function(name, i) {
-                tableRows += _fpRoomRowHtml(i, name);
-            });
-
-            document.getElementById('floorPlanModalBody').innerHTML =
-                '<div class="d-flex justify-content-center gap-1 mb-3">' + _fpStepBadges(2) + '</div>' +
-                '<div class="row g-3">' +
-                '  <div class="col-12 col-md-6">' +
-                '    <div class="text-muted small mb-1"><i class="fas fa-search-plus me-1"></i>Your floor plan — measure each room and enter dimensions on the right</div>' +
-                '    <div style="max-height:calc(100vh - 220px);overflow-y:auto;border:1px solid #dee2e6;border-radius:8px;">' +
-                '      <img src="' + imgSrc + '" style="width:100%;display:block;" alt="Floor plan">' +
-                '    </div>' +
-                '  </div>' +
-                '  <div class="col-12 col-md-6">' +
-                '    <div class="fw-semibold mb-1">Room Dimensions</div>' +
-                '    <div class="text-muted small mb-2">AI identified these rooms. Edit names, add/remove rooms, then enter each room\'s length and width from your drawing.</div>' +
-                '    <div style="max-height:calc(100vh - 280px);overflow-y:auto;">' +
-                '      <table class="table table-sm align-middle mb-0" id="fpRoomTable">' +
-                '        <thead><tr><th style="width:24px;"></th><th>Room</th><th style="width:70px;">L</th><th style="width:10px;">×</th><th style="width:70px;">W</th><th style="width:30px;"></th></tr></thead>' +
-                '        <tbody id="fpRoomTableBody">' + tableRows + '</tbody>' +
-                '      </table>' +
-                '    </div>' +
-                '    <button class="btn btn-outline-secondary btn-sm mt-2" onclick="_fpAddMeasureRow()"><i class="fas fa-plus me-1"></i>Add Room</button>' +
-                '    <div class="text-muted small mt-2"><i class="fas fa-lightbulb text-warning me-1"></i>Include hallways and stair areas — they need drywall and paint too!</div>' +
-                '  </div>' +
-                '</div>' +
-                '<div class="d-flex justify-content-between mt-3">' +
-                '  <button class="btn btn-outline-secondary" onclick="_fpRenderStep1()"><i class="fas fa-arrow-left me-1"></i>Back</button>' +
-                '  <button class="btn btn-primary" onclick="_fpGoToStep3()">Settings <i class="fas fa-arrow-right ms-1"></i></button>' +
-                '</div>';
-        }
-
-        function _fpRoomRowHtml(i, name) {
-            return '<tr id="fpRR_' + i + '">' +
-                '<td><input type="checkbox" class="form-check-input" id="fpRRChk_' + i + '" checked></td>' +
-                '<td><input type="text" class="form-control form-control-sm" id="fpRRName_' + i + '" value="' + name + '" style="min-width:90px;"></td>' +
-                '<td><input type="number" class="form-control form-control-sm" id="fpRRL_' + i + '" placeholder="ft" min="0" step="0.5" style="width:65px;"></td>' +
-                '<td class="text-center text-muted">&times;</td>' +
-                '<td><input type="number" class="form-control form-control-sm" id="fpRRW_' + i + '" placeholder="ft" min="0" step="0.5" style="width:65px;"></td>' +
-                '<td><button class="btn btn-link text-danger p-0" onclick="document.getElementById(\'fpRR_' + i + '\').remove()"><i class="fas fa-times"></i></button></td>' +
-                '</tr>';
-        }
-
-        function _fpAddMeasureRow() {
-            var tbody = document.getElementById('fpRoomTableBody');
-            if (!tbody) return;
-            var i = Date.now();
-            var tr = document.createElement('tr');
-            tr.id = 'fpRR_' + i;
-            tr.innerHTML =
-                '<td><input type="checkbox" class="form-check-input" id="fpRRChk_' + i + '" checked></td>' +
-                '<td><input type="text" class="form-control form-control-sm" id="fpRRName_' + i + '" placeholder="Room name" style="min-width:90px;"></td>' +
-                '<td><input type="number" class="form-control form-control-sm" id="fpRRL_' + i + '" placeholder="ft" min="0" step="0.5" style="width:65px;"></td>' +
-                '<td class="text-center text-muted">&times;</td>' +
-                '<td><input type="number" class="form-control form-control-sm" id="fpRRW_' + i + '" placeholder="ft" min="0" step="0.5" style="width:65px;"></td>' +
-                '<td><button class="btn btn-link text-danger p-0" onclick="document.getElementById(\'fpRR_' + i + '\').remove()"><i class="fas fa-times"></i></button></td>';
-            tbody.appendChild(tr);
-            document.getElementById('fpRRName_' + i).focus();
-        }
-
-        function _fpGoToStep3() {
-            // Read room table
-            var rows = document.querySelectorAll('#fpRoomTableBody tr');
-            _fpRooms = [];
-            rows.forEach(function(row) {
-                var rid = row.id.replace('fpRR_', '');
-                var chk = document.getElementById('fpRRChk_' + rid);
-                var nameEl = document.getElementById('fpRRName_' + rid);
-                var lEl = document.getElementById('fpRRL_' + rid);
-                var wEl = document.getElementById('fpRRW_' + rid);
-                if (!nameEl) return;
-                _fpRooms.push({
-                    id: rid,
-                    name: nameEl.value.trim() || 'Room',
-                    length: parseFloat(lEl.value) || 0,
-                    width: parseFloat(wEl.value) || 0,
-                    checked: chk ? chk.checked : true
+                if (data.rooms && data.rooms.length > 0) roomNames = data.rooms;
+            } catch(e) { /* silent fallback */ }
+            // Pre-populate _fpRooms from AI names if empty
+            if (_fpRooms.length === 0) {
+                _fpRooms = roomNames.map(function(n, i) {
+                    return { id: Date.now() + i, name: n, length: 0, width: 0, checked: true, trades: {} };
                 });
+            }
+            _fpRenderMeasureStep();
+        }
+
+        function _fpRenderMeasureStep() {
+            var imgSrc = 'data:' + _fpMimeType + ';base64,' + _fpImageBase64;
+            // Build the trade headers for per-room selectors
+            var activeTrades = _fpTradeConfig.filter(function(tc) {
+                return _fpMapping && _fpMapping[tc.key] && _fpMapping[tc.key].length > 0;
             });
 
+            var roomRowsHtml = _fpRooms.map(function(room, ri) {
+                // Trade dropdowns row
+                var tradeDropdowns = activeTrades.map(function(tc) {
+                    var opts = '<option value="">&#8212; Skip</option>' +
+                        (_fpMapping[tc.key] || []).map(function(item) {
+                            var sel = (room.trades && room.trades[tc.key] === item.name) ? ' selected' : '';
+                            return '<option value="' + item.name.replace(/"/g,'&quot;') + '"' + sel + '>' + item.name + '</option>';
+                        }).join('');
+                    return '<div class="me-2 mb-1" style="min-width:130px;">' +
+                        '<label class="form-label mb-0" style="font-size:0.7rem;color:#666;"><i class="fas ' + tc.icon + ' me-1"></i>' + tc.label + '</label>' +
+                        '<select class="form-select form-select-sm" onchange="_fpSetRoomTrade(' + ri + ',\'' + tc.key + '\',this.value)">' + opts + '</select>' +
+                        '</div>';
+                }).join('');
+
+                return '<div class="card mb-2" id="fpMR_' + ri + '">' +
+                    '<div class="card-body py-2">' +
+                    '<div class="d-flex align-items-center gap-2 flex-wrap">' +
+                    '<input type="checkbox" class="form-check-input" id="fpMRChk_' + ri + '"' + (room.checked ? ' checked' : '') + ' onchange="_fpRooms[' + ri + '].checked=this.checked">' +
+                    '<input type="text" class="form-control form-control-sm" id="fpMRName_' + ri + '" value="' + room.name.replace(/"/g,'&quot;') + '" style="max-width:160px;" oninput="_fpRooms[' + ri + '].name=this.value">' +
+                    '<div class="d-flex align-items-center gap-1">' +
+                    '<input type="number" class="form-control form-control-sm" id="fpMRL_' + ri + '" placeholder="L ft" value="' + (room.length||'') + '" min="0" step="0.5" style="width:72px;" oninput="_fpRooms[' + ri + '].length=parseFloat(this.value)||0">' +
+                    '<span class="text-muted">&times;</span>' +
+                    '<input type="number" class="form-control form-control-sm" id="fpMRW_' + ri + '" placeholder="W ft" value="' + (room.width||'') + '" min="0" step="0.5" style="width:72px;" oninput="_fpRooms[' + ri + '].width=parseFloat(this.value)||0">' +
+                    '<span class="text-muted small">ft</span>' +
+                    '</div>' +
+                    '<button class="btn btn-link text-danger p-0 ms-auto" onclick="_fpRemoveMeasureRoom(' + ri + ')"><i class="fas fa-times"></i></button>' +
+                    '</div>' +
+                    (activeTrades.length > 0 ?
+                        '<div class="d-flex flex-wrap mt-2 gap-1">' + tradeDropdowns + '</div>' : '') +
+                    '</div></div>';
+            }).join('');
+
             document.getElementById('floorPlanModalBody').innerHTML =
-                '<div class="d-flex justify-content-center gap-1 mb-3">' + _fpStepBadges(3) + '</div>' +
-                '<div class="mb-3">' +
-                '  <label class="form-label fw-semibold">Ceiling Height (feet)</label>' +
-                '  <input type="number" class="form-control" id="fpCeilingHeight" value="' + _fpSettings.ceilingHeight + '" min="6" max="20" step="0.5" style="max-width:120px;">' +
+                '<div class="d-flex justify-content-center gap-1 mb-2">' + _fpStepBadges(2, ['Upload','Measure','Review']) + '</div>' +
+                '<div class="row g-0" style="height:calc(100vh - 130px);">' +
+                // Left: image
+                '<div class="col-md-7 pe-2" style="overflow-y:auto;height:100%;">' +
+                '<div class="text-muted small mb-1"><i class="fas fa-search-plus me-1"></i>Measure each room on this drawing, then enter dimensions on the right</div>' +
+                '<img src="' + imgSrc + '" style="width:100%;border:1px solid #dee2e6;border-radius:8px;" alt="Floor plan">' +
                 '</div>' +
-                '<div class="mb-3">' +
-                '  <label class="form-label fw-semibold">What to Estimate</label>' +
-                '  <div class="row g-2">' +
-                '    <div class="col-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="fpTradeFlooring"' + (_fpSettings.trades.indexOf('flooring') >= 0 ? ' checked' : '') + '><label class="form-check-label" for="fpTradeFlooring">Flooring (sqft)</label></div></div>' +
-                '    <div class="col-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="fpTradeDrywall"' + (_fpSettings.trades.indexOf('drywall') >= 0 ? ' checked' : '') + '><label class="form-check-label" for="fpTradeDrywall">Drywall (sheets)</label></div></div>' +
-                '    <div class="col-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="fpTradePaint"' + (_fpSettings.trades.indexOf('paint') >= 0 ? ' checked' : '') + '><label class="form-check-label" for="fpTradePaint">Paint (sqft)</label></div></div>' +
-                '    <div class="col-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="fpTradeFraming"' + (_fpSettings.trades.indexOf('framing') >= 0 ? ' checked' : '') + '><label class="form-check-label" for="fpTradeFraming">Framing (linear ft)</label></div></div>' +
-                '    <div class="col-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="fpTradeTile"><label class="form-check-label" for="fpTradeTile">Tile (sqft)</label></div></div>' +
-                '  </div>' +
+                // Right: room table
+                '<div class="col-md-5 ps-2 d-flex flex-column" style="height:100%;">' +
+                '<div class="d-flex align-items-center gap-3 mb-2">' +
+                '<span class="fw-semibold">Room Dimensions</span>' +
+                '<div class="d-flex align-items-center gap-1 ms-auto">' +
+                '<label class="form-label mb-0 small">Ceiling:</label>' +
+                '<input type="number" id="fpCeilingHeight" class="form-control form-control-sm" value="9" min="6" max="20" step="0.5" style="width:65px;">' +
+                '<span class="text-muted small">ft</span>' +
                 '</div>' +
-                '<div class="d-flex justify-content-between mt-3">' +
-                '  <button class="btn btn-outline-secondary" onclick="_fpRenderMeasureStep(_fpRooms.map(function(r){return r.name;}))"><i class="fas fa-arrow-left me-1"></i>Back</button>' +
-                '  <button class="btn btn-primary" onclick="_fpGoToStep4()">Calculate <i class="fas fa-calculator ms-1"></i></button>' +
+                '<button class="btn btn-outline-secondary btn-sm" onclick="_fpApplyTradesAll()" title="Copy Room 1 trade selections to all rooms"><i class="fas fa-copy me-1"></i>Apply All</button>' +
+                '</div>' +
+                '<div class="text-muted small mb-2">Enter L &times; W for each room. Use the dropdowns to select your line items.</div>' +
+                '<div style="flex:1;overflow-y:auto;">' + roomRowsHtml + '</div>' +
+                '<div class="mt-2">' +
+                '<button class="btn btn-outline-secondary btn-sm" onclick="_fpAddMeasureRoom()"><i class="fas fa-plus me-1"></i>Add Room</button>' +
+                '<div class="text-muted small mt-1"><i class="fas fa-lightbulb text-warning me-1"></i>Include hallways and stair areas</div>' +
+                '</div>' +
+                '</div>' +
+                '</div>' +
+                '<div class="d-flex justify-content-between mt-2">' +
+                '<button class="btn btn-outline-secondary" onclick="_fpRenderStep1()"><i class="fas fa-arrow-left me-1"></i>Back</button>' +
+                '<button class="btn btn-primary" onclick="_fpGoToStep3()">Calculate <i class="fas fa-calculator ms-1"></i></button>' +
                 '</div>';
         }
 
-        function _fpGoToStep4() {
-            var ceilingHeight = parseFloat(document.getElementById('fpCeilingHeight').value) || 9;
-            var trades = [];
-            if (document.getElementById('fpTradeFlooring').checked) trades.push('flooring');
-            if (document.getElementById('fpTradeDrywall').checked) trades.push('drywall');
-            if (document.getElementById('fpTradePaint').checked) trades.push('paint');
-            if (document.getElementById('fpTradeFraming').checked) trades.push('framing');
-            if (document.getElementById('fpTradeTile').checked) trades.push('tile');
-            _fpSettings = { ceilingHeight: ceilingHeight, trades: trades };
+        function _fpSetRoomTrade(ri, tradeKey, itemName) {
+            if (!_fpRooms[ri].trades) _fpRooms[ri].trades = {};
+            _fpRooms[ri].trades[tradeKey] = itemName;
+        }
 
-            // Calculate quantities in pure JS — zero API calls
+        function _fpApplyTradesAll() {
+            if (_fpRooms.length === 0) return;
+            var sourceTrades = _fpRooms[0].trades || {};
+            _fpRooms.forEach(function(room) { room.trades = Object.assign({}, sourceTrades); });
+            _fpRenderMeasureStep();
+        }
+
+        function _fpAddMeasureRoom() {
+            _fpRooms.push({ id: Date.now(), name: 'New Room', length: 0, width: 0, checked: true, trades: {} });
+            _fpRenderMeasureStep();
+        }
+
+        function _fpRemoveMeasureRoom(ri) {
+            _fpRooms.splice(ri, 1);
+            _fpRenderMeasureStep();
+        }
+
+        // ── Step 3: Review ──
+        function _fpGoToStep3() {
+            var ceilingHeight = parseFloat(document.getElementById('fpCeilingHeight').value) || 9;
             var skipped = 0;
-            var computed = _fpRooms.map(function(room) {
-                if (!room.checked || room.length <= 0 || room.width <= 0) { skipped++; return null; }
+            var computed = [];
+
+            _fpRooms.forEach(function(room, ri) {
+                if (!room.checked || room.length <= 0 || room.width <= 0) { skipped++; return; }
                 var area = room.length * room.width;
                 var perimeter = 2 * (room.length + room.width);
-                var wallArea = perimeter * ceilingHeight;
                 var items = [];
-                if (trades.indexOf('flooring') >= 0) {
-                    items.push({ category: 'Flooring', description: 'Flooring supply and install', quantity: Math.ceil(area * 1.10), unitType: 'sqft', rate: 0, notes: Math.round(area) + ' sqft + 10% waste' });
-                }
-                if (trades.indexOf('drywall') >= 0) {
-                    var dwSqft = Math.max(0, Math.ceil((wallArea * 1.12) - (2 * 21) - (1 * 15)));
-                    items.push({ category: 'Drywall', description: 'Drywall supply and install', quantity: Math.ceil(dwSqft / 32), unitType: 'sheets', rate: 0, notes: dwSqft + ' sqft / 32 sqft per sheet' });
-                }
-                if (trades.indexOf('paint') >= 0) {
-                    items.push({ category: 'Paint', description: 'Paint walls and ceiling', quantity: Math.ceil(wallArea + area), unitType: 'sqft', rate: 0, notes: 'Walls + ceiling' });
-                }
-                if (trades.indexOf('framing') >= 0) {
-                    items.push({ category: 'Framing', description: 'Framing supply and install', quantity: Math.ceil(perimeter), unitType: 'lf', rate: 0, notes: 'Perimeter linear ft' });
-                }
-                if (trades.indexOf('tile') >= 0) {
-                    items.push({ category: 'Tile', description: 'Tile supply and install', quantity: Math.ceil(area * 1.10), unitType: 'sqft', rate: 0, notes: Math.round(area) + ' sqft + 10% waste' });
-                }
-                return { name: room.name, dimensions: { length: room.length, width: room.width, area: Math.round(area), perimeter: Math.round(perimeter) }, items: items };
-            }).filter(function(r) { return r !== null; });
 
-            _fpResults = { rooms: computed, totalArea: computed.reduce(function(sum, r) { return sum + r.dimensions.area; }, 0) };
+                _fpTradeConfig.forEach(function(tc) {
+                    var selectedName = room.trades && room.trades[tc.key];
+                    if (!selectedName) return;
+                    var mappedItems = (_fpMapping && _fpMapping[tc.key]) || [];
+                    // Support multiple items per trade — if selectedName is 'ALL', add all; else just the selected one
+                    var toAdd = mappedItems.filter(function(mi) { return mi.name === selectedName; });
+                    toAdd.forEach(function(mi) {
+                        var qty = (mi.unitType === 'lf' || mi.unitType === 'linear ft') ? perimeter : area;
+                        qty = Math.round(qty * 10) / 10;
+                        items.push({
+                            category: mi.category,
+                            description: mi.name,
+                            quantity: qty,
+                            unitType: mi.unitType || 'sqft',
+                            rate: mi.rate || 0,
+                            total: Math.round(qty * (mi.rate||0) * 100) / 100,
+                            notes: ''
+                        });
+                    });
+                });
 
-            var warningsHtml = skipped > 0 ? '<div class="alert alert-warning py-2 small mb-2"><i class="fas fa-exclamation-triangle me-1"></i>Skipped ' + skipped + ' room(s) with missing dimensions.</div>' : '';
+                computed.push({ name: room.name, dimensions: { length: room.length, width: room.width, area: Math.round(area) }, items: items });
+            });
 
-            var roomsHtml = '';
-            computed.forEach(function(room, ri) {
-                var itemsHtml = '';
-                room.items.forEach(function(item, ii) {
-                    itemsHtml +=
-                        '<div class="d-flex align-items-center gap-2 py-1 border-bottom">' +
+            _fpResults = { rooms: computed };
+
+            var warningsHtml = skipped > 0
+                ? '<div class="alert alert-warning py-2 small mb-2"><i class="fas fa-exclamation-triangle me-1"></i>Skipped ' + skipped + ' room(s) with missing dimensions.</div>'
+                : '';
+
+            var roomsHtml = computed.map(function(room, ri) {
+                var d = room.dimensions;
+                var itemsHtml = room.items.map(function(item, ii) {
+                    return '<div class="d-flex align-items-center gap-2 py-1 border-bottom">' +
                         '<input type="checkbox" class="form-check-input fp-item-check" id="fpItem_' + ri + '_' + ii + '" checked style="flex-shrink:0;">' +
-                        '<div style="flex:1;"><span class="badge bg-secondary me-1" style="font-size:0.7rem;">' + item.category + '</span><span class="small">' + item.description + '</span>' +
-                        (item.notes ? '<span class="text-muted small ms-1">(' + item.notes + ')</span>' : '') + '</div>' +
+                        '<span class="badge bg-secondary me-1" style="font-size:0.7rem;">' + item.category + '</span>' +
+                        '<span class="small flex-grow-1">' + item.description + '</span>' +
                         '<div class="d-flex align-items-center gap-1">' +
                         '<input type="number" class="form-control form-control-sm" id="fpQty_' + ri + '_' + ii + '" value="' + item.quantity + '" style="width:75px;" min="0">' +
-                        '<span class="text-muted small">' + item.unitType + '</span></div></div>';
-                });
-                var d = room.dimensions;
-                roomsHtml +=
-                    '<div class="card mb-2">' +
+                        '<span class="text-muted small">' + item.unitType + '</span>' +
+                        '</div>' +
+                        '<span class="text-muted small ms-1">$' + item.rate + ' = <strong>$' + item.total.toFixed(2) + '</strong></span>' +
+                        '</div>';
+                }).join('');
+
+                return '<div class="card mb-2">' +
                     '<div class="card-header py-2 d-flex align-items-center gap-2" style="background:#f0f4ff;">' +
-                    '<input type="checkbox" class="form-check-input fp-room-check" id="fpRoom_' + ri + '" checked onchange="_fpToggleRoom(' + ri + ', this.checked)">' +
+                    '<input type="checkbox" class="form-check-input fp-room-check" id="fpRoom_' + ri + '" checked onchange="_fpToggleRoom(' + ri + ',this.checked)">' +
                     '<input type="text" class="form-control form-control-sm fw-semibold" id="fpRoomName_' + ri + '" value="' + room.name + '" style="border:none;background:transparent;font-weight:600;">' +
                     '<span class="badge bg-light text-dark ms-auto" style="font-size:0.7rem;">' + d.length + '\' &times; ' + d.width + '\' = ' + d.area + ' sqft</span>' +
                     '</div>' +
-                    '<div class="card-body py-2" id="fpRoomItems_' + ri + '">' + itemsHtml + '</div>' +
+                    '<div class="card-body py-2" id="fpRoomItems_' + ri + '">' + (itemsHtml || '<p class="text-muted small mb-0">No trades selected for this room</p>') + '</div>' +
                     '</div>';
-            });
+            }).join('');
 
             document.getElementById('floorPlanModalBody').innerHTML =
-                '<div class="d-flex justify-content-center gap-1 mb-2">' + _fpStepBadges(4) + '</div>' +
-                '<div class="text-muted small text-center mb-2">Review quantities. Edit any value before adding to your quote.</div>' +
+                '<div class="d-flex justify-content-center gap-1 mb-2">' + _fpStepBadges(3, ['Upload','Measure','Review']) + '</div>' +
+                '<div class="text-muted small text-center mb-2">Review quantities and totals. Edit any value before adding to your quote.</div>' +
                 warningsHtml +
                 '<div style="max-height:calc(100vh - 220px);overflow-y:auto;">' + roomsHtml + '</div>' +
                 '<div class="d-flex justify-content-between align-items-center mt-3">' +
-                '<button class="btn btn-outline-secondary btn-sm" onclick="_fpGoToStep3()"><i class="fas fa-arrow-left me-1"></i>Back</button>' +
-                '<div class="text-muted small">' + computed.length + ' rooms &bull; ~' + _fpResults.totalArea + ' sqft total</div>' +
+                '<button class="btn btn-outline-secondary btn-sm" onclick="_fpRenderMeasureStep()"><i class="fas fa-arrow-left me-1"></i>Back</button>' +
+                '<div class="text-muted small">' + computed.length + ' rooms &bull; ' + computed.reduce(function(s,r){return s+r.dimensions.area;},0) + ' sqft total</div>' +
                 '<button class="btn btn-success" onclick="_fpAddToQuote()"><i class="fas fa-check me-1"></i>Add All to Quote</button>' +
                 '</div>';
         }
 
         function _fpToggleRoom(ri, checked) {
             var itemsDiv = document.getElementById('fpRoomItems_' + ri);
-            if (itemsDiv) {
-                itemsDiv.querySelectorAll('.fp-item-check').forEach(function(cb) { cb.checked = checked; cb.disabled = !checked; });
-            }
+            if (itemsDiv) itemsDiv.querySelectorAll('.fp-item-check').forEach(function(cb) { cb.checked = checked; cb.disabled = !checked; });
         }
 
         function _fpAddToQuote() {
@@ -2851,19 +2946,14 @@ Example:
                         isOptional: false
                     });
                 });
-                if (newRoom.items.length > 0) {
-                    rooms.push(newRoom);
-                    addedCount++;
-                }
+                if (newRoom.items.length > 0) { rooms.push(newRoom); addedCount++; }
             });
             bootstrap.Modal.getInstance(document.getElementById('floorPlanModal')).hide();
             if (addedCount > 0) {
-                renderRooms();
-                calculateTotals();
-                unsavedChanges = true;
+                renderRooms(); calculateTotals(); unsavedChanges = true;
                 setTimeout(function() {
                     var roomEls = document.querySelectorAll('.room-card');
-                    if (roomEls.length > 0) roomEls[roomEls.length - addedCount].scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    if (roomEls.length > 0) roomEls[roomEls.length - addedCount].scrollIntoView({ behavior:'smooth', block:'start' });
                 }, 300);
                 var toast = document.createElement('div');
                 toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#198754;color:white;padding:12px 20px;border-radius:8px;z-index:9999;font-size:0.9rem;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
