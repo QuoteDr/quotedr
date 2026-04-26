@@ -834,29 +834,7 @@ if (location.search.includes('debug')) {
         }
 
         function handleMainAction() {
-            var hasNotes = hasClientNotes();
-            var hasUpgrades = hasClientUpgrades();
-            if (hasNotes || hasUpgrades) {
-                // Save upgrades + notes to Supabase, mark as in_review
-                submitUpgrades();
-                var urlParams = new URLSearchParams(window.location.search);
-                var quoteId = urlParams.get('id');
-                if (quoteId) {
-                    var sb = window._supabaseClient || (typeof supabase !== 'undefined' ? supabase : null);
-                    if (sb) sb.from('quotes').update({ status: 'in_review', updated_at: new Date().toISOString() }).eq('id', quoteId).then(function() {});
-                }
-                // Show confirmation to client
-                var approveSection = document.getElementById('approveSection');
-                if (approveSection) approveSection.style.display = 'none';
-                var successMsg = document.getElementById('successMessage');
-                if (successMsg) successMsg.style.display = '';
-                // Show deposit payment button after acceptance
-                var depSection = document.getElementById('stripeDepositSection');
-                if (depSection && _paymentSettings && _paymentSettings.stripe_enabled && _paymentSettings.accept_deposit) depSection.style.display = 'block';
-            } else {
-                // No changes — open signature/approval modal
-                openSignatureModal();
-            }
+            openSignatureModal();
         }
 
         // --- Signature Pad ---
@@ -1013,23 +991,48 @@ if (location.search.includes('debug')) {
                 if (error) console.warn('Failed to fetch existing quote data:', error);
         
                 const existingData = existingQuote?.data || {};
+                // Build updated rooms with client upgrades/removals applied permanently
+                var updatedRooms = (quoteData.rooms || []).map(function(room) {
+                    return Object.assign({}, room, {
+                        items: (room.items || []).filter(function(item) { return !item._removed; }).map(function(item) {
+                            if (item.upgraded && item.upgrade) {
+                                return Object.assign({}, item, {
+                                    description: item.upgrade.name,
+                                    rate: item.upgrade.rate,
+                                    total: item.upgrade.rate * item.quantity,
+                                    upgraded: false,
+                                    upgrade: null,
+                                    _baseRate: null
+                                });
+                            }
+                            return item;
+                        })
+                    });
+                });
+
+                var _hasUpgrades = hasClientUpgrades();
+                var _hasRemovals = (quoteData.rooms || []).some(function(room) {
+                    return (room.items || []).some(function(item) { return item._removed; });
+                });
+
                 const updateData = {
                     status: 'accepted',
                     client_name: name,
-                    data: {
-                        ...existingData,
+                    data: Object.assign({}, existingData, {
+                        rooms: updatedRooms,
                         signature_url: signatureUrl,
                         signed_by: name,
-                        signed_at: now.toISOString()
-                    }
+                        signed_at: now.toISOString(),
+                        client_upgraded: _hasUpgrades || _hasRemovals,
+                        client_upgraded_at: (_hasUpgrades || _hasRemovals) ? now.toISOString() : undefined
+                    })
                 };
-        
+
                 await _supabase.from('quotes').update(updateData).eq('id', quoteId);
             }
 
             document.getElementById('approveSection').style.display = 'none';
             closeSignatureModal();
-            submitUpgrades();
     
             var depSection = document.getElementById('stripeDepositSection');
             if (depSection && _paymentSettings && _paymentSettings.stripe_enabled && _paymentSettings.accept_deposit) {

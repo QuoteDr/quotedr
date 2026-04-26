@@ -336,6 +336,8 @@
                             </button>
                         </div>
                     </div>
+                    ${q.status === 'accepted' && q.data && q.data.client_upgraded ? `
+                    <div class="alert alert-warning py-1 px-2 mt-2 mb-0 small"><i class="fas fa-bolt me-1"></i><strong>Client made upgrades</strong> when signing — <a href="interactive-quote-viewer.html?id=${q.id}" class="alert-link">review quote</a></div>` : ''}
                     ${q.status === 'in_review' ? `
                     <button class="btn btn-warning btn-sm w-100 mt-2" onclick="openNotesReview('${q.id}', '${(q.client_name || '').replace(/'/g, "\\'")}')"><i class="fas fa-comments me-1"></i> Review Client Notes</button>` : ''}
                     <button class="btn btn-outline-info btn-sm w-100 mt-1" onclick="shareClientPortal('${(q.client_name || '').replace(/'/g, "\\'")}')" title="Share client portal"><i class="fas fa-external-link-alt me-1"></i> Client Portal</button>
@@ -441,39 +443,45 @@
         }
 
         async function shareClientPortal(clientName) {
-            const session = await _supabase.auth.getSession();
-            const userId = session.data?.session?.user?.id;
-            if (!userId) { alert('Please log in first.'); return; }
+            try {
+                const session = await _supabase.auth.getSession();
+                const userId = session.data && session.data.session && session.data.session.user ? session.data.session.user.id : null;
+                if (!userId) { alert('Please log in first.'); return; }
 
-            // Look for existing PIN across all quotes for this client
-            var { data: quotes } = await _supabase.from('quotes').select('id, data').eq('user_id', userId).ilike('client_name', clientName);
-            var pin = null;
-            if (quotes && quotes.length > 0) {
-                for (var q of quotes) {
-                    if (q.data && q.data.portal_pin) { pin = q.data.portal_pin; break; }
-                }
-            }
+                // Look for existing PIN across all quotes for this client
+                var result = await _supabase.from('quotes').select('id, data').eq('user_id', userId).ilike('client_name', clientName);
+                var quotes = result.data || [];
+                var pin = null;
 
-            // Generate new PIN if none found
-            if (!pin) {
-                pin = Math.floor(1000 + Math.random() * 9000).toString();
-                if (quotes && quotes.length > 0) {
-                    for (var q of quotes) {
-                        var newData = Object.assign({}, q.data || {}, { portal_pin: pin });
-                        await _supabase.from('quotes').update({ data: newData }).eq('id', q.id);
+                for (var i = 0; i < quotes.length; i++) {
+                    if (quotes[i].data && quotes[i].data.portal_pin) {
+                        pin = quotes[i].data.portal_pin;
+                        break;
                     }
                 }
+
+                // Generate new PIN if none found
+                if (!pin) {
+                    pin = Math.floor(1000 + Math.random() * 9000).toString();
+                    for (var j = 0; j < quotes.length; j++) {
+                        var newData = Object.assign({}, quotes[j].data || {}, { portal_pin: pin });
+                        await _supabase.from('quotes').update({ data: newData }).eq('id', quotes[j].id);
+                    }
+                }
+
+                // Build URL and populate modal
+                var url = 'https://quotedr.io/client-portal.html?client=' + encodeURIComponent(clientName) + '&contractor=' + userId;
+                document.getElementById('portalClientName').textContent = clientName;
+                document.getElementById('portalUrlDisplay').value = url;
+                document.getElementById('portalPinDisplay').textContent = pin;
+                window._currentPortalClient = clientName;
+
+                var modal = new bootstrap.Modal(document.getElementById('portalShareModal'));
+                modal.show();
+            } catch(err) {
+                console.error('shareClientPortal error:', err);
+                alert('Could not open client portal. Please try again.');
             }
-
-            // Build URL and populate modal
-            const url = `https://quotedr.io/client-portal.html?client=${encodeURIComponent(clientName)}&contractor=${userId}`;
-            document.getElementById('portalClientName').textContent = clientName;
-            document.getElementById('portalUrlDisplay').value = url;
-            document.getElementById('portalPinDisplay').textContent = pin;
-            window._currentPortalClient = clientName;
-
-            var modal = new bootstrap.Modal(document.getElementById('portalShareModal'));
-            modal.show();
         }
 
         function copyPortalUrl() {
