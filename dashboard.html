@@ -340,7 +340,7 @@
                     <div class="alert alert-warning py-1 px-2 mt-2 mb-0 small"><i class="fas fa-bolt me-1"></i><strong>Client made upgrades</strong> when signing — <a href="interactive-quote-viewer.html?id=${q.id}" class="alert-link">review quote</a></div>` : ''}
                     ${q.status === 'in_review' ? `
                     <button class="btn btn-warning btn-sm w-100 mt-2" onclick="openNotesReview('${q.id}', '${(q.client_name || '').replace(/'/g, "\\'")}')"><i class="fas fa-comments me-1"></i> Review Client Notes</button>` : ''}
-                    <button class="btn btn-outline-info btn-sm w-100 mt-1" onclick="shareClientPortal('${(q.client_name || '').replace(/'/g, "\\'")}')" title="Share client portal"><i class="fas fa-external-link-alt me-1"></i> Client Portal</button>
+                    <button class="btn btn-outline-info btn-sm w-100 mt-1" onclick="alert('PORTAL BTN CLICKED: ' + '${(q.client_name || '').replace(/'/g, "\\'")}'); shareClientPortal('${(q.client_name || '').replace(/'/g, "\\'")}')" title="Share client portal"><i class="fas fa-external-link-alt me-1"></i> Client Portal</button>
                     ${(q.status === 'sent' || q.status === 'viewed') ? `
                     <button class="btn btn-outline-primary btn-sm w-100 mt-1" onclick="sendFollowUpReminder('${q.id}', '${(q.client_name || '').replace(/'/g, "\\'")}'", '${(q.data && q.data.clientEmail) || ''}')"><i class="fas fa-bell me-1"></i> Send Follow-up</button>` : ''}
                 </div>
