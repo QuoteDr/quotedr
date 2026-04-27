@@ -1054,7 +1054,7 @@ Example:
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD7acqRI6KsoUDTEkyMx36eDNRuuPXdqIA&v=weekly&libraries=drawing,geometry,places&callback=initMeasureMap" async defer></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD7acqRI6KsoUDTEkyMx36eDNRuuPXdqIA&libraries=drawing,geometry,places&callback=initMeasureMap" async defer></script>
 
     <script>
         // Pricing Database - Adam's Rates (ALD Direct Inc. 2026)
@@ -3524,6 +3524,7 @@ Example:
                         maxZoom: 21,
                         mapTypeId: 'satellite',
                         tilt: 0,
+                        mapId: '90109103adf307b01405b80d',
                         fullscreenControl: true,
                         streetViewControl: false,
                         mapTypeControl: true,
@@ -3534,6 +3535,12 @@ Example:
                         },
                         zoomControl: true,
                         gestureHandling: 'greedy'
+                    });
+                    // Force vector rendering after map init for sharper imagery
+                    google.maps.importLibrary('maps').then(function() {
+                        if (google.maps.RenderingType) {
+                            try { _map.setRenderingType(google.maps.RenderingType.VECTOR); } catch(e) {}
+                        }
                     });
                     // Manual click-to-draw (no DrawingManager - gives full undo/preview control)
                     _map.addListener('click', function(event) {
