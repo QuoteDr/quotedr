@@ -454,7 +454,6 @@
     document.addEventListener('DOMContentLoaded', init);
   
     // === PIN GATE ===
-    <script>
     function pinInput(el, idx) {
       // Only keep last digit if user types multiple
       if (el.value.length > 1) el.value = el.value.slice(-1);
@@ -511,6 +510,7 @@
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'apikey': supabaseKey,
             'Authorization': 'Bearer ' + supabaseKey
           },
           body: JSON.stringify({ clientName, contractorId, pin: enteredPin })
