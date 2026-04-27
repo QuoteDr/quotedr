@@ -215,7 +215,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-v2.js?v1777137478"></script>
+    <script src="supabase-v2.js?v1777304470"></script>
     <script>
         // ─── DASHBOARD FUNCTIONS ─────────────────────────────────────────────────────
 
@@ -450,16 +450,27 @@
             document.body.style.removeProperty('padding-right');
 
             var modalEl = document.getElementById('portalShareModal');
-            if (!modalEl) { alert('Portal modal not found — please refresh the page.'); return; }
+            if (!modalEl) { alert('DEBUG: Portal modal element NOT FOUND in page!'); return; }
 
-            // Pre-populate with loading state and show modal immediately
-            document.getElementById('portalClientName').textContent = clientName;
-            document.getElementById('portalUrlDisplay').value = 'Loading...';
-            document.getElementById('portalPinDisplay').textContent = '...';
+            // Pre-populate with loading state
+            var nameEl = document.getElementById('portalClientName');
+            var urlEl = document.getElementById('portalUrlDisplay');
+            var pinEl = document.getElementById('portalPinDisplay');
+            if (nameEl) nameEl.textContent = clientName;
+            if (urlEl) urlEl.value = 'Loading...';
+            if (pinEl) pinEl.textContent = '...';
             window._currentPortalClient = clientName;
 
-            var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-            modal.show();
+            // Show modal — try multiple approaches
+            try {
+                var existing = bootstrap.Modal.getInstance(modalEl);
+                if (existing) { existing.dispose(); }
+                var modal = new bootstrap.Modal(modalEl, { backdrop: true, keyboard: true });
+                modal.show();
+            } catch(modalErr) {
+                alert('DEBUG: Modal show error: ' + modalErr.message);
+                return;
+            }
 
             // Now load data async — modal is already visible
             try {
