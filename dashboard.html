@@ -443,10 +443,33 @@
         }
 
         async function shareClientPortal(clientName) {
+            // Dismiss any stale Bootstrap backdrop before opening
+            document.querySelectorAll('.modal-backdrop').forEach(function(el) { el.remove(); });
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('overflow');
+            document.body.style.removeProperty('padding-right');
+
+            var modalEl = document.getElementById('portalShareModal');
+            if (!modalEl) { alert('Portal modal not found — please refresh the page.'); return; }
+
+            // Pre-populate with loading state and show modal immediately
+            document.getElementById('portalClientName').textContent = clientName;
+            document.getElementById('portalUrlDisplay').value = 'Loading...';
+            document.getElementById('portalPinDisplay').textContent = '...';
+            window._currentPortalClient = clientName;
+
+            var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.show();
+
+            // Now load data async — modal is already visible
             try {
                 const session = await _supabase.auth.getSession();
                 const userId = session.data && session.data.session && session.data.session.user ? session.data.session.user.id : null;
-                if (!userId) { alert('Please log in first.'); return; }
+                if (!userId) {
+                    document.getElementById('portalUrlDisplay').value = 'Not logged in';
+                    document.getElementById('portalPinDisplay').textContent = '----';
+                    return;
+                }
 
                 // Look for existing PIN across all quotes for this client
                 var result = await _supabase.from('quotes').select('id, data').eq('user_id', userId).ilike('client_name', clientName);
@@ -455,8 +478,7 @@
 
                 for (var i = 0; i < quotes.length; i++) {
                     if (quotes[i].data && quotes[i].data.portal_pin) {
-                        pin = quotes[i].data.portal_pin;
-                        break;
+                        pin = quotes[i].data.portal_pin; break;
                     }
                 }
 
@@ -469,18 +491,15 @@
                     }
                 }
 
-                // Build URL and populate modal
+                // Update modal with real data
                 var url = 'https://quotedr.io/client-portal.html?client=' + encodeURIComponent(clientName) + '&contractor=' + userId;
-                document.getElementById('portalClientName').textContent = clientName;
                 document.getElementById('portalUrlDisplay').value = url;
                 document.getElementById('portalPinDisplay').textContent = pin;
-                window._currentPortalClient = clientName;
 
-                var modal = new bootstrap.Modal(document.getElementById('portalShareModal'));
-                modal.show();
             } catch(err) {
                 console.error('shareClientPortal error:', err);
-                alert('Could not open client portal. Please try again.');
+                document.getElementById('portalUrlDisplay').value = 'Error loading — try again';
+                document.getElementById('portalPinDisplay').textContent = '----';
             }
         }
 
