@@ -340,7 +340,7 @@
                     <div class="alert alert-warning py-1 px-2 mt-2 mb-0 small"><i class="fas fa-bolt me-1"></i><strong>Client made upgrades</strong> when signing — <a href="interactive-quote-viewer.html?id=${q.id}" class="alert-link">review quote</a></div>` : ''}
                     ${q.status === 'in_review' ? `
                     <button class="btn btn-warning btn-sm w-100 mt-2" onclick="openNotesReview('${q.id}', '${(q.client_name || '').replace(/'/g, "\\'")}')"><i class="fas fa-comments me-1"></i> Review Client Notes</button>` : ''}
-                    <button class="btn btn-outline-info btn-sm w-100 mt-1" onclick="alert('PORTAL BTN CLICKED: ' + '${(q.client_name || '').replace(/'/g, "\\'")}'); shareClientPortal('${(q.client_name || '').replace(/'/g, "\\'")}')" title="Share client portal"><i class="fas fa-external-link-alt me-1"></i> Client Portal</button>
+                    <button class="btn btn-outline-info btn-sm w-100 mt-1" onclick="shareClientPortal('${(q.client_name || '').replace(/'/g, "\\'")}')" title="Share client portal"><i class="fas fa-external-link-alt me-1"></i> Client Portal</button>
                     ${(q.status === 'sent' || q.status === 'viewed') ? `
                     <button class="btn btn-outline-primary btn-sm w-100 mt-1" onclick="sendFollowUpReminder('${q.id}', '${(q.client_name || '').replace(/'/g, "\\'")}'", '${(q.data && q.data.clientEmail) || ''}')"><i class="fas fa-bell me-1"></i> Send Follow-up</button>` : ''}
                 </div>
@@ -450,7 +450,7 @@
             document.body.style.removeProperty('padding-right');
 
             var modalEl = document.getElementById('portalShareModal');
-            if (!modalEl) { alert('DEBUG: Portal modal element NOT FOUND in page!'); return; }
+            if (!modalEl) { alert('Portal not found — please refresh.'); return; }
 
             // Pre-populate with loading state
             var nameEl = document.getElementById('portalClientName');
@@ -468,7 +468,7 @@
                 var modal = new bootstrap.Modal(modalEl, { backdrop: true, keyboard: true });
                 modal.show();
             } catch(modalErr) {
-                alert('DEBUG: Modal show error: ' + modalErr.message);
+                alert('Could not open portal: ' + modalErr.message);
                 return;
             }
 
@@ -1057,7 +1057,7 @@ function renderBusinessInsights(quotes) {
                                             <html>
                                             <head>
                                               <title>Warranty Certificate</title>
-                                              <style>
+                                              <sty` + `le>
                                                 body { font-family: Arial, sans-serif; margin: 40px; }
                                                 .header { text-align: center; margin-bottom: 30px; }
                                                 .logo { width: 100px; height: auto; margin-bottom: 20px; }
@@ -1066,7 +1066,7 @@ function renderBusinessInsights(quotes) {
                                                 .highlight { font-weight: bold; }
                                                 .signature-line { margin-top: 60px; text-align: center; }
                                                 .cert-number { text-align: right; font-size: 12px; color: #7f8c8d; }
-                                              </style>
+                                              </sty` + `le>
                                             </head>
                                             <body>
                                               <div class="header">
@@ -1092,91 +1092,16 @@ function renderBusinessInsights(quotes) {
                                                 <p>Authorized by: ${contractor}</p>
                                                 <p>Signature _________________________</p>
                                               </div>
-                                            
-                                <div class="modal fade" id="changeOrderModal" tabindex="-1">
-                                  <div class="modal-dialog modal-lg">
-                                    <div class="modal-content">
-                                      <div class="modal-header">
-                                        <h5 class="modal-title">Change Order</h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                      </div>
-                                      <div class="modal-body">
-                                        <ul class="nav nav-tabs" id="coTabs" role="tablist">
-                                          <li class="nav-item" role="presentation">
-                                            <button class="nav-link active" id="new-tab" data-bs-toggle="tab" data-bs-target="#new-co" type="button">New Change Order</button>
-                                          </li>
-                                          <li class="nav-item" role="presentation">
-                                            <button class="nav-link" id="view-tab" data-bs-toggle="tab" data-bs-target="#view-co" type="button">View Change Orders</button>
-                                          </li>
-                                        </ul>
-                                        <div class="tab-content mt-3" id="coTabsContent">
-                                          <!-- New CO Tab -->
-                                          <div class="tab-pane fade show active" id="new-co" role="tabpanel">
-                                            <form id="newCoForm">
-                                              <div class="mb-3">
-                                                <label class="form-label">Description</label>
-                                                <textarea class="form-control" id="coDescription" required></textarea>
-                                              </div>
-                                              <div class="mb-3">
-                                                <label class="form-label">Reason</label>
-                                                <select class="form-select" id="coReason" required>
-                                                  <option value="">Select reason</option>
-                                                  <option value="Client requested">Client requested</option>
-                                                  <option value="Unforeseen conditions">Unforeseen conditions</option>
-                                                  <option value="Design change">Design change</option>
-                                                  <option value="Other">Other</option>
-                                                </select>
-                                              </div>
-                                              <div class="mb-3">
-                                                <label class="form-label">Line Items</label>
-                                                <table class="table table-sm" id="coItemsTable">
-                                                  <thead>
-                                                    <tr>
-                                                      <th>Description</th>
-                                                      <th>Qty</th>
-                                                      <th>Unit</th>
-                                                      <th>Unit Price</th>
-                                                      <th>Total</th>
-                                                      <th>Action</th>
-                                                    </tr>
-                                                  </thead>
-                                                  <tbody id="coItemsBody">
-                                                    <tr>
-                                                      <td><input type="text" class="form-control item-desc" required></td>
-                                                      <td><input type="number" class="form-control item-qty" value="1" min="0"></td>
-                                                      <td><input type="text" class="form-control item-unit" value="each"></td>
-                                                      <td><input type="number" class="form-control item-price" min="0" step="0.01"></td>
-                                                      <td><input type="text" class="form-control item-total" readonly></td>
-                                                      <td><button type="button" class="btn btn-danger btn-sm" onclick="removeChangeOrderItem(this)">Remove</button></td>
-                                                    </tr>
-                                                  </tbody>
-                                                </table>
-                                                <button type="button" class="btn btn-secondary btn-sm" onclick="addChangeOrderItem()">Add Item</button>
-                                              </div>
-                                              <div class="mb-3">
-                                                <label class="form-label">Notes</label>
-                                                <textarea class="form-control" id="coNotes"></textarea>
-                                              </div>
-                                              <button type="submit" class="btn btn-primary">Add Change Order</button>
-                                            </form>
-                                          </div>
-                                          
-                                          <!-- View CO Tab -->
-                                          <div class="tab-pane fade" id="view-co" role="tabpanel">
-                                            <div id="coList"></div>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                                
+                                            </body>
+                                            </html>
                                           `);
                                           printWindow.document.close();
                                           printWindow.focus();
                                           printWindow.print();
                                         }
-                        
+
+// changeOrderModal HTML moved outside script block
+                                
                                 let currentQuoteId = '';
                                         let currentClientName = '';
                                         
