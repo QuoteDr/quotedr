@@ -1054,7 +1054,7 @@ Example:
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD7acqRI6KsoUDTEkyMx36eDNRuuPXdqIA&libraries=drawing,geometry,places&callback=initMeasureMap" async defer></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD7acqRI6KsoUDTEkyMx36eDNRuuPXdqIA&v=beta&libraries=drawing,geometry,places&callback=initMeasureMap" async defer></script>
 
     <script>
         // Pricing Database - Adam's Rates (ALD Direct Inc. 2026)
@@ -3520,8 +3520,20 @@ Example:
                 if (!_map) {
                     _map = new google.maps.Map(document.getElementById('measureMapContainer'), {
                         center: { lat: 43.6532, lng: -79.3832 },
-                        zoom: 19, mapTypeId: 'satellite', tilt: 0,
-                        fullscreenControl: true, streetViewControl: false, mapTypeControl: false
+                        zoom: 20,
+                        maxZoom: 21,
+                        mapTypeId: 'satellite',
+                        tilt: 0,
+                        renderingType: google.maps.RenderingType.VECTOR,
+                        mapId: 'DEMO_MAP_ID',
+                        fullscreenControl: true,
+                        streetViewControl: false,
+                        mapTypeControl: true,
+                        mapTypeControlOptions: {
+                            mapTypeIds: ['satellite', 'hybrid', 'roadmap']
+                        },
+                        zoomControl: true,
+                        gestureHandling: 'greedy'
                     });
                     // Manual click-to-draw (no DrawingManager - gives full undo/preview control)
                     _map.addListener('click', function(event) {
