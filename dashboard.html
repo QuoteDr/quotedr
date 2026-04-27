@@ -1537,6 +1537,18 @@ function renderBusinessInsights(quotes) {
                 quoteNum = 'Q-' + (maxNum + 1).toString().padStart(3, '0');
             }
 
+            // Check for duplicate quote number
+            var duplicate = (allQuotes || []).find(function(q) {
+                return q.quote_number && q.quote_number.toLowerCase() === quoteNum.toLowerCase();
+            });
+            if (duplicate) {
+                errEl.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i>Quote number <strong>' + quoteNum + '</strong> already exists. Change the number (e.g. add A, B) or leave blank for auto-assign.';
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-arrow-right me-1"></i>Create & Open Builder';
+                document.getElementById('newQuoteNumber').focus();
+                return;
+            }
+
             try {
                 var result = await saveQuoteToSupabase({
                     clientName: clientName,
@@ -1705,7 +1717,13 @@ function renderBusinessInsights(quotes) {
             <div id="coList"></div>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+</div>
 
+
+<!-- Portal Share Modal (must be at top level, outside any nested elements) -->
 <div class="modal fade" id="portalShareModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
@@ -1732,7 +1750,7 @@ function renderBusinessInsights(quotes) {
   </div>
 </div>
 
-<!-- New Quote Modal -->
+<!-- New Quote Modal (must be at top level) -->
 <div class="modal fade" id="newQuoteModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
@@ -1765,6 +1783,5 @@ function renderBusinessInsights(quotes) {
     </div>
   </div>
 </div>
-
 </body>
 </html>
