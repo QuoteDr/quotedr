@@ -1143,28 +1143,14 @@ function renderBusinessInsights(quotes) {
                                 
                                 javascript
                                 
-                                <div class="modal fade" id="portalShareModal" tabindex="-1">
+                                <div class="modal fade" id="portalShareModal_print" tabindex="-1">
                                   <div class="modal-dialog modal-dialog-centered">
                                     <div class="modal-content">
                                       <div class="modal-header" style="background:#1a2940; color:white;">
                                         <h5 class="modal-title"><i class="fas fa-external-link-alt me-2"></i>Client Portal Access</h5>
                                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                                       </div>
-                                      <div class="modal-body text-center">
-                                        <p class="text-muted mb-1">Share this link with <strong id="portalClientName"></strong>:</p>
-                                        <div class="input-group mb-3">
-                                          <input type="text" class="form-control form-control-sm" id="portalUrlDisplay" readonly>
-                                          <button class="btn btn-outline-secondary btn-sm" onclick="copyPortalUrl()"><i class="fas fa-copy"></i></button>
-                                        </div>
-                                        <div class="mb-3">
-                                          <div class="text-muted small mb-1">Client PIN (they need this to log in):</div>
-                                          <div id="portalPinDisplay" style="font-size:2.5rem; font-weight:bold; letter-spacing:0.5rem; color:#1a2940; background:#f8f9fa; border-radius:8px; padding:12px 24px; display:inline-block;"></div>
-                                        </div>
-                                        <div class="d-grid gap-2">
-                                          <button class="btn btn-primary" onclick="copyPortalBoth()"><i class="fas fa-copy me-1"></i>Copy Link + PIN</button>
-                                          <button class="btn btn-outline-secondary btn-sm" onclick="resetPortalPin()"><i class="fas fa-sync me-1"></i>Reset PIN (generate new)</button>
-                                        </div>
-                                      </div>
+                                      <div class="modal-body text-center"></div>
                                     </div>
                                   </div>
                                 </div>

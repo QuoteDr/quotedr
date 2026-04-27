@@ -567,6 +567,15 @@ if (location.search.includes('debug')) {
 
             let html = '';
 
+            // Show upgrade diff banner if quote was modified by client when signing
+            if (quoteData.data && quoteData.data.client_upgraded && quoteData.data.original_rooms) {
+                var signedAtStr = quoteData.data.client_upgraded_at ? new Date(quoteData.data.client_upgraded_at).toLocaleDateString('en-CA', {year:'numeric',month:'short',day:'numeric'}) : '';
+                html += '<div class="alert mb-4" style="background:#fff8e1;border:2px solid #f0ad4e;border-radius:10px;">' +
+                    '<div class="fw-semibold mb-1"><i class="fas fa-bolt text-warning me-2"></i>Client modified this quote when signing' + (signedAtStr ? ' on ' + signedAtStr : '') + '</div>' +
+                    '<div class="text-muted small">Items marked <span class="badge bg-success">\u2B06 Upgraded</span> were swapped by the client. Items marked <span class="badge bg-danger">Removed</span> were removed by the client. Original values shown in grey.</div>' +
+                    '</div>';
+            }
+
             // Match color presets from quote builder
             const ROOM_COLORS = [
                 'linear-gradient(135deg,#2d2d2d 0%,#111111 100%)',
@@ -615,6 +624,10 @@ if (location.search.includes('debug')) {
                     const catDisplay = canonicalCat(catName);
                     html += `<div class="text-uppercase fw-bold mt-3 mb-1" style="font-size:0.72rem; letter-spacing:0.8px; color:#6c757d; border-bottom:1px solid #dee2e6; padding-bottom:3px;"><i class="fas fa-tag me-1"></i>${catDisplay}</div>`;
 
+                    // Signed diff mode: show read-only diff badges instead of interactive buttons
+                    const isSignedDiff = !!(quoteData.data && quoteData.data.client_upgraded && quoteData.data.original_rooms);
+                    const origRoomsForDiff = isSignedDiff ? (quoteData.data.original_rooms || []) : [];
+
                     catEntries.forEach(({ item, itemIndex }) => {
                     // Ensure item has description field
                     if (!item.hasOwnProperty('itemDescription')) item.itemDescription = '';
@@ -624,34 +637,48 @@ if (location.search.includes('debug')) {
                     const itemTotal = item.quantity * activeRate;
                     const hasUpgrade = !!(item.upgrade && item.upgrade.name);
                     const upgradeDiff = hasUpgrade ? ((item.upgrade.rate - item.rate) * item.quantity) : 0;
-                    // Store item description for later use if needed
                     item._itemDescription = item.itemDescription || '';
 
-                    // Item description: use upgrade description if upgraded, else itemDescription from database
                     const displayDesc = isUpgraded && item.upgrade?.description
                         ? item.upgrade.description
                         : (item.itemDescription || '');
                     const isOptional = !!item.optional;
                     const isRemoved = !!item._removed;
 
+                    // Find original item for diff (match by description)
+                    const origRoom = origRoomsForDiff[roomIdx] || {};
+                    const origItem = isSignedDiff ? (origRoom.items || []).find(oi => oi.description === item.description) : null;
+                    const wasUpgraded = isSignedDiff && origItem && origItem.rate !== item.rate;
+
                     if (isRemoved) {
-                        html += `
-                        <div class="py-2 border-bottom" id="item_${roomIdx}_${itemIndex}" style="opacity:0.45; background:#f8f9fa;">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <span class="text-muted"><s>${isUpgraded && item.upgrade ? item.upgrade.name : (item.description || item.name || 'Item')}</s> <small class="badge bg-secondary">Removed</small></span>
-                                <button class="btn btn-sm btn-outline-secondary" onclick="restoreViewerItem(${roomIdx}, ${itemIndex})" style="font-size:0.8rem;">
-                                    <i class="fas fa-undo"></i> Undo
-                                </button>
-                            </div>
-                        </div>`;
+                        if (isSignedDiff) {
+                            // Read-only removed badge
+                            html += `
+                            <div class="py-2 border-bottom" id="item_${roomIdx}_${itemIndex}" style="opacity:0.6; background:#fff5f5;">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span><s class="text-muted">${item.description || item.name || 'Item'}</s> <span class="badge bg-danger ms-1">Removed by client</span></span>
+                                    <span class="text-muted small">-$${(item.quantity * item.rate).toFixed(2)}</span>
+                                </div>
+                            </div>`;
+                        } else {
+                            html += `
+                            <div class="py-2 border-bottom" id="item_${roomIdx}_${itemIndex}" style="opacity:0.45; background:#f8f9fa;">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="text-muted"><s>${isUpgraded && item.upgrade ? item.upgrade.name : (item.description || item.name || 'Item')}</s> <small class="badge bg-secondary">Removed</small></span>
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="restoreViewerItem(${roomIdx}, ${itemIndex})" style="font-size:0.8rem;">
+                                        <i class="fas fa-undo"></i> Undo
+                                    </button>
+                                </div>
+                            </div>`;
+                        }
                     } else {
                         html += `
-                        <div class="py-2 border-bottom" id="item_${roomIdx}_${itemIndex}" ${isOptional ? 'style="border-left:3px dashed #0dcaf0; padding-left:8px;"' : ''}>
+                        <div class="py-2 border-bottom" id="item_${roomIdx}_${itemIndex}" ${isOptional && !isSignedDiff ? 'style="border-left:3px dashed #0dcaf0; padding-left:8px;"' : ''}>
                             <div class="d-flex justify-content-between align-items-baseline mb-1">
                                 <div style="flex:1;">
-                                    <strong>${isUpgraded && item.upgrade ? item.upgrade.name : (item.description || item.name || 'Item')}</strong>
-                                    ${item.photo && !isUpgraded ? `<div class="mt-1"><button class="btn btn-sm btn-outline-secondary" onclick="openPhotoLightbox('${item.photo}')" style="font-size:0.7rem;"><i class="fas fa-expand me-1"></i>View Photo</button></div>` : ''}
-                                    ${isOptional ? '<span class="badge bg-info ms-2" style="font-size:0.65em;">Optional</span>' : ''}
+                                    <strong>${item.description || item.name || 'Item'}</strong>
+                                    ${item.photo && !isSignedDiff ? `<div class="mt-1"><button class="btn btn-sm btn-outline-secondary" onclick="openPhotoLightbox('${item.photo}')" style="font-size:0.7rem;"><i class="fas fa-expand me-1"></i>View Photo</button></div>` : ''}
+                                    ${isOptional && !isSignedDiff ? '<span class="badge bg-info ms-2" style="font-size:0.65em;">Optional</span>' : ''}
                                 </div>
                                 <div style="text-align:right; min-width:140px; padding-left:16px;">
                                     <div><strong>$${itemTotal.toFixed(2)}</strong></div>
@@ -660,6 +687,9 @@ if (location.search.includes('debug')) {
                             </div>
                             ${displayDesc ? `<div class="text-muted mb-1" style="font-size:0.88rem;">${displayDesc}</div>` : ''}
                             ${item.notes ? `<div class="text-muted mb-1"><small><i class="fas fa-info-circle"></i> ${item.notes}</small></div>` : ''}
+                            ${isSignedDiff ? `
+                                ${wasUpgraded && origItem ? `<div class="mt-1"><span class="badge bg-success me-1"><i class="fas fa-arrow-up me-1"></i>Upgraded by client</span><span class="text-muted small">was: ${origItem.description} @ $${origItem.rate.toFixed(2)} = $${(origItem.rate * item.quantity).toFixed(2)}</span></div>` : ''}
+                            ` : `
                             <div class="d-flex gap-2 mt-1 flex-wrap">
                                 ${hasUpgrade ? `
                                 <div>
@@ -672,7 +702,7 @@ if (location.search.includes('debug')) {
                                 ${isOptional ? `<button class="btn btn-sm btn-outline-danger" onclick="removeViewerItem(${roomIdx}, ${itemIndex})" style="font-size:0.82rem;">
                                     <i class="fas fa-times"></i> Remove this item
                                 </button>` : ''}
-                            </div>
+                            </div>`}
                         </div>`;
                     }
                     }); // end catEntries.forEach
@@ -991,6 +1021,9 @@ if (location.search.includes('debug')) {
                 if (error) console.warn('Failed to fetch existing quote data:', error);
         
                 const existingData = existingQuote?.data || {};
+                // Snapshot original rooms BEFORE overwriting
+                var originalRoomsSnapshot = JSON.parse(JSON.stringify(quoteData.rooms || []));
+
                 // Build updated rooms with client upgrades/removals applied permanently
                 var updatedRooms = (quoteData.rooms || []).map(function(room) {
                     return Object.assign({}, room, {
@@ -1024,7 +1057,8 @@ if (location.search.includes('debug')) {
                         signed_by: name,
                         signed_at: now.toISOString(),
                         client_upgraded: _hasUpgrades || _hasRemovals,
-                        client_upgraded_at: (_hasUpgrades || _hasRemovals) ? now.toISOString() : undefined
+                        client_upgraded_at: (_hasUpgrades || _hasRemovals) ? now.toISOString() : undefined,
+                        original_rooms: (_hasUpgrades || _hasRemovals) ? originalRoomsSnapshot : undefined
                     })
                 };
 
