@@ -3518,23 +3518,38 @@ Example:
             setTimeout(function() {
                 if (typeof google === 'undefined') { alert('Google Maps is loading, please try again in a moment.'); return; }
                 if (!_map) {
-                    _map = new google.maps.Map(document.getElementById('measureMapContainer'), {
-                        center: { lat: 43.6532, lng: -79.3832 },
-                        zoom: 20,
-                        maxZoom: 21,
-                        mapTypeId: 'satellite',
-                        tilt: 0,
-                        mapId: '90109103adf307b01405b80d',
-                        renderingType: google.maps.RenderingType.VECTOR,
-                        fullscreenControl: true,
-                        streetViewControl: false,
-                        mapTypeControl: true,
-                        mapTypeControlOptions: {
-                            mapTypeIds: ['satellite', 'hybrid', 'roadmap']
-                        },
-                        zoomControl: true,
-                        gestureHandling: 'greedy'
-                    });
+                    try {
+                        _map = new google.maps.Map(document.getElementById('measureMapContainer'), {
+                            center: { lat: 43.6532, lng: -79.3832 },
+                            zoom: 20,
+                            maxZoom: 21,
+                            mapTypeId: 'satellite',
+                            tilt: 0,
+                            mapId: '90109103adf307b01405b80d',
+                            renderingType: google.maps.RenderingType.VECTOR,
+                            fullscreenControl: true,
+                            streetViewControl: false,
+                            mapTypeControl: true,
+                            mapTypeControlOptions: { mapTypeIds: ['satellite', 'hybrid', 'roadmap'] },
+                            zoomControl: true,
+                            gestureHandling: 'greedy'
+                        });
+                    } catch(e) {
+                        // Fallback: raster renderer without mapId
+                        _map = new google.maps.Map(document.getElementById('measureMapContainer'), {
+                            center: { lat: 43.6532, lng: -79.3832 },
+                            zoom: 20,
+                            maxZoom: 21,
+                            mapTypeId: 'satellite',
+                            tilt: 0,
+                            fullscreenControl: true,
+                            streetViewControl: false,
+                            mapTypeControl: true,
+                            mapTypeControlOptions: { mapTypeIds: ['satellite', 'hybrid', 'roadmap'] },
+                            zoomControl: true,
+                            gestureHandling: 'greedy'
+                        });
+                    }
                     // Manual click-to-draw (no DrawingManager - gives full undo/preview control)
                     _map.addListener('click', function(event) {
                         if (!_drawingMode) return;
