@@ -9,7 +9,7 @@
   <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <!-- Supabase JS -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root {
       --primary-dark: #1a2940;
@@ -123,15 +123,15 @@
 </head>
 <body>
 <div id="pinGate" style="position:fixed;inset:0;background:#1a2940;z-index:9999;display:flex;align-items:center;justify-content:center;">
-  <div style="background:white;border-radius:16px;padding:1.5rem;max-width:340px;width:90%;text-align:center;">
-    <img src="quotedr-logo.svg" style="height:240px;margin-bottom:0;" onerror="this.style.display='none'">
+  <div style="background:white;border-radius:16px;padding:1rem 1.5rem;max-width:340px;width:90%;text-align:center;">
+    <img src="quotedr-logo.svg" style="height:240px;margin:-.5rem 0 -.5rem 0;" onerror="this.style.display='none'">
     <h4 style="color:#1a2940;margin-top:0;">Client Portal</h4>
-    <p class="text-muted small">Enter the 4-digit PIN your contractor provided</p>
+    <p class="text-muted small mb-2">Enter the 4-digit PIN your contractor provided</p>
     <div class="d-flex gap-2 justify-content-center mb-3" id="pinBoxes">
-      <input type="tel" class="form-control text-center fw-bold fs-3" style="width:60px;height:60px;" maxlength="1" id="pin0" inputmode="numeric" pattern="[0-9]" oninput="pinInput(this,0)" onkeydown="pinKeydown(event,0)">
-      <input type="tel" class="form-control text-center fw-bold fs-3" style="width:60px;height:60px;" maxlength="1" id="pin1" inputmode="numeric" pattern="[0-9]" oninput="pinInput(this,1)" onkeydown="pinKeydown(event,1)">
-      <input type="tel" class="form-control text-center fw-bold fs-3" style="width:60px;height:60px;" maxlength="1" id="pin2" inputmode="numeric" pattern="[0-9]" oninput="pinInput(this,2)" onkeydown="pinKeydown(event,2)">
-      <input type="tel" class="form-control text-center fw-bold fs-3" style="width:60px;height:60px;" maxlength="1" id="pin3" inputmode="numeric" pattern="[0-9]" oninput="pinInput(this,3)" onkeydown="pinKeydown(event,3)">
+      <input type="text" class="form-control text-center fw-bold fs-3" style="width:60px;height:60px;" maxlength="1" id="pin0" inputmode="numeric" autocomplete="off" oninput="pinInput(this,0)" onkeydown="pinKeydown(event,0)" onfocus="this.select()">
+      <input type="text" class="form-control text-center fw-bold fs-3" style="width:60px;height:60px;" maxlength="1" id="pin1" inputmode="numeric" autocomplete="off" oninput="pinInput(this,1)" onkeydown="pinKeydown(event,1)" onfocus="this.select()">
+      <input type="text" class="form-control text-center fw-bold fs-3" style="width:60px;height:60px;" maxlength="1" id="pin2" inputmode="numeric" autocomplete="off" oninput="pinInput(this,2)" onkeydown="pinKeydown(event,2)" onfocus="this.select()">
+      <input type="text" class="form-control text-center fw-bold fs-3" style="width:60px;height:60px;" maxlength="1" id="pin3" inputmode="numeric" autocomplete="off" oninput="pinInput(this,3)" onkeydown="pinKeydown(event,3)" onfocus="this.select()">
     </div>
     <div id="pinError" class="text-danger small mb-2" style="min-height:1.2rem;"></div>
     <button class="btn btn-primary w-100" onclick="checkPin()" id="pinSubmitBtn">Unlock Portal</button>
@@ -220,9 +220,7 @@
     // Supabase initialization
     const supabaseUrl = 'https://axmoffknvblluibuitrq.supabase.co';
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso';
-    const _sb = window.supabase;
-    const supabase = _sb ? _sb.createClient(supabaseUrl, supabaseKey) : null;
-    if (!supabase) console.error('Supabase failed to load — PIN validation will not work');
+    const _sbClient = supabase.createClient(supabaseUrl, supabaseKey);
 
     // Get URL parameters
     const urlParams = new URLSearchParams(window.location.search);
