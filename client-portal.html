@@ -124,7 +124,7 @@
 <body>
 <div id="pinGate" style="position:fixed;inset:0;background:#1a2940;z-index:9999;display:flex;align-items:center;justify-content:center;">
   <div style="background:white;border-radius:16px;padding:2rem;max-width:340px;width:90%;text-align:center;">
-    <img src="quotedr-logo.svg" style="height:48px;margin-bottom:1rem;" onerror="this.style.display='none'">
+    <img src="quotedr-logo.svg" style="height:240px;margin-bottom:1rem;" onerror="this.style.display='none'">
     <h4 style="color:#1a2940;">Client Portal</h4>
     <p class="text-muted small">Enter the 4-digit PIN your contractor provided</p>
     <div class="d-flex gap-2 justify-content-center mb-3" id="pinBoxes">
@@ -220,7 +220,7 @@
     // Supabase initialization
     const supabaseUrl = 'https://axmoffknvblluibuitrq.supabase.co';
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso';
-    const supabase = createSupabaseClient(supabaseUrl, supabaseKey);
+    const supabase = window.supabase ? window.supabase.createClient(supabaseUrl, supabaseKey) : null;
 
     // Get URL parameters
     const urlParams = new URLSearchParams(window.location.search);
