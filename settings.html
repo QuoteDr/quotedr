@@ -100,6 +100,7 @@ if (location.search.includes('debug')) {
 					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('pricing',this);return false;"><i class="fas fa-boxes me-2" style="color:#1a56a0"></i>Pricing &amp; Data</a>
 					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('notifications',this);return false;"><i class="fas fa-bell me-2" style="color:#e87e2a"></i>Notifications</a>
 					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('payments',this);return false;"><i class="fas fa-credit-card me-2" style="color:#28a745"></i>Payments</a>
+					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('portal',this);return false;"><i class="fas fa-paint-brush me-2" style="color:#e87e2a"></i>Portal Theme</a>
 					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('integrations',this);return false;"><i class="fas fa-plug me-2" style="color:#2b6cb0"></i>Integrations</a>
 					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('account',this);return false;"><i class="fas fa-user-circle me-2" style="color:#6f42c1"></i>Account</a>
 					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('feedback',this);return false;"><i class="fas fa-comment-alt me-2" style="color:#28a745"></i>Feedback</a>
@@ -602,6 +603,46 @@ Sarah Jones, 905-555-5678"></textarea>
 					</div>
 				</div><!-- /tab-payments -->
 
+				<div id="tab-portal" style="display:none;">
+					<div class="card mb-3">
+						<div class="card-header bg-white border-bottom">
+							<h5 class="mb-0"><i class="fas fa-paint-brush me-2" style="color:#e87e2a"></i>Client Portal Appearance</h5>
+							<p class="text-muted mb-0 mt-1" style="font-size:0.9rem;">Customize how your clients see their portal — make it look like YOUR brand.</p>
+						</div>
+						<div class="card-body">
+							<div class="row">
+								<div class="col-md-6">
+									<div class="mb-3">
+										<label class="form-label fw-semibold">Header Color</label>
+										<input type="color" id="portalHeaderColor" class="form-control form-control-color" value="#1a2940" oninput="updatePortalPreview()">
+									</div>
+									<div class="mb-3">
+										<label class="form-label fw-semibold">Page Background</label>
+										<input type="color" id="portalBgColor" class="form-control form-control-color" value="#f5f7fb" oninput="updatePortalPreview()">
+									</div>
+									<div class="mb-3">
+										<label class="form-label fw-semibold">Accent / Text Color</label>
+										<input type="color" id="portalTextColor" class="form-control form-control-color" value="#1a2940" oninput="updatePortalPreview()">
+									</div>
+									<button class="btn btn-primary" onclick="savePortalTheme()"><i class="fas fa-save me-1"></i> Save Theme</button>
+								</div>
+								<div class="col-md-6">
+									<label class="form-label fw-semibold">Live Preview</label>
+									<div id="portalPreviewHeader" style="background-color:#1a2940;padding:16px;border-radius:8px 8px 0 0;">
+										<span style="color:white;font-weight:600;">Your Company Name</span>
+									</div>
+									<div id="portalPreviewBody" style="background-color:#f5f7fb;padding:16px;border-radius:0 0 8px 8px;border:1px solid #dee2e6;">
+										<span id="portalPreviewText" style="color:#1a2940;font-weight:500;">Client Dashboard</span>
+										<div style="margin-top:8px;background:white;border-radius:6px;padding:10px;">
+											<small class="text-muted">Quote #1001 — $5,200.00</small>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+
 				<div id="tab-integrations" style="display:none;">
 					<div class="settings-card">
 						<h5><i class="fab fa-intuit me-2" style="color:#2b6cb0"></i>QuickBooks Online</h5>
@@ -867,6 +908,8 @@ Sarah Jones, 905-555-5678"></textarea>
 			loadNotificationSettings();
 			// Load payment settings
 			loadPaymentSettingsUI();
+			// Load portal theme settings
+			loadPortalTheme();
 			// Populate username in nav
 			var userName = localStorage.getItem('ald_user_name') || '';
 			var userEl = document.getElementById('userName');
@@ -1643,6 +1686,48 @@ Sarah Jones, 905-555-5678"></textarea>
 			var enabled = document.getElementById('stripeEnabledToggle').checked;
 			document.getElementById('stripeSettingsSection').style.display = enabled ? 'block' : 'none';
 			document.getElementById('paymentsDisabledMessage').style.display = enabled ? 'none' : 'block';
+		}
+
+		// === PORTAL THEME ===
+		async function loadPortalTheme() {
+			const user = window.currentUser;
+			if (!user) return;
+			const { data } = await _supabase.from('user_data').select('value').eq('user_id', user.id).eq('key', 'portal_theme').single();
+			if (data?.value) {
+				const v = data.value;
+				if (v.headerColor) document.getElementById('portalHeaderColor').value = v.headerColor;
+				if (v.bgColor) document.getElementById('portalBgColor').value = v.bgColor;
+				if (v.textColor) document.getElementById('portalTextColor').value = v.textColor;
+				updatePortalPreview();
+			}
+		}
+		async function savePortalTheme() {
+			const user = window.currentUser;
+			if (!user) return;
+			const theme = {
+				headerColor: document.getElementById('portalHeaderColor').value,
+				bgColor: document.getElementById('portalBgColor').value,
+				textColor: document.getElementById('portalTextColor').value
+			};
+			const { error } = await _supabase.from('user_data').upsert(
+				{ user_id: user.id, key: 'portal_theme', value: theme, updated_at: new Date().toISOString() },
+				{ onConflict: 'user_id,key' }
+			);
+			if (!error) {
+				const btn = document.querySelector('[onclick="savePortalTheme()"]');
+				if (btn) { btn.textContent = '✓ Saved!'; setTimeout(() => btn.innerHTML = '<i class="fas fa-save me-1"></i> Save Theme', 2000); }
+			}
+		}
+		function updatePortalPreview() {
+			const hc = document.getElementById('portalHeaderColor').value;
+			const bg = document.getElementById('portalBgColor').value;
+			const tc = document.getElementById('portalTextColor').value;
+			const ph = document.getElementById('portalPreviewHeader');
+			const pb = document.getElementById('portalPreviewBody');
+			const pt = document.getElementById('portalPreviewText');
+			if (ph) ph.style.backgroundColor = hc;
+			if (pb) pb.style.backgroundColor = bg;
+			if (pt) pt.style.color = tc;
 		}
 
 		function loadPaymentSettingsUI() {

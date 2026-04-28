@@ -143,8 +143,10 @@
     <div class="container">
       <div class="row align-items-center">
         <div class="col-md-6">
-          <h1 class="mb-0"><i class="fas fa-file-contract me-2"></i>QuoteDr</h1>
-          <p class="mb-0">Your Project Hub</p>
+          <div id="contractor-logo-area">
+            <h2 id="contractor-display-name" class="mb-0">Loading...</h2>
+          </div>
+          <p class="mb-0" id="portal-tagline">Client Portal</p>
         </div>
         <div class="col-md-6 text-md-end">
           <h3 id="client-name" class="mb-0">Client Name</h3>
@@ -259,25 +261,48 @@
     // Get contractor company name from user_data table
     async function getContractorName() {
       try {
-        const { data, error } = await supabase
+        const { data: rows } = await _sbClient
           .from('user_data')
-          .select('company_name')
+          .select('key,value')
           .eq('user_id', contractorId)
-          .single();
-          
-        if (error) throw error;
-        
-        contractorNameEl.textContent = data?.company_name || 'Your Contractor';
+          .in('key', ['business_profile', 'company_logo', 'portal_theme']);
+
+        const profile = rows?.find(r => r.key === 'business_profile')?.value || {};
+        const logoRow = rows?.find(r => r.key === 'company_logo')?.value || {};
+        const theme = rows?.find(r => r.key === 'portal_theme')?.value || {};
+
+        // Set contractor name in header
+        const companyName = profile.company_name || 'Your Contractor';
+        contractorNameEl.textContent = companyName;
+
+        // Logo or company name in top-left
+        const logoArea = document.getElementById('contractor-logo-area');
+        const displayName = document.getElementById('contractor-display-name');
+        if (logoRow.logo) {
+          logoArea.innerHTML = '<img src="' + logoRow.logo + '" style="max-height:64px;max-width:180px;object-fit:contain;" alt="' + companyName + '">';
+        } else {
+          displayName.textContent = companyName;
+        }
+
+        // Apply portal theme
+        if (theme.headerColor) {
+          document.documentElement.style.setProperty('--primary-dark', theme.headerColor);
+          const header = document.querySelector('.header-bg');
+          if (header) header.style.backgroundColor = theme.headerColor;
+        }
+        if (theme.bgColor) document.body.style.backgroundColor = theme.bgColor;
+
       } catch (error) {
-        console.error('Error fetching contractor name:', error);
+        console.error('Error fetching contractor branding:', error);
         contractorNameEl.textContent = 'Your Contractor';
+        document.getElementById('contractor-display-name').textContent = 'Your Contractor';
       }
     }
 
     // Load quotes for this client from this contractor
     async function loadQuotes() {
       try {
-        const { data: quotes, error } = await supabase
+        const { data: quotes, error } = await _sbClient
           .from('quotes')
           .select('id, client_name, quote_number, total, status, created_at, updated_at, data')
           .eq('user_id', contractorId)
@@ -557,7 +582,6 @@
         hidePinGate();
       }
     });
-    </script>
     </script>
 </body>
 </html>
