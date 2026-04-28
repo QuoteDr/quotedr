@@ -12,9 +12,9 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { clientName, contractorId, pin } = await req.json();
+    const { clientName, clientEmail, contractorId, pin } = await req.json();
 
-    if (!clientName || !contractorId || !pin) {
+    if ((!clientName && !clientEmail) || !contractorId || !pin) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -27,11 +27,18 @@ Deno.serve(async (req) => {
     );
 
     // Fetch quotes for this contractor + client (never expose portal_pin in response)
-    const { data: quotes, error } = await supabase
+    let query = supabase
       .from('quotes')
       .select('data')
-      .eq('user_id', contractorId)
-      .ilike('client_name', clientName);
+      .eq('user_id', contractorId);
+
+    if (clientEmail) {
+      query = query.filter('data->>clientEmail', 'ilike', clientEmail);
+    } else {
+      query = query.ilike('client_name', clientName);
+    }
+
+    const { data: quotes, error } = await query;
 
     if (error) throw new Error(error.message);
 

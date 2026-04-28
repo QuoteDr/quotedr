@@ -340,7 +340,8 @@
                     <div class="alert alert-warning py-1 px-2 mt-2 mb-0 small"><i class="fas fa-bolt me-1"></i><strong>Client made upgrades</strong> when signing — <a href="interactive-quote-viewer.html?id=${q.id}" class="alert-link">review quote</a></div>` : ''}
                     ${q.status === 'in_review' ? `
                     <button class="btn btn-warning btn-sm w-100 mt-2" onclick="openNotesReview('${q.id}', '${(q.client_name || '').replace(/'/g, "\\'")}')"><i class="fas fa-comments me-1"></i> Review Client Notes</button>` : ''}
-                    <button class="btn btn-outline-info btn-sm w-100 mt-1" onclick="shareClientPortal('${(q.client_name || '').replace(/'/g, "\\'")}')" title="Share client portal"><i class="fas fa-external-link-alt me-1"></i> Client Portal</button>
+                    <button class="btn btn-sm w-100 mt-1 ${q.data?.portal_visible ? 'btn-success' : 'btn-outline-secondary'}" onclick="togglePortalVisibility('${q.id}', ${!q.data?.portal_visible})" title="${q.data?.portal_visible ? 'Remove from client portal' : 'Publish to client portal'}"><i class="fas ${q.data?.portal_visible ? 'fa-eye' : 'fa-eye-slash'} me-1"></i> ${q.data?.portal_visible ? 'In Portal ✓' : 'Add to Portal'}</button>
+                    <button class="btn btn-outline-info btn-sm w-100 mt-1" onclick="shareClientPortal('${(q.client_name || '').replace(/'/g, "\\'")}')"" title="Share client portal"><i class="fas fa-external-link-alt me-1"></i> Client Portal</button>
                     ${(q.status === 'sent' || q.status === 'viewed') ? `
                     <button class="btn btn-outline-primary btn-sm w-100 mt-1" onclick="sendFollowUpReminder('${q.id}', '${(q.client_name || '').replace(/'/g, "\\'")}'", '${(q.data && q.data.clientEmail) || ''}')"><i class="fas fa-bell me-1"></i> Send Follow-up</button>` : ''}
                 </div>
@@ -438,8 +439,29 @@
         async function markAsResolved(quoteId) {
             if (!confirm('Mark this quote as resolved?')) return;
             await updateQuoteStatus(quoteId, 'sent');
+            // Auto-publish to portal when sending
+            try {
+                const { data: q } = await _supabase.from('quotes').select('data').eq('id', quoteId).single();
+                if (q) {
+                    const updatedData = Object.assign({}, q.data || {}, { portal_visible: true });
+                    await _supabase.from('quotes').update({ data: updatedData }).eq('id', quoteId);
+                }
+            } catch(e) { console.error('Auto-portal-publish error:', e); }
             var modal = bootstrap.Modal.getInstance(document.getElementById('notesReviewModal'));
             if (modal) modal.hide();
+        }
+
+        async function togglePortalVisibility(quoteId, visible) {
+            try {
+                const { data: quote, error: fetchErr } = await _supabase.from('quotes').select('data').eq('id', quoteId).single();
+                if (fetchErr) throw fetchErr;
+                const updatedData = Object.assign({}, quote.data || {}, { portal_visible: visible });
+                const { error } = await _supabase.from('quotes').update({ data: updatedData }).eq('id', quoteId);
+                if (error) throw error;
+                loadQuotes();
+            } catch(err) {
+                alert('Failed to update portal visibility: ' + err.message);
+            }
         }
 
         async function shareClientPortal(clientName) {
@@ -503,7 +525,15 @@
                 }
 
                 // Update modal with real data
-                var url = 'https://quotedr.io/client-portal.html?client=' + encodeURIComponent(clientName) + '&contractor=' + userId;
+                // Get email from the first quote's data
+                var clientEmail = '';
+                for (var i = 0; i < quotes.length; i++) {
+                    if (quotes[i].data && quotes[i].data.clientEmail) {
+                        clientEmail = quotes[i].data.clientEmail;
+                        break;
+                    }
+                }
+                var url = 'https://quotedr.io/client-portal.html?email=' + encodeURIComponent(clientEmail || clientName) + '&contractor=' + userId;
                 document.getElementById('portalUrlDisplay').value = url;
                 document.getElementById('portalPinDisplay').textContent = pin;
 

@@ -226,7 +226,8 @@
 
     // Get URL parameters
     const urlParams = new URLSearchParams(window.location.search);
-    const clientName = urlParams.get('client');
+    const clientEmail = urlParams.get('email');
+    const clientName = urlParams.get('client'); // backward compat
     const contractorId = urlParams.get('contractor');
 
     // DOM Elements
@@ -243,13 +244,13 @@
 
     // Initialize page
     async function init() {
-      if (!clientName || !contractorId) {
+      if ((!clientName && !clientEmail) || !contractorId) {
         alert('Missing client or contractor parameters');
         return;
       }
 
-      // Set client name (title-cased)
-      clientNameEl.textContent = titleCase(clientName);
+      // Set client name (title-cased) — will be updated from quote data later
+      clientNameEl.textContent = titleCase(clientName || clientEmail || 'Client');
       
       // Get contractor company name
       await getContractorName();
@@ -302,14 +303,28 @@
     // Load quotes for this client from this contractor
     async function loadQuotes() {
       try {
-        const { data: quotes, error } = await _sbClient
+        let query = _sbClient
           .from('quotes')
           .select('id, client_name, quote_number, total, status, created_at, updated_at, data')
           .eq('user_id', contractorId)
-          .ilike('client_name', clientName)
           .order('created_at', { ascending: false });
-          
+
+        if (clientEmail) {
+          query = query.eq('data->>clientEmail', clientEmail);
+        } else if (clientName) {
+          query = query.ilike('client_name', clientName);
+        }
+
+        const { data: allQuotes, error } = await query;
         if (error) throw error;
+
+        // Only show quotes explicitly published to portal
+        const quotes = (allQuotes || []).filter(q => q.data && q.data.portal_visible === true);
+
+        // Set client name from actual quote data
+        if (quotes.length > 0) {
+          clientNameEl.textContent = titleCase(quotes[0].client_name || clientEmail || 'Client');
+        }
         
         if (!quotes || quotes.length === 0) {
           noQuotesEl.classList.remove('d-none');
@@ -519,11 +534,13 @@
         return;
       }
       
-      const clientName = new URLSearchParams(window.location.search).get('client');
-      const contractorId = new URLSearchParams(window.location.search).get('contractor');
+      const _cp = new URLSearchParams(window.location.search);
+      const cpEmail = _cp.get('email');
+      const cpName = _cp.get('client');
+      const contractorId = _cp.get('contractor');
       
       // Check if already unlocked
-      const unlockKey = `portal_unlocked_${clientName}_${contractorId}`;
+      const unlockKey = `portal_unlocked_${cpEmail || cpName}_${contractorId}`;
       if (sessionStorage.getItem(unlockKey)) {
         hidePinGate();
         return;
@@ -538,7 +555,7 @@
             'apikey': supabaseKey,
             'Authorization': 'Bearer ' + supabaseKey
           },
-          body: JSON.stringify({ clientName, contractorId, pin: enteredPin })
+          body: JSON.stringify({ clientName: cpName, clientEmail: cpEmail, contractorId, pin: enteredPin })
         });
         const result = await res.json();
         if (result.valid) {
@@ -572,12 +589,14 @@
     
     // Check on load
     window.addEventListener('load', () => {
-      const clientName = new URLSearchParams(window.location.search).get('client');
-      const contractorId = new URLSearchParams(window.location.search).get('contractor');
+      const _lp = new URLSearchParams(window.location.search);
+      const _email = _lp.get('email');
+      const _name = _lp.get('client');
+      const _cid = _lp.get('contractor');
       
-      if (!clientName || !contractorId) return;
+      if ((!_email && !_name) || !_cid) return;
       
-      const unlockKey = `portal_unlocked_${clientName}_${contractorId}`;
+      const unlockKey = `portal_unlocked_${_email || _name}_${_cid}`;
       if (sessionStorage.getItem(unlockKey)) {
         hidePinGate();
       }
