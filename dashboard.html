@@ -327,7 +327,7 @@
                               <div class="fw-bold" id="title-display-${q.id}">${(q.data && q.data.quoteTitle) ? q.data.quoteTitle : (q.client_name || 'Unnamed Client')}</div>
                               <button class="btn btn-link btn-sm p-0 text-muted" onclick="event.stopPropagation();startEditTitle('${q.id}')" title="Edit title" style="font-size:0.75rem;"><i class="fas fa-pencil-alt"></i></button>
                             </div>
-                            <div id="title-edit-${q.id}" style="display:none;" class="d-flex gap-1 mt-1">
+                            <div id="title-edit-${q.id}" style="display:none; gap:0.25rem;" class="mt-1">
                               <input type="text" class="form-control form-control-sm" id="title-input-${q.id}"
                                      value="${(q.data && q.data.quoteTitle) ? q.data.quoteTitle.replace(/"/g,'&quot;') : ''}"
                                      placeholder="${(q.client_name || 'Add a title...').replace(/"/g,'&quot;')}"
