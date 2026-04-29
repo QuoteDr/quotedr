@@ -398,15 +398,6 @@ if (location.search.includes('debug')) {
                         </div>
                     </div>
 
-                    <!-- Quote Title -->
-                    <div class="col-12 mb-3">
-                        <label><strong>Quote Title:</strong> <span class="text-muted fw-normal small">(optional — e.g. "Michelle Paint Job")</span></label>
-                        <input type="text" id="quoteTitle" class="form-control form-control-lg fw-bold"
-                               placeholder="e.g. Michelle Paint Job, Amanda Basement Reno..."
-                               style="font-size:1.1rem;"
-                               oninput="markUnsaved()">
-                    </div>
-
                     <!-- Client Information Section -->
                     <div class="col-md-12 autocomplete-container">
                         <div class="d-flex justify-content-between align-items-center mb-1">
@@ -5272,7 +5263,7 @@ async function saveQuote() {
             _selectedOverwriteId = null;
             // Pre-fill name
             var nameInput = document.getElementById('saveQuoteNameInput');
-            if (nameInput) nameInput.value = qData.clientName || '';
+            if (nameInput) nameInput.value = qData.quoteTitle || qData.clientName || '';
             // Disable overwrite button
             var owBtn = document.getElementById('overwriteBtn');
             if (owBtn) owBtn.disabled = true;
@@ -5318,7 +5309,7 @@ async function saveQuote() {
         async function confirmSaveAsNew() {
             if (!_saveDialogData) return;
             var nameInput = document.getElementById('saveQuoteNameInput');
-            if (nameInput && nameInput.value.trim()) _saveDialogData.clientName = nameInput.value.trim();
+            if (nameInput && nameInput.value.trim()) _saveDialogData.quoteTitle = nameInput.value.trim();
 
             // Block save if quote number is already used
             var qNum = (document.getElementById('quoteNumber')?.value || '').trim();
@@ -7487,8 +7478,8 @@ async function saveQuote() {
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Quote name</label>
-                        <input type="text" id="saveQuoteNameInput" class="form-control" placeholder="Client name or job description">
+                        <label class="form-label fw-bold">Quote Title</label>
+                        <input type="text" id="saveQuoteNameInput" class="form-control" placeholder="e.g. Michelle Paint Job, Amanda Basement Reno...">
                     </div>
                     <hr>
                     <div>
