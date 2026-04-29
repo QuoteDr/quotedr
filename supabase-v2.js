@@ -337,6 +337,7 @@ async function saveQuote(quoteData) {
         total: quoteData.grandTotal || 0,
         status: quoteData.status || 'draft',
         data: {
+            quoteTitle: quoteData.quoteTitle || '',
             clientName: quoteData.clientName || '',
             quoteNumber: quoteData.quoteNumber || '',
             projectAddress: projectAddress,

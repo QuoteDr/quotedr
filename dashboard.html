@@ -323,8 +323,19 @@
                     <div class="d-flex justify-content-between align-items-start">
                         <div onclick="openQuote('${q.id}')" style="flex:1; cursor:pointer;">
                             ${q.id === lastOpenedId ? '<span class="badge bg-primary me-1" style="font-size:0.65rem; vertical-align:middle;">Last Opened</span>' : ''}
-                            <div class="fw-bold">${q.client_name || 'Unnamed Client'}</div>
-                            <div class="text-muted small">${q.quote_number ? '#' + q.quote_number + ' · ' : ''}${formatDate((q.data && q.data.savedAt) || q.created_at)} · Updated ${timeAgo(q.updated_at)}</div>
+                            <div class="d-flex align-items-center gap-1" id="title-row-${q.id}">
+                              <div class="fw-bold" id="title-display-${q.id}">${(q.data && q.data.quoteTitle) ? q.data.quoteTitle : (q.client_name || 'Unnamed Client')}</div>
+                              <button class="btn btn-link btn-sm p-0 text-muted" onclick="event.stopPropagation();startEditTitle('${q.id}')" title="Edit title" style="font-size:0.75rem;"><i class="fas fa-pencil-alt"></i></button>
+                            </div>
+                            <div id="title-edit-${q.id}" style="display:none;" class="d-flex gap-1 mt-1">
+                              <input type="text" class="form-control form-control-sm" id="title-input-${q.id}"
+                                     value="${(q.data && q.data.quoteTitle) ? q.data.quoteTitle.replace(/"/g,'&quot;') : ''}"
+                                     placeholder="${(q.client_name || 'Add a title...').replace(/"/g,'&quot;')}"
+                                     onkeydown="if(event.key==='Enter') saveTitle('${q.id}'); if(event.key==='Escape') cancelEditTitle('${q.id}')">
+                              <button class="btn btn-success btn-sm" onclick="saveTitle('${q.id}')"><i class="fas fa-check"></i></button>
+                              <button class="btn btn-outline-secondary btn-sm" onclick="cancelEditTitle('${q.id}')"><i class="fas fa-times"></i></button>
+                            </div>
+                            <div class="text-muted small">${(q.data && q.data.quoteTitle) ? (q.client_name + ' · ') : ''}${q.quote_number ? '#' + q.quote_number + ' · ' : ''}${formatDate((q.data && q.data.savedAt) || q.created_at)} · Updated ${timeAgo(q.updated_at)}</div>
                         </div>
                         <div class="text-end d-flex flex-column align-items-end gap-1">
                             <div class="fw-bold">$${parseFloat(q.total || 0).toFixed(2)}</div>
@@ -455,6 +466,32 @@
             } catch(e) { console.error('Auto-portal-publish error:', e); }
             var modal = bootstrap.Modal.getInstance(document.getElementById('notesReviewModal'));
             if (modal) modal.hide();
+        }
+
+        function startEditTitle(quoteId) {
+            document.getElementById('title-row-' + quoteId).style.display = 'none';
+            document.getElementById('title-edit-' + quoteId).style.display = 'flex';
+            var input = document.getElementById('title-input-' + quoteId);
+            if (input) { input.focus(); input.select(); }
+        }
+        function cancelEditTitle(quoteId) {
+            document.getElementById('title-edit-' + quoteId).style.display = 'none';
+            document.getElementById('title-row-' + quoteId).style.display = 'flex';
+        }
+        async function saveTitle(quoteId) {
+            var newTitle = document.getElementById('title-input-' + quoteId).value.trim();
+            try {
+                var { data: quote, error } = await _supabase.from('quotes').select('data').eq('id', quoteId).single();
+                if (error) throw error;
+                var updatedData = Object.assign({}, quote.data || {}, { quoteTitle: newTitle });
+                var { error: saveErr } = await _supabase.from('quotes').update({ data: updatedData }).eq('id', quoteId);
+                if (saveErr) throw saveErr;
+                var displayEl = document.getElementById('title-display-' + quoteId);
+                if (displayEl) displayEl.textContent = newTitle || displayEl.textContent;
+                cancelEditTitle(quoteId);
+            } catch(err) {
+                alert('Could not save title: ' + err.message);
+            }
         }
 
         async function togglePortalVisibility(quoteId, visible) {
@@ -1128,15 +1165,7 @@ function renderBusinessInsights(quotes) {
                                                 <p>Authorized by: ${contractor}</p>
                                                 <p>Signature _________________________</p>
                                               </div>
-                                            <script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(err => console.warn('SW reg failed:', err));
-  });
-}
-</script>
-</body>
-                                            </html>
+                                            </body></html>
                                           `);
                                           printWindow.document.close();
                                           printWindow.focus();
@@ -1763,5 +1792,12 @@ if ('serviceWorker' in navigator) {
     </div>
   </div>
 </div>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(err => console.warn('SW reg failed:', err));
+  });
+}
+</script>
 </body>
 </html>
