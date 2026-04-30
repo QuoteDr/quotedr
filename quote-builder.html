@@ -303,6 +303,22 @@
             border-color: #1a56a0;
             color: #fff;
         }
+        .room-toolbar .btn {
+            border: 1px solid #d8e2ec;
+            font-weight: 700;
+            min-width: 92px;
+            box-shadow: inset 0 -1px 0 rgba(0,0,0,0.08);
+        }
+        .room-toolbar .btn i { display: block; margin-bottom: 2px; }
+        .room-toolbar .btn-add-room { background:#ffffff; color:#0f2742; }
+        .room-toolbar .btn-quick-room { background:#0ea5e9; color:#ffffff; border-color:#0ea5e9; }
+        .room-toolbar .btn-save-template { background:#2563eb; color:#ffffff; border-color:#2563eb; }
+        .room-toolbar .btn-templates { background:#facc15; color:#111827; border-color:#eab308; }
+        .room-toolbar .btn-timelines { background:#64748b; color:#ffffff; border-color:#64748b; }
+        .room-toolbar .btn-markup { background:#15803d; color:#ffffff; border-color:#15803d; }
+        .room-toolbar .btn-manage { background:#1f2937; color:#ffffff; border-color:#1f2937; }
+        .room-toolbar .btn-total { background:#f8fafc; color:#0f172a; }
+        .room-toolbar .btn:hover { filter: brightness(0.96); }
     @media (max-width: 768px) {
             .container-fluid { padding-left: 8px !important; padding-right: 8px !important; }
             .btn-sm { font-size: 0.75rem; padding: 4px 7px; }
@@ -510,9 +526,14 @@ if (location.search.includes('debug')) {
     </div>
 
         <!-- Client Info -->
-        <div class="card mb-4">
-            <div class="card-header"><i class="fas fa-user"></i> Client Information</div>
-            <div class="card-body">
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-user"></i> Client Information</span>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="clientInfoToggleBtn" onclick="toggleClientInfo()">
+                    <i class="fas fa-eye-slash me-1"></i>Hide
+                </button>
+            </div>
+            <div class="card-body" id="clientInfoBody">
                 <div class="row">
                     <!-- Quote Number -->
                     <div class="col-md-12 mb-3">
@@ -569,21 +590,24 @@ if (location.search.includes('debug')) {
                         <input type="email" id="clientEmail" class="form-control" spellcheck="true" placeholder="client@email.com">
                     </div>
 
-                    <!-- Terms & Conditions Section (Collapsible) -->
-                    <div class="col-md-12 mt-3">
-                        <div onclick="var el=document.getElementById('termsCollapse'); var icon=this.querySelector('.fa-chevron-down,.fa-chevron-right'); if(el.style.display==='none'){el.style.display='';icon.className='fas fa-chevron-down me-1';}else{el.style.display='none';icon.className='fas fa-chevron-right me-1';}" style="cursor:pointer; user-select:none;" class="d-flex align-items-center">
-                            <i class="fas fa-chevron-right me-1 text-muted" style="font-size:0.75rem; width:12px;"></i>
-                            <strong>Terms & Conditions</strong>
-                            <span id="termsCount" class="badge bg-secondary ms-2" style="font-size:0.7rem;"></span>
-                        </div>
-                        <div id="termsCollapse" style="display:none; margin-top:8px;">
-                            <div id="termsCheckboxes">
-                                <!-- Populated dynamically from ald_custom_terms -->
-                            </div>
-                            <div class="mt-2">
-                                <a href="settings.html" class="text-muted small" style="font-size:0.8rem;"><i class="fas fa-cog me-1"></i>Manage terms in Settings</a>
-                            </div>
-                        </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Terms & Conditions Section (Collapsible) -->
+        <div class="card mb-4">
+            <div class="card-body py-3">
+                <div onclick="var el=document.getElementById('termsCollapse'); var icon=this.querySelector('.fa-chevron-down,.fa-chevron-right'); if(el.style.display==='none'){el.style.display='';icon.className='fas fa-chevron-down me-1';}else{el.style.display='none';icon.className='fas fa-chevron-right me-1';}" style="cursor:pointer; user-select:none;" class="d-flex align-items-center">
+                    <i class="fas fa-chevron-right me-1 text-muted" style="font-size:0.75rem; width:12px;"></i>
+                    <strong>Terms & Conditions</strong>
+                    <span id="termsCount" class="badge bg-secondary ms-2" style="font-size:0.7rem;"></span>
+                </div>
+                <div id="termsCollapse" style="display:none; margin-top:8px;">
+                    <div id="termsCheckboxes">
+                        <!-- Populated dynamically from ald_custom_terms -->
+                    </div>
+                    <div class="mt-2">
+                        <a href="settings.html" class="text-muted small" style="font-size:0.8rem;"><i class="fas fa-cog me-1"></i>Manage terms in Settings</a>
                     </div>
                 </div>
             </div>
@@ -594,29 +618,29 @@ if (location.search.includes('debug')) {
             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <span><i class="fas fa-th-large"></i> Quote by Room/Area</span>
                 <!-- Desktop buttons (hidden on mobile) -->
-                <div class="btn-group d-none d-md-flex" role="group">
-                    <a href="javascript:void(0)" onclick="addRoom()" class="btn btn-sm btn-light text-dark">
+                <div class="btn-group d-none d-md-flex room-toolbar" role="group">
+                    <a href="javascript:void(0)" onclick="addRoom()" class="btn btn-sm btn-add-room">
                         <i class="fas fa-plus"></i> Add Room
                     </a>
-                    <a href="javascript:void(0)" onclick="openMaterialEstimator()" class="btn btn-sm btn-info text-white" title="Estimate materials from room dimensions">
+                    <a href="javascript:void(0)" onclick="openMaterialEstimator()" class="btn btn-sm btn-quick-room" title="Estimate materials from room dimensions">
                         <i class="fas fa-ruler-combined"></i> Quick Add Room
                     </a>
-                    <a href="javascript:void(0)" onclick="saveTemplate()" class="btn btn-sm btn-info text-white" title="Save current rooms as a template">
+                    <a href="javascript:void(0)" onclick="saveTemplate()" class="btn btn-sm btn-save-template" title="Save current rooms as a template">
                         <i class="fas fa-save"></i> Save Template
                     </a>
-                    <a href="javascript:void(0)" onclick="openTemplatesMenu(this)" class="btn btn-sm btn-warning" title="Load existing templates">
+                    <a href="javascript:void(0)" onclick="openTemplatesMenu(this)" class="btn btn-sm btn-templates" title="Load existing templates">
                         <i class="fas fa-folder-open"></i> Templates
                     </a>
-                    <a href="javascript:void(0)" id="toggleTimelinesBtn" onclick="toggleTimelines()" class="btn btn-sm btn-secondary" title="Show/hide timeline estimates">
+                    <a href="javascript:void(0)" id="toggleTimelinesBtn" onclick="toggleTimelines()" class="btn btn-sm btn-timelines" title="Show/hide timeline estimates">
                         <i class="fas fa-eye-slash"></i> Hide Timelines
                     </a>
-                    <a href="javascript:void(0)" onclick="applyGlobalMarkup()" class="btn btn-sm btn-success text-white" title="Apply markup to all rooms">
+                    <a href="javascript:void(0)" onclick="applyGlobalMarkup()" class="btn btn-sm btn-markup" title="Apply markup to all rooms">
                         <i class="fas fa-percent"></i> Markup All
                     </a>
-                    <a href="javascript:void(0)" onclick="openManageItemsModal()" class="btn btn-sm btn-dark" title="Add custom line items to the pricing database">
+                    <a href="javascript:void(0)" onclick="openManageItemsModal()" class="btn btn-sm btn-manage" title="Add custom line items to the pricing database">
                         <i class="fas fa-database"></i> Manage Items
                     </a>
-                    <a href="javascript:void(0)" id="toggleTotalBarBtn" onclick="toggleStickyTotal()" class="btn btn-sm btn-outline-dark" title="Show/hide floating quote total">
+                    <a href="javascript:void(0)" id="toggleTotalBarBtn" onclick="toggleStickyTotal()" class="btn btn-sm btn-total" title="Show/hide floating quote total">
                         <i class="fas fa-dollar-sign"></i> Total
                     </a>
                 </div>
@@ -5470,6 +5494,17 @@ Example:
                 supabaseId: window._supabaseQuoteId || null,
                 currency: (function(){ try { return JSON.parse(localStorage.getItem('ald_quote_prefs')||'{}').currency||'CAD'; } catch(e){return 'CAD';} })()
             };
+        }
+
+        function toggleClientInfo() {
+            var body = document.getElementById('clientInfoBody');
+            var btn = document.getElementById('clientInfoToggleBtn');
+            if (!body || !btn) return;
+            var hidden = body.style.display === 'none';
+            body.style.display = hidden ? '' : 'none';
+            btn.innerHTML = hidden
+                ? '<i class="fas fa-eye-slash me-1"></i>Hide'
+                : '<i class="fas fa-eye me-1"></i>Show';
         }
 
         function applyQuoteData(data) {
