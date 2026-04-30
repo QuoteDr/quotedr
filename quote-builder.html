@@ -254,6 +254,41 @@
         .style-swatch { width:36px;height:36px;border-radius:50%;cursor:pointer;border:3px solid transparent;transition:all 0.15s; }
         .style-swatch.selected { border-color:#333;transform:scale(1.15); }
         .style-swatch:hover { transform:scale(1.1); }
+        .quote-style-preset {
+            border: 1px solid #dbe4ef;
+            border-radius: 8px;
+            background: #fff;
+            padding: 10px;
+            text-align: left;
+            cursor: pointer;
+            transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+        }
+        .quote-style-preset:hover { transform: translateY(-1px); border-color: #8bb7e0; }
+        .quote-style-preset.selected { border-color: #1a56a0; box-shadow: 0 0 0 2px rgba(26,86,160,0.16); }
+        .quote-style-preset .preset-dots { display:flex; gap:5px; margin-bottom:8px; }
+        .quote-style-preset .preset-dot { width:18px; height:18px; border-radius:50%; border:1px solid rgba(0,0,0,0.08); }
+        .quote-style-preview {
+            border: 1px solid #dbe4ef;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #fff;
+        }
+        .quote-style-preview-header {
+            padding: 12px 14px;
+            color: #fff;
+            font-weight: 700;
+            display:flex;
+            justify-content:space-between;
+            gap:12px;
+        }
+        .quote-style-preview-body { padding: 14px; }
+        .quote-style-preview-line { height: 10px; border-radius: 999px; background: rgba(15,23,42,0.12); margin-bottom: 8px; }
+        .send-settings-card {
+            border:1px solid #e5edf5;
+            border-radius:8px;
+            padding:12px;
+            background:#fff;
+        }
     @media (max-width: 768px) {
             .container-fluid { padding-left: 8px !important; padding-right: 8px !important; }
             .btn-sm { font-size: 0.75rem; padding: 4px 7px; }
@@ -5000,35 +5035,134 @@ Example:
         }
 
         // Quote style state
-        var _quoteStyle = { accent: '#ffffff', bg: '#ffffff' };
+        var _quoteStyle = {
+            preset: 'clean-blue',
+            accent: '#1a56a0',
+            bg: '#f7fbff',
+            headerStyle: 'branded',
+            fontFeel: 'clean',
+            pricingMode: 'full',
+            depositMode: 'auto',
+            approvalMode: 'approve_or_changes',
+            expiryDate: '',
+            showUpgrades: true,
+            showScopeNotes: true,
+            clientMessage: ''
+        };
+
+        function setFieldValue(id, value) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            if (el.type === 'checkbox') el.checked = !!value;
+            else el.value = value || '';
+        }
+
+        function readQuoteStyleFromControls() {
+            var style = Object.assign({}, _quoteStyle);
+            style.headerStyle = document.getElementById('quoteHeaderStyle')?.value || style.headerStyle;
+            style.fontFeel = document.getElementById('quoteFontFeel')?.value || style.fontFeel;
+            style.pricingMode = document.getElementById('quotePricingMode')?.value || style.pricingMode;
+            style.depositMode = document.getElementById('quoteDepositMode')?.value || style.depositMode;
+            style.approvalMode = document.getElementById('quoteApprovalMode')?.value || style.approvalMode;
+            style.expiryDate = document.getElementById('quoteExpiryDate')?.value || '';
+            style.showUpgrades = document.getElementById('quoteShowUpgrades')?.checked !== false;
+            style.showScopeNotes = document.getElementById('quoteShowScopeNotes')?.checked !== false;
+            style.clientMessage = document.getElementById('quoteClientMessage')?.value.trim() || '';
+            return style;
+        }
+
+        function applyQuoteStyleToControls(style) {
+            _quoteStyle = Object.assign({}, _quoteStyle, style || {});
+            setFieldValue('quoteHeaderStyle', _quoteStyle.headerStyle);
+            setFieldValue('quoteFontFeel', _quoteStyle.fontFeel);
+            setFieldValue('quotePricingMode', _quoteStyle.pricingMode);
+            setFieldValue('quoteDepositMode', _quoteStyle.depositMode);
+            setFieldValue('quoteApprovalMode', _quoteStyle.approvalMode);
+            setFieldValue('quoteExpiryDate', _quoteStyle.expiryDate);
+            setFieldValue('quoteShowUpgrades', _quoteStyle.showUpgrades);
+            setFieldValue('quoteShowScopeNotes', _quoteStyle.showScopeNotes);
+            setFieldValue('quoteClientMessage', _quoteStyle.clientMessage);
+
+            document.querySelectorAll('#stylePresets .quote-style-preset').forEach(function(btn) {
+                btn.classList.toggle('selected', btn.getAttribute('data-preset') === _quoteStyle.preset);
+            });
+            document.querySelectorAll('#accentSwatches .style-swatch').forEach(function(sw) {
+                sw.classList.toggle('selected', sw.getAttribute('data-accent') === _quoteStyle.accent);
+            });
+            document.querySelectorAll('#bgSwatches .style-swatch').forEach(function(sw) {
+                sw.classList.toggle('selected', sw.getAttribute('data-bg') === _quoteStyle.bg);
+            });
+            updateStylePreview();
+        }
 
         function updateStylePreview() {
+            _quoteStyle = readQuoteStyleFromControls();
             var prev = document.getElementById('stylePreview');
             var hdr = document.getElementById('previewHeader');
             var tot = document.getElementById('previewTotal');
-            if (prev) prev.style.background = _quoteStyle.bg;
-            if (hdr) hdr.style.background = _quoteStyle.accent;
-            if (tot) tot.style.background = _quoteStyle.accent;
+            var msg = document.getElementById('previewMessage');
+            var pricing = document.getElementById('previewPricingLabel');
+            var mode = document.getElementById('previewHeaderMode');
+            var accent = _quoteStyle.accent || '#1a56a0';
+            var isLight = _quoteStyle.headerStyle === 'light' || accent === '#ffffff';
+            if (prev) prev.style.background = _quoteStyle.bg || '#fff';
+            if (hdr) {
+                hdr.style.background = _quoteStyle.headerStyle === 'dark' ? '#172033' : (isLight ? '#ffffff' : accent);
+                hdr.style.color = isLight ? '#1f3349' : '#ffffff';
+                hdr.style.borderBottom = isLight ? '1px solid #dbe4ef' : 'none';
+            }
+            if (tot) {
+                tot.style.background = accent === '#ffffff' ? '#1a56a0' : accent;
+                tot.style.color = '#ffffff';
+            }
+            if (msg) {
+                msg.style.display = _quoteStyle.clientMessage ? 'block' : 'none';
+                msg.textContent = _quoteStyle.clientMessage;
+            }
+            if (pricing) {
+                var labels = { full: 'Full itemized quote', category: 'Category subtotals only', total: 'Total only' };
+                pricing.textContent = labels[_quoteStyle.pricingMode] || labels.full;
+            }
+            if (mode) mode.textContent = _quoteStyle.approvalMode === 'review' ? 'Review-only link' : 'Client-ready estimate';
         }
 
         function initStyleModal() {
+            var savedDefault = {};
+            try { savedDefault = JSON.parse(localStorage.getItem('ald_quote_send_style') || '{}'); } catch(e) { savedDefault = {}; }
+            applyQuoteStyleToControls(savedDefault);
+
+            document.querySelectorAll('#stylePresets .quote-style-preset').forEach(function(btn) {
+                btn.onclick = function() {
+                    _quoteStyle.preset = btn.getAttribute('data-preset') || 'custom';
+                    _quoteStyle.accent = btn.getAttribute('data-accent') || _quoteStyle.accent;
+                    _quoteStyle.bg = btn.getAttribute('data-bg') || _quoteStyle.bg;
+                    _quoteStyle.headerStyle = btn.getAttribute('data-header') || _quoteStyle.headerStyle;
+                    _quoteStyle.fontFeel = btn.getAttribute('data-font') || _quoteStyle.fontFeel;
+                    applyQuoteStyleToControls(_quoteStyle);
+                };
+            });
             document.querySelectorAll('#accentSwatches .style-swatch').forEach(function(sw) {
                 sw.onclick = function() {
-                    document.querySelectorAll('#accentSwatches .style-swatch').forEach(function(s){ s.classList.remove('selected'); });
-                    sw.classList.add('selected');
+                    _quoteStyle.preset = 'custom';
                     _quoteStyle.accent = sw.getAttribute('data-accent');
-                    updateStylePreview();
+                    applyQuoteStyleToControls(_quoteStyle);
                 };
             });
             document.querySelectorAll('#bgSwatches .style-swatch').forEach(function(sw) {
                 sw.onclick = function() {
-                    document.querySelectorAll('#bgSwatches .style-swatch').forEach(function(s){ s.classList.remove('selected'); });
-                    sw.classList.add('selected');
+                    _quoteStyle.preset = 'custom';
                     _quoteStyle.bg = sw.getAttribute('data-bg');
-                    updateStylePreview();
+                    applyQuoteStyleToControls(_quoteStyle);
                 };
             });
-            updateStylePreview();
+            ['quoteHeaderStyle','quoteFontFeel','quotePricingMode','quoteDepositMode','quoteApprovalMode','quoteExpiryDate','quoteShowUpgrades','quoteShowScopeNotes','quoteClientMessage'].forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el && !el.dataset.styleBound) {
+                    el.addEventListener('input', updateStylePreview);
+                    el.addEventListener('change', updateStylePreview);
+                    el.dataset.styleBound = '1';
+                }
+            });
         }
 
         function generateInteractiveLink() {
@@ -5049,6 +5183,11 @@ Example:
             // Show saving indicator
             var saveStatus = document.getElementById('saveStatus');
             if (saveStatus) saveStatus.innerHTML = '<span style="color:#1a56a0;"><i class="fas fa-spinner fa-spin"></i> Saving quote...</span>';
+
+            _quoteStyle = readQuoteStyleFromControls();
+            if (document.getElementById('quoteSaveDefaultStyle')?.checked) {
+                try { localStorage.setItem('ald_quote_send_style', JSON.stringify(_quoteStyle)); } catch(e) {}
+            }
 
             const quoteData = collectQuoteData();
             quoteData.style = JSON.parse(JSON.stringify(_quoteStyle));
@@ -5111,6 +5250,8 @@ Example:
                 var clientEmail = document.getElementById('clientEmail')?.value.trim();
                 var sendEmailEl = document.getElementById('sendQuoteEmail');
                 if (sendEmailEl && clientEmail) sendEmailEl.value = clientEmail;
+                var sendMessageEl = document.getElementById('sendQuoteMessage');
+                if (sendMessageEl && _quoteStyle.clientMessage) sendMessageEl.value = _quoteStyle.clientMessage;
                 // Clear previous result
                 var resultEl = document.getElementById('sendQuoteEmailResult');
                 if (resultEl) resultEl.innerHTML = '';
@@ -7312,46 +7453,158 @@ async function saveQuote() {
 
     <!-- Quote Style Modal -->
     <div class="modal fade" id="quoteStyleModal" tabindex="-1">
-        <div class="modal-dialog modal-md">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header" style="background:linear-gradient(135deg,#1a56a0,#0f3460);color:white;">
-                    <h5 class="modal-title"><i class="fas fa-palette me-2"></i>Style Your Quote</h5>
+                    <h5 class="modal-title"><i class="fas fa-share-square me-2"></i>Send Quote Settings</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <p class="text-muted small mb-3">Choose a colour scheme for your client's quote. All themes keep text readable.</p>
-                    <div class="mb-4">
-                        <label class="form-label fw-bold">Accent Colour</label>
-                        <div class="d-flex flex-wrap gap-2" id="accentSwatches">
-                            <div class="style-swatch selected" data-accent="#ffffff" style="background:#ffffff;border:1px solid #ddd;" title="Default (no accent)"></div>
-                            <div class="style-swatch" data-accent="#1a56a0" style="background:#1a56a0;" title="Classic Blue"></div>
-                            <div class="style-swatch" data-accent="#0f7b5e" style="background:#0f7b5e;" title="Forest Green"></div>
-                            <div class="style-swatch" data-accent="#7c3aed" style="background:#7c3aed;" title="Violet"></div>
-                            <div class="style-swatch" data-accent="#b45309" style="background:#b45309;" title="Amber"></div>
-                            <div class="style-swatch" data-accent="#be123c" style="background:#be123c;" title="Crimson"></div>
-                            <div class="style-swatch" data-accent="#0e7490" style="background:#0e7490;" title="Teal"></div>
-                            <div class="style-swatch" data-accent="#374151" style="background:#374151;" title="Charcoal"></div>
-                            <div class="style-swatch" data-accent="#e87e2a" style="background:#e87e2a;" title="Orange"></div>
+                    <p class="text-muted small mb-3">Choose how the client quote should look and what details the client can see.</p>
+
+                    <ul class="nav nav-pills nav-fill mb-3" id="quoteStyleTabs" role="tablist">
+                        <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#quoteStyleTabStyle" type="button">Style</button></li>
+                        <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#quoteStyleTabView" type="button">Client View</button></li>
+                        <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#quoteStyleTabMessage" type="button">Message</button></li>
+                    </ul>
+
+                    <div class="tab-content">
+                        <div class="tab-pane fade show active" id="quoteStyleTabStyle">
+                            <div class="row g-3 mb-3" id="stylePresets">
+                                <div class="col-sm-6 col-lg-4"><button type="button" class="quote-style-preset w-100 selected" data-preset="clean-blue" data-accent="#1a56a0" data-bg="#f7fbff" data-header="branded" data-font="clean"><div class="preset-dots"><span class="preset-dot" style="background:#1a56a0"></span><span class="preset-dot" style="background:#f7fbff"></span></div><strong>Clean Blue</strong><div class="text-muted small">Professional and familiar</div></button></div>
+                                <div class="col-sm-6 col-lg-4"><button type="button" class="quote-style-preset w-100" data-preset="modern-charcoal" data-accent="#263445" data-bg="#f8fafc" data-header="dark" data-font="bold"><div class="preset-dots"><span class="preset-dot" style="background:#263445"></span><span class="preset-dot" style="background:#f8fafc"></span></div><strong>Modern Charcoal</strong><div class="text-muted small">Quiet, sharp, premium</div></button></div>
+                                <div class="col-sm-6 col-lg-4"><button type="button" class="quote-style-preset w-100" data-preset="warm-renovation" data-accent="#b87333" data-bg="#fff8ee" data-header="branded" data-font="clean"><div class="preset-dots"><span class="preset-dot" style="background:#b87333"></span><span class="preset-dot" style="background:#fff8ee"></span></div><strong>Warm Renovation</strong><div class="text-muted small">Friendly and residential</div></button></div>
+                                <div class="col-sm-6 col-lg-4"><button type="button" class="quote-style-preset w-100" data-preset="premium-gold" data-accent="#9a6a16" data-bg="#fffdf5" data-header="dark" data-font="premium"><div class="preset-dots"><span class="preset-dot" style="background:#9a6a16"></span><span class="preset-dot" style="background:#fffdf5"></span></div><strong>Premium Gold</strong><div class="text-muted small">High-end finish work</div></button></div>
+                                <div class="col-sm-6 col-lg-4"><button type="button" class="quote-style-preset w-100" data-preset="minimal-white" data-accent="#ffffff" data-bg="#ffffff" data-header="light" data-font="clean"><div class="preset-dots"><span class="preset-dot" style="background:#ffffff"></span><span class="preset-dot" style="background:#eef2f7"></span></div><strong>Minimal White</strong><div class="text-muted small">Simple and document-like</div></button></div>
+                            </div>
+
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Accent Colour</label>
+                                    <div class="d-flex flex-wrap gap-2" id="accentSwatches">
+                                        <div class="style-swatch" data-accent="#ffffff" style="background:#ffffff;border:1px solid #ddd;" title="Default"></div>
+                                        <div class="style-swatch selected" data-accent="#1a56a0" style="background:#1a56a0;" title="Classic Blue"></div>
+                                        <div class="style-swatch" data-accent="#0f7b5e" style="background:#0f7b5e;" title="Forest Green"></div>
+                                        <div class="style-swatch" data-accent="#7c3aed" style="background:#7c3aed;" title="Violet"></div>
+                                        <div class="style-swatch" data-accent="#b45309" style="background:#b45309;" title="Amber"></div>
+                                        <div class="style-swatch" data-accent="#be123c" style="background:#be123c;" title="Crimson"></div>
+                                        <div class="style-swatch" data-accent="#0e7490" style="background:#0e7490;" title="Teal"></div>
+                                        <div class="style-swatch" data-accent="#374151" style="background:#374151;" title="Charcoal"></div>
+                                        <div class="style-swatch" data-accent="#e87e2a" style="background:#e87e2a;" title="Orange"></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Background Tint</label>
+                                    <div class="d-flex flex-wrap gap-2" id="bgSwatches">
+                                        <div class="style-swatch bg-swatch" data-bg="#ffffff" style="background:#ffffff;border:1px solid #ddd;" title="White"></div>
+                                        <div class="style-swatch bg-swatch selected" data-bg="#f7fbff" style="background:#f7fbff;" title="Cool Blue"></div>
+                                        <div class="style-swatch bg-swatch" data-bg="#f0fdf4" style="background:#f0fdf4;" title="Soft Green"></div>
+                                        <div class="style-swatch bg-swatch" data-bg="#fff8ee" style="background:#fff8ee;" title="Warm Renovation"></div>
+                                        <div class="style-swatch bg-swatch" data-bg="#fdf4ff" style="background:#fdf4ff;" title="Lavender"></div>
+                                        <div class="style-swatch bg-swatch" data-bg="#fff1f2" style="background:#fff1f2;" title="Blush"></div>
+                                        <div class="style-swatch bg-swatch" data-bg="#f8fafc" style="background:#f8fafc;" title="Slate"></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Header Style</label>
+                                    <select id="quoteHeaderStyle" class="form-select form-select-sm">
+                                        <option value="branded">Branded colour</option>
+                                        <option value="dark">Dark premium</option>
+                                        <option value="light">Light document</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Font Feel</label>
+                                    <select id="quoteFontFeel" class="form-select form-select-sm">
+                                        <option value="clean">Clean</option>
+                                        <option value="bold">Bold</option>
+                                        <option value="premium">Premium</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="tab-pane fade" id="quoteStyleTabView">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="send-settings-card h-100">
+                                        <label class="form-label fw-bold">Pricing Detail</label>
+                                        <select id="quotePricingMode" class="form-select form-select-sm">
+                                            <option value="full">Full itemized quote</option>
+                                            <option value="category">Category subtotals only</option>
+                                            <option value="total">Total only</option>
+                                        </select>
+                                        <div class="text-muted small mt-2">Controls how much pricing detail the client sees.</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="send-settings-card h-100">
+                                        <label class="form-label fw-bold">Deposit Display</label>
+                                        <select id="quoteDepositMode" class="form-select form-select-sm">
+                                            <option value="auto">Use payment settings</option>
+                                            <option value="show">Show deposit section</option>
+                                            <option value="hide">Hide deposit section</option>
+                                        </select>
+                                        <div class="text-muted small mt-2">Useful when you want approval first and payment later.</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="send-settings-card h-100">
+                                        <label class="form-label fw-bold">Approval Type</label>
+                                        <select id="quoteApprovalMode" class="form-select form-select-sm">
+                                            <option value="approve">Accept quote</option>
+                                            <option value="approve_or_changes">Accept or request changes</option>
+                                            <option value="review">Review only</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="send-settings-card h-100">
+                                        <label class="form-label fw-bold">Quote Expiry</label>
+                                        <input type="date" id="quoteExpiryDate" class="form-control form-control-sm">
+                                    </div>
+                                </div>
+                                <div class="col-12">
+                                    <div class="send-settings-card">
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input" type="checkbox" id="quoteShowUpgrades" checked>
+                                            <label class="form-check-label fw-semibold" for="quoteShowUpgrades">Show optional upgrades</label>
+                                        </div>
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="quoteShowScopeNotes" checked>
+                                            <label class="form-check-label fw-semibold" for="quoteShowScopeNotes">Show room scope notes</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="tab-pane fade" id="quoteStyleTabMessage">
+                            <label class="form-label fw-bold">Client Message</label>
+                            <textarea id="quoteClientMessage" class="form-control" rows="4" placeholder="Hi, here is the quote we discussed. Please review the scope and let me know if you have any questions."></textarea>
+                            <div class="form-check mt-3">
+                                <input class="form-check-input" type="checkbox" id="quoteSaveDefaultStyle">
+                                <label class="form-check-label" for="quoteSaveDefaultStyle">Save these settings as my default for future quotes</label>
+                            </div>
                         </div>
                     </div>
-                    <div class="mb-4">
-                        <label class="form-label fw-bold">Background Tint</label>
-                        <div class="d-flex flex-wrap gap-2" id="bgSwatches">
-                            <div class="style-swatch bg-swatch selected" data-bg="#ffffff" style="background:#ffffff;border:1px solid #ddd;" title="White"></div>
-                            <div class="style-swatch bg-swatch" data-bg="#f0f7ff" style="background:#f0f7ff;" title="Cool Blue"></div>
-                            <div class="style-swatch bg-swatch" data-bg="#f0fdf4" style="background:#f0fdf4;" title="Soft Green"></div>
-                            <div class="style-swatch bg-swatch" data-bg="#fefce8" style="background:#fefce8;" title="Warm Sand"></div>
-                            <div class="style-swatch bg-swatch" data-bg="#fdf4ff" style="background:#fdf4ff;" title="Lavender"></div>
-                            <div class="style-swatch bg-swatch" data-bg="#fff1f2" style="background:#fff1f2;" title="Blush"></div>
-                            <div class="style-swatch bg-swatch" data-bg="#f8fafc" style="background:#f8fafc;" title="Slate"></div>
+
+                    <hr>
+                    <label class="form-label fw-bold">Client Preview</label>
+                    <div id="stylePreview" class="quote-style-preview">
+                        <div id="previewHeader" class="quote-style-preview-header">
+                            <span>Quote Preview</span>
+                            <span id="previewHeaderMode" class="small fw-normal">Client-ready estimate</span>
                         </div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Preview</label>
-                        <div id="stylePreview" style="border-radius:8px;padding:12px;border:1px solid #eee;">
-                            <div id="previewHeader" style="padding:8px 12px;border-radius:6px 6px 0 0;margin:-12px -12px 10px -12px;color:white;font-weight:700;font-size:0.9rem;">Quote Preview</div>
-                            <div style="font-size:0.8rem;color:#555;">Client Name - 123 Main Street</div>
-                            <div id="previewTotal" style="margin-top:8px;padding:6px 10px;border-radius:4px;color:white;font-weight:700;font-size:0.85rem;display:inline-block;">Total: $12,450.00</div>
+                        <div class="quote-style-preview-body">
+                            <div class="text-muted small mb-2" id="previewClientLine">Client Name - Project Address</div>
+                            <div id="previewMessage" class="small mb-3" style="display:none;"></div>
+                            <div class="quote-style-preview-line" style="width:78%;"></div>
+                            <div class="quote-style-preview-line" style="width:58%;"></div>
+                            <div class="d-flex justify-content-between align-items-center mt-3">
+                                <span class="fw-semibold" id="previewPricingLabel">Full itemized quote</span>
+                                <span id="previewTotal" class="badge rounded-pill px-3 py-2">Total: $12,450.00</span>
+                            </div>
                         </div>
                     </div>
                 </div>
