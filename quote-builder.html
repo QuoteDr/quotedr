@@ -289,6 +289,20 @@
             padding:12px;
             background:#fff;
         }
+        .expiry-preset-btn {
+            border: 1px solid #dbe4ef;
+            background: #f8fafc;
+            border-radius: 999px;
+            padding: 4px 10px;
+            font-size: 0.78rem;
+            color: #1f3349;
+        }
+        .expiry-preset-btn:hover,
+        .expiry-preset-btn.active {
+            background: #1a56a0;
+            border-color: #1a56a0;
+            color: #fff;
+        }
     @media (max-width: 768px) {
             .container-fluid { padding-left: 8px !important; padding-right: 8px !important; }
             .btn-sm { font-size: 0.75rem; padding: 4px 7px; }
@@ -5057,6 +5071,39 @@ Example:
             else el.value = value || '';
         }
 
+        function formatDateInput(date) {
+            var y = date.getFullYear();
+            var m = String(date.getMonth() + 1).padStart(2, '0');
+            var d = String(date.getDate()).padStart(2, '0');
+            return y + '-' + m + '-' + d;
+        }
+
+        function setQuoteExpiryPreset(days) {
+            var date = new Date();
+            date.setDate(date.getDate() + days);
+            var expiryEl = document.getElementById('quoteExpiryDate');
+            if (expiryEl) expiryEl.value = formatDateInput(date);
+            document.querySelectorAll('.expiry-preset-btn').forEach(function(btn) {
+                btn.classList.toggle('active', parseInt(btn.dataset.days, 10) === days);
+            });
+            updateStylePreview();
+        }
+
+        function saveQuoteStyleDefaults(showToast) {
+            _quoteStyle = readQuoteStyleFromControls();
+            try {
+                localStorage.setItem('ald_quote_send_style', JSON.stringify(_quoteStyle));
+                if (showToast !== false) {
+                    var saveStatus = document.getElementById('saveStatus');
+                    if (saveStatus) saveStatus.innerHTML = '<span style="color:#28a745;"><i class="fas fa-check-circle"></i> Quote send defaults saved</span>';
+                }
+                return true;
+            } catch(e) {
+                alert('Could not save defaults in this browser.');
+                return false;
+            }
+        }
+
         function readQuoteStyleFromControls() {
             var style = Object.assign({}, _quoteStyle);
             style.headerStyle = document.getElementById('quoteHeaderStyle')?.value || style.headerStyle;
@@ -5082,6 +5129,11 @@ Example:
             setFieldValue('quoteShowUpgrades', _quoteStyle.showUpgrades);
             setFieldValue('quoteShowScopeNotes', _quoteStyle.showScopeNotes);
             setFieldValue('quoteClientMessage', _quoteStyle.clientMessage);
+            document.querySelectorAll('.expiry-preset-btn').forEach(function(btn) {
+                var date = new Date();
+                date.setDate(date.getDate() + parseInt(btn.dataset.days, 10));
+                btn.classList.toggle('active', _quoteStyle.expiryDate === formatDateInput(date));
+            });
 
             document.querySelectorAll('#stylePresets .quote-style-preset').forEach(function(btn) {
                 btn.classList.toggle('selected', btn.getAttribute('data-preset') === _quoteStyle.preset);
@@ -5186,7 +5238,7 @@ Example:
 
             _quoteStyle = readQuoteStyleFromControls();
             if (document.getElementById('quoteSaveDefaultStyle')?.checked) {
-                try { localStorage.setItem('ald_quote_send_style', JSON.stringify(_quoteStyle)); } catch(e) {}
+                saveQuoteStyleDefaults(false);
             }
 
             const quoteData = collectQuoteData();
@@ -7508,7 +7560,7 @@ async function saveQuote() {
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold">Header Style</label>
                                     <select id="quoteHeaderStyle" class="form-select form-select-sm">
-                                        <option value="branded">Branded colour</option>
+                                        <option value="branded">Use selected accent colour</option>
                                         <option value="dark">Dark premium</option>
                                         <option value="light">Light document</option>
                                     </select>
@@ -7562,6 +7614,11 @@ async function saveQuote() {
                                     <div class="send-settings-card h-100">
                                         <label class="form-label fw-bold">Quote Expiry</label>
                                         <input type="date" id="quoteExpiryDate" class="form-control form-control-sm">
+                                        <div class="d-flex flex-wrap gap-2 mt-2">
+                                            <button type="button" class="expiry-preset-btn" data-days="30" onclick="setQuoteExpiryPreset(30)">30 days</button>
+                                            <button type="button" class="expiry-preset-btn" data-days="60" onclick="setQuoteExpiryPreset(60)">60 days</button>
+                                            <button type="button" class="expiry-preset-btn" data-days="90" onclick="setQuoteExpiryPreset(90)">90 days</button>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="col-12">
@@ -7608,11 +7665,16 @@ async function saveQuote() {
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" onclick="confirmGenerateQuote()">
-                        <i class="fas fa-share-square me-1"></i>Generate Quote Link
+                <div class="modal-footer justify-content-between gap-2">
+                    <button type="button" class="btn btn-outline-primary" onclick="saveQuoteStyleDefaults(true)">
+                        <i class="fas fa-save me-1"></i>Save Defaults
                     </button>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" onclick="confirmGenerateQuote()">
+                            <i class="fas fa-share-square me-1"></i>Generate Quote Link
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
