@@ -56,8 +56,11 @@
 
         .quote-header {
             margin-bottom: 2rem;
-            padding-bottom: 1rem;
+            padding: 1.25rem 1.5rem 1rem;
             border-bottom: 2px solid #dee2e6;
+        }
+        .quote-header-summary {
+            padding-right: 1.25rem;
         }
         .upgrade-card {
             background: white;
@@ -88,15 +91,71 @@
         }
         .total-section {
             background: white;
-            padding: 1.5rem;
+            padding: 1.35rem 1.5rem;
             border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border: 1px solid #dbe4ef;
+            border-top: 5px solid var(--quote-accent, #1a56a0);
+            box-shadow: 0 8px 24px rgba(15,23,42,0.08);
             margin-top: 2rem;
         }
+        .total-header {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            align-items: center;
+            border-bottom: 1px solid #e5edf5;
+            padding-bottom: 0.85rem;
+            margin-bottom: 0.85rem;
+        }
+        .total-title {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: #17324d;
+            margin: 0;
+        }
+        .total-status {
+            color: #64748b;
+            font-size: 0.9rem;
+            font-weight: 700;
+        }
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 0.45rem 0;
+            color: #334155;
+            font-size: 1rem;
+        }
+        .total-row strong { color: #111827; }
+        .deposit-summary {
+            display: none;
+            margin: 0.9rem 0;
+            padding: 0.9rem 1rem;
+            border-radius: 8px;
+            background: #f8fbff;
+            border: 1px solid #dbeafe;
+        }
+        .total-final {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            align-items: flex-end;
+            margin-top: 0.85rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e5edf5;
+        }
+        .total-final-label {
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: #64748b;
+            font-weight: 800;
+        }
         .grand-total {
-            font-size: 2rem;
+            font-size: 2.35rem;
             font-weight: bold;
-            color: #667eea;
+            color: #17324d;
+            line-height: 1;
         }
         .submit-btn {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -186,6 +245,12 @@
             cursor: pointer;
         }
         .item-desc-toggle:hover { text-decoration: underline; }
+        @media (max-width: 768px) {
+            .quote-header { padding: 1rem; }
+            .quote-header-summary { padding-right: 0; text-align: left !important; margin-top: 1rem; }
+            .total-header, .total-final { display: block; }
+            .grand-total { margin-top: 0.35rem; font-size: 2rem; }
+        }
     </style>
 
 
@@ -214,7 +279,7 @@ if (location.search.includes('debug')) {
                         </div>
                     </div>
                 </div>
-                <div class="col-md-5 text-end">
+                <div class="col-md-5 text-end quote-header-summary">
                     <h5 class="mb-1" style="color: #2c3e50;" id="quoteHeadingDisplay">Your Quote</h5>
                     <div id="quoteNumberDisplay" class="fw-bold" style="font-size:1.05rem; color:#2c3e50;"></div>
                     <div id="clientNameDisplay" class="text-muted"></div>
@@ -242,11 +307,33 @@ if (location.search.includes('debug')) {
         </div>
 
         <!-- Total Section -->
-        <div class="total-section text-center">
-            <h4><i class="fas fa-calculator"></i> Updated Quote Total</h4>
-            <p id="originalTotalDisplay" class="text-muted"></p>
-            <div id="upgradesTotalDisplay" style="color: #667eea;"></div>
-            <div class="grand-total" id="newGrandTotal">$0.00</div>
+        <div class="total-section">
+            <div class="total-header">
+                <h4 class="total-title"><i class="fas fa-calculator me-2"></i>Updated Quote Total</h4>
+                <div class="total-status">Client-ready total</div>
+            </div>
+            <div class="total-row">
+                <span>Base quote</span>
+                <strong id="originalTotalDisplay">$0.00</strong>
+            </div>
+            <div class="total-row" id="upgradesTotalDisplay" style="display:none;"></div>
+            <div class="deposit-summary" id="depositSummary">
+                <div class="total-row py-0">
+                    <span id="depositLabel">Deposit</span>
+                    <strong id="depositAmountDisplay">$0.00</strong>
+                </div>
+                <div class="total-row py-0 mt-1">
+                    <span>Remaining balance</span>
+                    <strong id="remainingBalanceDisplay">$0.00</strong>
+                </div>
+            </div>
+            <div class="total-final">
+                <div>
+                    <div class="total-final-label">Total</div>
+                    <div class="text-muted small">Includes tax and selected upgrades</div>
+                </div>
+                <div class="grand-total" id="newGrandTotal">$0.00</div>
+            </div>
         </div>
 
         <!-- Terms & Conditions Section -->
@@ -260,30 +347,30 @@ if (location.search.includes('debug')) {
         </div>
 
         <!-- Warranty Badge -->
-        <div class="warranty-section">
+        <div class="warranty-section" id="warrantySection">
             <div class="text-center mb-2">
-                <span style="font-size:1.1rem; font-weight:800; letter-spacing:1px;">&#9733; OUR COMMITMENT TO YOU &#9733;</span>
+                <span id="commitmentTitle" style="font-size:1.1rem; font-weight:800; letter-spacing:1px;">&#9733; OUR COMMITMENT TO YOU &#9733;</span>
             </div>
             <div class="warranty-grid">
                 <div class="warranty-item">
                     <div class="icon">🛡️</div>
-                    <div class="label">1-Year Warranty</div>
-                    <div class="sublabel">Workmanship guaranteed for 12 months from project completion</div>
+                    <div class="label" id="commitmentLabel1">1-Year Warranty</div>
+                    <div class="sublabel" id="commitmentText1">Workmanship guaranteed for 12 months from project completion</div>
                 </div>
                 <div class="warranty-item">
                     <div class="icon">🏭</div>
-                    <div class="label">Manufacturer Warranty</div>
-                    <div class="sublabel">All materials carry full manufacturer warranty &mdash; passed directly to you</div>
+                    <div class="label" id="commitmentLabel2">Manufacturer Warranty</div>
+                    <div class="sublabel" id="commitmentText2">All materials carry full manufacturer warranty &mdash; passed directly to you</div>
                 </div>
                 <div class="warranty-item">
                     <div class="icon">✅</div>
-                    <div class="label">Fully Insured</div>
-                    <div class="sublabel">Liability insurance coverage on all work performed</div>
+                    <div class="label" id="commitmentLabel3">Fully Insured</div>
+                    <div class="sublabel" id="commitmentText3">Liability insurance coverage on all work performed</div>
                 </div>
                 <div class="warranty-item">
                     <div class="icon">🤝</div>
-                    <div class="label">Satisfaction Promise</div>
-                    <div class="sublabel">Any concerns addressed promptly &mdash; your satisfaction is our priority</div>
+                    <div class="label" id="commitmentLabel4">Satisfaction Promise</div>
+                    <div class="sublabel" id="commitmentText4">Any concerns addressed promptly &mdash; your satisfaction is our priority</div>
                 </div>
             </div>
         </div>
@@ -469,13 +556,11 @@ if (location.search.includes('debug')) {
                     ? 'body { font-family: Georgia, "Times New Roman", serif; } .btn, .badge, input, textarea, select { font-family: Arial, sans-serif; }'
                     : (fontFeel === 'bold' ? 'body { font-weight: 500; } h1,h2,h3,h4,h5,h6,.fw-bold,strong { font-weight: 800 !important; }' : '');
                 var accentCSS = (accent && accent !== '#ffffff')
-                    ? '.total-section { background: ' + accent + ' !important; color: white !important; }' +
-                      '.total-section h4, .total-section p, .total-section div { color: white !important; }' +
-                      '.grand-total { color: white !important; }' +
-                      '.card-header.bg-light { background: ' + accent + ' !important; color: white !important; }' +
+                    ? '.card-header.bg-light { background: ' + accent + ' !important; color: white !important; }' +
                       '.card-header.bg-light h6, .card-header.bg-light i { color: white !important; }'
                     : '';
-                styleTag.textContent = 'body { background: ' + bg + ' !important; }' +
+                styleTag.textContent = ':root { --quote-accent: ' + (accent === '#ffffff' ? '#1a56a0' : accent) + '; }' +
+                    'body { background: ' + bg + ' !important; }' +
                     '.quote-header { background: ' + headerBg + ' !important; color: ' + headerColor + ' !important; }' +
                     '.quote-header h2, .quote-header h5, .quote-header p, .quote-header div { color: ' + headerColor + ' !important; }' +
                     '.btn-success { background-color: ' + (accent === '#ffffff' ? '#198754' : accent) + ' !important; border-color: ' + (accent === '#ffffff' ? '#198754' : accent) + ' !important; }' +
@@ -495,6 +580,7 @@ if (location.search.includes('debug')) {
             }
 
             renderQuote();
+            applyCommitmentBanner();
             displayTerms();
             updateTotal();
         });
@@ -580,6 +666,37 @@ if (location.search.includes('debug')) {
             if (btn) btn.textContent = expanding ? 'Show less' : 'Show more';
         }
 
+        function defaultCommitmentItems() {
+            return [
+                { label: '1-Year Warranty', text: 'Workmanship guaranteed for 12 months from project completion' },
+                { label: 'Manufacturer Warranty', text: 'All materials carry full manufacturer warranty - passed directly to you' },
+                { label: 'Fully Insured', text: 'Liability insurance coverage on all work performed' },
+                { label: 'Satisfaction Promise', text: 'Any concerns addressed promptly - your satisfaction is our priority' }
+            ];
+        }
+
+        function applyCommitmentBanner() {
+            var section = document.getElementById('warrantySection');
+            if (!section) return;
+            var style = quoteData.style || {};
+            if (style.showCommitment === false) {
+                section.style.display = 'none';
+                return;
+            }
+            section.style.display = '';
+            var commitment = style.commitment || {};
+            var titleEl = document.getElementById('commitmentTitle');
+            if (titleEl) titleEl.textContent = commitment.title || 'OUR COMMITMENT TO YOU';
+            var items = Array.isArray(commitment.items) && commitment.items.length ? commitment.items : defaultCommitmentItems();
+            for (var i = 0; i < 4; i++) {
+                var item = items[i] || defaultCommitmentItems()[i];
+                var labelEl = document.getElementById('commitmentLabel' + (i + 1));
+                var textEl = document.getElementById('commitmentText' + (i + 1));
+                if (labelEl) labelEl.textContent = item.label || '';
+                if (textEl) textEl.textContent = item.text || '';
+            }
+        }
+
         function renderQuote() {
             // Populate header fields
             if (quoteData.clientName) {
@@ -625,7 +742,7 @@ if (location.search.includes('debug')) {
 
             // Show original total
             const originalTotal = quoteData.grandTotal || 0;
-            document.getElementById('originalTotalDisplay').textContent = 'Base Quote Total: $' + originalTotal.toFixed(2);
+            document.getElementById('originalTotalDisplay').textContent = '$' + originalTotal.toFixed(2);
             document.getElementById('newGrandTotal').textContent = '$' + originalTotal.toFixed(2);
 
             // Set hidden form fields
@@ -923,8 +1040,34 @@ if (location.search.includes('debug')) {
             const tax = subtotal * _vTaxRate;
             const total = subtotal + tax;
 
-            document.getElementById('upgradesTotalDisplay').innerHTML =
-                upgradesTotal > 0 ? `Upgrades: <strong>+$${upgradesTotal.toFixed(2)}</strong>` : '';
+            var baseEl = document.getElementById('originalTotalDisplay');
+            if (baseEl) baseEl.textContent = `$${(quoteData.grandTotal || quoteData.total || total).toFixed(2)}`;
+
+            var upgradesEl = document.getElementById('upgradesTotalDisplay');
+            if (upgradesEl) {
+                upgradesEl.style.display = upgradesTotal > 0 ? 'flex' : 'none';
+                upgradesEl.innerHTML = upgradesTotal > 0 ? `<span>Selected upgrades</span><strong>+$${upgradesTotal.toFixed(2)}</strong>` : '';
+            }
+
+            var depositSummary = document.getElementById('depositSummary');
+            var depositMode = quoteData.style?.depositMode || 'auto';
+            var depositPct = parseFloat(quoteData.style?.depositPercent || 50);
+            if (!isFinite(depositPct) || depositPct <= 0) depositPct = 50;
+            depositPct = Math.min(depositPct, 100);
+            if (depositSummary) {
+                var showDeposit = depositMode === 'show';
+                depositSummary.style.display = showDeposit ? 'block' : 'none';
+                if (showDeposit) {
+                    var depositAmt = total * depositPct / 100;
+                    var remaining = Math.max(total - depositAmt, 0);
+                    var labelEl = document.getElementById('depositLabel');
+                    var amountEl = document.getElementById('depositAmountDisplay');
+                    var remainingEl = document.getElementById('remainingBalanceDisplay');
+                    if (labelEl) labelEl.textContent = `Deposit (${depositPct.toFixed(0)}%)`;
+                    if (amountEl) amountEl.textContent = `$${depositAmt.toFixed(2)}`;
+                    if (remainingEl) remainingEl.textContent = `$${remaining.toFixed(2)}`;
+                }
+            }
             document.getElementById('newGrandTotal').textContent = `$${total.toFixed(2)}`;
         }
 

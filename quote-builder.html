@@ -5057,12 +5057,32 @@ Example:
             fontFeel: 'clean',
             pricingMode: 'full',
             depositMode: 'auto',
+            depositPercent: 50,
             approvalMode: 'approve_or_changes',
             expiryDate: '',
             showUpgrades: true,
             showScopeNotes: true,
+            showCommitment: true,
+            commitment: {
+                title: 'OUR COMMITMENT TO YOU',
+                items: [
+                    { label: '1-Year Warranty', text: 'Workmanship guaranteed for 12 months from project completion' },
+                    { label: 'Manufacturer Warranty', text: 'All materials carry full manufacturer warranty - passed directly to you' },
+                    { label: 'Fully Insured', text: 'Liability insurance coverage on all work performed' },
+                    { label: 'Satisfaction Promise', text: 'Any concerns addressed promptly - your satisfaction is our priority' }
+                ]
+            },
             clientMessage: ''
         };
+
+        function defaultCommitmentItemsForModal() {
+            return [
+                { label: '1-Year Warranty', text: 'Workmanship guaranteed for 12 months from project completion' },
+                { label: 'Manufacturer Warranty', text: 'All materials carry full manufacturer warranty - passed directly to you' },
+                { label: 'Fully Insured', text: 'Liability insurance coverage on all work performed' },
+                { label: 'Satisfaction Promise', text: 'Any concerns addressed promptly - your satisfaction is our priority' }
+            ];
+        }
 
         function setFieldValue(id, value) {
             var el = document.getElementById(id);
@@ -5110,10 +5130,25 @@ Example:
             style.fontFeel = document.getElementById('quoteFontFeel')?.value || style.fontFeel;
             style.pricingMode = document.getElementById('quotePricingMode')?.value || style.pricingMode;
             style.depositMode = document.getElementById('quoteDepositMode')?.value || style.depositMode;
+            style.depositPercent = parseFloat(document.getElementById('quoteDepositPercent')?.value || style.depositPercent || 50);
+            if (!isFinite(style.depositPercent) || style.depositPercent <= 0) style.depositPercent = 50;
+            style.depositPercent = Math.min(style.depositPercent, 100);
             style.approvalMode = document.getElementById('quoteApprovalMode')?.value || style.approvalMode;
             style.expiryDate = document.getElementById('quoteExpiryDate')?.value || '';
             style.showUpgrades = document.getElementById('quoteShowUpgrades')?.checked !== false;
             style.showScopeNotes = document.getElementById('quoteShowScopeNotes')?.checked !== false;
+            style.showCommitment = document.getElementById('quoteShowCommitment')?.checked !== false;
+            var commitmentItems = defaultCommitmentItemsForModal().map(function(item, i) {
+                var n = i + 1;
+                return {
+                    label: document.getElementById('commitmentLabel' + n)?.value.trim() || item.label,
+                    text: document.getElementById('commitmentText' + n)?.value.trim() || item.text
+                };
+            });
+            style.commitment = {
+                title: document.getElementById('commitmentTitleInput')?.value.trim() || 'OUR COMMITMENT TO YOU',
+                items: commitmentItems
+            };
             style.clientMessage = document.getElementById('quoteClientMessage')?.value.trim() || '';
             return style;
         }
@@ -5124,10 +5159,19 @@ Example:
             setFieldValue('quoteFontFeel', _quoteStyle.fontFeel);
             setFieldValue('quotePricingMode', _quoteStyle.pricingMode);
             setFieldValue('quoteDepositMode', _quoteStyle.depositMode);
+            setFieldValue('quoteDepositPercent', _quoteStyle.depositPercent || 50);
             setFieldValue('quoteApprovalMode', _quoteStyle.approvalMode);
             setFieldValue('quoteExpiryDate', _quoteStyle.expiryDate);
             setFieldValue('quoteShowUpgrades', _quoteStyle.showUpgrades);
             setFieldValue('quoteShowScopeNotes', _quoteStyle.showScopeNotes);
+            setFieldValue('quoteShowCommitment', _quoteStyle.showCommitment !== false);
+            var commitment = _quoteStyle.commitment || {};
+            var items = Array.isArray(commitment.items) && commitment.items.length ? commitment.items : defaultCommitmentItemsForModal();
+            setFieldValue('commitmentTitleInput', commitment.title || 'OUR COMMITMENT TO YOU');
+            for (var i = 0; i < 4; i++) {
+                setFieldValue('commitmentLabel' + (i + 1), (items[i] || defaultCommitmentItemsForModal()[i]).label);
+                setFieldValue('commitmentText' + (i + 1), (items[i] || defaultCommitmentItemsForModal()[i]).text);
+            }
             setFieldValue('quoteClientMessage', _quoteStyle.clientMessage);
             document.querySelectorAll('.expiry-preset-btn').forEach(function(btn) {
                 var date = new Date();
@@ -5173,7 +5217,8 @@ Example:
             }
             if (pricing) {
                 var labels = { full: 'Full itemized quote', category: 'Category subtotals only', total: 'Total only' };
-                pricing.textContent = labels[_quoteStyle.pricingMode] || labels.full;
+                var depositNote = _quoteStyle.depositMode === 'show' ? ' | ' + (_quoteStyle.depositPercent || 50) + '% deposit shown' : '';
+                pricing.textContent = (labels[_quoteStyle.pricingMode] || labels.full) + depositNote;
             }
             if (mode) mode.textContent = _quoteStyle.approvalMode === 'review' ? 'Review-only link' : 'Client-ready estimate';
         }
@@ -5207,7 +5252,7 @@ Example:
                     applyQuoteStyleToControls(_quoteStyle);
                 };
             });
-            ['quoteHeaderStyle','quoteFontFeel','quotePricingMode','quoteDepositMode','quoteApprovalMode','quoteExpiryDate','quoteShowUpgrades','quoteShowScopeNotes','quoteClientMessage'].forEach(function(id) {
+            ['quoteHeaderStyle','quoteFontFeel','quotePricingMode','quoteDepositMode','quoteDepositPercent','quoteApprovalMode','quoteExpiryDate','quoteShowUpgrades','quoteShowScopeNotes','quoteShowCommitment','commitmentTitleInput','commitmentLabel1','commitmentText1','commitmentLabel2','commitmentText2','commitmentLabel3','commitmentText3','commitmentLabel4','commitmentText4','quoteClientMessage'].forEach(function(id) {
                 var el = document.getElementById(id);
                 if (el && !el.dataset.styleBound) {
                     el.addEventListener('input', updateStylePreview);
@@ -7597,7 +7642,12 @@ async function saveQuote() {
                                             <option value="show">Show deposit section</option>
                                             <option value="hide">Hide deposit section</option>
                                         </select>
-                                        <div class="text-muted small mt-2">Useful when you want approval first and payment later.</div>
+                                        <label class="form-label fw-bold mt-3">Deposit Percentage</label>
+                                        <div class="input-group input-group-sm">
+                                            <input type="number" id="quoteDepositPercent" class="form-control" min="1" max="100" step="1" value="50">
+                                            <span class="input-group-text">%</span>
+                                        </div>
+                                        <div class="text-muted small mt-2">Shown in the client total when deposit display is set to show.</div>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
@@ -7630,6 +7680,34 @@ async function saveQuote() {
                                         <div class="form-check form-switch">
                                             <input class="form-check-input" type="checkbox" id="quoteShowScopeNotes" checked>
                                             <label class="form-check-label fw-semibold" for="quoteShowScopeNotes">Show room scope notes</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-12">
+                                    <div class="send-settings-card">
+                                        <div class="form-check form-switch mb-3">
+                                            <input class="form-check-input" type="checkbox" id="quoteShowCommitment" checked>
+                                            <label class="form-check-label fw-semibold" for="quoteShowCommitment">Show commitment banner</label>
+                                        </div>
+                                        <label class="form-label fw-bold">Banner Title</label>
+                                        <input type="text" id="commitmentTitleInput" class="form-control form-control-sm mb-3" value="OUR COMMITMENT TO YOU">
+                                        <div class="row g-2">
+                                            <div class="col-md-6">
+                                                <input type="text" id="commitmentLabel1" class="form-control form-control-sm mb-1" value="1-Year Warranty">
+                                                <textarea id="commitmentText1" class="form-control form-control-sm" rows="2">Workmanship guaranteed for 12 months from project completion</textarea>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <input type="text" id="commitmentLabel2" class="form-control form-control-sm mb-1" value="Manufacturer Warranty">
+                                                <textarea id="commitmentText2" class="form-control form-control-sm" rows="2">All materials carry full manufacturer warranty - passed directly to you</textarea>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <input type="text" id="commitmentLabel3" class="form-control form-control-sm mb-1" value="Fully Insured">
+                                                <textarea id="commitmentText3" class="form-control form-control-sm" rows="2">Liability insurance coverage on all work performed</textarea>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <input type="text" id="commitmentLabel4" class="form-control form-control-sm mb-1" value="Satisfaction Promise">
+                                                <textarea id="commitmentText4" class="form-control form-control-sm" rows="2">Any concerns addressed promptly - your satisfaction is our priority</textarea>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
