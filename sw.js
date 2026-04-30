@@ -1,5 +1,5 @@
 // QuoteDr Service Worker
-const CACHE_NAME = 'quotedr-v1';
+const CACHE_NAME = 'quotedr-v2';
 
 // Only cache static assets — NOT HTML pages (they must always be fresh from server)
 const STATIC_ASSETS = [
