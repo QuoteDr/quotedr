@@ -279,7 +279,7 @@
         const theme = rows?.find(r => r.key === 'portal_theme')?.value || {};
 
         // Set contractor name in header
-        const companyName = profile.company_name || 'Your Contractor';
+        const companyName = profile.business_name || profile.company_name || 'Your Contractor';
         contractorNameEl.textContent = companyName;
 
         // Logo or company name in top-left
@@ -378,12 +378,12 @@
       });
       
       // Extract project address from data
-      const projectAddress = quote.data?.project_address || 'No address provided';
+      const projectAddress = quote.data?.projectAddress || quote.data?.project_address || 'No address provided';
       
       // Format total
       const total = new Intl.NumberFormat('en-US', {
         style: 'currency',
-        currency: 'USD'
+        currency: quote.data?.currency || 'CAD'
       }).format(quote.total);
       
       card.innerHTML = `
@@ -471,7 +471,7 @@
       
       totalSpentEl.textContent = new Intl.NumberFormat('en-US', {
         style: 'currency',
-        currency: 'USD'
+        currency: 'CAD'
       }).format(totalSpent);
       
       openQuotesEl.textContent = openQuotes;

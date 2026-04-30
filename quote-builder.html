@@ -50,11 +50,97 @@
             color: #28a745;
         }
         .grand-total {
-            background: #343a40;
-            color: white;
-            padding: 1rem;
+            background: #ffffff;
+            color: #1f2937;
+            padding: 1.25rem;
             border-radius: 8px;
             margin-top: 1rem;
+            border: 1px solid #d8e2ee;
+            box-shadow: 0 8px 24px rgba(15, 52, 96, 0.08);
+        }
+        .quote-total-card {
+            max-width: 760px;
+            margin-left: auto;
+            margin-right: auto;
+            text-align: left;
+        }
+        .quote-total-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding-bottom: 0.85rem;
+            margin-bottom: 0.85rem;
+            border-bottom: 1px solid #e5edf6;
+        }
+        .quote-total-title {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+            margin: 0;
+            color: #0f3460;
+            font-size: 1.05rem;
+            font-weight: 800;
+        }
+        .quote-total-title i {
+            color: #1a56a0;
+        }
+        .quote-total-status {
+            color: #667085;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .quote-total-breakdown {
+            display: grid;
+            gap: 0.55rem;
+        }
+        .quote-total-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            color: #475467;
+            font-size: 1rem;
+        }
+        .quote-total-row span:last-child {
+            color: #111827;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+        }
+        .quote-total-final {
+            display: flex;
+            align-items: end;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-top: 1rem;
+            padding: 1rem 4.75rem 1rem 1rem;
+            border-radius: 8px;
+            background: #f0f6ff;
+            border: 1px solid #cfe0f7;
+        }
+        .quote-total-final-label {
+            color: #344054;
+            font-size: 0.9rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        #grandTotalDisplay {
+            color: #0f3460;
+            font-size: 2.35rem;
+            font-weight: 850;
+            line-height: 1;
+            font-variant-numeric: tabular-nums;
+        }
+        .deposit-section {
+            background: #f8fafc !important;
+            border: 1px solid #e2e8f0;
+            color: #344054;
+        }
+        .quote-total-actions {
+            display: grid;
+            gap: 0.55rem;
+            margin-top: 0.85rem;
         }
         .profit-positive { color: #198754; }
         .profit-negative { color: #dc3545; }
@@ -191,8 +277,11 @@
             /* Sticky total bar font on mobile */
             #stickyTotalBar .total-amount { font-size: 1.2rem !important; }
             /* Grand total section */
-            .grand-total { padding: 0.75rem !important; }
-            .grand-total h4 { font-size: 1rem !important; }
+            .grand-total { padding: 1rem !important; }
+            .quote-total-header,
+            .quote-total-final { align-items: stretch; flex-direction: column; }
+            .quote-total-final { padding-right: 1rem; }
+            #grandTotalDisplay { font-size: 1.9rem !important; }
             /* Card headers wrapping */
             .card-header { flex-wrap: wrap; gap: 4px; }
             /* Hide autosave toggle label on mobile to save space (only target the toolbar toggle) */
@@ -525,12 +614,23 @@ if (location.search.includes('debug')) {
         <!-- Pricing Summary -->
         <div class="row">
             <div class="col-12">
-                <div class="grand-total text-center">
-                    <h4><i class="fas fa-calculator"></i> Quote Total</h4>
-                    <div id="subtotalDisplay" style="font-size: 1.5rem;">Subtotal: $0.00</div>
-                    <div id="taxDisplay" style="font-size: 1.2rem;">HST (13%): $0.00</div>
+                <div class="grand-total quote-total-card">
+                    <div class="quote-total-header">
+                        <h4 class="quote-total-title"><i class="fas fa-calculator"></i> Quote Total</h4>
+                        <div class="quote-total-status">Client-ready estimate</div>
+                    </div>
+                    <div class="quote-total-breakdown">
+                        <div class="quote-total-row">
+                            <span>Subtotal</span>
+                            <span id="subtotalDisplay">$0.00</span>
+                        </div>
+                        <div class="quote-total-row">
+                            <span id="taxLabelDisplay">HST (13%)</span>
+                            <span id="taxDisplay">$0.00</span>
+                        </div>
+                    </div>
                     <!-- Deposit Calculator -->
-                    <div class="deposit-section mb-3 p-2 bg-light rounded" style="display:none;" id="depositSection">
+                    <div class="deposit-section mt-3 mb-2 p-3 rounded" style="display:none;" id="depositSection">
                         <label><strong>Deposit:</strong></label>
                         <div class="input-group input-group-sm" style="max-width: 200px;">
                             <span class="input-group-text">%</span>
@@ -544,8 +644,14 @@ if (location.search.includes('debug')) {
                         <i class="fas fa-calculator"></i> Deposit Calculator
                     </button>
 
-                    <div id="grandTotalDisplay" style="font-size: 2rem; font-weight: bold; margin-top: 0.5rem;">TOTAL: $0.00</div>
-                    <div class="mt-3">
+                    <div class="quote-total-final">
+                        <div>
+                            <div class="quote-total-final-label">Total</div>
+                            <small class="text-muted">Includes tax</small>
+                        </div>
+                        <div id="grandTotalDisplay">$0.00</div>
+                    </div>
+                    <div class="quote-total-actions">
                         <button class="btn btn-outline-secondary btn-sm w-100" type="button" data-bs-toggle="collapse" data-bs-target="#profitReport" aria-expanded="false">
                             <i class="fas fa-chart-line me-1"></i> View Profit Report
                         </button>
@@ -2298,9 +2404,11 @@ Example:
             const tax = subtotal * _taxRate;
             const total = subtotal + tax;
 
-            document.getElementById('subtotalDisplay').textContent = 'Subtotal: ' + _sym + subtotal.toFixed(2);
-            document.getElementById('taxDisplay').textContent = _taxLabel + ' (' + (_taxRate*100).toFixed(1).replace(/\.0$/,'') + '%): ' + _sym + tax.toFixed(2);
-            document.getElementById('grandTotalDisplay').textContent = 'TOTAL: ' + _sym + total.toFixed(2);
+            document.getElementById('subtotalDisplay').textContent = _sym + subtotal.toFixed(2);
+            var taxLabelEl = document.getElementById('taxLabelDisplay');
+            if (taxLabelEl) taxLabelEl.textContent = _taxLabel + ' (' + (_taxRate*100).toFixed(1).replace(/\.0$/,'') + '%)';
+            document.getElementById('taxDisplay').textContent = _sym + tax.toFixed(2);
+            document.getElementById('grandTotalDisplay').textContent = _sym + total.toFixed(2);
 
             // Keep sticky total bar in sync
             const stickyAmt = document.getElementById('stickyTotalAmount');
@@ -7526,7 +7634,7 @@ async function saveQuote() {
             </div>
         </div>
     </div>
-<script src="ai-assistant.js?v=1777231147"></script>
+<script src="ai-assistant.js?v=1777231148"></script>
 
 
 <!-- Hardwood/LVP Calculator Modal -->
@@ -8418,11 +8526,15 @@ function scanDrywallQuote() {
 
         function _toggleAiBtn() {
             var btn = document.getElementById('qdAiBtn');
-            var panel = document.getElementById('qdAiPanel');
-            var menuItem = document.getElementById('aiToggleMenuItem');
             if (!btn) return;
             var hidden = btn.style.display === 'none';
+            if (window._qdAiSetHidden) {
+                window._qdAiSetHidden(!hidden);
+                return;
+            }
             btn.style.display = hidden ? '' : 'none';
+            var panel = document.getElementById('qdAiPanel');
+            var menuItem = document.getElementById('aiToggleMenuItem');
             if (panel && !hidden) panel.style.display = 'none';
             if (menuItem) menuItem.innerHTML = hidden
                 ? '<i class="fas fa-robot me-2 text-secondary"></i>Hide AI Assistant'
@@ -8438,8 +8550,12 @@ function scanDrywallQuote() {
                         var btn = document.getElementById('qdAiBtn');
                         var menuItem = document.getElementById('aiToggleMenuItem');
                         if (btn) {
-                            btn.style.display = 'none';
-                            if (menuItem) menuItem.innerHTML = '<i class="fas fa-robot me-2 text-secondary"></i>Show AI Assistant';
+                            if (window._qdAiSetHidden) {
+                                window._qdAiSetHidden(true);
+                            } else {
+                                btn.style.display = 'none';
+                                if (menuItem) menuItem.innerHTML = '<i class="fas fa-robot me-2 text-secondary"></i>Show AI Assistant';
+                            }
                             clearInterval(check);
                         }
                     }, 200);

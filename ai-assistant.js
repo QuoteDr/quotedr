@@ -87,6 +87,25 @@ function init() {
     font-weight: 700;
     font-size: 0.95rem;
   }
+  #qdAiHeaderActions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  #qdAiHide {
+    background: rgba(255,255,255,0.16);
+    border: 1px solid rgba(255,255,255,0.34);
+    color: white;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1;
+    padding: 6px 10px;
+    cursor: pointer;
+  }
+  #qdAiHide:hover {
+    background: rgba(255,255,255,0.25);
+  }
   #qdAiClose {
     background: none;
     border: none;
@@ -94,6 +113,21 @@ function init() {
     font-size: 1.2rem;
     cursor: pointer;
     padding: 0;
+  }
+  #qdAiNotice {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 10000;
+    max-width: 340px;
+    background: #102a43;
+    color: white;
+    border-radius: 10px;
+    box-shadow: 0 10px 28px rgba(15,23,42,0.22);
+    padding: 12px 14px;
+    font-size: 0.9rem;
+    line-height: 1.35;
+    display: none;
   }
   #qdAiMessages {
     flex: 1;
@@ -188,10 +222,14 @@ function init() {
     <button id="qdAiBtn" title="Ask AI Assistant" onclick="window._qdAiToggle()">
       <i class="fas fa-robot"></i>
     </button>
+    <div id="qdAiNotice" role="status" aria-live="polite"></div>
     <div id="qdAiPanel">
       <div id="qdAiHeader">
         <span>&#129302; QuoteDr Assistant</span>
-        <button id="qdAiClose" onclick="window._qdAiToggle()">&#x2715;</button>
+        <div id="qdAiHeaderActions">
+          <button id="qdAiHide" onclick="window._qdAiHideFromPanel()">Hide</button>
+          <button id="qdAiClose" onclick="window._qdAiToggle()" aria-label="Close assistant">&#x2715;</button>
+        </div>
       </div>
       <div id="qdAiMessages">
         <div class="qdMsg ai">Hey! I'm your QuoteDr assistant. Ask me anything about the app or quoting! &#128293;</div>
@@ -233,7 +271,46 @@ function init() {
     };
     sugEl.appendChild(btn);
   });
+
+  if (localStorage.getItem('ald_ai_btn_hidden') === '1') {
+    window._qdAiSetHidden(true);
+  }
 }
+
+window._qdAiNotice = function(text) {
+  var notice = document.getElementById('qdAiNotice');
+  if (!notice) return;
+  notice.textContent = text;
+  notice.style.display = 'block';
+  clearTimeout(window._qdAiNoticeTimer);
+  window._qdAiNoticeTimer = setTimeout(function() {
+    notice.style.display = 'none';
+  }, 5200);
+};
+
+window._qdAiSetHidden = function(hidden, options) {
+  var btn = document.getElementById('qdAiBtn');
+  var panel = document.getElementById('qdAiPanel');
+  var menuItem = document.getElementById('aiToggleMenuItem');
+  if (btn) btn.style.display = hidden ? 'none' : '';
+  if (panel && hidden) panel.classList.remove('open');
+  if (hidden) isOpen = false;
+  if (menuItem) {
+    menuItem.innerHTML = hidden
+      ? '<i class="fas fa-robot me-2 text-secondary"></i>Show AI Assistant'
+      : '<i class="fas fa-robot me-2 text-secondary"></i>Hide AI Assistant';
+  }
+  try { localStorage.setItem('ald_ai_btn_hidden', hidden ? '1' : '0'); } catch(e) {}
+  if (hidden && options && options.notice) {
+    window._qdAiNotice(options.notice);
+  }
+};
+
+window._qdAiHideFromPanel = function() {
+  window._qdAiSetHidden(true, {
+    notice: 'AI assistant hidden. You can bring me back from the top-right Account menu.'
+  });
+};
 
 window._qdAiToggle = function() {
   isOpen = !isOpen;

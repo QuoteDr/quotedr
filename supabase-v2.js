@@ -483,14 +483,18 @@ var loadQuoteFromSupabase = function(quoteId) {
 // Save a quote to Supabase for sharing
 async function saveQuoteForSharing(quoteData) {
     const user = await getCurrentUser();
+    const now = new Date().toISOString();
     const { data, error } = await _supabase
         .from('quotes')
         .upsert({
             id: quoteData.supabaseId || undefined,
             user_id: user ? user.id : null,
+            client_name: quoteData.clientName || '',
+            quote_number: quoteData.quoteNumber || '',
+            total: quoteData.grandTotal || quoteData.total || 0,
             data: quoteData,
             status: 'sent',
-            updated_at: new Date().toISOString()
+            updated_at: now
         }, { onConflict: 'id' })
         .select()
         .single();

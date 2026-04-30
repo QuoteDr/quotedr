@@ -150,7 +150,7 @@
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <h3 class="mb-0">Recent Quotes</h3>
-                        <button class="btn btn-outline-secondary btn-sm" onclick="loadQuotes()" title="Refresh quotes"><i class="fas fa-sync-alt"></i></button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="refreshQuotes()" title="Refresh quotes"><i class="fas fa-sync-alt"></i></button>
                         <div class="d-flex gap-2 flex-wrap">
                             <button class="btn btn-sm btn-primary" onclick="openNewQuoteModal()">
                                 <i class="fas fa-plus me-1"></i> New Quote
@@ -226,6 +226,23 @@
         // ─── DASHBOARD FUNCTIONS ─────────────────────────────────────────────────────
 
         let allQuotes = []; // Store all quotes for client-side filtering
+
+        function escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function jsString(value) {
+            return JSON.stringify(String(value == null ? '' : value));
+        }
+
+        function jsAttr(value) {
+            return escapeHtml(jsString(value));
+        }
 
         async function refreshQuotes() {
             try {
@@ -318,51 +335,57 @@
                     return 0;
                 });
             }
-            el.innerHTML = sorted.map(q => `
+            el.innerHTML = sorted.map(q => {
+                var quoteTitle = q.data && q.data.quoteTitle ? q.data.quoteTitle : '';
+                var clientName = q.client_name || 'Unnamed Client';
+                var displayTitle = quoteTitle || clientName;
+                var quoteNumber = q.quote_number || '';
+                var clientEmail = q.data && q.data.clientEmail ? q.data.clientEmail : '';
+                var status = q.status || 'draft';
+                var portalVisible = !!(q.data && q.data.portal_visible);
+                return `
                 <div class="quote-card">
                     <div class="d-flex justify-content-between align-items-start">
-                        <div onclick="openQuote('${q.id}')" style="flex:1; cursor:pointer;">
+                        <div onclick="openQuote(${jsAttr(q.id)})" style="flex:1; cursor:pointer;">
                             ${q.id === lastOpenedId ? '<span class="badge bg-primary me-1" style="font-size:0.65rem; vertical-align:middle;">Last Opened</span>' : ''}
-                            <div class="d-flex align-items-center gap-1" id="title-row-${q.id}">
-                              <div class="fw-bold" id="title-display-${q.id}">${(q.data && q.data.quoteTitle) ? q.data.quoteTitle : (q.client_name || 'Unnamed Client')}</div>
-                              <button class="btn btn-link btn-sm p-0 text-muted" onclick="event.stopPropagation();startEditTitle('${q.id}')" title="Edit title" style="font-size:0.75rem;"><i class="fas fa-pencil-alt"></i></button>
+                            <div class="d-flex align-items-center gap-1" id="title-row-${escapeHtml(q.id)}">
+                              <div class="fw-bold" id="title-display-${escapeHtml(q.id)}">${escapeHtml(displayTitle)}</div>
+                              <button class="btn btn-link btn-sm p-0 text-muted" onclick="event.stopPropagation();startEditTitle(${jsAttr(q.id)})" title="Edit title" style="font-size:0.75rem;"><i class="fas fa-pencil-alt"></i></button>
                             </div>
-                            <div id="title-edit-${q.id}" style="display:none; gap:0.25rem;" class="mt-1">
-                              <input type="text" class="form-control form-control-sm" id="title-input-${q.id}"
-                                     value="${(q.data && q.data.quoteTitle) ? q.data.quoteTitle.replace(/"/g,'&quot;') : ''}"
-                                     placeholder="${(q.client_name || 'Add a title...').replace(/"/g,'&quot;')}"
-                                     onkeydown="if(event.key==='Enter') saveTitle('${q.id}'); if(event.key==='Escape') cancelEditTitle('${q.id}')">
-                              <button class="btn btn-success btn-sm" onclick="saveTitle('${q.id}')"><i class="fas fa-check"></i></button>
-                              <button class="btn btn-outline-secondary btn-sm" onclick="cancelEditTitle('${q.id}')"><i class="fas fa-times"></i></button>
+                            <div id="title-edit-${escapeHtml(q.id)}" style="display:none; gap:0.25rem;" class="mt-1">
+                              <input type="text" class="form-control form-control-sm" id="title-input-${escapeHtml(q.id)}"
+                                     value="${escapeHtml(quoteTitle)}"
+                                     placeholder="${escapeHtml(clientName || 'Add a title...')}"
+                                     onkeydown="if(event.key==='Enter') saveTitle(${jsAttr(q.id)}); if(event.key==='Escape') cancelEditTitle(${jsAttr(q.id)})">
+                              <button class="btn btn-success btn-sm" onclick="saveTitle(${jsAttr(q.id)})"><i class="fas fa-check"></i></button>
+                              <button class="btn btn-outline-secondary btn-sm" onclick="cancelEditTitle(${jsAttr(q.id)})"><i class="fas fa-times"></i></button>
                             </div>
-                            <div class="text-muted small">${(q.data && q.data.quoteTitle) ? q.client_name + ' · ' : ''}${q.quote_number ? '#' + q.quote_number + ' · ' : ''}${formatDate((q.data && q.data.savedAt) || q.created_at)}</div>
+                            <div class="text-muted small">${quoteTitle ? escapeHtml(clientName) + ' · ' : ''}${quoteNumber ? '#' + escapeHtml(quoteNumber) + ' · ' : ''}${escapeHtml(formatDate((q.data && q.data.savedAt) || q.created_at))}</div>
                         </div>
                         <div class="text-end d-flex flex-column align-items-end gap-1">
                             <div class="fw-bold">$${parseFloat(q.total || 0).toFixed(2)}</div>
-                            <select class="status-select status-${q.status}" onchange="updateQuoteStatus('${q.id}', this.value)">
-                                <option value="draft" ${q.status === 'draft' ? 'selected' : ''}>Draft</option>
-                                <option value="sent" ${q.status === 'sent' ? 'selected' : ''}>Sent</option>
-                                <option value="viewed" ${q.status === 'viewed' ? 'selected' : ''}>👁 Viewed</option>
-                                <option value="in_review" ${q.status === 'in_review' ? 'selected' : ''}>🔄 In Review</option>
-                                <option value="accepted" ${q.status === 'accepted' ? 'selected' : ''}>✅ Accepted</option>
-                                <option value="invoiced" ${q.status === 'invoiced' ? 'selected' : ''}>Invoiced</option>
-                                <option value="declined" ${q.status === 'declined' ? 'selected' : ''}>Declined</option>
+                            <select class="status-select status-${escapeHtml(status)}" onchange="updateQuoteStatus(${jsAttr(q.id)}, this.value)">
+                                <option value="draft" ${status === 'draft' ? 'selected' : ''}>Draft</option>
+                                <option value="sent" ${status === 'sent' ? 'selected' : ''}>Sent</option>
+                                <option value="viewed" ${status === 'viewed' ? 'selected' : ''}>Viewed</option>
+                                <option value="in_review" ${status === 'in_review' ? 'selected' : ''}>In Review</option>
+                                <option value="accepted" ${status === 'accepted' ? 'selected' : ''}>Accepted</option>
+                                <option value="invoiced" ${status === 'invoiced' ? 'selected' : ''}>Invoiced</option>
+                                <option value="declined" ${status === 'declined' ? 'selected' : ''}>Declined</option>
                             </select>
-                            <button class="btn btn-outline-danger" onclick="deleteQuote('${q.id}')">
+                            <button class="btn btn-outline-danger" onclick="deleteQuote(${jsAttr(q.id)})">
                                 <i class="fas fa-trash"></i>
                             </button>
                         </div>
                     </div>
-                    ${q.status === 'accepted' && q.data && q.data.client_upgraded ? `
-                    <div class="alert alert-warning py-1 px-2 mt-2 mb-0 small"><i class="fas fa-bolt me-1"></i><strong>Client made upgrades</strong> when signing — <a href="interactive-quote-viewer.html?id=${q.id}" class="alert-link">review quote</a></div>` : ''}
-                    ${q.status === 'in_review' ? `
-                    <button class="btn btn-warning btn-sm w-100 mt-2" onclick="openNotesReview('${q.id}', '${(q.client_name || '').replace(/'/g, "\\'")}')"><i class="fas fa-comments me-1"></i> Review Client Notes</button>` : ''}
-                    <button class="btn btn-sm w-100 mt-1 ${q.data?.portal_visible ? 'btn-success' : 'btn-outline-secondary'}" onclick="togglePortalVisibility('${q.id}', ${!q.data?.portal_visible})" title="${q.data?.portal_visible ? 'Remove from client portal' : 'Publish to client portal'}"><i class="fas ${q.data?.portal_visible ? 'fa-eye' : 'fa-eye-slash'} me-1"></i> ${q.data?.portal_visible ? 'In Portal ✓' : 'Add to Portal'}</button>
-                    <button class="btn btn-outline-info btn-sm w-100 mt-1" onclick="shareClientPortal('${(q.client_name || '').replace(/'/g, "\\'")}')"" title="Share client portal"><i class="fas fa-external-link-alt me-1"></i> Client Portal</button>
-                    ${(q.status === 'sent' || q.status === 'viewed') ? `
-                    <button class="btn btn-outline-primary btn-sm w-100 mt-1" onclick="sendFollowUpReminder('${q.id}', '${(q.client_name || '').replace(/'/g, "\\'")}'", '${(q.data && q.data.clientEmail) || ''}')"><i class="fas fa-bell me-1"></i> Send Follow-up</button>` : ''}
+                    ${status === 'accepted' && q.data && q.data.client_upgraded ? `<div class="alert alert-warning py-1 px-2 mt-2 mb-0 small"><i class="fas fa-bolt me-1"></i><strong>Client made upgrades</strong> when signing - <a href="interactive-quote-viewer.html?id=${encodeURIComponent(q.id)}" class="alert-link">review quote</a></div>` : ''}
+                    ${status === 'in_review' ? `<button class="btn btn-warning btn-sm w-100 mt-2" onclick="openNotesReview(${jsAttr(q.id)}, ${jsAttr(clientName)})"><i class="fas fa-comments me-1"></i> Review Client Notes</button>` : ''}
+                    <button class="btn btn-sm w-100 mt-1 ${portalVisible ? 'btn-success' : 'btn-outline-secondary'}" onclick="togglePortalVisibility(${jsAttr(q.id)}, ${!portalVisible})" title="${portalVisible ? 'Remove from client portal' : 'Publish to client portal'}"><i class="fas ${portalVisible ? 'fa-eye' : 'fa-eye-slash'} me-1"></i> ${portalVisible ? 'In Portal' : 'Add to Portal'}</button>
+                    <button class="btn btn-outline-info btn-sm w-100 mt-1" onclick="shareClientPortal(${jsAttr(clientName)})" title="Share client portal"><i class="fas fa-external-link-alt me-1"></i> Client Portal</button>
+                    ${(status === 'sent' || status === 'viewed') ? `<button class="btn btn-outline-primary btn-sm w-100 mt-1" onclick="sendFollowUpReminder(${jsAttr(q.id)}, ${jsAttr(clientName)}, ${jsAttr(clientEmail)})"><i class="fas fa-bell me-1"></i> Send Follow-up</button>` : ''}
                 </div>
-            `).join('');
+            `;
+            }).join('');
         }
 
         function filterQuotes() {
@@ -501,7 +524,7 @@
                 const updatedData = Object.assign({}, quote.data || {}, { portal_visible: visible });
                 const { error } = await _supabase.from('quotes').update({ data: updatedData }).eq('id', quoteId);
                 if (error) throw error;
-                loadQuotes();
+                refreshQuotes();
             } catch(err) {
                 alert('Failed to update portal visibility: ' + err.message);
             }
@@ -779,8 +802,8 @@
                                         const timeAgo = getTimeAgo(q.updated_at);
                                         cardsHtml += `
                                             <div class="kanban-card mb-2 p-2 bg-white rounded shadow-sm" style="cursor:pointer; border-left:3px solid ${col.color};" onclick="openQuote('${q.id}')">
-                                                <div class="fw-semibold small">${q.client_name}</div>
-                                                <div class="text-muted" style="font-size:0.75rem;">#${q.quote_number} · $${q.total}</div>
+                                                <div class="fw-semibold small">${escapeHtml(q.client_name || "")}</div>
+                                                <div class="text-muted" style="font-size:0.75rem;">#${escapeHtml(q.quote_number || "")} · $${escapeHtml(q.total || 0)}</div>
                                                 <div class="text-muted" style="font-size:0.7rem;">${timeAgo}</div>
                                             </div>
                                         `;
@@ -865,8 +888,8 @@
                                                                 const timeAgo = getTimeAgo(q.updated_at);
                                                                 cardsHtml += `
                                                                     <div class="kanban-card mb-2 p-2 bg-white rounded shadow-sm" style="cursor:pointer; border-left:3px solid ${col.color};" onclick="openQuote('${q.id}')">
-                                                                        <div class="fw-semibold small">${q.client_name}</div>
-                                                                        <div class="text-muted" style="font-size:0.75rem;">#${q.quote_number} · $${q.total}</div>
+                                                                        <div class="fw-semibold small">${escapeHtml(q.client_name || "")}</div>
+                                                                        <div class="text-muted" style="font-size:0.75rem;">#${escapeHtml(q.quote_number || "")} · $${escapeHtml(q.total || 0)}</div>
                                                                         <div class="text-muted" style="font-size:0.7rem;">${timeAgo}</div>
                                                                     </div>
                                                                 `;
