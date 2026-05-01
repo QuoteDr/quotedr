@@ -8,6 +8,19 @@ const QB_REDIRECT_URI = "https://quotedr.io/qb-callback.html";
 const QB_TOKEN_URL = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer";
 const QB_AUTH_URL = "https://appcenter.intuit.com/connect/oauth2";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+function jsonResponse(body: Record<string, unknown>, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
 // Supabase configuration
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "https://axmoffknvblluibuitrq.supabase.co";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso";
@@ -31,14 +44,15 @@ interface UserTokenData {
 }
 
 serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
   try {
     // Get the Authorization header
     const authHeader = req.headers.get("Authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return new Response(
-        JSON.stringify({ error: "Missing or invalid authorization header" }),
-        { status: 401, headers: { "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "Missing or invalid authorization header" }, 401);
     }
 
     const jwtToken = authHeader.substring(7);
@@ -49,10 +63,7 @@ serve(async (req) => {
       .getUser(jwtToken);
       
     if (authError || !authData?.user) {
-      return new Response(
-        JSON.stringify({ error: "Invalid or expired token" }),
-        { status: 401, headers: { "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "Invalid or expired token" }, 401);
     }
 
     const userId = authData.user.id;
@@ -73,17 +84,11 @@ serve(async (req) => {
       case "disconnect":
         return await handleDisconnect(userId);
       default:
-        return new Response(
-          JSON.stringify({ error: "Invalid action" }),
-          { status: 400, headers: { "Content-Type": "application/json" } }
-        );
+        return jsonResponse({ error: "Invalid action" }, 400);
     }
   } catch (error) {
     console.error("Error in qb-oauth function:", error);
-    return new Response(
-      JSON.stringify({ error: "Internal server error" }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ error: "Internal server error" }, 500);
   }
 });
 
@@ -92,14 +97,14 @@ async function handleGetAuthUrl(userId: string) {
   const { error } = await supabaseAdmin
     .from('user_data')
     .upsert({ user_id: userId, key: 'qb_oauth_state', value: { state, created_at: new Date().toISOString() } }, { onConflict: 'user_id,key' });
-  if (error) return new Response(JSON.stringify({ error: 'Failed to save state' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+  if (error) return jsonResponse({ error: 'Failed to save state' }, 500);
   const authUrl = QB_AUTH_URL +
     "?client_id=" + QB_CLIENT_ID +
     "&redirect_uri=" + encodeURIComponent(QB_REDIRECT_URI) +
     "&response_type=code" +
     "&scope=com.intuit.quickbooks.accounting" +
     "&state=" + state;
-  return new Response(JSON.stringify({ auth_url: authUrl }), { headers: { 'Content-Type': 'application/json' } });
+  return jsonResponse({ auth_url: authUrl, url: authUrl });
 }
 
 async function handleExchange(userId: string, code: string, realmId: string, state: string) {
@@ -107,7 +112,7 @@ async function handleExchange(userId: string, code: string, realmId: string, sta
   const { data: storedStateData, error: stateErr } = await supabaseAdmin
     .from('user_data').select('value').eq('user_id', userId).eq('key', 'qb_oauth_state').single();
   if (stateErr || !storedStateData || storedStateData.value.state !== state) {
-    return new Response(JSON.stringify({ error: 'Invalid state parameter - possible CSRF attack' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+    return jsonResponse({ error: 'Invalid state parameter - possible CSRF attack' }, 403);
   }
   // Delete used state (one-time use)
   await supabaseAdmin.from('user_data').delete().eq('user_id', userId).eq('key', 'qb_oauth_state');
@@ -144,7 +149,7 @@ async function handleExchange(userId: string, code: string, realmId: string, sta
     };
 
     // Save tokens to Supabase
-    const { error } = await supabase
+    const { error } = await supabaseAdmin
       .from("user_data")
       .upsert({
         user_id: userId,
@@ -158,16 +163,10 @@ async function handleExchange(userId: string, code: string, realmId: string, sta
       throw new Error(`Failed to save tokens: ${error.message}`);
     }
 
-    return new Response(
-      JSON.stringify({ success: true, message: "QuickBooks connected successfully" }),
-      { headers: { "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ success: true, message: "QuickBooks connected successfully" });
   } catch (error) {
     console.error("Error in handleExchange:", error);
-    return new Response(
-      JSON.stringify({ error: error.message || "Failed to connect to QuickBooks" }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ error: error.message || "Failed to connect to QuickBooks" }, 500);
   }
 }
 
@@ -186,17 +185,14 @@ async function handleRefresh(userId: string) {
     }
 
     const currentTokens: QBToken = tokensData.value;
-    
+
     // Check if token is expired
     if (Date.now() < currentTokens.expires_at) {
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: "Token is still valid",
-          realm_id: currentTokens.realm_id
-        }),
-        { headers: { "Content-Type": "application/json" } }
-      );
+      return jsonResponse({
+        success: true,
+        message: "Token is still valid",
+        realm_id: currentTokens.realm_id
+      });
     }
 
     // Refresh the token
@@ -218,10 +214,10 @@ async function handleRefresh(userId: string) {
     }
 
     const tokenData = await refreshResponse.json();
-    
+
     // Create updated token object with new expiration timestamp
     const expiresAt = Date.now() + (tokenData.expires_in * 1000);
-    
+
     const updatedTokens: QBToken = {
       access_token: tokenData.access_token,
       refresh_token: tokenData.refresh_token,
@@ -230,7 +226,7 @@ async function handleRefresh(userId: string) {
     };
 
     // Save updated tokens to Supabase
-    const { error } = await supabase
+    const { error } = await supabaseAdmin
       .from("user_data")
       .upsert({
         user_id: userId,
@@ -244,20 +240,14 @@ async function handleRefresh(userId: string) {
       throw new Error(`Failed to update tokens: ${error.message}`);
     }
 
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: "Token refreshed successfully",
-        realm_id: updatedTokens.realm_id
-      }),
-      { headers: { "Content-Type": "application/json" } }
-    );
+    return jsonResponse({
+      success: true,
+      message: "Token refreshed successfully",
+      realm_id: updatedTokens.realm_id
+    });
   } catch (error) {
     console.error("Error in handleRefresh:", error);
-    return new Response(
-      JSON.stringify({ error: error.message || "Failed to refresh token" }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ error: error.message || "Failed to refresh token" }, 500);
   }
 }
 
@@ -272,37 +262,28 @@ async function handleStatus(userId: string) {
       .single();
 
     if (fetchError || !tokensData) {
-      return new Response(
-        JSON.stringify({ connected: false }),
-        { headers: { "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ connected: false });
     }
 
     const tokens: QBToken = tokensData.value;
-    
+
     // Check if token is expired
     const isConnected = Date.now() < tokens.expires_at;
 
-    return new Response(
-      JSON.stringify({ 
-        connected: isConnected,
-        realm_id: tokens.realm_id
-      }),
-      { headers: { "Content-Type": "application/json" } }
-    );
+    return jsonResponse({
+      connected: isConnected,
+      realm_id: tokens.realm_id
+    });
   } catch (error) {
     console.error("Error in handleStatus:", error);
-    return new Response(
-      JSON.stringify({ error: error.message || "Failed to check connection status" }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ error: error.message || "Failed to check connection status" }, 500);
   }
 }
 
 async function handleDisconnect(userId: string) {
   try {
     // Delete tokens from Supabase
-    const { error } = await supabase
+    const { error } = await supabaseAdmin
       .from("user_data")
       .delete()
       .eq("user_id", userId)
@@ -312,15 +293,9 @@ async function handleDisconnect(userId: string) {
       throw new Error(`Failed to disconnect: ${error.message}`);
     }
 
-    return new Response(
-      JSON.stringify({ success: true, message: "QuickBooks disconnected successfully" }),
-      { headers: { "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ success: true, message: "QuickBooks disconnected successfully" });
   } catch (error) {
     console.error("Error in handleDisconnect:", error);
-    return new Response(
-      JSON.stringify({ error: error.message || "Failed to disconnect from QuickBooks" }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ error: error.message || "Failed to disconnect from QuickBooks" }, 500);
   }
 }

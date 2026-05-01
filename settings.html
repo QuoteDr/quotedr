@@ -735,9 +735,10 @@ Sarah Jones, 905-555-5678"></textarea>
 				});
 				const data = await res.json();
 				if (data.error) throw new Error(data.error);
-				if (!data.url) throw new Error('No auth URL returned');
+				var authUrl = data.url || data.auth_url;
+				if (!authUrl) throw new Error('No auth URL returned');
 				// Redirect to QuickBooks OAuth
-				window.location.href = data.url;
+				window.location.href = authUrl;
 			} catch(e) {
 				alert('Error starting QuickBooks connection: ' + e.message);
 			}

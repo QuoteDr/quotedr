@@ -39,9 +39,10 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
     <script>
         // Initialize Supabase client
-        const supabase = supabaseCreateClient(
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso';
+        const supabase = window.supabase.createClient(
             'https://axmoffknvblluibuitrq.supabase.co',
-            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso'
+            SUPABASE_ANON_KEY
         );
 
         // Get URL parameters
@@ -71,6 +72,7 @@
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${session.access_token}`,
+                        'apikey': SUPABASE_ANON_KEY,
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
