@@ -51,6 +51,12 @@
             border: 1px solid rgba(255,255,255,0.12);
         }
         .warranty-item .icon { font-size: 1.8rem; margin-bottom: 0.4rem; }
+        .warranty-item .icon img {
+            width: 2.1rem;
+            height: 2.1rem;
+            object-fit: contain;
+            border-radius: 8px;
+        }
         .warranty-item .label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #f0ad4e; }
         .warranty-item .sublabel { font-size: 0.72rem; opacity: 0.75; margin-top: 2px; }
 
@@ -668,10 +674,10 @@ if (location.search.includes('debug')) {
 
         function defaultCommitmentItems() {
             return [
-                { icon: 'fa-solid fa-shield-halved', label: '1-Year Warranty', text: 'Workmanship guaranteed for 12 months from project completion' },
-                { icon: 'fa-solid fa-industry', label: 'Manufacturer Warranty', text: 'All materials carry full manufacturer warranty - passed directly to you' },
-                { icon: 'fa-solid fa-clipboard-check', label: 'Fully Insured', text: 'Liability insurance coverage on all work performed' },
-                { icon: 'fa-solid fa-handshake', label: 'Satisfaction Promise', text: 'Any concerns addressed promptly - your satisfaction is our priority' }
+                { icon: 'fa-solid fa-shield-halved', image: '', label: '1-Year Warranty', text: 'Workmanship guaranteed for 12 months from project completion' },
+                { icon: 'fa-solid fa-industry', image: '', label: 'Manufacturer Warranty', text: 'All materials carry full manufacturer warranty - passed directly to you' },
+                { icon: 'fa-solid fa-clipboard-check', image: '', label: 'Fully Insured', text: 'Liability insurance coverage on all work performed' },
+                { icon: 'fa-solid fa-handshake', image: '', label: 'Satisfaction Promise', text: 'Any concerns addressed promptly - your satisfaction is our priority' }
             ];
         }
 
@@ -680,6 +686,12 @@ if (location.search.includes('debug')) {
             var value = String(icon || '').trim();
             if (!value || !/^fa[-\w\s]+$/.test(value)) return fallback;
             return value;
+        }
+
+        function safeCommitmentImage(src) {
+            var value = String(src || '').trim();
+            if (/^data:image\/(png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i.test(value)) return value;
+            return '';
         }
 
         function applyCommitmentBanner() {
@@ -701,7 +713,10 @@ if (location.search.includes('debug')) {
                 var iconEl = iconEls[i];
                 var labelEl = document.getElementById('commitmentLabel' + (i + 1));
                 var textEl = document.getElementById('commitmentText' + (i + 1));
-                if (iconEl) iconEl.innerHTML = '<i class="' + safeCommitmentIcon(item.icon || defaultCommitmentItems()[i].icon) + '"></i>';
+                if (iconEl) {
+                    var customImage = safeCommitmentImage(item.image || '');
+                    iconEl.innerHTML = customImage ? '<img src="' + customImage + '" alt="">' : '<i class="' + safeCommitmentIcon(item.icon || defaultCommitmentItems()[i].icon) + '"></i>';
+                }
                 if (labelEl) labelEl.textContent = item.label || '';
                 if (textEl) textEl.textContent = item.text || '';
             }

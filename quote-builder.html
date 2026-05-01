@@ -313,6 +313,19 @@
             border-color: #1a56a0;
             background: #edf6ff;
         }
+        .commitment-icon-preview {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+        }
+        .commitment-icon-preview img {
+            width: 28px;
+            height: 28px;
+            object-fit: contain;
+            border-radius: 6px;
+        }
         .commitment-icon-library {
             display: none;
             grid-template-columns: repeat(auto-fill, minmax(42px, 1fr));
@@ -326,6 +339,15 @@
             overflow-y: auto;
         }
         .commitment-icon-library.open { display: grid; }
+        .commitment-icon-group-label {
+            grid-column: 1 / -1;
+            margin: 4px 0 2px;
+            color: #64748b;
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+        }
         .commitment-icon-option {
             height: 38px;
             border: 1px solid #e5edf5;
@@ -341,6 +363,15 @@
             background: #1a56a0;
             border-color: #1a56a0;
             color: #fff;
+        }
+        .commitment-upload-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin: 8px 0;
+        }
+        .commitment-upload-actions .btn {
+            border-radius: 8px;
         }
         .expiry-preset-btn {
             border: 1px solid #dbe4ef;
@@ -5143,56 +5174,90 @@ Example:
             commitment: {
                 title: 'OUR COMMITMENT TO YOU',
                 items: [
-                    { icon: 'fa-solid fa-shield-halved', label: '1-Year Warranty', text: 'Workmanship guaranteed for 12 months from project completion' },
-                    { icon: 'fa-solid fa-industry', label: 'Manufacturer Warranty', text: 'All materials carry full manufacturer warranty - passed directly to you' },
-                    { icon: 'fa-solid fa-clipboard-check', label: 'Fully Insured', text: 'Liability insurance coverage on all work performed' },
-                    { icon: 'fa-solid fa-handshake', label: 'Satisfaction Promise', text: 'Any concerns addressed promptly - your satisfaction is our priority' }
+                    { icon: 'fa-solid fa-shield-halved', image: '', label: '1-Year Warranty', text: 'Workmanship guaranteed for 12 months from project completion' },
+                    { icon: 'fa-solid fa-industry', image: '', label: 'Manufacturer Warranty', text: 'All materials carry full manufacturer warranty - passed directly to you' },
+                    { icon: 'fa-solid fa-clipboard-check', image: '', label: 'Fully Insured', text: 'Liability insurance coverage on all work performed' },
+                    { icon: 'fa-solid fa-handshake', image: '', label: 'Satisfaction Promise', text: 'Any concerns addressed promptly - your satisfaction is our priority' }
                 ]
             },
             clientMessage: ''
         };
 
         var COMMITMENT_ICON_LIBRARY = [
-            { icon: 'fa-solid fa-shield-halved', label: 'Warranty' },
-            { icon: 'fa-solid fa-award', label: 'Award' },
-            { icon: 'fa-solid fa-certificate', label: 'Certified' },
-            { icon: 'fa-solid fa-clipboard-check', label: 'Insured' },
-            { icon: 'fa-solid fa-handshake', label: 'Promise' },
-            { icon: 'fa-solid fa-thumbs-up', label: 'Approval' },
-            { icon: 'fa-solid fa-circle-check', label: 'Checked' },
-            { icon: 'fa-solid fa-user-shield', label: 'Protected' },
-            { icon: 'fa-solid fa-lock', label: 'Secure' },
-            { icon: 'fa-solid fa-medal', label: 'Quality' },
-            { icon: 'fa-solid fa-star', label: 'Premium' },
-            { icon: 'fa-solid fa-heart', label: 'Care' },
-            { icon: 'fa-solid fa-house-chimney', label: 'Home' },
-            { icon: 'fa-solid fa-hammer', label: 'Workmanship' },
-            { icon: 'fa-solid fa-screwdriver-wrench', label: 'Tools' },
-            { icon: 'fa-solid fa-helmet-safety', label: 'Safety' },
-            { icon: 'fa-solid fa-industry', label: 'Manufacturer' },
-            { icon: 'fa-solid fa-truck-fast', label: 'Delivery' },
-            { icon: 'fa-solid fa-calendar-check', label: 'Schedule' },
-            { icon: 'fa-solid fa-clock', label: 'On time' },
-            { icon: 'fa-solid fa-broom', label: 'Clean site' },
-            { icon: 'fa-solid fa-recycle', label: 'Eco' },
-            { icon: 'fa-solid fa-file-contract', label: 'Contract' },
-            { icon: 'fa-solid fa-receipt', label: 'Receipts' },
-            { icon: 'fa-solid fa-credit-card', label: 'Payment' },
-            { icon: 'fa-solid fa-comments', label: 'Communication' },
-            { icon: 'fa-solid fa-phone', label: 'Support' },
-            { icon: 'fa-solid fa-camera', label: 'Photos' },
-            { icon: 'fa-solid fa-ruler-combined', label: 'Measured' },
-            { icon: 'fa-solid fa-paint-roller', label: 'Finish' },
-            { icon: 'fa-solid fa-lightbulb', label: 'Ideas' },
-            { icon: 'fa-solid fa-gem', label: 'Premium finish' }
+            { group: 'Trust', icon: 'fa-solid fa-shield-halved', label: 'Warranty' },
+            { group: 'Trust', icon: 'fa-solid fa-award', label: 'Award' },
+            { group: 'Trust', icon: 'fa-solid fa-certificate', label: 'Certified' },
+            { group: 'Trust', icon: 'fa-solid fa-medal', label: 'Quality' },
+            { group: 'Trust', icon: 'fa-solid fa-star', label: 'Premium' },
+            { group: 'Trust', icon: 'fa-solid fa-gem', label: 'Premium finish' },
+            { group: 'Trust', icon: 'fa-solid fa-ranking-star', label: 'Top rated' },
+            { group: 'Trust', icon: 'fa-solid fa-stamp', label: 'Approved stamp' },
+            { group: 'Trust', icon: 'fa-solid fa-ribbon', label: 'Ribbon' },
+            { group: 'Protection', icon: 'fa-solid fa-clipboard-check', label: 'Insured' },
+            { group: 'Protection', icon: 'fa-solid fa-user-shield', label: 'Protected' },
+            { group: 'Protection', icon: 'fa-solid fa-lock', label: 'Secure' },
+            { group: 'Protection', icon: 'fa-solid fa-scale-balanced', label: 'Fair terms' },
+            { group: 'Protection', icon: 'fa-solid fa-file-shield', label: 'Protected file' },
+            { group: 'Protection', icon: 'fa-solid fa-house-lock', label: 'Home protection' },
+            { group: 'Protection', icon: 'fa-solid fa-triangle-exclamation', label: 'Safety warning' },
+            { group: 'Protection', icon: 'fa-solid fa-kit-medical', label: 'First aid' },
+            { group: 'Service', icon: 'fa-solid fa-handshake', label: 'Promise' },
+            { group: 'Service', icon: 'fa-solid fa-thumbs-up', label: 'Approval' },
+            { group: 'Service', icon: 'fa-solid fa-circle-check', label: 'Checked' },
+            { group: 'Service', icon: 'fa-solid fa-heart', label: 'Care' },
+            { group: 'Service', icon: 'fa-solid fa-face-smile', label: 'Friendly' },
+            { group: 'Service', icon: 'fa-solid fa-comments', label: 'Communication' },
+            { group: 'Service', icon: 'fa-solid fa-phone', label: 'Support' },
+            { group: 'Service', icon: 'fa-solid fa-headset', label: 'Help desk' },
+            { group: 'Service', icon: 'fa-solid fa-user-check', label: 'Client approved' },
+            { group: 'Craft', icon: 'fa-solid fa-house-chimney', label: 'Home' },
+            { group: 'Craft', icon: 'fa-solid fa-hammer', label: 'Workmanship' },
+            { group: 'Craft', icon: 'fa-solid fa-screwdriver-wrench', label: 'Tools' },
+            { group: 'Craft', icon: 'fa-solid fa-wrench', label: 'Repair' },
+            { group: 'Craft', icon: 'fa-solid fa-screwdriver', label: 'Install' },
+            { group: 'Craft', icon: 'fa-solid fa-ruler-combined', label: 'Measured' },
+            { group: 'Craft', icon: 'fa-solid fa-helmet-safety', label: 'Safety' },
+            { group: 'Craft', icon: 'fa-solid fa-person-digging', label: 'Construction' },
+            { group: 'Craft', icon: 'fa-solid fa-paint-roller', label: 'Finish' },
+            { group: 'Craft', icon: 'fa-solid fa-brush', label: 'Paint' },
+            { group: 'Craft', icon: 'fa-solid fa-trowel-bricks', label: 'Masonry' },
+            { group: 'Craft', icon: 'fa-solid fa-plug-circle-check', label: 'Electrical' },
+            { group: 'Materials', icon: 'fa-solid fa-industry', label: 'Manufacturer' },
+            { group: 'Materials', icon: 'fa-solid fa-boxes-stacked', label: 'Materials' },
+            { group: 'Materials', icon: 'fa-solid fa-box-open', label: 'Supplies' },
+            { group: 'Materials', icon: 'fa-solid fa-truck-fast', label: 'Delivery' },
+            { group: 'Materials', icon: 'fa-solid fa-warehouse', label: 'Warehouse' },
+            { group: 'Materials', icon: 'fa-solid fa-dolly', label: 'Handling' },
+            { group: 'Materials', icon: 'fa-solid fa-barcode', label: 'Tracked materials' },
+            { group: 'Schedule', icon: 'fa-solid fa-calendar-check', label: 'Schedule' },
+            { group: 'Schedule', icon: 'fa-solid fa-clock', label: 'On time' },
+            { group: 'Schedule', icon: 'fa-solid fa-stopwatch', label: 'Fast' },
+            { group: 'Schedule', icon: 'fa-solid fa-list-check', label: 'Checklist' },
+            { group: 'Schedule', icon: 'fa-solid fa-clipboard-list', label: 'Scope list' },
+            { group: 'Schedule', icon: 'fa-solid fa-route', label: 'Planned route' },
+            { group: 'Schedule', icon: 'fa-solid fa-flag-checkered', label: 'Finished' },
+            { group: 'Clean Site', icon: 'fa-solid fa-broom', label: 'Clean site' },
+            { group: 'Clean Site', icon: 'fa-solid fa-bucket', label: 'Cleanup' },
+            { group: 'Clean Site', icon: 'fa-solid fa-spray-can-sparkles', label: 'Sparkling clean' },
+            { group: 'Clean Site', icon: 'fa-solid fa-trash-can', label: 'Waste removed' },
+            { group: 'Clean Site', icon: 'fa-solid fa-recycle', label: 'Eco' },
+            { group: 'Clean Site', icon: 'fa-solid fa-leaf', label: 'Green' },
+            { group: 'Documents', icon: 'fa-solid fa-file-contract', label: 'Contract' },
+            { group: 'Documents', icon: 'fa-solid fa-file-signature', label: 'Signed document' },
+            { group: 'Documents', icon: 'fa-solid fa-file-invoice-dollar', label: 'Invoice' },
+            { group: 'Documents', icon: 'fa-solid fa-receipt', label: 'Receipts' },
+            { group: 'Documents', icon: 'fa-solid fa-credit-card', label: 'Payment' },
+            { group: 'Documents', icon: 'fa-solid fa-money-check-dollar', label: 'Deposit' },
+            { group: 'Documents', icon: 'fa-solid fa-camera', label: 'Photos' },
+            { group: 'Documents', icon: 'fa-solid fa-lightbulb', label: 'Ideas' }
         ];
 
         function defaultCommitmentItemsForModal() {
             return [
-                { icon: 'fa-solid fa-shield-halved', label: '1-Year Warranty', text: 'Workmanship guaranteed for 12 months from project completion' },
-                { icon: 'fa-solid fa-industry', label: 'Manufacturer Warranty', text: 'All materials carry full manufacturer warranty - passed directly to you' },
-                { icon: 'fa-solid fa-clipboard-check', label: 'Fully Insured', text: 'Liability insurance coverage on all work performed' },
-                { icon: 'fa-solid fa-handshake', label: 'Satisfaction Promise', text: 'Any concerns addressed promptly - your satisfaction is our priority' }
+                { icon: 'fa-solid fa-shield-halved', image: '', label: '1-Year Warranty', text: 'Workmanship guaranteed for 12 months from project completion' },
+                { icon: 'fa-solid fa-industry', image: '', label: 'Manufacturer Warranty', text: 'All materials carry full manufacturer warranty - passed directly to you' },
+                { icon: 'fa-solid fa-clipboard-check', image: '', label: 'Fully Insured', text: 'Liability insurance coverage on all work performed' },
+                { icon: 'fa-solid fa-handshake', image: '', label: 'Satisfaction Promise', text: 'Any concerns addressed promptly - your satisfaction is our priority' }
             ];
         }
 
@@ -5346,15 +5411,26 @@ Example:
             return value;
         }
 
+        function safeCommitmentImage(src) {
+            var value = String(src || '').trim();
+            if (/^data:image\/(png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i.test(value)) return value;
+            return '';
+        }
+
         function refreshCommitmentIconButtons() {
             for (var i = 1; i <= 4; i++) {
                 var input = document.getElementById('commitmentIcon' + i);
+                var imageInput = document.getElementById('commitmentImage' + i);
                 var preview = document.getElementById('commitmentIconPreview' + i);
                 var icon = safeCommitmentIcon(input ? input.value : '');
+                var image = safeCommitmentImage(imageInput ? imageInput.value : '');
                 if (input) input.value = icon;
-                if (preview) preview.className = icon;
+                if (imageInput) imageInput.value = image;
+                if (preview) {
+                    preview.innerHTML = image ? '<img src="' + image + '" alt="">' : '<i class="' + icon + '"></i>';
+                }
                 document.querySelectorAll('#commitmentIconLibrary' + i + ' .commitment-icon-option').forEach(function(btn) {
-                    btn.classList.toggle('selected', btn.getAttribute('data-icon') === icon);
+                    btn.classList.toggle('selected', !image && btn.getAttribute('data-icon') === icon);
                 });
             }
         }
@@ -5363,14 +5439,48 @@ Example:
             for (var i = 1; i <= 4; i++) {
                 var library = document.getElementById('commitmentIconLibrary' + i);
                 if (!library || library.dataset.rendered) continue;
-                library.innerHTML = COMMITMENT_ICON_LIBRARY.map(function(iconItem) {
-                    return '<button type="button" class="commitment-icon-option" data-icon="' + iconItem.icon + '" title="' + iconItem.label + '" aria-label="' + iconItem.label + '">' +
+                var currentGroup = '';
+                var html = '';
+                COMMITMENT_ICON_LIBRARY.forEach(function(iconItem) {
+                    if (iconItem.group && iconItem.group !== currentGroup) {
+                        currentGroup = iconItem.group;
+                        html += '<div class="commitment-icon-group-label">' + currentGroup + '</div>';
+                    }
+                    html += '<button type="button" class="commitment-icon-option" data-icon="' + iconItem.icon + '" title="' + iconItem.label + '" aria-label="' + iconItem.label + '">' +
                         '<i class="' + iconItem.icon + '"></i>' +
                         '</button>';
-                }).join('');
+                });
+                library.innerHTML = html;
                 library.dataset.rendered = '1';
             }
             refreshCommitmentIconButtons();
+        }
+
+        function resizeCommitmentImageFile(file, callback) {
+            if (!file || !/^image\//.test(file.type || '')) {
+                alert('Please choose an image file.');
+                return;
+            }
+            var reader = new FileReader();
+            reader.onload = function() {
+                var img = new Image();
+                img.onload = function() {
+                    var max = 240;
+                    var scale = Math.min(1, max / Math.max(img.width || max, img.height || max));
+                    var canvas = document.createElement('canvas');
+                    canvas.width = Math.max(1, Math.round((img.width || max) * scale));
+                    canvas.height = Math.max(1, Math.round((img.height || max) * scale));
+                    var ctx = canvas.getContext('2d');
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    callback(canvas.toDataURL('image/png'));
+                };
+                img.onerror = function() {
+                    alert('That image could not be loaded. Try a PNG or JPG.');
+                };
+                img.src = reader.result;
+            };
+            reader.readAsDataURL(file);
         }
 
         function initCommitmentIconPickers() {
@@ -5392,12 +5502,50 @@ Example:
                     if (!btn) return;
                     var n = library.id.replace('commitmentIconLibrary', '');
                     var input = document.getElementById('commitmentIcon' + n);
+                    var imageInput = document.getElementById('commitmentImage' + n);
                     if (input) input.value = btn.getAttribute('data-icon');
+                    if (imageInput) imageInput.value = '';
                     library.classList.remove('open');
                     refreshCommitmentIconButtons();
                     updateStylePreview();
                 });
                 library.dataset.pickBound = '1';
+            });
+            document.querySelectorAll('[data-commitment-upload]').forEach(function(btn) {
+                if (btn.dataset.uploadBound) return;
+                btn.addEventListener('click', function() {
+                    var n = btn.getAttribute('data-commitment-upload');
+                    var fileInput = document.getElementById('commitmentImageFile' + n);
+                    if (fileInput) fileInput.click();
+                });
+                btn.dataset.uploadBound = '1';
+            });
+            document.querySelectorAll('[data-commitment-clear]').forEach(function(btn) {
+                if (btn.dataset.clearBound) return;
+                btn.addEventListener('click', function() {
+                    var n = btn.getAttribute('data-commitment-clear');
+                    var imageInput = document.getElementById('commitmentImage' + n);
+                    var fileInput = document.getElementById('commitmentImageFile' + n);
+                    if (imageInput) imageInput.value = '';
+                    if (fileInput) fileInput.value = '';
+                    refreshCommitmentIconButtons();
+                    updateStylePreview();
+                });
+                btn.dataset.clearBound = '1';
+            });
+            document.querySelectorAll('[id^="commitmentImageFile"]').forEach(function(fileInput) {
+                if (fileInput.dataset.fileBound) return;
+                fileInput.addEventListener('change', function() {
+                    var n = fileInput.id.replace('commitmentImageFile', '');
+                    var imageInput = document.getElementById('commitmentImage' + n);
+                    resizeCommitmentImageFile(fileInput.files && fileInput.files[0], function(dataUrl) {
+                        if (imageInput) imageInput.value = dataUrl;
+                        document.querySelectorAll('.commitment-icon-library').forEach(function(lib) { lib.classList.remove('open'); });
+                        refreshCommitmentIconButtons();
+                        updateStylePreview();
+                    });
+                });
+                fileInput.dataset.fileBound = '1';
             });
         }
 
@@ -5431,7 +5579,7 @@ Example:
                     applyQuoteStyleToControls(_quoteStyle);
                 };
             });
-            ['quoteHeaderStyle','quoteFontFeel','quotePricingMode','quoteDepositMode','quoteDepositPercent','quoteApprovalMode','quoteExpiryDate','quoteShowUpgrades','quoteShowScopeNotes','quoteShowCommitment','commitmentTitleInput','commitmentIcon1','commitmentLabel1','commitmentText1','commitmentIcon2','commitmentLabel2','commitmentText2','commitmentIcon3','commitmentLabel3','commitmentText3','commitmentIcon4','commitmentLabel4','commitmentText4','quoteClientMessage'].forEach(function(id) {
+            ['quoteHeaderStyle','quoteFontFeel','quotePricingMode','quoteDepositMode','quoteDepositPercent','quoteApprovalMode','quoteExpiryDate','quoteShowUpgrades','quoteShowScopeNotes','quoteShowCommitment','commitmentTitleInput','commitmentIcon1','commitmentImage1','commitmentLabel1','commitmentText1','commitmentIcon2','commitmentImage2','commitmentLabel2','commitmentText2','commitmentIcon3','commitmentImage3','commitmentLabel3','commitmentText3','commitmentIcon4','commitmentImage4','commitmentLabel4','commitmentText4','quoteClientMessage'].forEach(function(id) {
                 var el = document.getElementById(id);
                 if (el && !el.dataset.styleBound) {
                     el.addEventListener('input', updateStylePreview);
@@ -7975,44 +8123,68 @@ async function saveQuote() {
                                             <div class="col-md-6">
                                                 <div class="commitment-item-editor">
                                                     <div class="d-flex gap-2 mb-2">
-                                                        <button type="button" class="commitment-icon-button" data-commitment-icon-toggle="1" title="Choose icon"><i id="commitmentIconPreview1" class="fa-solid fa-shield-halved"></i></button>
+                                                        <button type="button" class="commitment-icon-button" data-commitment-icon-toggle="1" title="Choose icon"><span id="commitmentIconPreview1" class="commitment-icon-preview"><i class="fa-solid fa-shield-halved"></i></span></button>
                                                         <input type="hidden" id="commitmentIcon1" value="fa-solid fa-shield-halved">
+                                                        <input type="hidden" id="commitmentImage1" value="">
+                                                        <input type="file" id="commitmentImageFile1" accept="image/*" class="d-none">
                                                         <input type="text" id="commitmentLabel1" class="form-control form-control-sm" value="1-Year Warranty">
                                                     </div>
                                                     <div id="commitmentIconLibrary1" class="commitment-icon-library"></div>
+                                                    <div class="commitment-upload-actions">
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary" data-commitment-upload="1"><i class="fas fa-upload me-1"></i>Upload image</button>
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary" data-commitment-clear="1"><i class="fas fa-icons me-1"></i>Use catalog icon</button>
+                                                    </div>
                                                     <textarea id="commitmentText1" class="form-control form-control-sm" rows="2">Workmanship guaranteed for 12 months from project completion</textarea>
                                                 </div>
                                             </div>
                                             <div class="col-md-6">
                                                 <div class="commitment-item-editor">
                                                     <div class="d-flex gap-2 mb-2">
-                                                        <button type="button" class="commitment-icon-button" data-commitment-icon-toggle="2" title="Choose icon"><i id="commitmentIconPreview2" class="fa-solid fa-industry"></i></button>
+                                                        <button type="button" class="commitment-icon-button" data-commitment-icon-toggle="2" title="Choose icon"><span id="commitmentIconPreview2" class="commitment-icon-preview"><i class="fa-solid fa-industry"></i></span></button>
                                                         <input type="hidden" id="commitmentIcon2" value="fa-solid fa-industry">
+                                                        <input type="hidden" id="commitmentImage2" value="">
+                                                        <input type="file" id="commitmentImageFile2" accept="image/*" class="d-none">
                                                         <input type="text" id="commitmentLabel2" class="form-control form-control-sm" value="Manufacturer Warranty">
                                                     </div>
                                                     <div id="commitmentIconLibrary2" class="commitment-icon-library"></div>
+                                                    <div class="commitment-upload-actions">
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary" data-commitment-upload="2"><i class="fas fa-upload me-1"></i>Upload image</button>
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary" data-commitment-clear="2"><i class="fas fa-icons me-1"></i>Use catalog icon</button>
+                                                    </div>
                                                     <textarea id="commitmentText2" class="form-control form-control-sm" rows="2">All materials carry full manufacturer warranty - passed directly to you</textarea>
                                                 </div>
                                             </div>
                                             <div class="col-md-6">
                                                 <div class="commitment-item-editor">
                                                     <div class="d-flex gap-2 mb-2">
-                                                        <button type="button" class="commitment-icon-button" data-commitment-icon-toggle="3" title="Choose icon"><i id="commitmentIconPreview3" class="fa-solid fa-clipboard-check"></i></button>
+                                                        <button type="button" class="commitment-icon-button" data-commitment-icon-toggle="3" title="Choose icon"><span id="commitmentIconPreview3" class="commitment-icon-preview"><i class="fa-solid fa-clipboard-check"></i></span></button>
                                                         <input type="hidden" id="commitmentIcon3" value="fa-solid fa-clipboard-check">
+                                                        <input type="hidden" id="commitmentImage3" value="">
+                                                        <input type="file" id="commitmentImageFile3" accept="image/*" class="d-none">
                                                         <input type="text" id="commitmentLabel3" class="form-control form-control-sm" value="Fully Insured">
                                                     </div>
                                                     <div id="commitmentIconLibrary3" class="commitment-icon-library"></div>
+                                                    <div class="commitment-upload-actions">
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary" data-commitment-upload="3"><i class="fas fa-upload me-1"></i>Upload image</button>
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary" data-commitment-clear="3"><i class="fas fa-icons me-1"></i>Use catalog icon</button>
+                                                    </div>
                                                     <textarea id="commitmentText3" class="form-control form-control-sm" rows="2">Liability insurance coverage on all work performed</textarea>
                                                 </div>
                                             </div>
                                             <div class="col-md-6">
                                                 <div class="commitment-item-editor">
                                                     <div class="d-flex gap-2 mb-2">
-                                                        <button type="button" class="commitment-icon-button" data-commitment-icon-toggle="4" title="Choose icon"><i id="commitmentIconPreview4" class="fa-solid fa-handshake"></i></button>
+                                                        <button type="button" class="commitment-icon-button" data-commitment-icon-toggle="4" title="Choose icon"><span id="commitmentIconPreview4" class="commitment-icon-preview"><i class="fa-solid fa-handshake"></i></span></button>
                                                         <input type="hidden" id="commitmentIcon4" value="fa-solid fa-handshake">
+                                                        <input type="hidden" id="commitmentImage4" value="">
+                                                        <input type="file" id="commitmentImageFile4" accept="image/*" class="d-none">
                                                         <input type="text" id="commitmentLabel4" class="form-control form-control-sm" value="Satisfaction Promise">
                                                     </div>
                                                     <div id="commitmentIconLibrary4" class="commitment-icon-library"></div>
+                                                    <div class="commitment-upload-actions">
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary" data-commitment-upload="4"><i class="fas fa-upload me-1"></i>Upload image</button>
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary" data-commitment-clear="4"><i class="fas fa-icons me-1"></i>Use catalog icon</button>
+                                                    </div>
                                                     <textarea id="commitmentText4" class="form-control form-control-sm" rows="2">Any concerns addressed promptly - your satisfaction is our priority</textarea>
                                                 </div>
                                             </div>
