@@ -65,6 +65,17 @@
             border-radius: 6px;
             margin-top: 0.4rem;
         }
+        .spend-breakdown {
+            background: #f8fbff;
+            border: 1px solid #d7e6f7;
+            border-radius: 8px;
+            padding: 0.75rem;
+        }
+        .spend-breakdown .possible-total {
+            border-top: 1px solid #d7e6f7;
+            margin-top: 0.35rem;
+            padding-top: 0.35rem;
+        }
         .badge-soft {
             background: #edf4ff;
             color: #174b82;
@@ -228,6 +239,7 @@
         let allQuotes = [];
         let lastWorkbookRows = null;
         let cloudSaveTimer = null;
+        let reviewProjectFilter = '';
 
         function loadTracker() {
             try {
@@ -579,6 +591,9 @@
             el.innerHTML = projects.map(p => {
                 const projectTxs = txs.filter(tx => tx.projectId === p.id);
                 const total = projectTxs.reduce((sum, tx) => sum + amountFor(tx), 0);
+                const likelyTxs = txs.filter(tx => !tx.projectId && tx.reviewReason && tx.suggestedProjectIds && tx.suggestedProjectIds.includes(p.id));
+                const likelyTotal = likelyTxs.reduce((sum, tx) => sum + amountFor(tx), 0);
+                const possibleTotal = total + likelyTotal;
                 const returns = projectTxs.filter(tx => tx.total < 0).reduce((sum, tx) => sum + amountFor(tx), 0);
                 const attached = allQuotes.filter(q => (p.quoteIds || []).includes(q.id));
                 const quoted = attached.reduce((sum, q) => sum + Number(q.total || 0), 0);
@@ -599,9 +614,15 @@
                             <div class="col-4"><span class="badge badge-soft w-100 py-2">${attached.length} docs</span></div>
                             <div class="col-4"><span class="badge badge-soft w-100 py-2">Returns ${money(returns)}</span></div>
                         </div>
+                        <div class="spend-breakdown mt-3">
+                            <div class="d-flex justify-content-between"><span>Tagged spend</span><strong>${money(total)}</strong></div>
+                            <div class="d-flex justify-content-between"><span>Likely unassigned nearby</span><strong class="${likelyTotal < 0 ? 'amount-negative' : 'amount-positive'}">${money(likelyTotal)}</strong></div>
+                            <div class="d-flex justify-content-between possible-total"><span>Possible total</span><strong>${money(possibleTotal)}</strong></div>
+                            ${likelyTxs.length ? `<button class="btn btn-outline-primary btn-sm mt-2" onclick="event.stopPropagation(); reviewLikelyProjectRows('${escapeHtml(p.id)}')"><i class="fas fa-flag me-1"></i>Review ${likelyTxs.length} likely row${likelyTxs.length === 1 ? '' : 's'}</button>` : ''}
+                        </div>
                         <div class="border-top mt-3 pt-3">
                             <div class="d-flex justify-content-between"><span>Attached quote/invoice total</span><strong>${money(quoted)}</strong></div>
-                            <div class="d-flex justify-content-between"><span>Difference</span><strong>${money(quoted - total)}</strong></div>
+                            <div class="d-flex justify-content-between"><span>Difference vs tagged spend</span><strong>${money(quoted - total)}</strong></div>
                         </div>
                         <div class="d-flex justify-content-between align-items-center border-top mt-3 pt-2 gap-2">
                             <span class="merge-hint"><i class="fas fa-arrows-alt me-1"></i>Drag to merge</span>
@@ -618,13 +639,14 @@
         }
 
         function renderReview() {
-            const rows = allTransactions().filter(tx => tx.reviewReason && !tx.excluded);
+            const rows = allTransactions().filter(tx => tx.reviewReason && !tx.excluded && (!reviewProjectFilter || (tx.suggestedProjectIds || []).includes(reviewProjectFilter)));
             const el = document.getElementById('reviewRows');
             if (!rows.length) {
                 el.innerHTML = '<tr><td colspan="6" class="text-center small-muted py-4">Nothing needs review right now.</td></tr>';
                 return;
             }
-            el.innerHTML = rows.map(tx => {
+            const filterNotice = reviewProjectFilter ? `<tr><td colspan="6"><div class="alert alert-info py-2 mb-0 d-flex justify-content-between align-items-center"><span>Showing likely rows for <strong>${escapeHtml(projectName(reviewProjectFilter))}</strong>.</span><button class="btn btn-sm btn-outline-secondary" onclick="clearReviewProjectFilter()">Show all review rows</button></div></td></tr>` : '';
+            el.innerHTML = filterNotice + rows.map(tx => {
                 const rowClass = tx.possibleDuplicateIds && tx.possibleDuplicateIds.length ? 'review-row-duplicate' : 'review-row-flagged';
                 const suggestion = tx.suggestedProjectIds && tx.suggestedProjectIds[0] ? tx.suggestedProjectIds[0] : '';
                 return `<tr class="${rowClass}">
@@ -647,6 +669,22 @@
                     </td>
                 </tr>`;
             }).join('');
+        }
+
+        function reviewLikelyProjectRows(projectId) {
+            reviewProjectFilter = projectId;
+            const tabButton = document.querySelector('[data-bs-target="#reviewTab"]');
+            if (tabButton) bootstrap.Tab.getOrCreateInstance(tabButton).show();
+            renderReview();
+            setTimeout(function() {
+                const reviewTab = document.getElementById('reviewTab');
+                if (reviewTab) reviewTab.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
+        }
+
+        function clearReviewProjectFilter() {
+            reviewProjectFilter = '';
+            renderReview();
         }
 
         function renderSuggestionWhy(tx) {
