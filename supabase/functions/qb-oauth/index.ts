@@ -173,7 +173,7 @@ async function handleExchange(userId: string, code: string, realmId: string, sta
 async function handleRefresh(userId: string) {
   try {
     // Get current tokens from Supabase
-    const { data: tokensData, error: fetchError } = await supabase
+    const { data: tokensData, error: fetchError } = await supabaseAdmin
       .from("user_data")
       .select("value")
       .eq("user_id", userId)
@@ -254,7 +254,7 @@ async function handleRefresh(userId: string) {
 async function handleStatus(userId: string) {
   try {
     // Get tokens from Supabase
-    const { data: tokensData, error: fetchError } = await supabase
+    const { data: tokensData, error: fetchError } = await supabaseAdmin
       .from("user_data")
       .select("value")
       .eq("user_id", userId)
