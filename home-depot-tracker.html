@@ -36,6 +36,20 @@
             border: 1px solid #d7e2ef;
             border-radius: 8px;
             background: #fff;
+            cursor: grab;
+        }
+        .project-card:active { cursor: grabbing; }
+        .project-card.dragging {
+            opacity: 0.55;
+            border-style: dashed;
+        }
+        .project-card.drop-target {
+            border-color: #1a56a0;
+            box-shadow: 0 0 0 3px rgba(26, 86, 160, 0.16);
+        }
+        .merge-hint {
+            color: #5d7186;
+            font-size: 0.82rem;
         }
         .review-row-flagged { background: #fff8e6; }
         .review-row-duplicate { background: #fff1f1; }
@@ -76,6 +90,7 @@
             <div>
                 <h1 class="page-title mb-1">Home Depot Pro Spend Tracker</h1>
                 <p class="small-muted mb-0">Import Pro Extra exports, group purchases by project, catch online-order duplicates, and attach quotes or invoices for internal tracking.</p>
+                <div class="merge-hint mt-2"><i class="fas fa-arrows-alt me-1"></i>Drag one project card onto another to combine them.</div>
             </div>
             <div class="d-flex gap-2 flex-wrap">
                 <button class="btn btn-outline-secondary" onclick="clearImportPreview()"><i class="fas fa-eraser me-1"></i>Clear Preview</button>
@@ -297,6 +312,15 @@
             return Math.abs((new Date(a) - new Date(b)) / 86400000);
         }
 
+        function dateInProjectWindow(date, project, gapDays) {
+            if (!date || !project) return false;
+            if (!project.firstDate || !project.lastDate) return true;
+            const d = new Date(date).getTime();
+            const start = new Date(project.firstDate).getTime() - gapDays * 86400000;
+            const end = new Date(project.lastDate).getTime() + gapDays * 86400000;
+            return d >= start && d <= end;
+        }
+
         function levenshtein(a, b) {
             a = normalizeName(a); b = normalizeName(b);
             if (a === b) return 0;
@@ -320,7 +344,18 @@
             if (na === nb) return true;
             if (na.length < 4 || nb.length < 4) return false;
             const maxLen = Math.max(na.length, nb.length);
-            return levenshtein(na, nb) <= Math.max(1, Math.floor(maxLen * 0.22));
+            if (isTransposedMatch(na, nb)) return true;
+            const allowed = Math.max(maxLen >= 6 ? 2 : 1, Math.floor(maxLen * 0.24));
+            return levenshtein(na, nb) <= allowed;
+        }
+
+        function isTransposedMatch(a, b) {
+            if (a.length !== b.length) return false;
+            const diffs = [];
+            for (let i = 0; i < a.length; i++) {
+                if (a[i] !== b[i]) diffs.push(i);
+            }
+            return diffs.length === 2 && diffs[1] === diffs[0] + 1 && a[diffs[0]] === b[diffs[1]] && a[diffs[1]] === b[diffs[0]];
         }
 
         async function loadQuotes() {
@@ -419,7 +454,7 @@
         function assignKnownTransactions(transactions, projects, gapDays) {
             transactions.forEach(tx => {
                 if (tx.isOnline || isWeakJobName(tx.jobName)) return;
-                const match = projects.find(p => p.aliases.some(alias => similarEnough(alias, tx.jobName)) && daysBetween(p.lastDate, tx.date) <= gapDays);
+                const match = projects.find(p => p.aliases.some(alias => similarEnough(alias, tx.jobName)) && dateInProjectWindow(tx.date, p, gapDays));
                 if (match) tx.projectId = match.id;
             });
         }
@@ -521,7 +556,7 @@
                 const attached = allQuotes.filter(q => (p.quoteIds || []).includes(q.id));
                 const quoted = attached.reduce((sum, q) => sum + Number(q.total || 0), 0);
                 return `<div class="col-lg-6">
-                    <div class="project-card p-3 h-100">
+                    <div class="project-card p-3 h-100" draggable="true" data-project-id="${escapeHtml(p.id)}" ondragstart="startProjectDrag(event, '${escapeHtml(p.id)}')" ondragend="endProjectDrag(event)" ondragover="allowProjectDrop(event)" ondragleave="leaveProjectDrop(event)" ondrop="dropProject(event, '${escapeHtml(p.id)}')">
                         <div class="d-flex justify-content-between gap-3">
                             <div>
                                 <h4 class="mb-1">${escapeHtml(p.name)}</h4>
@@ -540,6 +575,10 @@
                         <div class="border-top mt-3 pt-3">
                             <div class="d-flex justify-content-between"><span>Attached quote/invoice total</span><strong>${money(quoted)}</strong></div>
                             <div class="d-flex justify-content-between"><span>Difference</span><strong>${money(quoted - total)}</strong></div>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center border-top mt-3 pt-2 gap-2">
+                            <span class="merge-hint"><i class="fas fa-arrows-alt me-1"></i>Drag to merge</span>
+                            <button class="btn btn-outline-secondary btn-sm" onclick="event.stopPropagation(); renameProject('${escapeHtml(p.id)}')"><i class="fas fa-pencil-alt me-1"></i>Rename</button>
                         </div>
                     </div>
                 </div>`;
@@ -652,6 +691,85 @@
             [tracker.transactions, importPreview].forEach(list => (list || []).forEach(tx => {
                 if (tx.id === txId) tx.projectId = projectId || null;
             }));
+            renderAll();
+        }
+
+        let draggedProjectId = null;
+
+        function startProjectDrag(event, projectId) {
+            draggedProjectId = projectId;
+            event.currentTarget.classList.add('dragging');
+            if (event.dataTransfer) {
+                event.dataTransfer.effectAllowed = 'move';
+                event.dataTransfer.setData('text/plain', projectId);
+            }
+        }
+
+        function endProjectDrag(event) {
+            draggedProjectId = null;
+            document.querySelectorAll('.project-card.dragging, .project-card.drop-target').forEach(el => {
+                el.classList.remove('dragging', 'drop-target');
+            });
+        }
+
+        function allowProjectDrop(event) {
+            const targetId = event.currentTarget.getAttribute('data-project-id');
+            if (!draggedProjectId || draggedProjectId === targetId) return;
+            event.preventDefault();
+            event.currentTarget.classList.add('drop-target');
+            if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+        }
+
+        function leaveProjectDrop(event) {
+            event.currentTarget.classList.remove('drop-target');
+        }
+
+        function dropProject(event, targetProjectId) {
+            event.preventDefault();
+            const sourceProjectId = draggedProjectId || (event.dataTransfer && event.dataTransfer.getData('text/plain'));
+            endProjectDrag(event);
+            if (!sourceProjectId || sourceProjectId === targetProjectId) return;
+            mergeProjects(sourceProjectId, targetProjectId);
+        }
+
+        function mergeProjects(sourceProjectId, targetProjectId) {
+            const projects = effectiveProjects();
+            const source = projects.find(p => p.id === sourceProjectId);
+            const target = projects.find(p => p.id === targetProjectId);
+            if (!source || !target) return;
+            if (!confirm('Merge "' + source.name + '" into "' + target.name + '"?')) return;
+
+            const merged = Object.assign({}, target);
+            merged.aliases = Array.from(new Set([...(target.aliases || []), ...(source.aliases || [])]));
+            merged.quoteIds = Array.from(new Set([...(target.quoteIds || []), ...(source.quoteIds || [])]));
+            merged.firstDate = [target.firstDate, source.firstDate].filter(Boolean).sort()[0] || '';
+            merged.lastDate = [target.lastDate, source.lastDate].filter(Boolean).sort().slice(-1)[0] || '';
+
+            tracker.projects = projects
+                .filter(p => p.id !== sourceProjectId && p.id !== targetProjectId)
+                .concat([merged]);
+            tracker.previewProjects = [];
+            [tracker.transactions, importPreview].forEach(list => (list || []).forEach(tx => {
+                if (tx.projectId === sourceProjectId) tx.projectId = targetProjectId;
+                if (tx.suggestedProjectIds) {
+                    tx.suggestedProjectIds = tx.suggestedProjectIds.map(id => id === sourceProjectId ? targetProjectId : id);
+                }
+            }));
+            saveTracker();
+            renderAll();
+        }
+
+        function renameProject(projectId) {
+            const project = effectiveProjects().find(p => p.id === projectId);
+            if (!project) return;
+            const nextName = prompt('Project name', project.name);
+            if (!nextName || !nextName.trim()) return;
+            tracker.projects = effectiveProjects().map(p => p.id === projectId ? Object.assign({}, p, {
+                name: nextName.trim(),
+                aliases: Array.from(new Set([...(p.aliases || []), normalizeName(nextName)]))
+            }) : p);
+            tracker.previewProjects = [];
+            saveTracker();
             renderAll();
         }
 
