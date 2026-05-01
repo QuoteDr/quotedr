@@ -72,6 +72,32 @@
         .navbar-nav .nav-link:hover {
             color: var(--accent-orange) !important;
         }
+
+        .app-install-btn {
+            background: var(--accent-orange);
+            border: 1px solid var(--accent-orange);
+            color: #fff !important;
+            border-radius: 22px;
+            font-weight: 700;
+            padding: 6px 14px !important;
+            white-space: nowrap;
+            box-shadow: 0 3px 10px rgba(232, 126, 42, 0.2);
+        }
+
+        .app-install-btn:hover {
+            background: #d47024;
+            border-color: #d47024;
+            color: #fff !important;
+            transform: translateY(-1px);
+        }
+
+        .install-step {
+            border: 1px solid #dbe6f3;
+            border-radius: 10px;
+            background: #f8fbff;
+            padding: 1rem;
+            height: 100%;
+        }
         
         /* Hero Section */
         .hero-section {
@@ -456,9 +482,17 @@
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
-            <a href="login.html" class="btn btn-sm d-lg-none ms-auto me-2" style="background:#1a56a0; color:white; font-weight:600; border-radius:20px; padding:4px 16px; vertical-align:middle; position:relative; top:-3px;">Sign In</a>
+            <button type="button" class="btn btn-sm app-install-btn d-lg-none ms-auto me-2" id="installAppBtnMobile">
+                <i class="fas fa-mobile-alt me-1"></i>Install App
+            </button>
+            <a href="login.html" class="btn btn-sm d-lg-none me-2" style="background:#1a56a0; color:white; font-weight:600; border-radius:20px; padding:4px 16px; vertical-align:middle; position:relative; top:-3px;">Sign In</a>
             <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
-                <ul class="navbar-nav">
+                <ul class="navbar-nav align-items-lg-center gap-lg-2">
+                    <li class="nav-item d-none d-lg-block">
+                        <button type="button" class="nav-link app-install-btn" id="installAppBtn">
+                            <i class="fas fa-mobile-alt me-1"></i>Download App to Phone
+                        </button>
+                    </li>
                     <li class="nav-item">
                         <a class="nav-link" href="login.html?signup=1">Sign In</a>
                     </li>
@@ -730,8 +764,85 @@
         <button><i class="fas fa-arrow-up"></i></button>
     </div>
 
+    <div class="modal fade" id="installHelpModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header" style="background:#0f3460; color:white;">
+                    <h5 class="modal-title"><i class="fas fa-mobile-alt me-2"></i>Save QuoteDr to Your Phone</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted mb-3">If your browser does not show an install prompt, use the browser menu to add QuoteDr to your home screen.</p>
+                    <div class="row g-3">
+                        <div class="col-sm-6">
+                            <div class="install-step">
+                                <h6 class="fw-bold"><i class="fab fa-apple me-1"></i>iPhone / iPad</h6>
+                                <ol class="small mb-0 ps-3">
+                                    <li>Open QuoteDr in Safari.</li>
+                                    <li>Tap the Share button.</li>
+                                    <li>Tap Add to Home Screen.</li>
+                                </ol>
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="install-step">
+                                <h6 class="fw-bold"><i class="fab fa-android me-1"></i>Android</h6>
+                                <ol class="small mb-0 ps-3">
+                                    <li>Open QuoteDr in Chrome.</li>
+                                    <li>Tap the browser menu.</li>
+                                    <li>Tap Install app or Add to Home screen.</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                    <a href="login.html?signup=1" class="btn btn-primary">Open QuoteDr</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        var deferredInstallPrompt = null;
+
+        window.addEventListener('beforeinstallprompt', function(event) {
+            event.preventDefault();
+            deferredInstallPrompt = event;
+        });
+
+        function showInstallHelp() {
+            var modalEl = document.getElementById('installHelpModal');
+            if (modalEl && window.bootstrap) {
+                bootstrap.Modal.getOrCreateInstance(modalEl).show();
+            }
+        }
+
+        async function handleInstallAppClick() {
+            if (deferredInstallPrompt) {
+                deferredInstallPrompt.prompt();
+                try { await deferredInstallPrompt.userChoice; } catch (e) {}
+                deferredInstallPrompt = null;
+                return;
+            }
+            showInstallHelp();
+        }
+
+        ['installAppBtn', 'installAppBtnMobile'].forEach(function(id) {
+            var btn = document.getElementById(id);
+            if (btn) btn.addEventListener('click', handleInstallAppClick);
+        });
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/sw.js').catch(function(err) {
+                    console.warn('Service worker registration failed:', err);
+                });
+            });
+        }
+
         // Smooth scrolling for anchor links
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
             anchor.addEventListener('click', function (e) {
