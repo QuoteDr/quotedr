@@ -776,6 +776,10 @@ Sarah Jones, 905-555-5678"></textarea>
 			});
 		}
 
+		function normalizeMatchName(value) {
+			return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+		}
+
 		async function fetchQuickBooksSync(action) {
 			const headers = await getQBAuthHeader();
 			if (!headers) throw new Error('Please sign in first.');
@@ -794,27 +798,75 @@ Sarah Jones, 905-555-5678"></textarea>
 			const isCustomers = type === 'customers';
 			const title = isCustomers ? 'QuickBooks Customers' : 'QuickBooks Products & Services';
 			const importFn = isCustomers ? 'importQBCustomers()' : 'importQBItems()';
+			const existingMap = {};
+			if (isCustomers) {
+				let existingClients = {};
+				try { existingClients = JSON.parse(localStorage.getItem('ald_clients') || '{}'); } catch(e) { existingClients = {}; }
+				Object.values(existingClients).forEach(function(client) {
+					if (client && client.name) existingMap[normalizeMatchName(client.name)] = client;
+					if (client && client.qb_id) existingMap['qb:' + client.qb_id] = client;
+				});
+			} else {
+				let existingItems = {};
+				try { existingItems = JSON.parse(localStorage.getItem('ald_custom_items') || '{}'); } catch(e) { existingItems = {}; }
+				Object.values(existingItems).forEach(function(group) {
+					(Array.isArray(group) ? group : []).forEach(function(item) {
+						if (item && item.name) existingMap[normalizeMatchName(item.name)] = item;
+						if (item && item.qb_id) existingMap['qb:' + item.qb_id] = item;
+					});
+				});
+			}
+			records.forEach(function(record) {
+				record._existsInQuoteDr = !!(existingMap['qb:' + record.id] || existingMap[normalizeMatchName(record.name)]);
+			});
+			const existingCount = records.filter(function(record) { return record._existsInQuoteDr; }).length;
+			const newCount = records.length - existingCount;
 			const empty = '<div class="alert alert-light border small mb-0">No active ' + (isCustomers ? 'customers' : 'items') + ' found in QuickBooks.</div>';
 			if (!records.length) { resultEl.innerHTML = empty; return; }
-			const rows = records.slice(0, 50).map(function(record, i) {
+			const rows = records.map(function(record, i) {
 				const sub = isCustomers
 					? [record.email, record.phone, record.address].filter(Boolean).join(' | ')
 					: [record.type, record.description, record.rate ? '$' + Number(record.rate).toFixed(2) : ''].filter(Boolean).join(' | ');
+				const badge = record._existsInQuoteDr
+					? '<span class="badge bg-secondary ms-2">Already in QuoteDr</span>'
+					: '<span class="badge bg-success ms-2">New</span>';
 				return '<label class="list-group-item d-flex gap-2 align-items-start">' +
-					'<input class="form-check-input mt-1 qb-import-check" type="checkbox" checked data-index="' + i + '">' +
-					'<span><strong>' + escapeHtml(record.name) + '</strong><br><span class="text-muted small">' + escapeHtml(sub || 'No extra details') + '</span></span>' +
+					'<input class="form-check-input mt-1 qb-import-check" type="checkbox" ' + (record._existsInQuoteDr ? '' : 'checked ') + 'data-index="' + i + '">' +
+					'<span class="flex-grow-1"><strong>' + escapeHtml(record.name) + '</strong>' + badge +
+					'<br><span class="text-muted small">' + escapeHtml(sub || 'No extra details') + '</span>' +
+					'<br><span class="text-muted small">QuickBooks ID: <code>' + escapeHtml(record.id) + '</code></span></span>' +
 				'</label>';
 			}).join('');
 			resultEl.innerHTML =
 				'<div class="border rounded p-3 bg-light">' +
 					'<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">' +
 						'<div><strong>' + title + '</strong> <span class="badge bg-info text-dark ms-1">' + escapeHtml((meta.environment || 'sandbox').toUpperCase()) + '</span>' +
-						'<div class="text-muted small">Company ID: <code>' + escapeHtml(meta.realm_id || '') + '</code></div></div>' +
+						'<div class="text-muted small">Company ID: <code>' + escapeHtml(meta.realm_id || '') + '</code></div>' +
+						'<div class="small mt-1"><span class="badge bg-primary">' + records.length + ' found</span> <span class="badge bg-success">' + newCount + ' new</span> <span class="badge bg-secondary">' + existingCount + ' already in QuoteDr</span></div></div>' +
 						'<button class="btn btn-primary btn-sm" onclick="' + importFn + '"><i class="fas fa-download me-1"></i>Import Selected</button>' +
 					'</div>' +
+					'<div class="d-flex gap-2 flex-wrap mb-2">' +
+						'<button type="button" class="btn btn-outline-secondary btn-sm" onclick="setQBImportSelection(true)"><i class="fas fa-check-square me-1"></i>Select all</button>' +
+						'<button type="button" class="btn btn-outline-secondary btn-sm" onclick="setQBImportSelection(false)"><i class="far fa-square me-1"></i>Select none</button>' +
+						'<button type="button" class="btn btn-outline-secondary btn-sm" onclick="selectNewQBImports()"><i class="fas fa-plus-circle me-1"></i>Select new only</button>' +
+					'</div>' +
 					'<div class="list-group" style="max-height:320px; overflow:auto;">' + rows + '</div>' +
-					(records.length > 50 ? '<div class="text-muted small mt-2">Showing first 50 of ' + records.length + '. Import selected will import the checked visible rows.</div>' : '') +
+					'<div class="text-muted small mt-2">Existing records are unchecked by default so importing does not overwrite them unless you choose to.</div>' +
 				'</div>';
+		}
+
+		function setQBImportSelection(checked) {
+			document.querySelectorAll('#qbSyncResult .qb-import-check').forEach(function(input) {
+				input.checked = !!checked;
+			});
+		}
+
+		function selectNewQBImports() {
+			const records = window._activeQBSyncType === 'items' ? (window._pendingQBItems || []) : (window._pendingQBCustomers || []);
+			document.querySelectorAll('#qbSyncResult .qb-import-check').forEach(function(input) {
+				const record = records[parseInt(input.dataset.index, 10)];
+				input.checked = !!record && !record._existsInQuoteDr;
+			});
 		}
 
 		async function syncQuickBooksCustomers() {
@@ -823,6 +875,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			try {
 				const data = await fetchQuickBooksSync('get_customers');
 				window._pendingQBCustomers = (data.customers || []).filter(function(c) { return c.active !== false && c.name; });
+				window._activeQBSyncType = 'customers';
 				renderQBSyncPreview('customers', window._pendingQBCustomers, data);
 			} catch(e) {
 				resultEl.innerHTML = '<div class="alert alert-danger py-2 small"><i class="fas fa-exclamation-triangle me-1"></i>' + escapeHtml(e.message) + '</div>';
@@ -835,6 +888,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			try {
 				const data = await fetchQuickBooksSync('get_items');
 				window._pendingQBItems = (data.items || []).filter(function(item) { return item.active !== false && item.name; });
+				window._activeQBSyncType = 'items';
 				renderQBSyncPreview('items', window._pendingQBItems, data);
 			} catch(e) {
 				resultEl.innerHTML = '<div class="alert alert-danger py-2 small"><i class="fas fa-exclamation-triangle me-1"></i>' + escapeHtml(e.message) + '</div>';
@@ -858,7 +912,9 @@ Sarah Jones, 905-555-5678"></textarea>
 					email: c.email || '',
 					address: c.address || '',
 					notes: 'Imported from QuickBooks customer ID ' + c.id,
-					qb_id: c.id
+					qb_id: c.id,
+					source: 'quickbooks',
+					source_label: 'Imported from QuickBooks'
 				};
 			});
 			localStorage.setItem('ald_clients', JSON.stringify(existing));
@@ -879,7 +935,9 @@ Sarah Jones, 905-555-5678"></textarea>
 					unitType: item.unitType || 'service',
 					rate: Number(item.rate || 0),
 					materialCost: Number(item.materialCost || 0),
-					qb_id: item.id
+					qb_id: item.id,
+					source: 'quickbooks',
+					source_label: 'Imported from QuickBooks'
 				};
 				const idx = existing.QuickBooks.findIndex(function(old) { return old.qb_id === item.id || old.name === item.name; });
 				if (idx >= 0) existing.QuickBooks[idx] = Object.assign({}, existing.QuickBooks[idx], mapped);
