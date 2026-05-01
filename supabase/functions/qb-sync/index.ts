@@ -4,7 +4,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 // QuickBooks configuration
 const QB_CLIENT_ID = Deno.env.get("QB_CLIENT_ID") ?? "";
 const QB_CLIENT_SECRET = Deno.env.get("QB_CLIENT_SECRET") ?? "";
-const QB_BASE_URL = "https://quickbooks.api.intuit.com/v3/company";
+const QB_ENVIRONMENT = Deno.env.get("QB_ENVIRONMENT") ?? "sandbox";
+const QB_BASE_URL = QB_ENVIRONMENT === "production"
+  ? "https://quickbooks.api.intuit.com/v3/company"
+  : "https://sandbox-quickbooks.api.intuit.com/v3/company";
 
 // Log intuit_tid from every QB API response (helps Intuit debug issues)
 function logQBResponse(action: string, response: Response) {

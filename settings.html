@@ -712,7 +712,11 @@ Sarah Jones, 905-555-5678"></textarea>
 				const connectBtn = document.getElementById('qbConnectBtn');
 				const disconnectBtn = document.getElementById('qbDisconnectBtn');
 				if (data.connected) {
-					statusEl.innerHTML = '<span class="badge bg-success"><i class="fas fa-check-circle me-1"></i>Connected' + (data.company_name ? ' — ' + data.company_name : '') + '</span>';
+					var env = data.environment || 'sandbox';
+					var envClass = env === 'production' ? 'bg-danger' : 'bg-info text-dark';
+					var realm = data.realm_id ? '<div class="small text-muted mt-2">Connected company ID: <code>' + data.realm_id + '</code></div>' : '';
+					statusEl.innerHTML = '<span class="badge bg-success"><i class="fas fa-check-circle me-1"></i>Connected' + (data.company_name ? ' — ' + data.company_name : '') + '</span> ' +
+						'<span class="badge ' + envClass + ' ms-1">' + env.toUpperCase() + '</span>' + realm;
 					connectBtn.style.display = 'none';
 					disconnectBtn.style.display = 'inline-block';
 				} else {

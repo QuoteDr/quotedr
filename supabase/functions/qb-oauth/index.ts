@@ -4,6 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 // QuickBooks configuration — secrets stored in Supabase vault, never hardcoded
 const QB_CLIENT_ID = Deno.env.get("QB_CLIENT_ID") ?? "";
 const QB_CLIENT_SECRET = Deno.env.get("QB_CLIENT_SECRET") ?? "";
+const QB_ENVIRONMENT = Deno.env.get("QB_ENVIRONMENT") ?? "sandbox";
 const QB_REDIRECT_URI = "https://quotedr.io/qb-callback.html";
 const QB_TOKEN_URL = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer";
 const QB_AUTH_URL = "https://appcenter.intuit.com/connect/oauth2";
@@ -272,7 +273,8 @@ async function handleStatus(userId: string) {
 
     return jsonResponse({
       connected: isConnected,
-      realm_id: tokens.realm_id
+      realm_id: tokens.realm_id,
+      environment: QB_ENVIRONMENT
     });
   } catch (error) {
     console.error("Error in handleStatus:", error);

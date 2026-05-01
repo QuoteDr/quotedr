@@ -772,6 +772,7 @@ if (location.search.includes('debug')) {
         }
 
         async function pushInvoiceToQB() {
+            if (!confirm('This will create an invoice in the connected QuickBooks company. Continue?')) return;
             const btn = document.getElementById('qbPushBtn');
             btn.disabled = true;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Sending...';
