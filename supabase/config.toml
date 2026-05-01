@@ -1,2 +1,5 @@
 [functions.qb-oauth]
 verify_jwt = false
+
+[functions.qb-sync]
+verify_jwt = false

@@ -800,8 +800,9 @@ if (location.search.includes('debug')) {
                 if (result.error) throw new Error(result.error);
                 btn.innerHTML = '<i class="fas fa-check me-1"></i> Sent to QuickBooks!';
                 btn.className = 'btn btn-success btn-sm';
-                if (result.qb_url) {
-                    setTimeout(() => window.open(result.qb_url, '_blank'), 500);
+                var qbUrl = result.qb_url || result.deepLink;
+                if (qbUrl) {
+                    setTimeout(() => window.open(qbUrl, '_blank'), 500);
                 }
             } catch(e) {
                 btn.disabled = false;

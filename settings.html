@@ -665,6 +665,18 @@ Sarah Jones, 905-555-5678"></textarea>
 						<div class="mt-3 text-muted small">
 							<i class="fas fa-info-circle me-1"></i>QuoteDr never stores your QuickBooks data — only a secure access token.
 						</div>
+						<hr>
+						<div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+							<div>
+								<h6 class="mb-1"><i class="fas fa-cloud-download-alt me-1"></i>Read-only sync</h6>
+								<p class="text-muted small mb-0">Preview QuickBooks customers and products/services before importing them into QuoteDr.</p>
+							</div>
+							<div class="d-flex gap-2 flex-wrap">
+								<button class="btn btn-outline-primary btn-sm" onclick="syncQuickBooksCustomers()"><i class="fas fa-users me-1"></i>Preview Customers</button>
+								<button class="btn btn-outline-primary btn-sm" onclick="syncQuickBooksItems()"><i class="fas fa-boxes-stacked me-1"></i>Preview Items</button>
+							</div>
+						</div>
+						<div id="qbSyncResult" class="mt-3"></div>
 					</div>
 				</div><!-- /tab-integrations -->
 
@@ -756,6 +768,126 @@ Sarah Jones, 905-555-5678"></textarea>
 				await fetch(SUPABASE_URL + '/functions/v1/qb-oauth', { method: 'POST', headers, body: JSON.stringify({ action: 'disconnect' }) });
 				checkQBStatus();
 			} catch(e) { alert('Error disconnecting: ' + e.message); }
+		}
+
+		function escapeHtml(value) {
+			return String(value || '').replace(/[&<>"']/g, function(ch) {
+				return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
+			});
+		}
+
+		async function fetchQuickBooksSync(action) {
+			const headers = await getQBAuthHeader();
+			if (!headers) throw new Error('Please sign in first.');
+			const resp = await fetch(SUPABASE_URL + '/functions/v1/qb-sync', {
+				method: 'POST',
+				headers,
+				body: JSON.stringify({ action: action })
+			});
+			const data = await resp.json();
+			if (!resp.ok || data.error) throw new Error(data.error || 'QuickBooks sync failed');
+			return data;
+		}
+
+		function renderQBSyncPreview(type, records, meta) {
+			const resultEl = document.getElementById('qbSyncResult');
+			const isCustomers = type === 'customers';
+			const title = isCustomers ? 'QuickBooks Customers' : 'QuickBooks Products & Services';
+			const importFn = isCustomers ? 'importQBCustomers()' : 'importQBItems()';
+			const empty = '<div class="alert alert-light border small mb-0">No active ' + (isCustomers ? 'customers' : 'items') + ' found in QuickBooks.</div>';
+			if (!records.length) { resultEl.innerHTML = empty; return; }
+			const rows = records.slice(0, 50).map(function(record, i) {
+				const sub = isCustomers
+					? [record.email, record.phone, record.address].filter(Boolean).join(' | ')
+					: [record.type, record.description, record.rate ? '$' + Number(record.rate).toFixed(2) : ''].filter(Boolean).join(' | ');
+				return '<label class="list-group-item d-flex gap-2 align-items-start">' +
+					'<input class="form-check-input mt-1 qb-import-check" type="checkbox" checked data-index="' + i + '">' +
+					'<span><strong>' + escapeHtml(record.name) + '</strong><br><span class="text-muted small">' + escapeHtml(sub || 'No extra details') + '</span></span>' +
+				'</label>';
+			}).join('');
+			resultEl.innerHTML =
+				'<div class="border rounded p-3 bg-light">' +
+					'<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">' +
+						'<div><strong>' + title + '</strong> <span class="badge bg-info text-dark ms-1">' + escapeHtml((meta.environment || 'sandbox').toUpperCase()) + '</span>' +
+						'<div class="text-muted small">Company ID: <code>' + escapeHtml(meta.realm_id || '') + '</code></div></div>' +
+						'<button class="btn btn-primary btn-sm" onclick="' + importFn + '"><i class="fas fa-download me-1"></i>Import Selected</button>' +
+					'</div>' +
+					'<div class="list-group" style="max-height:320px; overflow:auto;">' + rows + '</div>' +
+					(records.length > 50 ? '<div class="text-muted small mt-2">Showing first 50 of ' + records.length + '. Import selected will import the checked visible rows.</div>' : '') +
+				'</div>';
+		}
+
+		async function syncQuickBooksCustomers() {
+			const resultEl = document.getElementById('qbSyncResult');
+			resultEl.innerHTML = '<div class="alert alert-info py-2 small"><i class="fas fa-spinner fa-spin me-1"></i>Reading customers from QuickBooks...</div>';
+			try {
+				const data = await fetchQuickBooksSync('get_customers');
+				window._pendingQBCustomers = (data.customers || []).filter(function(c) { return c.active !== false && c.name; });
+				renderQBSyncPreview('customers', window._pendingQBCustomers, data);
+			} catch(e) {
+				resultEl.innerHTML = '<div class="alert alert-danger py-2 small"><i class="fas fa-exclamation-triangle me-1"></i>' + escapeHtml(e.message) + '</div>';
+			}
+		}
+
+		async function syncQuickBooksItems() {
+			const resultEl = document.getElementById('qbSyncResult');
+			resultEl.innerHTML = '<div class="alert alert-info py-2 small"><i class="fas fa-spinner fa-spin me-1"></i>Reading products and services from QuickBooks...</div>';
+			try {
+				const data = await fetchQuickBooksSync('get_items');
+				window._pendingQBItems = (data.items || []).filter(function(item) { return item.active !== false && item.name; });
+				renderQBSyncPreview('items', window._pendingQBItems, data);
+			} catch(e) {
+				resultEl.innerHTML = '<div class="alert alert-danger py-2 small"><i class="fas fa-exclamation-triangle me-1"></i>' + escapeHtml(e.message) + '</div>';
+			}
+		}
+
+		function selectedQBRecords(records) {
+			const checks = Array.from(document.querySelectorAll('#qbSyncResult .qb-import-check:checked'));
+			return checks.map(function(check) { return records[parseInt(check.dataset.index, 10)]; }).filter(Boolean);
+		}
+
+		async function importQBCustomers() {
+			const selected = selectedQBRecords(window._pendingQBCustomers || []);
+			if (!selected.length) { alert('Select at least one customer to import.'); return; }
+			let existing = {};
+			try { existing = JSON.parse(localStorage.getItem('ald_clients') || '{}'); } catch(e) { existing = {}; }
+			selected.forEach(function(c) {
+				existing[c.name] = {
+					name: c.name,
+					phone: c.phone || '',
+					email: c.email || '',
+					address: c.address || '',
+					notes: 'Imported from QuickBooks customer ID ' + c.id,
+					qb_id: c.id
+				};
+			});
+			localStorage.setItem('ald_clients', JSON.stringify(existing));
+			if (typeof saveAllClientsToSupabase === 'function') await saveAllClientsToSupabase(Object.values(existing));
+			document.getElementById('qbSyncResult').innerHTML = '<div class="alert alert-success py-2 small"><i class="fas fa-check-circle me-1"></i>Imported ' + selected.length + ' QuickBooks customers into QuoteDr.</div>';
+		}
+
+		async function importQBItems() {
+			const selected = selectedQBRecords(window._pendingQBItems || []);
+			if (!selected.length) { alert('Select at least one item to import.'); return; }
+			let existing = {};
+			try { existing = JSON.parse(localStorage.getItem('ald_custom_items') || '{}'); } catch(e) { existing = {}; }
+			if (!existing.QuickBooks) existing.QuickBooks = [];
+			selected.forEach(function(item) {
+				const mapped = {
+					name: item.name,
+					description: item.description || '',
+					unitType: item.unitType || 'service',
+					rate: Number(item.rate || 0),
+					materialCost: Number(item.materialCost || 0),
+					qb_id: item.id
+				};
+				const idx = existing.QuickBooks.findIndex(function(old) { return old.qb_id === item.id || old.name === item.name; });
+				if (idx >= 0) existing.QuickBooks[idx] = Object.assign({}, existing.QuickBooks[idx], mapped);
+				else existing.QuickBooks.push(mapped);
+			});
+			localStorage.setItem('ald_custom_items', JSON.stringify(existing));
+			if (typeof saveItemsToSupabase === 'function') await saveItemsToSupabase(existing);
+			document.getElementById('qbSyncResult').innerHTML = '<div class="alert alert-success py-2 small"><i class="fas fa-check-circle me-1"></i>Imported ' + selected.length + ' QuickBooks items into the QuickBooks category.</div>';
 		}
 
 		// Check QB status when integrations tab is opened

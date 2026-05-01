@@ -9,6 +9,19 @@ const QB_BASE_URL = QB_ENVIRONMENT === "production"
   ? "https://quickbooks.api.intuit.com/v3/company"
   : "https://sandbox-quickbooks.api.intuit.com/v3/company";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+function jsonResponse(body: Record<string, unknown>, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
 // Log intuit_tid from every QB API response (helps Intuit debug issues)
 function logQBResponse(action: string, response: Response) {
   const tid = response.headers.get('intuit_tid') || 'none';
@@ -35,14 +48,15 @@ interface QBToken {
 }
 
 serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
   try {
     // Get the Authorization header
     const authHeader = req.headers.get("Authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return new Response(
-        JSON.stringify({ error: "Missing or invalid authorization header" }),
-        { status: 401, headers: { "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "Missing or invalid authorization header" }, 401);
     }
 
     const jwtToken = authHeader.substring(7);
@@ -53,10 +67,7 @@ serve(async (req) => {
       .getUser(jwtToken);
       
     if (authError || !authData?.user) {
-      return new Response(
-        JSON.stringify({ error: "Invalid or expired token" }),
-        { status: 401, headers: { "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "Invalid or expired token" }, 401);
     }
 
     const userId = authData.user.id;
@@ -70,22 +81,115 @@ serve(async (req) => {
         return await handlePushInvoice(userId, body.invoice);
       case "get_customers":
         return await handleGetCustomers(userId);
+      case "get_items":
+        return await handleGetItems(userId);
       case "get_invoice_status":
         return await handleGetInvoiceStatus(userId, body.invoiceId);
       default:
-        return new Response(
-          JSON.stringify({ error: "Invalid action" }),
-          { status: 400, headers: { "Content-Type": "application/json" } }
-        );
+        return jsonResponse({ error: "Invalid action" }, 400);
     }
   } catch (error) {
     console.error("Error in qb-sync function:", error);
-    return new Response(
-      JSON.stringify({ error: "Internal server error" }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ error: "Internal server error" }, 500);
   }
 });
+
+async function getQuickBooksTokens(userId: string): Promise<QBToken> {
+  const { data: tokensData, error: fetchError } = await supabaseAdmin
+    .from("user_data")
+    .select("value")
+    .eq("user_id", userId)
+    .eq("key", "qb_tokens")
+    .single();
+
+  if (fetchError || !tokensData) {
+    throw new Error("No QuickBooks tokens found for user");
+  }
+
+  let tokens: QBToken = tokensData.value;
+  if (Date.now() < tokens.expires_at) return tokens;
+
+  const refreshResponse = await fetch("https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer", {
+    method: "POST",
+    headers: {
+      "Authorization": "Basic " + btoa(`${QB_CLIENT_ID}:${QB_CLIENT_SECRET}`),
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: tokens.refresh_token
+    })
+  });
+
+  if (!refreshResponse.ok) {
+    const errorText = await refreshResponse.text();
+    throw new Error(`Token refresh failed: ${errorText}`);
+  }
+
+  const tokenData = await refreshResponse.json();
+  tokens = {
+    access_token: tokenData.access_token,
+    refresh_token: tokenData.refresh_token || tokens.refresh_token,
+    realm_id: tokens.realm_id,
+    expires_at: Date.now() + (tokenData.expires_in * 1000)
+  };
+
+  const { error } = await supabaseAdmin
+    .from("user_data")
+    .upsert({ user_id: userId, key: "qb_tokens", value: tokens }, { onConflict: "user_id,key" });
+
+  if (error) throw new Error(`Failed to update tokens: ${error.message}`);
+  return tokens;
+}
+
+async function queryQuickBooks(tokens: QBToken, query: string) {
+  const response = await fetch(
+    `${QB_BASE_URL}/${tokens.realm_id}/query?query=${encodeURIComponent(query)}&minorversion=70`,
+    {
+      headers: {
+        "Authorization": `Bearer ${tokens.access_token}`,
+        "Accept": "application/json"
+      }
+    }
+  );
+
+  logQBResponse('query', response);
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`QuickBooks query failed: ${errorText}`);
+  }
+  return await response.json();
+}
+
+function normalizeQBCustomer(customer: any) {
+  const billAddr = customer.BillAddr || {};
+  const address = [billAddr.Line1, billAddr.City, billAddr.CountrySubDivisionCode, billAddr.PostalCode]
+    .filter(Boolean)
+    .join(", ");
+  return {
+    id: customer.Id || "",
+    name: customer.DisplayName || customer.FullyQualifiedName || "",
+    company: customer.CompanyName || "",
+    phone: customer.PrimaryPhone?.FreeFormNumber || "",
+    email: customer.PrimaryEmailAddr?.Address || "",
+    address,
+    active: customer.Active !== false
+  };
+}
+
+function normalizeQBItem(item: any) {
+  return {
+    id: item.Id || "",
+    name: item.Name || "",
+    description: item.Description || "",
+    category: item.Type || "QuickBooks",
+    type: item.Type || "",
+    unitType: item.Type === "Inventory" ? "each" : "service",
+    rate: Number(item.UnitPrice || 0),
+    materialCost: Number(item.PurchaseCost || 0),
+    active: item.Active !== false
+  };
+}
 
 async function handlePushInvoice(userId: string, invoiceData: any) {
   try {
@@ -315,113 +419,48 @@ async function handlePushInvoice(userId: string, invoiceData: any) {
     const qbInvoiceId = invoiceResult.Invoice.Id;
     const deepLink = `https://app.quickbooks.com/app/invoice?txnId=${qbInvoiceId}&realmId=${realmId}`;
     
-    return new Response(
-      JSON.stringify({
-        success: true,
-        invoiceId: qbInvoiceId,
-        deepLink: deepLink
-      }),
-      { headers: { "Content-Type": "application/json" } }
-    );
+    return jsonResponse({
+      success: true,
+      invoiceId: qbInvoiceId,
+      deepLink: deepLink
+    });
   } catch (error) {
     console.error("Error in handlePushInvoice:", error);
-    return new Response(
-      JSON.stringify({ error: error.message || "Failed to push invoice to QuickBooks" }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ error: error.message || "Failed to push invoice to QuickBooks" }, 500);
   }
 }
 
 async function handleGetCustomers(userId: string) {
   try {
-    // Get QB tokens
-    const { data: tokensData, error: fetchError } = await supabaseAdmin
-      .from("user_data")
-      .select("value")
-      .eq("user_id", userId)
-      .eq("key", "qb_tokens")
-      .single();
-
-    if (fetchError || !tokensData) {
-      throw new Error("No QuickBooks tokens found for user");
-    }
-
-    const tokens: QBToken = tokensData.value;
-    
-    // Check if token is expired and refresh if needed
-    if (Date.now() >= tokens.expires_at) {
-      // Call the oauth function to refresh token
-      const refreshResponse = await fetch("/functions/v1/qb-oauth", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${tokens.access_token}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          action: "refresh"
-        })
-      });
-
-      if (!refreshResponse.ok) {
-        throw new Error("Failed to refresh QuickBooks token");
-      }
-
-      const refreshResult = await refreshResponse.json();
-      if (refreshResult.error) {
-        throw new Error(refreshResult.error);
-      }
-      
-      // Get updated tokens
-      const { data: updatedTokensData } = await supabaseAdmin
-        .from("user_data")
-        .select("value")
-        .eq("user_id", userId)
-        .eq("key", "qb_tokens")
-        .single();
-        
-      if (!updatedTokensData) {
-        throw new Error("Failed to retrieve updated tokens");
-      }
-      
-      const updatedTokens: QBToken = updatedTokensData.value;
-      tokens.access_token = updatedTokens.access_token;
-      tokens.expires_at = updatedTokens.expires_at;
-    }
-
-    // Get realm ID
-    const realmId = tokens.realm_id;
-
-    // Fetch customers from QuickBooks
-    const response = await fetch(
-      `${QB_BASE_URL}/${realmId}/query?query=SELECT * FROM Customer`,
-      {
-        headers: {
-          "Authorization": `Bearer ${tokens.access_token}`,
-          "Accept": "application/json"
-        }
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to fetch customers: ${errorText}`);
-    }
-
-    const customersData = await response.json();
-    
-    return new Response(
-      JSON.stringify({
-        success: true,
-        customers: customersData.QueryResponse.Customer || []
-      }),
-      { headers: { "Content-Type": "application/json" } }
-    );
+    const tokens = await getQuickBooksTokens(userId);
+    const customersData = await queryQuickBooks(tokens, "SELECT * FROM Customer MAXRESULTS 1000");
+    const rawCustomers = customersData.QueryResponse?.Customer || [];
+    return jsonResponse({
+      success: true,
+      environment: QB_ENVIRONMENT,
+      realm_id: tokens.realm_id,
+      customers: rawCustomers.map(normalizeQBCustomer)
+    });
   } catch (error) {
     console.error("Error in handleGetCustomers:", error);
-    return new Response(
-      JSON.stringify({ error: error.message || "Failed to fetch customers from QuickBooks" }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ error: error.message || "Failed to fetch customers from QuickBooks" }, 500);
+  }
+}
+
+async function handleGetItems(userId: string) {
+  try {
+    const tokens = await getQuickBooksTokens(userId);
+    const itemsData = await queryQuickBooks(tokens, "SELECT * FROM Item MAXRESULTS 1000");
+    const rawItems = itemsData.QueryResponse?.Item || [];
+    return jsonResponse({
+      success: true,
+      environment: QB_ENVIRONMENT,
+      realm_id: tokens.realm_id,
+      items: rawItems.map(normalizeQBItem)
+    });
+  } catch (error) {
+    console.error("Error in handleGetItems:", error);
+    return jsonResponse({ error: error.message || "Failed to fetch items from QuickBooks" }, 500);
   }
 }
 
@@ -502,19 +541,13 @@ async function handleGetInvoiceStatus(userId: string, invoiceId: string) {
 
     const invoiceData = await response.json();
     
-    return new Response(
-      JSON.stringify({
-        success: true,
-        status: invoiceData.Invoice.Status,
-        balance: invoiceData.Invoice.Balance
-      }),
-      { headers: { "Content-Type": "application/json" } }
-    );
+    return jsonResponse({
+      success: true,
+      status: invoiceData.Invoice.Status,
+      balance: invoiceData.Invoice.Balance
+    });
   } catch (error) {
     console.error("Error in handleGetInvoiceStatus:", error);
-    return new Response(
-      JSON.stringify({ error: error.message || "Failed to fetch invoice status from QuickBooks" }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ error: error.message || "Failed to fetch invoice status from QuickBooks" }, 500);
   }
 }
