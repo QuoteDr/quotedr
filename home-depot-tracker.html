@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuoteDr.io - Project Tracker</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            background: #eef4fb;
+            color: #102033;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+        }
+        .tracker-shell { max-width: 1220px; }
+        .page-title { color: #123b66; font-weight: 800; letter-spacing: 0; }
+        .metric-card {
+            border: 1px solid #d7e2ef;
+            border-radius: 8px;
+            background: #fff;
+            box-shadow: 0 8px 24px rgba(16, 32, 51, 0.06);
+        }
+        .metric-label {
+            color: #66778a;
+            font-size: 0.82rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .metric-value { color: #0f3460; font-size: 1.55rem; font-weight: 800; }
+        .tool-card {
+            border: 1px solid #d7e2ef;
+            border-radius: 8px;
+            background: #fff;
+        }
+        .project-card {
+            border: 1px solid #d7e2ef;
+            border-radius: 8px;
+            background: #fff;
+        }
+        .review-row-flagged { background: #fff8e6; }
+        .review-row-duplicate { background: #fff1f1; }
+        .badge-soft {
+            background: #edf4ff;
+            color: #174b82;
+            border: 1px solid #cfe0f5;
+        }
+        .table-sm td, .table-sm th { padding: 0.55rem; }
+        .amount-positive { color: #0f5132; font-weight: 700; }
+        .amount-negative { color: #a12424; font-weight: 700; }
+        .nav-pills .nav-link { font-weight: 700; }
+        .nav-pills .nav-link.active { background: #1a56a0; }
+        .small-muted { color: #6b7b8c; font-size: 0.88rem; }
+        .sticky-actions {
+            position: sticky;
+            bottom: 0;
+            background: rgba(238, 244, 251, 0.96);
+            border-top: 1px solid #d7e2ef;
+            padding: 0.75rem 0;
+            z-index: 10;
+        }
+        @media (max-width: 768px) {
+            .metric-value { font-size: 1.2rem; }
+            .table-responsive { font-size: 0.88rem; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-light px-3 py-2" style="background:#f8fbff; border-bottom:1px solid #d7e2ef;">
+        <a href="dashboard.html" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>Dashboard</a>
+        <span class="navbar-brand mx-auto fw-bold" style="color:#0f3460;">QuoteDr Project Tracker</span>
+        <a href="quote-builder.html" class="btn btn-primary btn-sm"><i class="fas fa-file-invoice me-1"></i>Builder</a>
+    </nav>
+
+    <main class="container-fluid tracker-shell py-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+            <div>
+                <h1 class="page-title mb-1">Home Depot Pro Spend Tracker</h1>
+                <p class="small-muted mb-0">Import Pro Extra exports, group purchases by project, catch online-order duplicates, and attach quotes or invoices for internal tracking.</p>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                <button class="btn btn-outline-secondary" onclick="clearImportPreview()"><i class="fas fa-eraser me-1"></i>Clear Preview</button>
+                <button class="btn btn-success" onclick="saveApprovedImport()"><i class="fas fa-check me-1"></i>Approve Import</button>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-md-3 col-6"><div class="metric-card p-3"><div class="metric-label">Imported Spend</div><div class="metric-value" id="metricSpend">$0.00</div></div></div>
+            <div class="col-md-3 col-6"><div class="metric-card p-3"><div class="metric-label">Projects</div><div class="metric-value" id="metricProjects">0</div></div></div>
+            <div class="col-md-3 col-6"><div class="metric-card p-3"><div class="metric-label">Need Review</div><div class="metric-value" id="metricReview">0</div></div></div>
+            <div class="col-md-3 col-6"><div class="metric-card p-3"><div class="metric-label">Duplicate Flags</div><div class="metric-value" id="metricDupes">0</div></div></div>
+        </div>
+
+        <section class="tool-card p-3 mb-4">
+            <div class="row g-3 align-items-end">
+                <div class="col-lg-4">
+                    <label class="form-label fw-semibold">Home Depot Pro Export</label>
+                    <input type="file" id="hdFileInput" class="form-control" accept=".xlsx,.xls,.csv" onchange="handleFileSelect(event)">
+                </div>
+                <div class="col-sm-6 col-lg-2">
+                    <label class="form-label fw-semibold">Same-job gap</label>
+                    <div class="input-group">
+                        <input type="number" id="gapDaysInput" class="form-control" value="30" min="1" max="365" onchange="rerunImportAnalysis()">
+                        <span class="input-group-text">days</span>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-lg-3">
+                    <label class="form-label fw-semibold">Spend view</label>
+                    <select id="taxModeSelect" class="form-select" onchange="renderAll()">
+                        <option value="total">Total including tax</option>
+                        <option value="subtotal">Subtotal before tax</option>
+                    </select>
+                </div>
+                <div class="col-lg-3">
+                    <label class="form-label fw-semibold">Create Project</label>
+                    <div class="input-group">
+                        <input id="newProjectName" class="form-control" placeholder="e.g. Amanda Bathroom">
+                        <button class="btn btn-primary" onclick="createProjectFromInput()"><i class="fas fa-plus"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div id="importHelp" class="small-muted mt-3">Default totals include tax. Switch to subtotal anytime to see spend before tax. Returns stay negative and reduce the project total. Tracker data saves locally and syncs to your QuoteDr account when logged in.</div>
+        </section>
+
+        <ul class="nav nav-pills mb-3" id="trackerTabs">
+            <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#projectsTab" type="button"><i class="fas fa-folder-tree me-1"></i>Projects</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#reviewTab" type="button"><i class="fas fa-flag me-1"></i>Needs Review</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#transactionsTab" type="button"><i class="fas fa-receipt me-1"></i>Transactions</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#quotesTab" type="button"><i class="fas fa-paperclip me-1"></i>Attach Quotes</button></li>
+        </ul>
+
+        <div class="tab-content">
+            <section class="tab-pane fade show active" id="projectsTab">
+                <div id="projectsList" class="row g-3"></div>
+            </section>
+            <section class="tab-pane fade" id="reviewTab">
+                <div class="tool-card p-3">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                        <h4 class="mb-0">Review flagged transactions</h4>
+                        <button class="btn btn-outline-primary btn-sm" onclick="applyRecommendedAssignments()"><i class="fas fa-magic me-1"></i>Use Best Suggestions</button>
+                    </div>
+                    <div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Date</th><th>Job Name</th><th>Reason</th><th>Amount</th><th>Likely Project</th><th>Action</th></tr></thead><tbody id="reviewRows"></tbody></table></div>
+                </div>
+            </section>
+            <section class="tab-pane fade" id="transactionsTab">
+                <div class="tool-card p-3">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                        <h4 class="mb-0">All imported transactions</h4>
+                        <input id="transactionSearch" class="form-control form-control-sm" style="max-width:280px;" placeholder="Search job, project, transaction" oninput="renderTransactions()">
+                    </div>
+                    <div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Date</th><th>Transaction</th><th>Location</th><th>Job Name</th><th>Project</th><th>Subtotal</th><th>Total</th><th>Flags</th></tr></thead><tbody id="transactionRows"></tbody></table></div>
+                </div>
+            </section>
+            <section class="tab-pane fade" id="quotesTab">
+                <div class="tool-card p-3">
+                    <div class="row g-3">
+                        <div class="col-lg-5">
+                            <h4>Quotes and invoices</h4>
+                            <p class="small-muted">Attach any quote or invoice to an internal project. A large project can hold multiple quotes and invoices.</p>
+                            <div id="quoteAttachList"></div>
+                        </div>
+                        <div class="col-lg-7">
+                            <h4>Project financial view</h4>
+                            <div id="projectQuoteSummary"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <div class="sticky-actions mt-4">
+            <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                <div class="small-muted"><i class="fas fa-lock me-1"></i>Internal tracker only. This does not appear on client quote links.</div>
+                <button class="btn btn-success" onclick="saveApprovedImport()"><i class="fas fa-save me-1"></i>Save Tracker</button>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="supabase-v2.js?v1777304470"></script>
+    <script>
+        const STORE_KEY = 'quotedr_project_tracker_v1';
+        const CLOUD_KEY = 'home_depot_project_tracker_v1';
+        let tracker = loadTracker();
+        let importPreview = [];
+        let allQuotes = [];
+        let lastWorkbookRows = null;
+        let cloudSaveTimer = null;
+
+        function loadTracker() {
+            try {
+                const data = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
+                return Object.assign({ projects: [], transactions: [], imports: [] }, data);
+            } catch (e) {
+                return { projects: [], transactions: [], imports: [] };
+            }
+        }
+
+        function saveTracker() {
+            localStorage.setItem(STORE_KEY, JSON.stringify(tracker));
+            clearTimeout(cloudSaveTimer);
+            cloudSaveTimer = setTimeout(syncTrackerToCloud, 300);
+        }
+
+        async function loadCloudTracker() {
+            try {
+                const user = await getCurrentUser();
+                if (!user) return;
+                const { data, error } = await _supabase
+                    .from('user_data')
+                    .select('value')
+                    .eq('user_id', user.id)
+                    .eq('key', CLOUD_KEY)
+                    .maybeSingle();
+                if (!error && data && data.value) {
+                    tracker = Object.assign({ projects: [], transactions: [], imports: [] }, data.value);
+                    localStorage.setItem(STORE_KEY, JSON.stringify(tracker));
+                }
+            } catch (e) {
+                console.warn('Project tracker cloud load skipped', e);
+            }
+        }
+
+        async function syncTrackerToCloud() {
+            try {
+                const user = await getCurrentUser();
+                if (!user) return;
+                await _supabase
+                    .from('user_data')
+                    .upsert({
+                        user_id: user.id,
+                        key: CLOUD_KEY,
+                        value: tracker,
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'user_id,key' });
+            } catch (e) {
+                console.warn('Project tracker cloud save skipped', e);
+            }
+        }
+
+        function money(value) {
+            const num = Number(value || 0);
+            return num.toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });
+        }
+
+        function amountFor(tx) {
+            return document.getElementById('taxModeSelect').value === 'subtotal' ? (tx.subtotal ?? tx.total) : tx.total;
+        }
+
+        function escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function idFor(prefix) {
+            return prefix + '_' + Math.random().toString(36).slice(2, 10) + '_' + Date.now().toString(36);
+        }
+
+        function normalizeName(value) {
+            return String(value || '').toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+        }
+
+        function isWeakJobName(name) {
+            const n = normalizeName(name);
+            return !n || n === '0' || /^\d+$/.test(n) || n.includes('ONLINE') || n.includes('ORDER') || n.includes('BODFS') || n.includes('BOSS');
+        }
+
+        function titleCase(value) {
+            return String(value || '').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+        }
+
+        function parseDate(value) {
+            if (value instanceof Date) return value;
+            if (typeof value === 'number') {
+                const d = XLSX.SSF.parse_date_code(value);
+                return d ? new Date(d.y, d.m - 1, d.d) : null;
+            }
+            const s = String(value || '').trim();
+            let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+            if (m) return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+            const d = new Date(s);
+            return isNaN(d) ? null : d;
+        }
+
+        function parseMoney(value) {
+            if (value == null || value === '') return null;
+            if (typeof value === 'number') return value;
+            const n = Number(String(value).replace(/[$,\s]/g, ''));
+            return isNaN(n) ? null : n;
+        }
+
+        function daysBetween(a, b) {
+            if (!a || !b) return 99999;
+            return Math.abs((new Date(a) - new Date(b)) / 86400000);
+        }
+
+        function levenshtein(a, b) {
+            a = normalizeName(a); b = normalizeName(b);
+            if (a === b) return 0;
+            const matrix = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+            for (let j = 1; j <= b.length; j++) matrix[0][j] = j;
+            for (let i = 1; i <= a.length; i++) {
+                for (let j = 1; j <= b.length; j++) {
+                    matrix[i][j] = Math.min(
+                        matrix[i - 1][j] + 1,
+                        matrix[i][j - 1] + 1,
+                        matrix[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+                    );
+                }
+            }
+            return matrix[a.length][b.length];
+        }
+
+        function similarEnough(a, b) {
+            const na = normalizeName(a), nb = normalizeName(b);
+            if (!na || !nb) return false;
+            if (na === nb) return true;
+            if (na.length < 4 || nb.length < 4) return false;
+            const maxLen = Math.max(na.length, nb.length);
+            return levenshtein(na, nb) <= Math.max(1, Math.floor(maxLen * 0.22));
+        }
+
+        async function loadQuotes() {
+            try {
+                const user = await getCurrentUser();
+                if (!user) return;
+                const { data, error } = await _supabase.from('quotes').select('id, client_name, quote_number, total, status, created_at, updated_at, data').eq('user_id', user.id).order('updated_at', { ascending: false });
+                if (!error) allQuotes = data || [];
+            } catch (e) {
+                console.warn('Quote load failed', e);
+            }
+            renderAll();
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: true });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                lastWorkbookRows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+                analyzeRows(lastWorkbookRows);
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function rerunImportAnalysis() {
+            if (lastWorkbookRows) analyzeRows(lastWorkbookRows);
+        }
+
+        function analyzeRows(rows) {
+            const gapDays = Number(document.getElementById('gapDaysInput').value || 30);
+            const parsed = rows.map((row, idx) => {
+                const clean = {};
+                Object.keys(row).forEach(k => clean[String(k).trim()] = row[k]);
+                const date = parseDate(clean['Sales Date']);
+                const subtotal = parseMoney(clean['Subtotal']);
+                const total = parseMoney(clean['Total']);
+                const jobName = String(clean['Job Name'] || '').trim();
+                const location = String(clean['Purchase Location'] || '').trim();
+                const status = String(clean['Status'] || '').trim();
+                const txNumber = String(clean['Transaction Number'] || '').trim();
+                const online = /online/i.test(location) || isWeakJobName(jobName);
+                const taxRate = subtotal && total ? ((total - subtotal) / subtotal) : null;
+                return {
+                    id: txNumber ? 'hd_' + txNumber.replace(/[^A-Za-z0-9]/g, '_') : idFor('hd'),
+                    source: 'Home Depot Pro',
+                    row: idx + 2,
+                    date: date ? date.toISOString().slice(0, 10) : '',
+                    txNumber,
+                    location,
+                    jobName,
+                    status,
+                    purchaser: String(clean['Purchaser'] || '').trim(),
+                    subtotal,
+                    total: total || 0,
+                    taxRate,
+                    isReturn: (total || 0) < 0,
+                    isOnline: online,
+                    reviewReason: online ? 'Online, blank, or unreliable job tag' : '',
+                    projectId: null,
+                    suggestedProjectIds: [],
+                    possibleDuplicateIds: [],
+                    excluded: false
+                };
+            }).filter(tx => tx.date || tx.txNumber || tx.total);
+
+            const projects = seedProjectsFromTransactions(parsed, gapDays);
+            assignKnownTransactions(parsed, projects, gapDays);
+            flagDuplicates(parsed);
+            suggestProjectsForReview(parsed, projects);
+            importPreview = parsed;
+            mergePreviewProjects(projects);
+            renderAll();
+        }
+
+        function seedProjectsFromTransactions(transactions, gapDays) {
+            const named = transactions.filter(tx => !tx.isOnline && !isWeakJobName(tx.jobName)).sort((a, b) => a.date.localeCompare(b.date));
+            const projects = [];
+            named.forEach(tx => {
+                let match = projects.find(p => p.sourceImport && p.aliases.some(alias => similarEnough(alias, tx.jobName)) && daysBetween(p.lastDate, tx.date) <= gapDays);
+                if (!match) {
+                    const hasOlderSameName = projects.some(p => p.aliases.some(alias => similarEnough(alias, tx.jobName)));
+                    const name = titleCase(tx.jobName) + (hasOlderSameName ? ' (' + tx.date + ')' : '');
+                    match = { id: idFor('project'), name, aliases: [normalizeName(tx.jobName)], firstDate: tx.date, lastDate: tx.date, sourceImport: true, quoteIds: [] };
+                    projects.push(match);
+                }
+                if (!match.aliases.includes(normalizeName(tx.jobName))) match.aliases.push(normalizeName(tx.jobName));
+                if (tx.date < match.firstDate) match.firstDate = tx.date;
+                if (tx.date > match.lastDate) match.lastDate = tx.date;
+            });
+            return projects;
+        }
+
+        function assignKnownTransactions(transactions, projects, gapDays) {
+            transactions.forEach(tx => {
+                if (tx.isOnline || isWeakJobName(tx.jobName)) return;
+                const match = projects.find(p => p.aliases.some(alias => similarEnough(alias, tx.jobName)) && daysBetween(p.lastDate, tx.date) <= gapDays);
+                if (match) tx.projectId = match.id;
+            });
+        }
+
+        function flagDuplicates(transactions) {
+            for (let i = 0; i < transactions.length; i++) {
+                for (let j = i + 1; j < transactions.length; j++) {
+                    const a = transactions[i], b = transactions[j];
+                    if (!a.total || !b.total) continue;
+                    if (Math.abs(Math.abs(a.total) - Math.abs(b.total)) > 0.01) continue;
+                    if (daysBetween(a.date, b.date) > 7) continue;
+                    if (a.txNumber && b.txNumber && a.txNumber === b.txNumber) continue;
+                    if (a.isOnline || b.isOnline) {
+                        a.possibleDuplicateIds.push(b.id);
+                        b.possibleDuplicateIds.push(a.id);
+                        a.reviewReason = appendReason(a.reviewReason, 'Possible duplicate online/order entry');
+                        b.reviewReason = appendReason(b.reviewReason, 'Possible duplicate online/order entry');
+                    }
+                }
+            }
+        }
+
+        function appendReason(existing, reason) {
+            return existing ? existing + '; ' + reason : reason;
+        }
+
+        function suggestProjectsForReview(transactions, projects) {
+            transactions.forEach(tx => {
+                if (!tx.reviewReason) return;
+                const scored = projects.map(p => {
+                    const dateScore = Math.min(daysBetween(tx.date, p.lastDate), daysBetween(tx.date, p.firstDate));
+                    return { id: p.id, score: dateScore };
+                }).filter(x => x.score <= 21).sort((a, b) => a.score - b.score).slice(0, 3);
+                tx.suggestedProjectIds = scored.map(x => x.id);
+            });
+        }
+
+        function mergePreviewProjects(projects) {
+            projects.forEach(p => {
+                const existing = tracker.projects.find(tp => tp.aliases && tp.aliases.some(alias => p.aliases.some(pa => similarEnough(alias, pa))) && daysBetween(tp.lastDate, p.firstDate) <= Number(document.getElementById('gapDaysInput').value || 30));
+                if (existing) {
+                    p.id = existing.id;
+                    p.name = existing.name;
+                    p.quoteIds = existing.quoteIds || [];
+                }
+            });
+            tracker.previewProjects = projects;
+        }
+
+        function effectiveProjects() {
+            const map = {};
+            (tracker.projects || []).forEach(p => map[p.id] = p);
+            (tracker.previewProjects || []).forEach(p => map[p.id] = Object.assign({}, map[p.id] || {}, p));
+            return Object.values(map).sort((a, b) => (b.lastDate || '').localeCompare(a.lastDate || ''));
+        }
+
+        function allTransactions() {
+            const map = {};
+            (tracker.transactions || []).forEach(tx => map[tx.id] = tx);
+            (importPreview || []).forEach(tx => map[tx.id] = Object.assign({}, map[tx.id] || {}, tx));
+            return Object.values(map).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+        }
+
+        function projectName(id) {
+            const p = effectiveProjects().find(project => project.id === id);
+            return p ? p.name : 'Unassigned';
+        }
+
+        function renderAll() {
+            renderMetrics();
+            renderProjects();
+            renderReview();
+            renderTransactions();
+            renderQuoteAttach();
+            renderProjectQuoteSummary();
+        }
+
+        function renderMetrics() {
+            const txs = allTransactions();
+            const spend = txs.filter(tx => !tx.excluded).reduce((sum, tx) => sum + amountFor(tx), 0);
+            document.getElementById('metricSpend').textContent = money(spend);
+            document.getElementById('metricProjects').textContent = effectiveProjects().length;
+            document.getElementById('metricReview').textContent = txs.filter(tx => tx.reviewReason && !tx.excluded).length;
+            document.getElementById('metricDupes').textContent = txs.filter(tx => tx.possibleDuplicateIds && tx.possibleDuplicateIds.length).length;
+        }
+
+        function renderProjects() {
+            const projects = effectiveProjects();
+            const txs = allTransactions().filter(tx => !tx.excluded);
+            const el = document.getElementById('projectsList');
+            if (!projects.length) {
+                el.innerHTML = '<div class="col-12"><div class="tool-card p-4 text-center small-muted">Upload a Home Depot export or create a project to get started.</div></div>';
+                return;
+            }
+            el.innerHTML = projects.map(p => {
+                const projectTxs = txs.filter(tx => tx.projectId === p.id);
+                const total = projectTxs.reduce((sum, tx) => sum + amountFor(tx), 0);
+                const returns = projectTxs.filter(tx => tx.total < 0).reduce((sum, tx) => sum + amountFor(tx), 0);
+                const attached = allQuotes.filter(q => (p.quoteIds || []).includes(q.id));
+                const quoted = attached.reduce((sum, q) => sum + Number(q.total || 0), 0);
+                return `<div class="col-lg-6">
+                    <div class="project-card p-3 h-100">
+                        <div class="d-flex justify-content-between gap-3">
+                            <div>
+                                <h4 class="mb-1">${escapeHtml(p.name)}</h4>
+                                <div class="small-muted">${escapeHtml(p.firstDate || '')}${p.lastDate && p.lastDate !== p.firstDate ? ' to ' + escapeHtml(p.lastDate) : ''}</div>
+                            </div>
+                            <div class="text-end">
+                                <div class="metric-label">Actual Spend</div>
+                                <div class="fs-4 fw-bold ${total < 0 ? 'amount-negative' : 'amount-positive'}">${money(total)}</div>
+                            </div>
+                        </div>
+                        <div class="row g-2 mt-3">
+                            <div class="col-4"><span class="badge badge-soft w-100 py-2">${projectTxs.length} txns</span></div>
+                            <div class="col-4"><span class="badge badge-soft w-100 py-2">${attached.length} docs</span></div>
+                            <div class="col-4"><span class="badge badge-soft w-100 py-2">Returns ${money(returns)}</span></div>
+                        </div>
+                        <div class="border-top mt-3 pt-3">
+                            <div class="d-flex justify-content-between"><span>Attached quote/invoice total</span><strong>${money(quoted)}</strong></div>
+                            <div class="d-flex justify-content-between"><span>Difference</span><strong>${money(quoted - total)}</strong></div>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function projectSelectHtml(selectedId, onChange, includeBlank) {
+            const options = effectiveProjects().map(p => `<option value="${escapeHtml(p.id)}" ${p.id === selectedId ? 'selected' : ''}>${escapeHtml(p.name)}</option>`).join('');
+            return `<select class="form-select form-select-sm" onchange="${onChange}">${includeBlank ? '<option value="">Unassigned</option>' : ''}${options}</select>`;
+        }
+
+        function renderReview() {
+            const rows = allTransactions().filter(tx => tx.reviewReason && !tx.excluded);
+            const el = document.getElementById('reviewRows');
+            if (!rows.length) {
+                el.innerHTML = '<tr><td colspan="6" class="text-center small-muted py-4">Nothing needs review right now.</td></tr>';
+                return;
+            }
+            el.innerHTML = rows.map(tx => {
+                const rowClass = tx.possibleDuplicateIds && tx.possibleDuplicateIds.length ? 'review-row-duplicate' : 'review-row-flagged';
+                const suggestion = tx.suggestedProjectIds && tx.suggestedProjectIds[0] ? tx.suggestedProjectIds[0] : '';
+                return `<tr class="${rowClass}">
+                    <td>${escapeHtml(tx.date)}</td>
+                    <td><strong>${escapeHtml(tx.jobName || '(blank)')}</strong><div class="small-muted">${escapeHtml(tx.location)}</div></td>
+                    <td>${escapeHtml(tx.reviewReason)}${tx.suggestedProjectIds && tx.suggestedProjectIds.length ? '<div class="small-muted">Probably: ' + tx.suggestedProjectIds.map(projectName).map(escapeHtml).join(', ') + '</div>' : ''}</td>
+                    <td class="${amountFor(tx) < 0 ? 'amount-negative' : 'amount-positive'}">${money(amountFor(tx))}</td>
+                    <td>${projectSelectHtml(tx.projectId, `assignTransaction('${tx.id}', this.value)`, true)}</td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            ${suggestion ? `<button class="btn btn-outline-primary" onclick="assignTransaction('${tx.id}', '${suggestion}')">Use Suggestion</button>` : ''}
+                            <button class="btn btn-outline-success" onclick="markReviewed('${tx.id}')">Keep</button>
+                            <button class="btn btn-outline-danger" onclick="excludeTransaction('${tx.id}')">Exclude</button>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        function renderTransactions() {
+            const q = String(document.getElementById('transactionSearch')?.value || '').toLowerCase();
+            const txs = allTransactions().filter(tx => {
+                if (!q) return true;
+                return [tx.jobName, tx.txNumber, tx.location, projectName(tx.projectId)].join(' ').toLowerCase().includes(q);
+            });
+            const el = document.getElementById('transactionRows');
+            if (!txs.length) {
+                el.innerHTML = '<tr><td colspan="8" class="text-center small-muted py-4">No transactions imported yet.</td></tr>';
+                return;
+            }
+            el.innerHTML = txs.map(tx => `<tr class="${tx.excluded ? 'text-muted' : ''}">
+                <td>${escapeHtml(tx.date)}</td>
+                <td>${escapeHtml(tx.txNumber)}</td>
+                <td>${escapeHtml(tx.location)}</td>
+                <td>${escapeHtml(tx.jobName || '(blank)')}</td>
+                <td>${projectSelectHtml(tx.projectId, `assignTransaction('${tx.id}', this.value)`, true)}</td>
+                <td>${tx.subtotal == null ? '-' : money(tx.subtotal)}</td>
+                <td class="${tx.total < 0 ? 'amount-negative' : 'amount-positive'}">${money(tx.total)}</td>
+                <td>${renderFlags(tx)}</td>
+            </tr>`).join('');
+        }
+
+        function renderFlags(tx) {
+            const flags = [];
+            if (tx.isOnline) flags.push('Online/review');
+            if (tx.isReturn) flags.push('Return');
+            if (tx.possibleDuplicateIds && tx.possibleDuplicateIds.length) flags.push('Possible duplicate');
+            if (tx.excluded) flags.push('Excluded');
+            return flags.map(f => `<span class="badge text-bg-warning me-1">${escapeHtml(f)}</span>`).join('');
+        }
+
+        function renderQuoteAttach() {
+            const el = document.getElementById('quoteAttachList');
+            if (!allQuotes.length) {
+                el.innerHTML = '<div class="small-muted">No quotes loaded yet.</div>';
+                return;
+            }
+            el.innerHTML = allQuotes.map(q => {
+                const currentProject = effectiveProjects().find(p => (p.quoteIds || []).includes(q.id));
+                return `<div class="border rounded p-2 mb-2 bg-white">
+                    <div class="d-flex justify-content-between gap-2">
+                        <div><strong>${escapeHtml(q.data?.quoteTitle || q.client_name || 'Untitled')}</strong><div class="small-muted">#${escapeHtml(q.quote_number || '')} · ${escapeHtml(q.status || 'draft')} · ${money(q.total || 0)}</div></div>
+                    </div>
+                    <div class="mt-2">${projectSelectHtml(currentProject ? currentProject.id : '', `attachQuoteToProject('${q.id}', this.value)`, true)}</div>
+                </div>`;
+            }).join('');
+        }
+
+        function renderProjectQuoteSummary() {
+            const el = document.getElementById('projectQuoteSummary');
+            const projects = effectiveProjects();
+            if (!projects.length) {
+                el.innerHTML = '<div class="small-muted">Create or import projects first.</div>';
+                return;
+            }
+            el.innerHTML = projects.map(p => {
+                const docs = allQuotes.filter(q => (p.quoteIds || []).includes(q.id));
+                const txs = allTransactions().filter(tx => tx.projectId === p.id && !tx.excluded);
+                const spend = txs.reduce((sum, tx) => sum + amountFor(tx), 0);
+                const quoteTotal = docs.reduce((sum, q) => sum + Number(q.total || 0), 0);
+                return `<div class="border rounded p-3 mb-2 bg-white">
+                    <div class="d-flex justify-content-between"><strong>${escapeHtml(p.name)}</strong><span>${docs.length} attached</span></div>
+                    <div class="d-flex justify-content-between small-muted"><span>Quote/invoice total</span><strong>${money(quoteTotal)}</strong></div>
+                    <div class="d-flex justify-content-between small-muted"><span>Home Depot spend</span><strong>${money(spend)}</strong></div>
+                    <div class="d-flex justify-content-between"><span>Difference</span><strong>${money(quoteTotal - spend)}</strong></div>
+                </div>`;
+            }).join('');
+        }
+
+        function assignTransaction(txId, projectId) {
+            [tracker.transactions, importPreview].forEach(list => (list || []).forEach(tx => {
+                if (tx.id === txId) tx.projectId = projectId || null;
+            }));
+            renderAll();
+        }
+
+        function markReviewed(txId) {
+            [tracker.transactions, importPreview].forEach(list => (list || []).forEach(tx => {
+                if (tx.id === txId) tx.reviewReason = '';
+            }));
+            renderAll();
+        }
+
+        function excludeTransaction(txId) {
+            [tracker.transactions, importPreview].forEach(list => (list || []).forEach(tx => {
+                if (tx.id === txId) tx.excluded = true;
+            }));
+            renderAll();
+        }
+
+        function applyRecommendedAssignments() {
+            allTransactions().forEach(tx => {
+                if (!tx.projectId && tx.suggestedProjectIds && tx.suggestedProjectIds[0]) assignTransaction(tx.id, tx.suggestedProjectIds[0]);
+            });
+            renderAll();
+        }
+
+        function attachQuoteToProject(quoteId, projectId) {
+            tracker.projects = effectiveProjects().map(p => {
+                const ids = (p.quoteIds || []).filter(id => id !== quoteId);
+                if (p.id === projectId) ids.push(quoteId);
+                return Object.assign({}, p, { quoteIds: ids });
+            });
+            saveTracker();
+            renderAll();
+        }
+
+        function createProjectFromInput() {
+            const input = document.getElementById('newProjectName');
+            const name = input.value.trim();
+            if (!name) return;
+            tracker.projects.push({ id: idFor('project'), name, aliases: [normalizeName(name)], firstDate: '', lastDate: '', quoteIds: [] });
+            input.value = '';
+            saveTracker();
+            renderAll();
+        }
+
+        function saveApprovedImport() {
+            const projectMap = {};
+            effectiveProjects().forEach(p => projectMap[p.id] = Object.assign({}, p, { sourceImport: false }));
+            tracker.projects = Object.values(projectMap);
+            const txMap = {};
+            allTransactions().forEach(tx => txMap[tx.id] = tx);
+            tracker.transactions = Object.values(txMap);
+            tracker.previewProjects = [];
+            importPreview = [];
+            tracker.imports.push({ id: idFor('import'), importedAt: new Date().toISOString(), count: tracker.transactions.length });
+            saveTracker();
+            renderAll();
+            alert('Project tracker saved.');
+        }
+
+        function clearImportPreview() {
+            importPreview = [];
+            tracker.previewProjects = [];
+            lastWorkbookRows = null;
+            document.getElementById('hdFileInput').value = '';
+            renderAll();
+        }
+
+        document.addEventListener('DOMContentLoaded', async function() {
+            await loadCloudTracker();
+            await loadQuotes();
+            renderAll();
+        });
+    </script>
+</body>
+</html>
