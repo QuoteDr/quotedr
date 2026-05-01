@@ -98,6 +98,44 @@
             padding: 1rem;
             height: 100%;
         }
+
+        .mobile-signin-btn {
+            background: #1a56a0;
+            color: white;
+            font-weight: 600;
+            border-radius: 20px;
+            padding: 4px 16px;
+            vertical-align: middle;
+            position: relative;
+            top: -3px;
+            white-space: nowrap;
+        }
+
+        @media (max-width: 575.98px) {
+            .navbar .container {
+                flex-wrap: nowrap;
+                gap: 4px;
+            }
+            .navbar-brand img {
+                height: 82px;
+                margin-top: -24px;
+                margin-bottom: -20px;
+            }
+            .navbar-toggler {
+                display: none;
+            }
+            .app-install-btn {
+                font-size: 0.75rem;
+                padding: 4px 9px !important;
+                border-radius: 18px;
+            }
+            .mobile-signin-btn {
+                font-size: 0.75rem;
+                padding: 4px 9px;
+                border-radius: 18px;
+                top: 0;
+            }
+        }
         
         /* Hero Section */
         .hero-section {
@@ -485,7 +523,7 @@
             <button type="button" class="btn btn-sm app-install-btn d-lg-none ms-auto me-2" id="installAppBtnMobile">
                 <i class="fas fa-mobile-alt me-1"></i>Install App
             </button>
-            <a href="login.html" class="btn btn-sm d-lg-none me-2" style="background:#1a56a0; color:white; font-weight:600; border-radius:20px; padding:4px 16px; vertical-align:middle; position:relative; top:-3px;">Sign In</a>
+            <a href="login.html" class="btn btn-sm d-lg-none me-2 mobile-signin-btn">Sign In</a>
             <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
                 <ul class="navbar-nav align-items-lg-center gap-lg-2">
                     <li class="nav-item d-none d-lg-block">

@@ -36,9 +36,7 @@
             border: 1px solid #d7e2ef;
             border-radius: 8px;
             background: #fff;
-            cursor: grab;
         }
-        .project-card:active { cursor: grabbing; }
         .project-card.dragging {
             opacity: 0.55;
             border-style: dashed;
@@ -51,6 +49,11 @@
             color: #5d7186;
             font-size: 0.82rem;
         }
+        .drag-handle {
+            cursor: grab;
+            user-select: none;
+        }
+        .drag-handle:active { cursor: grabbing; }
         .review-row-flagged { background: #fff8e6; }
         .review-row-duplicate { background: #fff1f1; }
         .import-row-highlight {
@@ -602,7 +605,10 @@
                     <div class="project-card p-3 h-100" draggable="true" data-project-id="${escapeHtml(p.id)}" ondragstart="startProjectDrag(event, '${escapeHtml(p.id)}')" ondragend="endProjectDrag(event)" ondragover="allowProjectDrop(event)" ondragleave="leaveProjectDrop(event)" ondrop="dropProject(event, '${escapeHtml(p.id)}')">
                         <div class="d-flex justify-content-between gap-3">
                             <div>
-                                <h4 class="mb-1">${escapeHtml(p.name)}</h4>
+                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                    <h4 class="mb-1">${escapeHtml(p.name)}</h4>
+                                    <button type="button" draggable="false" class="btn btn-outline-secondary btn-sm" onmousedown="event.stopPropagation()" onclick="event.preventDefault(); event.stopPropagation(); renameProject('${escapeHtml(p.id)}')"><i class="fas fa-pencil-alt me-1"></i>Rename</button>
+                                </div>
                                 <div class="small-muted">${escapeHtml(p.firstDate || '')}${p.lastDate && p.lastDate !== p.firstDate ? ' to ' + escapeHtml(p.lastDate) : ''}</div>
                             </div>
                             <div class="text-end">
@@ -626,8 +632,7 @@
                             <div class="d-flex justify-content-between"><span>Difference vs tagged spend</span><strong>${money(quoted - total)}</strong></div>
                         </div>
                         <div class="d-flex justify-content-between align-items-center border-top mt-3 pt-2 gap-2">
-                            <span class="merge-hint"><i class="fas fa-arrows-alt me-1"></i>Drag to merge</span>
-                            <button class="btn btn-outline-secondary btn-sm" onclick="event.stopPropagation(); renameProject('${escapeHtml(p.id)}')"><i class="fas fa-pencil-alt me-1"></i>Rename</button>
+                            <span class="merge-hint drag-handle"><i class="fas fa-arrows-alt me-1"></i>Drag card to merge</span>
                         </div>
                     </div>
                 </div>`;
