@@ -289,6 +289,59 @@
             padding:12px;
             background:#fff;
         }
+        .commitment-item-editor {
+            border: 1px solid #e5edf5;
+            border-radius: 8px;
+            padding: 10px;
+            background: #f8fafc;
+            height: 100%;
+        }
+        .commitment-icon-button {
+            width: 54px;
+            min-width: 54px;
+            height: 38px;
+            border: 1px solid #cfd9e6;
+            border-radius: 8px;
+            background: #fff;
+            color: #1a56a0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.05rem;
+        }
+        .commitment-icon-button:hover {
+            border-color: #1a56a0;
+            background: #edf6ff;
+        }
+        .commitment-icon-library {
+            display: none;
+            grid-template-columns: repeat(auto-fill, minmax(42px, 1fr));
+            gap: 6px;
+            margin-top: 8px;
+            padding: 8px;
+            border: 1px solid #dbe4ef;
+            border-radius: 8px;
+            background: #fff;
+            max-height: 170px;
+            overflow-y: auto;
+        }
+        .commitment-icon-library.open { display: grid; }
+        .commitment-icon-option {
+            height: 38px;
+            border: 1px solid #e5edf5;
+            border-radius: 8px;
+            background: #fff;
+            color: #334155;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .commitment-icon-option:hover,
+        .commitment-icon-option.selected {
+            background: #1a56a0;
+            border-color: #1a56a0;
+            color: #fff;
+        }
         .expiry-preset-btn {
             border: 1px solid #dbe4ef;
             background: #f8fafc;
@@ -5090,21 +5143,56 @@ Example:
             commitment: {
                 title: 'OUR COMMITMENT TO YOU',
                 items: [
-                    { label: '1-Year Warranty', text: 'Workmanship guaranteed for 12 months from project completion' },
-                    { label: 'Manufacturer Warranty', text: 'All materials carry full manufacturer warranty - passed directly to you' },
-                    { label: 'Fully Insured', text: 'Liability insurance coverage on all work performed' },
-                    { label: 'Satisfaction Promise', text: 'Any concerns addressed promptly - your satisfaction is our priority' }
+                    { icon: 'fa-solid fa-shield-halved', label: '1-Year Warranty', text: 'Workmanship guaranteed for 12 months from project completion' },
+                    { icon: 'fa-solid fa-industry', label: 'Manufacturer Warranty', text: 'All materials carry full manufacturer warranty - passed directly to you' },
+                    { icon: 'fa-solid fa-clipboard-check', label: 'Fully Insured', text: 'Liability insurance coverage on all work performed' },
+                    { icon: 'fa-solid fa-handshake', label: 'Satisfaction Promise', text: 'Any concerns addressed promptly - your satisfaction is our priority' }
                 ]
             },
             clientMessage: ''
         };
 
+        var COMMITMENT_ICON_LIBRARY = [
+            { icon: 'fa-solid fa-shield-halved', label: 'Warranty' },
+            { icon: 'fa-solid fa-award', label: 'Award' },
+            { icon: 'fa-solid fa-certificate', label: 'Certified' },
+            { icon: 'fa-solid fa-clipboard-check', label: 'Insured' },
+            { icon: 'fa-solid fa-handshake', label: 'Promise' },
+            { icon: 'fa-solid fa-thumbs-up', label: 'Approval' },
+            { icon: 'fa-solid fa-circle-check', label: 'Checked' },
+            { icon: 'fa-solid fa-user-shield', label: 'Protected' },
+            { icon: 'fa-solid fa-lock', label: 'Secure' },
+            { icon: 'fa-solid fa-medal', label: 'Quality' },
+            { icon: 'fa-solid fa-star', label: 'Premium' },
+            { icon: 'fa-solid fa-heart', label: 'Care' },
+            { icon: 'fa-solid fa-house-chimney', label: 'Home' },
+            { icon: 'fa-solid fa-hammer', label: 'Workmanship' },
+            { icon: 'fa-solid fa-screwdriver-wrench', label: 'Tools' },
+            { icon: 'fa-solid fa-helmet-safety', label: 'Safety' },
+            { icon: 'fa-solid fa-industry', label: 'Manufacturer' },
+            { icon: 'fa-solid fa-truck-fast', label: 'Delivery' },
+            { icon: 'fa-solid fa-calendar-check', label: 'Schedule' },
+            { icon: 'fa-solid fa-clock', label: 'On time' },
+            { icon: 'fa-solid fa-broom', label: 'Clean site' },
+            { icon: 'fa-solid fa-recycle', label: 'Eco' },
+            { icon: 'fa-solid fa-file-contract', label: 'Contract' },
+            { icon: 'fa-solid fa-receipt', label: 'Receipts' },
+            { icon: 'fa-solid fa-credit-card', label: 'Payment' },
+            { icon: 'fa-solid fa-comments', label: 'Communication' },
+            { icon: 'fa-solid fa-phone', label: 'Support' },
+            { icon: 'fa-solid fa-camera', label: 'Photos' },
+            { icon: 'fa-solid fa-ruler-combined', label: 'Measured' },
+            { icon: 'fa-solid fa-paint-roller', label: 'Finish' },
+            { icon: 'fa-solid fa-lightbulb', label: 'Ideas' },
+            { icon: 'fa-solid fa-gem', label: 'Premium finish' }
+        ];
+
         function defaultCommitmentItemsForModal() {
             return [
-                { label: '1-Year Warranty', text: 'Workmanship guaranteed for 12 months from project completion' },
-                { label: 'Manufacturer Warranty', text: 'All materials carry full manufacturer warranty - passed directly to you' },
-                { label: 'Fully Insured', text: 'Liability insurance coverage on all work performed' },
-                { label: 'Satisfaction Promise', text: 'Any concerns addressed promptly - your satisfaction is our priority' }
+                { icon: 'fa-solid fa-shield-halved', label: '1-Year Warranty', text: 'Workmanship guaranteed for 12 months from project completion' },
+                { icon: 'fa-solid fa-industry', label: 'Manufacturer Warranty', text: 'All materials carry full manufacturer warranty - passed directly to you' },
+                { icon: 'fa-solid fa-clipboard-check', label: 'Fully Insured', text: 'Liability insurance coverage on all work performed' },
+                { icon: 'fa-solid fa-handshake', label: 'Satisfaction Promise', text: 'Any concerns addressed promptly - your satisfaction is our priority' }
             ];
         }
 
@@ -5165,6 +5253,7 @@ Example:
             var commitmentItems = defaultCommitmentItemsForModal().map(function(item, i) {
                 var n = i + 1;
                 return {
+                    icon: document.getElementById('commitmentIcon' + n)?.value || item.icon,
                     label: document.getElementById('commitmentLabel' + n)?.value.trim() || item.label,
                     text: document.getElementById('commitmentText' + n)?.value.trim() || item.text
                 };
@@ -5193,9 +5282,12 @@ Example:
             var items = Array.isArray(commitment.items) && commitment.items.length ? commitment.items : defaultCommitmentItemsForModal();
             setFieldValue('commitmentTitleInput', commitment.title || 'OUR COMMITMENT TO YOU');
             for (var i = 0; i < 4; i++) {
-                setFieldValue('commitmentLabel' + (i + 1), (items[i] || defaultCommitmentItemsForModal()[i]).label);
-                setFieldValue('commitmentText' + (i + 1), (items[i] || defaultCommitmentItemsForModal()[i]).text);
+                var item = items[i] || defaultCommitmentItemsForModal()[i];
+                setFieldValue('commitmentIcon' + (i + 1), item.icon || defaultCommitmentItemsForModal()[i].icon);
+                setFieldValue('commitmentLabel' + (i + 1), item.label);
+                setFieldValue('commitmentText' + (i + 1), item.text);
             }
+            refreshCommitmentIconButtons();
             setFieldValue('quoteClientMessage', _quoteStyle.clientMessage);
             document.querySelectorAll('.expiry-preset-btn').forEach(function(btn) {
                 var date = new Date();
@@ -5247,10 +5339,73 @@ Example:
             if (mode) mode.textContent = _quoteStyle.approvalMode === 'review' ? 'Review-only link' : 'Client-ready estimate';
         }
 
+        function safeCommitmentIcon(icon) {
+            var fallback = 'fa-solid fa-circle-check';
+            var value = String(icon || '').trim();
+            if (!value || !/^fa[-\w\s]+$/.test(value)) return fallback;
+            return value;
+        }
+
+        function refreshCommitmentIconButtons() {
+            for (var i = 1; i <= 4; i++) {
+                var input = document.getElementById('commitmentIcon' + i);
+                var preview = document.getElementById('commitmentIconPreview' + i);
+                var icon = safeCommitmentIcon(input ? input.value : '');
+                if (input) input.value = icon;
+                if (preview) preview.className = icon;
+                document.querySelectorAll('#commitmentIconLibrary' + i + ' .commitment-icon-option').forEach(function(btn) {
+                    btn.classList.toggle('selected', btn.getAttribute('data-icon') === icon);
+                });
+            }
+        }
+
+        function renderCommitmentIconLibraries() {
+            for (var i = 1; i <= 4; i++) {
+                var library = document.getElementById('commitmentIconLibrary' + i);
+                if (!library || library.dataset.rendered) continue;
+                library.innerHTML = COMMITMENT_ICON_LIBRARY.map(function(iconItem) {
+                    return '<button type="button" class="commitment-icon-option" data-icon="' + iconItem.icon + '" title="' + iconItem.label + '" aria-label="' + iconItem.label + '">' +
+                        '<i class="' + iconItem.icon + '"></i>' +
+                        '</button>';
+                }).join('');
+                library.dataset.rendered = '1';
+            }
+            refreshCommitmentIconButtons();
+        }
+
+        function initCommitmentIconPickers() {
+            renderCommitmentIconLibraries();
+            document.querySelectorAll('[data-commitment-icon-toggle]').forEach(function(btn) {
+                if (btn.dataset.iconBound) return;
+                btn.addEventListener('click', function() {
+                    var n = btn.getAttribute('data-commitment-icon-toggle');
+                    document.querySelectorAll('.commitment-icon-library').forEach(function(lib) {
+                        lib.classList.toggle('open', lib.id === 'commitmentIconLibrary' + n && !lib.classList.contains('open'));
+                    });
+                });
+                btn.dataset.iconBound = '1';
+            });
+            document.querySelectorAll('.commitment-icon-library').forEach(function(library) {
+                if (library.dataset.pickBound) return;
+                library.addEventListener('click', function(e) {
+                    var btn = e.target.closest('.commitment-icon-option');
+                    if (!btn) return;
+                    var n = library.id.replace('commitmentIconLibrary', '');
+                    var input = document.getElementById('commitmentIcon' + n);
+                    if (input) input.value = btn.getAttribute('data-icon');
+                    library.classList.remove('open');
+                    refreshCommitmentIconButtons();
+                    updateStylePreview();
+                });
+                library.dataset.pickBound = '1';
+            });
+        }
+
         function initStyleModal() {
             var savedDefault = {};
             try { savedDefault = JSON.parse(localStorage.getItem('ald_quote_send_style') || '{}'); } catch(e) { savedDefault = {}; }
             applyQuoteStyleToControls(savedDefault);
+            initCommitmentIconPickers();
 
             document.querySelectorAll('#stylePresets .quote-style-preset').forEach(function(btn) {
                 btn.onclick = function() {
@@ -5276,7 +5431,7 @@ Example:
                     applyQuoteStyleToControls(_quoteStyle);
                 };
             });
-            ['quoteHeaderStyle','quoteFontFeel','quotePricingMode','quoteDepositMode','quoteDepositPercent','quoteApprovalMode','quoteExpiryDate','quoteShowUpgrades','quoteShowScopeNotes','quoteShowCommitment','commitmentTitleInput','commitmentLabel1','commitmentText1','commitmentLabel2','commitmentText2','commitmentLabel3','commitmentText3','commitmentLabel4','commitmentText4','quoteClientMessage'].forEach(function(id) {
+            ['quoteHeaderStyle','quoteFontFeel','quotePricingMode','quoteDepositMode','quoteDepositPercent','quoteApprovalMode','quoteExpiryDate','quoteShowUpgrades','quoteShowScopeNotes','quoteShowCommitment','commitmentTitleInput','commitmentIcon1','commitmentLabel1','commitmentText1','commitmentIcon2','commitmentLabel2','commitmentText2','commitmentIcon3','commitmentLabel3','commitmentText3','commitmentIcon4','commitmentLabel4','commitmentText4','quoteClientMessage'].forEach(function(id) {
                 var el = document.getElementById(id);
                 if (el && !el.dataset.styleBound) {
                     el.addEventListener('input', updateStylePreview);
@@ -7728,20 +7883,48 @@ async function saveQuote() {
                                         <input type="text" id="commitmentTitleInput" class="form-control form-control-sm mb-3" value="OUR COMMITMENT TO YOU">
                                         <div class="row g-2">
                                             <div class="col-md-6">
-                                                <input type="text" id="commitmentLabel1" class="form-control form-control-sm mb-1" value="1-Year Warranty">
-                                                <textarea id="commitmentText1" class="form-control form-control-sm" rows="2">Workmanship guaranteed for 12 months from project completion</textarea>
+                                                <div class="commitment-item-editor">
+                                                    <div class="d-flex gap-2 mb-2">
+                                                        <button type="button" class="commitment-icon-button" data-commitment-icon-toggle="1" title="Choose icon"><i id="commitmentIconPreview1" class="fa-solid fa-shield-halved"></i></button>
+                                                        <input type="hidden" id="commitmentIcon1" value="fa-solid fa-shield-halved">
+                                                        <input type="text" id="commitmentLabel1" class="form-control form-control-sm" value="1-Year Warranty">
+                                                    </div>
+                                                    <div id="commitmentIconLibrary1" class="commitment-icon-library"></div>
+                                                    <textarea id="commitmentText1" class="form-control form-control-sm" rows="2">Workmanship guaranteed for 12 months from project completion</textarea>
+                                                </div>
                                             </div>
                                             <div class="col-md-6">
-                                                <input type="text" id="commitmentLabel2" class="form-control form-control-sm mb-1" value="Manufacturer Warranty">
-                                                <textarea id="commitmentText2" class="form-control form-control-sm" rows="2">All materials carry full manufacturer warranty - passed directly to you</textarea>
+                                                <div class="commitment-item-editor">
+                                                    <div class="d-flex gap-2 mb-2">
+                                                        <button type="button" class="commitment-icon-button" data-commitment-icon-toggle="2" title="Choose icon"><i id="commitmentIconPreview2" class="fa-solid fa-industry"></i></button>
+                                                        <input type="hidden" id="commitmentIcon2" value="fa-solid fa-industry">
+                                                        <input type="text" id="commitmentLabel2" class="form-control form-control-sm" value="Manufacturer Warranty">
+                                                    </div>
+                                                    <div id="commitmentIconLibrary2" class="commitment-icon-library"></div>
+                                                    <textarea id="commitmentText2" class="form-control form-control-sm" rows="2">All materials carry full manufacturer warranty - passed directly to you</textarea>
+                                                </div>
                                             </div>
                                             <div class="col-md-6">
-                                                <input type="text" id="commitmentLabel3" class="form-control form-control-sm mb-1" value="Fully Insured">
-                                                <textarea id="commitmentText3" class="form-control form-control-sm" rows="2">Liability insurance coverage on all work performed</textarea>
+                                                <div class="commitment-item-editor">
+                                                    <div class="d-flex gap-2 mb-2">
+                                                        <button type="button" class="commitment-icon-button" data-commitment-icon-toggle="3" title="Choose icon"><i id="commitmentIconPreview3" class="fa-solid fa-clipboard-check"></i></button>
+                                                        <input type="hidden" id="commitmentIcon3" value="fa-solid fa-clipboard-check">
+                                                        <input type="text" id="commitmentLabel3" class="form-control form-control-sm" value="Fully Insured">
+                                                    </div>
+                                                    <div id="commitmentIconLibrary3" class="commitment-icon-library"></div>
+                                                    <textarea id="commitmentText3" class="form-control form-control-sm" rows="2">Liability insurance coverage on all work performed</textarea>
+                                                </div>
                                             </div>
                                             <div class="col-md-6">
-                                                <input type="text" id="commitmentLabel4" class="form-control form-control-sm mb-1" value="Satisfaction Promise">
-                                                <textarea id="commitmentText4" class="form-control form-control-sm" rows="2">Any concerns addressed promptly - your satisfaction is our priority</textarea>
+                                                <div class="commitment-item-editor">
+                                                    <div class="d-flex gap-2 mb-2">
+                                                        <button type="button" class="commitment-icon-button" data-commitment-icon-toggle="4" title="Choose icon"><i id="commitmentIconPreview4" class="fa-solid fa-handshake"></i></button>
+                                                        <input type="hidden" id="commitmentIcon4" value="fa-solid fa-handshake">
+                                                        <input type="text" id="commitmentLabel4" class="form-control form-control-sm" value="Satisfaction Promise">
+                                                    </div>
+                                                    <div id="commitmentIconLibrary4" class="commitment-icon-library"></div>
+                                                    <textarea id="commitmentText4" class="form-control form-control-sm" rows="2">Any concerns addressed promptly - your satisfaction is our priority</textarea>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

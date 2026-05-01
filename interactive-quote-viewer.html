@@ -668,11 +668,18 @@ if (location.search.includes('debug')) {
 
         function defaultCommitmentItems() {
             return [
-                { label: '1-Year Warranty', text: 'Workmanship guaranteed for 12 months from project completion' },
-                { label: 'Manufacturer Warranty', text: 'All materials carry full manufacturer warranty - passed directly to you' },
-                { label: 'Fully Insured', text: 'Liability insurance coverage on all work performed' },
-                { label: 'Satisfaction Promise', text: 'Any concerns addressed promptly - your satisfaction is our priority' }
+                { icon: 'fa-solid fa-shield-halved', label: '1-Year Warranty', text: 'Workmanship guaranteed for 12 months from project completion' },
+                { icon: 'fa-solid fa-industry', label: 'Manufacturer Warranty', text: 'All materials carry full manufacturer warranty - passed directly to you' },
+                { icon: 'fa-solid fa-clipboard-check', label: 'Fully Insured', text: 'Liability insurance coverage on all work performed' },
+                { icon: 'fa-solid fa-handshake', label: 'Satisfaction Promise', text: 'Any concerns addressed promptly - your satisfaction is our priority' }
             ];
+        }
+
+        function safeCommitmentIcon(icon) {
+            var fallback = 'fa-solid fa-circle-check';
+            var value = String(icon || '').trim();
+            if (!value || !/^fa[-\w\s]+$/.test(value)) return fallback;
+            return value;
         }
 
         function applyCommitmentBanner() {
@@ -688,10 +695,13 @@ if (location.search.includes('debug')) {
             var titleEl = document.getElementById('commitmentTitle');
             if (titleEl) titleEl.textContent = commitment.title || 'OUR COMMITMENT TO YOU';
             var items = Array.isArray(commitment.items) && commitment.items.length ? commitment.items : defaultCommitmentItems();
+            var iconEls = section.querySelectorAll('.warranty-item .icon');
             for (var i = 0; i < 4; i++) {
                 var item = items[i] || defaultCommitmentItems()[i];
+                var iconEl = iconEls[i];
                 var labelEl = document.getElementById('commitmentLabel' + (i + 1));
                 var textEl = document.getElementById('commitmentText' + (i + 1));
+                if (iconEl) iconEl.innerHTML = '<i class="' + safeCommitmentIcon(item.icon || defaultCommitmentItems()[i].icon) + '"></i>';
                 if (labelEl) labelEl.textContent = item.label || '';
                 if (textEl) textEl.textContent = item.text || '';
             }
