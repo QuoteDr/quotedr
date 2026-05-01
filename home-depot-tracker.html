@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QuoteDr.io - Project Tracker</title>
+    <title>QuoteDr.io - Job Tracker</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -104,15 +104,15 @@
 <body>
     <nav class="navbar navbar-light px-3 py-2" style="background:#f8fbff; border-bottom:1px solid #d7e2ef;">
         <a href="dashboard.html" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>Dashboard</a>
-        <span class="navbar-brand mx-auto fw-bold" style="color:#0f3460;">QuoteDr Project Tracker</span>
+        <span class="navbar-brand mx-auto fw-bold" style="color:#0f3460;">QuoteDr Job Tracker</span>
         <a href="quote-builder.html" class="btn btn-primary btn-sm"><i class="fas fa-file-invoice me-1"></i>Builder</a>
     </nav>
 
     <main class="container-fluid tracker-shell py-4">
         <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
             <div>
-                <h1 class="page-title mb-1">Home Depot Pro Spend Tracker</h1>
-                <p class="small-muted mb-0">Import Pro Extra exports, group purchases by project, catch online-order duplicates, and attach quotes or invoices for internal tracking.</p>
+                <h1 class="page-title mb-1">Job Tracker</h1>
+                <p class="small-muted mb-0">Track real job costs by combining supplier purchases, quotes, invoices, returns, and messy import data in one internal workspace.</p>
                 <div class="merge-hint mt-2"><i class="fas fa-arrows-alt me-1"></i>Drag one project card onto another to combine them.</div>
             </div>
             <div class="d-flex gap-2 flex-wrap">
@@ -124,7 +124,7 @@
 
         <div class="row g-3 mb-4">
             <div class="col-md-3 col-6"><div class="metric-card p-3"><div class="metric-label">Imported Spend</div><div class="metric-value" id="metricSpend">$0.00</div></div></div>
-            <div class="col-md-3 col-6"><div class="metric-card p-3"><div class="metric-label">Projects</div><div class="metric-value" id="metricProjects">0</div></div></div>
+            <div class="col-md-3 col-6"><div class="metric-card p-3"><div class="metric-label">Jobs</div><div class="metric-value" id="metricProjects">0</div></div></div>
             <div class="col-md-3 col-6"><div class="metric-card p-3"><div class="metric-label">Need Review</div><div class="metric-value" id="metricReview">0</div></div></div>
             <div class="col-md-3 col-6"><div class="metric-card p-3"><div class="metric-label">Duplicate Flags</div><div class="metric-value" id="metricDupes">0</div></div></div>
         </div>
@@ -132,8 +132,9 @@
         <section class="tool-card p-3 mb-4">
             <div class="row g-3 align-items-end">
                 <div class="col-lg-4">
-                    <label class="form-label fw-semibold">Home Depot Pro Export</label>
+                    <label class="form-label fw-semibold">Supplier Export</label>
                     <input type="file" id="hdFileInput" class="form-control" accept=".xlsx,.xls,.csv" onchange="handleFileSelect(event)">
+                    <div class="small-muted mt-1">Currently optimized for Home Depot Pro Extra exports.</div>
                 </div>
                 <div class="col-sm-6 col-lg-2">
                     <label class="form-label fw-semibold">Same-job gap</label>
@@ -157,11 +158,11 @@
                     </div>
                 </div>
             </div>
-            <div id="importHelp" class="small-muted mt-3">Default totals include tax. Switch to subtotal anytime to see spend before tax. Returns stay negative and reduce the project total. Tracker data saves locally and syncs to your QuoteDr account when logged in.</div>
+            <div id="importHelp" class="small-muted mt-3">Default totals include tax. Switch to subtotal anytime to see spend before tax. Returns stay negative and reduce the job total. Tracker data saves locally and syncs to your QuoteDr account when logged in.</div>
         </section>
 
         <ul class="nav nav-pills mb-3" id="trackerTabs">
-            <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#projectsTab" type="button"><i class="fas fa-folder-tree me-1"></i>Projects</button></li>
+            <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#projectsTab" type="button"><i class="fas fa-folder-tree me-1"></i>Jobs</button></li>
             <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#reviewTab" type="button"><i class="fas fa-flag me-1"></i>Needs Review</button></li>
             <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#transactionsTab" type="button"><i class="fas fa-receipt me-1"></i>Transactions</button></li>
             <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#importSheetTab" type="button"><i class="fas fa-table me-1"></i>Import Sheet</button></li>
@@ -585,7 +586,7 @@
             const txs = allTransactions().filter(tx => !tx.excluded);
             const el = document.getElementById('projectsList');
             if (!projects.length) {
-                el.innerHTML = '<div class="col-12"><div class="tool-card p-4 text-center small-muted">Upload a Home Depot export or create a project to get started.</div></div>';
+                el.innerHTML = '<div class="col-12"><div class="tool-card p-4 text-center small-muted">Upload a supplier export or create a job to get started.</div></div>';
                 return;
             }
             el.innerHTML = projects.map(p => {
@@ -794,7 +795,7 @@
             const el = document.getElementById('projectQuoteSummary');
             const projects = effectiveProjects();
             if (!projects.length) {
-                el.innerHTML = '<div class="small-muted">Create or import projects first.</div>';
+                el.innerHTML = '<div class="small-muted">Create or import jobs first.</div>';
                 return;
             }
             el.innerHTML = projects.map(p => {
@@ -805,7 +806,7 @@
                 return `<div class="border rounded p-3 mb-2 bg-white">
                     <div class="d-flex justify-content-between"><strong>${escapeHtml(p.name)}</strong><span>${docs.length} attached</span></div>
                     <div class="d-flex justify-content-between small-muted"><span>Quote/invoice total</span><strong>${money(quoteTotal)}</strong></div>
-                    <div class="d-flex justify-content-between small-muted"><span>Home Depot spend</span><strong>${money(spend)}</strong></div>
+                    <div class="d-flex justify-content-between small-muted"><span>Supplier spend</span><strong>${money(spend)}</strong></div>
                     <div class="d-flex justify-content-between"><span>Difference</span><strong>${money(quoteTotal - spend)}</strong></div>
                 </div>`;
             }).join('');
@@ -962,7 +963,7 @@
         }
 
         function resetProjectTracker() {
-            if (!confirm('Reset the project tracker? This clears saved project groups, imported Home Depot transactions, and review assignments for this tracker.')) return;
+            if (!confirm('Reset the job tracker? This clears saved job groups, imported supplier transactions, and review assignments for this tracker.')) return;
             tracker = { projects: [], transactions: [], imports: [], previewProjects: [] };
             importPreview = [];
             lastWorkbookRows = null;
