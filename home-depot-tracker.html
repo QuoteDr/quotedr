@@ -53,6 +53,18 @@
         }
         .review-row-flagged { background: #fff8e6; }
         .review-row-duplicate { background: #fff1f1; }
+        .import-row-highlight {
+            background: #dbeafe !important;
+            outline: 3px solid #1a56a0;
+            outline-offset: -3px;
+        }
+        .why-box {
+            border-left: 3px solid #1a56a0;
+            background: #f7fbff;
+            padding: 0.45rem 0.65rem;
+            border-radius: 6px;
+            margin-top: 0.4rem;
+        }
         .badge-soft {
             background: #edf4ff;
             color: #174b82;
@@ -140,6 +152,7 @@
             <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#projectsTab" type="button"><i class="fas fa-folder-tree me-1"></i>Projects</button></li>
             <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#reviewTab" type="button"><i class="fas fa-flag me-1"></i>Needs Review</button></li>
             <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#transactionsTab" type="button"><i class="fas fa-receipt me-1"></i>Transactions</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#importSheetTab" type="button"><i class="fas fa-table me-1"></i>Import Sheet</button></li>
             <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#quotesTab" type="button"><i class="fas fa-paperclip me-1"></i>Attach Quotes</button></li>
         </ul>
 
@@ -163,6 +176,18 @@
                         <input id="transactionSearch" class="form-control form-control-sm" style="max-width:280px;" placeholder="Search job, project, transaction" oninput="renderTransactions()">
                     </div>
                     <div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Date</th><th>Transaction</th><th>Location</th><th>Job Name</th><th>Project</th><th>Subtotal</th><th>Total</th><th>Flags</th></tr></thead><tbody id="transactionRows"></tbody></table></div>
+                </div>
+            </section>
+            <section class="tab-pane fade" id="importSheetTab">
+                <div class="tool-card p-3">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                        <div>
+                            <h4 class="mb-0">Import sheet view</h4>
+                            <div class="small-muted">This mirrors the uploaded Home Depot export. Rows from Needs Review can jump here so you can inspect the surrounding purchases.</div>
+                        </div>
+                        <input id="importSheetSearch" class="form-control form-control-sm" style="max-width:280px;" placeholder="Search imported rows" oninput="renderImportSheet()">
+                    </div>
+                    <div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Excel Row</th><th>Sales Date</th><th>Transaction Number</th><th>Purchase Location</th><th>Job Name</th><th>Status</th><th>Subtotal</th><th>Total</th><th>Assigned Project</th></tr></thead><tbody id="importSheetRows"></tbody></table></div>
                 </div>
             </section>
             <section class="tab-pane fade" id="quotesTab">
@@ -528,6 +553,7 @@
             renderProjects();
             renderReview();
             renderTransactions();
+            renderImportSheet();
             renderQuoteAttach();
             renderProjectQuoteSummary();
         }
@@ -603,7 +629,12 @@
                 return `<tr class="${rowClass}">
                     <td>${escapeHtml(tx.date)}</td>
                     <td><strong>${escapeHtml(tx.jobName || '(blank)')}</strong><div class="small-muted">${escapeHtml(tx.location)}</div></td>
-                    <td>${escapeHtml(tx.reviewReason)}${tx.suggestedProjectIds && tx.suggestedProjectIds.length ? '<div class="small-muted">Probably: ' + tx.suggestedProjectIds.map(projectName).map(escapeHtml).join(', ') + '</div>' : ''}</td>
+                    <td>
+                        ${escapeHtml(tx.reviewReason)}
+                        ${tx.suggestedProjectIds && tx.suggestedProjectIds.length ? '<div class="small-muted">Probably: ' + tx.suggestedProjectIds.map(projectName).map(escapeHtml).join(', ') + '</div>' : ''}
+                        ${renderSuggestionWhy(tx)}
+                        <button class="btn btn-link btn-sm p-0 mt-1" onclick="showOnImportSheet('${tx.id}')"><i class="fas fa-table me-1"></i>Show on import sheet</button>
+                    </td>
                     <td class="${amountFor(tx) < 0 ? 'amount-negative' : 'amount-positive'}">${money(amountFor(tx))}</td>
                     <td>${projectSelectHtml(tx.projectId, `assignTransaction('${tx.id}', this.value)`, true)}</td>
                     <td>
@@ -615,6 +646,22 @@
                     </td>
                 </tr>`;
             }).join('');
+        }
+
+        function renderSuggestionWhy(tx) {
+            const lines = [];
+            (tx.suggestedProjectIds || []).forEach(projectId => {
+                const p = effectiveProjects().find(project => project.id === projectId);
+                if (!p) return;
+                const nearest = Math.min(daysBetween(tx.date, p.firstDate), daysBetween(tx.date, p.lastDate));
+                lines.push(projectName(projectId) + ' is nearby on the timeline (' + Math.round(nearest) + ' days from its date range ' + (p.firstDate || '?') + ' to ' + (p.lastDate || '?') + ').');
+            });
+            if (tx.possibleDuplicateIds && tx.possibleDuplicateIds.length) {
+                const duplicateNotes = tx.possibleDuplicateIds.map(id => allTransactions().find(other => other.id === id)).filter(Boolean).slice(0, 3).map(other => 'possible duplicate row ' + (other.row || '?') + ' on ' + other.date + ' for ' + money(other.total));
+                if (duplicateNotes.length) lines.push('Duplicate check: ' + duplicateNotes.join('; ') + '.');
+            }
+            if (!lines.length) return '';
+            return '<div class="why-box small-muted"><strong>Why suggested:</strong><br>' + lines.map(escapeHtml).join('<br>') + '</div>';
         }
 
         function renderTransactions() {
@@ -638,6 +685,44 @@
                 <td class="${tx.total < 0 ? 'amount-negative' : 'amount-positive'}">${money(tx.total)}</td>
                 <td>${renderFlags(tx)}</td>
             </tr>`).join('');
+        }
+
+        function renderImportSheet() {
+            const q = String(document.getElementById('importSheetSearch')?.value || '').toLowerCase();
+            const txs = allTransactions().slice().sort((a, b) => Number(a.row || 0) - Number(b.row || 0)).filter(tx => {
+                if (!q) return true;
+                return [tx.row, tx.date, tx.txNumber, tx.location, tx.jobName, tx.status, projectName(tx.projectId)].join(' ').toLowerCase().includes(q);
+            });
+            const el = document.getElementById('importSheetRows');
+            if (!el) return;
+            if (!txs.length) {
+                el.innerHTML = '<tr><td colspan="9" class="text-center small-muted py-4">Upload or approve a Home Depot export to view the import sheet.</td></tr>';
+                return;
+            }
+            el.innerHTML = txs.map(tx => `<tr id="import-row-${escapeHtml(tx.id)}">
+                <td><strong>${escapeHtml(tx.row || '')}</strong></td>
+                <td>${escapeHtml(tx.date)}</td>
+                <td>${escapeHtml(tx.txNumber)}</td>
+                <td>${escapeHtml(tx.location)}</td>
+                <td>${escapeHtml(tx.jobName || '(blank)')}</td>
+                <td>${escapeHtml(tx.status || '')}</td>
+                <td>${tx.subtotal == null ? '-' : money(tx.subtotal)}</td>
+                <td class="${tx.total < 0 ? 'amount-negative' : 'amount-positive'}">${money(tx.total)}</td>
+                <td>${projectSelectHtml(tx.projectId, `assignTransaction('${tx.id}', this.value)`, true)}</td>
+            </tr>`).join('');
+        }
+
+        function showOnImportSheet(txId) {
+            const tabButton = document.querySelector('[data-bs-target="#importSheetTab"]');
+            if (tabButton) bootstrap.Tab.getOrCreateInstance(tabButton).show();
+            setTimeout(function() {
+                document.querySelectorAll('.import-row-highlight').forEach(el => el.classList.remove('import-row-highlight'));
+                const row = document.getElementById('import-row-' + txId);
+                if (row) {
+                    row.classList.add('import-row-highlight');
+                    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }, 150);
         }
 
         function renderFlags(tx) {
