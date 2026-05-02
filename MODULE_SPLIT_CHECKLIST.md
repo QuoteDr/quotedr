@@ -6,6 +6,6 @@ Keep extractions small and behavior-preserving. Each module should continue expo
 - [ ] Floor Plan Scanner -> `floor-plan-scanner.js`
 - [x] Quote Style Modal -> `quote-style.js`
 - [ ] Manage Items -> `quote-items.js`
-- [ ] Client Management -> `quote-clients.js`
+- [x] Client Management -> `quote-clients.js`
 - [ ] Material Estimator / Calculators -> `quote-calculators.js`
 - [ ] Quote save/load/session core -> `quote-storage.js`
