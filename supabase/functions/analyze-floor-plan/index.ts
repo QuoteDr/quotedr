@@ -120,9 +120,30 @@ function normalizeAnalysis(parsed: Record<string, unknown>): FloorPlanAnalysis {
   };
 }
 
+function extractResponseText(result: Record<string, unknown>) {
+  if (typeof result.output_text === "string" && result.output_text.trim()) {
+    return result.output_text;
+  }
+
+  const output = Array.isArray(result.output) ? result.output : [];
+  for (const item of output) {
+    if (!item || typeof item !== "object") continue;
+    const content = Array.isArray((item as Record<string, unknown>).content)
+      ? (item as Record<string, unknown>).content as Record<string, unknown>[]
+      : [];
+    for (const part of content) {
+      if (typeof part.text === "string" && part.text.trim()) return part.text;
+      if (typeof part.output_text === "string" && part.output_text.trim()) return part.output_text;
+    }
+  }
+
+  return "{}";
+}
+
 async function callOpenAI(openaiKey: string, imageBase64: string, mimeType: string, prompt: string, maxTokens: number) {
-  const model = Deno.env.get("FLOOR_PLAN_OPENAI_MODEL") || "gpt-4o";
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+  const model = Deno.env.get("FLOOR_PLAN_OPENAI_MODEL") || "gpt-5.5-pro";
+  const reasoningEffort = Deno.env.get("FLOOR_PLAN_REASONING_EFFORT") || "high";
+  const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
       "Authorization": "Bearer " + openaiKey,
@@ -130,20 +151,21 @@ async function callOpenAI(openaiKey: string, imageBase64: string, mimeType: stri
     },
     body: JSON.stringify({
       model,
-      max_tokens: maxTokens,
-      temperature: 0,
-      response_format: { type: "json_object" },
-      messages: [
+      max_output_tokens: maxTokens,
+      reasoning: { effort: reasoningEffort },
+      text: {
+        format: { type: "json_object" },
+        verbosity: "low",
+      },
+      input: [
         {
           role: "user",
           content: [
-            { type: "text", text: prompt },
+            { type: "input_text", text: prompt },
             {
-              type: "image_url",
-              image_url: {
-                url: "data:" + (mimeType || "image/jpeg") + ";base64," + imageBase64,
-                detail: "high",
-              },
+              type: "input_image",
+              image_url: "data:" + (mimeType || "image/jpeg") + ";base64," + imageBase64,
+              detail: "high",
             },
           ],
         },
@@ -163,7 +185,7 @@ async function callOpenAI(openaiKey: string, imageBase64: string, mimeType: stri
   }
 
   const result = await response.json();
-  return result.choices?.[0]?.message?.content || "{}";
+  return extractResponseText(result);
 }
 
 Deno.serve(async (req) => {
