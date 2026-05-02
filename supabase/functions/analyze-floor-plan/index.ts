@@ -141,8 +141,8 @@ function extractResponseText(result: Record<string, unknown>) {
 }
 
 async function callOpenAI(openaiKey: string, imageBase64: string, mimeType: string, prompt: string, maxTokens: number) {
-  const model = Deno.env.get("FLOOR_PLAN_OPENAI_MODEL") || "gpt-5.5-pro";
-  const reasoningEffort = Deno.env.get("FLOOR_PLAN_REASONING_EFFORT") || "high";
+  const model = Deno.env.get("FLOOR_PLAN_OPENAI_MODEL") || "gpt-5.5";
+  const reasoningEffort = Deno.env.get("FLOOR_PLAN_REASONING_EFFORT") || "medium";
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
