@@ -466,14 +466,21 @@
         .container-fluid > .d-flex.align-items-center.justify-content-between > div:last-child { width: 100% !important; }
     }
 
-    /* Logo area: portrait vs landscape */
-    #logo-header { display: flex; justify-content: center; align-items: center; width: 100%; }
+    /* Logo area */
+    #logo-header { display: flex; justify-content: center; align-items: center; width: 100%; gap: 24px; }
     #userLogoImg { display: none; }
+    #quotedr-logo { order: 1; }
+    #userLogoImg[src]:not([src='']) { order: 2; display: block !important; }
+    @media (min-width: 901px) {
+        #logo-header { justify-content: center; padding-left: 160px; }
+    }
     @media (orientation: landscape) and (max-width: 900px) {
-        #logo-header { flex-direction: row; justify-content: space-between; }
+        #logo-header { flex-direction: row; justify-content: center; gap: 16px; }
         #userLogoImg[src]:not([src='']) { display: block !important; }
-        #quotedr-logo { order: 2; }
-        #userLogoImg { order: 1; }
+    }
+    @media (max-width: 768px) and (orientation: portrait) {
+        #userLogoImg[src]:not([src='']) { display: none !important; }
+        #logo-header { padding-left: 0; }
     }
 
     /* Full screen modals in landscape on mobile */
@@ -7110,7 +7117,7 @@ async function saveQuote() {
     </script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
     <script src="ikea-quote.js?v=1777304471"></script>
-    <script src="quote-style.js?v=1777304472"></script>
+    <script src="quote-style.js?v=1777660401"></script>
 
     <!-- Quote Style Modal -->
     <div class="modal fade" id="quoteStyleModal" tabindex="-1">
@@ -7539,19 +7546,24 @@ async function saveQuote() {
                 }
             }
             tryStartup();
-            // Auto-open Manage Items modal if navigated from settings
-            if (window.location.hash === "#manage-items") {
-                setTimeout(function() {
-                    if (typeof openManageItemsModal === "function") openManageItemsModal();
+            // Auto-open builder modals when navigated from settings.
+            function openBuilderHashTarget(attempt) {
+                attempt = attempt || 0;
+                if (window.location.hash === "#manage-items" && typeof openManageItemsModal === "function") {
+                    openManageItemsModal();
                     history.replaceState(null, "", window.location.pathname + window.location.search);
-                }, 1500);
-            }
-            if (window.location.hash === "#send-quote-settings") {
-                setTimeout(function() {
-                    if (typeof openQuoteSendSettingsModal === "function") openQuoteSendSettingsModal(true);
+                    return;
+                }
+                if (window.location.hash === "#send-quote-settings" && typeof openQuoteSendSettingsModal === "function") {
+                    openQuoteSendSettingsModal(true);
                     history.replaceState(null, "", window.location.pathname + window.location.search);
-                }, 1500);
+                    return;
+                }
+                if ((window.location.hash === "#manage-items" || window.location.hash === "#send-quote-settings") && attempt < 25) {
+                    setTimeout(function() { openBuilderHashTarget(attempt + 1); }, 250);
+                }
             }
+            openBuilderHashTarget();
         });
     </script>
     <!-- Mobile bottom action bar (hidden on desktop) -->
