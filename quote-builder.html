@@ -13,7 +13,6 @@
     <title>QuoteDr - Quote Builder</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="brand-theme.css?v=1777661601">
     <style>
         body { background-color: #eef4fb; }
         .room-header {
@@ -395,14 +394,14 @@
             box-shadow: inset 0 -1px 0 rgba(0,0,0,0.08);
         }
         .room-toolbar .btn i { display: block; margin-bottom: 2px; }
-        .room-toolbar .btn-add-room { background:#ffffff; color:var(--qd-blue-dark, #0f3460); border-color:#cfdbe9; }
-        .room-toolbar .btn-quick-room { background:var(--qd-blue, #1a56a0); color:#ffffff; border-color:var(--qd-blue, #1a56a0); }
-        .room-toolbar .btn-save-template { background:#174b82; color:#ffffff; border-color:#174b82; }
-        .room-toolbar .btn-templates { background:var(--qd-orange, #f27a1a); color:#ffffff; border-color:var(--qd-orange-dark, #c95b08); }
-        .room-toolbar .btn-timelines { background:#f8fbff; color:#31506f; border-color:#cfdbe9; }
-        .room-toolbar .btn-markup { background:#f8fbff; color:var(--qd-blue-dark, #0f3460); border-color:#cfdbe9; }
-        .room-toolbar .btn-manage { background:#102033; color:#ffffff; border-color:#102033; }
-        .room-toolbar .btn-total { background:#fff7ed; color:var(--qd-orange-dark, #c95b08); border-color:#fed7aa; }
+        .room-toolbar .btn-add-room { background:#ffffff; color:#0f2742; }
+        .room-toolbar .btn-quick-room { background:#0ea5e9; color:#ffffff; border-color:#0ea5e9; }
+        .room-toolbar .btn-save-template { background:#2563eb; color:#ffffff; border-color:#2563eb; }
+        .room-toolbar .btn-templates { background:#facc15; color:#111827; border-color:#eab308; }
+        .room-toolbar .btn-timelines { background:#64748b; color:#ffffff; border-color:#64748b; }
+        .room-toolbar .btn-markup { background:#15803d; color:#ffffff; border-color:#15803d; }
+        .room-toolbar .btn-manage { background:#1f2937; color:#ffffff; border-color:#1f2937; }
+        .room-toolbar .btn-total { background:#f8fafc; color:#0f172a; }
         .room-toolbar .btn:hover { filter: brightness(0.96); }
     @media (max-width: 768px) {
             .container-fluid { padding-left: 8px !important; padding-right: 8px !important; }
@@ -555,7 +554,7 @@ if (location.search.includes('debug')) {
 
                     <!-- Tools dropdown -->
                     <div class="dropdown flex-grow-1">
-                        <button class="btn btn-outline-primary btn-sm shadow-sm dropdown-toggle w-100" data-bs-toggle="dropdown" title="Tools">
+                        <button class="btn btn-success btn-sm shadow-sm dropdown-toggle w-100" data-bs-toggle="dropdown" title="Tools">
                             <i class="fas fa-tools"></i>
                         </button>
                         <ul class="dropdown-menu">
@@ -2619,6 +2618,9 @@ Example:
         var _fpCanvasReady = false;
         var _fpMouseDown = false;
         var _fpShapeCounter = 1;
+        var _fpActiveShapeIndex = -1;
+        var _fpPendingRoomName = '';
+        var _fpPendingTrades = {};
 
         var _fpTradeConfig = [
             { key: 'flooring', label: 'Flooring', icon: 'fa-layer-group' },
@@ -2672,9 +2674,10 @@ Example:
         function openFloorPlanModal() {
             _fpImageBase64 = null; _fpMimeType = 'image/jpeg'; _fpImageUrl = null; _fpResults = null; _fpRooms = [];
             _fpSuggestedRoomNames = []; _fpCeilingHeight = 9; _fpScale = null; _fpShapes = []; _fpDraft = null; _fpPolygonDraft = [];
-            _fpCanvasReady = false; _fpTool = 'calibrate'; _fpShapeCounter = 1;
+            _fpCanvasReady = false; _fpTool = 'calibrate'; _fpShapeCounter = 1; _fpActiveShapeIndex = -1; _fpPendingRoomName = ''; _fpPendingTrades = {};
             var modal = new bootstrap.Modal(document.getElementById('floorPlanModal'));
             modal.show();
+            setTimeout(_fpMaybeShowIntroPopup, 250);
             _supabase.auth.getUser().then(function(r) {
                 var uid = r.data && r.data.user ? r.data.user.id : null;
                 if (!uid) { _fpRenderSetup(1); return; }
@@ -2693,6 +2696,38 @@ Example:
             var modal = new bootstrap.Modal(document.getElementById('floorPlanModal'));
             modal.show();
             _fpRenderSetup(1);
+        }
+
+        function _fpMaybeShowIntroPopup() {
+            if (localStorage.getItem('fp_scanner_intro_hidden') === '1') return;
+            if (document.getElementById('fpIntroOverlay')) return;
+            var overlay = document.createElement('div');
+            overlay.id = 'fpIntroOverlay';
+            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.45);z-index:20000;display:flex;align-items:center;justify-content:center;padding:18px;';
+            overlay.innerHTML =
+                '<div style="background:white;border-radius:10px;box-shadow:0 18px 50px rgba(0,0,0,0.28);max-width:520px;width:100%;overflow:hidden;">' +
+                '<div style="background:#1f5ea8;color:white;padding:14px 18px;font-weight:700;"><i class="fas fa-drafting-compass me-2"></i>Floor Plan Scanner Flow</div>' +
+                '<div style="padding:18px;">' +
+                '<ol class="mb-3 ps-3">' +
+                '<li class="mb-2">Set the scale by drawing over a known dimension and entering the real feet.</li>' +
+                '<li class="mb-2">Pick a room name or type your own.</li>' +
+                '<li class="mb-2">Choose the line items you want calculated for that room.</li>' +
+                '<li class="mb-2">Measure with a line, box, or polygon. Click a saved measurement later to edit it.</li>' +
+                '<li>When all rooms look right, hit Review and add the quantities to the quote.</li>' +
+                '</ol>' +
+                '<div class="d-flex align-items-center justify-content-between gap-3">' +
+                '<button class="btn btn-primary" onclick="_fpCloseIntroPopup()"><i class="fas fa-check me-1"></i>Got it</button>' +
+                '<label class="form-check-label small text-muted ms-auto"><input class="form-check-input me-1" type="checkbox" id="fpIntroDontShow"> Do not show this message again</label>' +
+                '</div>' +
+                '</div></div>';
+            document.body.appendChild(overlay);
+        }
+
+        function _fpCloseIntroPopup() {
+            var dontShow = document.getElementById('fpIntroDontShow');
+            if (dontShow && dontShow.checked) localStorage.setItem('fp_scanner_intro_hidden', '1');
+            var overlay = document.getElementById('fpIntroOverlay');
+            if (overlay) overlay.remove();
         }
 
         var _fpSetupCurrent = 1;
@@ -2891,15 +2926,22 @@ Example:
         }
 
         function _fpRenderMeasureTool() {
-            var nameOptions = _fpSuggestedRoomNames.map(function(n) { return '<option value="' + _fpEscapeHtml(n) + '">' + _fpEscapeHtml(n) + '</option>'; }).join('');
+            var state = _fpCurrentFormState();
+            var selectedName = state.name || '';
+            var selectedFromList = _fpSuggestedRoomNames.indexOf(selectedName) >= 0;
+            var nameOptions = _fpSuggestedRoomNames.map(function(n) {
+                return '<option value="' + _fpEscapeHtml(n) + '"' + (selectedName === n ? ' selected' : '') + '>' + _fpEscapeHtml(n) + '</option>';
+            }).join('');
             var activeTrades = _fpTradeConfig.filter(function(tc) { return _fpMapping && _fpMapping[tc.key] && _fpMapping[tc.key].length > 0; });
             var tradeControls = activeTrades.map(function(tc) {
+                var selectedTrade = (state.trades && state.trades[tc.key]) || '';
                 var opts = '<option value="">Skip</option>' + (_fpMapping[tc.key] || []).map(function(item) {
-                    return '<option value="' + _fpEscapeHtml(item.name) + '">' + _fpEscapeHtml(item.name) + '</option>';
+                    return '<option value="' + _fpEscapeHtml(item.name) + '"' + (selectedTrade === item.name ? ' selected' : '') + '>' + _fpEscapeHtml(item.name) + '</option>';
                 }).join('');
-                return '<label class="form-label small mb-1"><i class="fas ' + tc.icon + ' me-1"></i>' + tc.label + '</label><select class="form-select form-select-sm mb-2" id="fpTrade_' + tc.key + '">' + opts + '</select>';
+                return '<label class="form-label small mb-1"><i class="fas ' + tc.icon + ' me-1"></i>' + tc.label + '</label><select class="form-select form-select-sm mb-2" id="fpTrade_' + tc.key + '" onchange="_fpSaveMeasureForm()">' + opts + '</select>';
             }).join('');
             var scaleText = _fpScale ? (_fpRound(_fpScale.pxPerFt, 2) + ' px/ft') : 'Not calibrated';
+            var editorTitle = _fpActiveShapeIndex >= 0 && _fpShapes[_fpActiveShapeIndex] ? 'Editing: ' + _fpEscapeHtml(_fpShapes[_fpActiveShapeIndex].name) : 'New Measurement';
             document.getElementById('floorPlanModalBody').innerHTML =
                 '<div class="d-flex justify-content-center gap-1 mb-2">' + _fpStepBadges(2, ['Upload','Calibrate','Review']) + '</div>' +
                 '<div class="row g-2" style="height:calc(100vh - 138px);">' +
@@ -2926,10 +2968,10 @@ Example:
                 '<div class="text-muted small mt-1">Use the Scale tool on a labeled dimension first.</div>' +
                 '</div>' +
                 '<div class="border rounded p-2 mb-2">' +
-                '<strong class="small d-block mb-2">Next Measurement</strong>' +
+                '<div class="d-flex align-items-center justify-content-between mb-2"><strong class="small">' + editorTitle + '</strong><button class="btn btn-outline-secondary btn-sm" onclick="_fpNewMeasurement()"><i class="fas fa-plus me-1"></i>New</button></div>' +
                 '<label class="form-label small mb-1">Room name</label>' +
                 '<select class="form-select form-select-sm mb-2" id="fpRoomNameSelect" onchange="_fpRoomNameSelectChanged()"><option value="">Custom room</option>' + nameOptions + '</select>' +
-                '<input type="text" class="form-control form-control-sm mb-2" id="fpRoomNameCustom" placeholder="Room name">' +
+                '<input type="text" class="form-control form-control-sm mb-2" id="fpRoomNameCustom" value="' + _fpEscapeHtml(selectedFromList ? '' : selectedName) + '" placeholder="Room name" oninput="_fpSaveMeasureForm()">' +
                 '<label class="form-label small mb-1">Ceiling height</label>' +
                 '<div class="input-group input-group-sm mb-2"><input type="number" id="fpCeilingHeight" class="form-control" value="' + _fpCeilingHeight + '" min="6" max="20" step="0.5" oninput="_fpCeilingHeight=parseFloat(this.value)||9"><span class="input-group-text">ft</span></div>' +
                 (tradeControls || '<div class="text-muted small">No linked line items yet. Reconfigure items to auto-create quote rows.</div>') +
@@ -2963,35 +3005,75 @@ Example:
             if (!_fpShapes.length) return '<div class="text-muted small">No measurements yet.</div>';
             return _fpShapes.map(function(shape, i) {
                 var d = shape.dimensions || {};
-                var metric = shape.type === 'line'
-                    ? _fpRound(d.length, 1) + ' LF'
-                    : _fpRound(d.area, 1) + ' sqft | ' + _fpRound(d.perimeter, 1) + ' LF';
-                return '<div class="border-bottom py-2 small">' +
-                    '<div class="d-flex align-items-center gap-2"><strong class="flex-grow-1">' + _fpEscapeHtml(shape.name) + '</strong><span class="badge bg-light text-dark">' + _fpEscapeHtml(shape.type) + '</span><button class="btn btn-link text-danger p-0" onclick="_fpRemoveShape(' + i + ')"><i class="fas fa-times"></i></button></div>' +
+                var metric = _fpMeasurementSummary(shape);
+                var active = i === _fpActiveShapeIndex;
+                return '<div class="border-bottom py-2 small' + (active ? ' bg-light' : '') + '" style="cursor:pointer;" onclick="_fpSelectShape(' + i + ')">' +
+                    '<div class="d-flex align-items-center gap-2"><strong class="flex-grow-1">' + _fpEscapeHtml(shape.name) + '</strong><span class="badge bg-light text-dark">' + _fpEscapeHtml(shape.type) + '</span><button class="btn btn-link text-danger p-0" onclick="event.stopPropagation();_fpRemoveShape(' + i + ')"><i class="fas fa-times"></i></button></div>' +
                     '<div class="text-muted">' + metric + '</div>' +
                     '</div>';
             }).join('');
         }
 
+        function _fpMeasurementSummary(shape) {
+            var d = shape.dimensions || {};
+            if (shape.type === 'line') return _fpRound(d.length, 1) + ' LF';
+            return _fpRound(d.length, 1) + ' ft x ' + _fpRound(d.width, 1) + ' ft | ' + _fpRound(d.area, 1) + ' sqft | ' + _fpRound(d.perimeter, 1) + ' LF';
+        }
+
         function _fpRoomNameSelectChanged() {
             var select = document.getElementById('fpRoomNameSelect');
             var custom = document.getElementById('fpRoomNameCustom');
-            if (select && custom && select.value) custom.value = select.value;
+            if (select && custom && select.value) custom.value = '';
+            _fpSaveMeasureForm();
         }
 
-        function _fpSelectedRoomName() {
+        function _fpCurrentFormState() {
+            var shape = _fpActiveShapeIndex >= 0 ? _fpShapes[_fpActiveShapeIndex] : null;
+            return shape || { name: _fpPendingRoomName, trades: _fpPendingTrades };
+        }
+
+        function _fpSaveMeasureForm() {
             var custom = document.getElementById('fpRoomNameCustom');
             var select = document.getElementById('fpRoomNameSelect');
-            return (custom && custom.value.trim()) || (select && select.value) || ('Room ' + _fpShapeCounter);
-        }
-
-        function _fpSelectedTrades() {
+            var name = (custom && custom.value.trim()) || (select && select.value) || '';
             var trades = {};
             _fpTradeConfig.forEach(function(tc) {
                 var el = document.getElementById('fpTrade_' + tc.key);
                 if (el && el.value) trades[tc.key] = el.value;
             });
-            return trades;
+            var ceiling = document.getElementById('fpCeilingHeight');
+            if (ceiling) _fpCeilingHeight = parseFloat(ceiling.value) || _fpCeilingHeight || 9;
+            if (_fpActiveShapeIndex >= 0 && _fpShapes[_fpActiveShapeIndex]) {
+                _fpShapes[_fpActiveShapeIndex].name = name || _fpShapes[_fpActiveShapeIndex].name || ('Room ' + (_fpActiveShapeIndex + 1));
+                _fpShapes[_fpActiveShapeIndex].trades = trades;
+            } else {
+                _fpPendingRoomName = name;
+                _fpPendingTrades = trades;
+            }
+        }
+
+        function _fpNewMeasurement() {
+            _fpSaveMeasureForm();
+            _fpActiveShapeIndex = -1;
+            _fpPendingRoomName = '';
+            _fpPendingTrades = {};
+            _fpRenderMeasureTool();
+        }
+
+        function _fpSelectShape(index) {
+            _fpSaveMeasureForm();
+            _fpActiveShapeIndex = index;
+            _fpRenderMeasureTool();
+        }
+
+        function _fpSelectedRoomName() {
+            _fpSaveMeasureForm();
+            return _fpPendingRoomName || ('Room ' + _fpShapeCounter);
+        }
+
+        function _fpSelectedTrades() {
+            _fpSaveMeasureForm();
+            return Object.assign({}, _fpPendingTrades);
         }
 
         function _fpLoadCanvas() {
@@ -3102,6 +3184,7 @@ Example:
                 trades: _fpSelectedTrades(),
                 dimensions: dimensions
             });
+            _fpActiveShapeIndex = _fpShapes.length - 1;
         }
 
         function _fpFinishPolygon() {
@@ -3140,6 +3223,8 @@ Example:
 
         function _fpRemoveShape(index) {
             _fpShapes.splice(index, 1);
+            if (_fpActiveShapeIndex === index) _fpActiveShapeIndex = -1;
+            else if (_fpActiveShapeIndex > index) _fpActiveShapeIndex--;
             _fpRenderMeasureTool();
         }
 
@@ -3147,6 +3232,7 @@ Example:
             _fpShapes = [];
             _fpPolygonDraft = [];
             _fpDraft = null;
+            _fpActiveShapeIndex = -1;
             _fpRenderMeasureTool();
         }
 
@@ -3180,7 +3266,7 @@ Example:
             } else {
                 _fpDrawPolygon(shape.points, color, false);
                 var c = _fpCentroid(shape.points);
-                _fpDrawLabel(c.x, c.y, shape.name + ' ' + _fpRound(shape.dimensions.area, 1) + ' sqft');
+                _fpDrawLabel(c.x, c.y, shape.name + ' ' + _fpRound(shape.dimensions.length, 1) + ' x ' + _fpRound(shape.dimensions.width, 1) + ' ft');
             }
         }
 
@@ -3247,6 +3333,7 @@ Example:
                 var data = await res.json();
                 if (Array.isArray(data.rooms) && data.rooms.length) {
                     _fpSuggestedRoomNames = data.rooms.map(function(r) { return String(r).trim(); }).filter(Boolean).slice(0, 20);
+                    if (!_fpPendingRoomName && _fpActiveShapeIndex < 0 && _fpSuggestedRoomNames.length) _fpPendingRoomName = _fpSuggestedRoomNames[0];
                     _fpRenderMeasureTool();
                 }
             } catch(e) {
@@ -3255,8 +3342,8 @@ Example:
         }
 
         function _fpApplyTradesAll() {
-            if (!_fpShapes.length) return;
-            var trades = _fpShapes[0].trades || {};
+            _fpSaveMeasureForm();
+            var trades = _fpActiveShapeIndex >= 0 && _fpShapes[_fpActiveShapeIndex] ? _fpShapes[_fpActiveShapeIndex].trades || {} : _fpPendingTrades || {};
             _fpShapes.forEach(function(shape) { shape.trades = Object.assign({}, trades); });
             _fpRenderMeasureTool();
         }
@@ -5604,7 +5691,7 @@ async function saveQuote() {
                     if (item) Object.assign(item, overrides);
                 }
             });
-            // Restore from cloud (fire and forget � don't block startup)
+            // Restore from cloud (fire and forget ? don't block startup)
             _restoreItemOverridesFromCloud().catch(function(){});
         }
 
