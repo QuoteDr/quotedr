@@ -7,5 +7,5 @@ Keep extractions small and behavior-preserving. Each module should continue expo
 - [x] Quote Style Modal -> `quote-style.js`
 - [x] Manage Items -> `quote-items.js`
 - [x] Client Management -> `quote-clients.js`
-- [ ] Material Estimator / Calculators -> `quote-calculators.js`
+- [x] Material Estimator / Calculators -> `quote-calculators.js`
 - [ ] Quote save/load/session core -> `quote-storage.js`
