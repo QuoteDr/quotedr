@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <!-- build:20260423-0307 -->
 <html lang="en">
 <head>
@@ -2747,6 +2747,8 @@ Example:
         var _fpCurrentPage = 1;
         var _fpRooms = [];
         var _fpMapping = null;
+        var _fpAnalysis = null;
+        var _fpCeilingHeight = 9;
 
         var _fpTradeConfig = [
             { key: 'flooring', label: 'Flooring', icon: 'fa-layer-group' },
@@ -2760,6 +2762,18 @@ Example:
             return labels.map(function(s, i) {
                 return '<span class="badge ' + (i+1 === active ? 'bg-primary' : 'bg-secondary') + ' me-1">' + (i+1) + ' ' + s + '</span>';
             }).join('');
+        }
+
+        function _fpEscapeHtml(value) {
+            return String(value || '').replace(/[&<>"']/g, function(ch) {
+                return ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[ch];
+            });
+        }
+
+        function _fpConfidenceBadge(confidence) {
+            var pct = Math.round((parseFloat(confidence) || 0) * 100);
+            var cls = pct >= 75 ? 'bg-success' : (pct >= 55 ? 'bg-warning text-dark' : 'bg-danger');
+            return '<span class="badge ' + cls + '" title="AI confidence">' + pct + '%</span>';
         }
 
         function _fpAllItems() {
@@ -2785,7 +2799,7 @@ Example:
 
         // ── Open modal ──
         function openFloorPlanModal() {
-            _fpImageBase64 = null; _fpMimeType = 'image/jpeg'; _fpResults = null; _fpRooms = [];
+            _fpImageBase64 = null; _fpMimeType = 'image/jpeg'; _fpResults = null; _fpRooms = []; _fpAnalysis = null; _fpCeilingHeight = 9;
             var modal = new bootstrap.Modal(document.getElementById('floorPlanModal'));
             modal.show();
             // Load mapping
@@ -2912,6 +2926,11 @@ Example:
                 '</div>' +
                 '</div>' +
                 '<div id="fpStep1Error" class="alert alert-danger mt-3" style="display:none;"></div>' +
+                '<div class="row g-2 mt-3">' +
+                '<div class="col-sm-6"><label class="form-label small mb-1">Overall width (ft, optional)</label><input type="number" id="fpOverallWidth" class="form-control form-control-sm" min="0" step="0.5" value="' + _fpEscapeHtml(localStorage.getItem('fp_overall_width_ft') || '') + '" placeholder="e.g. 28"></div>' +
+                '<div class="col-sm-6"><label class="form-label small mb-1">Overall depth (ft, optional)</label><input type="number" id="fpOverallDepth" class="form-control form-control-sm" min="0" step="0.5" value="' + _fpEscapeHtml(localStorage.getItem('fp_overall_depth_ft') || '') + '" placeholder="e.g. 40"></div>' +
+                '<div class="col-12 text-muted small"><i class="fas fa-anchor me-1"></i>These help AI scale the plan, but uncertain rooms will still stay blank for manual entry.</div>' +
+                '</div>' +
                 '<div class="d-flex justify-content-between mt-3">' +
                 '<button class="btn btn-outline-secondary btn-sm" onclick="openFpScannerSetup()"><i class="fas fa-cog me-1"></i>Reconfigure items</button>' +
                 '<button class="btn btn-primary" id="fpNext1Btn" onclick="_fpGoToStep2()" disabled>Next <i class="fas fa-arrow-right ms-1"></i></button>' +
@@ -3000,23 +3019,49 @@ Example:
             if (!_fpImageBase64) return;
             document.getElementById('floorPlanModalBody').innerHTML =
                 '<div class="text-center py-5"><div class="spinner-border text-primary mb-3"></div>' +
-                '<div class="fw-semibold">Identifying rooms...</div>' +
-                '<div class="text-muted small mt-1">Just a few seconds</div></div>';
+                '<div class="fw-semibold">Reading plan labels and dimensions...</div>' +
+                '<div class="text-muted small mt-1">AI will prefill only what it can explain. You can edit everything next.</div></div>';
             var roomNames = ['Living Room','Kitchen','Dining','Bathroom','Bedroom'];
             try {
                 var ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso';
+                var overallWidthEl = document.getElementById('fpOverallWidth');
+                var overallDepthEl = document.getElementById('fpOverallDepth');
+                var overallWidth = parseFloat((overallWidthEl && overallWidthEl.value) || localStorage.getItem('fp_overall_width_ft') || '') || null;
+                var overallDepth = parseFloat((overallDepthEl && overallDepthEl.value) || localStorage.getItem('fp_overall_depth_ft') || '') || null;
+                if (overallWidth) localStorage.setItem('fp_overall_width_ft', overallWidth);
+                if (overallDepth) localStorage.setItem('fp_overall_depth_ft', overallDepth);
                 var res = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/analyze-floor-plan', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ANON_KEY },
-                    body: JSON.stringify({ mode: 'rooms_only', imageBase64: _fpImageBase64, mimeType: _fpMimeType })
+                    body: JSON.stringify({ mode: 'full_analysis', imageBase64: _fpImageBase64, mimeType: _fpMimeType, overallWidthFt: overallWidth, overallDepthFt: overallDepth })
                 });
                 var data = await res.json();
-                if (data.rooms && data.rooms.length > 0) roomNames = data.rooms;
+                if (res.ok && data && data.rooms && data.rooms.length > 0) {
+                    _fpAnalysis = data;
+                    _fpRooms = data.rooms.map(function(r, i) {
+                        return {
+                            id: Date.now() + i,
+                            name: r.name || ('Room ' + (i + 1)),
+                            length: parseFloat(r.lengthFt || r.length || 0) || 0,
+                            width: parseFloat(r.widthFt || r.width || 0) || 0,
+                            area: parseFloat(r.areaSqft || r.area || 0) || 0,
+                            perimeter: parseFloat(r.perimeterFt || r.perimeter || 0) || 0,
+                            confidence: parseFloat(r.confidence || 0) || 0,
+                            source: r.source || '',
+                            evidence: r.evidence || '',
+                            notes: r.notes || '',
+                            checked: true,
+                            trades: {}
+                        };
+                    });
+                } else if (data && data.error) {
+                    throw new Error(data.error);
+                }
             } catch(e) { /* silent fallback */ }
             // Pre-populate _fpRooms from AI names if empty
             if (_fpRooms.length === 0) {
                 _fpRooms = roomNames.map(function(n, i) {
-                    return { id: Date.now() + i, name: n, length: 0, width: 0, checked: true, trades: {} };
+                    return { id: Date.now() + i, name: n, length: 0, width: 0, confidence: 0, source: 'manual', evidence: '', checked: true, trades: {} };
                 });
             }
             _fpRenderMeasureStep();
@@ -3024,6 +3069,13 @@ Example:
 
         function _fpRenderMeasureStep() {
             var imgSrc = 'data:' + _fpMimeType + ';base64,' + _fpImageBase64;
+            var analysisWarnings = (_fpAnalysis && _fpAnalysis.warnings) ? _fpAnalysis.warnings : [];
+            var warningHtml = analysisWarnings.length
+                ? '<div class="alert alert-warning py-2 small mb-2"><strong>Review needed:</strong> ' + analysisWarnings.map(_fpEscapeHtml).join(' ') + '</div>'
+                : '';
+            var rawDimsHtml = (_fpAnalysis && _fpAnalysis.rawDimensions && _fpAnalysis.rawDimensions.length)
+                ? '<details class="small text-muted mb-2"><summary>Visible dimensions AI found</summary><div class="mt-1">' + _fpAnalysis.rawDimensions.map(_fpEscapeHtml).join(' &bull; ') + '</div></details>'
+                : '';
             // Build the trade headers for per-room selectors
             var activeTrades = _fpTradeConfig.filter(function(tc) {
                 return _fpMapping && _fpMapping[tc.key] && _fpMapping[tc.key].length > 0;
@@ -3043,19 +3095,29 @@ Example:
                         '</div>';
                 }).join('');
 
+                var evidence = room.evidence || room.notes || '';
+                var metaHtml = (room.confidence || evidence)
+                    ? '<div class="d-flex align-items-center gap-2 flex-wrap mt-2 small text-muted">' +
+                        _fpConfidenceBadge(room.confidence || 0) +
+                        (room.source ? '<span class="badge bg-light text-dark">' + _fpEscapeHtml(room.source) + '</span>' : '') +
+                        (evidence ? '<span style="font-size:0.78rem;">' + _fpEscapeHtml(evidence) + '</span>' : '') +
+                      '</div>'
+                    : '';
                 return '<div class="card mb-2" id="fpMR_' + ri + '">' +
                     '<div class="card-body py-2">' +
                     '<div class="d-flex align-items-center gap-2 flex-wrap">' +
                     '<input type="checkbox" class="form-check-input" id="fpMRChk_' + ri + '"' + (room.checked ? ' checked' : '') + ' onchange="_fpRooms[' + ri + '].checked=this.checked">' +
-                    '<input type="text" class="form-control form-control-sm" id="fpMRName_' + ri + '" value="' + room.name.replace(/"/g,'&quot;') + '" style="max-width:160px;" oninput="_fpRooms[' + ri + '].name=this.value">' +
+                    '<input type="text" class="form-control form-control-sm" id="fpMRName_' + ri + '" value="' + _fpEscapeHtml(room.name) + '" style="max-width:160px;" oninput="_fpRooms[' + ri + '].name=this.value">' +
                     '<div class="d-flex align-items-center gap-1">' +
-                    '<input type="number" class="form-control form-control-sm" id="fpMRL_' + ri + '" placeholder="L ft" value="' + (room.length||'') + '" min="0" step="0.5" style="width:72px;" oninput="_fpRooms[' + ri + '].length=parseFloat(this.value)||0">' +
+                    '<input type="number" class="form-control form-control-sm" id="fpMRL_' + ri + '" placeholder="L ft" value="' + (room.length||'') + '" min="0" step="0.5" style="width:72px;" oninput="_fpRooms[' + ri + '].length=parseFloat(this.value)||0;_fpUpdateRoomAreaLabel(' + ri + ')">' +
                     '<span class="text-muted">&times;</span>' +
-                    '<input type="number" class="form-control form-control-sm" id="fpMRW_' + ri + '" placeholder="W ft" value="' + (room.width||'') + '" min="0" step="0.5" style="width:72px;" oninput="_fpRooms[' + ri + '].width=parseFloat(this.value)||0">' +
+                    '<input type="number" class="form-control form-control-sm" id="fpMRW_' + ri + '" placeholder="W ft" value="' + (room.width||'') + '" min="0" step="0.5" style="width:72px;" oninput="_fpRooms[' + ri + '].width=parseFloat(this.value)||0;_fpUpdateRoomAreaLabel(' + ri + ')">' +
                     '<span class="text-muted small">ft</span>' +
                     '</div>' +
+                    '<span class="badge bg-light text-dark" id="fpAreaLabel_' + ri + '">' + ((room.length && room.width) ? Math.round(room.length * room.width) + ' sqft' : 'manual') + '</span>' +
                     '<button class="btn btn-link text-danger p-0 ms-auto" onclick="_fpRemoveMeasureRoom(' + ri + ')"><i class="fas fa-times"></i></button>' +
                     '</div>' +
+                    metaHtml +
                     (activeTrades.length > 0 ?
                         '<div class="d-flex flex-wrap mt-2 gap-1">' + tradeDropdowns + '</div>' : '') +
                     '</div></div>';
@@ -3071,11 +3133,13 @@ Example:
                 '</div>' +
                 // Right: room table
                 '<div class="col-md-5 ps-2 d-flex flex-column" style="height:100%;">' +
+                warningHtml +
+                rawDimsHtml +
                 '<div class="d-flex align-items-center gap-3 mb-2">' +
                 '<span class="fw-semibold">Room Dimensions</span>' +
                 '<div class="d-flex align-items-center gap-1 ms-auto">' +
                 '<label class="form-label mb-0 small">Ceiling:</label>' +
-                '<input type="number" id="fpCeilingHeight" class="form-control form-control-sm" value="9" min="6" max="20" step="0.5" style="width:65px;">' +
+                '<input type="number" id="fpCeilingHeight" class="form-control form-control-sm" value="' + _fpCeilingHeight + '" min="6" max="20" step="0.5" style="width:65px;" oninput="_fpCeilingHeight=parseFloat(this.value)||9">' +
                 '<span class="text-muted small">ft</span>' +
                 '</div>' +
                 '<button class="btn btn-outline-secondary btn-sm" onclick="_fpApplyTradesAll()" title="Copy Room 1 trade selections to all rooms"><i class="fas fa-copy me-1"></i>Apply All</button>' +
@@ -3094,6 +3158,14 @@ Example:
                 '</div>';
         }
 
+        function _fpUpdateRoomAreaLabel(ri) {
+            var label = document.getElementById('fpAreaLabel_' + ri);
+            var room = _fpRooms[ri];
+            if (!label || !room) return;
+            var area = (parseFloat(room.length) || 0) * (parseFloat(room.width) || 0);
+            label.textContent = area > 0 ? Math.round(area) + ' sqft' : 'manual';
+        }
+
         function _fpSetRoomTrade(ri, tradeKey, itemName) {
             if (!_fpRooms[ri].trades) _fpRooms[ri].trades = {};
             _fpRooms[ri].trades[tradeKey] = itemName;
@@ -3107,7 +3179,7 @@ Example:
         }
 
         function _fpAddMeasureRoom() {
-            _fpRooms.push({ id: Date.now(), name: 'New Room', length: 0, width: 0, checked: true, trades: {} });
+            _fpRooms.push({ id: Date.now(), name: 'New Room', length: 0, width: 0, confidence: 1, source: 'manual', evidence: 'Added manually', checked: true, trades: {} });
             _fpRenderMeasureStep();
         }
 
@@ -3116,9 +3188,20 @@ Example:
             _fpRenderMeasureStep();
         }
 
+        function _fpQuantityForTrade(tradeKey, unitType, area, perimeter, ceilingHeight) {
+            var unit = String(unitType || '').toLowerCase().replace(/\s+/g, '');
+            if (unit === 'lf' || unit === 'linearft' || unit === 'linearfeet') return perimeter;
+            if (unit === 'each' || unit === 'ea') return 1;
+            if (unit === 'hour' || unit === 'hours' || unit === 'hr' || unit === 'hourly') return 1;
+            if (tradeKey === 'paint' || tradeKey === 'drywall') return perimeter * ceilingHeight;
+            if (tradeKey === 'framing') return perimeter;
+            return area;
+        }
+
         // ── Step 3: Review ──
         function _fpGoToStep3() {
-            var ceilingHeight = parseFloat(document.getElementById('fpCeilingHeight').value) || 9;
+            var ceilingHeight = parseFloat(document.getElementById('fpCeilingHeight').value) || _fpCeilingHeight || 9;
+            _fpCeilingHeight = ceilingHeight;
             var skipped = 0;
             var computed = [];
 
@@ -3135,7 +3218,7 @@ Example:
                     // Support multiple items per trade — if selectedName is 'ALL', add all; else just the selected one
                     var toAdd = mappedItems.filter(function(mi) { return mi.name === selectedName; });
                     toAdd.forEach(function(mi) {
-                        var qty = (mi.unitType === 'lf' || mi.unitType === 'linear ft') ? perimeter : area;
+                        var qty = _fpQuantityForTrade(tc.key, mi.unitType, area, perimeter, ceilingHeight);
                         qty = Math.round(qty * 10) / 10;
                         items.push({
                             category: mi.category,
@@ -3144,12 +3227,12 @@ Example:
                             unitType: mi.unitType || 'sqft',
                             rate: mi.rate || 0,
                             total: Math.round(qty * (mi.rate||0) * 100) / 100,
-                            notes: ''
+                            notes: tc.label + ' quantity from floor plan scanner. Review before sending.'
                         });
                     });
                 });
 
-                computed.push({ name: room.name, dimensions: { length: room.length, width: room.width, area: Math.round(area) }, items: items });
+                computed.push({ name: room.name, confidence: room.confidence || 0, evidence: room.evidence || '', dimensions: { length: room.length, width: room.width, area: Math.round(area), perimeter: Math.round(perimeter * 10) / 10 }, items: items });
             });
 
             _fpResults = { rooms: computed };
@@ -3157,17 +3240,24 @@ Example:
             var warningsHtml = skipped > 0
                 ? '<div class="alert alert-warning py-2 small mb-2"><i class="fas fa-exclamation-triangle me-1"></i>Skipped ' + skipped + ' room(s) with missing dimensions.</div>'
                 : '';
+            var lowConfidenceRooms = computed.filter(function(r) { return (r.confidence || 0) > 0 && (r.confidence || 0) < 0.65; }).length;
+            if (lowConfidenceRooms > 0) {
+                warningsHtml += '<div class="alert alert-warning py-2 small mb-2"><i class="fas fa-ruler-combined me-1"></i>' + lowConfidenceRooms + ' room(s) have low-confidence AI measurements. Verify before adding.</div>';
+            }
 
             var roomsHtml = computed.map(function(room, ri) {
                 var d = room.dimensions;
+                var roomMeta = (room.confidence || room.evidence)
+                    ? '<div class="small text-muted mt-1">' + _fpConfidenceBadge(room.confidence || 0) + (room.evidence ? ' <span>' + _fpEscapeHtml(room.evidence) + '</span>' : '') + '</div>'
+                    : '';
                 var itemsHtml = room.items.map(function(item, ii) {
                     return '<div class="d-flex align-items-center gap-2 py-1 border-bottom">' +
                         '<input type="checkbox" class="form-check-input fp-item-check" id="fpItem_' + ri + '_' + ii + '" checked style="flex-shrink:0;">' +
-                        '<span class="badge bg-secondary me-1" style="font-size:0.7rem;">' + item.category + '</span>' +
-                        '<span class="small flex-grow-1">' + item.description + '</span>' +
+                        '<span class="badge bg-secondary me-1" style="font-size:0.7rem;">' + _fpEscapeHtml(item.category) + '</span>' +
+                        '<span class="small flex-grow-1">' + _fpEscapeHtml(item.description) + '</span>' +
                         '<div class="d-flex align-items-center gap-1">' +
                         '<input type="number" class="form-control form-control-sm" id="fpQty_' + ri + '_' + ii + '" value="' + item.quantity + '" style="width:75px;" min="0">' +
-                        '<span class="text-muted small">' + item.unitType + '</span>' +
+                        '<span class="text-muted small">' + _fpEscapeHtml(item.unitType) + '</span>' +
                         '</div>' +
                         '<span class="text-muted small ms-1">$' + item.rate + ' = <strong>$' + item.total.toFixed(2) + '</strong></span>' +
                         '</div>';
@@ -3176,8 +3266,8 @@ Example:
                 return '<div class="card mb-2">' +
                     '<div class="card-header py-2 d-flex align-items-center gap-2" style="background:#f0f4ff;">' +
                     '<input type="checkbox" class="form-check-input fp-room-check" id="fpRoom_' + ri + '" checked onchange="_fpToggleRoom(' + ri + ',this.checked)">' +
-                    '<input type="text" class="form-control form-control-sm fw-semibold" id="fpRoomName_' + ri + '" value="' + room.name + '" style="border:none;background:transparent;font-weight:600;">' +
-                    '<span class="badge bg-light text-dark ms-auto" style="font-size:0.7rem;">' + d.length + '\' &times; ' + d.width + '\' = ' + d.area + ' sqft</span>' +
+                    '<div class="flex-grow-1"><input type="text" class="form-control form-control-sm fw-semibold" id="fpRoomName_' + ri + '" value="' + _fpEscapeHtml(room.name) + '" style="border:none;background:transparent;font-weight:600;">' + roomMeta + '</div>' +
+                    '<span class="badge bg-light text-dark ms-auto" style="font-size:0.7rem;">' + d.length + '\' &times; ' + d.width + '\' = ' + d.area + ' sqft | ' + d.perimeter + ' lf</span>' +
                     '</div>' +
                     '<div class="card-body py-2" id="fpRoomItems_' + ri + '">' + (itemsHtml || '<p class="text-muted small mb-0">No trades selected for this room</p>') + '</div>' +
                     '</div>';
