@@ -34,6 +34,43 @@
             window._quoteStyle = _quoteStyle;
         }
 
+        async function saveQuoteStyleDefaultsToCloud(style) {
+            try {
+                if (typeof _supabase === 'undefined') return;
+                var user = await _supabase.auth.getUser();
+                if (!user.data || !user.data.user) return;
+                await _supabase.from('user_data').upsert(
+                    { user_id: user.data.user.id, key: 'quote_send_style', value: style, updated_at: new Date().toISOString() },
+                    { onConflict: 'user_id,key' }
+                );
+            } catch(e) {
+                console.warn('Quote send defaults cloud save failed:', e);
+            }
+        }
+
+        async function loadQuoteStyleDefaults() {
+            var savedDefault = {};
+            try { savedDefault = JSON.parse(localStorage.getItem('ald_quote_send_style') || '{}'); } catch(e) { savedDefault = {}; }
+            try {
+                if (typeof _supabase === 'undefined') return savedDefault;
+                var user = await _supabase.auth.getUser();
+                if (!user.data || !user.data.user) return savedDefault;
+                var result = await _supabase
+                    .from('user_data')
+                    .select('value')
+                    .eq('user_id', user.data.user.id)
+                    .eq('key', 'quote_send_style')
+                    .maybeSingle();
+                if (result.data && result.data.value && Object.keys(result.data.value).length) {
+                    savedDefault = result.data.value;
+                    localStorage.setItem('ald_quote_send_style', JSON.stringify(savedDefault));
+                }
+            } catch(e) {
+                console.warn('Quote send defaults cloud load failed:', e);
+            }
+            return savedDefault;
+        }
+
         var COMMITMENT_ICON_LIBRARY = [
             { group: 'Trust', icon: 'fa-solid fa-shield-halved', label: 'Warranty' },
             { group: 'Trust', icon: 'fa-solid fa-award', label: 'Award' },
@@ -137,11 +174,12 @@
             updateStylePreview();
         }
 
-        function saveQuoteStyleDefaults(showToast) {
+        async function saveQuoteStyleDefaults(showToast) {
             _quoteStyle = readQuoteStyleFromControls();
             syncQuoteStyleGlobal();
             try {
                 localStorage.setItem('ald_quote_send_style', JSON.stringify(_quoteStyle));
+                await saveQuoteStyleDefaultsToCloud(_quoteStyle);
                 if (showToast !== false) {
                     var saveStatus = document.getElementById('saveStatus');
                     if (saveStatus) saveStatus.innerHTML = '<span style="color:#28a745;"><i class="fas fa-check-circle"></i> Quote send defaults saved</span>';
@@ -405,9 +443,8 @@
             });
         }
 
-        function initStyleModal() {
-            var savedDefault = {};
-            try { savedDefault = JSON.parse(localStorage.getItem('ald_quote_send_style') || '{}'); } catch(e) { savedDefault = {}; }
+        async function initStyleModal() {
+            var savedDefault = await loadQuoteStyleDefaults();
             applyQuoteStyleToControls(savedDefault);
             initCommitmentIconPickers();
 
@@ -454,13 +491,29 @@
                 return;
             }
             markQuoteNumberUsed(document.getElementById('quoteNumber')?.value);
-            initStyleModal();
+            openQuoteSendSettingsModal(false);
+        }
+
+        async function openQuoteSendSettingsModal(settingsOnly) {
+            window._quoteStyleSettingsOnly = !!settingsOnly;
+            await initStyleModal();
+            var generateBtn = document.getElementById('quoteStyleGenerateBtn');
+            if (generateBtn) {
+                generateBtn.innerHTML = settingsOnly
+                    ? '<i class="fas fa-check me-1"></i>Done'
+                    : '<i class="fas fa-share-square me-1"></i>Generate Quote Link';
+            }
             var modal = new bootstrap.Modal(document.getElementById('quoteStyleModal'));
             modal.show();
         }
 
         async function confirmGenerateQuote() {
             var styleModal = bootstrap.Modal.getInstance(document.getElementById('quoteStyleModal'));
+            if (window._quoteStyleSettingsOnly) {
+                await saveQuoteStyleDefaults(true);
+                if (styleModal) styleModal.hide();
+                return;
+            }
             if (styleModal) styleModal.hide();
 
             // Show saving indicator
@@ -470,7 +523,7 @@
             _quoteStyle = readQuoteStyleFromControls();
             syncQuoteStyleGlobal();
             if (document.getElementById('quoteSaveDefaultStyle')?.checked) {
-                saveQuoteStyleDefaults(false);
+                await saveQuoteStyleDefaults(false);
             }
 
             const quoteData = collectQuoteData();
@@ -557,6 +610,7 @@
         window.formatDateInput = formatDateInput;
         window.setQuoteExpiryPreset = setQuoteExpiryPreset;
         window.saveQuoteStyleDefaults = saveQuoteStyleDefaults;
+        window.loadQuoteStyleDefaults = loadQuoteStyleDefaults;
         window.readQuoteStyleFromControls = readQuoteStyleFromControls;
         window.applyQuoteStyleToControls = applyQuoteStyleToControls;
         window.updateStylePreview = updateStylePreview;
@@ -568,5 +622,6 @@
         window.initCommitmentIconPickers = initCommitmentIconPickers;
         window.initStyleModal = initStyleModal;
         window.generateInteractiveLink = generateInteractiveLink;
+        window.openQuoteSendSettingsModal = openQuoteSendSettingsModal;
         window.confirmGenerateQuote = confirmGenerateQuote;
 })();

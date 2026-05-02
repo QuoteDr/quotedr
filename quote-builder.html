@@ -7365,7 +7365,7 @@ async function saveQuote() {
                     </button>
                     <div class="d-flex gap-2">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-primary" onclick="confirmGenerateQuote()">
+                        <button type="button" class="btn btn-primary" id="quoteStyleGenerateBtn" onclick="confirmGenerateQuote()">
                             <i class="fas fa-share-square me-1"></i>Generate Quote Link
                         </button>
                     </div>
@@ -7543,6 +7543,12 @@ async function saveQuote() {
             if (window.location.hash === "#manage-items") {
                 setTimeout(function() {
                     if (typeof openManageItemsModal === "function") openManageItemsModal();
+                    history.replaceState(null, "", window.location.pathname + window.location.search);
+                }, 1500);
+            }
+            if (window.location.hash === "#send-quote-settings") {
+                setTimeout(function() {
+                    if (typeof openQuoteSendSettingsModal === "function") openQuoteSendSettingsModal(true);
                     history.replaceState(null, "", window.location.pathname + window.location.search);
                 }, 1500);
             }

@@ -241,6 +241,15 @@ if (location.search.includes('debug')) {
 				<!-- Quote Preferences -->
 				<div class="settings-card">
 			<h5><i class="fas fa-file-invoice me-2" style="color:#1a56a0"></i>Quote Preferences</h5>
+			<div class="alert alert-light border d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+				<div>
+					<div class="fw-semibold"><i class="fas fa-share-square me-1 text-primary"></i>Send Quote Settings</div>
+					<div class="text-muted small">Customize the client view, default message, deposit display, expiry presets, and commitment banner.</div>
+				</div>
+				<a href="quote-builder.html#send-quote-settings" class="btn btn-outline-primary btn-sm">
+					<i class="fas fa-sliders-h me-1"></i>Open Send Settings
+				</a>
+			</div>
 			<div class="row g-3">
 				<div class="col-12">
 					<label class="form-label mb-0">Quote Heading</label>
@@ -966,7 +975,7 @@ Sarah Jones, 905-555-5678"></textarea>
 		// ── Settings Search ──────────────────────────────────────────────────
 		var settingsIndex = [
 			{ tab: 'business', keywords: ['business','company','name','logo','phone','email','address','hst','tagline','owner','city','province','postal'], label: 'Business Profile' },
-			{ tab: 'quotes', keywords: ['quote','prefix','tax','valid','expiry','markup','terms','conditions','heading','number'], label: 'Quote Preferences & Terms' },
+			{ tab: 'quotes', keywords: ['quote','prefix','tax','valid','expiry','markup','terms','conditions','heading','number','send','client view','message','deposit','commitment'], label: 'Quote Preferences & Send Settings' },
 			{ tab: 'pricing', keywords: ['pricing','items','materials','import','export','ai','csv','custom','clients','quickbooks'], label: 'Pricing & Data' },
 			{ tab: 'notifications', keywords: ['email','reminder','followup','follow-up','notification','auto','automatic','days','message'], label: 'Notifications & Reminders' },
 			{ tab: 'feedback', keywords: ['bug','report','feature','request','feedback','idea','problem','issue','broken'], label: 'Feedback & Bug Reports' },
