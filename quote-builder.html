@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!-- build:20260423-0307 -->
 <html lang="en">
 <head>
@@ -588,7 +588,7 @@ if (location.search.includes('debug')) {
                             <li><a class="dropdown-item" href="dashboard.html" onclick="if(unsavedChanges && !confirm('You have unsaved changes. Leave anyway?')) return false; saveSessionQuote();"><i class="fas fa-th-large me-2 text-secondary"></i>Dashboard</a></li>
                             <li><a class="dropdown-item" href="settings.html" onclick="if(unsavedChanges && !confirm('You have unsaved changes. Leave anyway?')) return false; saveSessionQuote();"><i class="fas fa-cog me-2 text-secondary"></i>Settings</a></li>
                             <li><a class="dropdown-item" href="help.html"><i class="fas fa-question-circle me-2 text-secondary"></i>Help</a></li>
-                            <li><a class="dropdown-item" href="pricing.html"><i class="fas fa-star me-2 text-warning"></i>Upgrade ⭐</a></li>
+                            <li><a class="dropdown-item" href="pricing.html"><i class="fas fa-star me-2 text-warning"></i>Upgrade ?</a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="_toggleAiBtn()" id="aiToggleMenuItem"><i class="fas fa-robot me-2 text-secondary"></i>Hide AI Assistant</a></li>
                             <li><hr class="dropdown-divider"></li>
@@ -910,8 +910,8 @@ if (location.search.includes('debug')) {
                 </div>
                 <div class="modal-body">
                     <ul class="nav nav-tabs mb-3" id="ikeaTabs">
-                        <li class="nav-item"><a class="nav-link active" href="#" onclick="showIkeaTab('parse',this);return false;">📋 Paste Order List</a></li>
-                        <li class="nav-item"><a class="nav-link" href="#" onclick="showIkeaTab('prices',this);return false;">💰 My Prices</a></li>
+                        <li class="nav-item"><a class="nav-link active" href="#" onclick="showIkeaTab('parse',this);return false;">?? Paste Order List</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" onclick="showIkeaTab('prices',this);return false;">?? My Prices</a></li>
                     </ul>
 
                     <!-- Tab: Paste Order -->
@@ -1197,7 +1197,7 @@ Example:
                             <label class="form-label"><strong>Category</strong></label>
                             <div class="d-flex gap-2">
                                 <select id="newItemCategory" class="form-select" onchange="handleCategoryChange()"></select>
-                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="addNewCategory()" title="Add a new category">➕</button>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="addNewCategory()" title="Add a new category">?</button>
                             </div>
                         </div>
                         <div class="col-md-3">
@@ -1208,7 +1208,7 @@ Example:
                             <label class="form-label"><strong>Unit Type</strong></label>
                             <div class="d-flex gap-2">
                                 <input type="text" id="newItemUnit" class="form-control" list="unitTypeOptions" placeholder="sq ft">
-                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="addNewUnitType()" title="Add a new unit type">➕</button>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="addNewUnitType()" title="Add a new unit type">?</button>
                             </div>
                             <datalist id="unitTypeOptions">
                                 <option value="sq ft">
@@ -1247,9 +1247,9 @@ Example:
                     </div>
                     <hr>
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h6 class="fw-bold mb-0"><i class="fas fa-list-alt text-secondary"></i> All Items - edit fields, then hit 💾 to save each row</h6>
+                        <h6 class="fw-bold mb-0"><i class="fas fa-list-alt text-secondary"></i> All Items - edit fields, then hit ?? to save each row</h6>
                         <div class="d-flex align-items-center gap-2">
-                            <span id="pricingUnsavedIndicator" class="badge bg-warning text-dark" style="display:none;">⚠️ Unsaved changes</span>
+                            <span id="pricingUnsavedIndicator" class="badge bg-warning text-dark" style="display:none;">?? Unsaved changes</span>
                             <button onclick="saveAllPricingRows()" class="btn btn-sm btn-success"><i class="fas fa-save"></i> Save All</button>
                         </div>
                     </div>
@@ -1257,7 +1257,7 @@ Example:
                     <!-- Search + jump bar -->
                     <div class="d-flex gap-2 mb-2 align-items-center" id="itemListTopAnchor">
                         <div class="flex-grow-1">
-                            <input type="text" id="itemSearchFilter" class="form-control form-control-sm" placeholder="🔍 Search items by name..." oninput="filterItemsList()">
+                            <input type="text" id="itemSearchFilter" class="form-control form-control-sm" placeholder="?? Search items by name..." oninput="filterItemsList()">
                         </div>
                         <button class="btn btn-sm btn-outline-secondary" onclick="whizzScroll('customItemsList', 'top')" title="Jump to top">
                             <i class="fas fa-arrow-up"></i> Top
@@ -1361,7 +1361,7 @@ Example:
         let rooms = [];
         let roomCounter = 0;
 
-        // ── Undo system ──────────────────────────────────────────────────────────
+        // -- Undo system ----------------------------------------------------------
         const _undoStack = [];
         const _UNDO_LIMIT = 50;
         let _undoPaused = false;
@@ -1402,14 +1402,14 @@ Example:
                 undoLastAction();
             }
         });
-        // ─────────────────────────────────────────────────────────────────────────
+        // -------------------------------------------------------------------------
         let customItems = {};
         let categoryStyles = {}; // { "Tile & Stone": { icon: "fa-border-all", color: "#f0f4ff" } }
 
         // Timeline feature - show/hide toggle
         let showTimelines = true;
 
-        // ── Room Icon Picker ──────────────────────────────────────────
+        // -- Room Icon Picker ------------------------------------------
         var _iconPickerRoomId = null;
         var ROOM_ICONS = [
             { label: 'Rooms', icons: [
@@ -1586,9 +1586,9 @@ Example:
             if (picker) picker.remove();
             _iconPickerRoomId = null;
         }
-        // ── End Room Icon Picker ─────────────────────────────────────────
+        // -- End Room Icon Picker -----------------------------------------
 
-        // ── Category Style Picker ──────────────────────────────────
+        // -- Category Style Picker ----------------------------------
         var CAT_ICONS = [
             // General
             { fa: 'fa-tag',                 label: 'Tag (default)' },
@@ -1808,7 +1808,7 @@ Example:
                 }, 0);
             }
         }
-        // ── End Category Style Picker ──────────────────────────────────
+        // -- End Category Style Picker ----------------------------------
 
         function editRoomName(roomId) {
             const room = rooms.find(r => r.id === roomId);
@@ -2596,16 +2596,28 @@ Example:
 
         // IKEA Quick Quote lives in ikea-quote.js.
 
-        // ── Floor Plan Scanner ──────────────────────────────────────────────────────
+        // -- Floor Plan Scanner ------------------------------------------------------
         var _fpImageBase64 = null;
         var _fpMimeType = 'image/jpeg';
+        var _fpImageUrl = null;
         var _fpResults = null;
         var _fpPdfDoc = null;
         var _fpCurrentPage = 1;
         var _fpRooms = [];
         var _fpMapping = null;
-        var _fpAnalysis = null;
+        var _fpSuggestedRoomNames = [];
         var _fpCeilingHeight = 9;
+        var _fpScale = null;
+        var _fpShapes = [];
+        var _fpTool = 'calibrate';
+        var _fpDraft = null;
+        var _fpPolygonDraft = [];
+        var _fpCanvas = null;
+        var _fpCtx = null;
+        var _fpPlanImg = null;
+        var _fpCanvasReady = false;
+        var _fpMouseDown = false;
+        var _fpShapeCounter = 1;
 
         var _fpTradeConfig = [
             { key: 'flooring', label: 'Flooring', icon: 'fa-layer-group' },
@@ -2627,21 +2639,23 @@ Example:
             });
         }
 
-        function _fpConfidenceBadge(confidence) {
-            var pct = Math.round((parseFloat(confidence) || 0) * 100);
-            var cls = pct >= 75 ? 'bg-success' : (pct >= 55 ? 'bg-warning text-dark' : 'bg-danger');
-            return '<span class="badge ' + cls + '" title="AI confidence">' + pct + '%</span>';
+        function _fpRound(value, places) {
+            var p = Math.pow(10, places || 1);
+            return Math.round((parseFloat(value) || 0) * p) / p;
+        }
+
+        function _fpDistance(a, b) {
+            var dx = (a.x || 0) - (b.x || 0);
+            var dy = (a.y || 0) - (b.y || 0);
+            return Math.sqrt(dx * dx + dy * dy);
         }
 
         function _fpAllItems() {
-            // customItems is the source of truth — { "Category": [{name, unitType, rate, ...}] }
-            // category is the object KEY, not a field on the item itself
             var all = [];
             var seen = {};
             var db = (typeof customItems === 'object') ? customItems : {};
             for (var cat in db) {
-                if (!db.hasOwnProperty(cat)) continue;
-                if (!Array.isArray(db[cat])) continue;
+                if (!db.hasOwnProperty(cat) || !Array.isArray(db[cat])) continue;
                 db[cat].forEach(function(item) {
                     if (!item || !item.name) return;
                     var key = cat + '||' + item.name;
@@ -2654,12 +2668,12 @@ Example:
             return all;
         }
 
-        // ── Open modal ──
         function openFloorPlanModal() {
-            _fpImageBase64 = null; _fpMimeType = 'image/jpeg'; _fpResults = null; _fpRooms = []; _fpAnalysis = null; _fpCeilingHeight = 9;
+            _fpImageBase64 = null; _fpMimeType = 'image/jpeg'; _fpImageUrl = null; _fpResults = null; _fpRooms = [];
+            _fpSuggestedRoomNames = []; _fpCeilingHeight = 9; _fpScale = null; _fpShapes = []; _fpDraft = null; _fpPolygonDraft = [];
+            _fpCanvasReady = false; _fpTool = 'calibrate'; _fpShapeCounter = 1;
             var modal = new bootstrap.Modal(document.getElementById('floorPlanModal'));
             modal.show();
-            // Load mapping
             _supabase.auth.getUser().then(function(r) {
                 var uid = r.data && r.data.user ? r.data.user.id : null;
                 if (!uid) { _fpRenderSetup(1); return; }
@@ -2680,7 +2694,6 @@ Example:
             _fpRenderSetup(1);
         }
 
-        // ── Setup Wizard ──
         var _fpSetupCurrent = 1;
 
         function _fpRenderSetup(step) {
@@ -2692,8 +2705,8 @@ Example:
 
             document.getElementById('floorPlanModalBody').innerHTML =
                 '<div class="d-flex justify-content-center gap-1 mb-3">' + _fpStepBadges(step, stepLabels) + '</div>' +
-                '<h5><i class="fas ' + tc.icon + ' me-2 text-primary"></i>' + tc.label + ' — link your line items</h5>' +
-                '<p class="text-muted small">Select all items you use for ' + tc.label.toLowerCase() + '. You can link multiple (e.g. supply + labour).</p>' +
+                '<h5><i class="fas ' + tc.icon + ' me-2 text-primary"></i>' + tc.label + ' - link your line items</h5>' +
+                '<p class="text-muted small">Select all items you use for ' + tc.label.toLowerCase() + '. You can link multiple supply and labor items.</p>' +
                 '<input type="text" class="form-control form-control-sm mb-2" id="fpSetupSearch" placeholder="Search items..." oninput="_fpSetupRenderList(' + step + ')">' +
                 '<div id="fpSetupList" style="max-height:calc(100vh - 340px);overflow-y:auto;border:1px solid #dee2e6;border-radius:8px;padding:8px;"></div>' +
                 '<p class="text-muted small mt-3"><i class="fas fa-info-circle me-1"></i>These settings can be changed later in <strong>Settings &rarr; Floor Plan Scanner</strong></p>' +
@@ -2713,7 +2726,6 @@ Example:
             var items = _fpAllItems().filter(function(i) {
                 return !filter || (i.name + ' ' + i.category).toLowerCase().indexOf(filter) >= 0;
             });
-            // Sort: linked items first
             items.sort(function(a, b) {
                 var aL = linked.indexOf(a.category+'||'+a.name) >= 0;
                 var bL = linked.indexOf(b.category+'||'+b.name) >= 0;
@@ -2725,9 +2737,9 @@ Example:
                 var safeKey = key.replace(/'/g, "\\'");
                 return '<div class="d-flex align-items-center gap-2 py-1 border-bottom">' +
                     '<input type="checkbox" class="form-check-input"' + chk + ' onchange="_fpSetupToggle(\'' + tc.key + '\',\'' + safeKey + '\',this.checked)">' +
-                    '<span class="badge bg-light text-dark me-1" style="font-size:0.7rem;">' + item.category + '</span>' +
-                    '<span class="small flex-grow-1">' + item.name + '</span>' +
-                    '<span class="text-muted small">$' + (item.rate||0) + '/' + (item.unitType||'sqft') + '</span>' +
+                    '<span class="badge bg-light text-dark me-1" style="font-size:0.7rem;">' + _fpEscapeHtml(item.category) + '</span>' +
+                    '<span class="small flex-grow-1">' + _fpEscapeHtml(item.name) + '</span>' +
+                    '<span class="text-muted small">$' + (item.rate||0) + '/' + _fpEscapeHtml(item.unitType||'sqft') + '</span>' +
                     '</div>';
             }).join('');
             document.getElementById('fpSetupList').innerHTML = html || '<p class="text-muted small p-2">No items found. Add items in the quote builder first.</p>';
@@ -2758,12 +2770,11 @@ Example:
             });
         }
 
-        // ── Step 1: Upload ──
         function _fpRenderStep1() {
             document.getElementById('floorPlanModalBody').innerHTML =
                 '<div class="text-center mb-3">' +
-                '<div class="d-flex justify-content-center gap-1 mb-3">' + _fpStepBadges(1, ['Upload','Measure','Review']) + '</div>' +
-                '<p class="text-muted small">Upload a photo or PDF of your floor plan. Clear photos of drawings work best.</p>' +
+                '<div class="d-flex justify-content-center gap-1 mb-3">' + _fpStepBadges(1, ['Upload','Calibrate','Review']) + '</div>' +
+                '<p class="text-muted small">Upload a floor plan, then calibrate the scale from one known dimension. AI will only suggest room names.</p>' +
                 '</div>' +
                 '<div id="fpDropZone" onclick="document.getElementById(\'fpFileInput\').click()" style="border:2px dashed #1a56a0;border-radius:12px;padding:40px 20px;text-align:center;cursor:pointer;background:#f8f9ff;" ondragover="event.preventDefault();this.style.background=\'#e8f0ff\'" ondragleave="this.style.background=\'#f8f9ff\'" ondrop="event.preventDefault();_fpHandleFile(event.dataTransfer.files[0])">' +
                 '<i class="fas fa-cloud-upload-alt fa-3x mb-3" style="color:#1a56a0;"></i>' +
@@ -2783,14 +2794,9 @@ Example:
                 '</div>' +
                 '</div>' +
                 '<div id="fpStep1Error" class="alert alert-danger mt-3" style="display:none;"></div>' +
-                '<div class="row g-2 mt-3">' +
-                '<div class="col-sm-6"><label class="form-label small mb-1">Overall width (ft, optional)</label><input type="number" id="fpOverallWidth" class="form-control form-control-sm" min="0" step="0.5" value="' + _fpEscapeHtml(localStorage.getItem('fp_overall_width_ft') || '') + '" placeholder="e.g. 28"></div>' +
-                '<div class="col-sm-6"><label class="form-label small mb-1">Overall depth (ft, optional)</label><input type="number" id="fpOverallDepth" class="form-control form-control-sm" min="0" step="0.5" value="' + _fpEscapeHtml(localStorage.getItem('fp_overall_depth_ft') || '') + '" placeholder="e.g. 40"></div>' +
-                '<div class="col-12 text-muted small"><i class="fas fa-anchor me-1"></i>These help AI scale the plan, but uncertain rooms will still stay blank for manual entry.</div>' +
-                '</div>' +
                 '<div class="d-flex justify-content-between mt-3">' +
                 '<button class="btn btn-outline-secondary btn-sm" onclick="openFpScannerSetup()"><i class="fas fa-cog me-1"></i>Reconfigure items</button>' +
-                '<button class="btn btn-primary" id="fpNext1Btn" onclick="_fpGoToStep2()" disabled>Next <i class="fas fa-arrow-right ms-1"></i></button>' +
+                '<button class="btn btn-primary" id="fpNext1Btn" onclick="_fpGoToMeasureTool()" disabled>Measure <i class="fas fa-ruler-combined ms-1"></i></button>' +
                 '</div>';
         }
 
@@ -2824,10 +2830,10 @@ Example:
                 _fpMimeType = file.type;
                 var reader = new FileReader();
                 reader.onload = function(e) {
-                    var dataUrl = e.target.result;
-                    _fpImageBase64 = dataUrl.split(',')[1];
-                    document.getElementById('fpPreviewImg').src = dataUrl;
-                    document.getElementById('fpPreviewLabel').textContent = file.name + ' ready \u2714';
+                    _fpImageUrl = e.target.result;
+                    _fpImageBase64 = _fpImageUrl.split(',')[1];
+                    document.getElementById('fpPreviewImg').src = _fpImageUrl;
+                    document.getElementById('fpPreviewLabel').textContent = file.name + ' ready';
                     document.getElementById('fpPreviewArea').style.display = '';
                     document.getElementById('fpNext1Btn').disabled = false;
                 };
@@ -2844,16 +2850,16 @@ Example:
             var viewport = page.getViewport({ scale: 2.0 });
             var canvas = document.createElement('canvas');
             canvas.width = viewport.width; canvas.height = viewport.height;
-            await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-            var dataUrl = canvas.toDataURL('image/jpeg', 0.92);
-            _fpImageBase64 = dataUrl.split(',')[1]; _fpMimeType = 'image/jpeg';
+            await page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise;
+            _fpImageUrl = canvas.toDataURL('image/jpeg', 0.92);
+            _fpImageBase64 = _fpImageUrl.split(',')[1]; _fpMimeType = 'image/jpeg';
             var imgEl = document.getElementById('fpPreviewImg');
             var labelEl = document.getElementById('fpPreviewLabel');
             var pickerEl = document.getElementById('fpPagePicker');
             var pageInput = document.getElementById('fpPageInput');
             var pageTotalEl = document.getElementById('fpPageTotal');
-            if (imgEl) imgEl.src = dataUrl;
-            if (labelEl) labelEl.textContent = 'Page ' + pageNum + ' of ' + _fpPdfDoc.numPages + ' \u2014 navigate to your floor plan page';
+            if (imgEl) imgEl.src = _fpImageUrl;
+            if (labelEl) labelEl.textContent = 'Page ' + pageNum + ' of ' + _fpPdfDoc.numPages + ' ready';
             if (pickerEl) pickerEl.style.display = _fpPdfDoc.numPages > 1 ? 'flex' : 'none';
             if (pageInput) { pageInput.value = pageNum; pageInput.max = _fpPdfDoc.numPages; }
             if (pageTotalEl) pageTotalEl.textContent = 'of ' + _fpPdfDoc.numPages;
@@ -2861,9 +2867,7 @@ Example:
 
         async function _fpChangePage(delta, absolute) {
             if (!_fpPdfDoc) return;
-            var newPage;
-            if (absolute !== undefined) { newPage = Math.max(1, Math.min(_fpPdfDoc.numPages, absolute)); }
-            else { newPage = Math.max(1, Math.min(_fpPdfDoc.numPages, _fpCurrentPage + delta)); }
+            var newPage = absolute !== undefined ? Math.max(1, Math.min(_fpPdfDoc.numPages, absolute)) : Math.max(1, Math.min(_fpPdfDoc.numPages, _fpCurrentPage + delta));
             if (newPage === _fpCurrentPage && absolute === undefined) return;
             _fpCurrentPage = newPage;
             var labelEl = document.getElementById('fpPreviewLabel');
@@ -2871,273 +2875,463 @@ Example:
             await _fpRenderPdfPage(newPage);
         }
 
-        // ── Step 2: Measure ──
-        async function _fpGoToStep2() {
-            if (!_fpImageBase64) return;
-            document.getElementById('floorPlanModalBody').innerHTML =
-                '<div class="text-center py-5"><div class="spinner-border text-primary mb-3"></div>' +
-                '<div class="fw-semibold">Reading plan labels and dimensions...</div>' +
-                '<div class="text-muted small mt-1">AI will prefill only what it can explain. You can edit everything next.</div></div>';
-            var roomNames = ['Living Room','Kitchen','Dining','Bathroom','Bedroom'];
-            try {
-                var ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso';
-                var overallWidthEl = document.getElementById('fpOverallWidth');
-                var overallDepthEl = document.getElementById('fpOverallDepth');
-                var overallWidth = parseFloat((overallWidthEl && overallWidthEl.value) || localStorage.getItem('fp_overall_width_ft') || '') || null;
-                var overallDepth = parseFloat((overallDepthEl && overallDepthEl.value) || localStorage.getItem('fp_overall_depth_ft') || '') || null;
-                if (overallWidth) localStorage.setItem('fp_overall_width_ft', overallWidth);
-                if (overallDepth) localStorage.setItem('fp_overall_depth_ft', overallDepth);
-                var res = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/analyze-floor-plan', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ANON_KEY },
-                    body: JSON.stringify({ mode: 'full_analysis', imageBase64: _fpImageBase64, mimeType: _fpMimeType, overallWidthFt: overallWidth, overallDepthFt: overallDepth })
-                });
-                var data = await res.json();
-                if (res.ok && data && data.rooms && data.rooms.length > 0) {
-                    _fpAnalysis = data;
-                    _fpRooms = data.rooms.map(function(r, i) {
-                        return {
-                            id: Date.now() + i,
-                            name: r.name || ('Room ' + (i + 1)),
-                            length: parseFloat(r.lengthFt || r.length || 0) || 0,
-                            width: parseFloat(r.widthFt || r.width || 0) || 0,
-                            area: parseFloat(r.areaSqft || r.area || 0) || 0,
-                            perimeter: parseFloat(r.perimeterFt || r.perimeter || 0) || 0,
-                            confidence: parseFloat(r.confidence || 0) || 0,
-                            source: r.source || '',
-                            evidence: r.evidence || '',
-                            notes: r.notes || '',
-                            checked: true,
-                            trades: {}
-                        };
-                    });
-                } else if (data && data.error) {
-                    throw new Error(data.error);
-                }
-            } catch(e) { /* silent fallback */ }
-            // Pre-populate _fpRooms from AI names if empty
-            if (_fpRooms.length === 0) {
-                _fpRooms = roomNames.map(function(n, i) {
-                    return { id: Date.now() + i, name: n, length: 0, width: 0, confidence: 0, source: 'manual', evidence: '', checked: true, trades: {} };
-                });
-            }
-            _fpRenderMeasureStep();
+        async function _fpGoToMeasureTool() {
+            if (!_fpImageBase64 || !_fpImageUrl) return;
+            _fpRenderMeasureTool();
+            _fpLoadCanvas();
+            _fpLoadRoomSuggestions();
         }
 
-        function _fpRenderMeasureStep() {
-            var imgSrc = 'data:' + _fpMimeType + ';base64,' + _fpImageBase64;
-            var analysisWarnings = (_fpAnalysis && _fpAnalysis.warnings) ? _fpAnalysis.warnings : [];
-            var warningHtml = analysisWarnings.length
-                ? '<div class="alert alert-warning py-2 small mb-2"><strong>Review needed:</strong> ' + analysisWarnings.map(_fpEscapeHtml).join(' ') + '</div>'
-                : '';
-            var rawDimsHtml = (_fpAnalysis && _fpAnalysis.rawDimensions && _fpAnalysis.rawDimensions.length)
-                ? '<details class="small text-muted mb-2"><summary>Visible dimensions AI found</summary><div class="mt-1">' + _fpAnalysis.rawDimensions.map(_fpEscapeHtml).join(' &bull; ') + '</div></details>'
-                : '';
-            // Build the trade headers for per-room selectors
-            var activeTrades = _fpTradeConfig.filter(function(tc) {
-                return _fpMapping && _fpMapping[tc.key] && _fpMapping[tc.key].length > 0;
-            });
+        function _fpToolLabel() {
+            if (_fpTool === 'calibrate') return 'Draw over a known dimension, then enter its real length.';
+            if (_fpTool === 'line') return 'Drag a line for linear footage.';
+            if (_fpTool === 'box') return 'Drag a rectangle around a room.';
+            return 'Click room corners, then finish the polygon.';
+        }
 
-            var roomRowsHtml = _fpRooms.map(function(room, ri) {
-                // Trade dropdowns row
-                var tradeDropdowns = activeTrades.map(function(tc) {
-                    var opts = '<option value="">&#8212; Skip</option>' +
-                        (_fpMapping[tc.key] || []).map(function(item) {
-                            var sel = (room.trades && room.trades[tc.key] === item.name) ? ' selected' : '';
-                            return '<option value="' + item.name.replace(/"/g,'&quot;') + '"' + sel + '>' + item.name + '</option>';
-                        }).join('');
-                    return '<div class="me-2 mb-1" style="min-width:130px;">' +
-                        '<label class="form-label mb-0" style="font-size:0.7rem;color:#666;"><i class="fas ' + tc.icon + ' me-1"></i>' + tc.label + '</label>' +
-                        '<select class="form-select form-select-sm" onchange="_fpSetRoomTrade(' + ri + ',\'' + tc.key + '\',this.value)">' + opts + '</select>' +
-                        '</div>';
+        function _fpRenderMeasureTool() {
+            var nameOptions = _fpSuggestedRoomNames.map(function(n) { return '<option value="' + _fpEscapeHtml(n) + '">' + _fpEscapeHtml(n) + '</option>'; }).join('');
+            var activeTrades = _fpTradeConfig.filter(function(tc) { return _fpMapping && _fpMapping[tc.key] && _fpMapping[tc.key].length > 0; });
+            var tradeControls = activeTrades.map(function(tc) {
+                var opts = '<option value="">Skip</option>' + (_fpMapping[tc.key] || []).map(function(item) {
+                    return '<option value="' + _fpEscapeHtml(item.name) + '">' + _fpEscapeHtml(item.name) + '</option>';
                 }).join('');
-
-                var evidence = room.evidence || room.notes || '';
-                var metaHtml = (room.confidence || evidence)
-                    ? '<div class="d-flex align-items-center gap-2 flex-wrap mt-2 small text-muted">' +
-                        _fpConfidenceBadge(room.confidence || 0) +
-                        (room.source ? '<span class="badge bg-light text-dark">' + _fpEscapeHtml(room.source) + '</span>' : '') +
-                        (evidence ? '<span style="font-size:0.78rem;">' + _fpEscapeHtml(evidence) + '</span>' : '') +
-                      '</div>'
-                    : '';
-                return '<div class="card mb-2" id="fpMR_' + ri + '">' +
-                    '<div class="card-body py-2">' +
-                    '<div class="d-flex align-items-center gap-2 flex-wrap">' +
-                    '<input type="checkbox" class="form-check-input" id="fpMRChk_' + ri + '"' + (room.checked ? ' checked' : '') + ' onchange="_fpRooms[' + ri + '].checked=this.checked">' +
-                    '<input type="text" class="form-control form-control-sm" id="fpMRName_' + ri + '" value="' + _fpEscapeHtml(room.name) + '" style="max-width:160px;" oninput="_fpRooms[' + ri + '].name=this.value">' +
-                    '<div class="d-flex align-items-center gap-1">' +
-                    '<input type="number" class="form-control form-control-sm" id="fpMRL_' + ri + '" placeholder="L ft" value="' + (room.length||'') + '" min="0" step="0.5" style="width:72px;" oninput="_fpRooms[' + ri + '].length=parseFloat(this.value)||0;_fpUpdateRoomAreaLabel(' + ri + ')">' +
-                    '<span class="text-muted">&times;</span>' +
-                    '<input type="number" class="form-control form-control-sm" id="fpMRW_' + ri + '" placeholder="W ft" value="' + (room.width||'') + '" min="0" step="0.5" style="width:72px;" oninput="_fpRooms[' + ri + '].width=parseFloat(this.value)||0;_fpUpdateRoomAreaLabel(' + ri + ')">' +
-                    '<span class="text-muted small">ft</span>' +
-                    '</div>' +
-                    '<span class="badge bg-light text-dark" id="fpAreaLabel_' + ri + '">' + ((room.length && room.width) ? Math.round(room.length * room.width) + ' sqft' : 'manual') + '</span>' +
-                    '<button class="btn btn-link text-danger p-0 ms-auto" onclick="_fpRemoveMeasureRoom(' + ri + ')"><i class="fas fa-times"></i></button>' +
-                    '</div>' +
-                    metaHtml +
-                    (activeTrades.length > 0 ?
-                        '<div class="d-flex flex-wrap mt-2 gap-1">' + tradeDropdowns + '</div>' : '') +
-                    '</div></div>';
+                return '<label class="form-label small mb-1"><i class="fas ' + tc.icon + ' me-1"></i>' + tc.label + '</label><select class="form-select form-select-sm mb-2" id="fpTrade_' + tc.key + '">' + opts + '</select>';
             }).join('');
-
+            var scaleText = _fpScale ? (_fpRound(_fpScale.pxPerFt, 2) + ' px/ft') : 'Not calibrated';
             document.getElementById('floorPlanModalBody').innerHTML =
-                '<div class="d-flex justify-content-center gap-1 mb-2">' + _fpStepBadges(2, ['Upload','Measure','Review']) + '</div>' +
-                '<div class="row g-0" style="height:calc(100vh - 130px);">' +
-                // Left: image
-                '<div class="col-md-7 pe-2" style="overflow-y:auto;height:100%;">' +
-                '<div class="text-muted small mb-1"><i class="fas fa-search-plus me-1"></i>Measure each room on this drawing, then enter dimensions on the right</div>' +
-                '<img src="' + imgSrc + '" style="width:100%;border:1px solid #dee2e6;border-radius:8px;" alt="Floor plan">' +
+                '<div class="d-flex justify-content-center gap-1 mb-2">' + _fpStepBadges(2, ['Upload','Calibrate','Review']) + '</div>' +
+                '<div class="row g-2" style="height:calc(100vh - 138px);">' +
+                '<div class="col-lg-8 d-flex flex-column" style="min-height:420px;">' +
+                '<div class="d-flex flex-wrap align-items-center gap-1 mb-2">' +
+                _fpToolButton('calibrate', 'fa-arrows-left-right', 'Scale') +
+                _fpToolButton('line', 'fa-ruler-horizontal', 'Line') +
+                _fpToolButton('box', 'fa-vector-square', 'Box') +
+                _fpToolButton('polygon', 'fa-draw-polygon', 'Polygon') +
+                '<button class="btn btn-outline-secondary btn-sm ms-auto" onclick="_fpUndoShape()" title="Undo"><i class="fas fa-undo"></i></button>' +
+                '<button class="btn btn-outline-secondary btn-sm" onclick="_fpClearShapes()" title="Clear"><i class="fas fa-trash"></i></button>' +
+                '<button class="btn btn-outline-primary btn-sm" onclick="_fpFinishPolygon()" id="fpFinishPolyBtn"><i class="fas fa-check me-1"></i>Finish Polygon</button>' +
                 '</div>' +
-                // Right: room table
-                '<div class="col-md-5 ps-2 d-flex flex-column" style="height:100%;">' +
-                warningHtml +
-                rawDimsHtml +
-                '<div class="d-flex align-items-center gap-3 mb-2">' +
-                '<span class="fw-semibold">Room Dimensions</span>' +
-                '<div class="d-flex align-items-center gap-1 ms-auto">' +
-                '<label class="form-label mb-0 small">Ceiling:</label>' +
-                '<input type="number" id="fpCeilingHeight" class="form-control form-control-sm" value="' + _fpCeilingHeight + '" min="6" max="20" step="0.5" style="width:65px;" oninput="_fpCeilingHeight=parseFloat(this.value)||9">' +
-                '<span class="text-muted small">ft</span>' +
+                '<div class="small text-muted mb-1" id="fpToolHelp">' + _fpToolLabel() + '</div>' +
+                '<div style="flex:1;overflow:auto;border:1px solid #ced4da;border-radius:8px;background:#f8f9fa;">' +
+                '<canvas id="fpMeasureCanvas" style="display:block;max-width:100%;cursor:crosshair;"></canvas>' +
                 '</div>' +
-                '<button class="btn btn-outline-secondary btn-sm" onclick="_fpApplyTradesAll()" title="Copy Room 1 trade selections to all rooms"><i class="fas fa-copy me-1"></i>Apply All</button>' +
                 '</div>' +
-                '<div class="text-muted small mb-2">Enter L &times; W for each room. Use the dropdowns to select your line items.</div>' +
-                '<div style="flex:1;overflow-y:auto;">' + roomRowsHtml + '</div>' +
-                '<div class="mt-2">' +
-                '<button class="btn btn-outline-secondary btn-sm" onclick="_fpAddMeasureRoom()"><i class="fas fa-plus me-1"></i>Add Room</button>' +
-                '<div class="text-muted small mt-1"><i class="fas fa-lightbulb text-warning me-1"></i>Include hallways and stair areas</div>' +
+                '<div class="col-lg-4 d-flex flex-column">' +
+                '<div class="border rounded p-2 mb-2">' +
+                '<div class="d-flex align-items-center justify-content-between mb-2"><strong class="small">Scale</strong><span class="badge bg-light text-dark">' + _fpEscapeHtml(scaleText) + '</span></div>' +
+                '<label class="form-label small mb-1">Known line length in feet</label>' +
+                '<div class="input-group input-group-sm"><input type="number" id="fpKnownLength" class="form-control" min="0.1" step="0.1" placeholder="e.g. 12"><span class="input-group-text">ft</span><button class="btn btn-primary" onclick="_fpApplyScale()">Set</button></div>' +
+                '<div class="text-muted small mt-1">Use the Scale tool on a labeled dimension first.</div>' +
+                '</div>' +
+                '<div class="border rounded p-2 mb-2">' +
+                '<strong class="small d-block mb-2">Next Measurement</strong>' +
+                '<label class="form-label small mb-1">Room name</label>' +
+                '<select class="form-select form-select-sm mb-2" id="fpRoomNameSelect" onchange="_fpRoomNameSelectChanged()"><option value="">Custom room</option>' + nameOptions + '</select>' +
+                '<input type="text" class="form-control form-control-sm mb-2" id="fpRoomNameCustom" placeholder="Room name">' +
+                '<label class="form-label small mb-1">Ceiling height</label>' +
+                '<div class="input-group input-group-sm mb-2"><input type="number" id="fpCeilingHeight" class="form-control" value="' + _fpCeilingHeight + '" min="6" max="20" step="0.5" oninput="_fpCeilingHeight=parseFloat(this.value)||9"><span class="input-group-text">ft</span></div>' +
+                (tradeControls || '<div class="text-muted small">No linked line items yet. Reconfigure items to auto-create quote rows.</div>') +
+                '<button class="btn btn-outline-secondary btn-sm w-100 mt-1" onclick="_fpApplyTradesAll()"><i class="fas fa-copy me-1"></i>Apply First Selection To All</button>' +
+                '</div>' +
+                '<div class="border rounded p-2 flex-grow-1" style="overflow:auto;">' +
+                '<div class="d-flex align-items-center justify-content-between mb-2"><strong class="small">Measurements</strong><span class="badge bg-primary">' + _fpShapes.length + '</span></div>' +
+                '<div id="fpMeasurementsList">' + _fpMeasurementsHtml() + '</div>' +
                 '</div>' +
                 '</div>' +
                 '</div>' +
                 '<div class="d-flex justify-content-between mt-2">' +
                 '<button class="btn btn-outline-secondary" onclick="_fpRenderStep1()"><i class="fas fa-arrow-left me-1"></i>Back</button>' +
-                '<button class="btn btn-primary" onclick="_fpGoToStep3()">Calculate <i class="fas fa-calculator ms-1"></i></button>' +
+                '<button class="btn btn-primary" onclick="_fpGoToStep3()" ' + (_fpShapes.length ? '' : 'disabled') + '>Review <i class="fas fa-arrow-right ms-1"></i></button>' +
                 '</div>';
+            setTimeout(function() { _fpLoadCanvas(); }, 0);
         }
 
-        function _fpUpdateRoomAreaLabel(ri) {
-            var label = document.getElementById('fpAreaLabel_' + ri);
-            var room = _fpRooms[ri];
-            if (!label || !room) return;
-            var area = (parseFloat(room.length) || 0) * (parseFloat(room.width) || 0);
-            label.textContent = area > 0 ? Math.round(area) + ' sqft' : 'manual';
+        function _fpToolButton(tool, icon, label) {
+            return '<button class="btn btn-' + (_fpTool === tool ? 'primary' : 'outline-primary') + ' btn-sm" onclick="_fpSetTool(\'' + tool + '\')" title="' + _fpEscapeHtml(label) + '"><i class="fas ' + icon + ' me-1"></i>' + label + '</button>';
         }
 
-        function _fpSetRoomTrade(ri, tradeKey, itemName) {
-            if (!_fpRooms[ri].trades) _fpRooms[ri].trades = {};
-            _fpRooms[ri].trades[tradeKey] = itemName;
+        function _fpSetTool(tool) {
+            _fpTool = tool;
+            _fpDraft = null;
+            if (tool !== 'polygon') _fpPolygonDraft = [];
+            _fpRenderMeasureTool();
+        }
+
+        function _fpMeasurementsHtml() {
+            if (!_fpShapes.length) return '<div class="text-muted small">No measurements yet.</div>';
+            return _fpShapes.map(function(shape, i) {
+                var d = shape.dimensions || {};
+                var metric = shape.type === 'line'
+                    ? _fpRound(d.length, 1) + ' LF'
+                    : _fpRound(d.area, 1) + ' sqft | ' + _fpRound(d.perimeter, 1) + ' LF';
+                return '<div class="border-bottom py-2 small">' +
+                    '<div class="d-flex align-items-center gap-2"><strong class="flex-grow-1">' + _fpEscapeHtml(shape.name) + '</strong><span class="badge bg-light text-dark">' + _fpEscapeHtml(shape.type) + '</span><button class="btn btn-link text-danger p-0" onclick="_fpRemoveShape(' + i + ')"><i class="fas fa-times"></i></button></div>' +
+                    '<div class="text-muted">' + metric + '</div>' +
+                    '</div>';
+            }).join('');
+        }
+
+        function _fpRoomNameSelectChanged() {
+            var select = document.getElementById('fpRoomNameSelect');
+            var custom = document.getElementById('fpRoomNameCustom');
+            if (select && custom && select.value) custom.value = select.value;
+        }
+
+        function _fpSelectedRoomName() {
+            var custom = document.getElementById('fpRoomNameCustom');
+            var select = document.getElementById('fpRoomNameSelect');
+            return (custom && custom.value.trim()) || (select && select.value) || ('Room ' + _fpShapeCounter);
+        }
+
+        function _fpSelectedTrades() {
+            var trades = {};
+            _fpTradeConfig.forEach(function(tc) {
+                var el = document.getElementById('fpTrade_' + tc.key);
+                if (el && el.value) trades[tc.key] = el.value;
+            });
+            return trades;
+        }
+
+        function _fpLoadCanvas() {
+            _fpCanvas = document.getElementById('fpMeasureCanvas');
+            if (!_fpCanvas || !_fpImageUrl) return;
+            _fpCtx = _fpCanvas.getContext('2d');
+            _fpPlanImg = new Image();
+            _fpPlanImg.onload = function() {
+                var maxW = Math.min(1200, Math.max(720, (_fpCanvas.parentElement ? _fpCanvas.parentElement.clientWidth : 900) - 4));
+                var scale = Math.min(1, maxW / _fpPlanImg.naturalWidth);
+                _fpCanvas.width = Math.max(1, Math.round(_fpPlanImg.naturalWidth * scale));
+                _fpCanvas.height = Math.max(1, Math.round(_fpPlanImg.naturalHeight * scale));
+                _fpCanvasReady = true;
+                _fpAttachCanvasEvents();
+                _fpDrawCanvas();
+            };
+            _fpPlanImg.src = _fpImageUrl;
+        }
+
+        function _fpAttachCanvasEvents() {
+            if (!_fpCanvas || _fpCanvas._fpEventsAttached) return;
+            _fpCanvas._fpEventsAttached = true;
+            _fpCanvas.addEventListener('mousedown', _fpCanvasDown);
+            _fpCanvas.addEventListener('mousemove', _fpCanvasMove);
+            window.addEventListener('mouseup', _fpCanvasUp);
+            _fpCanvas.addEventListener('dblclick', function(e) {
+                if (_fpTool === 'polygon') { e.preventDefault(); _fpFinishPolygon(); }
+            });
+        }
+
+        function _fpCanvasPoint(e) {
+            var rect = _fpCanvas.getBoundingClientRect();
+            var sx = _fpCanvas.width / rect.width;
+            var sy = _fpCanvas.height / rect.height;
+            return { x: (e.clientX - rect.left) * sx, y: (e.clientY - rect.top) * sy };
+        }
+
+        function _fpCanvasDown(e) {
+            if (!_fpCanvasReady) return;
+            var pt = _fpCanvasPoint(e);
+            if (_fpTool === 'polygon') {
+                if (!_fpScale) { _fpShowMeasureNotice('Calibrate the scale before drawing rooms.'); return; }
+                _fpPolygonDraft.push(pt);
+                _fpDraft = { type: 'polygon', points: _fpPolygonDraft.slice() };
+                _fpDrawCanvas();
+                return;
+            }
+            _fpMouseDown = true;
+            _fpDraft = { type: _fpTool, start: pt, end: pt };
+            _fpDrawCanvas();
+        }
+
+        function _fpCanvasMove(e) {
+            if (!_fpCanvasReady || !_fpDraft) return;
+            var pt = _fpCanvasPoint(e);
+            if (_fpTool === 'polygon') {
+                _fpDraft.hover = pt;
+            } else if (_fpMouseDown) {
+                _fpDraft.end = pt;
+            }
+            _fpDrawCanvas();
+        }
+
+        function _fpCanvasUp() {
+            if (!_fpMouseDown || !_fpDraft) return;
+            _fpMouseDown = false;
+            if (_fpTool === 'calibrate') {
+                _fpDrawCanvas();
+                _fpShowMeasureNotice('Enter the real length and press Set.');
+                return;
+            }
+            if (!_fpScale) { _fpDraft = null; _fpShowMeasureNotice('Calibrate the scale before drawing rooms.'); _fpDrawCanvas(); return; }
+            if (_fpDistance(_fpDraft.start, _fpDraft.end) < 8) { _fpDraft = null; _fpDrawCanvas(); return; }
+            if (_fpTool === 'line') _fpAddShape('line', [_fpDraft.start, _fpDraft.end]);
+            if (_fpTool === 'box') _fpAddBoxShape(_fpDraft.start, _fpDraft.end);
+            _fpDraft = null;
+            _fpRenderMeasureTool();
+        }
+
+        function _fpApplyScale() {
+            var known = parseFloat(document.getElementById('fpKnownLength') ? document.getElementById('fpKnownLength').value : '');
+            if (!_fpDraft || _fpDraft.type !== 'calibrate' || !known || known <= 0) { _fpShowMeasureNotice('Draw a scale line and enter a valid length.'); return; }
+            var px = _fpDistance(_fpDraft.start, _fpDraft.end);
+            if (px < 8) { _fpShowMeasureNotice('Draw a longer scale line.'); return; }
+            _fpScale = { pxPerFt: px / known, knownFt: known, line: { start: _fpDraft.start, end: _fpDraft.end } };
+            _fpDraft = null;
+            _fpTool = 'box';
+            _fpRenderMeasureTool();
+        }
+
+        function _fpAddBoxShape(start, end) {
+            var points = [
+                { x: start.x, y: start.y },
+                { x: end.x, y: start.y },
+                { x: end.x, y: end.y },
+                { x: start.x, y: end.y }
+            ];
+            _fpAddShape('box', points);
+        }
+
+        function _fpAddShape(type, points) {
+            var dimensions = _fpShapeDimensions(type, points);
+            _fpShapes.push({
+                id: _fpShapeCounter++,
+                type: type,
+                name: _fpSelectedRoomName(),
+                points: points,
+                trades: _fpSelectedTrades(),
+                dimensions: dimensions
+            });
+        }
+
+        function _fpFinishPolygon() {
+            if (_fpPolygonDraft.length < 3) { _fpShowMeasureNotice('A polygon needs at least 3 points.'); return; }
+            _fpAddShape('polygon', _fpPolygonDraft.slice());
+            _fpPolygonDraft = [];
+            _fpDraft = null;
+            _fpRenderMeasureTool();
+        }
+
+        function _fpShapeDimensions(type, points) {
+            var pxPerFt = _fpScale ? _fpScale.pxPerFt : 1;
+            if (type === 'line') {
+                return { length: _fpDistance(points[0], points[1]) / pxPerFt, width: 0, area: 0, perimeter: _fpDistance(points[0], points[1]) / pxPerFt };
+            }
+            var perimeterPx = 0;
+            var areaPx = 0;
+            var minX = points[0].x, maxX = points[0].x, minY = points[0].y, maxY = points[0].y;
+            for (var i = 0; i < points.length; i++) {
+                var a = points[i];
+                var b = points[(i + 1) % points.length];
+                perimeterPx += _fpDistance(a, b);
+                areaPx += (a.x * b.y) - (b.x * a.y);
+                minX = Math.min(minX, a.x); maxX = Math.max(maxX, a.x);
+                minY = Math.min(minY, a.y); maxY = Math.max(maxY, a.y);
+            }
+            var area = Math.abs(areaPx / 2) / (pxPerFt * pxPerFt);
+            return { length: (maxX - minX) / pxPerFt, width: (maxY - minY) / pxPerFt, area: area, perimeter: perimeterPx / pxPerFt };
+        }
+
+        function _fpUndoShape() {
+            if (_fpPolygonDraft.length) { _fpPolygonDraft.pop(); _fpDraft = { type: 'polygon', points: _fpPolygonDraft.slice() }; _fpDrawCanvas(); return; }
+            _fpShapes.pop();
+            _fpRenderMeasureTool();
+        }
+
+        function _fpRemoveShape(index) {
+            _fpShapes.splice(index, 1);
+            _fpRenderMeasureTool();
+        }
+
+        function _fpClearShapes() {
+            _fpShapes = [];
+            _fpPolygonDraft = [];
+            _fpDraft = null;
+            _fpRenderMeasureTool();
+        }
+
+        function _fpShowMeasureNotice(text) {
+            var help = document.getElementById('fpToolHelp');
+            if (help) help.innerHTML = '<span class="text-primary fw-semibold">' + _fpEscapeHtml(text) + '</span>';
+        }
+
+        function _fpDrawCanvas() {
+            if (!_fpCtx || !_fpPlanImg || !_fpCanvasReady) return;
+            _fpCtx.clearRect(0, 0, _fpCanvas.width, _fpCanvas.height);
+            _fpCtx.drawImage(_fpPlanImg, 0, 0, _fpCanvas.width, _fpCanvas.height);
+            if (_fpScale && _fpScale.line) _fpDrawLine(_fpScale.line.start, _fpScale.line.end, '#198754', 4, _fpScale.knownFt + ' ft');
+            _fpShapes.forEach(function(shape) { _fpDrawShape(shape, false); });
+            if (_fpDraft) {
+                if (_fpDraft.type === 'polygon') {
+                    var pts = _fpDraft.points.slice();
+                    if (_fpDraft.hover) pts.push(_fpDraft.hover);
+                    _fpDrawPolygon(pts, '#0d6efd', true);
+                } else {
+                    _fpDrawLine(_fpDraft.start, _fpDraft.end, _fpDraft.type === 'calibrate' ? '#198754' : '#0d6efd', 3, '');
+                    if (_fpDraft.type === 'box') _fpDrawPolygon([{x:_fpDraft.start.x,y:_fpDraft.start.y},{x:_fpDraft.end.x,y:_fpDraft.start.y},{x:_fpDraft.end.x,y:_fpDraft.end.y},{x:_fpDraft.start.x,y:_fpDraft.end.y}], '#0d6efd', true);
+                }
+            }
+        }
+
+        function _fpDrawShape(shape) {
+            var color = shape.type === 'line' ? '#dc3545' : '#0d6efd';
+            if (shape.type === 'line') {
+                _fpDrawLine(shape.points[0], shape.points[1], color, 3, shape.name + ' ' + _fpRound(shape.dimensions.length, 1) + ' LF');
+            } else {
+                _fpDrawPolygon(shape.points, color, false);
+                var c = _fpCentroid(shape.points);
+                _fpDrawLabel(c.x, c.y, shape.name + ' ' + _fpRound(shape.dimensions.area, 1) + ' sqft');
+            }
+        }
+
+        function _fpDrawLine(a, b, color, width, label) {
+            _fpCtx.save();
+            _fpCtx.strokeStyle = color;
+            _fpCtx.lineWidth = width || 2;
+            _fpCtx.beginPath();
+            _fpCtx.moveTo(a.x, a.y);
+            _fpCtx.lineTo(b.x, b.y);
+            _fpCtx.stroke();
+            _fpCtx.fillStyle = color;
+            _fpCtx.beginPath(); _fpCtx.arc(a.x, a.y, 4, 0, Math.PI * 2); _fpCtx.fill();
+            _fpCtx.beginPath(); _fpCtx.arc(b.x, b.y, 4, 0, Math.PI * 2); _fpCtx.fill();
+            if (label) _fpDrawLabel((a.x + b.x) / 2, (a.y + b.y) / 2, label);
+            _fpCtx.restore();
+        }
+
+        function _fpDrawPolygon(points, color, draft) {
+            if (!points.length) return;
+            _fpCtx.save();
+            _fpCtx.strokeStyle = color;
+            _fpCtx.fillStyle = draft ? 'rgba(13,110,253,0.12)' : 'rgba(13,110,253,0.18)';
+            _fpCtx.lineWidth = 3;
+            _fpCtx.beginPath();
+            _fpCtx.moveTo(points[0].x, points[0].y);
+            for (var i = 1; i < points.length; i++) _fpCtx.lineTo(points[i].x, points[i].y);
+            if (!draft && points.length > 2) _fpCtx.closePath();
+            _fpCtx.fill();
+            _fpCtx.stroke();
+            points.forEach(function(p) { _fpCtx.beginPath(); _fpCtx.arc(p.x, p.y, 4, 0, Math.PI * 2); _fpCtx.fillStyle = color; _fpCtx.fill(); });
+            _fpCtx.restore();
+        }
+
+        function _fpDrawLabel(x, y, text) {
+            _fpCtx.save();
+            _fpCtx.font = '12px Arial';
+            var pad = 5;
+            var w = _fpCtx.measureText(text).width + pad * 2;
+            _fpCtx.fillStyle = 'rgba(255,255,255,0.92)';
+            _fpCtx.fillRect(x - w / 2, y - 12, w, 22);
+            _fpCtx.strokeStyle = 'rgba(0,0,0,0.18)';
+            _fpCtx.strokeRect(x - w / 2, y - 12, w, 22);
+            _fpCtx.fillStyle = '#111827';
+            _fpCtx.fillText(text, x - w / 2 + pad, y + 3);
+            _fpCtx.restore();
+        }
+
+        function _fpCentroid(points) {
+            var x = 0, y = 0;
+            points.forEach(function(p) { x += p.x; y += p.y; });
+            return { x: x / points.length, y: y / points.length };
+        }
+
+        async function _fpLoadRoomSuggestions() {
+            _fpSuggestedRoomNames = ['Living Room','Kitchen','Dining','Bathroom','Bedroom'];
+            try {
+                var ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso';
+                var res = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/analyze-floor-plan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ANON_KEY, 'apikey': ANON_KEY },
+                    body: JSON.stringify({ mode: 'rooms_only', imageBase64: _fpImageBase64, mimeType: _fpMimeType })
+                });
+                var data = await res.json();
+                if (Array.isArray(data.rooms) && data.rooms.length) {
+                    _fpSuggestedRoomNames = data.rooms.map(function(r) { return String(r).trim(); }).filter(Boolean).slice(0, 20);
+                    _fpRenderMeasureTool();
+                }
+            } catch(e) {
+                console.warn('Room name suggestions failed', e);
+            }
         }
 
         function _fpApplyTradesAll() {
-            if (_fpRooms.length === 0) return;
-            var sourceTrades = _fpRooms[0].trades || {};
-            _fpRooms.forEach(function(room) { room.trades = Object.assign({}, sourceTrades); });
-            _fpRenderMeasureStep();
+            if (!_fpShapes.length) return;
+            var trades = _fpShapes[0].trades || {};
+            _fpShapes.forEach(function(shape) { shape.trades = Object.assign({}, trades); });
+            _fpRenderMeasureTool();
         }
 
-        function _fpAddMeasureRoom() {
-            _fpRooms.push({ id: Date.now(), name: 'New Room', length: 0, width: 0, confidence: 1, source: 'manual', evidence: 'Added manually', checked: true, trades: {} });
-            _fpRenderMeasureStep();
-        }
-
-        function _fpRemoveMeasureRoom(ri) {
-            _fpRooms.splice(ri, 1);
-            _fpRenderMeasureStep();
-        }
-
-        function _fpQuantityForTrade(tradeKey, unitType, area, perimeter, ceilingHeight) {
+        function _fpQuantityForTrade(tradeKey, unitType, area, perimeter, ceilingHeight, length) {
             var unit = String(unitType || '').toLowerCase().replace(/\s+/g, '');
-            if (unit === 'lf' || unit === 'linearft' || unit === 'linearfeet') return perimeter;
+            if (unit === 'lf' || unit === 'linearft' || unit === 'linearfeet') return length || perimeter;
             if (unit === 'each' || unit === 'ea') return 1;
             if (unit === 'hour' || unit === 'hours' || unit === 'hr' || unit === 'hourly') return 1;
             if (tradeKey === 'paint' || tradeKey === 'drywall') return perimeter * ceilingHeight;
             if (tradeKey === 'framing') return perimeter;
-            return area;
+            return area || length || perimeter;
         }
 
-        // ── Step 3: Review ──
         function _fpGoToStep3() {
-            var ceilingHeight = parseFloat(document.getElementById('fpCeilingHeight').value) || _fpCeilingHeight || 9;
-            _fpCeilingHeight = ceilingHeight;
-            var skipped = 0;
+            if (!_fpShapes.length) return;
+            var ceilingInput = document.getElementById('fpCeilingHeight');
+            _fpCeilingHeight = parseFloat(ceilingInput ? ceilingInput.value : _fpCeilingHeight) || 9;
             var computed = [];
-
-            _fpRooms.forEach(function(room, ri) {
-                if (!room.checked || room.length <= 0 || room.width <= 0) { skipped++; return; }
-                var area = room.length * room.width;
-                var perimeter = 2 * (room.length + room.width);
+            _fpShapes.forEach(function(shape) {
+                var d = shape.dimensions || {};
                 var items = [];
-
                 _fpTradeConfig.forEach(function(tc) {
-                    var selectedName = room.trades && room.trades[tc.key];
+                    var selectedName = shape.trades && shape.trades[tc.key];
                     if (!selectedName) return;
                     var mappedItems = (_fpMapping && _fpMapping[tc.key]) || [];
-                    // Support multiple items per trade — if selectedName is 'ALL', add all; else just the selected one
-                    var toAdd = mappedItems.filter(function(mi) { return mi.name === selectedName; });
-                    toAdd.forEach(function(mi) {
-                        var qty = _fpQuantityForTrade(tc.key, mi.unitType, area, perimeter, ceilingHeight);
-                        qty = Math.round(qty * 10) / 10;
+                    mappedItems.filter(function(mi) { return mi.name === selectedName; }).forEach(function(mi) {
+                        var qty = _fpQuantityForTrade(tc.key, mi.unitType, d.area || 0, d.perimeter || 0, _fpCeilingHeight, d.length || 0);
+                        qty = _fpRound(qty, 1);
                         items.push({
                             category: mi.category,
                             description: mi.name,
                             quantity: qty,
                             unitType: mi.unitType || 'sqft',
                             rate: mi.rate || 0,
-                            total: Math.round(qty * (mi.rate||0) * 100) / 100,
-                            notes: tc.label + ' quantity from floor plan scanner. Review before sending.'
+                            total: Math.round(qty * (mi.rate || 0) * 100) / 100,
+                            notes: tc.label + ' quantity from calibrated floor plan measurement. Review before sending.'
                         });
                     });
                 });
-
-                computed.push({ name: room.name, confidence: room.confidence || 0, evidence: room.evidence || '', dimensions: { length: room.length, width: room.width, area: Math.round(area), perimeter: Math.round(perimeter * 10) / 10 }, items: items });
+                computed.push({ name: shape.name, type: shape.type, dimensions: d, items: items });
             });
-
             _fpResults = { rooms: computed };
-
-            var warningsHtml = skipped > 0
-                ? '<div class="alert alert-warning py-2 small mb-2"><i class="fas fa-exclamation-triangle me-1"></i>Skipped ' + skipped + ' room(s) with missing dimensions.</div>'
-                : '';
-            var lowConfidenceRooms = computed.filter(function(r) { return (r.confidence || 0) > 0 && (r.confidence || 0) < 0.65; }).length;
-            if (lowConfidenceRooms > 0) {
-                warningsHtml += '<div class="alert alert-warning py-2 small mb-2"><i class="fas fa-ruler-combined me-1"></i>' + lowConfidenceRooms + ' room(s) have low-confidence AI measurements. Verify before adding.</div>';
-            }
-
             var roomsHtml = computed.map(function(room, ri) {
-                var d = room.dimensions;
-                var roomMeta = (room.confidence || room.evidence)
-                    ? '<div class="small text-muted mt-1">' + _fpConfidenceBadge(room.confidence || 0) + (room.evidence ? ' <span>' + _fpEscapeHtml(room.evidence) + '</span>' : '') + '</div>'
-                    : '';
+                var d = room.dimensions || {};
+                var label = room.type === 'line'
+                    ? _fpRound(d.length, 1) + ' LF'
+                    : _fpRound(d.length, 1) + '\' x ' + _fpRound(d.width, 1) + '\' | ' + _fpRound(d.area, 1) + ' sqft | ' + _fpRound(d.perimeter, 1) + ' LF';
                 var itemsHtml = room.items.map(function(item, ii) {
                     return '<div class="d-flex align-items-center gap-2 py-1 border-bottom">' +
                         '<input type="checkbox" class="form-check-input fp-item-check" id="fpItem_' + ri + '_' + ii + '" checked style="flex-shrink:0;">' +
                         '<span class="badge bg-secondary me-1" style="font-size:0.7rem;">' + _fpEscapeHtml(item.category) + '</span>' +
                         '<span class="small flex-grow-1">' + _fpEscapeHtml(item.description) + '</span>' +
                         '<div class="d-flex align-items-center gap-1">' +
-                        '<input type="number" class="form-control form-control-sm" id="fpQty_' + ri + '_' + ii + '" value="' + item.quantity + '" style="width:75px;" min="0">' +
+                        '<input type="number" class="form-control form-control-sm" id="fpQty_' + ri + '_' + ii + '" value="' + item.quantity + '" style="width:75px;" min="0" step="0.1">' +
                         '<span class="text-muted small">' + _fpEscapeHtml(item.unitType) + '</span>' +
                         '</div>' +
                         '<span class="text-muted small ms-1">$' + item.rate + ' = <strong>$' + item.total.toFixed(2) + '</strong></span>' +
                         '</div>';
                 }).join('');
-
                 return '<div class="card mb-2">' +
                     '<div class="card-header py-2 d-flex align-items-center gap-2" style="background:#f0f4ff;">' +
                     '<input type="checkbox" class="form-check-input fp-room-check" id="fpRoom_' + ri + '" checked onchange="_fpToggleRoom(' + ri + ',this.checked)">' +
-                    '<div class="flex-grow-1"><input type="text" class="form-control form-control-sm fw-semibold" id="fpRoomName_' + ri + '" value="' + _fpEscapeHtml(room.name) + '" style="border:none;background:transparent;font-weight:600;">' + roomMeta + '</div>' +
-                    '<span class="badge bg-light text-dark ms-auto" style="font-size:0.7rem;">' + d.length + '\' &times; ' + d.width + '\' = ' + d.area + ' sqft | ' + d.perimeter + ' lf</span>' +
+                    '<input type="text" class="form-control form-control-sm fw-semibold flex-grow-1" id="fpRoomName_' + ri + '" value="' + _fpEscapeHtml(room.name) + '" style="border:none;background:transparent;font-weight:600;">' +
+                    '<span class="badge bg-light text-dark ms-auto" style="font-size:0.7rem;">' + label + '</span>' +
                     '</div>' +
-                    '<div class="card-body py-2" id="fpRoomItems_' + ri + '">' + (itemsHtml || '<p class="text-muted small mb-0">No trades selected for this room</p>') + '</div>' +
+                    '<div class="card-body py-2" id="fpRoomItems_' + ri + '">' + (itemsHtml || '<p class="text-muted small mb-0">No trades selected for this measurement</p>') + '</div>' +
                     '</div>';
             }).join('');
-
             document.getElementById('floorPlanModalBody').innerHTML =
-                '<div class="d-flex justify-content-center gap-1 mb-2">' + _fpStepBadges(3, ['Upload','Measure','Review']) + '</div>' +
-                '<div class="text-muted small text-center mb-2">Review quantities and totals. Edit any value before adding to your quote.</div>' +
-                warningsHtml +
+                '<div class="d-flex justify-content-center gap-1 mb-2">' + _fpStepBadges(3, ['Upload','Calibrate','Review']) + '</div>' +
+                '<div class="text-muted small text-center mb-2">Quantities are calculated from your calibrated drawing. Edit any value before adding to your quote.</div>' +
                 '<div style="max-height:calc(100vh - 220px);overflow-y:auto;">' + roomsHtml + '</div>' +
                 '<div class="d-flex justify-content-between align-items-center mt-3">' +
-                '<button class="btn btn-outline-secondary btn-sm" onclick="_fpRenderMeasureStep()"><i class="fas fa-arrow-left me-1"></i>Back</button>' +
-                '<div class="text-muted small">' + computed.length + ' rooms &bull; ' + computed.reduce(function(s,r){return s+r.dimensions.area;},0) + ' sqft total</div>' +
+                '<button class="btn btn-outline-secondary btn-sm" onclick="_fpRenderMeasureTool()"><i class="fas fa-arrow-left me-1"></i>Back</button>' +
+                '<div class="text-muted small">' + computed.length + ' measurement(s)</div>' +
                 '<button class="btn btn-success" onclick="_fpAddToQuote()"><i class="fas fa-check me-1"></i>Add All to Quote</button>' +
                 '</div>';
         }
@@ -3181,14 +3375,14 @@ Example:
                 }, 300);
                 var toast = document.createElement('div');
                 toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#198754;color:white;padding:12px 20px;border-radius:8px;z-index:9999;font-size:0.9rem;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
-                toast.innerHTML = '<i class="fas fa-check-circle me-2"></i>' + addedCount + ' room' + (addedCount !== 1 ? 's' : '') + ' added to your quote!';
+                toast.innerHTML = '<i class="fas fa-check-circle me-2"></i>' + addedCount + ' measurement' + (addedCount !== 1 ? 's' : '') + ' added to your quote!';
                 document.body.appendChild(toast);
                 setTimeout(function() { toast.remove(); }, 4000);
             }
         }
-        // ── End Floor Plan Scanner ────────────────────────────────────────────────
+        // -- End Floor Plan Scanner ------------------------------------------------
 
-        // ── Material Estimator ─────────────────────────────────────────────
+        // -- Material Estimator ---------------------------------------------
 
         var EST_FIELDS = [
             { key: 'flooring',     label: 'Flooring',       unit: 'sqft', defaultRate: 0 },
@@ -3394,7 +3588,7 @@ Example:
             showToast(added + ' items added to ' + roomName, 'success');
         }
 
-        // ── Google Maps Measurement ─────────────────────────────────────────
+        // -- Google Maps Measurement -----------------------------------------
         var _map = null, _mapShapes = [], _mapInited = false;
 
         function populateMeasureModalCategories() {
@@ -3878,7 +4072,7 @@ Example:
             if (rooms.length === 0) {
                 container.innerHTML = `
                 <div class="text-center py-5" style="color:#adb5bd">
-                    <div style="font-size:4rem; margin-bottom:1rem;">🏠</div>
+                    <div style="font-size:4rem; margin-bottom:1rem;">??</div>
                     <h4 style="color:#6c757d; font-weight:700;">No rooms yet</h4>
                     <p class="mb-4" style="max-width:360px; margin:0 auto 1.5rem;">Break your quote into rooms or areas - Kitchen, Basement, Bathroom - to keep things organized and easy to read.</p>
                     <button onclick="addRoom()" class="btn btn-primary btn-lg px-5 shadow-sm" style="border-radius:30px;">
@@ -4012,7 +4206,7 @@ Example:
                                 const profit = displayTotal - matCost;
                                 const margin = displayTotal > 0 ? (profit / displayTotal * 100).toFixed(0) : 0;
                                 const profitClass = profit >= 0 ? 'profit-positive' : 'profit-negative';
-                                const profitIcon = profit >= 0 ? '▲' : '▼';
+                                const profitIcon = profit >= 0 ? '?' : '?';
                                 html += '<td class="' + profitClass + '"><strong>' + profitIcon + ' $' + Math.abs(profit).toFixed(2) + '</strong><br><small>' + margin + '%</small></td>';
                             }
                             let upgradeBtn = '';
@@ -4275,7 +4469,7 @@ Example:
                         currentSupabaseId = data.id;
                         draftData.supabaseId = data.id;
                         localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
-                        alert('Quote saved! ✓ (Saved to cloud + local backup)');
+                        alert('Quote saved! ? (Saved to cloud + local backup)');
                     }
                 } catch(e) {
                     console.warn('Supabase save error:', e);
@@ -4501,7 +4695,7 @@ Example:
             if (typeof renderTemplateDropdown === 'function') renderTemplateDropdown();
         }
 
-        // ─── UNIFIED TEMPLATE SYSTEM ─────────────────────────────────────────────
+        // --- UNIFIED TEMPLATE SYSTEM ---------------------------------------------
         // All templates stored as array in localStorage 'ald_quote_templates'
         // Each entry: { id: <timestamp>, name: <str>, rooms: [...] } OR { id, name, room: {...} }
 
@@ -4907,7 +5101,7 @@ Example:
             });
         }
 
-        // ── Save / Load / Auto-save ─────────────────────────────────────────────
+        // -- Save / Load / Auto-save ---------------------------------------------
 
         let saveFileHandle = null;
         let autoSaveTimer = null;
@@ -5078,7 +5272,7 @@ async function saveQuote() {
             }
         }
 
-        // ── Save Dialog ──────────────────────────────────────────────────────────
+        // -- Save Dialog ----------------------------------------------------------
         var _saveDialogData = null;
         var _selectedOverwriteId = null;
 
@@ -5165,7 +5359,7 @@ async function saveQuote() {
                     }
                 }
                 unsavedChanges = false;
-                updateSaveStatus('saved', 'Saved to cloud ✓');
+                updateSaveStatus('saved', 'Saved to cloud ?');
                 updateDraftWarning();
                 bootstrap.Modal.getInstance(document.getElementById('saveQuoteModal')).hide();
                 // Update client name field if changed
@@ -5190,7 +5384,7 @@ async function saveQuote() {
             try {
                 var result = await saveQuoteToSupabase(_saveDialogData);
                 unsavedChanges = false;
-                updateSaveStatus('saved', 'Saved to cloud ✓');
+                updateSaveStatus('saved', 'Saved to cloud ?');
                 updateDraftWarning();
                 bootstrap.Modal.getInstance(document.getElementById('saveQuoteModal')).hide();
             } catch(e) {
@@ -5211,7 +5405,7 @@ async function saveQuote() {
                         types: [{ description: 'QuoteDr File', accept: { 'application/json': ['.qdr'] } }]
                     });
                     await writeToHandle(saveFileHandle);
-                    updateSaveStatus('saved', 'Saved locally ✓');
+                    updateSaveStatus('saved', 'Saved locally ?');
                     startAutoSave();
                 } catch(err) {
                     if (err.name !== 'AbortError') downloadQuoteFallback();
@@ -5222,7 +5416,7 @@ async function saveQuote() {
             }
         }
 
-        // ── End Save Dialog ──────────────────────────────────────────────────────
+        // -- End Save Dialog ------------------------------------------------------
 
         async function loadQuoteFromFile() {
             // Always show the cloud load modal first
@@ -5326,7 +5520,7 @@ async function saveQuote() {
                 window._loadedQuoteData = qData;
                 unsavedChanges = false;
                 clearTimeout(_autoSaveTimer);
-                updateSaveStatus('saved', 'Quote loaded ✓');
+                updateSaveStatus('saved', 'Quote loaded ?');
                 updateDraftWarning();
                 var m = bootstrap.Modal.getInstance(document.getElementById('loadQuoteModal'));
                 if (m) m.hide();
@@ -5436,7 +5630,7 @@ async function saveQuote() {
             if (sub.status && sub.status !== 'active' && sub.status !== 'trialing') {
                 var banner = document.createElement('div');
                 banner.style.cssText = 'background:#fff3cd;border-bottom:1px solid #ffc107;text-align:center;padding:8px;font-size:0.9rem;';
-                banner.innerHTML = '⚠️ Your trial has ended. <a href="pricing.html" style="color:#1a56a0;font-weight:600;">Upgrade to continue using QuoteDr</a>';
+                banner.innerHTML = '?? Your trial has ended. <a href="pricing.html" style="color:#1a56a0;font-weight:600;">Upgrade to continue using QuoteDr</a>';
                 document.body.insertBefore(banner, document.body.firstChild);
             }
 
@@ -5505,7 +5699,7 @@ async function saveQuote() {
                         }
                         unsavedChanges = false;
                         window._quoteFullyLoaded = true; // allow autosave now
-                        updateSaveStatus('saved', 'Quote loaded ✓');
+                        updateSaveStatus('saved', 'Quote loaded ?');
                         updateDraftWarning();
                         // Show client notes banner if ?shownotes=1
                         if (urlParams.get('shownotes') === '1') {
@@ -5519,14 +5713,14 @@ async function saveQuote() {
             }
         });
 
-        // ── End Save / Load ──────────────────────────────────────────────────────
+        // -- End Save / Load ------------------------------------------------------
 
-        // ── Custom Line Items (localStorage) ─────────────────────────────────────
+        // -- Custom Line Items (localStorage) -------------------------------------
 
-        // ── Item overrides: edits to built-in items saved to localStorage ────────
+        // -- Item overrides: edits to built-in items saved to localStorage --------
         let itemOverrides = {}; // { "Category::Item Name": { rate, materialCost, supplierUrl, unitType } }
 
-        // ── Cloud sync helpers for settings ──────────────────────────────────────
+        // -- Cloud sync helpers for settings --------------------------------------
         async function _saveCategoryStylesToCloud() {
             try {
                 var user = await _supabase.auth.getUser();
@@ -5599,7 +5793,7 @@ async function saveQuote() {
                 }
             } catch(e) { console.warn('Item overrides cloud restore failed:', e); }
         }
-        // ─────────────────────────────────────────────────────────────────────────
+        // -------------------------------------------------------------------------
 
         async function loadItemOverrides() {
             try {
@@ -5613,7 +5807,7 @@ async function saveQuote() {
                     if (item) Object.assign(item, overrides);
                 }
             });
-            // Restore from cloud (fire and forget — don't block startup)
+            // Restore from cloud (fire and forget � don't block startup)
             _restoreItemOverridesFromCloud().catch(function(){});
         }
 
@@ -5712,13 +5906,13 @@ async function saveQuote() {
                 if (_voiceRecording) {
                     // Show brief 'paused' indicator then restart
                     var el = document.getElementById('voiceStatus');
-                    if (el) el.textContent = '🎙️ Listening...';
+                    if (el) el.textContent = '??? Listening...';
                     setTimeout(function() {
                         if (_voiceRecording) {
                             _voiceRecognition = _createRecognition();
                             try {
                                 _voiceRecognition.start();
-                                if (el) el.textContent = '🎙️ Recording - speak your quote';
+                                if (el) el.textContent = '??? Recording - speak your quote';
                             } catch(e) {
                                 // Back off and retry once more
                                 setTimeout(function() {
@@ -5957,7 +6151,7 @@ async function saveQuote() {
                     var cbId = 'upgradeCheck_' + i;
                     html += '<div class="d-flex align-items-center gap-2 mb-1 p-2 rounded" style="background:rgba(25,135,84,0.07);" id="upgradeRow_' + i + '">';
                     html += '<input type="checkbox" class="form-check-input" id="' + cbId + '" onchange="markBannerRow(\'upgradeRow_' + i + '\', this.checked)" style="width:16px;height:16px;">';
-                    html += '<label for="' + cbId + '" style="margin:0;cursor:pointer;"><strong>' + u.room + ':</strong> ' + u.from + ' → <span class="text-success fw-bold">' + u.to + '</span> <span class="text-success">(+$' + parseFloat(u.diff||0).toFixed(2) + ')</span></label>';
+                    html += '<label for="' + cbId + '" style="margin:0;cursor:pointer;"><strong>' + u.room + ':</strong> ' + u.from + ' ? <span class="text-success fw-bold">' + u.to + '</span> <span class="text-success">(+$' + parseFloat(u.diff||0).toFixed(2) + ')</span></label>';
                     html += '</div>';
                 });
                 html += '</div>';
