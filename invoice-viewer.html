@@ -407,7 +407,18 @@ if (location.search.includes('debug')) {
             if (tagEl && bizProfile.tagline) tagEl.textContent = bizProfile.tagline;
             else if (tagEl && !bizProfile.tagline) tagEl.style.display = 'none';
             loadInvoice();
+            showPaymentReturnNotice();
         });
+
+        function showPaymentReturnNotice() {
+            var params = new URLSearchParams(window.location.search);
+            if (params.get('payment') !== 'success') return;
+            var section = document.getElementById('clientPaymentSection');
+            if (!section) return;
+            section.style.display = 'block';
+            var buttons = document.getElementById('clientPaymentButtons');
+            if (buttons) buttons.innerHTML = '<div class="alert alert-success mb-0"><i class="fas fa-check-circle me-1"></i>Payment received. Thank you.</div>';
+        }
 
         function tryLocalStorageFallback() {
             // Try ?invoice= param, then last preview key
@@ -662,7 +673,7 @@ if (location.search.includes('debug')) {
                 var resp = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/stripe-deposit', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso' },
-                    body: JSON.stringify({ amount: Math.round(amount * 100), currency: 'cad', quoteId: quoteId, description: description, successUrl: successUrl, cancelUrl: cancelUrl })
+                    body: JSON.stringify({ amount: Math.round(amount * 100), currency: 'cad', quoteId: quoteId, paymentType: 'invoice_deposit', clientEmail: invoiceData.email || invoiceData.clientEmail || '', description: description, successUrl: successUrl, cancelUrl: cancelUrl })
                 });
                 var data = await resp.json();
                 if (data.url) {
@@ -707,18 +718,22 @@ if (location.search.includes('debug')) {
             _invoiceTotalForPayment = total || 0;
             _invoiceIdForPayment = invoiceId;
             if (!contractorUserId || !total) return;
+            if (new URLSearchParams(window.location.search).get('payment') === 'success') {
+                showPaymentReturnNotice();
+                return;
+            }
             _invoicePaymentSettings = await loadContractorPaymentSettings(contractorUserId);
             if (!_invoicePaymentSettings || !_invoicePaymentSettings.stripe_enabled) return;
             var s = _invoicePaymentSettings;
             var html = '';
             if (s.accept_full_payment) {
-                html += '<button class="btn btn-success btn-lg px-5 mb-2 w-100" onclick="handleClientInvoicePayment(' + Math.round(total * 100) + ', \"Pay Invoice in Full\")">';
+                html += '<button class="btn btn-success btn-lg px-5 mb-2 w-100" onclick="handleClientInvoicePayment(' + Math.round(total * 100) + ', \"Pay Invoice in Full\", \"invoice_full\")">';
                 html += '<i class="fas fa-credit-card me-2"></i>Pay Invoice in Full — $' + total.toFixed(2) + '</button>';
             }
             if (s.accept_deposit) {
                 var pct = s.deposit_default_pct || 50;
                 var depAmt = (total * pct / 100);
-                html += '<button class="btn btn-outline-success btn-lg px-5 mb-2 w-100 mt-2" onclick="handleClientInvoicePayment(' + Math.round(depAmt * 100) + ', \"Pay Deposit\")">';
+                html += '<button class="btn btn-outline-success btn-lg px-5 mb-2 w-100 mt-2" onclick="handleClientInvoicePayment(' + Math.round(depAmt * 100) + ', \"Pay Deposit\", \"invoice_deposit\")">';
                 html += '<i class="fas fa-credit-card me-2"></i>Pay ' + pct + '% Deposit — $' + depAmt.toFixed(2) + '</button>';
             }
             if (html) {
@@ -727,7 +742,7 @@ if (location.search.includes('debug')) {
             }
         }
 
-        async function handleClientInvoicePayment(amountCents, description) {
+        async function handleClientInvoicePayment(amountCents, description, paymentType) {
             var btns = document.querySelectorAll('#clientPaymentButtons button');
             btns.forEach(function(b) { b.disabled = true; });
             try {
@@ -738,9 +753,11 @@ if (location.search.includes('debug')) {
                         amount: amountCents,
                         currency: 'cad',
                         quoteId: _invoiceIdForPayment,
+                        paymentType: paymentType || 'invoice_full',
+                        clientEmail: invoiceData.email || invoiceData.clientEmail || '',
                         description: description,
-                        successUrl: window.location.href + '?payment=success',
-                        cancelUrl: window.location.href + '?payment=cancelled'
+                        successUrl: window.location.href.split('#')[0].replace(/[?&]payment=[^&]*/g, ''),
+                        cancelUrl: window.location.href.split('#')[0]
                     })
                 });
                 var data = await resp.json();

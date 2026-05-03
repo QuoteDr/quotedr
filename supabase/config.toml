@@ -3,3 +3,12 @@ verify_jwt = false
 
 [functions.qb-sync]
 verify_jwt = false
+
+[functions.stripe-checkout]
+verify_jwt = false
+
+[functions.stripe-deposit]
+verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false

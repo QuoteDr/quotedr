@@ -545,14 +545,8 @@ async function saveQuote() {
             if (!session) { window.location.href = 'login.html'; return; }
             window.currentUser = session.user;
 
-            // Subscription status check - show banner if trial ended
-            var sub = JSON.parse(localStorage.getItem('ald_subscription') || '{}');
-            if (sub.status && sub.status !== 'active' && sub.status !== 'trialing') {
-                var banner = document.createElement('div');
-                banner.style.cssText = 'background:#fff3cd;border-bottom:1px solid #ffc107;text-align:center;padding:8px;font-size:0.9rem;';
-                banner.innerHTML = '?? Your trial has ended. <a href="pricing.html" style="color:#1a56a0;font-weight:600;">Upgrade to continue using QuoteDr</a>';
-                document.body.insertBefore(banner, document.body.firstChild);
-            }
+            // Subscription status check - show banner if billing needs attention
+            if (typeof refreshSubscriptionBanner === 'function') refreshSubscriptionBanner();
 
             // Load user's uploaded logo from onboarding/settings
             var savedLogo = localStorage.getItem('ald_company_logo') || localStorage.getItem('ald_logo');

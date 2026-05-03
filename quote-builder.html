@@ -720,7 +720,7 @@ if (location.search.includes('debug')) {
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openMeasureModal()"><i class="fas fa-satellite me-2 text-primary"></i>Satellite Measure</a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openIkeaQuoteModal()"><i class="fas fa-utensils me-2 text-warning"></i>IKEA Quick Quote</a></li>
-                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="openFloorPlanModal()"><i class="fas fa-drafting-compass me-2 text-info"></i>Floor Plan Scanner</a></li>
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="openProFeature('floor_plan_scanner','Floor Plan Scanner', openFloorPlanModal)"><i class="fas fa-drafting-compass me-2 text-info"></i>Floor Plan Scanner</a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openMaterialEstimator()"><i class="fas fa-ruler-combined me-2 text-info"></i>Material Estimator</a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openHardwoodCalc()"><i class="fas fa-rug me-2 text-warning"></i>Hardwood/LVP Calculator</a></li>
@@ -827,7 +827,6 @@ if (location.search.includes('debug')) {
             </div>
         </div>
     </div>
-
 
         <!-- Client Info -->
         <div class="card mb-3">
@@ -3229,7 +3228,19 @@ Example:
             renderRooms();
         }
 
-        function toggleItemUpgrade(roomId, itemIndex) {
+        async function openProFeature(feature, label, callback) {
+            if (typeof requireFeature === 'function') {
+                var allowed = await requireFeature(feature, label);
+                if (!allowed) return;
+            }
+            if (typeof callback === 'function') callback();
+        }
+
+        async function toggleItemUpgrade(roomId, itemIndex) {
+            if (typeof requireFeature === 'function') {
+                var allowed = await requireFeature('quote_upsells', 'Optional upgrades');
+                if (!allowed) return;
+            }
             const room = rooms.find(r => r.id === roomId);
             if (!room || !room.items[itemIndex]) return;
             const item = room.items[itemIndex];
@@ -4027,6 +4038,13 @@ Example:
         function updateProfitReport() {
             var content = document.getElementById('profitReportContent');
             if (!content) return;
+            if (typeof hasFeature === 'function') {
+                hasFeature('profit_tracking').then(function(allowed) {
+                    if (!allowed) {
+                        content.innerHTML = '<div class="alert alert-light border mb-0"><strong>Profit tracking is included with QuoteDr Pro.</strong><br><a href="pricing.html">Upgrade to Pro</a> to see material cost, profit, and margin by room.</div>';
+                    }
+                });
+            }
             var totalRevenue = 0, totalMaterialCost = 0;
             var roomRows = '';
             rooms.forEach(function(room) {
@@ -5295,7 +5313,11 @@ Example:
         var _voiceTranscriptFull = '';
         var _voiceLastResultIndex = 0;
 
-        function startVoiceQuote() {
+        async function startVoiceQuote() {
+            if (typeof requireFeature === 'function') {
+                var allowed = await requireFeature('ai_voice_quote', 'AI Quote');
+                if (!allowed) return;
+            }
             if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
                 qdAlert('Voice input is not supported in this browser. Please use Chrome on Android or Safari on iOS.');
                 return;

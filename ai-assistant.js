@@ -312,7 +312,11 @@ window._qdAiHideFromPanel = function() {
   });
 };
 
-window._qdAiToggle = function() {
+window._qdAiToggle = async function() {
+  if (!isOpen && typeof requireFeature === 'function') {
+    var allowed = await requireFeature('ai_assistant', 'AI Assistant');
+    if (!allowed) return;
+  }
   isOpen = !isOpen;
   var panel = document.getElementById('qdAiPanel');
   if (isOpen) {

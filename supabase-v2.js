@@ -347,6 +347,8 @@ async function saveQuote(quoteData) {
             terms: quoteData.terms || [],
             style: quoteData.style || {},
             notes: quoteData.notes || '',
+            paymentStatus: quoteData.paymentStatus || '',
+            payments: quoteData.payments || [],
             savedAt: quoteData.savedAt || now
         },
         updated_at: now
@@ -680,6 +682,101 @@ async function loadPaymentSettings() {
         return data.value;
     }
     return JSON.parse(localStorage.getItem('ald_payment_settings') || 'null');
+}
+
+const QUOTEDR_PLAN_FEATURES = {
+    basic: [
+        'quotes',
+        'invoices',
+        'clients',
+        'templates',
+        'custom_branding',
+        'stripe_payments',
+        'client_quote_viewer',
+        'cross_device_sync'
+    ],
+    pro: [
+        'quotes',
+        'invoices',
+        'clients',
+        'templates',
+        'custom_branding',
+        'stripe_payments',
+        'client_quote_viewer',
+        'cross_device_sync',
+        'ai_voice_quote',
+        'ai_assistant',
+        'smart_import',
+        'floor_plan_scanner',
+        'quote_upsells',
+        'profit_tracking',
+        'payment_reminders',
+        'quickbooks'
+    ]
+};
+
+function normalizePlanName(plan) {
+    plan = String(plan || 'basic').toLowerCase();
+    if (plan === 'starter') return 'basic';
+    return plan === 'pro' ? 'pro' : 'basic';
+}
+
+function subscriptionAllowsAccess(sub) {
+    if (!sub || !sub.status) return false;
+    return ['active', 'trialing'].includes(String(sub.status).toLowerCase());
+}
+
+async function loadSubscriptionStatus() {
+    const user = await getCurrentUser();
+    if (!user) return JSON.parse(localStorage.getItem('ald_subscription') || 'null');
+    const { data, error } = await _supabase
+        .from('user_data')
+        .select('value')
+        .eq('user_id', user.id)
+        .eq('key', 'subscription_status')
+        .maybeSingle();
+    if (!error && data && data.value) {
+        localStorage.setItem('ald_subscription', JSON.stringify(data.value));
+        return data.value;
+    }
+    return JSON.parse(localStorage.getItem('ald_subscription') || 'null');
+}
+
+async function getCurrentPlan() {
+    const sub = await loadSubscriptionStatus();
+    if (!subscriptionAllowsAccess(sub)) return 'basic';
+    return normalizePlanName(sub.plan || 'basic');
+}
+
+async function hasFeature(feature) {
+    const plan = await getCurrentPlan();
+    return (QUOTEDR_PLAN_FEATURES[plan] || QUOTEDR_PLAN_FEATURES.basic).includes(feature);
+}
+
+function showUpgradePrompt(featureName) {
+    var label = featureName || 'This feature';
+    var msg = label + ' is included with QuoteDr Pro.';
+    if (window.confirm(msg + '\n\nView plans now?')) {
+        window.location.href = 'pricing.html?feature=' + encodeURIComponent(label);
+    }
+}
+
+async function requireFeature(feature, featureName) {
+    if (await hasFeature(feature)) return true;
+    showUpgradePrompt(featureName);
+    return false;
+}
+
+async function refreshSubscriptionBanner() {
+    var sub = await loadSubscriptionStatus();
+    var existing = document.getElementById('subscriptionStatusBanner');
+    if (existing) existing.remove();
+    if (!sub || subscriptionAllowsAccess(sub)) return;
+    var banner = document.createElement('div');
+    banner.id = 'subscriptionStatusBanner';
+    banner.style.cssText = 'background:#fff3cd;border-bottom:1px solid #ffc107;text-align:center;padding:8px;font-size:0.9rem;';
+    banner.innerHTML = 'Your QuoteDr subscription needs attention. <a href="pricing.html" style="color:#1a56a0;font-weight:600;">View plans</a>';
+    document.body.insertBefore(banner, document.body.firstChild);
 }
 
 // Supabase RLS policies needed:

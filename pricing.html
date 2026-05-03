@@ -64,10 +64,10 @@
 
 <div class="container plans-row">
     <div class="row g-4 justify-content-center">
-        <!-- STARTER -->
+        <!-- BASIC -->
         <div class="col-md-5">
             <div class="plan-card">
-                <div class="plan-name">Starter</div>
+                <div class="plan-name">Basic</div>
                 <div class="plan-tagline">Perfect for solo operators getting organized</div>
                 <div class="price">$29<span>/mo</span></div>
                 <ul class="feature-list mt-3">
@@ -77,10 +77,11 @@
                     <li><i class="fas fa-check-circle"></i> Cross-device sync</li>
                     <li><i class="fas fa-check-circle"></i> Shareable quote links</li>
                     <li><i class="fas fa-check-circle"></i> Interactive quote viewer for clients</li>
+                    <li><i class="fas fa-check-circle"></i> Stripe deposits and invoice payments</li>
                     <li><i class="fas fa-check-circle"></i> Quote templates</li>
                     <li><i class="fas fa-check-circle"></i> Custom price list import</li>
                 </ul>
-                <button class="btn-starter" id="starterBtn" onclick="startCheckout('starter')">Start Free Trial</button>
+                <button class="btn-starter" id="basicBtn" onclick="startCheckout('basic')">Start Free Trial</button>
                 <p class="trial-note">14-day free trial &middot; Cancel anytime</p>
             </div>
         </div>
@@ -89,11 +90,11 @@
             <div class="plan-card featured">
                 <div class="badge-popular">⚡ MOST POPULAR</div>
                 <div class="plan-name" style="color:#e87e2a;">Pro</div>
-                <div class="plan-tagline">Everything in Starter, plus AI superpowers</div>
+                <div class="plan-tagline">Everything in Basic, plus AI superpowers</div>
                 <div class="price" style="color:#e87e2a;">$55<span>/mo</span></div>
                 <div class="compare-tag mt-3">💡 Competitors charge $500–$1,000/mo for less</div>
                 <ul class="feature-list">
-                    <li><i class="fas fa-check-circle"></i> Everything in Starter</li>
+                    <li><i class="fas fa-check-circle"></i> Everything in Basic</li>
                     <li><i class="fas fa-robot"></i> AI voice-to-quote <span class="ai-badge">AI</span></li>
                     <li><i class="fas fa-robot"></i> AI smart import — any file format <span class="ai-badge">AI</span></li>
                     <li><i class="fas fa-robot"></i> AI assistant built-in <span class="ai-badge">AI</span></li>
@@ -153,8 +154,8 @@
         <p>Built mobile-first. Use it on your phone at the job site, tablet in the truck, desktop in the office. All synced instantly.</p>
     </div>
     <div class="faq-item">
-        <h6>What's the difference between Starter and Pro?</h6>
-        <p>Starter is a powerful quoting tool. Pro adds AI — voice-to-quote, smart import, AI assistant, upsells, and margin tracking. If you want to quote faster and smarter, Pro pays for itself.</p>
+        <h6>What's the difference between Basic and Pro?</h6>
+        <p>Basic is a powerful quoting and invoicing tool with Stripe payments. Pro adds AI — voice-to-quote, smart import, AI assistant, upsells, and margin tracking. If you want to quote faster and smarter, Pro pays for itself.</p>
     </div>
     <div class="faq-item">
         <h6>Can I import my existing price list?</h6>
@@ -168,7 +169,7 @@
 
 <script>
 async function startCheckout(plan) {
-    var btn = document.getElementById(plan === 'pro' ? 'proBtn' : 'starterBtn');
+    var btn = document.getElementById(plan === 'pro' ? 'proBtn' : 'basicBtn');
     btn.disabled = true;
     btn.textContent = 'Loading...';
     try {
