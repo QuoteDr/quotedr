@@ -97,10 +97,12 @@
                 });
         }
 
-        function addNewCategory() {
-            const newCat = prompt('Enter new category name:').trim();
+        async function addNewCategory() {
+            const newCat = (await qdPrompt('Enter new category name:', '', {
+                title: 'New Category'
+            }) || '').trim();
             if (!newCat || newCat.length === 0) return;
-            if (pricingDatabase[newCat]) { alert('Category already exists!'); return; }
+            if (pricingDatabase[newCat]) { qdAlert('Category already exists!'); return; }
             pricingDatabase[newCat] = [];
             // Repopulate dropdown
             const catSelect = document.getElementById('newItemCategory');
@@ -111,11 +113,13 @@
             catSelect.appendChild(opt);
         }
 
-        function addNewUnitType() {
-            const newUnit = prompt('Enter new unit type (e.g., "bundle", "bag", "gallon"):').trim();
+        async function addNewUnitType() {
+            const newUnit = (await qdPrompt('Enter new unit type (e.g., "bundle", "bag", "gallon"):', '', {
+                title: 'New Unit Type'
+            }) || '').trim();
             if (!newUnit || newUnit.length === 0) return;
             const datalist = document.getElementById('unitTypeOptions');
-            if ([...datalist.children].find(opt => opt.value === newUnit)) { alert('Unit type already exists!'); return; }
+            if ([...datalist.children].find(opt => opt.value === newUnit)) { qdAlert('Unit type already exists!'); return; }
             const opt = document.createElement('option');
             opt.value = newUnit;
             datalist.appendChild(opt);
@@ -196,9 +200,15 @@
 (bootstrap.Modal.getInstance(document.getElementById('manageItemsModal')) || new bootstrap.Modal(document.getElementById('manageItemsModal'))).show();
         }
 
-        function closeManageItemsModal() {
+        async function closeManageItemsModal() {
             if (pricingDirty) {
-                const choice = confirm('You have unsaved pricing changes.\n\nClick OK to save all changes before closing, or Cancel to close without saving.');
+                const choice = await qdConfirm('You have unsaved pricing changes. Save all changes before closing?', {
+                    title: 'Unsaved Pricing Changes',
+                    okText: 'Save & Close',
+                    cancelText: 'Close Without Saving',
+                    okClass: 'btn-warning',
+                    type: 'warning'
+                });
                 if (choice) {
                     saveAllPricingRows();
                 }
@@ -609,14 +619,14 @@
             const itemDescription = document.getElementById('newItemDescription')?.value.trim() || '';
 
             if (!name || !unitType) {
-                alert('Please fill in item name and unit type.');
+                qdAlert('Please fill in item name and unit type.');
                 return;
             }
 
             if (!customItems[category]) customItems[category] = [];
             if (customItems[category].find(i => i.name === name) ||
                 pricingDatabase[category]?.find(i => i.name === name)) {
-                alert('An item with this name already exists in this category.');
+                qdAlert('An item with this name already exists in this category.');
                 return;
             }
 
@@ -640,7 +650,7 @@
         async function refineDescription(textareaEl, btnEl) {
             if (!textareaEl || !btnEl) return;
             const currentText = textareaEl.value || '';
-            if (!currentText.trim()) { alert('Please enter a description first.'); return; }
+            if (!currentText.trim()) { qdAlert('Please enter a description first.'); return; }
             const originalBtnHTML = btnEl.innerHTML;
             btnEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
             btnEl.disabled = true;
@@ -672,8 +682,13 @@
             }
         }
 
-        function deleteCustomItem(category, name) {
-            if (!confirm('Are you sure you want to delete this item?\n\n' + name)) {
+        async function deleteCustomItem(category, name) {
+            if (!await qdConfirm('Delete "' + name + '" from your item database?', {
+                title: 'Delete Item',
+                okText: 'Delete',
+                okClass: 'btn-danger',
+                type: 'danger'
+            })) {
                 return;
             }
             pushUndoState();

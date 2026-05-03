@@ -109,8 +109,13 @@
             updateDraftWarning();
         }
 
-        function newQuote() {
-            if (!confirm('Start a new quote? Any unsaved changes will be lost.')) return;
+        async function newQuote() {
+            if (!await qdConfirm('Start a new quote? Any unsaved changes will be lost.', {
+                title: 'Start New Quote',
+                okText: 'Start New',
+                okClass: 'btn-warning',
+                type: 'warning'
+            })) return;
             window._quoteFullyLoaded = true; // new quote - intentionally empty, allow save
             // Clear all fields
             ['clientName','clientEmail','projectAddress','quoteNotes'].forEach(function(id) {
@@ -131,7 +136,7 @@ async function saveQuote() {
             // Always show save dialog first
             var qData = collectQuoteData();
             if (!qData.clientName && !qData.rooms.length) {
-                alert('Nothing to save yet - add a client name or some rooms first.');
+                qdAlert('Nothing to save yet - add a client name or some rooms first.');
                 return;
             }
             showSaveDialog(qData);
@@ -239,7 +244,7 @@ async function saveQuote() {
                     errEl.textContent = '\u26a0\ufe0f Quote number "' + qNum + '" is already used. Change it before saving as new.';
                     setTimeout(function(){ errEl.style.display = 'none'; }, 5000);
                 } else {
-                    alert('Quote number "' + qNum + '" is already used. Change the quote number before saving as new.');
+                    qdAlert('Quote number "' + qNum + '" is already used. Change the quote number before saving as new.');
                 }
                 return;
             }
@@ -265,7 +270,7 @@ async function saveQuote() {
                 // Update client name field if changed
                 if (document.getElementById('clientName')) document.getElementById('clientName').value = _saveDialogData.clientName;
             } catch(e) {
-                alert('Save failed: ' + e.message);
+                qdAlert('Save failed: ' + e.message);
             } finally {
                 if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<i class="fas fa-plus me-1"></i>Save as New'; }
             }
@@ -275,7 +280,12 @@ async function saveQuote() {
             if (!_saveDialogData || !_selectedOverwriteId) return;
             var selectedEl = document.querySelector('.save-quote-item[style*="background"]');
             var quoteName = selectedEl ? selectedEl.querySelector('.fw-bold')?.textContent : 'this quote';
-            if (!confirm('Are you sure you want to overwrite \u201c' + quoteName + '\u201d? This cannot be undone.')) return;
+            if (!await qdConfirm('Overwrite "' + quoteName + '"? This cannot be undone.', {
+                title: 'Overwrite Quote',
+                okText: 'Overwrite',
+                okClass: 'btn-warning',
+                type: 'warning'
+            })) return;
             _saveDialogData.supabaseId = _selectedOverwriteId;
             window._supabaseQuoteId = _selectedOverwriteId;
             localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
@@ -288,7 +298,7 @@ async function saveQuote() {
                 updateDraftWarning();
                 bootstrap.Modal.getInstance(document.getElementById('saveQuoteModal')).hide();
             } catch(e) {
-                alert('Save failed: ' + e.message);
+                qdAlert('Save failed: ' + e.message);
             } finally {
                 if (owBtn) { owBtn.disabled = false; owBtn.innerHTML = '<i class="fas fa-save me-1"></i>Overwrite'; }
             }
@@ -324,7 +334,12 @@ async function saveQuote() {
         }
 
         async function loadQuoteFromLocalFile() {
-            if (unsavedChanges && !confirm('You have unsaved changes. Open a different quote anyway?')) return;
+            if (unsavedChanges && !await qdConfirm('You have unsaved changes. Open a different quote anyway?', {
+                title: 'Unsaved Changes',
+                okText: 'Open Anyway',
+                okClass: 'btn-warning',
+                type: 'warning'
+            })) return;
             try {
                 const [handle] = await window.showOpenFilePicker({
                     types: [{ description: 'QuoteDr File', accept: { 'application/json': ['.qdr', '.aldquote'] } }]
@@ -343,7 +358,12 @@ async function saveQuote() {
         }
 
         async function showLoadModal() {
-            if (unsavedChanges && !confirm('You have unsaved changes. Open a different quote anyway?')) return;
+            if (unsavedChanges && !await qdConfirm('You have unsaved changes. Open a different quote anyway?', {
+                title: 'Unsaved Changes',
+                okText: 'Open Anyway',
+                okClass: 'btn-warning',
+                type: 'warning'
+            })) return;
 
             // Build or show modal
             var modalEl = document.getElementById('loadQuoteModal');
@@ -678,7 +698,7 @@ async function saveQuote() {
         function startupRecoverDraft() {
             try {
                 var draft = JSON.parse(localStorage.getItem('ald_autosave_draft'));
-                if (!draft) { alert('No draft found.'); return; }
+                if (!draft) { qdAlert('No draft found.'); return; }
                 bootstrap.Modal.getInstance(document.getElementById('startupModal')).hide(); cleanupModalBackdrop();
                 applyQuoteData(draft);
                 if (draft.quoteNumber) document.getElementById('quoteNumber').value = draft.quoteNumber;
@@ -691,7 +711,7 @@ async function saveQuote() {
                 var el = document.getElementById('saveStatus');
                 if (el) el.innerHTML = '<span style="color:#fd7e14;"><i class="fas fa-history"></i> Draft recovered - save to file to keep it safe</span>';
                 updateDraftWarning();
-            } catch(e) { alert('Could not recover draft.'); }
+            } catch(e) { qdAlert('Could not recover draft.'); }
         }
 
         async function startupOpenQuote() {
@@ -719,7 +739,7 @@ async function saveQuote() {
                             }
                             if (d.quoteNumber) document.getElementById('quoteNumber').value = d.quoteNumber;
                             updateSaveStatus('loaded', f.name);
-                        } catch(e) { alert('Could not read file.'); }
+                        } catch(e) { qdAlert('Could not read file.'); }
                     };
                     reader.readAsText(f);
                 };

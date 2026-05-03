@@ -506,6 +506,7 @@ if (location.search.includes('debug')) {
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="quote-dialogs.js?v=1777660407"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
         // Initialize Supabase for status tracking (read-only anon key)
@@ -641,7 +642,7 @@ if (location.search.includes('debug')) {
                     if (contractorId && quoteTotal && quoteData.style?.depositMode !== 'hide') initPaymentSection(contractorId, quoteTotal);
                     return;
                 } else {
-                    alert('Quote not found or could not be loaded. The link may be invalid.');
+                    qdAlert('Quote not found or could not be loaded. The link may be invalid.');
                     return;
                 }
             }
@@ -652,7 +653,7 @@ if (location.search.includes('debug')) {
                 legacyQuoteId = localStorage.getItem('ald_last_preview_quote');
             }
             if (!legacyQuoteId) {
-                alert('Invalid or missing quote ID. Please check the link you were sent.');
+                qdAlert('Invalid or missing quote ID. Please check the link you were sent.');
                 return;
             }
             const storedQuote = localStorage.getItem(legacyQuoteId);
@@ -660,7 +661,7 @@ if (location.search.includes('debug')) {
                 quoteData = JSON.parse(storedQuote);
                 console.log('Loaded quote from localStorage:', quoteData);
             } else {
-                alert('Quote not found. The link may be expired or invalid.');
+                qdAlert('Quote not found. The link may be expired or invalid.');
             }
         }
 
@@ -1302,9 +1303,9 @@ if (location.search.includes('debug')) {
 
         async function confirmApproval() {
             const name = document.getElementById('signerName').value.trim();
-            if (!name) { alert('Please enter your full name.'); return; }
-            if (!sigHasStrokes) { alert('Please draw your signature.'); return; }
-            if (!document.getElementById('termsCheck').checked) { alert('Please agree to the terms and conditions.'); return; }
+            if (!name) { qdAlert('Please enter your full name.'); return; }
+            if (!sigHasStrokes) { qdAlert('Please draw your signature.'); return; }
+            if (!document.getElementById('termsCheck').checked) { qdAlert('Please agree to the terms and conditions.'); return; }
 
             const sigDataUrl = sigCanvas.toDataURL('image/png');
             const now = new Date();
@@ -1510,7 +1511,7 @@ if (location.search.includes('debug')) {
                 if (data.url) { window.location.href = data.url; }
                 else { throw new Error(data.error || 'Payment failed'); }
             } catch(e) {
-                alert('Payment error: ' + e.message);
+                qdAlert('Payment error: ' + e.message);
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fas fa-credit-card me-2"></i><span id="depositBtnLabel">Pay Deposit</span>';
             }

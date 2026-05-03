@@ -118,10 +118,10 @@
             var l = parseFloat(document.getElementById('estLength').value);
             var doors = parseInt(document.getElementById('estDoors').value) || 0;
             var windows = parseInt(document.getElementById('estWindows').value) || 0;
-            if (!w || !l || w <= 0 || l <= 0) { alert('Please enter valid width and length.'); return; }
+            if (!w || !l || w <= 0 || l <= 0) { qdAlert('Please enter valid width and length.'); return; }
             var ceilVal = document.querySelector('input[name="ceilingHeight"]:checked').value;
             var ceilH = ceilVal === 'custom' ? parseFloat(document.getElementById('estCeilingCustom').value) : parseFloat(ceilVal);
-            if (!ceilH || ceilH <= 0) { alert('Please enter a valid ceiling height.'); return; }
+            if (!ceilH || ceilH <= 0) { qdAlert('Please enter a valid ceiling height.'); return; }
 
             var floorSqft = Math.round(w * l * 10) / 10;
             var wallSqft = Math.round((2 * w + 2 * l) * ceilH * 10) / 10;
@@ -259,7 +259,7 @@ function calculateHardwood() {
     }
 
     if (totalSqft <= 0) {
-        alert("Please enter valid dimensions or square footage.");
+        qdAlert("Please enter valid dimensions or square footage.");
         return;
     }
 
@@ -292,13 +292,13 @@ function addToHardwoodQuote() {
                      (parseFloat(document.getElementById('hardwoodWidth').value) * parseFloat(document.getElementById('hardwoodLength').value));
 
     if (totalSqft <= 0) {
-        alert("Please calculate before adding to quote.");
+        qdAlert("Please calculate before adding to quote.");
         return;
     }
 
     // Find or create a room
     var room = rooms[0];
-    if (!room) { alert('Please create a room in the quote first.'); return; }
+    if (!room) { qdAlert('Please create a room in the quote first.'); return; }
 
     // Add item to room
     room.items.push({
@@ -318,7 +318,7 @@ function addToHardwoodQuote() {
     var modal = bootstrap.Modal.getInstance(document.getElementById('hardwoodCalcModal'));
     modal.hide();
 
-    alert("Hardwood/LVP item added to quote!");
+    qdAlert("Hardwood/LVP item added to quote!");
 }
 
 function scanHardwoodQuote() {
@@ -430,7 +430,7 @@ function calculatePaint() {
     }
 
     if (wallSqft <= 0 && ceilingSqft <= 0) {
-        alert("Please enter valid dimensions or square footage.");
+        qdAlert("Please enter valid dimensions or square footage.");
         return;
     }
 
@@ -490,13 +490,13 @@ function addToPaintQuote() {
                       parseFloat(document.getElementById('paintLength').value) * 2 * (parseFloat(document.getElementById('paintHeight').value) || 9));
 
     if (wallSqft <= 0) {
-        alert("Please calculate before adding to quote.");
+        qdAlert("Please calculate before adding to quote.");
         return;
     }
 
     // Find or create a room
     var room = rooms[0];
-    if (!room) { alert('Please create a room in the quote first.'); return; }
+    if (!room) { qdAlert('Please create a room in the quote first.'); return; }
 
     // Add wall paint item
     room.items.push({
@@ -533,7 +533,7 @@ function addToPaintQuote() {
     var modal = bootstrap.Modal.getInstance(document.getElementById('paintCalcModal'));
     modal.hide();
 
-    alert("Paint items added to quote!");
+    qdAlert("Paint items added to quote!");
 }
 
 function scanPaintQuote() {
@@ -631,7 +631,7 @@ function calculateDrywall() {
     var finishLevel = document.getElementById('drywallFinishLevel') ? document.getElementById('drywallFinishLevel').value : 'standard';
     var roomName = document.getElementById('drywallRoomName').value || 'Room';
     var totalSqft = wallSqft + (includeCeiling ? ceilingSqft : 0);
-    if (totalSqft <= 0) { alert('Please enter valid dimensions or square footage.'); return; }
+    if (totalSqft <= 0) { qdAlert('Please enter valid dimensions or square footage.'); return; }
     var totalWithWaste = totalSqft * (1 + waste / 100);
     var sheets = Math.ceil(totalWithWaste / 32);
     // Standard 3-coat: 4.5 gal bucket covers ~950 sqft total
@@ -658,14 +658,14 @@ function calculateDrywall() {
 function addToDrywallQuote() {
     var roomName = document.getElementById('drywallRoomName').value || 'Room';
     var totalSqft = parseFloat(document.getElementById('drywallCalcModal').dataset.calcSqft) || 0;
-    if (totalSqft <= 0) { alert('Please calculate before adding to quote.'); return; }
+    if (totalSqft <= 0) { qdAlert('Please calculate before adding to quote.'); return; }
     var room = rooms[0];
-    if (!room) { alert('Please create a room in the quote first.'); return; }
+    if (!room) { qdAlert('Please create a room in the quote first.'); return; }
     room.items.push({ description: 'Drywall Hang \u2014 ' + roomName, category: 'Drywall', unitType: 'sqft', quantity: totalSqft, rate: 0, total: 0, notes: 'Auto-calculated', itemDescription: '' });
     room.items.push({ description: 'Drywall Mud & Tape \u2014 ' + roomName, category: 'Drywall', unitType: 'sqft', quantity: totalSqft, rate: 0, total: 0, notes: 'Auto-calculated', itemDescription: '' });
     renderQuote();
     bootstrap.Modal.getInstance(document.getElementById('drywallCalcModal')).hide();
-    alert('Drywall items added to quote!');
+    qdAlert('Drywall items added to quote!');
 }
 
 function scanDrywallQuote() {

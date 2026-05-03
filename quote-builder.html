@@ -582,14 +582,14 @@ if (location.search.includes('debug')) {
                             <i class="fas fa-user-circle"></i>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="dashboard.html" onclick="if(unsavedChanges && !confirm('You have unsaved changes. Leave anyway?')) return false; saveSessionQuote();"><i class="fas fa-th-large me-2 text-secondary"></i>Dashboard</a></li>
-                            <li><a class="dropdown-item" href="settings.html" onclick="if(unsavedChanges && !confirm('You have unsaved changes. Leave anyway?')) return false; saveSessionQuote();"><i class="fas fa-cog me-2 text-secondary"></i>Settings</a></li>
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="qdLeavePage('dashboard.html'); return false;"><i class="fas fa-th-large me-2 text-secondary"></i>Dashboard</a></li>
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="qdLeavePage('settings.html'); return false;"><i class="fas fa-cog me-2 text-secondary"></i>Settings</a></li>
                             <li><a class="dropdown-item" href="help.html"><i class="fas fa-question-circle me-2 text-secondary"></i>Help</a></li>
                             <li><a class="dropdown-item" href="pricing.html"><i class="fas fa-star me-2 text-warning"></i>Upgrade ?</a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="_toggleAiBtn()" id="aiToggleMenuItem"><i class="fas fa-robot me-2 text-secondary"></i>Hide AI Assistant</a></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item text-danger" href="javascript:void(0)" onclick="if(unsavedChanges && !confirm('You have unsaved changes. Leave anyway?')) return; signOut();"><i class="fas fa-sign-out-alt me-2"></i>Sign Out</a></li>
+                            <li><a class="dropdown-item text-danger" href="javascript:void(0)" onclick="qdRunAfterLeaveConfirm('signOut'); return false;"><i class="fas fa-sign-out-alt me-2"></i>Sign Out</a></li>
                         </ul>
                     </div>
 
@@ -1347,6 +1347,7 @@ Example:
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="quote-dialogs.js?v=1777660407"></script>
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD7acqRI6KsoUDTEkyMx36eDNRuuPXdqIA&libraries=drawing,geometry,places&callback=initMeasureMap" async defer></script>
 
     <script>
@@ -1391,7 +1392,7 @@ Example:
         }
 
         function undoLastAction() {
-            if (_undoStack.length === 0) { alert('Nothing to undo!'); return; }
+            if (_undoStack.length === 0) { qdAlert('Nothing to undo!'); return; }
             const state = JSON.parse(_undoStack.pop());
             _undoPaused = true;
             rooms = JSON.parse(JSON.stringify(state.rooms)); // deep clone
@@ -1827,10 +1828,10 @@ Example:
         }
         // -- End Category Style Picker ----------------------------------
 
-        function editRoomName(roomId) {
+        async function editRoomName(roomId) {
             const room = rooms.find(r => r.id === roomId);
             if (!room) return;
-            const newName = prompt('Edit room name:', room.name);
+            const newName = await qdPrompt('Edit room name:', room.name, { title: 'Rename Room' });
             if (newName && newName.trim()) {
                 room.name = newName.trim();
                 renderRooms();
@@ -2006,10 +2007,10 @@ Example:
             modal.show();
         }
 
-        function handleLineCategoryChange() {
+        async function handleLineCategoryChange() {
             const sel = document.getElementById('lineCategory');
             if (sel.value === '__add_new_category__') {
-                const newCat = prompt('Enter new category name:');
+                const newCat = await qdPrompt('Enter new category name:', '', { title: 'New Category' });
                 if (newCat && newCat.trim()) {
                     if (!pricingDatabase[newCat.trim()]) pricingDatabase[newCat.trim()] = [];
                     const items = JSON.parse(localStorage.getItem('ald_custom_items') || '{}');
@@ -2041,9 +2042,9 @@ Example:
             const addSvcOpt = document.createElement('option');
             addSvcOpt.value = '__add_new_service__'; addSvcOpt.text = '+ Add New Service';
             serviceSelect.appendChild(addSvcOpt);
-            serviceSelect.onchange = function() {
+            serviceSelect.onchange = async function() {
                 if (serviceSelect.value === '__add_new_service__') {
-                    const newSvc = prompt('Enter new service name:');
+                    const newSvc = await qdPrompt('Enter new service name:', '', { title: 'New Service' });
                     if (newSvc && newSvc.trim()) {
                         const cat = document.getElementById('lineCategory').value;
                         if (!pricingDatabase[cat]) pricingDatabase[cat] = [];
@@ -2379,7 +2380,7 @@ Example:
             modal.show();
         }
 
-        function confirmAddLine() {
+        async function confirmAddLine() {
             const roomId = parseInt(document.getElementById('currentRoomId').value);
             const description = document.getElementById('lineDescription').value.trim();
             const category = document.getElementById('lineCategory').value;
@@ -2448,7 +2449,11 @@ Example:
                 const savNewItemBtn = document.getElementById('saveNewItemBtn');
                 if (savNewItemBtn && savNewItemBtn.style.display !== 'none') {
                     const desc = document.getElementById('lineDescription').value.trim();
-                    if (desc && confirm('Save "' + desc + '" to your item database for next time?')) {
+                    if (desc && await qdConfirm('Save "' + desc + '" to your item database for next time?', {
+                        title: 'Save New Item',
+                        okText: 'Save Item',
+                        type: 'warning'
+                    })) {
                         saveLineItemToDatabase();
                     }
                 }
@@ -2523,12 +2528,16 @@ Example:
             calculateTotals();
         }
 
-        function deleteRoom(roomId) {
-            if (confirm('Delete this room? All items will be lost.')) {
-                _pushUndo();
-                rooms = rooms.filter(r => r.id !== roomId);
-                renderRooms();
-            }
+        async function deleteRoom(roomId) {
+            if (!await qdConfirm('Delete this room? All items in it will be lost.', {
+                title: 'Delete Room',
+                okText: 'Delete',
+                okClass: 'btn-danger',
+                type: 'danger'
+            })) return;
+            _pushUndo();
+            rooms = rooms.filter(r => r.id !== roomId);
+            renderRooms();
         }
 
         function toggleItemOptional(roomId, itemIndex) {
@@ -2714,7 +2723,7 @@ Example:
             var modal = bootstrap.Modal.getInstance(document.getElementById('measureMapModal')) || new bootstrap.Modal(document.getElementById('measureMapModal'));
             modal.show();
             setTimeout(function() {
-                if (typeof google === 'undefined') { alert('Google Maps is loading, please try again in a moment.'); return; }
+                if (typeof google === 'undefined') { qdAlert('Google Maps is loading, please try again in a moment.'); return; }
                 if (!_map) {
                     _map = new google.maps.Map(document.getElementById('measureMapContainer'), {
                         center: { lat: 43.6532, lng: -79.3832 },
@@ -2829,7 +2838,7 @@ Example:
             if (!addr || !_map) return;
             new google.maps.Geocoder().geocode({ address: addr }, function(results, status) {
                 if (status === 'OK' && results[0]) { _map.setCenter(results[0].geometry.location); _map.setZoom(20); }
-                else alert('Address not found. Try a more specific address.');
+                else qdAlert('Address not found. Try a more specific address.');
             });
         }
 
@@ -2891,10 +2900,12 @@ Example:
             if (_activePath.length === 0) { document.getElementById('btnUndoPoint').disabled = true; }
         }
 
-        function finishDrawing() {
+        async function finishDrawing() {
             if (_activePath.length < 2) { stopDrawing(); return; }
             clearPreview();
-            var label = prompt('Label this measurement (e.g. "Main Roof", "Back Fence"):') || ('Shape ' + (_mapShapes.length + 1));
+            var label = await qdPrompt('Label this measurement (e.g. "Main Roof", "Back Fence"):', 'Shape ' + (_mapShapes.length + 1), {
+                title: 'Measurement Label'
+            }) || ('Shape ' + (_mapShapes.length + 1));
             var isPolygon = _drawingMode === 'polygon';
             var shape = isPolygon
                 ? new google.maps.Polygon({ paths: [_activePath], strokeColor: '#0055ff', strokeWeight: 2, fillColor: '#00aaff', fillOpacity: 0.25, editable: true, map: _map })
@@ -2902,8 +2913,8 @@ Example:
             shape._label = label;
             shape._type = isPolygon ? 'polygon' : 'polyline';
             _mapShapes.push(shape);
-            google.maps.event.addListener(shape, 'click', function() {
-                var nl = prompt('Rename:', shape._label); if (nl) { shape._label = nl; renderMeasurements(); }
+            google.maps.event.addListener(shape, 'click', async function() {
+                var nl = await qdPrompt('Rename:', shape._label, { title: 'Rename Measurement' }); if (nl) { shape._label = nl; renderMeasurements(); }
             });
             stopDrawing();
             renderMeasurements();
@@ -3007,9 +3018,9 @@ Example:
         }
 
         function addMeasurementsToQuote() {
-            if (_mapShapes.length === 0) { alert('Draw at least one shape on the map first.'); return; }
+            if (_mapShapes.length === 0) { qdAlert('Draw at least one shape on the map first.'); return; }
             var roomId = parseInt(document.getElementById('mapTargetRoom').value);
-            if (!roomId) { alert('Please select a room to add items to.'); return; }
+            if (!roomId) { qdAlert('Please select a room to add items to.'); return; }
             var room = rooms.find(function(r) { return r.id === roomId; });
             if (!room) return;
             var itemName = document.getElementById('mapItemName').value.trim();
@@ -3509,13 +3520,15 @@ Example:
             if (typeof markUnsaved === 'function') markUnsaved();
         }
 
-        function applyGlobalMarkup() {
-            const markupPercent = prompt('Enter markup percentage to apply to entire quote (0-100%):');
+        async function applyGlobalMarkup() {
+            const markupPercent = await qdPrompt('Enter markup percentage to apply to entire quote (0-100%):', '', {
+                title: 'Apply Markup'
+            });
             if (markupPercent === null) return; // Cancelled
 
             const percent = parseFloat(markupPercent);
             if (isNaN(percent) || percent < 0 || percent > 100) {
-                alert('Please enter a valid percentage between 0 and 100.');
+                qdAlert('Please enter a valid percentage between 0 and 100.');
                 return;
             }
 
@@ -3526,7 +3539,7 @@ Example:
             });
 
             renderRooms();
-            alert('Markup of ' + percent + '% applied to all rooms!');
+            qdAlert('Markup of ' + percent + '% applied to all rooms!');
         }
 
         // Template Management Functions
@@ -3541,7 +3554,7 @@ Example:
 
         async function saveCurrentQuoteAsDraft() {
             if (rooms.length === 0) {
-                alert('No rooms to save. Add at least one room first.');
+                qdAlert('No rooms to save. Add at least one room first.');
                 return;
             }
 
@@ -3577,20 +3590,20 @@ Example:
                     const { data, error } = await saveQuoteToSupabase(draftData);
                     if (error) {
                         console.warn('Supabase save failed (local save succeeded):', error.message);
-                        alert('Quote saved locally! (Cloud sync failed: ' + error.message + ')');
+                        qdAlert('Quote saved locally! (Cloud sync failed: ' + error.message + ')');
                     } else {
                         // Store the Supabase ID for future updates
                         currentSupabaseId = data.id;
                         draftData.supabaseId = data.id;
                         localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
-                        alert('Quote saved! ? (Saved to cloud + local backup)');
+                        qdAlert('Quote saved! ? (Saved to cloud + local backup)');
                     }
                 } catch(e) {
                     console.warn('Supabase save error:', e);
-                    alert('Quote saved locally! (Cloud unavailable)');
+                    qdAlert('Quote saved locally! (Cloud unavailable)');
                 }
             } else {
-                alert('Quote saved as draft! You can load it later.');
+                qdAlert('Quote saved as draft! You can load it later.');
             }
             renderRecentQuotesSection();
         }
@@ -3599,7 +3612,7 @@ Example:
             const recentQuotes = JSON.parse(localStorage.getItem(RECENT_QUOTES_KEY) || '[]');
 
             if (recentQuotes.length === 0) {
-                alert('No recent quotes found. Save your current work first!');
+                qdAlert('No recent quotes found. Save your current work first!');
                 return;
             }
 
@@ -3632,7 +3645,7 @@ Example:
             const quote = recentQuotes[index];
 
             if (!quote) {
-                alert('Quote not found.');
+                qdAlert('Quote not found.');
                 return;
             }
 
@@ -3658,7 +3671,7 @@ Example:
             });
 
             renderRooms();
-            alert(`Loaded quote from ${new Date(quote.savedAt).toLocaleString()}!`);
+            qdAlert(`Loaded quote from ${new Date(quote.savedAt).toLocaleString()}!`);
         }
 
         function loadDraft() {
@@ -3776,15 +3789,17 @@ Example:
             }
         }
 
-        function saveTemplate() {
+        async function saveTemplate() {
             if (rooms.length === 0) {
-                alert('Please add at least one room before saving a template.');
+                qdAlert('Please add at least one room before saving a template.');
                 return;
             }
 
-            const templateName = prompt('Enter a name for this template:');
+            const templateName = await qdPrompt('Enter a name for this template:', '', {
+                title: 'Save Template'
+            });
             if (!templateName || !templateName.trim()) {
-                alert('Template name cannot be empty.');
+                qdAlert('Template name cannot be empty.');
                 return;
             }
 
@@ -3805,7 +3820,7 @@ Example:
             // Also sync to cloud (fire and forget)
             _syncTemplateToCloud(quoteData.name, quoteData.rooms).catch(function(){});
 
-            alert(`Template "${templateName}" saved successfully!`);
+            qdAlert(`Template "${templateName}" saved successfully!`);
             if (typeof renderTemplateDropdown === 'function') renderTemplateDropdown();
         }
 
@@ -3876,13 +3891,17 @@ Example:
             }, 10);
         }
 
-        function loadTemplateById(id) {
+        async function loadTemplateById(id) {
             var existing = document.getElementById('_templateDropdown');
             if (existing) existing.remove();
             var templates = _getTemplates();
             var t = templates.find(function(x){ return x.id === id; });
             if (!t) return;
-            if (!confirm('Load template "' + t.name + '"? Rooms will be added to your current quote.')) return;
+            if (!await qdConfirm('Load template "' + t.name + '"? Rooms will be added to your current quote.', {
+                title: 'Load Template',
+                okText: 'Load Template',
+                type: 'warning'
+            })) return;
             if (t.rooms && t.rooms.length) {
                 t.rooms.forEach(function(room) {
                     var newRoom = JSON.parse(JSON.stringify(room));
@@ -3899,25 +3918,29 @@ Example:
             markUnsaved();
         }
 
-        function saveRoomAsTemplate(roomId) {
+        async function saveRoomAsTemplate(roomId) {
             var room = rooms.find(function(r) { return r.id === roomId; });
             if (!room) return;
-            var name = prompt('Save as template:', room.name || 'My Template');
+            var name = await qdPrompt('Save as template:', room.name || 'My Template', {
+                title: 'Save Room Template'
+            });
             if (!name) return;
             var templates = _getTemplates();
             templates.push({ id: Date.now(), name: name, rooms: [JSON.parse(JSON.stringify(room))] });
             _saveTemplates(templates);
-            alert('Template "' + name + '" saved!');
+            qdAlert('Template "' + name + '" saved!');
         }
 
-        function saveTemplate() {
-            if (!rooms.length) { alert('No rooms to save!'); return; }
-            var name = prompt('Save all rooms as template:', 'My Quote Template');
+        async function saveTemplate() {
+            if (!rooms.length) { qdAlert('No rooms to save!'); return; }
+            var name = await qdPrompt('Save all rooms as template:', 'My Quote Template', {
+                title: 'Save Quote Template'
+            });
             if (!name) return;
             var templates = _getTemplates();
             templates.push({ id: Date.now(), name: name, rooms: JSON.parse(JSON.stringify(rooms)) });
             _saveTemplates(templates);
-            alert('Template "' + name + '" saved!');
+            qdAlert('Template "' + name + '" saved!');
         }
 
         function openManageTemplates() {
@@ -3967,8 +3990,13 @@ Example:
             }
         }
 
-        function deleteTemplateById(id) {
-            if (!confirm('Delete this template?')) return;
+        async function deleteTemplateById(id) {
+            if (!await qdConfirm('Delete this template?', {
+                title: 'Delete Template',
+                okText: 'Delete',
+                okClass: 'btn-danger',
+                type: 'danger'
+            })) return;
             var allTemplates = _getTemplates();
             var deleted = allTemplates.find(function(t){ return t.id === id; });
             var templates = allTemplates.filter(function(t){ return t.id !== id; });
@@ -3986,7 +4014,7 @@ Example:
         async function generateInvoiceLink() {
             try {
             if (!rooms || rooms.length === 0) {
-                alert('Please add at least one room before generating an invoice.');
+                qdAlert('Please add at least one room before generating an invoice.');
                 return;
             }
             const invoiceId = 'invoice_' + Date.now();
@@ -4078,7 +4106,7 @@ Example:
             }
             } catch(err) {
                 console.error('generateInvoiceLink error:', err);
-                alert('Something went wrong generating the invoice. Please try again.');
+                qdAlert('Something went wrong generating the invoice. Please try again.');
             }
         }
 
@@ -4366,7 +4394,7 @@ Example:
 
         function startVoiceQuote() {
             if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-                alert('Voice input is not supported in this browser. Please use Chrome on Android or Safari on iOS.');
+                qdAlert('Voice input is not supported in this browser. Please use Chrome on Android or Safari on iOS.');
                 return;
             }
             _voiceTranscriptFull = '';
@@ -4509,14 +4537,19 @@ Example:
             }
         }
 
-        function applyAIQuote(result) {
+        async function applyAIQuote(result) {
             if (!result.rooms || !Array.isArray(result.rooms)) {
-                alert('AI could not parse the quote. Please try again with more detail.');
+                qdAlert('AI could not parse the quote. Please try again with more detail.');
                 return;
             }
             var action = 'replace';
             if (rooms.length > 0) {
-                if (confirm('Add AI rooms to your existing quote? Click OK to add, Cancel to replace everything.')) { action = 'add'; }
+                if (await qdConfirm('Add AI rooms to your existing quote? Choose Cancel to replace everything.', {
+                    title: 'Apply AI Quote',
+                    okText: 'Add Rooms',
+                    cancelText: 'Replace',
+                    type: 'warning'
+                })) { action = 'add'; }
             }
             if (action === 'replace') { rooms = []; roomCounter = 0; }
             result.rooms.forEach(function(aiRoom) {
@@ -4605,9 +4638,14 @@ Example:
             var _toggleEl = document.getElementById('autoSaveToggle');
             if (_toggleEl) {
                 _toggleEl.checked = _autoSaveOn;
-                _toggleEl.addEventListener('change', function() {
+                _toggleEl.addEventListener('change', async function() {
                     if (!this.checked) {
-                        if (!confirm('Turning off auto-save is not recommended. Are you sure?')) {
+                        if (!await qdConfirm('Turning off auto-save is not recommended. Are you sure?', {
+                            title: 'Turn Off Auto-Save',
+                            okText: 'Turn Off',
+                            okClass: 'btn-warning',
+                            type: 'warning'
+                        })) {
                             this.checked = true;
                             return;
                         }
@@ -5075,7 +5113,7 @@ Example:
             <i class="fas fa-microphone d-block" style="font-size:1rem;"></i>
             <span style="font-size:0.55rem;">AI</span>
         </a>
-        <a href="dashboard.html" class="btn btn-outline-secondary btn-sm" style="flex:1; flex-direction:column; display:flex; align-items:center; justify-content:center; padding:4px 2px; min-width:0;" onclick="if(unsavedChanges && !confirm('Unsaved changes. Leave?')) return false; saveSessionQuote();">
+        <a href="javascript:void(0)" class="btn btn-outline-secondary btn-sm" style="flex:1; flex-direction:column; display:flex; align-items:center; justify-content:center; padding:4px 2px; min-width:0;" onclick="qdLeavePage('dashboard.html'); return false;">
             <i class="fas fa-th-large d-block" style="font-size:1rem;"></i>
             <span style="font-size:0.55rem;">Home</span>
         </a>

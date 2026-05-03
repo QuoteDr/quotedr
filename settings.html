@@ -710,6 +710,7 @@ Sarah Jones, 905-555-5678"></textarea>
 	</div>
 
 	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="quote-dialogs.js?v=1777660407"></script>
 	<script>
 		// ── Tab Navigation ──────────────────────────────────────────────────
 		// === QuickBooks Integration ===
@@ -752,7 +753,7 @@ Sarah Jones, 905-555-5678"></textarea>
 		async function connectQuickBooks() {
 			try {
 				const headers = await getQBAuthHeader();
-				if (!headers) { alert('Please sign in first.'); return; }
+				if (!headers) { qdAlert('Please sign in first.'); return; }
 				// Ask the edge function to generate the auth URL + save state to user_data
 				const res = await fetch(SUPABASE_URL + '/functions/v1/qb-oauth', {
 					method: 'POST',
@@ -766,18 +767,23 @@ Sarah Jones, 905-555-5678"></textarea>
 				// Redirect to QuickBooks OAuth
 				window.location.href = authUrl;
 			} catch(e) {
-				alert('Error starting QuickBooks connection: ' + e.message);
+				qdAlert('Error starting QuickBooks connection: ' + e.message);
 			}
 		}
 
 		async function disconnectQuickBooks() {
-			if (!confirm('Disconnect QuickBooks? You can reconnect at any time.')) return;
+			if (!await qdConfirm('Disconnect QuickBooks? You can reconnect at any time.', {
+				title: 'Disconnect QuickBooks',
+				okText: 'Disconnect',
+				okClass: 'btn-warning',
+				type: 'warning'
+			})) return;
 			try {
 				const headers = await getQBAuthHeader();
 				if (!headers) return;
 				await fetch(SUPABASE_URL + '/functions/v1/qb-oauth', { method: 'POST', headers, body: JSON.stringify({ action: 'disconnect' }) });
 				checkQBStatus();
-			} catch(e) { alert('Error disconnecting: ' + e.message); }
+			} catch(e) { qdAlert('Error disconnecting: ' + e.message); }
 		}
 
 		function escapeHtml(value) {
@@ -912,7 +918,7 @@ Sarah Jones, 905-555-5678"></textarea>
 
 		async function importQBCustomers() {
 			const selected = selectedQBRecords(window._pendingQBCustomers || []);
-			if (!selected.length) { alert('Select at least one customer to import.'); return; }
+			if (!selected.length) { qdAlert('Select at least one customer to import.'); return; }
 			let existing = {};
 			try { existing = JSON.parse(localStorage.getItem('ald_clients') || '{}'); } catch(e) { existing = {}; }
 			selected.forEach(function(c) {
@@ -934,7 +940,7 @@ Sarah Jones, 905-555-5678"></textarea>
 
 		async function importQBItems() {
 			const selected = selectedQBRecords(window._pendingQBItems || []);
-			if (!selected.length) { alert('Select at least one item to import.'); return; }
+			if (!selected.length) { qdAlert('Select at least one item to import.'); return; }
 			let existing = {};
 			try { existing = JSON.parse(localStorage.getItem('ald_custom_items') || '{}'); } catch(e) { existing = {}; }
 			if (!existing.QuickBooks) existing.QuickBooks = [];
@@ -1059,7 +1065,7 @@ Sarah Jones, 905-555-5678"></textarea>
 		function handleLogoUpload(event) {
 			var file = event.target.files[0];
 			if (!file) return;
-			if (file.size > 1024 * 1024) { alert('Logo must be under 1MB.'); return; }
+			if (file.size > 1024 * 1024) { qdAlert('Logo must be under 1MB.'); return; }
 			var reader = new FileReader();
 			reader.onload = async function(e) {
 				var dataUrl = e.target.result;
@@ -1073,8 +1079,13 @@ Sarah Jones, 905-555-5678"></textarea>
 			reader.readAsDataURL(file);
 		}
 
-		function removeLogo() {
-			if (!confirm('Remove your company logo?')) return;
+		async function removeLogo() {
+			if (!await qdConfirm('Remove your company logo?', {
+				title: 'Remove Logo',
+				okText: 'Remove',
+				okClass: 'btn-warning',
+				type: 'warning'
+			})) return;
 			localStorage.removeItem('ald_company_logo');
 			document.getElementById('logoPreviewImg').style.display = 'none';
 			document.getElementById('logoPreviewImg').src = '';
@@ -1360,8 +1371,13 @@ Sarah Jones, 905-555-5678"></textarea>
 
 			modal1.querySelector('#skipContinueBtn').addEventListener('click', function() {
 				bsModal1.hide();
-				setTimeout(function() {
-					if (!confirm('Are you absolutely sure? You are about to permanently delete ALL items from your database. This CANNOT be undone.')) return;
+				setTimeout(async function() {
+					if (!await qdConfirm('You are about to permanently delete all items from your database. This cannot be undone.', {
+						title: 'Delete All Items',
+						okText: 'Delete All',
+						okClass: 'btn-danger',
+						type: 'danger'
+					})) return;
 					localStorage.setItem('ald_custom_items', '{}');
 					if (typeof saveItemsToSupabase === 'function') {
 						saveItemsToSupabase({}).then(function() {
@@ -1377,8 +1393,13 @@ Sarah Jones, 905-555-5678"></textarea>
 			});
 		}
 
-		function clearAllClients() {
-			if (!confirm('Clear all clients? This cannot be undone.')) return;
+		async function clearAllClients() {
+			if (!await qdConfirm('Clear all clients? This cannot be undone.', {
+				title: 'Clear Clients',
+				okText: 'Clear Clients',
+				okClass: 'btn-danger',
+				type: 'danger'
+			})) return;
 			localStorage.setItem('ald_clients', '{}');
 			if (typeof saveAllClientsToSupabase === 'function') {
 				saveAllClientsToSupabase([]).catch(function(e) { console.warn('Clear clients error:', e); });
@@ -1489,7 +1510,11 @@ Sarah Jones, 905-555-5678"></textarea>
 		}
 
 		async function resetOnboarding() {
-			if (!confirm('Redo onboarding? This will walk you through the setup again.')) return;
+			if (!await qdConfirm('Redo onboarding? This will walk you through the setup again.', {
+				title: 'Redo Onboarding',
+				okText: 'Redo Onboarding',
+				type: 'warning'
+			})) return;
 			if (typeof saveOnboardingComplete === 'function') await saveOnboardingComplete(false);
 			localStorage.removeItem('ald_onboarding_complete');
 			window.location.href = 'onboarding.html';
@@ -1623,7 +1648,7 @@ Sarah Jones, 905-555-5678"></textarea>
 		async function runFixIt(type) {
 			var fixText = document.getElementById('fixItText_' + type)?.value.trim();
 			var resultEl = document.getElementById(type === 'pricing' ? 'importPricingResult' : 'importClientsResult');
-			if (!fixText) { alert('Please describe what needs to be fixed!'); return; }
+			if (!fixText) { qdAlert('Please describe what needs to be fixed!'); return; }
 
 			// Build context: original data + current parsed result + user instructions
 			var currentData = type === 'pricing'
@@ -1657,7 +1682,7 @@ Sarah Jones, 905-555-5678"></textarea>
 				}
 			} catch(e) {
 				if (fixBtn) { fixBtn.disabled = false; fixBtn.innerHTML = '<i class="fas fa-magic me-1"></i>Fix It'; }
-				alert('Fix failed: ' + e.message);
+				qdAlert('Fix failed: ' + e.message);
 			}
 		}
 
@@ -1715,7 +1740,7 @@ Sarah Jones, 905-555-5678"></textarea>
 				try { items = JSON.parse(localStorage.getItem('ald_custom_items') || '{}'); } catch(e) {}
 			}
 			if (!items || Object.keys(items).length === 0) {
-				alert('No items to export. Make sure your items are loaded first.');
+				qdAlert('No items to export. Make sure your items are loaded first.');
 				return;
 			}
 			var rows = [['Category','Name','Unit','Rate','Material Cost','Description']];

@@ -151,7 +151,7 @@
             if (file && file.type === 'application/pdf') {
                 ikeaHandlePdfUpload(file);
             } else {
-                alert('Please drop a PDF file.');
+                qdAlert('Please drop a PDF file.');
             }
         }
 
@@ -317,13 +317,13 @@
 
         function parseIkeaOrder() {
             var text = document.getElementById('ikeaOrderInput').value.trim();
-            if (!text) { alert('Please paste your IKEA order list first.'); return; }
+            if (!text) { qdAlert('Please paste your IKEA order list first.'); return; }
             var btn = document.getElementById('ikeaParseBtn');
             var origHtml = btn ? btn.innerHTML : '';
             if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-cog fa-spin me-1"></i>Parsing...'; }
             try {
                 var rawItems = parseIkeaOrderLocal(text);
-                if (!rawItems || rawItems.length === 0) { alert('Could not find any recognizable IKEA install items. Make sure you uploaded the full order PDF or pasted the complete text.'); return; }
+                if (!rawItems || rawItems.length === 0) { qdAlert('Could not find any recognizable IKEA install items. Make sure you uploaded the full order PDF or pasted the complete text.'); return; }
                 var pricing = loadIkeaPricing();
                 var parsed = rawItems.map(function(item) {
                     var rate = pricing[item.type] || 0;
@@ -333,7 +333,7 @@
                 renderIkeaResults(parsed, []);
                 setTimeout(function() { showIkeaReminders(hasCountertop); }, 400);
             } catch(e) {
-                alert('Parse error: ' + e.message);
+                qdAlert('Parse error: ' + e.message);
             } finally {
                 if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
             }
@@ -405,7 +405,7 @@
                 renderRooms();
             } else { roomId = parseInt(roomId); }
             var room = rooms.find(function(r) { return r.id === roomId; });
-            if (!room) { alert('Room not found.'); return; }
+            if (!room) { qdAlert('Room not found.'); return; }
             var added = 0;
             document.querySelectorAll('.ikea-check').forEach(function(chk) {
                 if (!chk.checked) return;
