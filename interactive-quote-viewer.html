@@ -91,6 +91,29 @@
             height: 24px;
             cursor: pointer;
         }
+        .upgrade-action-btn {
+            position: relative;
+            overflow: hidden;
+            isolation: isolate;
+        }
+        .upgrade-action-btn::after {
+            content: '';
+            position: absolute;
+            inset: -35% auto -35% -65%;
+            width: 42%;
+            transform: skewX(-22deg);
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.42), transparent);
+            animation: qdUpgradeShimmer 4.8s ease-in-out infinite;
+            pointer-events: none;
+        }
+        @keyframes qdUpgradeShimmer {
+            0%, 72% { left: -65%; opacity: 0; }
+            78% { opacity: 0.7; }
+            100% { left: 125%; opacity: 0; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .upgrade-action-btn::after { animation: none; display: none; }
+        }
         .price-tag {
             font-weight: bold;
             color: #28a745;
@@ -555,10 +578,13 @@ if (location.search.includes('debug')) {
                 var accent = quoteData.style.accent || '#ffffff';
                 var bg = quoteData.style.bg || '#ffffff';
                 var headerStyle = quoteData.style.headerStyle || 'branded';
+                var headerOpacity = parseInt(quoteData.style.headerOpacity || 100, 10);
+                if (!isFinite(headerOpacity)) headerOpacity = 100;
+                headerOpacity = Math.max(20, Math.min(headerOpacity, 100));
                 var fontFeel = quoteData.style.fontFeel || 'clean';
                 var styleTag = document.createElement('style');
-                var headerBg = headerStyle === 'dark' ? '#172033' : (headerStyle === 'light' || accent === '#ffffff' ? '#ffffff' : accent);
-                var headerColor = (headerStyle === 'light' || accent === '#ffffff') ? '#1f3349' : '#ffffff';
+                var headerBg = headerStyle === 'dark' ? colorWithOpacity('#172033', headerOpacity) : (headerStyle === 'light' || accent === '#ffffff' ? '#ffffff' : colorWithOpacity(accent, headerOpacity));
+                var headerColor = (headerStyle === 'light' || accent === '#ffffff' || headerOpacity < 55) ? '#1f3349' : '#ffffff';
                 var fontCSS = fontFeel === 'premium'
                     ? 'body { font-family: Georgia, "Times New Roman", serif; } .btn, .badge, input, textarea, select { font-family: Arial, sans-serif; }'
                     : (fontFeel === 'bold' ? 'body { font-weight: 500; } h1,h2,h3,h4,h5,h6,.fw-bold,strong { font-weight: 800 !important; }' : '');
@@ -646,6 +672,24 @@ if (location.search.includes('debug')) {
 
         function formatDescriptionText(value) {
             return escapeHtml(value).replace(/\n/g, '<br>');
+        }
+
+        function hexToRgb(hex) {
+            var value = String(hex || '').replace('#', '').trim();
+            if (value.length === 3) value = value.split('').map(function(ch) { return ch + ch; }).join('');
+            if (!/^[0-9a-f]{6}$/i.test(value)) return null;
+            return {
+                r: parseInt(value.slice(0, 2), 16),
+                g: parseInt(value.slice(2, 4), 16),
+                b: parseInt(value.slice(4, 6), 16)
+            };
+        }
+
+        function colorWithOpacity(hex, opacityPercent) {
+            var rgb = hexToRgb(hex);
+            if (!rgb) return hex || '#1a56a0';
+            var alpha = Math.max(20, Math.min(parseInt(opacityPercent || 100, 10), 100)) / 100;
+            return 'rgba(' + rgb.r + ', ' + rgb.g + ', ' + rgb.b + ', ' + alpha.toFixed(2) + ')';
         }
 
         function renderExpandableDescription(text, id) {
@@ -929,7 +973,7 @@ if (location.search.includes('debug')) {
                                 <div>
                                     ${!isUpgraded ? `<div class="text-muted mb-1" style="font-size:0.88rem;"><i class="fas fa-arrow-up" style="color:#f0ad4e;"></i> <strong>Upgrade available:</strong> ${item.upgrade.name}</div>` : ''}
                                     ${item.upgrade.photo ? `<div class="mb-2"><button class="btn btn-sm btn-outline-warning" onclick="openPhotoLightbox('${item.upgrade.photo}')" style="font-size:0.75rem;"><i class="fas fa-camera me-1"></i>View Upgrade Photo</button></div>` : ''}
-                                    <button class="btn btn-sm ${isUpgraded ? 'btn-warning' : 'btn-outline-warning'}" onclick="toggleViewerUpgrade(${roomIdx}, ${itemIndex})" style="font-size:0.85rem;">
+                                    <button class="btn btn-sm upgrade-action-btn ${isUpgraded ? 'btn-warning' : 'btn-outline-warning'}" onclick="toggleViewerUpgrade(${roomIdx}, ${itemIndex})" style="font-size:0.85rem;">
                                         <i class="fas fa-arrow-up"></i> ${isUpgraded ? 'Upgraded ✓' : 'Upgrade: ' + item.upgrade.name}
                                     </button>
                                 </div>` : ''}

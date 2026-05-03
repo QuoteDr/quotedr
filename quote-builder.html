@@ -4688,7 +4688,7 @@ Example:
     <script src="quote-clients.js?v=1777660402"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
     <script src="ikea-quote.js?v=1777304471"></script>
-    <script src="quote-style.js?v=1777660401"></script>
+    <script src="quote-style.js?v=1777740601"></script>
 
     <!-- Quote Style Modal -->
     <div class="modal fade" id="quoteStyleModal" tabindex="-1">
@@ -4751,6 +4751,14 @@ Example:
                                         <option value="dark">Dark premium</option>
                                         <option value="light">Light document</option>
                                     </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <label class="form-label fw-bold mb-0" for="quoteHeaderOpacity">Header Colour Strength</label>
+                                        <span id="quoteHeaderOpacityValue" class="text-muted small fw-semibold">100%</span>
+                                    </div>
+                                    <input type="range" id="quoteHeaderOpacity" class="form-range mt-2" min="20" max="100" step="5" value="100">
+                                    <div class="text-muted small">Lower makes the selected header colour softer; higher makes it more defined.</div>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold">Font Feel</label>
