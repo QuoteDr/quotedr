@@ -417,6 +417,117 @@
             font-size: 0.78rem;
             font-weight: 700;
         }
+        .builder-guide-card {
+            background: #ffffff;
+            border: 1px solid #d8e2ee;
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(15, 52, 96, 0.08);
+            margin: 0 0 1rem;
+            overflow: hidden;
+        }
+        .builder-guide-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 0.85rem 1rem;
+            background: #f8fbff;
+            border-bottom: 1px solid #e5edf6;
+        }
+        .builder-guide-title {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+            margin: 0;
+            color: #0f3460;
+            font-size: 1rem;
+            font-weight: 850;
+        }
+        .builder-guide-body {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(260px, 0.7fr);
+            gap: 1rem;
+            padding: 1rem;
+        }
+        .builder-guide-progress-wrap {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.85rem;
+        }
+        .builder-guide-progress {
+            flex: 1;
+            height: 9px;
+            background: #e8eef6;
+            border-radius: 999px;
+            overflow: hidden;
+        }
+        .builder-guide-progress-bar {
+            height: 100%;
+            width: 0;
+            background: linear-gradient(135deg, #1a56a0, #f27a1a);
+            transition: width 0.25s ease;
+        }
+        .builder-guide-list {
+            display: grid;
+            gap: 0.5rem;
+        }
+        .builder-guide-step {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            width: 100%;
+            border: 1px solid #dbe4ef;
+            border-radius: 8px;
+            background: #fff;
+            color: #24364b;
+            padding: 0.65rem 0.75rem;
+            text-align: left;
+        }
+        .builder-guide-step:hover,
+        .builder-guide-step.active {
+            border-color: #1a56a0;
+            background: #f0f6ff;
+        }
+        .builder-guide-step.done {
+            border-color: #c7ead7;
+            background: #f0fff6;
+        }
+        .builder-guide-check {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            border: 1px solid #cbd5e1;
+            color: #64748b;
+            flex: 0 0 auto;
+        }
+        .builder-guide-step.done .builder-guide-check {
+            background: #198754;
+            border-color: #198754;
+            color: #fff;
+        }
+        .builder-guide-current {
+            border: 1px solid #cfe0f7;
+            border-radius: 8px;
+            background: #f8fbff;
+            padding: 1rem;
+        }
+        .builder-guide-current h6 {
+            color: #0f3460;
+            font-weight: 850;
+        }
+        .builder-guide-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.9rem;
+        }
+        #builderGuideShowBtn {
+            display: none;
+        }
     @media (max-width: 768px) {
             .container-fluid { padding-left: 8px !important; padding-right: 8px !important; }
             .btn-sm { font-size: 0.75rem; padding: 4px 7px; }
@@ -447,6 +558,8 @@
             #grandTotalDisplay { font-size: 1.9rem !important; }
             /* Card headers wrapping */
             .card-header { flex-wrap: wrap; gap: 4px; }
+            .builder-guide-body { grid-template-columns: 1fr; }
+            .builder-guide-header { align-items: stretch; flex-direction: column; }
             /* Hide autosave toggle label on mobile to save space (only target the toolbar toggle) */
             #autoSaveToggle + .form-check-label { display: none !important; }
             /* Hide bottom action bar when modal is open on mobile */
@@ -607,6 +720,9 @@ if (location.search.includes('debug')) {
                         <input class="form-check-input" type="checkbox" id="autoSaveToggle" style="cursor:pointer;">
                         <label class="form-check-label text-muted" for="autoSaveToggle">Auto-save</label>
                     </div>
+                    <button type="button" id="builderGuideShowBtn" class="btn btn-sm btn-outline-primary ms-auto" onclick="toggleBuilderGuide(true)">
+                        <i class="fas fa-route me-1"></i>Show Guide
+                    </button>
                 </div>
             </div>
         </div>
@@ -619,6 +735,51 @@ if (location.search.includes('debug')) {
             <i class="fas fa-save me-1"></i>Save to File Now
         </button>
     </div>
+
+    <div id="builderGuideCard" class="builder-guide-card">
+        <div class="builder-guide-header">
+            <div>
+                <h2 class="builder-guide-title"><i class="fas fa-route"></i> Quote Builder Guide</h2>
+                <div class="text-muted small">Follow the steps from client info to sending. You can hide this anytime.</div>
+            </div>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="restartBuilderGuide()">
+                    <i class="fas fa-rotate-left me-1"></i>Restart
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleBuilderGuide(false)">
+                    <i class="fas fa-eye-slash me-1"></i>Hide Guide
+                </button>
+            </div>
+        </div>
+        <div class="builder-guide-body">
+            <div>
+                <div class="builder-guide-progress-wrap">
+                    <div class="builder-guide-progress" aria-hidden="true">
+                        <div id="builderGuideProgressBar" class="builder-guide-progress-bar"></div>
+                    </div>
+                    <strong id="builderGuideProgressText" class="small text-muted">0%</strong>
+                </div>
+                <div id="builderGuideList" class="builder-guide-list"></div>
+            </div>
+            <div class="builder-guide-current">
+                <div class="text-muted small fw-bold text-uppercase mb-2">Current Step</div>
+                <h6 id="builderGuideCurrentTitle" class="mb-2">Start with client info</h6>
+                <p id="builderGuideCurrentDetail" class="text-muted small mb-0">Add the client name and confirm the quote number.</p>
+                <div class="builder-guide-actions">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="moveBuilderGuide(-1)">
+                        <i class="fas fa-chevron-left me-1"></i>Back
+                    </button>
+                    <button type="button" class="btn btn-sm btn-primary" id="builderGuideActionBtn" onclick="runBuilderGuideAction()">
+                        Do This Step
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="moveBuilderGuide(1)">
+                        Next<i class="fas fa-chevron-right ms-1"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 
         <!-- Client Info -->
         <div class="card mb-3">
@@ -633,7 +794,7 @@ if (location.search.includes('debug')) {
                     <!-- Quote Number -->
                     <div class="col-md-12 mb-3">
                         <div class="d-flex align-items-center gap-3">
-                            <label class="mb-0"><strong>Quote #:</strong></label>
+                            <label class="mb-0"><strong>Quote #:</strong><button type="button" class="qd-inline-help-btn" title="Help with quote numbers" aria-label="Help with quote numbers" onclick="QuoteDrModalHelp.openInline('quoteNumber'); return false;"><i class="fas fa-question"></i></button></label>
                             <input type="text" id="quoteNumber" class="form-control" style="max-width: 200px; font-weight: bold; font-size: 1.1rem;" placeholder="2026-001" id="quoteNumber" oninput="checkQuoteNumberDuplicate()">
                             <select id="quoteStatus" class="form-select form-select-sm d-inline-block" style="width:auto; font-size:0.8rem;" onchange="markUnsaved()">
                                 <option value="draft">Draft</option>
@@ -1181,7 +1342,7 @@ Example:
                         <div class="collapse mt-2" id="materialCostCollapse">
                             <div class="row g-2 align-items-center bg-light p-3 rounded">
                                 <div class="col-md-6">
-                                    <label><strong>Material Cost ($):</strong></label>
+                                    <label><strong>Material Cost ($):</strong><button type="button" class="qd-inline-help-btn" title="Help with material costs" aria-label="Help with material costs" onclick="QuoteDrModalHelp.openInline('materialCost'); return false;"><i class="fas fa-question"></i></button></label>
                                     <div class="input-group">
                                         <input type="number" id="lineMaterialCost" class="form-control" value="0" step="0.01" placeholder="per unit"
                                                oninput="calculateMaterialTotal()">
@@ -1264,7 +1425,7 @@ Example:
                     </div>
                     <div class="row g-2 mb-3 align-items-end">
                         <div class="col-md-3">
-                            <label class="form-label"><strong>Material Cost ($/unit)</strong> <span class="text-muted small">(optional)</span></label>
+                            <label class="form-label"><strong>Material Cost ($/unit)</strong> <span class="text-muted small">(optional)</span><button type="button" class="qd-inline-help-btn" title="Help with material costs" aria-label="Help with material costs" onclick="QuoteDrModalHelp.openInline('materialCost'); return false;"><i class="fas fa-question"></i></button></label>
                             <input type="number" id="newItemMaterialCost" class="form-control" step="0.01" min="0" placeholder="0.00">
                         </div>
                         <div class="col-md-7">
@@ -1465,6 +1626,195 @@ Example:
 
         // Timeline feature - show/hide toggle
         let showTimelines = true;
+
+        // -- Guided builder flow -----------------------------------------------
+        var _builderGuideIndex = parseInt(localStorage.getItem('ald_builder_guide_step') || '0', 10) || 0;
+        var BUILDER_GUIDE_STEPS = [
+            {
+                id: 'client',
+                title: 'Add client info',
+                detail: 'Enter the client name and confirm the quote number. Address, phone, and email help when sending later.',
+                actionText: 'Go to Client Info',
+                complete: function() {
+                    return !!(document.getElementById('clientName')?.value.trim() && document.getElementById('quoteNumber')?.value.trim());
+                },
+                action: function() {
+                    var body = document.getElementById('clientInfoBody');
+                    if (body && body.style.display === 'none') toggleClientInfo();
+                    focusBuilderGuideTarget('clientName');
+                }
+            },
+            {
+                id: 'room',
+                title: 'Create a room or area',
+                detail: 'Break the quote into sections like Kitchen, Bathroom, Basement, Exterior, or Garage.',
+                actionText: 'Add Room',
+                complete: function() { return rooms.length > 0; },
+                action: function() { addRoom(); }
+            },
+            {
+                id: 'items',
+                title: 'Add line items',
+                detail: 'Add the labour, materials, and services that make up each room total.',
+                actionText: 'Add Line Item',
+                complete: function() {
+                    return rooms.some(function(room) { return room.items && room.items.length > 0; });
+                },
+                action: function() {
+                    if (!rooms.length) { addRoom(); return; }
+                    addLine(rooms[0].id);
+                }
+            },
+            {
+                id: 'review',
+                title: 'Review totals and details',
+                detail: 'Check room subtotals, tax, material costs, markup, and the final quote total before sending.',
+                actionText: 'Review Total',
+                complete: function() { return getBuilderGuideTotal() > 0; },
+                action: function() { scrollBuilderGuideTarget('grandTotalDisplay'); }
+            },
+            {
+                id: 'save',
+                title: 'Save the quote',
+                detail: 'Save before leaving the builder so the quote is available later and can sync across devices.',
+                actionText: 'Save Quote',
+                complete: function() {
+                    return !!(window._supabaseQuoteId || localStorage.getItem('ald_active_quote_id'));
+                },
+                action: function() { if (typeof saveQuote === 'function') saveQuote(); }
+            },
+            {
+                id: 'send',
+                title: 'Preview and send',
+                detail: 'Choose the client view settings, preview the quote, then send the link or email it directly.',
+                actionText: 'Preview & Send',
+                complete: function() {
+                    var status = document.getElementById('quoteStatus')?.value || 'draft';
+                    return status === 'sent' || status === 'accepted' || status === 'invoiced' || !!document.getElementById('interactiveLinkModal');
+                },
+                action: function() { if (typeof generateInteractiveLink === 'function') generateInteractiveLink(); }
+            }
+        ];
+
+        function getBuilderGuideTotal() {
+            var totalText = document.getElementById('grandTotalDisplay')?.textContent || '';
+            return parseFloat(totalText.replace(/[^0-9.]/g, '')) || 0;
+        }
+
+        function focusBuilderGuideTarget(id) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setTimeout(function() {
+                try { el.focus(); } catch(e) {}
+            }, 250);
+        }
+
+        function scrollBuilderGuideTarget(id) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function isBuilderGuideHidden() {
+            return localStorage.getItem('ald_builder_guide_hidden') === '1';
+        }
+
+        function toggleBuilderGuide(show) {
+            var hidden = show === undefined ? !isBuilderGuideHidden() : !show;
+            localStorage.setItem('ald_builder_guide_hidden', hidden ? '1' : '0');
+            applyBuilderGuideVisibility();
+        }
+
+        function applyBuilderGuideVisibility() {
+            var card = document.getElementById('builderGuideCard');
+            var showBtn = document.getElementById('builderGuideShowBtn');
+            var hidden = isBuilderGuideHidden();
+            if (card) card.style.display = hidden ? 'none' : '';
+            if (showBtn) showBtn.style.display = hidden ? 'inline-flex' : 'none';
+        }
+
+        function restartBuilderGuide() {
+            _builderGuideIndex = 0;
+            localStorage.setItem('ald_builder_guide_step', '0');
+            toggleBuilderGuide(true);
+            updateBuilderGuide();
+        }
+
+        function setBuilderGuideStep(index) {
+            _builderGuideIndex = Math.max(0, Math.min(BUILDER_GUIDE_STEPS.length - 1, index));
+            localStorage.setItem('ald_builder_guide_step', String(_builderGuideIndex));
+            updateBuilderGuide();
+        }
+
+        function moveBuilderGuide(delta) {
+            setBuilderGuideStep(_builderGuideIndex + delta);
+        }
+
+        function runBuilderGuideAction() {
+            var step = BUILDER_GUIDE_STEPS[_builderGuideIndex];
+            if (step && typeof step.action === 'function') step.action();
+        }
+
+        function updateBuilderGuide() {
+            var list = document.getElementById('builderGuideList');
+            var bar = document.getElementById('builderGuideProgressBar');
+            var text = document.getElementById('builderGuideProgressText');
+            var title = document.getElementById('builderGuideCurrentTitle');
+            var detail = document.getElementById('builderGuideCurrentDetail');
+            var actionBtn = document.getElementById('builderGuideActionBtn');
+            if (!list || !bar || !text || !title || !detail || !actionBtn) return;
+
+            var completed = 0;
+            var statuses = BUILDER_GUIDE_STEPS.map(function(step) {
+                var done = false;
+                try { done = !!step.complete(); } catch(e) {}
+                if (done) completed++;
+                return done;
+            });
+            var progress = Math.round((completed / BUILDER_GUIDE_STEPS.length) * 100);
+            bar.style.width = progress + '%';
+            text.textContent = progress + '%';
+
+            if (statuses[_builderGuideIndex] && _builderGuideIndex < BUILDER_GUIDE_STEPS.length - 1) {
+                var nextOpen = statuses.findIndex(function(done, idx) { return idx > _builderGuideIndex && !done; });
+                if (nextOpen !== -1) {
+                    _builderGuideIndex = nextOpen;
+                    localStorage.setItem('ald_builder_guide_step', String(_builderGuideIndex));
+                }
+            }
+
+            list.innerHTML = BUILDER_GUIDE_STEPS.map(function(step, index) {
+                var done = statuses[index];
+                var active = index === _builderGuideIndex;
+                return '<button type="button" class="builder-guide-step' + (done ? ' done' : '') + (active ? ' active' : '') + '" onclick="setBuilderGuideStep(' + index + ')">' +
+                    '<span class="builder-guide-check"><i class="fas ' + (done ? 'fa-check' : 'fa-' + (index + 1)) + '"></i></span>' +
+                    '<span><strong>' + step.title + '</strong><br><small class="text-muted">' + step.detail + '</small></span>' +
+                    '</button>';
+            }).join('');
+
+            var current = BUILDER_GUIDE_STEPS[_builderGuideIndex];
+            title.textContent = current.title;
+            detail.textContent = current.detail;
+            actionBtn.innerHTML = statuses[_builderGuideIndex]
+                ? '<i class="fas fa-check me-1"></i>Done'
+                : current.actionText;
+            actionBtn.disabled = statuses[_builderGuideIndex] && _builderGuideIndex === BUILDER_GUIDE_STEPS.length - 1;
+            applyBuilderGuideVisibility();
+        }
+
+        function initBuilderGuide() {
+            applyBuilderGuideVisibility();
+            updateBuilderGuide();
+            document.addEventListener('input', function(e) {
+                if (e.target && ['clientName','quoteNumber','projectAddress','clientEmail','clientPhone'].includes(e.target.id)) {
+                    updateBuilderGuide();
+                }
+            });
+            document.addEventListener('change', updateBuilderGuide);
+            setInterval(updateBuilderGuide, 1600);
+        }
+        // -----------------------------------------------------------------------
 
         // -- Room Icon Picker ------------------------------------------
         var _iconPickerRoomId = null;
@@ -1906,6 +2256,7 @@ Example:
             });
 
             renderRooms();
+            updateBuilderGuide();
 
             // Close modal
             const modalEl = document.getElementById('addRoomModal');
@@ -2483,6 +2834,7 @@ Example:
                 }
 
                 renderRooms();
+                updateBuilderGuide();
 
                 // Prompt to save if this is a new item
                 const savNewItemBtn = document.getElementById('saveNewItemBtn');
@@ -3490,7 +3842,7 @@ Example:
                 }
                 // Markup controls (hidden from client view)
                 html += '<div class="mt-2 d-flex align-items-center gap-2" id="markupControls_' + room.id + '">';
-                html += '<small><strong>Markup:</strong></small>';
+                html += '<small><strong>Markup:</strong><button type="button" class="qd-inline-help-btn" title="Help with markup" aria-label="Help with markup" onclick="QuoteDrModalHelp.openInline(\'markup\'); return false;"><i class="fas fa-question"></i></button></small>';
                 html += '<input type="number" id="roomMarkup_' + room.id + '" class="form-control form-control-sm" style="width: 80px;" value="' + roomMarkup + '" min="0" max="100" step="1" onchange="updateRoomMarkup(' + room.id + ', this.value)">';
                 html += '<span>%</span>';
                 const markupVisibleToClient = room.hideMarkup === false;
@@ -4638,6 +4990,7 @@ Example:
 
         if (typeof renderTemplateDropdown === 'function') renderTemplateDropdown();
         renderTermsCheckboxes();
+        initBuilderGuide();
         // ============================================================
         // VOICE QUOTE - AI-powered voice to quote generation
         // ============================================================
@@ -5150,7 +5503,7 @@ Example:
                             <div class="row g-3">
                                 <div class="col-md-6">
                                     <div class="send-settings-card h-100">
-                                        <label class="form-label fw-bold">Pricing Detail</label>
+                                        <label class="form-label fw-bold">Pricing Detail<button type="button" class="qd-inline-help-btn" title="Help with pricing detail" aria-label="Help with pricing detail" onclick="QuoteDrModalHelp.openInline('pricingDetail'); return false;"><i class="fas fa-question"></i></button></label>
                                         <select id="quotePricingMode" class="form-select form-select-sm">
                                             <option value="full">Full itemized quote</option>
                                             <option value="category">Category subtotals only</option>
@@ -5161,7 +5514,7 @@ Example:
                                 </div>
                                 <div class="col-md-6">
                                     <div class="send-settings-card h-100">
-                                        <label class="form-label fw-bold">Deposit Display</label>
+                                        <label class="form-label fw-bold">Deposit Display<button type="button" class="qd-inline-help-btn" title="Help with deposit display" aria-label="Help with deposit display" onclick="QuoteDrModalHelp.openInline('depositDisplay'); return false;"><i class="fas fa-question"></i></button></label>
                                         <select id="quoteDepositMode" class="form-select form-select-sm">
                                             <option value="auto">Use payment settings</option>
                                             <option value="show">Show deposit section</option>
@@ -5177,7 +5530,7 @@ Example:
                                 </div>
                                 <div class="col-md-6">
                                     <div class="send-settings-card h-100">
-                                        <label class="form-label fw-bold">Approval Type</label>
+                                        <label class="form-label fw-bold">Approval Type<button type="button" class="qd-inline-help-btn" title="Help with approval type" aria-label="Help with approval type" onclick="QuoteDrModalHelp.openInline('approvalType'); return false;"><i class="fas fa-question"></i></button></label>
                                         <select id="quoteApprovalMode" class="form-select form-select-sm">
                                             <option value="approve">Accept quote</option>
                                             <option value="approve_or_changes">Accept or request changes</option>
@@ -5831,6 +6184,8 @@ Example:
 </div>
 
 <script src="quote-calculators.js?v=1777660404"></script>
+<script src="help-content.js?v=1777741200"></script>
+<script src="modal-help.js?v=1777741200"></script>
 <script>
         function _toggleAiBtn() {
             var btn = document.getElementById('qdAiBtn');

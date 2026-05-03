@@ -269,7 +269,7 @@ if (location.search.includes('debug')) {
 			</div>
 				<div class="row g-3 mt-2">
 					<div class="col-sm-6">
-						<label class="form-label fw-bold">Tax Rate</label>
+						<label class="form-label fw-bold">Tax Rate<button type="button" class="qd-inline-help-btn" title="Help with tax settings" aria-label="Help with tax settings" onclick="QuoteDrModalHelp.openInline('taxRate'); return false;"><i class="fas fa-question"></i></button></label>
 						<div class="input-group" style="max-width:200px;">
 							<input type="number" class="form-control" id="taxRate" min="0" max="100" step="0.1" value="13" placeholder="13">
 							<span class="input-group-text">%</span>
@@ -277,7 +277,7 @@ if (location.search.includes('debug')) {
 						<div class="form-text">HST/GST/VAT rate. Set to 0 to disable.</div>
 					</div>
 					<div class="col-sm-6">
-						<label class="form-label fw-bold">Tax Label</label>
+						<label class="form-label fw-bold">Tax Label<button type="button" class="qd-inline-help-btn" title="Help with tax settings" aria-label="Help with tax settings" onclick="QuoteDrModalHelp.openInline('taxRate'); return false;"><i class="fas fa-question"></i></button></label>
 						<input type="text" class="form-control" id="taxLabel" placeholder="HST" value="HST" style="max-width:200px;">
 						<div class="form-text">e.g. HST, GST, VAT, Sales Tax</div>
 					</div>
@@ -591,7 +591,7 @@ Sarah Jones, 905-555-5678"></textarea>
 					<div class="card border-0 shadow-sm p-4 mb-3">
 						<div class="form-check form-switch mb-3">
 							<input class="form-check-input" type="checkbox" id="stripeEnabledToggle" onchange="toggleStripeSettings()">
-							<label class="form-check-label fw-semibold" for="stripeEnabledToggle">Enable Stripe Payments</label>
+							<label class="form-check-label fw-semibold" for="stripeEnabledToggle">Enable Stripe Payments<button type="button" class="qd-inline-help-btn" title="Help with Stripe payments" aria-label="Help with Stripe payments" onclick="QuoteDrModalHelp.openInline('stripePayments'); return false;"><i class="fas fa-question"></i></button></label>
 						</div>
 						<div id="paymentsDisabledMessage" class="alert alert-secondary small py-2">Payments disabled. Clients will not see payment buttons on quotes or invoices.</div>
 						<div id="stripeSettingsSection" style="display:none;">
@@ -601,16 +601,16 @@ Sarah Jones, 905-555-5678"></textarea>
 								<div class="form-text">Find this in your Stripe Dashboard &rarr; Developers &rarr; API Keys. <strong>Never enter your secret key here.</strong></div>
 							</div>
 							<div class="mb-3" style="max-width:200px;">
-								<label class="form-label fw-semibold">Default Deposit %</label>
+								<label class="form-label fw-semibold">Default Deposit %<button type="button" class="qd-inline-help-btn" title="Help with deposit settings" aria-label="Help with deposit settings" onclick="QuoteDrModalHelp.openInline('depositDisplay'); return false;"><i class="fas fa-question"></i></button></label>
 								<input type="number" class="form-control" id="depositDefaultPct" min="1" max="100" value="50">
 							</div>
 							<div class="form-check mb-2">
 								<input class="form-check-input" type="checkbox" id="acceptDeposit" checked>
-								<label class="form-check-label" for="acceptDeposit">Show deposit payment button on quotes</label>
+								<label class="form-check-label" for="acceptDeposit">Show deposit payment button on quotes<button type="button" class="qd-inline-help-btn" title="Help with deposit buttons" aria-label="Help with deposit buttons" onclick="QuoteDrModalHelp.openInline('depositDisplay'); return false;"><i class="fas fa-question"></i></button></label>
 							</div>
 							<div class="form-check mb-3">
 								<input class="form-check-input" type="checkbox" id="acceptFullPayment" checked>
-								<label class="form-check-label" for="acceptFullPayment">Show pay-in-full button on invoices</label>
+								<label class="form-check-label" for="acceptFullPayment">Show pay-in-full button on invoices<button type="button" class="qd-inline-help-btn" title="Help with payment buttons" aria-label="Help with payment buttons" onclick="QuoteDrModalHelp.openInline('stripePayments'); return false;"><i class="fas fa-question"></i></button></label>
 							</div>
 							<button class="btn btn-primary" onclick="savePaymentSettingsUI()"><i class="fas fa-save me-1"></i>Save Payment Settings</button>
 							<span class="saved-badge ms-2" id="paymentSaved" style="display:none;"><i class="fas fa-check-circle me-1"></i>Saved!</span>
@@ -710,6 +710,8 @@ Sarah Jones, 905-555-5678"></textarea>
 	</div>
 
 	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+	<script src="help-content.js?v=1777741200"></script>
+	<script src="modal-help.js?v=1777741200"></script>
     <script src="quote-dialogs.js?v=1777660407"></script>
 	<script>
 		// ── Tab Navigation ──────────────────────────────────────────────────
