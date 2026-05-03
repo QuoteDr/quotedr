@@ -159,6 +159,26 @@
             min-height: 46px;
             border-radius: 8px;
         }
+        .room-locator {
+            margin-top: 18px;
+            padding-top: 16px;
+            border-top: 1px solid #dbe4ef;
+        }
+        .room-locator-label {
+            color: #64748b;
+            font-size: 0.76rem;
+            font-weight: 850;
+            text-transform: uppercase;
+            margin-bottom: 7px;
+        }
+        .room-locator select {
+            border-radius: 8px;
+            min-height: 42px;
+            font-weight: 650;
+        }
+        .quote-room-anchor {
+            scroll-margin-top: 18px;
+        }
         .client-section-title {
             display: flex;
             align-items: center;
@@ -534,6 +554,20 @@
             min-height: 44px;
             border-radius: 8px;
         }
+        .mobile-jump-control {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 1045;
+            display: none;
+        }
+        .mobile-jump-control .btn {
+            border-radius: 999px;
+            box-shadow: 0 8px 22px rgba(15,52,96,0.18);
+            padding: 6px 10px;
+            font-size: 0.78rem;
+            font-weight: 800;
+        }
         @media (max-width: 768px) {
             body { padding-bottom: 74px; }
             .proposal-shell {
@@ -572,11 +606,18 @@
             .hero-total-panel {
                 padding: 16px;
             }
+            .room-locator {
+                margin-top: 14px;
+                padding-top: 14px;
+            }
             .hero-actions {
                 display: none;
             }
             .sticky-client-actions {
                 display: flex;
+            }
+            .mobile-jump-control {
+                display: block;
             }
             .quote-header-summary { padding-right: 0; text-align: left !important; margin-top: 1rem; }
             .client-section-title {
@@ -653,6 +694,12 @@ if (location.search.includes('debug')) {
                         <div class="hero-total-label">Current Total</div>
                         <div class="hero-total" id="heroGrandTotal">$0.00</div>
                         <div class="text-muted mt-2">Includes selected options and applicable tax.</div>
+                        <div class="room-locator" id="roomLocatorWrap" style="display:none;">
+                            <div class="room-locator-label"><i class="fas fa-location-dot me-1"></i>Find Room</div>
+                            <select class="form-select" id="roomLocatorSelect" onchange="jumpToRoom(this.value)">
+                                <option value="">Choose a room...</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="hero-actions">
                         <button type="button" class="btn btn-warning btn-lg" onclick="handleMainAction()">
@@ -858,6 +905,16 @@ if (location.search.includes('debug')) {
         <button type="button" class="btn btn-warning" onclick="handleMainAction()"><i class="fas fa-signature me-1"></i>Accept</button>
         <button type="button" class="btn btn-outline-primary" onclick="document.getElementById('quoteContainer').scrollIntoView({behavior:'smooth'});"><i class="fas fa-list me-1"></i>Scope</button>
         <button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('termsDisplay').scrollIntoView({behavior:'smooth'});"><i class="fas fa-file-contract me-1"></i>Terms</button>
+    </div>
+
+    <div class="dropdown mobile-jump-control">
+        <button class="btn btn-light border dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="fas fa-arrow-up-wide-short me-1"></i>Jump
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+            <li><button class="dropdown-item" type="button" onclick="jumpToTop()"><i class="fas fa-arrow-up me-2 text-primary"></i>Top</button></li>
+            <li><button class="dropdown-item" type="button" onclick="jumpToBottom()"><i class="fas fa-arrow-down me-2 text-success"></i>Bottom</button></li>
+        </ul>
     </div>
 
     <!-- Scripts -->
@@ -1080,6 +1137,45 @@ if (location.search.includes('debug')) {
                 '</div>';
         }
 
+        function roomAnchorId(roomIdx) {
+            return 'quoteRoom_' + roomIdx;
+        }
+
+        function updateRoomLocator() {
+            var wrap = document.getElementById('roomLocatorWrap');
+            var select = document.getElementById('roomLocatorSelect');
+            if (!wrap || !select) return;
+            var rooms = Array.isArray(quoteData && quoteData.rooms) ? quoteData.rooms : [];
+            if (!rooms.length) {
+                wrap.style.display = 'none';
+                select.innerHTML = '<option value="">Choose a room...</option>';
+                return;
+            }
+            select.innerHTML = '<option value="">Choose a room...</option>' + rooms.map(function(room, idx) {
+                var name = escapeHtml(room && room.name ? room.name : 'Room ' + (idx + 1));
+                return '<option value="' + roomAnchorId(idx) + '">' + name + '</option>';
+            }).join('');
+            wrap.style.display = '';
+        }
+
+        function jumpToRoom(anchorId) {
+            if (!anchorId) return;
+            var target = document.getElementById(anchorId);
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                var select = document.getElementById('roomLocatorSelect');
+                if (select) select.value = '';
+            }
+        }
+
+        function jumpToTop() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function jumpToBottom() {
+            window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
+        }
+
         function toggleViewerDescription(id, btn) {
             var shortEl = document.getElementById(id + '_short');
             var fullEl = document.getElementById(id + '_full');
@@ -1236,7 +1332,7 @@ if (location.search.includes('debug')) {
                 const headerBg = ROOM_COLORS[room.colorIndex ?? 0] || ROOM_COLORS[0];
 
                 html += `
-                    <div class="card mb-3">
+                    <div class="card mb-3 quote-room-anchor" id="${roomAnchorId(roomIdx)}">
                         <div class="card-header" style="background: ${headerBg}; color: white;">
                             <h5 class="mb-0"><i class="fas fa-th"></i> ${escapeHtml(room.name)}</h5>
                         </div>
@@ -1399,6 +1495,7 @@ if (location.search.includes('debug')) {
             container.innerHTML = html;
             var intro = document.getElementById('clientIntroMessage');
             if (intro && sendStyle.clientMessage) intro.textContent = sendStyle.clientMessage;
+            updateRoomLocator();
             updateActionButton();
         }
 
