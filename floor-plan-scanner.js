@@ -21,6 +21,11 @@
         var _fpCtx = null;
         var _fpPlanImg = null;
         var _fpCanvasPixelRatio = 1;
+        var _fpCanvasBaseDisplayWidth = 0;
+        var _fpCanvasBaseDisplayHeight = 0;
+        var _fpCanvasZoom = 1;
+        var _fpCanvasScrollLeft = 0;
+        var _fpCanvasScrollTop = 0;
         var _fpCanvasReady = false;
         var _fpMouseDown = false;
         var _fpShapeCounter = 1;
@@ -123,7 +128,7 @@
         function openFloorPlanModal() {
             _fpImageBase64 = null; _fpMimeType = 'image/jpeg'; _fpImageUrl = null; _fpResults = null; _fpRooms = [];
             _fpSuggestedRoomNames = []; _fpCeilingHeight = 9; _fpScale = null; _fpShapes = []; _fpDraft = null; _fpPolygonDraft = [];
-            _fpCanvasReady = false; _fpTool = 'calibrate'; _fpShapeCounter = 1; _fpActiveShapeIndex = -1; _fpPendingRoomName = ''; _fpPendingTrades = {};
+            _fpCanvasReady = false; _fpCanvasZoom = 1; _fpCanvasScrollLeft = 0; _fpCanvasScrollTop = 0; _fpTool = 'calibrate'; _fpShapeCounter = 1; _fpActiveShapeIndex = -1; _fpPendingRoomName = ''; _fpPendingTrades = {};
             var modal = new bootstrap.Modal(document.getElementById('floorPlanModal'));
             modal.show();
             setTimeout(_fpMaybeShowIntroPopup, 250);
@@ -307,6 +312,7 @@
                     var arrayBuffer = await file.arrayBuffer();
                     _fpPdfDoc = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
                     _fpCurrentPage = 1;
+                    _fpCanvasZoom = 1; _fpCanvasScrollLeft = 0; _fpCanvasScrollTop = 0;
                     await _fpRenderPdfPage(_fpCurrentPage);
                     document.getElementById('fpPreviewArea').style.display = '';
                     document.getElementById('fpNext1Btn').disabled = false;
@@ -321,6 +327,7 @@
                 reader.onload = function(e) {
                     _fpImageUrl = e.target.result;
                     _fpImageBase64 = _fpImageUrl.split(',')[1];
+                    _fpCanvasZoom = 1; _fpCanvasScrollLeft = 0; _fpCanvasScrollTop = 0;
                     document.getElementById('fpPreviewImg').src = _fpImageUrl;
                     document.getElementById('fpPreviewLabel').textContent = file.name + ' ready';
                     document.getElementById('fpPreviewArea').style.display = '';
@@ -363,6 +370,7 @@
             var newPage = absolute !== undefined ? Math.max(1, Math.min(_fpPdfDoc.numPages, absolute)) : Math.max(1, Math.min(_fpPdfDoc.numPages, _fpCurrentPage + delta));
             if (newPage === _fpCurrentPage && absolute === undefined) return;
             _fpCurrentPage = newPage;
+            _fpCanvasZoom = 1; _fpCanvasScrollLeft = 0; _fpCanvasScrollTop = 0;
             var labelEl = document.getElementById('fpPreviewLabel');
             if (labelEl) labelEl.textContent = 'Loading page ' + newPage + '...';
             await _fpRenderPdfPage(newPage);
@@ -383,6 +391,11 @@
         }
 
         function _fpRenderMeasureTool() {
+            var oldCanvasWrap = document.getElementById('fpMeasureCanvasWrap');
+            if (oldCanvasWrap) {
+                _fpCanvasScrollLeft = oldCanvasWrap.scrollLeft || 0;
+                _fpCanvasScrollTop = oldCanvasWrap.scrollTop || 0;
+            }
             var state = _fpCurrentFormState();
             var selectedName = state.name || '';
             var selectedFromList = _fpSuggestedRoomNames.indexOf(selectedName) >= 0;
@@ -408,12 +421,17 @@
                 _fpToolButton('line', 'fa-ruler-horizontal', 'Line') +
                 _fpToolButton('box', 'fa-vector-square', 'Box') +
                 _fpToolButton('polygon', 'fa-draw-polygon', 'Polygon') +
-                '<button class="btn btn-outline-secondary btn-sm ms-auto" onclick="_fpUndoShape()" title="Undo"><i class="fas fa-undo"></i></button>' +
+                '<div class="btn-group btn-group-sm ms-auto" role="group" aria-label="Zoom controls">' +
+                '<button class="btn btn-outline-secondary" onclick="_fpZoomCanvasButton(0.85)" title="Zoom out"><i class="fas fa-magnifying-glass-minus"></i></button>' +
+                '<button class="btn btn-outline-secondary" onclick="_fpResetCanvasZoom()" title="Reset zoom"><span id="fpZoomBadge">' + Math.round((_fpCanvasZoom || 1) * 100) + '%</span></button>' +
+                '<button class="btn btn-outline-secondary" onclick="_fpZoomCanvasButton(1.18)" title="Zoom in"><i class="fas fa-magnifying-glass-plus"></i></button>' +
+                '</div>' +
+                '<button class="btn btn-outline-secondary btn-sm" onclick="_fpUndoShape()" title="Undo"><i class="fas fa-undo"></i></button>' +
                 '<button class="btn btn-outline-secondary btn-sm" onclick="_fpClearShapes()" title="Clear"><i class="fas fa-trash"></i></button>' +
                 '<button class="btn btn-outline-primary btn-sm" onclick="_fpFinishPolygon()" id="fpFinishPolyBtn"><i class="fas fa-check me-1"></i>Finish Polygon</button>' +
                 '</div>' +
                 '<div class="small text-muted mb-1" id="fpToolHelp">' + _fpToolLabel() + '</div>' +
-                '<div style="flex:1;overflow:auto;border:1px solid #ced4da;border-radius:8px;background:#f8f9fa;">' +
+                '<div id="fpMeasureCanvasWrap" style="flex:1;overflow:auto;border:1px solid #ced4da;border-radius:8px;background:#f8f9fa;">' +
                 '<canvas id="fpMeasureCanvas" style="display:block;max-width:none;cursor:crosshair;"></canvas>' +
                 '</div>' +
                 '</div>' +
@@ -544,12 +562,15 @@
                 var displayScale = Math.min(1, maxDisplayW / _fpPlanImg.naturalWidth);
                 var displayW = Math.max(1, Math.round(_fpPlanImg.naturalWidth * displayScale));
                 var displayH = Math.max(1, Math.round(_fpPlanImg.naturalHeight * displayScale));
-                var pixelRatio = Math.min(3, Math.max(1, window.devicePixelRatio || 1));
-                _fpCanvasPixelRatio = pixelRatio;
-                _fpCanvas.style.width = displayW + 'px';
-                _fpCanvas.style.height = displayH + 'px';
-                _fpCanvas.width = Math.max(1, Math.round(displayW * pixelRatio));
-                _fpCanvas.height = Math.max(1, Math.round(displayH * pixelRatio));
+                _fpCanvasBaseDisplayWidth = displayW;
+                _fpCanvasBaseDisplayHeight = displayH;
+                _fpCanvas.width = Math.max(1, Math.round(_fpPlanImg.naturalWidth));
+                _fpCanvas.height = Math.max(1, Math.round(_fpPlanImg.naturalHeight));
+                _fpApplyCanvasZoom(_fpCanvasZoom || 1);
+                if (_fpCanvas.parentElement) {
+                    _fpCanvas.parentElement.scrollLeft = _fpCanvasScrollLeft || 0;
+                    _fpCanvas.parentElement.scrollTop = _fpCanvasScrollTop || 0;
+                }
                 _fpCanvasReady = true;
                 _fpAttachCanvasEvents();
                 _fpDrawCanvas();
@@ -562,10 +583,69 @@
             _fpCanvas._fpEventsAttached = true;
             _fpCanvas.addEventListener('mousedown', _fpCanvasDown);
             _fpCanvas.addEventListener('mousemove', _fpCanvasMove);
+            _fpCanvas.addEventListener('wheel', _fpCanvasWheel, { passive: false });
             window.addEventListener('mouseup', _fpCanvasUp);
             _fpCanvas.addEventListener('dblclick', function(e) {
                 if (_fpTool === 'polygon') { e.preventDefault(); _fpFinishPolygon(); }
             });
+        }
+
+        function _fpClampZoom(value) {
+            return Math.max(1, Math.min(5, value || 1));
+        }
+
+        function _fpApplyCanvasZoom(zoom) {
+            if (!_fpCanvas || !_fpCanvasBaseDisplayWidth || !_fpCanvasBaseDisplayHeight) return;
+            _fpCanvasZoom = _fpClampZoom(zoom);
+            var displayW = Math.round(_fpCanvasBaseDisplayWidth * _fpCanvasZoom);
+            var displayH = Math.round(_fpCanvasBaseDisplayHeight * _fpCanvasZoom);
+            _fpCanvas.style.width = displayW + 'px';
+            _fpCanvas.style.height = displayH + 'px';
+            _fpCanvasPixelRatio = _fpCanvas.width / Math.max(1, displayW);
+            var badge = document.getElementById('fpZoomBadge');
+            if (badge) badge.textContent = Math.round(_fpCanvasZoom * 100) + '%';
+        }
+
+        function _fpZoomCanvasAt(nextZoom, clientX, clientY) {
+            if (!_fpCanvas || !_fpCanvas.parentElement) return;
+            var wrap = _fpCanvas.parentElement;
+            var canvasRect = _fpCanvas.getBoundingClientRect();
+            var wrapRect = wrap.getBoundingClientRect();
+            var ratioX = canvasRect.width ? (clientX - canvasRect.left) / canvasRect.width : 0.5;
+            var ratioY = canvasRect.height ? (clientY - canvasRect.top) / canvasRect.height : 0.5;
+            _fpApplyCanvasZoom(nextZoom);
+            var newW = _fpCanvasBaseDisplayWidth * _fpCanvasZoom;
+            var newH = _fpCanvasBaseDisplayHeight * _fpCanvasZoom;
+            wrap.scrollLeft = Math.max(0, ratioX * newW - (clientX - wrapRect.left));
+            wrap.scrollTop = Math.max(0, ratioY * newH - (clientY - wrapRect.top));
+            _fpCanvasScrollLeft = wrap.scrollLeft;
+            _fpCanvasScrollTop = wrap.scrollTop;
+            _fpDrawCanvas();
+        }
+
+        function _fpCanvasWheel(e) {
+            if (!_fpCanvasReady) return;
+            e.preventDefault();
+            var factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+            _fpZoomCanvasAt((_fpCanvasZoom || 1) * factor, e.clientX, e.clientY);
+        }
+
+        function _fpZoomCanvasButton(factor) {
+            if (!_fpCanvas || !_fpCanvas.parentElement) return;
+            var rect = _fpCanvas.parentElement.getBoundingClientRect();
+            _fpZoomCanvasAt((_fpCanvasZoom || 1) * factor, rect.left + rect.width / 2, rect.top + rect.height / 2);
+        }
+
+        function _fpResetCanvasZoom() {
+            _fpCanvasZoom = 1;
+            _fpCanvasScrollLeft = 0;
+            _fpCanvasScrollTop = 0;
+            _fpApplyCanvasZoom(1);
+            if (_fpCanvas && _fpCanvas.parentElement) {
+                _fpCanvas.parentElement.scrollLeft = 0;
+                _fpCanvas.parentElement.scrollTop = 0;
+            }
+            _fpDrawCanvas();
         }
 
         function _fpCanvasPoint(e) {
