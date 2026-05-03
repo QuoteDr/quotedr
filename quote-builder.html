@@ -706,7 +706,7 @@ if (location.search.includes('debug')) {
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="newQuote()"><i class="fas fa-plus me-2 text-warning"></i>New Quote</a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="saveQuote()"><i class="fas fa-save me-2 text-warning"></i>Save <span class="text-muted small">(Ctrl+S)</span></a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="loadQuoteFromFile()"><i class="fas fa-folder-open me-2 text-secondary"></i>Open</a></li>
-                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="exportToPDF()"><i class="fas fa-download me-2 text-success"></i>Export PDF</a></li>
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="previewInvoice()"><i class="fas fa-file-invoice me-2 text-success"></i>Preview Invoice PDF</a></li>
                         </ul>
                     </div>
 
@@ -740,9 +740,16 @@ if (location.search.includes('debug')) {
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="previewInteractiveQuote()"><i class="fas fa-eye me-2 text-warning"></i>Preview Quote</a></li>
                         </ul>
                     </div>
-                    <a href="javascript:void(0)" onclick="generateInvoiceLink()" class="btn btn-danger btn-sm shadow-sm flex-grow-1 text-center">
-                        <i class="fas fa-file-invoice-dollar me-1"></i>Send Invoice
-                    </a>
+                    <div class="dropdown flex-grow-1">
+                        <button class="btn btn-danger btn-sm shadow-sm dropdown-toggle w-100" data-bs-toggle="dropdown" title="Invoice actions">
+                            <i class="fas fa-file-invoice-dollar me-1"></i>Send Invoice
+                        </button>
+                        <ul class="dropdown-menu w-100">
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="openInvoiceSettingsModal()"><i class="fas fa-sliders-h me-2 text-primary"></i>Invoice Settings</a></li>
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="previewInvoice()"><i class="fas fa-eye me-2 text-warning"></i>Preview Invoice</a></li>
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="generateInvoiceLink()"><i class="fas fa-paper-plane me-2 text-danger"></i>Send Invoice</a></li>
+                        </ul>
+                    </div>
 
                     <!-- Account dropdown -->
                     <div class="dropdown flex-grow-1">
@@ -4428,9 +4435,200 @@ Example:
             if (badge) badge.textContent = checked + '/' + total + ' selected';
         }
 
+        const INVOICE_SETTINGS_KEY = 'ald_invoice_settings';
+        const DEFAULT_INVOICE_SETTINGS = {
+            title: 'Invoice',
+            note: 'Thank you for your business. Please contact us with any questions about this invoice.',
+            paymentTerms: 'Payment is due upon receipt unless otherwise agreed in writing.',
+            showDescriptions: true,
+            showRoomTotals: true,
+            showTerms: true,
+            showPaymentOptions: true
+        };
+
+        function getInvoiceSettings() {
+            var saved = {};
+            try { saved = JSON.parse(localStorage.getItem(INVOICE_SETTINGS_KEY) || '{}'); } catch(e) { saved = {}; }
+            return Object.assign({}, DEFAULT_INVOICE_SETTINGS, saved || {});
+        }
+
+        function loadInvoiceSettingsControls() {
+            var settings = getInvoiceSettings();
+            var fields = {
+                invoiceSettingsTitle: settings.title,
+                invoiceSettingsNote: settings.note,
+                invoiceSettingsPaymentTerms: settings.paymentTerms
+            };
+            Object.keys(fields).forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) el.value = fields[id] || '';
+            });
+            [
+                ['invoiceSettingsShowDescriptions', settings.showDescriptions],
+                ['invoiceSettingsShowRoomTotals', settings.showRoomTotals],
+                ['invoiceSettingsShowTerms', settings.showTerms],
+                ['invoiceSettingsShowPaymentOptions', settings.showPaymentOptions]
+            ].forEach(function(pair) {
+                var el = document.getElementById(pair[0]);
+                if (el) el.checked = pair[1] !== false;
+            });
+        }
+
+        async function saveInvoiceSettings(showToast) {
+            var settings = {
+                title: document.getElementById('invoiceSettingsTitle')?.value.trim() || DEFAULT_INVOICE_SETTINGS.title,
+                note: document.getElementById('invoiceSettingsNote')?.value.trim() || '',
+                paymentTerms: document.getElementById('invoiceSettingsPaymentTerms')?.value.trim() || '',
+                showDescriptions: document.getElementById('invoiceSettingsShowDescriptions')?.checked !== false,
+                showRoomTotals: document.getElementById('invoiceSettingsShowRoomTotals')?.checked !== false,
+                showTerms: document.getElementById('invoiceSettingsShowTerms')?.checked !== false,
+                showPaymentOptions: document.getElementById('invoiceSettingsShowPaymentOptions')?.checked !== false
+            };
+            localStorage.setItem(INVOICE_SETTINGS_KEY, JSON.stringify(settings));
+            try {
+                if (typeof _supabase !== 'undefined') {
+                    var user = await _supabase.auth.getUser();
+                    if (user.data && user.data.user) {
+                        await _supabase.from('user_data').upsert(
+                            { user_id: user.data.user.id, key: 'invoice_settings', value: settings, updated_at: new Date().toISOString() },
+                            { onConflict: 'user_id,key' }
+                        );
+                    }
+                }
+            } catch(e) {
+                console.warn('Invoice settings cloud save failed:', e);
+            }
+            if (showToast !== false) qdAlert('Invoice settings saved.');
+            return settings;
+        }
+
+        async function loadInvoiceSettingsDefaultsFromCloud() {
+            try {
+                if (typeof _supabase === 'undefined') return;
+                var user = await _supabase.auth.getUser();
+                if (!user.data || !user.data.user) return;
+                var result = await _supabase
+                    .from('user_data')
+                    .select('value')
+                    .eq('user_id', user.data.user.id)
+                    .eq('key', 'invoice_settings')
+                    .maybeSingle();
+                if (result.data && result.data.value) {
+                    localStorage.setItem(INVOICE_SETTINGS_KEY, JSON.stringify(Object.assign({}, DEFAULT_INVOICE_SETTINGS, result.data.value)));
+                }
+            } catch(e) {
+                console.warn('Invoice settings cloud load failed:', e);
+            }
+        }
+
+        function openInvoiceSettingsModal() {
+            loadInvoiceSettingsControls();
+            var modalEl = document.getElementById('invoiceSettingsModal');
+            if (!modalEl) return;
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
+
+        function getBuilderTaxPrefs() {
+            var prefs = {};
+            try { prefs = JSON.parse(localStorage.getItem('ald_quote_prefs') || '{}'); } catch(e) { prefs = {}; }
+            var rate = (prefs.taxRate !== undefined && prefs.taxRate !== '') ? parseFloat(prefs.taxRate) / 100 : 0.13;
+            if (!isFinite(rate) || rate < 0) rate = 0.13;
+            return {
+                rate: rate,
+                label: prefs.taxLabel || 'HST',
+                currency: prefs.currency || 'CAD'
+            };
+        }
+
+        function getInvoiceBaseUrl() {
+            return window.location.href.split('?')[0].split('#')[0].replace(/quote-builder(\.html)?\/?$/, 'invoice-viewer');
+        }
+
+        function buildInvoiceData(invoiceId) {
+            var taxPrefs = getBuilderTaxPrefs();
+            return {
+                id: invoiceId,
+                clientName: document.getElementById('clientName')?.value || 'Client',
+                projectAddress: document.getElementById('projectAddress')?.value || 'Project Address',
+                email: document.getElementById('clientEmail')?.value || '',
+                phone: document.getElementById('clientPhone')?.value || '',
+                quoteNumber: document.getElementById('quoteNumber')?.value || '',
+                rooms: JSON.parse(JSON.stringify(rooms || [])),
+                grandTotal: parseFloat(document.getElementById('grandTotalDisplay')?.textContent.replace(/[^0-9.]/g, '')) || 0,
+                terms: getSelectedTerms(),
+                taxRate: taxPrefs.rate,
+                taxLabel: taxPrefs.label,
+                currency: taxPrefs.currency,
+                invoiceSettings: getInvoiceSettings()
+            };
+        }
+
+        async function prepareInvoiceForViewer(options) {
+            options = options || {};
+            if (!rooms || rooms.length === 0) {
+                qdAlert('Please add at least one room before generating an invoice.');
+                return null;
+            }
+            var invoiceId = 'invoice_' + Date.now();
+            var invoiceData = buildInvoiceData(invoiceId);
+            var invoiceBaseUrl = getInvoiceBaseUrl();
+            var invoiceUrl = invoiceBaseUrl + '?invoice=' + invoiceId;
+            localStorage.setItem(invoiceId, JSON.stringify(invoiceData));
+            localStorage.setItem('ald_last_preview_invoice', invoiceId);
+
+            if (window._supabaseQuoteId && typeof _supabase !== 'undefined' && options.markInvoiced !== false) {
+                _supabase.from('quotes').update({ status: 'invoiced', updated_at: new Date().toISOString() }).eq('id', window._supabaseQuoteId).then(function() {});
+            }
+
+            var result = { invoiceId: invoiceId, invoiceData: invoiceData, invoiceUrl: invoiceUrl, invoiceBaseUrl: invoiceBaseUrl };
+            window._currentInvoiceUrl = invoiceUrl;
+            window._currentInvoiceData = invoiceData;
+            return result;
+        }
+
+        function saveInvoiceForViewer(invoiceState, savingNote, openBtn) {
+            if (!invoiceState || typeof saveInvoiceForSharing !== 'function') {
+                if (savingNote) savingNote.style.display = 'none';
+                return Promise.resolve(invoiceState);
+            }
+            return saveInvoiceForSharing(invoiceState.invoiceData).then(function(result) {
+                if (result && result.data && result.data.id) {
+                    invoiceState.invoiceUrl = invoiceState.invoiceBaseUrl + '?id=' + result.data.id + '&invoice=' + invoiceState.invoiceId;
+                    invoiceState.invoiceData.supabaseId = result.data.id;
+                    localStorage.setItem(invoiceState.invoiceId, JSON.stringify(invoiceState.invoiceData));
+                    window._currentInvoiceUrl = invoiceState.invoiceUrl;
+                    window._currentInvoiceData = invoiceState.invoiceData;
+                    if (openBtn) openBtn.href = invoiceState.invoiceUrl;
+                }
+                if (savingNote) savingNote.style.display = 'none';
+                return invoiceState;
+            }).catch(function(e) {
+                console.warn('Could not save invoice to Supabase:', e);
+                if (savingNote) savingNote.style.display = 'none';
+                return invoiceState;
+            });
+        }
+
+        async function previewInvoice() {
+            try {
+                var invoiceState = await prepareInvoiceForViewer({ markInvoiced: false });
+                if (!invoiceState) return;
+                var savePromise = saveInvoiceForViewer(invoiceState);
+                var win = window.open(invoiceState.invoiceUrl, '_blank');
+                if (!win) window.location.href = invoiceState.invoiceUrl;
+                savePromise.then(function(updated) {
+                    if (updated && updated.invoiceUrl !== invoiceState.invoiceUrl && !win) {
+                        window.location.href = updated.invoiceUrl;
+                    }
+                });
+            } catch(err) {
+                console.error('previewInvoice error:', err);
+                qdAlert('Something went wrong opening the invoice preview. Please try again.');
+            }
+        }
+
         function exportToPDF() {
-            // Simple export - print to PDF
-            window.print();
+            previewInvoice();
         }
 
         function toggleTimelines() {
@@ -4977,30 +5175,10 @@ Example:
 
         async function generateInvoiceLink() {
             try {
-            if (!rooms || rooms.length === 0) {
-                qdAlert('Please add at least one room before generating an invoice.');
-                return;
-            }
-            const invoiceId = 'invoice_' + Date.now();
-            const invoiceData = {
-                id: invoiceId,
-                clientName: document.getElementById('clientName')?.value || 'Client',
-                projectAddress: document.getElementById('projectAddress')?.value || 'Project Address',
-                email: document.getElementById('clientEmail')?.value || '',
-                phone: document.getElementById('clientPhone')?.value || '',
-                quoteNumber: document.getElementById('quoteNumber')?.value || '',
-                rooms: JSON.parse(JSON.stringify(rooms)),
-                grandTotal: parseFloat(document.getElementById('grandTotalDisplay').textContent.replace(/[^0-9.]/g, '')) || 0,
-                terms: getSelectedTerms()
-            };
-            localStorage.setItem(invoiceId, JSON.stringify(invoiceData));
-            localStorage.setItem('ald_last_preview_invoice', invoiceId);
-            // Update quote status to invoiced in Supabase
-            if (window._supabaseQuoteId && typeof _supabase !== 'undefined') {
-                _supabase.from('quotes').update({ status: 'invoiced', updated_at: new Date().toISOString() }).eq('id', window._supabaseQuoteId).then(function() {});
-            }
-            const invoiceBaseUrl = window.location.href.split('?')[0].split('#')[0].replace(/quote-builder(\.html)?\/?$/, 'invoice-viewer');
-            let invoiceUrl = invoiceBaseUrl + '?invoice=' + invoiceId;
+            var invoiceState = await prepareInvoiceForViewer({ markInvoiced: true });
+            if (!invoiceState) return;
+            var invoiceData = invoiceState.invoiceData;
+            var invoiceUrl = invoiceState.invoiceUrl;
             console.log('Invoice URL:', invoiceUrl);
 
             // Show modal immediately with local fallback URL
@@ -5050,24 +5228,7 @@ Example:
             modal.show();
 
             // Save to Supabase in background (after modal is visible)
-            if (typeof saveInvoiceForSharing === 'function') {
-                saveInvoiceForSharing(invoiceData).then(function(result) {
-                    if (result && result.data && result.data.id) {
-                        invoiceUrl = invoiceBaseUrl + '?id=' + result.data.id + '&invoice=' + invoiceId;
-                        invoiceData.supabaseId = result.data.id;
-                        localStorage.setItem(invoiceId, JSON.stringify(invoiceData));
-                        window._currentInvoiceUrl = invoiceUrl;
-                        var btn = document.getElementById('openInvoiceBtn');
-                        if (btn) btn.href = invoiceUrl;
-                    }
-                    if (savingNote) savingNote.style.display = 'none';
-                }).catch(function(e) {
-                    console.warn('Could not save invoice to Supabase:', e);
-                    if (savingNote) savingNote.style.display = 'none';
-                });
-            } else {
-                if (savingNote) savingNote.style.display = 'none';
-            }
+            saveInvoiceForViewer(invoiceState, savingNote, document.getElementById('openInvoiceBtn'));
             } catch(err) {
                 console.error('generateInvoiceLink error:', err);
                 qdAlert('Something went wrong generating the invoice. Please try again.');
@@ -5547,6 +5708,7 @@ Example:
     <script>
         // These run independently of auth - always fire on page load
         document.addEventListener('DOMContentLoaded', function() {
+            loadInvoiceSettingsDefaultsFromCloud();
             // Event delegation for Manage Items modal buttons (handles dynamically rendered rows)
             var ciList = document.getElementById('customItemsList');
             if (ciList) {
@@ -6050,6 +6212,60 @@ Example:
         </div>
     </div>
 
+    <!-- Invoice Settings Modal -->
+    <div class="modal fade" id="invoiceSettingsModal" tabindex="-1">
+        <div class="modal-dialog modal-md modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header" style="background:linear-gradient(135deg,#1a56a0,#f97316);color:white;">
+                    <h5 class="modal-title"><i class="fas fa-file-invoice-dollar me-2"></i>Invoice Settings</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small mb-3">Keep invoices clean and printable while choosing what clients see.</p>
+
+                    <label class="form-label fw-bold" for="invoiceSettingsTitle">Invoice Label</label>
+                    <input type="text" id="invoiceSettingsTitle" class="form-control form-control-sm mb-3" placeholder="Invoice">
+
+                    <label class="form-label fw-bold" for="invoiceSettingsNote">Invoice Note</label>
+                    <textarea id="invoiceSettingsNote" class="form-control form-control-sm mb-3" rows="2" placeholder="Thank you for your business."></textarea>
+
+                    <label class="form-label fw-bold" for="invoiceSettingsPaymentTerms">Payment Terms</label>
+                    <textarea id="invoiceSettingsPaymentTerms" class="form-control form-control-sm mb-3" rows="2" placeholder="Payment is due upon receipt."></textarea>
+
+                    <div class="send-settings-card">
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="invoiceSettingsShowDescriptions" checked>
+                            <label class="form-check-label fw-semibold" for="invoiceSettingsShowDescriptions">Show line item descriptions</label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="invoiceSettingsShowRoomTotals" checked>
+                            <label class="form-check-label fw-semibold" for="invoiceSettingsShowRoomTotals">Show room totals</label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="invoiceSettingsShowTerms" checked>
+                            <label class="form-check-label fw-semibold" for="invoiceSettingsShowTerms">Show terms and conditions</label>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="invoiceSettingsShowPaymentOptions" checked>
+                            <label class="form-check-label fw-semibold" for="invoiceSettingsShowPaymentOptions">Show client payment options when enabled</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer justify-content-between gap-2">
+                    <button type="button" class="btn btn-outline-primary" onclick="saveInvoiceSettings(true)">
+                        <i class="fas fa-save me-1"></i>Save Defaults
+                    </button>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Done</button>
+                        <button type="button" class="btn btn-primary" onclick="saveInvoiceSettings(true); bootstrap.Modal.getInstance(document.getElementById('invoiceSettingsModal')).hide();">
+                            <i class="fas fa-check me-1"></i>Apply
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Startup Modal removed - was causing iOS backdrop blocking issue -->
     <script>
         // Startup restore listener moved to quote-storage.js
@@ -6081,12 +6297,19 @@ Example:
                 <li><a class="dropdown-item" href="javascript:void(0)" onclick="previewInteractiveQuote()"><i class="fas fa-eye me-2 text-warning"></i>Preview Quote</a></li>
             </ul>
         </div>
-        <a href="javascript:void(0)" onclick="generateInvoiceLink()" class="btn btn-danger btn-sm" style="flex:1; flex-direction:column; display:flex; align-items:center; justify-content:center; padding:4px 2px; min-width:0;">
-            <i class="fas fa-file-invoice-dollar d-block" style="font-size:1rem;"></i>
-            <span style="font-size:0.55rem;">Invoice</span>
-        </a>
-        <a href="javascript:void(0)" onclick="exportToPDF()" class="btn btn-success btn-sm" style="flex:1; flex-direction:column; display:flex; align-items:center; justify-content:center; padding:4px 2px; min-width:0;">
-            <i class="fas fa-download d-block" style="font-size:1rem;"></i>
+        <div class="dropup" style="flex:1; min-width:0;">
+            <button type="button" class="btn btn-danger btn-sm dropdown-toggle" data-bs-toggle="dropdown" style="width:100%; height:100%; flex-direction:column; display:flex; align-items:center; justify-content:center; padding:4px 2px; min-width:0;">
+                <i class="fas fa-file-invoice-dollar d-block" style="font-size:1rem;"></i>
+                <span style="font-size:0.55rem;">Invoice</span>
+            </button>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="javascript:void(0)" onclick="openInvoiceSettingsModal()"><i class="fas fa-sliders-h me-2 text-primary"></i>Invoice Settings</a></li>
+                <li><a class="dropdown-item" href="javascript:void(0)" onclick="previewInvoice()"><i class="fas fa-eye me-2 text-warning"></i>Preview Invoice</a></li>
+                <li><a class="dropdown-item" href="javascript:void(0)" onclick="generateInvoiceLink()"><i class="fas fa-paper-plane me-2 text-danger"></i>Send Invoice</a></li>
+            </ul>
+        </div>
+        <a href="javascript:void(0)" onclick="previewInvoice()" class="btn btn-success btn-sm" style="flex:1; flex-direction:column; display:flex; align-items:center; justify-content:center; padding:4px 2px; min-width:0;">
+            <i class="fas fa-file-pdf d-block" style="font-size:1rem;"></i>
             <span style="font-size:0.55rem;">PDF</span>
         </a>
         <a href="javascript:void(0)" onclick="openManageItemsModal()" class="btn btn-dark btn-sm" style="flex:1; flex-direction:column; display:flex; align-items:center; justify-content:center; padding:4px 2px; min-width:0;">
