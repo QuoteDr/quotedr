@@ -202,7 +202,7 @@
         /* Sticky total bar */
         #stickyTotalBar {
             position: fixed;
-            bottom: 0;
+            top: 0;
             left: 0;
             right: 0;
             z-index: 1040;
@@ -212,8 +212,8 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            box-shadow: 0 3px 12px rgba(0,0,0,0.2);
-            transform: translateY(100%);
+            box-shadow: 0 8px 22px rgba(15,52,96,0.22);
+            transform: translateY(-110%);
             transition: transform 0.3s ease;
         }
         #stickyTotalBar.visible {
@@ -470,7 +470,7 @@
 
     @media (max-width: 768px) and (orientation: portrait) {
         #stickyToolbar { display: none !important; }
-        #stickyTotalBar { display: none !important; }
+        #stickyTotalBar { padding: 8px 12px 10px !important; }
     }
 
     @media (max-width: 768px) and (orientation: portrait) {
