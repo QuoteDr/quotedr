@@ -202,18 +202,18 @@
         /* Sticky total bar */
         #stickyTotalBar {
             position: fixed;
-            top: 0;
+            bottom: 0;
             left: 0;
             right: 0;
             z-index: 1040;
-            background: linear-gradient(135deg, #0652DD 0%, #74b9ff 100%);
+            background: linear-gradient(135deg, var(--qd-blue, #1a56a0) 0%, var(--qd-blue-dark, #0f3460) 100%);
             color: white;
-            padding: 10px 24px;
+            padding: 10px 24px 12px;
             display: flex;
             align-items: center;
             justify-content: space-between;
             box-shadow: 0 3px 12px rgba(0,0,0,0.2);
-            transform: translateY(-100%);
+            transform: translateY(100%);
             transition: transform 0.3s ease;
         }
         #stickyTotalBar.visible {
@@ -403,7 +403,20 @@
         .room-toolbar .btn-markup { background:#f8fbff; color:var(--qd-blue-dark, #0f3460); border-color:#cfdbe9; }
         .room-toolbar .btn-manage { background:#102033; color:#ffffff; border-color:#102033; }
         .room-toolbar .btn-total { background:#fff7ed; color:var(--qd-orange-dark, #c95b08); border-color:#fed7aa; }
+        .room-toolbar .btn-total.btn-total-active { background:var(--qd-orange, #f27a1a); color:#ffffff; border-color:var(--qd-orange-dark, #c95b08); }
         .room-toolbar .btn:hover { filter: brightness(0.96); }
+        .markup-client-warning {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            color: #fde68a;
+            background: rgba(146, 64, 14, 0.38);
+            border: 1px solid rgba(251, 191, 36, 0.55);
+            border-radius: 999px;
+            padding: 4px 10px;
+            font-size: 0.78rem;
+            font-weight: 700;
+        }
     @media (max-width: 768px) {
             .container-fluid { padding-left: 8px !important; padding-right: 8px !important; }
             .btn-sm { font-size: 0.75rem; padding: 4px 7px; }
@@ -436,8 +449,6 @@
             .card-header { flex-wrap: wrap; gap: 4px; }
             /* Hide autosave toggle label on mobile to save space (only target the toolbar toggle) */
             #autoSaveToggle + .form-check-label { display: none !important; }
-            /* Hide user logo on mobile to save header space */
-            #userLogoImg { display: none !important; }
             /* Hide bottom action bar when modal is open on mobile */
             body.modal-open #stickyToolbar { display: none !important; }
             /* Compact top header on mobile */
@@ -467,22 +478,8 @@
         .container-fluid > .d-flex.align-items-center.justify-content-between > div:last-child { width: 100% !important; }
     }
 
-    /* Logo area */
-    #logo-header { display: flex; justify-content: center; align-items: center; width: 100%; gap: 24px; }
-    #userLogoImg { display: none; }
-    #quotedr-logo { order: 1; }
-    #userLogoImg[src]:not([src='']) { order: 2; display: block !important; }
-    @media (min-width: 901px) {
-        #logo-header { justify-content: center; padding-left: 160px; }
-    }
-    @media (orientation: landscape) and (max-width: 900px) {
-        #logo-header { flex-direction: row; justify-content: center; gap: 16px; }
-        #userLogoImg[src]:not([src='']) { display: block !important; }
-    }
-    @media (max-width: 768px) and (orientation: portrait) {
-        #userLogoImg[src]:not([src='']) { display: none !important; }
-        #logo-header { padding-left: 0; }
-    }
+    /* QuoteDr-only app header. Client/user branding belongs on quotes and invoices. */
+    #logo-header { display: flex; justify-content: center; align-items: center; width: 100%; }
 
     /* Full screen modals in landscape on mobile */
     @media (max-height: 500px) and (orientation: landscape) {
@@ -531,9 +528,8 @@ if (location.search.includes('debug')) {
     <div class="container-fluid py-4">
         <!-- Professional Header -->
         <div class="d-flex flex-column align-items-center mb-2" style="overflow: visible; padding-top: 8px; padding-bottom: 8px;">
-            <!-- Logo header: portrait=centered, landscape=user left / quotedr right -->
+            <!-- QuoteDr app header -->
             <div id="logo-header">
-                <img id="userLogoImg" src="" alt="Your Logo" style="height: 80px; width: auto; max-width: 180px; border-radius: 6px;">
                 <img id="quotedr-logo" src="quotedr-logo.svg" alt="QuoteDr" style="height: 200px; width: auto; margin-top: -60px; margin-bottom: -60px; max-width: 100%;">
             </div>
             <!-- Toolbar full width -->
@@ -2595,6 +2591,26 @@ Example:
             updateProfitReport();
         }
 
+        var stickyTotalVisible = false;
+        function toggleStickyTotal() {
+            stickyTotalVisible = !stickyTotalVisible;
+            const bar = document.getElementById('stickyTotalBar');
+            const btn = document.getElementById('toggleTotalBarBtn');
+            if (bar) {
+                bar.classList.toggle('visible', stickyTotalVisible);
+                if (stickyTotalVisible) {
+                    bar.style.removeProperty('display');
+                    calculateTotals();
+                }
+            }
+            if (btn) {
+                btn.classList.toggle('active', stickyTotalVisible);
+                btn.classList.toggle('btn-total-active', stickyTotalVisible);
+                btn.setAttribute('aria-pressed', stickyTotalVisible ? 'true' : 'false');
+                btn.title = stickyTotalVisible ? 'Hide floating quote total' : 'Show floating quote total';
+            }
+        }
+
         // IKEA Quick Quote lives in ikea-quote.js.
 
         // Floor plan scanner moved to floor-plan-scanner.js
@@ -3137,7 +3153,11 @@ Example:
                 html += '<small><strong>Markup:</strong></small>';
                 html += '<input type="number" id="roomMarkup_' + room.id + '" class="form-control form-control-sm" style="width: 80px;" value="' + roomMarkup + '" min="0" max="100" step="1" onchange="updateRoomMarkup(' + room.id + ', this.value)">';
                 html += '<span>%</span>';
-                html += '<button onclick="toggleMarkupVisibility(' + room.id + ')" class="btn btn-sm btn-outline-secondary" title="Toggle visibility to client"><i id="markupIcon_' + room.id + '" class="fas fa-eye"></i></button>';
+                const markupVisibleToClient = room.hideMarkup === false;
+                const markupIcon = markupVisibleToClient ? 'fa-eye-slash' : 'fa-eye';
+                const markupToggleTitle = markupVisibleToClient ? 'Hide room markup from client' : 'Show room markup to client';
+                html += '<button onclick="toggleMarkupVisibility(' + room.id + ')" class="btn btn-sm btn-outline-secondary" title="' + markupToggleTitle + '"><i id="markupIcon_' + room.id + '" class="fas ' + markupIcon + '"></i></button>';
+                html += '<span id="markupWarning_' + room.id + '" class="markup-client-warning" style="' + (markupVisibleToClient ? '' : 'display:none;') + '"><i class="fas fa-exclamation-triangle"></i>Client can see the room markup! Turn off to hide</span>';
                 html += '</div>';
                 html += '<button onclick="addLine(' + room.id + ')" class="btn btn-sm btn-light text-dark mt-1">';
                 html += '<i class="fas fa-plus"></i> Add Item</button>';
@@ -3409,6 +3429,9 @@ Example:
                     icon.className = 'fas fa-eye-slash';
                 }
             }
+            const warning = document.getElementById('markupWarning_' + roomId);
+            if (warning) warning.style.display = room.hideMarkup ? 'none' : 'inline-flex';
+            if (typeof markUnsaved === 'function') markUnsaved();
         }
 
         function applyGlobalMarkup() {
@@ -4933,7 +4956,17 @@ Example:
     <script>
         // Startup restore listener moved to quote-storage.js
     </script>
-    <!-- Mobile bottom action bar (hidden on desktop) -->    <!-- Mobile bottom action bar (hidden on desktop) -->
+    <div id="stickyTotalBar" aria-live="polite">
+        <div>
+            <div class="total-label">Quote Total</div>
+            <div class="total-amount" id="stickyTotalAmount">$0.00</div>
+        </div>
+        <div class="text-end">
+            <div class="total-sub" id="stickySubtotal">Subtotal: $0.00</div>
+            <div class="total-sub" id="stickyTax">HST: $0.00</div>
+        </div>
+    </div>
+    <!-- Mobile bottom action bar (hidden on desktop) -->
     <div id="mobileActionBar" class="d-md-none" style="position:fixed; bottom:0; left:0; right:0; background:white; border-top:2px solid #dee2e6; padding:4px 4px; z-index:1055; display:flex; gap:3px; box-shadow: 0 -4px 12px rgba(0,0,0,0.1);">
         <a href="javascript:void(0)" onclick="saveQuote()" class="btn btn-warning btn-sm" style="flex:1; flex-direction:column; display:flex; align-items:center; justify-content:center; padding:4px 2px; min-width:0;">
             <i class="fas fa-save d-block" style="font-size:1rem;"></i>
