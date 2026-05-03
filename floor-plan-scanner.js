@@ -28,11 +28,20 @@
         var _fpPendingTrades = {};
 
         var _fpTradeConfig = [
-            { key: 'flooring', label: 'Flooring', icon: 'fa-layer-group' },
-            { key: 'drywall',  label: 'Drywall',  icon: 'fa-border-all' },
-            { key: 'paint',    label: 'Paint',    icon: 'fa-paint-roller' },
-            { key: 'framing',  label: 'Framing',  icon: 'fa-ruler-combined' },
-            { key: 'tile',     label: 'Tile',     icon: 'fa-th-large' }
+            { key: 'flooring',    label: 'Flooring',       icon: 'fa-layer-group',     qtyMode: 'area',      defaultEnabled: true },
+            { key: 'drywall',     label: 'Drywall',        icon: 'fa-border-all',      qtyMode: 'wallArea',  defaultEnabled: true },
+            { key: 'paint',       label: 'Paint',          icon: 'fa-paint-roller',    qtyMode: 'wallArea',  defaultEnabled: true },
+            { key: 'framing',     label: 'Framing',        icon: 'fa-ruler-combined',  qtyMode: 'perimeter', defaultEnabled: true },
+            { key: 'tile',        label: 'Tile',           icon: 'fa-th-large',        qtyMode: 'area',      defaultEnabled: true },
+            { key: 'trim',        label: 'Trim/Baseboard', icon: 'fa-ruler-horizontal',qtyMode: 'perimeter', defaultEnabled: false },
+            { key: 'ceiling',     label: 'Ceiling',        icon: 'fa-square',          qtyMode: 'area',      defaultEnabled: false },
+            { key: 'insulation',  label: 'Insulation',     icon: 'fa-temperature-low', qtyMode: 'wallArea',  defaultEnabled: false },
+            { key: 'demolition',  label: 'Demolition',     icon: 'fa-hammer',          qtyMode: 'area',      defaultEnabled: false },
+            { key: 'doors',       label: 'Doors',          icon: 'fa-door-open',       qtyMode: 'each',      defaultEnabled: false },
+            { key: 'windows',     label: 'Windows',        icon: 'fa-table-columns',   qtyMode: 'each',      defaultEnabled: false },
+            { key: 'cabinets',    label: 'Cabinets',       icon: 'fa-kitchen-set',     qtyMode: 'perimeter', defaultEnabled: false },
+            { key: 'electrical',  label: 'Electrical',     icon: 'fa-bolt',            qtyMode: 'each',      defaultEnabled: false },
+            { key: 'plumbing',    label: 'Plumbing',       icon: 'fa-faucet',          qtyMode: 'each',      defaultEnabled: false }
         ];
 
         function _fpStepBadges(active, labels) {
@@ -56,6 +65,40 @@
             var dx = (a.x || 0) - (b.x || 0);
             var dy = (a.y || 0) - (b.y || 0);
             return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        function _fpEnsureMapping() {
+            if (!_fpMapping || Array.isArray(_fpMapping)) _fpMapping = {};
+            if (!_fpMapping.enabledTrades) _fpMapping.enabledTrades = {};
+            _fpTradeConfig.forEach(function(tc) {
+                if (!Array.isArray(_fpMapping[tc.key])) _fpMapping[tc.key] = [];
+                if (_fpMapping.enabledTrades[tc.key] === undefined) {
+                    _fpMapping.enabledTrades[tc.key] = tc.defaultEnabled !== false || _fpMapping[tc.key].length > 0;
+                }
+            });
+        }
+
+        function _fpIsTradeEnabled(tradeKey) {
+            _fpEnsureMapping();
+            return _fpMapping.enabledTrades[tradeKey] !== false;
+        }
+
+        function _fpSetTradeEnabled(tradeKey, enabled) {
+            _fpEnsureMapping();
+            _fpMapping.enabledTrades[tradeKey] = !!enabled;
+        }
+
+        function _fpEnabledTradeConfig() {
+            _fpEnsureMapping();
+            return _fpTradeConfig.filter(function(tc) { return _fpIsTradeEnabled(tc.key); });
+        }
+
+        function _fpSetupTradeToggleHtml(tc) {
+            var checked = _fpIsTradeEnabled(tc.key) ? ' checked' : '';
+            return '<div class="form-check form-switch mb-2 p-2 border rounded bg-light">' +
+                '<input class="form-check-input" type="checkbox" role="switch" id="fpTradeEnabled_' + tc.key + '"' + checked + ' onchange="_fpSetTradeEnabled(\'' + tc.key + '\',this.checked)">' +
+                '<label class="form-check-label small" for="fpTradeEnabled_' + tc.key + '">Show ' + _fpEscapeHtml(tc.label) + ' in the measuring panel</label>' +
+                '</div>';
         }
 
         function _fpAllItems() {
@@ -139,7 +182,7 @@
 
         function _fpRenderSetup(step) {
             _fpSetupCurrent = step;
-            if (!_fpMapping) _fpMapping = { flooring:[], drywall:[], paint:[], framing:[], tile:[] };
+            _fpEnsureMapping();
             var tc = _fpTradeConfig[step-1];
             var stepLabels = _fpTradeConfig.map(function(t) { return t.label; });
             var isLast = step === _fpTradeConfig.length;
@@ -148,6 +191,7 @@
                 '<div class="d-flex justify-content-center gap-1 mb-3">' + _fpStepBadges(step, stepLabels) + '</div>' +
                 '<h5><i class="fas ' + tc.icon + ' me-2 text-primary"></i>' + tc.label + ' - link your line items</h5>' +
                 '<p class="text-muted small">Select all items you use for ' + tc.label.toLowerCase() + '. You can link multiple supply and labor items.</p>' +
+                _fpSetupTradeToggleHtml(tc) +
                 '<input type="text" class="form-control form-control-sm mb-2" id="fpSetupSearch" placeholder="Search items..." oninput="_fpSetupRenderList(' + step + ')">' +
                 '<div id="fpSetupList" style="max-height:calc(100vh - 340px);overflow-y:auto;border:1px solid #dee2e6;border-radius:8px;padding:8px;"></div>' +
                 '<p class="text-muted small mt-3"><i class="fas fa-info-circle me-1"></i>These settings can be changed later in <strong>Settings &rarr; Floor Plan Scanner</strong></p>' +
@@ -161,6 +205,7 @@
         }
 
         function _fpSetupRenderList(step) {
+            _fpEnsureMapping();
             var tc = _fpTradeConfig[step-1];
             var filter = (document.getElementById('fpSetupSearch') ? document.getElementById('fpSetupSearch').value : '').toLowerCase();
             var linked = (_fpMapping[tc.key] || []).map(function(i) { return i.category + '||' + i.name; });
@@ -187,6 +232,7 @@
         }
 
         function _fpSetupToggle(tradeKey, itemKey, checked) {
+            _fpEnsureMapping();
             if (!_fpMapping[tradeKey]) _fpMapping[tradeKey] = [];
             var parts = itemKey.split('||');
             var cat = parts[0], name = parts.slice(1).join('||');
@@ -203,6 +249,7 @@
         function _fpSetupSave() {
             _supabase.auth.getUser().then(function(r) {
                 var uid = r.data && r.data.user ? r.data.user.id : null;
+                _fpEnsureMapping();
                 if (!uid) { _fpRenderStep1(); return; }
                 _supabase.from('user_data').upsert(
                     { user_id: uid, key: 'fp_scanner_mapping', value: _fpMapping, updated_at: new Date().toISOString() },
@@ -337,7 +384,7 @@
             var nameOptions = _fpSuggestedRoomNames.map(function(n) {
                 return '<option value="' + _fpEscapeHtml(n) + '"' + (selectedName === n ? ' selected' : '') + '>' + _fpEscapeHtml(n) + '</option>';
             }).join('');
-            var activeTrades = _fpTradeConfig.filter(function(tc) { return _fpMapping && _fpMapping[tc.key] && _fpMapping[tc.key].length > 0; });
+            var activeTrades = _fpTradeConfig.filter(function(tc) { return _fpIsTradeEnabled(tc.key) && _fpMapping && _fpMapping[tc.key] && _fpMapping[tc.key].length > 0; });
             var tradeControls = activeTrades.map(function(tc) {
                 var selectedTrade = (state.trades && state.trades[tc.key]) || '';
                 var opts = '<option value="">Skip</option>' + (_fpMapping[tc.key] || []).map(function(item) {
@@ -442,7 +489,7 @@
             var select = document.getElementById('fpRoomNameSelect');
             var name = (custom && custom.value.trim()) || (select && select.value) || '';
             var trades = {};
-            _fpTradeConfig.forEach(function(tc) {
+            _fpEnabledTradeConfig().forEach(function(tc) {
                 var el = document.getElementById('fpTrade_' + tc.key);
                 if (el && el.value) trades[tc.key] = el.value;
             });
@@ -758,8 +805,10 @@
             if (unit === 'lf' || unit === 'linearft' || unit === 'linearfeet') return length || perimeter;
             if (unit === 'each' || unit === 'ea') return 1;
             if (unit === 'hour' || unit === 'hours' || unit === 'hr' || unit === 'hourly') return 1;
-            if (tradeKey === 'paint' || tradeKey === 'drywall') return perimeter * ceilingHeight;
-            if (tradeKey === 'framing') return perimeter;
+            var tc = _fpTradeConfig.find(function(t) { return t.key === tradeKey; }) || {};
+            if (tc.qtyMode === 'wallArea') return perimeter * ceilingHeight;
+            if (tc.qtyMode === 'perimeter') return perimeter || length;
+            if (tc.qtyMode === 'each') return 1;
             return area || length || perimeter;
         }
 
@@ -771,7 +820,7 @@
             _fpShapes.forEach(function(shape) {
                 var d = shape.dimensions || {};
                 var items = [];
-                _fpTradeConfig.forEach(function(tc) {
+                _fpEnabledTradeConfig().forEach(function(tc) {
                     var selectedName = shape.trades && shape.trades[tc.key];
                     if (!selectedName) return;
                     var mappedItems = (_fpMapping && _fpMapping[tc.key]) || [];
