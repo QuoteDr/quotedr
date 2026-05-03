@@ -586,26 +586,8 @@
             var saveStatus = document.getElementById('saveStatus');
             if (saveStatus) saveStatus.innerHTML = '<span style="color:#1a56a0;"><i class="fas fa-spinner fa-spin"></i> Saving quote...</span>';
 
-            _quoteStyle = readQuoteStyleFromControls();
-            syncQuoteStyleGlobal();
-            if (document.getElementById('quoteSaveDefaultStyle')?.checked) {
-                await saveQuoteStyleDefaults(false);
-            }
-
-            const quoteData = collectQuoteData();
-            quoteData.style = JSON.parse(JSON.stringify(_quoteStyle));
-            if (window._supabaseQuoteId) quoteData.supabaseId = window._supabaseQuoteId;
-
             try {
-                const result = await saveQuoteForSharing(quoteData);
-                if (result.error) throw result.error;
-
-                const supabaseId = result.data.id;
-                window._supabaseQuoteId = supabaseId;
-                localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
-
-                const _base = window.location.href.split('?')[0].split('#')[0].replace(/quote-builder(\.html)?\/?$/, '');
-                const viewerUrl = _base + 'interactive-quote-viewer?id=' + supabaseId;
+                const viewerUrl = await createInteractiveQuoteLink();
 
                 if (saveStatus) saveStatus.innerHTML = '<span style="color:green;"><i class="fas fa-check"></i> Quote saved!</span>';
 
@@ -669,6 +651,60 @@
             }
         }
 
+        async function createInteractiveQuoteLink() {
+            _quoteStyle = readQuoteStyleFromControls();
+            syncQuoteStyleGlobal();
+            if (document.getElementById('quoteSaveDefaultStyle')?.checked) {
+                await saveQuoteStyleDefaults(false);
+            }
+
+            const quoteData = collectQuoteData();
+            quoteData.style = JSON.parse(JSON.stringify(_quoteStyle));
+            if (window._supabaseQuoteId) quoteData.supabaseId = window._supabaseQuoteId;
+
+            const result = await saveQuoteForSharing(quoteData);
+            if (result.error) throw result.error;
+
+            const supabaseId = result.data.id;
+            window._supabaseQuoteId = supabaseId;
+            localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
+
+            const _base = window.location.href.split('?')[0].split('#')[0].replace(/quote-builder(\.html)?\/?$/, '');
+            return _base + 'interactive-quote-viewer?id=' + supabaseId;
+        }
+
+        async function previewInteractiveQuote() {
+            if (rooms.length === 0) {
+                alert('Please add at least one room before previewing a quote.');
+                return;
+            }
+            markQuoteNumberUsed(document.getElementById('quoteNumber')?.value);
+            var previewWindow = window.open('about:blank', '_blank');
+            if (previewWindow) {
+                previewWindow.document.write('<!doctype html><title>Preparing Quote Preview</title><body style="font-family:Arial,sans-serif;padding:32px;color:#1f3349;"><h3>Preparing quote preview...</h3><p>This tab will open the client view automatically.</p></body>');
+            }
+            var saveStatus = document.getElementById('saveStatus');
+            if (saveStatus) saveStatus.innerHTML = '<span style="color:#1a56a0;"><i class="fas fa-spinner fa-spin"></i> Preparing preview...</span>';
+            try {
+                await initStyleModal();
+                var viewerUrl = await createInteractiveQuoteLink();
+                if (saveStatus) saveStatus.innerHTML = '<span style="color:green;"><i class="fas fa-check"></i> Preview ready!</span>';
+                if (typeof qdToast === 'function') {
+                    qdToast({ title: 'Preview Ready', message: 'Opening the client quote view.', type: 'success' });
+                }
+                if (previewWindow && !previewWindow.closed) {
+                    previewWindow.location.href = viewerUrl;
+                } else {
+                    window.open(viewerUrl, '_blank');
+                }
+            } catch(err) {
+                console.error('Failed to preview quote:', err);
+                if (previewWindow && !previewWindow.closed) previewWindow.close();
+                alert('Failed to prepare quote preview: ' + (err.message || err));
+                if (saveStatus) saveStatus.innerHTML = '<span style="color:red;"><i class="fas fa-times"></i> Preview failed</span>';
+            }
+        }
+
         syncQuoteStyleGlobal();
         window.COMMITMENT_ICON_LIBRARY = COMMITMENT_ICON_LIBRARY;
         window.defaultCommitmentItemsForModal = defaultCommitmentItemsForModal;
@@ -690,4 +726,6 @@
         window.generateInteractiveLink = generateInteractiveLink;
         window.openQuoteSendSettingsModal = openQuoteSendSettingsModal;
         window.confirmGenerateQuote = confirmGenerateQuote;
+        window.createInteractiveQuoteLink = createInteractiveQuoteLink;
+        window.previewInteractiveQuote = previewInteractiveQuote;
 })();

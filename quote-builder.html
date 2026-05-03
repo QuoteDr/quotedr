@@ -568,10 +568,17 @@ if (location.search.includes('debug')) {
                         </ul>
                     </div>
 
-                    <!-- Always visible: Send Quote + Send Invoice -->
-                    <a href="javascript:void(0)" onclick="generateInteractiveLink()" class="btn btn-primary btn-sm shadow-sm flex-grow-1 text-center">
-                        <i class="fas fa-share-square me-1"></i>Send Quote
-                    </a>
+                    <!-- Always visible: Quote actions + Send Invoice -->
+                    <div class="dropdown flex-grow-1">
+                        <button class="btn btn-primary btn-sm shadow-sm dropdown-toggle w-100" data-bs-toggle="dropdown" title="Quote actions">
+                            <i class="fas fa-share-square me-1"></i>Quote Actions
+                        </button>
+                        <ul class="dropdown-menu w-100">
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="openQuoteSendSettingsModal(true)"><i class="fas fa-sliders-h me-2 text-primary"></i>Quote Settings</a></li>
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="generateInteractiveLink()"><i class="fas fa-link me-2 text-success"></i>Generate Quote Link</a></li>
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="previewInteractiveQuote()"><i class="fas fa-eye me-2 text-warning"></i>Preview Quote</a></li>
+                        </ul>
+                    </div>
                     <a href="javascript:void(0)" onclick="generateInvoiceLink()" class="btn btn-danger btn-sm shadow-sm flex-grow-1 text-center">
                         <i class="fas fa-file-invoice-dollar me-1"></i>Send Invoice
                     </a>
@@ -5048,7 +5055,7 @@ Example:
     <script src="quote-clients.js?v=1777660402"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
     <script src="ikea-quote.js?v=1777304471"></script>
-    <script src="quote-style.js?v=1777841201"></script>
+    <script src="quote-style.js?v=1777923001"></script>
 
     <!-- Quote Style Modal -->
     <div class="modal fade" id="quoteStyleModal" tabindex="-1">
@@ -5348,10 +5355,17 @@ Example:
             <i class="fas fa-save d-block" style="font-size:1rem;"></i>
             <span style="font-size:0.55rem;">Save</span>
         </a>
-        <a href="javascript:void(0)" onclick="generateInteractiveLink()" class="btn btn-primary btn-sm" style="flex:1; flex-direction:column; display:flex; align-items:center; justify-content:center; padding:4px 2px; min-width:0;">
-            <i class="fas fa-share-square d-block" style="font-size:1rem;"></i>
-            <span style="font-size:0.55rem;">Send</span>
-        </a>
+        <div class="dropup" style="flex:1; min-width:0;">
+            <button type="button" class="btn btn-primary btn-sm dropdown-toggle" data-bs-toggle="dropdown" style="width:100%; height:100%; flex-direction:column; display:flex; align-items:center; justify-content:center; padding:4px 2px; min-width:0;">
+                <i class="fas fa-share-square d-block" style="font-size:1rem;"></i>
+                <span style="font-size:0.55rem;">Quote</span>
+            </button>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="javascript:void(0)" onclick="openQuoteSendSettingsModal(true)"><i class="fas fa-sliders-h me-2 text-primary"></i>Quote Settings</a></li>
+                <li><a class="dropdown-item" href="javascript:void(0)" onclick="generateInteractiveLink()"><i class="fas fa-link me-2 text-success"></i>Generate Link</a></li>
+                <li><a class="dropdown-item" href="javascript:void(0)" onclick="previewInteractiveQuote()"><i class="fas fa-eye me-2 text-warning"></i>Preview Quote</a></li>
+            </ul>
+        </div>
         <a href="javascript:void(0)" onclick="generateInvoiceLink()" class="btn btn-danger btn-sm" style="flex:1; flex-direction:column; display:flex; align-items:center; justify-content:center; padding:4px 2px; min-width:0;">
             <i class="fas fa-file-invoice-dollar d-block" style="font-size:1rem;"></i>
             <span style="font-size:0.55rem;">Invoice</span>
