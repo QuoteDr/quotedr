@@ -423,7 +423,7 @@
             document.getElementById('floorPlanModalBody').innerHTML =
                 '<div class="d-flex justify-content-center gap-1 mb-2">' + _fpStepBadges(2, ['Upload','Calibrate','Review']) + '</div>' +
                 '<div class="row g-2" style="height:calc(100vh - 138px);min-height:0;">' +
-                '<div class="col-lg-8 d-flex flex-column" style="min-height:420px;min-width:0;">' +
+                '<div class="col-lg-8 d-flex flex-column" style="height:100%;min-height:420px;min-width:0;overflow:hidden;">' +
                 '<div class="d-flex flex-wrap align-items-center gap-1 mb-2">' +
                 _fpToolButton('calibrate', 'fa-arrows-left-right', 'Scale') +
                 _fpToolButton('line', 'fa-ruler-horizontal', 'Line') +
@@ -442,8 +442,10 @@
                 '<div class="small text-muted" id="fpToolHelp">' + _fpToolLabel() + '</div>' +
                 '<div class="small text-primary fw-semibold" id="fpPanHint" style="display:' + ((_fpCanvasZoom || 1) > 1.01 ? 'block' : 'none') + ';"><i class="fas fa-hand me-1"></i>Right-click + drag to pan</div>' +
                 '</div>' +
-                '<div id="fpMeasureCanvasWrap" style="flex:1;min-height:0;overflow:scroll;border:1px solid #ced4da;border-radius:8px;background:#f8f9fa;overscroll-behavior:contain;">' +
+                '<div id="fpMeasureCanvasWrap" style="flex:1;min-height:0;height:100%;overflow:scroll;border:1px solid #ced4da;border-radius:8px;background:#f8f9fa;overscroll-behavior:contain;">' +
+                '<div id="fpMeasureCanvasStage" style="position:relative;width:1px;height:1px;">' +
                 '<canvas id="fpMeasureCanvas" style="display:block;max-width:none;cursor:crosshair;user-select:none;"></canvas>' +
+                '</div>' +
                 '</div>' +
                 '</div>' +
                 '<div class="col-lg-4 d-flex flex-column">' +
@@ -569,7 +571,8 @@
             _fpCtx = _fpCanvas.getContext('2d');
             _fpPlanImg = new Image();
             _fpPlanImg.onload = function() {
-                var parentW = (_fpCanvas.parentElement ? _fpCanvas.parentElement.clientWidth : 900) - 4;
+                var wrap = _fpCanvasWrap();
+                var parentW = (wrap ? wrap.clientWidth : 900) - 4;
                 var maxDisplayW = Math.min(1600, Math.max(860, parentW));
                 var displayScale = Math.min(1, maxDisplayW / _fpPlanImg.naturalWidth);
                 var displayW = Math.max(1, Math.round(_fpPlanImg.naturalWidth * displayScale));
@@ -579,9 +582,9 @@
                 _fpCanvas.width = Math.max(1, Math.round(_fpPlanImg.naturalWidth));
                 _fpCanvas.height = Math.max(1, Math.round(_fpPlanImg.naturalHeight));
                 _fpApplyCanvasZoom(_fpCanvasZoom || 1);
-                if (_fpCanvas.parentElement) {
-                    _fpCanvas.parentElement.scrollLeft = _fpCanvasScrollLeft || 0;
-                    _fpCanvas.parentElement.scrollTop = _fpCanvasScrollTop || 0;
+                if (wrap) {
+                    wrap.scrollLeft = _fpCanvasScrollLeft || 0;
+                    wrap.scrollTop = _fpCanvasScrollTop || 0;
                 }
                 _fpCanvasReady = true;
                 _fpAttachCanvasEvents();
@@ -611,11 +614,20 @@
             return Math.max(1, Math.min(5, value || 1));
         }
 
+        function _fpCanvasWrap() {
+            return document.getElementById('fpMeasureCanvasWrap');
+        }
+
         function _fpApplyCanvasZoom(zoom) {
             if (!_fpCanvas || !_fpCanvasBaseDisplayWidth || !_fpCanvasBaseDisplayHeight) return;
             _fpCanvasZoom = _fpClampZoom(zoom);
             var displayW = Math.round(_fpCanvasBaseDisplayWidth * _fpCanvasZoom);
             var displayH = Math.round(_fpCanvasBaseDisplayHeight * _fpCanvasZoom);
+            var stage = document.getElementById('fpMeasureCanvasStage');
+            if (stage) {
+                stage.style.width = displayW + 'px';
+                stage.style.height = displayH + 'px';
+            }
             _fpCanvas.style.width = displayW + 'px';
             _fpCanvas.style.height = displayH + 'px';
             _fpCanvasPixelRatio = _fpCanvas.width / Math.max(1, displayW);
@@ -627,8 +639,8 @@
         }
 
         function _fpZoomCanvasAt(nextZoom, clientX, clientY) {
-            if (!_fpCanvas || !_fpCanvas.parentElement) return;
-            var wrap = _fpCanvas.parentElement;
+            var wrap = _fpCanvasWrap();
+            if (!_fpCanvas || !wrap) return;
             var canvasRect = _fpCanvas.getBoundingClientRect();
             var wrapRect = wrap.getBoundingClientRect();
             var ratioX = canvasRect.width ? (clientX - canvasRect.left) / canvasRect.width : 0.5;
@@ -651,8 +663,9 @@
         }
 
         function _fpZoomCanvasButton(factor) {
-            if (!_fpCanvas || !_fpCanvas.parentElement) return;
-            var rect = _fpCanvas.parentElement.getBoundingClientRect();
+            var wrap = _fpCanvasWrap();
+            if (!_fpCanvas || !wrap) return;
+            var rect = wrap.getBoundingClientRect();
             _fpZoomCanvasAt((_fpCanvasZoom || 1) * factor, rect.left + rect.width / 2, rect.top + rect.height / 2);
         }
 
@@ -661,9 +674,10 @@
             _fpCanvasScrollLeft = 0;
             _fpCanvasScrollTop = 0;
             _fpApplyCanvasZoom(1);
-            if (_fpCanvas && _fpCanvas.parentElement) {
-                _fpCanvas.parentElement.scrollLeft = 0;
-                _fpCanvas.parentElement.scrollTop = 0;
+            var wrap = _fpCanvasWrap();
+            if (_fpCanvas && wrap) {
+                wrap.scrollLeft = 0;
+                wrap.scrollTop = 0;
             }
             _fpDrawCanvas();
         }
@@ -758,13 +772,14 @@
             if (!_fpCanvasReady) return;
             if (e.button === 2) {
                 e.preventDefault();
-                if (!_fpCanvas.parentElement || (_fpCanvasZoom || 1) <= 1.01) return;
+                var wrap = _fpCanvasWrap();
+                if (!wrap || (_fpCanvasZoom || 1) <= 1.01) return;
                 _fpPanActive = true;
                 _fpPanStarted = false;
                 _fpPanStartX = e.clientX;
                 _fpPanStartY = e.clientY;
-                _fpPanStartScrollLeft = _fpCanvas.parentElement.scrollLeft || 0;
-                _fpPanStartScrollTop = _fpCanvas.parentElement.scrollTop || 0;
+                _fpPanStartScrollLeft = wrap.scrollLeft || 0;
+                _fpPanStartScrollTop = wrap.scrollTop || 0;
                 _fpUpdateCanvasCursor();
                 return;
             }
@@ -783,13 +798,13 @@
         }
 
         function _fpCanvasMove(e) {
-            if (_fpPanActive && _fpCanvas && _fpCanvas.parentElement) {
+            var panWrap = _fpCanvasWrap();
+            if (_fpPanActive && _fpCanvas && panWrap) {
                 e.preventDefault();
-                var wrap = _fpCanvas.parentElement;
-                wrap.scrollLeft = _fpPanStartScrollLeft - (e.clientX - _fpPanStartX);
-                wrap.scrollTop = _fpPanStartScrollTop - (e.clientY - _fpPanStartY);
-                _fpCanvasScrollLeft = wrap.scrollLeft;
-                _fpCanvasScrollTop = wrap.scrollTop;
+                panWrap.scrollLeft = _fpPanStartScrollLeft - (e.clientX - _fpPanStartX);
+                panWrap.scrollTop = _fpPanStartScrollTop - (e.clientY - _fpPanStartY);
+                _fpCanvasScrollLeft = panWrap.scrollLeft;
+                _fpCanvasScrollTop = panWrap.scrollTop;
                 _fpPanStarted = true;
                 return;
             }
@@ -807,9 +822,10 @@
             if (_fpPanActive) {
                 _fpPanActive = false;
                 _fpUpdateCanvasCursor();
-                if (_fpPanStarted && _fpCanvas && _fpCanvas.parentElement) {
-                    _fpCanvasScrollLeft = _fpCanvas.parentElement.scrollLeft || 0;
-                    _fpCanvasScrollTop = _fpCanvas.parentElement.scrollTop || 0;
+                var wrap = _fpCanvasWrap();
+                if (_fpPanStarted && _fpCanvas && wrap) {
+                    _fpCanvasScrollLeft = wrap.scrollLeft || 0;
+                    _fpCanvasScrollTop = wrap.scrollTop || 0;
                 }
                 return;
             }
