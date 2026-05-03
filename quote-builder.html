@@ -1348,6 +1348,7 @@ Example:
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="quote-dialogs.js?v=1777660407"></script>
+    <script>window.initMeasureMap = window.initMeasureMap || function(){ window._mapInited = true; };</script>
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD7acqRI6KsoUDTEkyMx36eDNRuuPXdqIA&libraries=drawing,geometry,places&callback=initMeasureMap" async defer></script>
 
     <script>
@@ -2650,7 +2651,8 @@ Example:
         // Material estimator moved to quote-calculators.js
 
         // -- Google Maps Measurement -----------------------------------------
-        var _map = null, _mapShapes = [], _mapInited = false;
+        var _map = null, _mapShapes = [], _mapInited = false, _mapsLoadingPromise = null;
+        var _mapsApiUrl = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyD7acqRI6KsoUDTEkyMx36eDNRuuPXdqIA&libraries=drawing,geometry,places&callback=initMeasureMap';
         var _mapTradePresets = {
             roofing:   { category: 'Roofing', item: 'Roof area', mode: 'roofArea', draw: 'polygon', hint: 'Trace each roof plane. The pitch multiplier adjusts measured flat area.' },
             siding:    { category: 'Siding', item: 'Siding install', mode: 'wallArea', draw: 'polygon', hint: 'Trace the building footprint. Quantity uses perimeter x height.' },
@@ -2707,7 +2709,98 @@ Example:
             });
         });
 
-        function initMeasureMap() { _mapInited = true; }
+        function initMeasureMap() {
+            _mapInited = true;
+            window._mapInited = true;
+        }
+        window.initMeasureMap = initMeasureMap;
+
+        function ensureMeasureMapApiLoaded() {
+            if (window.google && google.maps && google.maps.Map && google.maps.geometry && google.maps.places) {
+                return Promise.resolve();
+            }
+            if (_mapsLoadingPromise) return _mapsLoadingPromise;
+            _mapsLoadingPromise = new Promise(function(resolve, reject) {
+                var started = Date.now();
+                function ready() {
+                    if (window.google && google.maps && google.maps.Map && google.maps.geometry && google.maps.places) {
+                        resolve();
+                        return true;
+                    }
+                    return false;
+                }
+                if (ready()) return;
+                var existing = Array.from(document.scripts).find(function(s) { return s.src && s.src.indexOf('maps.googleapis.com/maps/api/js') >= 0; });
+                if (!existing) {
+                    var s = document.createElement('script');
+                    s.src = _mapsApiUrl;
+                    s.async = true;
+                    s.defer = true;
+                    s.onerror = function() { reject(new Error('Google Maps could not be loaded.')); };
+                    document.head.appendChild(s);
+                }
+                var timer = setInterval(function() {
+                    if (ready()) { clearInterval(timer); return; }
+                    if (Date.now() - started > 12000) {
+                        clearInterval(timer);
+                        reject(new Error('Google Maps is still loading. Please try again in a moment.'));
+                    }
+                }, 150);
+            });
+            return _mapsLoadingPromise;
+        }
+
+        function initializeMeasureMapIfNeeded() {
+            if (!_map) {
+                _map = new google.maps.Map(document.getElementById('measureMapContainer'), {
+                    center: { lat: 43.6532, lng: -79.3832 },
+                    zoom: 20,
+                    maxZoom: 21,
+                    mapTypeId: 'satellite',
+                    tilt: 0,
+                    mapId: '90109103adf307b01405b80d',
+                    fullscreenControl: true,
+                    streetViewControl: false,
+                    mapTypeControl: true,
+                    mapTypeControlOptions: {
+                        style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
+                        position: google.maps.ControlPosition.TOP_RIGHT,
+                        mapTypeIds: ['satellite', 'hybrid', 'roadmap']
+                    },
+                    zoomControl: true,
+                    gestureHandling: 'greedy',
+                    disableDoubleClickZoom: true
+                });
+                if (google.maps.importLibrary) {
+                    google.maps.importLibrary('maps').then(function() {
+                        if (google.maps.RenderingType) {
+                            try { _map.setRenderingType(google.maps.RenderingType.VECTOR); } catch(e) {}
+                        }
+                    }).catch(function() {});
+                }
+                _map.addListener('click', function(event) {
+                    if (!_drawingMode) return;
+                    addMapMeasurePoint(event.latLng);
+                });
+                _map.addListener('mousemove', function(event) {
+                    if (!_drawingMode || _activePath.length === 0) return;
+                    redrawPreview(event.latLng);
+                });
+                _map.addListener('dblclick', function(event) {
+                    if (!_drawingMode) return;
+                    if (_activePath.length > 0) _activePath.pop();
+                    finishDrawing();
+                });
+            }
+            initPlacesAutocomplete();
+            google.maps.event.trigger(_map, 'resize');
+            var addr = document.getElementById('projectAddress')?.value || '';
+            if (addr && !document.getElementById('mapAddressInput').value) {
+                document.getElementById('mapAddressInput').value = addr;
+                searchMapAddress();
+            }
+            if (window.pendingPlace) { _map.panTo(window.pendingPlace.geometry.location); _map.setZoom(20); window.pendingPlace = null; }
+        }
 
         function openMeasureModal() {
             var sel = document.getElementById('mapTargetRoom');
@@ -2721,58 +2814,14 @@ Example:
             populateMeasureModalCategories();
             populateMeasureItemSuggestions();
             renderMapPresetHint('Choose a trade preset or draw area/linear measurements manually.');
-            var modal = bootstrap.Modal.getInstance(document.getElementById('measureMapModal')) || new bootstrap.Modal(document.getElementById('measureMapModal'));
+            var modalEl = document.getElementById('measureMapModal');
+            var modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
             modal.show();
-            setTimeout(function() {
-                if (typeof google === 'undefined') { qdAlert('Google Maps is loading, please try again in a moment.'); return; }
-                if (!_map) {
-                    _map = new google.maps.Map(document.getElementById('measureMapContainer'), {
-                        center: { lat: 43.6532, lng: -79.3832 },
-                        zoom: 20,
-                        maxZoom: 21,
-                        mapTypeId: 'satellite',
-                        tilt: 0,
-                        mapId: '90109103adf307b01405b80d',
-                        fullscreenControl: true,
-                        streetViewControl: false,
-                        mapTypeControl: true,
-                        mapTypeControlOptions: {
-                            style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
-                            position: google.maps.ControlPosition.TOP_RIGHT,
-                            mapTypeIds: ['satellite', 'hybrid', 'roadmap']
-                        },
-                        zoomControl: true,
-                        gestureHandling: 'greedy',
-                        disableDoubleClickZoom: true
-                    });
-                    // Force vector rendering after map init for sharper imagery
-                    google.maps.importLibrary('maps').then(function() {
-                        if (google.maps.RenderingType) {
-                            try { _map.setRenderingType(google.maps.RenderingType.VECTOR); } catch(e) {}
-                        }
-                    });
-                    // Manual click-to-draw (no DrawingManager - gives full undo/preview control)
-                    _map.addListener('click', function(event) {
-                        if (!_drawingMode) return;
-                        addMapMeasurePoint(event.latLng);
-                    });
-                    _map.addListener('mousemove', function(event) {
-                        if (!_drawingMode || _activePath.length === 0) return;
-                        redrawPreview(event.latLng);
-                    });
-                    _map.addListener('dblclick', function(event) {
-                        if (!_drawingMode) return;
-                        // remove the last point added by the click that preceded dblclick
-                        if (_activePath.length > 0) _activePath.pop();
-                        finishDrawing();
-                    });
-                    var addr = document.getElementById('projectAddress')?.value || '';
-                    if (addr) { document.getElementById('mapAddressInput').value = addr; searchMapAddress(); }
-                    if (window.pendingPlace) { _map.panTo(window.pendingPlace.geometry.location); _map.setZoom(20); window.pendingPlace = null; }
-                }
-                initPlacesAutocomplete();
-                google.maps.event.trigger(_map, 'resize');
-            }, 500);
+            ensureMeasureMapApiLoaded().then(function() {
+                setTimeout(initializeMeasureMapIfNeeded, 150);
+            }).catch(function(err) {
+                qdAlert(err.message || 'Google Maps could not be loaded. Please try again.');
+            });
         }
 
         var _placesAutocomplete = null;
