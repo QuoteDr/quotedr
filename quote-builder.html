@@ -2758,7 +2758,6 @@ Example:
                     maxZoom: 21,
                     mapTypeId: 'satellite',
                     tilt: 0,
-                    mapId: '90109103adf307b01405b80d',
                     fullscreenControl: true,
                     streetViewControl: false,
                     mapTypeControl: true,
@@ -2771,13 +2770,12 @@ Example:
                     gestureHandling: 'greedy',
                     disableDoubleClickZoom: true
                 });
-                if (google.maps.importLibrary) {
-                    google.maps.importLibrary('maps').then(function() {
-                        if (google.maps.RenderingType) {
-                            try { _map.setRenderingType(google.maps.RenderingType.VECTOR); } catch(e) {}
-                        }
-                    }).catch(function() {});
-                }
+                _map.addListener('maptypeid_changed', function() {
+                    setTimeout(function() {
+                        google.maps.event.trigger(_map, 'resize');
+                        _map.setTilt(0);
+                    }, 80);
+                });
                 _map.addListener('click', function(event) {
                     if (!_drawingMode) return;
                     addMapMeasurePoint(event.latLng);
