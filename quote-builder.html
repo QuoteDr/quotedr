@@ -1096,15 +1096,15 @@ if (location.search.includes('debug')) {
                             <option value="each">Each</option>
                         </select>
                         <input type="number" id="mapWallHeight" class="form-control form-control-sm map-shape-setting" value="9" min="1" step="0.5" style="max-width:75px;" title="Height for siding, fencing, walls, or screens">
-                        <span class="text-muted small">ft high</span>
+                        <span class="text-muted small" id="mapWallHeightLabel">ft high</span>
                         <input type="number" id="mapWastePct" class="form-control form-control-sm map-shape-setting" value="0" min="0" step="1" style="max-width:78px;" title="Waste factor percentage">
-                        <span class="text-muted small">% waste</span>
+                        <span class="text-muted small" id="mapWastePctLabel">% waste</span>
                         <input type="number" id="mapOpeningsSqft" class="form-control form-control-sm map-shape-setting" value="0" min="0" step="1" style="max-width:92px;" title="Window/door/opening deduction in square feet">
-                        <span class="text-muted small">sqft deduct</span>
+                        <span class="text-muted small" id="mapOpeningsSqftLabel">sqft deduct</span>
                         <input type="number" id="mapGateCount" class="form-control form-control-sm map-shape-setting" value="0" min="0" step="1" style="max-width:70px;" title="Fence gate count">
-                        <span class="text-muted small">gates</span>
+                        <span class="text-muted small" id="mapGateCountLabel">gates</span>
                         <input type="number" id="mapGateWidth" class="form-control form-control-sm map-shape-setting" value="4" min="0" step="0.5" style="max-width:70px;" title="Fence gate width in feet">
-                        <span class="text-muted small">ft gate</span>
+                        <span class="text-muted small" id="mapGateWidthLabel">ft gate</span>
                         <select id="mapRoofPitch" class="form-select form-select-sm map-shape-setting" style="max-width:130px;" title="Roof pitch correction">
                             <option value="1">No pitch (flat)</option>
                             <option value="1.014">2/12 pitch</option>
@@ -3394,6 +3394,10 @@ Example:
 
         document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('mapItemCategory').addEventListener('change', populateMeasureItemSuggestions);
+            ['mapTradePreset','mapQuantityMode'].forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) el.addEventListener('change', updateMapTradeControlVisibility);
+            });
             ['mapItemCategory','mapItemName','mapItemRate','mapQuantityMode','mapWallHeight','mapWastePct','mapOpeningsSqft','mapGateCount','mapGateWidth','mapRoofPitch'].forEach(function(id) {
                 var el = document.getElementById(id);
                 if (el) el.addEventListener('change', saveMapControlsToSelectedShape);
@@ -3518,6 +3522,7 @@ Example:
             else if (rooms.length === 1) sel.value = rooms[0].id;
             populateMeasureModalCategories();
             populateMeasureItemSuggestions();
+            updateMapTradeControlVisibility();
             renderMapPresetHint('Choose a trade preset or draw area/linear measurements manually.');
             var modalEl = document.getElementById('measureMapModal');
             var modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
@@ -3579,13 +3584,44 @@ Example:
             if (document.getElementById('mapGateCount')) document.getElementById('mapGateCount').value = preset.gates || 0;
             if (document.getElementById('mapGateWidth')) document.getElementById('mapGateWidth').value = preset.gateWidth || 4;
             if (unitEl) unitEl.value = preset.mode === 'length' || preset.mode === 'perimeter' ? 'LF' : (preset.mode === 'each' ? 'each' : 'sq ft');
+            updateMapTradeControlVisibility();
             saveMapControlsToSelectedShape();
             renderMapPresetHint(preset.hint);
             if (preset.draw && !_drawingMode) setDrawMode(preset.draw);
         }
 
-        function mapCurrentSettings() {
+        function mapControlContext() {
+            var preset = document.getElementById('mapTradePreset') ? document.getElementById('mapTradePreset').value : '';
+            var mode = document.getElementById('mapQuantityMode') ? document.getElementById('mapQuantityMode').value : 'auto';
             return {
+                preset: preset,
+                mode: mode,
+                isRoof: preset === 'roofing' || mode === 'roofArea',
+                isFence: preset === 'fence',
+                isWall: preset === 'siding' || mode === 'wallArea',
+                usesWaste: preset === 'roofing' || preset === 'siding' || preset === 'deck' || preset === 'driveway' || preset === 'landscape' || mode === 'area' || mode === 'roofArea' || mode === 'wallArea'
+            };
+        }
+
+        function mapSetVisible(ids, visible) {
+            ids.forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) el.style.display = visible ? '' : 'none';
+            });
+        }
+
+        function updateMapTradeControlVisibility() {
+            var ctx = mapControlContext();
+            mapSetVisible(['mapRoofPitch'], ctx.isRoof);
+            mapSetVisible(['mapGateCount','mapGateCountLabel','mapGateWidth','mapGateWidthLabel'], ctx.isFence);
+            mapSetVisible(['mapOpeningsSqft','mapOpeningsSqftLabel'], ctx.isWall);
+            mapSetVisible(['mapWallHeight','mapWallHeightLabel'], ctx.isWall || ctx.isFence);
+            mapSetVisible(['mapWastePct','mapWastePctLabel'], ctx.usesWaste);
+        }
+
+        function mapCurrentSettings() {
+            var ctx = mapControlContext();
+            var settings = {
                 preset: document.getElementById('mapTradePreset') ? document.getElementById('mapTradePreset').value : '',
                 category: document.getElementById('mapItemCategory') ? document.getElementById('mapItemCategory').value : '',
                 itemName: document.getElementById('mapItemName') ? document.getElementById('mapItemName').value.trim() : '',
@@ -3598,6 +3634,12 @@ Example:
                 gateWidth: parseFloat(document.getElementById('mapGateWidth') ? document.getElementById('mapGateWidth').value : '') || 0,
                 pitch: parseFloat(document.getElementById('mapRoofPitch') ? document.getElementById('mapRoofPitch').value : '') || 1
             };
+            if (!ctx.isRoof) settings.pitch = 1;
+            if (!ctx.isFence) { settings.gateCount = 0; settings.gateWidth = 0; }
+            if (!ctx.isWall) settings.openingsSqft = 0;
+            if (!ctx.usesWaste) settings.wastePct = 0;
+            if (!(ctx.isWall || ctx.isFence)) settings.height = 0;
+            return settings;
         }
 
         function applyMapSettingsToControls(settings) {
@@ -3616,6 +3658,7 @@ Example:
             if (document.getElementById('mapGateCount')) document.getElementById('mapGateCount').value = settings.gateCount || 0;
             if (document.getElementById('mapGateWidth')) document.getElementById('mapGateWidth').value = settings.gateWidth !== undefined ? settings.gateWidth : 4;
             if (document.getElementById('mapRoofPitch')) document.getElementById('mapRoofPitch').value = settings.pitch || 1;
+            updateMapTradeControlVisibility();
         }
 
         function saveMapControlsToSelectedShape() {
