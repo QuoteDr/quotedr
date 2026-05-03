@@ -176,7 +176,7 @@ if (location.search.includes('debug')) {
                     </div>
                 </div>
                 <div class="col-4 text-end">
-                    <div class="invoice-badge mb-2">Invoice</div>
+                    <div class="invoice-badge mb-2" id="invoiceTitleDisplay">Invoice</div>
                     <div id="invoiceNumberDisplay" class="text-muted small"></div>
                     <div id="invoiceDateDisplay" class="text-muted small"></div>
                 </div>
@@ -222,6 +222,14 @@ if (location.search.includes('debug')) {
             <div class="total-row grand">
                 <span>Total Due</span>
                 <span id="grandTotalDisplay">$0.00</span>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm mb-4" id="invoiceNoteSection" style="display:none;">
+            <div class="card-body">
+                <div class="fw-bold mb-1"><i class="fas fa-circle-info me-1 text-primary"></i>Invoice Note</div>
+                <div id="invoiceNoteDisplay" class="text-muted"></div>
+                <div id="invoicePaymentTermsDisplay" class="text-muted small mt-2"></div>
             </div>
         </div>
 
@@ -279,7 +287,7 @@ if (location.search.includes('debug')) {
         </div>
 
         <!-- Terms -->
-        <div class="terms-section">
+        <div class="terms-section" id="termsSection">
             <div class="card">
                 <div class="card-header bg-light">
                     <h6 class="mb-0"><i class="fas fa-file-contract"></i> Terms & Conditions</h6>
@@ -346,6 +354,25 @@ if (location.search.includes('debug')) {
         ];
 
         let invoiceData = {};
+        const DEFAULT_INVOICE_SETTINGS = {
+            title: 'Invoice',
+            note: '',
+            paymentTerms: '',
+            showDescriptions: true,
+            showRoomTotals: true,
+            showTerms: true,
+            showPaymentOptions: true
+        };
+
+        function getInvoiceSettings() {
+            return Object.assign({}, DEFAULT_INVOICE_SETTINGS, invoiceData.invoiceSettings || {});
+        }
+
+        function formatMoney(amount, currency) {
+            var symbols = { CAD:'$', USD:'$', GBP:'\u00a3', EUR:'\u20ac', AUD:'$', NZD:'$' };
+            var symbol = symbols[currency || 'CAD'] || '$';
+            return symbol + (Number(amount || 0)).toFixed(2);
+        }
 
         const CATEGORY_ORDER = [
             'Demolition','Asbestos / Hazmat','Concrete & Masonry','Waterproofing',
@@ -505,9 +532,11 @@ if (location.search.includes('debug')) {
         }
 
         function renderInvoice() {
+            const settings = getInvoiceSettings();
             // Header info
             const date = new Date().toLocaleDateString('en-CA', { year:'numeric', month:'long', day:'numeric' });
             document.getElementById('invoiceDateDisplay').textContent = date;
+            document.getElementById('invoiceTitleDisplay').textContent = settings.title || 'Invoice';
             if (invoiceData.quoteNumber) {
                 document.getElementById('invoiceNumberDisplay').textContent = '#' + invoiceData.quoteNumber;
             }
@@ -598,6 +627,9 @@ if (location.search.includes('debug')) {
                     const displayDesc = isUpgraded && item.upgrade?.description
                         ? item.upgrade.description
                         : (item.itemDescription || '');
+                    const descHtml = settings.showDescriptions !== false
+                        ? ((displayDesc ? `<div class="item-desc">${displayDesc}</div>` : '') + (item.notes ? `<div class="item-desc"><i class="fas fa-info-circle"></i> ${item.notes}</div>` : ''))
+                        : '';
 
                     html += `
                             <tr>
@@ -605,8 +637,7 @@ if (location.search.includes('debug')) {
                                     <span class="item-name">${displayName}</span>
                                     ${item.photo ? `<div class="mt-1"><img src="${item.photo}" style="max-width:100px;max-height:70px;border-radius:4px;" alt=""></div>` : ''}
                                     ${isUpgraded ? '<span class="item-upgraded-badge">⬆ Upgraded</span>' : ''}
-                                    ${displayDesc ? `<div class="item-desc">${displayDesc}</div>` : ''}
-                                    ${item.notes ? `<div class="item-desc"><i class="fas fa-info-circle"></i> ${item.notes}</div>` : ''}
+                                    ${descHtml}
                                 </td>
                                 <td style="text-align:center; vertical-align:top; padding-top:10px;">${item.quantity || 0} ${item.unitType || ''}</td>
                                 <td style="text-align:right; vertical-align:top; padding-top:10px;">$${activeRate.toFixed(2)}</td>
@@ -617,12 +648,12 @@ if (location.search.includes('debug')) {
 
                 html += `
                             </tbody>
-                            <tfoot>
+                            ${settings.showRoomTotals !== false ? `<tfoot>
                                 <tr class="table-light">
                                     <td colspan="3" class="text-end fw-bold">Room Total:</td>
                                     <td class="text-end fw-bold text-success">$${roomTotal.toFixed(2)}</td>
                                 </tr>
-                            </tfoot>
+                            </tfoot>` : ''}
                         </table>
                     </div>
                 </div>`;
@@ -632,25 +663,36 @@ if (location.search.includes('debug')) {
 
             // Totals
             var _iqp = {}; try { _iqp = JSON.parse(localStorage.getItem('ald_quote_prefs')||'{}'); } catch(e) {}
-            var _iTaxRate = (_iqp.taxRate !== undefined && _iqp.taxRate !== '') ? parseFloat(_iqp.taxRate)/100 : 0.13;
-            var _iTaxLabel = _iqp.taxLabel || 'HST';
+            var _iTaxRate = (invoiceData.taxRate !== undefined && invoiceData.taxRate !== '') ? parseFloat(invoiceData.taxRate) : ((_iqp.taxRate !== undefined && _iqp.taxRate !== '') ? parseFloat(_iqp.taxRate)/100 : 0.13);
+            if (!isFinite(_iTaxRate) || _iTaxRate < 0) _iTaxRate = 0.13;
+            var _iTaxLabel = invoiceData.taxLabel || _iqp.taxLabel || 'HST';
+            var _iCurrency = invoiceData.currency || _iqp.currency || 'CAD';
             const tax = subtotal * _iTaxRate;
             const total = subtotal + tax;
-            document.getElementById('subtotalDisplay').textContent = '$' + subtotal.toFixed(2);
-            document.getElementById('taxDisplay').textContent = '$' + tax.toFixed(2);
-            document.getElementById('grandTotalDisplay').textContent = '$' + total.toFixed(2);
+            document.getElementById('subtotalDisplay').textContent = formatMoney(subtotal, _iCurrency);
+            document.getElementById('taxDisplay').textContent = formatMoney(tax, _iCurrency);
+            document.getElementById('grandTotalDisplay').textContent = formatMoney(total, _iCurrency);
+            var taxLabelRow = document.querySelector('.totals-section .total-row:nth-child(2) span:first-child');
+            if (taxLabelRow) taxLabelRow.textContent = _iTaxLabel + ' (' + (_iTaxRate * 100).toFixed(1).replace(/\.0$/, '') + '%)';
+            var noteSection = document.getElementById('invoiceNoteSection');
+            var noteEl = document.getElementById('invoiceNoteDisplay');
+            var termsEl = document.getElementById('invoicePaymentTermsDisplay');
+            var hasNote = !!(settings.note || settings.paymentTerms);
+            if (noteSection) noteSection.style.display = hasNote ? 'block' : 'none';
+            if (noteEl) noteEl.textContent = settings.note || '';
+            if (termsEl) termsEl.textContent = settings.paymentTerms ? 'Payment terms: ' + settings.paymentTerms : '';
             // Store total for deposit modal
             window._invoiceTotal = total;
             // Update deposit button visibility
             var depBtn = document.getElementById('depositRequestBtn');
-            if (depBtn) depBtn.style.display = total > 0 ? 'block' : 'none';
+            if (depBtn) depBtn.style.display = (total > 0 && settings.showPaymentOptions !== false) ? 'block' : 'none';
         }
 
         function openDepositModal() {
             var total = window._invoiceTotal || 0;
             var half = (total * 0.5).toFixed(2);
             document.getElementById('depositAmountInput').value = half;
-            document.getElementById('depositModalTotal').textContent = '$' + total.toFixed(2);
+            document.getElementById('depositModalTotal').textContent = formatMoney(total, invoiceData.currency || 'CAD');
             var modal = new bootstrap.Modal(document.getElementById('depositModal'));
             modal.show();
         }
@@ -690,6 +732,10 @@ if (location.search.includes('debug')) {
         }
 
         function renderTerms() {
+            var settings = getInvoiceSettings();
+            var section = document.getElementById('termsSection');
+            if (section) section.style.display = settings.showTerms === false ? 'none' : 'block';
+            if (settings.showTerms === false) return;
             const el = document.getElementById('termsDisplay');
             if (!invoiceData.terms || !invoiceData.terms.length) return;
             let html = '<ul class="list-group list-group-flush">';
@@ -715,6 +761,7 @@ if (location.search.includes('debug')) {
         }
 
         async function initInvoicePaymentSection(contractorUserId, total, invoiceId) {
+            if (getInvoiceSettings().showPaymentOptions === false) return;
             _invoiceTotalForPayment = total || 0;
             _invoiceIdForPayment = invoiceId;
             if (!contractorUserId || !total) return;
