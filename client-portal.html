@@ -238,6 +238,7 @@
     const clientEmail = urlParams.get('email');
     const clientName = urlParams.get('client'); // backward compat
     const contractorId = urlParams.get('contractor');
+    const portalQuoteId = urlParams.get('quote');
 
     // DOM Elements
     const clientNameEl = document.getElementById('client-name');
@@ -253,7 +254,7 @@
 
     // Initialize page
     async function init() {
-      if ((!clientName && !clientEmail) || !contractorId) {
+      if ((!clientName && !clientEmail && !portalQuoteId) || !contractorId) {
         alert('Missing client or contractor parameters');
         return;
       }
@@ -319,7 +320,9 @@
           .eq('user_id', contractorId)
           .order('created_at', { ascending: false });
 
-        if (clientEmail) {
+        if (portalQuoteId) {
+          query = query.eq('id', portalQuoteId);
+        } else if (clientEmail) {
           query = query.or('data->>clientEmail.eq.' + escapePostgrestValue(clientEmail) + ',data->>email.eq.' + escapePostgrestValue(clientEmail) + ',client_name.ilike.' + escapePostgrestValue(clientEmail));
         } else if (clientName) {
           query = query.ilike('client_name', clientName);
@@ -333,7 +336,7 @@
           if (!q.data || q.data.portal_visible !== true) return false;
           var quoteEmail = normalizePortalValue(q.data.clientEmail || q.data.email || q.data.client_email);
           var quoteName = normalizePortalValue(q.client_name || q.data.clientName || q.data.client_name);
-          return !portalKey || quoteEmail === portalKey || quoteName === portalKey;
+          return q.id === portalQuoteId || !portalKey || quoteEmail === portalKey || quoteName === portalKey;
         });
 
         // Set client name from actual quote data
@@ -578,7 +581,7 @@
             'apikey': supabaseKey,
             'Authorization': 'Bearer ' + supabaseKey
           },
-          body: JSON.stringify({ clientName: cpName, clientEmail: cpEmail, contractorId, pin: enteredPin })
+          body: JSON.stringify({ clientName: cpName, clientEmail: cpEmail, contractorId, quoteId: _cp.get('quote'), pin: enteredPin })
         });
         const result = await res.json();
         if (result.valid) {
@@ -617,7 +620,7 @@
       const _name = _lp.get('client');
       const _cid = _lp.get('contractor');
       
-      if ((!_email && !_name) || !_cid) return;
+      if ((!_email && !_name && !_lp.get('quote')) || !_cid) return;
       
       const unlockKey = `portal_unlocked_${_email || _name}_${_cid}`;
       if (sessionStorage.getItem(unlockKey)) {

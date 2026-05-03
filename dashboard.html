@@ -390,7 +390,7 @@
                     ${status === 'accepted' && q.data && q.data.client_upgraded ? `<div class="alert alert-warning py-1 px-2 mt-2 mb-0 small"><i class="fas fa-bolt me-1"></i><strong>Client made upgrades</strong> when signing - <a href="interactive-quote-viewer.html?id=${encodeURIComponent(q.id)}" class="alert-link">review quote</a></div>` : ''}
                     ${status === 'in_review' ? `<button class="btn btn-warning btn-sm w-100 mt-2" onclick="openNotesReview(${jsAttr(q.id)}, ${jsAttr(clientName)})"><i class="fas fa-comments me-1"></i> Review Client Notes</button>` : ''}
                     <button class="btn btn-sm w-100 mt-1 ${portalVisible ? 'btn-success' : 'btn-outline-secondary'}" onclick="togglePortalVisibility(${jsAttr(q.id)}, ${!portalVisible})" title="${portalVisible ? 'Remove from client portal' : 'Publish to client portal'}"><i class="fas ${portalVisible ? 'fa-eye' : 'fa-eye-slash'} me-1"></i> ${portalVisible ? 'In Portal' : 'Add to Portal'}</button>
-                    <button class="btn btn-outline-info btn-sm w-100 mt-1" onclick="shareClientPortal(${jsAttr(clientName)})" title="Share client portal"><i class="fas fa-external-link-alt me-1"></i> Client Portal</button>
+                    <button class="btn btn-outline-info btn-sm w-100 mt-1" onclick="shareClientPortal(${jsAttr(q.id)}, ${jsAttr(clientName)}, ${jsAttr(clientEmail)})" title="Share client portal"><i class="fas fa-external-link-alt me-1"></i> Client Portal</button>
                     ${(status === 'sent' || status === 'viewed') ? `<button class="btn btn-outline-primary btn-sm w-100 mt-1" onclick="sendFollowUpReminder(${jsAttr(q.id)}, ${jsAttr(clientName)}, ${jsAttr(clientEmail)})"><i class="fas fa-bell me-1"></i> Send Follow-up</button>` : ''}
                 </div>
             `;
@@ -543,7 +543,7 @@
             }
         }
 
-        async function shareClientPortal(clientName) {
+        async function shareClientPortal(quoteId, clientName, savedEmail) {
             // Dismiss any stale Bootstrap backdrop before opening
             document.querySelectorAll('.modal-backdrop').forEach(function(el) { el.remove(); });
             document.body.classList.remove('modal-open');
@@ -561,6 +561,8 @@
             if (urlEl) urlEl.value = 'Loading...';
             if (pinEl) pinEl.textContent = '...';
             window._currentPortalClient = clientName;
+            window._currentPortalQuoteId = quoteId || '';
+            window._currentPortalClientEmail = savedEmail || '';
 
             // Show modal — try multiple approaches
             try {
@@ -583,9 +585,32 @@
                     return;
                 }
 
-                // Look for existing PIN across all quotes for this client
-                var result = await _supabase.from('quotes').select('id, data').eq('user_id', userId).ilike('client_name', clientName);
-                var quotes = result.data || [];
+                var selectedQuote = null;
+                if (quoteId) {
+                    var selectedResult = await _supabase.from('quotes').select('id, client_name, data').eq('id', quoteId).eq('user_id', userId).single();
+                    if (selectedResult.error) throw selectedResult.error;
+                    selectedQuote = selectedResult.data;
+                }
+
+                var selectedData = (selectedQuote && selectedQuote.data) || {};
+                var selectedEmail = savedEmail || selectedData.clientEmail || selectedData.email || selectedData.client_email || '';
+                var selectedName = clientName || (selectedQuote && selectedQuote.client_name) || selectedData.clientName || selectedData.client_name || '';
+                window._currentPortalClient = selectedName;
+                window._currentPortalClientEmail = selectedEmail;
+
+                // Look for existing PIN across related quotes for this client
+                var allResult = await _supabase.from('quotes').select('id, client_name, data').eq('user_id', userId);
+                var allClientQuotes = allResult.data || [];
+                var clientKeyEmail = normalizePortalDashboardValue(selectedEmail);
+                var clientKeyName = normalizePortalDashboardValue(selectedName);
+                var quotes = allClientQuotes.filter(function(q) {
+                    if (quoteId && q.id === quoteId) return true;
+                    var d = q.data || {};
+                    var qEmail = normalizePortalDashboardValue(d.clientEmail || d.email || d.client_email);
+                    var qName = normalizePortalDashboardValue(q.client_name || d.clientName || d.client_name);
+                    return (clientKeyEmail && qEmail === clientKeyEmail) || (clientKeyName && qName === clientKeyName);
+                });
+                if (selectedQuote && !quotes.some(function(q) { return q.id === selectedQuote.id; })) quotes.push(selectedQuote);
                 var pin = null;
 
                 for (var i = 0; i < quotes.length; i++) {
@@ -605,14 +630,17 @@
 
                 // Update modal with real data
                 // Get email from the first quote's data
-                var clientEmail = '';
+                var clientEmail = selectedEmail || '';
                 for (var i = 0; i < quotes.length; i++) {
                     if (quotes[i].data && (quotes[i].data.clientEmail || quotes[i].data.email || quotes[i].data.client_email)) {
                         clientEmail = quotes[i].data.clientEmail || quotes[i].data.email || quotes[i].data.client_email;
                         break;
                     }
                 }
-                var url = 'https://quotedr.io/client-portal.html?email=' + encodeURIComponent(clientEmail || clientName) + '&contractor=' + userId;
+                var url = 'https://quotedr.io/client-portal.html?'
+                    + (clientEmail ? 'email=' + encodeURIComponent(clientEmail) : 'client=' + encodeURIComponent(selectedName || clientName))
+                    + '&contractor=' + encodeURIComponent(userId)
+                    + (quoteId ? '&quote=' + encodeURIComponent(quoteId) : '');
                 document.getElementById('portalUrlDisplay').value = url;
                 document.getElementById('portalPinDisplay').textContent = pin;
 
@@ -640,12 +668,23 @@
 
         async function resetPortalPin() {
             var clientName = window._currentPortalClient;
+            var quoteId = window._currentPortalQuoteId || '';
+            var clientEmail = window._currentPortalClientEmail || '';
             if (!clientName) return;
             var session = await _supabase.auth.getSession();
             var userId = session.data?.session?.user?.id;
             if (!userId) return;
             var newPin = Math.floor(1000 + Math.random() * 9000).toString();
-            var { data: quotes } = await _supabase.from('quotes').select('id, data').eq('user_id', userId).ilike('client_name', clientName);
+            var { data: allQuotes } = await _supabase.from('quotes').select('id, client_name, data').eq('user_id', userId);
+            var emailKey = normalizePortalDashboardValue(clientEmail);
+            var nameKey = normalizePortalDashboardValue(clientName);
+            var quotes = (allQuotes || []).filter(function(q) {
+                if (quoteId && q.id === quoteId) return true;
+                var d = q.data || {};
+                var qEmail = normalizePortalDashboardValue(d.clientEmail || d.email || d.client_email);
+                var qName = normalizePortalDashboardValue(q.client_name || d.clientName || d.client_name);
+                return (emailKey && qEmail === emailKey) || (nameKey && qName === nameKey);
+            });
             if (quotes && quotes.length > 0) {
                 for (var q of quotes) {
                     var newData = Object.assign({}, q.data || {}, { portal_pin: newPin });
@@ -655,6 +694,10 @@
             document.getElementById('portalPinDisplay').textContent = newPin;
             var btn = event.target.closest('button');
             if (btn) { var orig = btn.innerHTML; btn.innerHTML = '<i class="fas fa-check me-1"></i>PIN Reset!'; setTimeout(function(){ btn.innerHTML = orig; }, 1500); }
+        }
+
+        function normalizePortalDashboardValue(value) {
+            return String(value || '').trim().toLowerCase();
         }
 
         async function sendFollowUpReminder(quoteId, clientName, savedEmail) {

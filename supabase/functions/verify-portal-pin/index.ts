@@ -16,9 +16,9 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { clientName, clientEmail, contractorId, pin } = await req.json();
+    const { clientName, clientEmail, contractorId, quoteId, pin } = await req.json();
 
-    if ((!clientName && !clientEmail) || !contractorId || !pin) {
+    if ((!clientName && !clientEmail && !quoteId) || !contractorId || !pin) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -32,13 +32,14 @@ Deno.serve(async (req) => {
 
     const normalizedEmail = normalize(clientEmail);
     const normalizedName = normalize(clientName);
+    const normalizedQuoteId = String(quoteId ?? '').trim();
     const enteredPin = String(pin ?? '').trim();
 
     // Fetch quotes for this contractor, then match the client server-side.
     // This keeps the stored PIN private while tolerating older quote payload keys.
     const query = supabase
       .from('quotes')
-      .select('client_name,data')
+      .select('id,client_name,data')
       .eq('user_id', contractorId);
 
     const { data: quotes, error } = await query;
@@ -53,6 +54,7 @@ Deno.serve(async (req) => {
       const quoteEmail = normalize(data.clientEmail || data.email || data.client_email);
       const quoteName = normalize(quote.client_name || data.clientName || data.client_name);
       return (
+        (normalizedQuoteId && quote.id === normalizedQuoteId) ||
         (normalizedEmail && quoteEmail && quoteEmail === normalizedEmail) ||
         (normalizedName && quoteName && quoteName === normalizedName) ||
         (normalizedEmail && quoteName && quoteName === normalizedEmail)
