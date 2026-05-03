@@ -1352,6 +1352,11 @@ Example:
                         <div class="text-muted small">Click to reuse or delete</div>
                     </div>
                     <div id="roomSavedColours"></div>
+                    <div class="form-check form-switch mt-3 pt-3 border-top">
+                        <input class="form-check-input" type="checkbox" role="switch" id="roomDefaultColorToggle">
+                        <label class="form-check-label fw-semibold" for="roomDefaultColorToggle">Use this colour as the default for new rooms</label>
+                        <div class="text-muted small">New rooms will start with this header colour until you choose a different default.</div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -2330,12 +2335,14 @@ Example:
             if (!name) return;
             _pushUndo();
             roomCounter++;
+            const defaultColour = roomDefaultColorFields((roomCounter - 1) % ROOM_COLORS.length);
             rooms.push({
                 id: roomCounter,
                 name: name,
                 items: [],
-                colorIndex: (roomCounter - 1) % ROOM_COLORS.length,
-                colorIntensity: 100
+                colorIndex: defaultColour.colorIndex,
+                customColor: defaultColour.customColor,
+                colorIntensity: defaultColour.colorIntensity
             });
 
             renderRooms();
@@ -2775,6 +2782,7 @@ Example:
         // Swatch fill colours (mid-point of each gradient for display)
         const SWATCH_COLORS = ['#2d2d2d','#1e3a5f','#1a5c38','#6b1a2a','#4a5568','#0652DD','#00796b','#6a1b9a','#b87333','#546e7a','#c0747a','#1a1a2e'];
         const ROOM_COLOR_PRESETS_KEY = 'quotedr_room_color_presets';
+        const ROOM_DEFAULT_COLOR_KEY = 'quotedr_default_room_color';
         let activeRoomColorModalId = null;
 
         function normalizeHexColor(value) {
@@ -2831,10 +2839,39 @@ Example:
             localStorage.setItem(ROOM_COLOR_PRESETS_KEY, JSON.stringify(presets.slice(0, 8)));
         }
 
+        function getDefaultRoomColor() {
+            try {
+                var saved = JSON.parse(localStorage.getItem(ROOM_DEFAULT_COLOR_KEY) || 'null');
+                return saved && saved.customColor ? { customColor: normalizeHexColor(saved.customColor) } : null;
+            } catch(e) {
+                return null;
+            }
+        }
+
+        function saveDefaultRoomColor(hex) {
+            localStorage.setItem(ROOM_DEFAULT_COLOR_KEY, JSON.stringify({ customColor: normalizeHexColor(hex), savedAt: new Date().toISOString() }));
+        }
+
+        function clearDefaultRoomColorIfMatches(hex) {
+            var saved = getDefaultRoomColor();
+            if (saved && saved.customColor === normalizeHexColor(hex)) {
+                localStorage.removeItem(ROOM_DEFAULT_COLOR_KEY);
+            }
+        }
+
+        function roomDefaultColorFields(fallbackIndex) {
+            var saved = getDefaultRoomColor();
+            if (saved) {
+                return { colorIndex: -1, customColor: saved.customColor, colorIntensity: 100 };
+            }
+            return { colorIndex: fallbackIndex, customColor: '', colorIntensity: 100 };
+        }
+
         function deleteRoomColorPreset(hex) {
             hex = normalizeHexColor(hex);
             var presets = getRoomColorPresets().filter(function(c) { return c.toLowerCase() !== hex; });
             localStorage.setItem(ROOM_COLOR_PRESETS_KEY, JSON.stringify(presets));
+            clearDefaultRoomColorIfMatches(hex);
             renderRoomColorPresetManager();
             renderRooms();
             markUnsaved();
@@ -2867,8 +2904,14 @@ Example:
             var current = normalizeHexColor(room.customColor || SWATCH_COLORS[colorIdx] || SWATCH_COLORS[0]);
             var input = document.getElementById('roomCustomColorModalInput');
             var preview = document.getElementById('roomCustomColorPreview');
+            var defaultToggle = document.getElementById('roomDefaultColorToggle');
+            var defaultColor = getDefaultRoomColor();
             if (input) input.value = current;
             if (preview) preview.style.background = current;
+            if (defaultToggle) {
+                defaultToggle.checked = !!(defaultColor && defaultColor.customColor === current);
+                defaultToggle.dataset.wasChecked = defaultToggle.checked ? 'true' : 'false';
+            }
             renderRoomColorPresetManager();
             var modalEl = document.getElementById('roomColorModal');
             var modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
@@ -2885,12 +2928,19 @@ Example:
             var input = document.getElementById('roomCustomColorModalInput');
             if (input) input.value = normalizeHexColor(color);
             updateRoomColorModalPreview(color);
+            var defaultToggle = document.getElementById('roomDefaultColorToggle');
+            var defaultColor = getDefaultRoomColor();
+            if (defaultToggle) defaultToggle.checked = !!(defaultColor && defaultColor.customColor === normalizeHexColor(color));
         }
 
         function applyRoomColorModal() {
             if (!activeRoomColorModalId) return;
             var input = document.getElementById('roomCustomColorModalInput');
-            setRoomCustomColor(activeRoomColorModalId, input ? input.value : '#2d2d2d');
+            var color = normalizeHexColor(input ? input.value : '#2d2d2d');
+            var defaultToggle = document.getElementById('roomDefaultColorToggle');
+            if (defaultToggle && defaultToggle.checked) saveDefaultRoomColor(color);
+            if (defaultToggle && !defaultToggle.checked && defaultToggle.dataset.wasChecked === 'true') localStorage.removeItem(ROOM_DEFAULT_COLOR_KEY);
+            setRoomCustomColor(activeRoomColorModalId, color);
             var modalEl = document.getElementById('roomColorModal');
             var modal = bootstrap.Modal.getInstance(modalEl);
             if (modal) modal.hide();
@@ -3833,7 +3883,8 @@ Example:
                 var roomName = prompt('Name this new room / area:', suggestedName);
                 if (!roomName) return;
                 roomCounter++;
-                room = { id: roomCounter, name: roomName.trim(), items: [], notes: '', photos: [], colorIndex: (roomCounter - 1) % ROOM_COLORS.length, colorIntensity: 100 };
+                var defaultColour = roomDefaultColorFields((roomCounter - 1) % ROOM_COLORS.length);
+                room = { id: roomCounter, name: roomName.trim(), items: [], notes: '', photos: [], colorIndex: defaultColour.colorIndex, customColor: defaultColour.customColor, colorIntensity: defaultColour.colorIntensity };
                 rooms.push(room);
             } else {
                 var roomId = parseInt(roomValue);
