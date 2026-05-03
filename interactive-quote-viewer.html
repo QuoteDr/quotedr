@@ -916,6 +916,9 @@ if (location.search.includes('debug')) {
             if (quoteData && quoteData.style) {
                 var accent = quoteData.style.accent || '#ffffff';
                 var bg = quoteData.style.bg || '#ffffff';
+                var bgOpacity = parseInt(quoteData.style.bgOpacity, 10);
+                if (!isFinite(bgOpacity)) bgOpacity = 100;
+                bgOpacity = Math.max(0, Math.min(bgOpacity, 100));
                 var headerStyle = quoteData.style.headerStyle || 'branded';
                 var headerOpacity = parseInt(quoteData.style.headerOpacity || 100, 10);
                 if (!isFinite(headerOpacity)) headerOpacity = 100;
@@ -932,7 +935,7 @@ if (location.search.includes('debug')) {
                       '.card-header.bg-light h6, .card-header.bg-light i { color: white !important; }'
                     : '';
                 styleTag.textContent = ':root { --quote-accent: ' + (accent === '#ffffff' ? '#1a56a0' : accent) + '; }' +
-                    'body { background: ' + bg + ' !important; }' +
+                    'body { background: ' + blendColorWithWhite(bg, bgOpacity) + ' !important; }' +
                     '.quote-header { background: ' + headerBg + ' !important; color: ' + headerColor + ' !important; }' +
                     '.quote-header .brand-lockup h1, .quote-header .brand-lockup h2, .quote-header .brand-lockup p { color: ' + headerColor + ' !important; }' +
                     '.quote-header .hero-total-panel, .quote-header .hero-total-panel div, .quote-header .proposal-detail, .quote-header .proposal-detail div { color: #102033 !important; }' +
@@ -1030,6 +1033,18 @@ if (location.search.includes('debug')) {
             if (!rgb) return hex || '#1a56a0';
             var alpha = Math.max(20, Math.min(parseInt(opacityPercent || 100, 10), 100)) / 100;
             return 'rgba(' + rgb.r + ', ' + rgb.g + ', ' + rgb.b + ', ' + alpha.toFixed(2) + ')';
+        }
+
+        function blendColorWithWhite(hex, opacityPercent) {
+            var rgb = hexToRgb(hex);
+            if (!rgb) return hex || '#ffffff';
+            var value = parseInt(opacityPercent, 10);
+            if (!isFinite(value)) value = 100;
+            var alpha = Math.max(0, Math.min(value, 100)) / 100;
+            var r = Math.round(255 + (rgb.r - 255) * alpha);
+            var g = Math.round(255 + (rgb.g - 255) * alpha);
+            var b = Math.round(255 + (rgb.b - 255) * alpha);
+            return 'rgb(' + r + ', ' + g + ', ' + b + ')';
         }
 
         function renderExpandableDescription(text, id) {

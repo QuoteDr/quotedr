@@ -8,6 +8,7 @@
             preset: 'clean-blue',
             accent: '#1a56a0',
             bg: '#f7fbff',
+            bgOpacity: 100,
             headerStyle: 'branded',
             headerOpacity: 100,
             fontFeel: 'clean',
@@ -198,6 +199,9 @@
             style.headerOpacity = parseInt(document.getElementById('quoteHeaderOpacity')?.value || style.headerOpacity || 100, 10);
             if (!isFinite(style.headerOpacity)) style.headerOpacity = 100;
             style.headerOpacity = Math.max(20, Math.min(style.headerOpacity, 100));
+            style.bgOpacity = parseInt(document.getElementById('quoteBgOpacity')?.value || style.bgOpacity || 100, 10);
+            if (!isFinite(style.bgOpacity)) style.bgOpacity = 100;
+            style.bgOpacity = Math.max(0, Math.min(style.bgOpacity, 100));
             style.fontFeel = document.getElementById('quoteFontFeel')?.value || style.fontFeel;
             style.pricingMode = document.getElementById('quotePricingMode')?.value || style.pricingMode;
             style.depositMode = document.getElementById('quoteDepositMode')?.value || style.depositMode;
@@ -229,10 +233,13 @@
         function applyQuoteStyleToControls(style) {
             _quoteStyle = Object.assign({}, _quoteStyle, style || {});
             if (!isFinite(parseInt(_quoteStyle.headerOpacity, 10))) _quoteStyle.headerOpacity = 100;
+            if (!isFinite(parseInt(_quoteStyle.bgOpacity, 10))) _quoteStyle.bgOpacity = 100;
             syncQuoteStyleGlobal();
             setFieldValue('quoteHeaderStyle', _quoteStyle.headerStyle);
             setFieldValue('quoteHeaderOpacity', _quoteStyle.headerOpacity);
             updateHeaderOpacityLabel(_quoteStyle.headerOpacity);
+            setFieldValue('quoteBgOpacity', _quoteStyle.bgOpacity);
+            updateBgOpacityLabel(_quoteStyle.bgOpacity);
             setFieldValue('quoteFontFeel', _quoteStyle.fontFeel);
             setFieldValue('quotePricingMode', _quoteStyle.pricingMode);
             setFieldValue('quoteDepositMode', _quoteStyle.depositMode);
@@ -284,8 +291,13 @@
             var accent = _quoteStyle.accent || '#1a56a0';
             var headerOpacity = Math.max(20, Math.min(parseInt(_quoteStyle.headerOpacity || 100, 10), 100));
             updateHeaderOpacityLabel(headerOpacity);
+            var bgOpacity = parseInt(_quoteStyle.bgOpacity, 10);
+            if (!isFinite(bgOpacity)) bgOpacity = 100;
+            bgOpacity = Math.max(0, Math.min(bgOpacity, 100));
+            updateBgOpacityLabel(bgOpacity);
+            var previewBg = blendColorWithWhite(_quoteStyle.bg || '#ffffff', bgOpacity);
             var isLight = _quoteStyle.headerStyle === 'light' || accent === '#ffffff' || headerOpacity < 55;
-            if (prev) prev.style.background = _quoteStyle.bg || '#fff';
+            if (prev) prev.style.background = previewBg;
             if (hdr) {
                 var headerBg = _quoteStyle.headerStyle === 'dark'
                     ? colorWithOpacity('#172033', headerOpacity)
@@ -328,9 +340,28 @@
             return 'rgba(' + rgb.r + ', ' + rgb.g + ', ' + rgb.b + ', ' + alpha.toFixed(2) + ')';
         }
 
+        function blendColorWithWhite(hex, opacityPercent) {
+            var rgb = hexToRgb(hex);
+            if (!rgb) return hex || '#ffffff';
+            var value = parseInt(opacityPercent, 10);
+            if (!isFinite(value)) value = 100;
+            var alpha = Math.max(0, Math.min(value, 100)) / 100;
+            var r = Math.round(255 + (rgb.r - 255) * alpha);
+            var g = Math.round(255 + (rgb.g - 255) * alpha);
+            var b = Math.round(255 + (rgb.b - 255) * alpha);
+            return 'rgb(' + r + ', ' + g + ', ' + b + ')';
+        }
+
         function updateHeaderOpacityLabel(value) {
             var label = document.getElementById('quoteHeaderOpacityValue');
             if (label) label.textContent = Math.max(20, Math.min(parseInt(value || 100, 10), 100)) + '%';
+        }
+
+        function updateBgOpacityLabel(value) {
+            var label = document.getElementById('quoteBgOpacityValue');
+            var parsed = parseInt(value, 10);
+            if (!isFinite(parsed)) parsed = 100;
+            if (label) label.textContent = Math.max(0, Math.min(parsed, 100)) + '%';
         }
 
         function safeCommitmentIcon(icon) {
@@ -510,7 +541,7 @@
                     applyQuoteStyleToControls(_quoteStyle);
                 };
             });
-            ['quoteHeaderStyle','quoteHeaderOpacity','quoteFontFeel','quotePricingMode','quoteDepositMode','quoteDepositPercent','quoteApprovalMode','quoteExpiryDate','quoteShowUpgrades','quoteShowScopeNotes','quoteShowCommitment','commitmentTitleInput','commitmentIcon1','commitmentImage1','commitmentLabel1','commitmentText1','commitmentIcon2','commitmentImage2','commitmentLabel2','commitmentText2','commitmentIcon3','commitmentImage3','commitmentLabel3','commitmentText3','commitmentIcon4','commitmentImage4','commitmentLabel4','commitmentText4','quoteClientMessage'].forEach(function(id) {
+            ['quoteHeaderStyle','quoteHeaderOpacity','quoteBgOpacity','quoteFontFeel','quotePricingMode','quoteDepositMode','quoteDepositPercent','quoteApprovalMode','quoteExpiryDate','quoteShowUpgrades','quoteShowScopeNotes','quoteShowCommitment','commitmentTitleInput','commitmentIcon1','commitmentImage1','commitmentLabel1','commitmentText1','commitmentIcon2','commitmentImage2','commitmentLabel2','commitmentText2','commitmentIcon3','commitmentImage3','commitmentLabel3','commitmentText3','commitmentIcon4','commitmentImage4','commitmentLabel4','commitmentText4','quoteClientMessage'].forEach(function(id) {
                 var el = document.getElementById(id);
                 if (el && !el.dataset.styleBound) {
                     el.addEventListener('input', updateStylePreview);

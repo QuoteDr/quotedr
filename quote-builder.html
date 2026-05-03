@@ -4881,7 +4881,7 @@ Example:
     <script src="quote-clients.js?v=1777660402"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
     <script src="ikea-quote.js?v=1777304471"></script>
-    <script src="quote-style.js?v=1777740601"></script>
+    <script src="quote-style.js?v=1777841201"></script>
 
     <!-- Quote Style Modal -->
     <div class="modal fade" id="quoteStyleModal" tabindex="-1">
@@ -4936,6 +4936,14 @@ Example:
                                         <div class="style-swatch bg-swatch" data-bg="#fff1f2" style="background:#fff1f2;" title="Blush"></div>
                                         <div class="style-swatch bg-swatch" data-bg="#f8fafc" style="background:#f8fafc;" title="Slate"></div>
                                     </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <label class="form-label fw-bold mb-0" for="quoteBgOpacity">Background Colour Strength</label>
+                                        <span id="quoteBgOpacityValue" class="text-muted small fw-semibold">100%</span>
+                                    </div>
+                                    <input type="range" id="quoteBgOpacity" class="form-range mt-2" min="0" max="100" step="5" value="100">
+                                    <div class="text-muted small">Lower keeps the background closer to white; higher shows more of the selected tint.</div>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold">Header Style</label>
