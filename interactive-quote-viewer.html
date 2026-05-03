@@ -47,17 +47,18 @@
         .proposal-logo-row {
             display: flex;
             align-items: center;
-            margin-bottom: 22px;
-            padding-bottom: 18px;
+            justify-content: center;
+            padding: 28px 28px 0;
             border-bottom: 1px solid rgba(219,228,239,0.9);
         }
-        .brand-lockup img {
-            width: clamp(190px, 28vw, 360px);
+        .proposal-logo-row img {
+            width: clamp(230px, 34vw, 430px);
             max-width: 100%;
-            max-height: 150px;
+            max-height: 176px;
             height: auto;
             object-fit: contain;
             display: block;
+            margin-bottom: 20px;
         }
         .proposal-eyebrow {
             display: inline-flex;
@@ -541,25 +542,32 @@
             }
             .proposal-hero-inner {
                 grid-template-columns: 1fr;
-                gap: 16px;
-                padding: 16px;
+                gap: 14px;
+                padding: 14px 16px 16px;
             }
             .proposal-logo-row {
-                justify-content: center;
-                margin-bottom: 18px;
-                padding-bottom: 14px;
+                padding: 14px 16px 0;
             }
-            .brand-lockup img {
-                width: min(260px, 78vw);
-                max-height: 128px;
+            .proposal-logo-row img {
+                width: min(285px, 82vw);
+                max-height: 132px;
+                margin-bottom: 12px;
             }
             .proposal-title {
-                font-size: 1.85rem;
+                font-size: 1.78rem;
+                margin-bottom: 8px;
+            }
+            .proposal-subtitle {
+                font-size: 0.95rem;
+                line-height: 1.42;
             }
             .proposal-detail-grid {
                 grid-template-columns: 1fr;
                 gap: 8px;
-                margin-top: 16px;
+                margin-top: 14px;
+            }
+            .proposal-detail {
+                padding: 10px 12px;
             }
             .hero-total-panel {
                 padding: 16px;
@@ -605,12 +613,12 @@ if (location.search.includes('debug')) {
     <div class="proposal-shell">
         <!-- Header -->
         <section class="proposal-hero quote-header">
+            <div class="proposal-logo-row">
+                <img id="businessLogoImg" src="quotedr-logo.svg" alt="Company Logo">
+            </div>
             <div class="proposal-hero-inner">
                 <div>
                     <div class="brand-lockup">
-                        <div class="proposal-logo-row">
-                            <img id="businessLogoImg" src="quotedr-logo.svg" alt="Company Logo">
-                        </div>
                         <div>
                             <div class="proposal-eyebrow"><i class="fas fa-file-signature"></i> Client Proposal</div>
                             <h1 class="proposal-title" id="quoteHeadingDisplay">Your Quote</h1>
