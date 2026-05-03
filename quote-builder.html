@@ -1019,6 +1019,9 @@ if (location.search.includes('debug')) {
                         <button class="btn btn-outline-secondary btn-sm" onclick="setDrawMode('polyline')" id="btnDrawLine"><i class="fas fa-ruler me-1"></i>Linear Measure</button>
                         <button class="btn btn-outline-danger btn-sm" onclick="undoLastPoint()" id="btnUndoPoint" disabled title="Undo last point"><i class="fas fa-undo me-1"></i>Undo</button>
                         <button class="btn btn-outline-danger btn-sm" onclick="clearMapShapes()"><i class="fas fa-trash me-1"></i>Clear</button>
+                        <button class="btn btn-outline-primary btn-sm ms-auto" onclick="if(window.QuoteDrModalHelp){QuoteDrModalHelp.open('measureMapModal');} return false;" title="How to use Satellite Measure">
+                            <i class="fas fa-circle-question me-1"></i>How it works
+                        </button>
                     </div>
                     <div id="measureMapContainer" style="flex:1;min-height:0;"></div>
                     <div class="p-3 bg-light border-top" style="max-height:230px;overflow-y:auto;">

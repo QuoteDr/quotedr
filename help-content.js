@@ -150,14 +150,19 @@
             title: 'Measure from Satellite Map',
             summary: 'Use the map to measure outdoor areas, lengths, roofs, fences, driveways, and similar work.',
             steps: [
-                'Search the project address.',
-                'Choose area or linear measure and draw on the map.',
-                'Pick how the measurement should become a quote quantity.',
-                'Choose a target room and item, then add the measurements to the quote.'
+                'Search the project address so the map opens on the job site.',
+                'Choose a trade preset if one fits the job, such as roofing, siding, deck, fence, driveway, or landscaping.',
+                'Pick Area Measure for surfaces like roofs, patios, sod, or driveways. Pick Linear Measure for fences, edging, trenching, or runs.',
+                'Click around the map to draw the shape or line. Use Undo for the last point or Clear to start over.',
+                'Click a measurement in the list if you need to edit its item, pitch, waste, openings, gates, or quantity settings.',
+                'Choose the target room, item name, rate, and quantity mode at the bottom.',
+                'Click Add to Quote when the measurement and pricing look right.'
             ],
             tips: [
                 'Use trade presets to quickly switch quantity behaviour.',
-                'Rename shapes so the resulting line items are easy to understand.'
+                'Rename measurements so the resulting line items are easy to understand.',
+                'Roof pitch, waste, openings, and gates can change the final quote quantity, so review them before adding.',
+                'Satellite measurements are excellent for estimating, but confirm critical dimensions on site when accuracy matters.'
             ],
             helpUrl: 'help.html#measurement-tools'
         },
