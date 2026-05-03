@@ -171,6 +171,20 @@ Deno.serve(async (req) => {
         });
         break;
       }
+      case "invoice.payment_succeeded": {
+        const invoice = event.data.object;
+        const userId = invoice.subscription_details?.metadata?.userId || invoice.metadata?.userId;
+        if (!userId) break;
+        await saveSubscriptionStatus(supabase, userId, {
+          status: "active",
+          plan: invoice.subscription_details?.metadata?.plan || invoice.metadata?.plan || "pro",
+          stripe_customer_id: invoice.customer,
+          stripe_subscription_id: invoice.subscription || null,
+          last_invoice_id: invoice.id,
+          last_invoice_paid_at: new Date().toISOString(),
+        });
+        break;
+      }
     }
 
     return json({ received: true });
