@@ -20,6 +20,7 @@
         var _fpCanvas = null;
         var _fpCtx = null;
         var _fpPlanImg = null;
+        var _fpCanvasPixelRatio = 1;
         var _fpCanvasReady = false;
         var _fpMouseDown = false;
         var _fpShapeCounter = 1;
@@ -271,7 +272,7 @@
                 '<input type="file" id="fpFileInput" accept="image/*,application/pdf" style="display:none" onchange="_fpHandleFile(this.files[0])">' +
                 '</div>' +
                 '<div id="fpPreviewArea" style="display:none;" class="mt-3 text-center">' +
-                '<img id="fpPreviewImg" style="max-width:100%;max-height:280px;border-radius:8px;border:1px solid #dee2e6;" alt="Floor plan preview">' +
+                '<img id="fpPreviewImg" style="max-width:100%;max-height:min(68vh,760px);width:auto;height:auto;object-fit:contain;border-radius:8px;border:1px solid #dee2e6;" alt="Floor plan preview">' +
                 '<div class="mt-2 text-success small" id="fpPreviewLabel"></div>' +
                 '<div id="fpPagePicker" style="display:none;" class="mt-2 d-flex align-items-center justify-content-center gap-2">' +
                 '<button class="btn btn-outline-secondary btn-sm" onclick="_fpChangePage(-1)"><i class="fas fa-chevron-left"></i></button>' +
@@ -335,11 +336,15 @@
         async function _fpRenderPdfPage(pageNum) {
             if (!_fpPdfDoc) return;
             var page = await _fpPdfDoc.getPage(pageNum);
-            var viewport = page.getViewport({ scale: 2.0 });
+            var baseViewport = page.getViewport({ scale: 1 });
+            var desiredScale = Math.min(4, Math.max(2.5, (window.devicePixelRatio || 1) * 2));
+            var maxRenderSide = 4096;
+            var renderScale = Math.max(1.5, Math.min(desiredScale, maxRenderSide / Math.max(baseViewport.width, baseViewport.height)));
+            var viewport = page.getViewport({ scale: renderScale });
             var canvas = document.createElement('canvas');
             canvas.width = viewport.width; canvas.height = viewport.height;
             await page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise;
-            _fpImageUrl = canvas.toDataURL('image/jpeg', 0.92);
+            _fpImageUrl = canvas.toDataURL('image/jpeg', 0.96);
             _fpImageBase64 = _fpImageUrl.split(',')[1]; _fpMimeType = 'image/jpeg';
             var imgEl = document.getElementById('fpPreviewImg');
             var labelEl = document.getElementById('fpPreviewLabel');
@@ -409,7 +414,7 @@
                 '</div>' +
                 '<div class="small text-muted mb-1" id="fpToolHelp">' + _fpToolLabel() + '</div>' +
                 '<div style="flex:1;overflow:auto;border:1px solid #ced4da;border-radius:8px;background:#f8f9fa;">' +
-                '<canvas id="fpMeasureCanvas" style="display:block;max-width:100%;cursor:crosshair;"></canvas>' +
+                '<canvas id="fpMeasureCanvas" style="display:block;max-width:none;cursor:crosshair;"></canvas>' +
                 '</div>' +
                 '</div>' +
                 '<div class="col-lg-4 d-flex flex-column">' +
@@ -534,10 +539,17 @@
             _fpCtx = _fpCanvas.getContext('2d');
             _fpPlanImg = new Image();
             _fpPlanImg.onload = function() {
-                var maxW = Math.min(1200, Math.max(720, (_fpCanvas.parentElement ? _fpCanvas.parentElement.clientWidth : 900) - 4));
-                var scale = Math.min(1, maxW / _fpPlanImg.naturalWidth);
-                _fpCanvas.width = Math.max(1, Math.round(_fpPlanImg.naturalWidth * scale));
-                _fpCanvas.height = Math.max(1, Math.round(_fpPlanImg.naturalHeight * scale));
+                var parentW = (_fpCanvas.parentElement ? _fpCanvas.parentElement.clientWidth : 900) - 4;
+                var maxDisplayW = Math.min(1600, Math.max(860, parentW));
+                var displayScale = Math.min(1, maxDisplayW / _fpPlanImg.naturalWidth);
+                var displayW = Math.max(1, Math.round(_fpPlanImg.naturalWidth * displayScale));
+                var displayH = Math.max(1, Math.round(_fpPlanImg.naturalHeight * displayScale));
+                var pixelRatio = Math.min(3, Math.max(1, window.devicePixelRatio || 1));
+                _fpCanvasPixelRatio = pixelRatio;
+                _fpCanvas.style.width = displayW + 'px';
+                _fpCanvas.style.height = displayH + 'px';
+                _fpCanvas.width = Math.max(1, Math.round(displayW * pixelRatio));
+                _fpCanvas.height = Math.max(1, Math.round(displayH * pixelRatio));
                 _fpCanvasReady = true;
                 _fpAttachCanvasEvents();
                 _fpDrawCanvas();
@@ -724,15 +736,16 @@
 
         function _fpDrawLine(a, b, color, width, label) {
             _fpCtx.save();
+            var pr = _fpCanvasPixelRatio || 1;
             _fpCtx.strokeStyle = color;
-            _fpCtx.lineWidth = width || 2;
+            _fpCtx.lineWidth = (width || 2) * pr;
             _fpCtx.beginPath();
             _fpCtx.moveTo(a.x, a.y);
             _fpCtx.lineTo(b.x, b.y);
             _fpCtx.stroke();
             _fpCtx.fillStyle = color;
-            _fpCtx.beginPath(); _fpCtx.arc(a.x, a.y, 4, 0, Math.PI * 2); _fpCtx.fill();
-            _fpCtx.beginPath(); _fpCtx.arc(b.x, b.y, 4, 0, Math.PI * 2); _fpCtx.fill();
+            _fpCtx.beginPath(); _fpCtx.arc(a.x, a.y, 4 * pr, 0, Math.PI * 2); _fpCtx.fill();
+            _fpCtx.beginPath(); _fpCtx.arc(b.x, b.y, 4 * pr, 0, Math.PI * 2); _fpCtx.fill();
             if (label) _fpDrawLabel((a.x + b.x) / 2, (a.y + b.y) / 2, label);
             _fpCtx.restore();
         }
@@ -740,30 +753,32 @@
         function _fpDrawPolygon(points, color, draft) {
             if (!points.length) return;
             _fpCtx.save();
+            var pr = _fpCanvasPixelRatio || 1;
             _fpCtx.strokeStyle = color;
             _fpCtx.fillStyle = draft ? 'rgba(13,110,253,0.12)' : 'rgba(13,110,253,0.18)';
-            _fpCtx.lineWidth = 3;
+            _fpCtx.lineWidth = 3 * pr;
             _fpCtx.beginPath();
             _fpCtx.moveTo(points[0].x, points[0].y);
             for (var i = 1; i < points.length; i++) _fpCtx.lineTo(points[i].x, points[i].y);
             if (!draft && points.length > 2) _fpCtx.closePath();
             _fpCtx.fill();
             _fpCtx.stroke();
-            points.forEach(function(p) { _fpCtx.beginPath(); _fpCtx.arc(p.x, p.y, 4, 0, Math.PI * 2); _fpCtx.fillStyle = color; _fpCtx.fill(); });
+            points.forEach(function(p) { _fpCtx.beginPath(); _fpCtx.arc(p.x, p.y, 4 * pr, 0, Math.PI * 2); _fpCtx.fillStyle = color; _fpCtx.fill(); });
             _fpCtx.restore();
         }
 
         function _fpDrawLabel(x, y, text) {
             _fpCtx.save();
-            _fpCtx.font = '12px Arial';
-            var pad = 5;
+            var pr = _fpCanvasPixelRatio || 1;
+            _fpCtx.font = (12 * pr) + 'px Arial';
+            var pad = 5 * pr;
             var w = _fpCtx.measureText(text).width + pad * 2;
             _fpCtx.fillStyle = 'rgba(255,255,255,0.92)';
-            _fpCtx.fillRect(x - w / 2, y - 12, w, 22);
+            _fpCtx.fillRect(x - w / 2, y - 12 * pr, w, 22 * pr);
             _fpCtx.strokeStyle = 'rgba(0,0,0,0.18)';
-            _fpCtx.strokeRect(x - w / 2, y - 12, w, 22);
+            _fpCtx.strokeRect(x - w / 2, y - 12 * pr, w, 22 * pr);
             _fpCtx.fillStyle = '#111827';
-            _fpCtx.fillText(text, x - w / 2 + pad, y + 3);
+            _fpCtx.fillText(text, x - w / 2 + pad, y + 3 * pr);
             _fpCtx.restore();
         }
 
