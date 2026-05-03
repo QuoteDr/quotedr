@@ -1380,6 +1380,29 @@ Example:
         let rooms = [];
         let roomCounter = 0;
 
+        function ensureUniqueRoomIds() {
+            if (!Array.isArray(rooms)) return;
+            const used = new Set();
+            let nextId = Number(roomCounter) || 0;
+            rooms.forEach(function(room) {
+                const numericId = Number(room && room.id);
+                if (Number.isFinite(numericId) && numericId > nextId) nextId = numericId;
+            });
+            rooms.forEach(function(room) {
+                const numericId = Number(room && room.id);
+                const key = Number.isFinite(numericId) ? String(numericId) : '';
+                if (!key || used.has(key)) {
+                    nextId += 1;
+                    room.id = nextId;
+                    used.add(String(nextId));
+                } else {
+                    room.id = numericId;
+                    used.add(key);
+                }
+            });
+            roomCounter = Math.max(Number(roomCounter) || 0, nextId);
+        }
+
         // -- Undo system ----------------------------------------------------------
         const _undoStack = [];
         const _UNDO_LIMIT = 50;
@@ -2529,7 +2552,19 @@ Example:
             calculateTotals();
         }
 
-        async function deleteRoom(roomId) {
+        async function deleteRoom(roomId, triggerEl) {
+            let roomIndex = -1;
+            if (triggerEl && triggerEl.closest) {
+                const card = triggerEl.closest('.room-card');
+                if (card && card.parentNode) {
+                    roomIndex = Array.prototype.indexOf.call(card.parentNode.querySelectorAll('.room-card'), card);
+                }
+            }
+            if (roomIndex < 0) {
+                roomIndex = rooms.findIndex(function(room) { return String(room.id) === String(roomId); });
+            }
+            if (roomIndex < 0 || !rooms[roomIndex]) return;
+
             if (!await qdConfirm('Delete this room? All items in it will be lost.', {
                 title: 'Delete Room',
                 okText: 'Delete',
@@ -2537,7 +2572,7 @@ Example:
                 type: 'danger'
             })) return;
             _pushUndo();
-            rooms = rooms.filter(r => r.id !== roomId);
+            rooms.splice(roomIndex, 1);
             renderRooms();
         }
 
@@ -3266,6 +3301,7 @@ Example:
 
         function renderRooms() {
             const container = document.getElementById('roomsContainer');
+            ensureUniqueRoomIds();
 
             if (rooms.length === 0) {
                 container.innerHTML = `
@@ -3327,7 +3363,7 @@ Example:
                 html += '</div>';
                 html += '<button onclick="addLine(' + room.id + ')" class="btn btn-sm btn-light text-dark mt-1">';
                 html += '<i class="fas fa-plus"></i> Add Item</button>';
-                html += '<button onclick="deleteRoom(' + room.id + ')" class="btn btn-sm btn-danger mt-1">';
+                html += '<button onclick="deleteRoom(' + room.id + ', this)" class="btn btn-sm btn-danger mt-1">';
                 html += '<i class="fas fa-trash"></i> Delete Room</button>';
                 html += '<button onclick="saveRoomAsTemplate(' + room.id + ')" class="btn btn-sm btn-info text-white ms-1" title="Save this room as a template">';
                 html += '<i class="fas fa-bookmark"></i></button>';
