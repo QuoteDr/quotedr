@@ -2742,7 +2742,8 @@ Example:
                             mapTypeIds: ['satellite', 'hybrid', 'roadmap']
                         },
                         zoomControl: true,
-                        gestureHandling: 'greedy'
+                        gestureHandling: 'greedy',
+                        disableDoubleClickZoom: true
                     });
                     // Force vector rendering after map init for sharper imagery
                     google.maps.importLibrary('maps').then(function() {
@@ -2753,9 +2754,7 @@ Example:
                     // Manual click-to-draw (no DrawingManager - gives full undo/preview control)
                     _map.addListener('click', function(event) {
                         if (!_drawingMode) return;
-                        _activePath.push(event.latLng);
-                        redrawPreview(null);
-                        document.getElementById('btnUndoPoint').disabled = false;
+                        addMapMeasurePoint(event.latLng);
                     });
                     _map.addListener('mousemove', function(event) {
                         if (!_drawingMode || _activePath.length === 0) return;
@@ -2857,7 +2856,14 @@ Example:
             document.getElementById('btnDrawLine').className = 'btn btn-sm btn-outline-secondary';
             document.getElementById('btnDrawLine').innerHTML = '<i class="fas fa-ruler me-1"></i>Linear Measure';
             document.getElementById('btnUndoPoint').disabled = true;
-            _map.setOptions({ draggableCursor: null });
+            if (_map) _map.setOptions({ draggableCursor: null, draggingCursor: null });
+        }
+
+        function addMapMeasurePoint(latLng) {
+            if (!_drawingMode || !latLng) return;
+            _activePath.push(latLng);
+            redrawPreview(null);
+            document.getElementById('btnUndoPoint').disabled = false;
         }
 
         function redrawPreview(cursorLatLng) {
@@ -2868,7 +2874,7 @@ Example:
                 _previewPath = new google.maps.Polyline({
                     path: pathPoints,
                     strokeColor: _drawingMode === 'polygon' ? '#0055ff' : '#ff6600',
-                    strokeWeight: 2, strokeOpacity: 0.9, map: _map
+                    strokeWeight: 2, strokeOpacity: 0.9, clickable: false, map: _map
                 });
             } else { _previewPath.setPath(pathPoints); }
 
@@ -2881,6 +2887,7 @@ Example:
                         strokeColor: _drawingMode === 'polygon' ? '#0055ff' : '#ff6600',
                         strokeWeight: 1, strokeOpacity: 0.5,
                         icons: [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 2 }, offset: '0', repeat: '8px' }],
+                        clickable: false,
                         map: _map
                     });
                 } else { _previewLine.setPath(rubberPoints); }
@@ -2936,7 +2943,7 @@ Example:
                     stopDrawing();
                     _drawingMode = 'polyline';
                     _linearActive = true;
-                    _map.setOptions({ draggableCursor: 'crosshair' });
+                    _map.setOptions({ draggableCursor: 'crosshair', draggingCursor: 'crosshair' });
                     document.getElementById('btnDrawLine').className = 'btn btn-sm btn-primary';
                     document.getElementById('btnDrawLine').innerHTML = '<i class="fas fa-stop-circle me-1"></i>Stop Measuring';
                     document.getElementById('btnDrawPolygon').className = 'btn btn-sm btn-outline-secondary';
@@ -2947,7 +2954,7 @@ Example:
                 } else {
                     stopDrawing();
                     _drawingMode = 'polygon';
-                    _map.setOptions({ draggableCursor: 'crosshair' });
+                    _map.setOptions({ draggableCursor: 'crosshair', draggingCursor: 'crosshair' });
                     document.getElementById('btnDrawPolygon').className = 'btn btn-sm btn-primary';
                     document.getElementById('btnDrawPolygon').innerHTML = '<i class="fas fa-stop-circle me-1"></i>Stop Measuring';
                     document.getElementById('btnDrawLine').className = 'btn btn-sm btn-outline-secondary';
