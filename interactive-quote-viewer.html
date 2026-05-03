@@ -560,6 +560,10 @@
             right: 10px;
             z-index: 1045;
             display: none;
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(-8px);
+            transition: opacity 0.18s ease, transform 0.18s ease;
         }
         .mobile-jump-control .btn {
             border-radius: 999px;
@@ -618,6 +622,11 @@
             }
             .mobile-jump-control {
                 display: block;
+            }
+            .mobile-jump-control.visible {
+                opacity: 1;
+                pointer-events: auto;
+                transform: translateY(0);
             }
             .quote-header-summary { padding-right: 0; text-align: left !important; margin-top: 1rem; }
             .client-section-title {
@@ -1035,6 +1044,7 @@ if (location.search.includes('debug')) {
             displayTerms();
             updateTotal();
             showPaymentReturnNotice();
+            setupMobileJumpVisibility();
         });
 
         function showPaymentReturnNotice() {
@@ -1203,6 +1213,19 @@ if (location.search.includes('debug')) {
 
         function jumpToBottom() {
             window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
+        }
+
+        function setupMobileJumpVisibility() {
+            var jump = document.querySelector('.mobile-jump-control');
+            if (!jump || jump.dataset.scrollBound) return;
+            jump.dataset.scrollBound = '1';
+            var update = function() {
+                var threshold = Math.max(520, Math.round(window.innerHeight * 0.7));
+                jump.classList.toggle('visible', window.scrollY > threshold);
+            };
+            window.addEventListener('scroll', update, { passive: true });
+            window.addEventListener('resize', update);
+            update();
         }
 
         function toggleViewerDescription(id, btn) {
