@@ -755,10 +755,77 @@ async function hasFeature(feature) {
 
 function showUpgradePrompt(featureName) {
     var label = featureName || 'This feature';
-    var msg = label + ' is included with QuoteDr Pro.';
-    if (window.confirm(msg + '\n\nView plans now?')) {
-        window.location.href = 'pricing.html?feature=' + encodeURIComponent(label);
+    var msg = label + ' is included with QuoteDr Pro. Upgrade to unlock this tool.';
+    var pricingUrl = 'pricing.html?feature=' + encodeURIComponent(label);
+
+    if (typeof window.qdConfirm === 'function') {
+        window.qdConfirm(msg, {
+            title: 'Upgrade Required',
+            okText: 'View Plans',
+            cancelText: 'Not now',
+            okClass: 'btn-primary',
+            type: 'warning'
+        }).then(function(confirmed) {
+            if (confirmed) window.location.href = pricingUrl;
+        });
+        return;
     }
+
+    showUpgradePromptFallback(label, msg, pricingUrl);
+}
+
+function showUpgradePromptFallback(label, msg, pricingUrl) {
+    var existing = document.getElementById('quotedrUpgradePromptModal');
+    if (existing) existing.remove();
+
+    var modal = document.createElement('div');
+    modal.id = 'quotedrUpgradePromptModal';
+    modal.className = 'modal fade';
+    modal.tabIndex = -1;
+    modal.setAttribute('aria-labelledby', 'quotedrUpgradePromptTitle');
+    modal.setAttribute('aria-hidden', 'true');
+    modal.innerHTML = '' +
+        '<div class="modal-dialog modal-dialog-centered">' +
+            '<div class="modal-content" style="border-radius:16px;border:0;box-shadow:0 18px 45px rgba(15,23,42,.2);">' +
+                '<div class="modal-header">' +
+                    '<h5 class="modal-title d-flex align-items-center gap-2" id="quotedrUpgradePromptTitle">' +
+                        '<span style="width:32px;height:32px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:#fff7ed;color:#f27a1a;"><i class="fas fa-exclamation"></i></span>' +
+                        '<span>Upgrade Required</span>' +
+                    '</h5>' +
+                    '<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>' +
+                '</div>' +
+                '<div class="modal-body"><p class="mb-0"></p></div>' +
+                '<div class="modal-footer">' +
+                    '<button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Not now</button>' +
+                    '<button type="button" class="btn btn-primary" id="quotedrUpgradePromptPlans">View Plans</button>' +
+                '</div>' +
+            '</div>' +
+        '</div>';
+
+    modal.querySelector('.modal-body p').textContent = msg;
+    modal.querySelector('#quotedrUpgradePromptPlans').addEventListener('click', function() {
+        window.location.href = pricingUrl;
+    });
+    document.body.appendChild(modal);
+
+    if (window.bootstrap && window.bootstrap.Modal) {
+        window.bootstrap.Modal.getOrCreateInstance(modal).show();
+        modal.addEventListener('hidden.bs.modal', function() {
+            modal.remove();
+        }, { once: true });
+        return;
+    }
+
+    modal.classList.add('show');
+    modal.style.display = 'block';
+    modal.style.background = 'rgba(15,23,42,.45)';
+    modal.removeAttribute('aria-hidden');
+    var closeButtons = modal.querySelectorAll('[data-bs-dismiss="modal"], .btn-close');
+    closeButtons.forEach(function(button) {
+        button.addEventListener('click', function() {
+            modal.remove();
+        });
+    });
 }
 
 async function requireFeature(feature, featureName) {
