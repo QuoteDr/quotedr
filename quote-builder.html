@@ -2657,16 +2657,24 @@ Example:
         }
 
         var stickyTotalVisible = false;
+        function syncStickyTotalBarVisibility() {
+            const bar = document.getElementById('stickyTotalBar');
+            if (!bar) return;
+            const nearTop = (window.scrollY || document.documentElement.scrollTop || 0) < 120;
+            const modalOpen = !!document.querySelector('.modal.show');
+            bar.classList.toggle('visible', stickyTotalVisible && !nearTop && !modalOpen);
+        }
+
         function toggleStickyTotal() {
             stickyTotalVisible = !stickyTotalVisible;
             const bar = document.getElementById('stickyTotalBar');
             const btn = document.getElementById('toggleTotalBarBtn');
             if (bar) {
-                bar.classList.toggle('visible', stickyTotalVisible);
                 if (stickyTotalVisible) {
                     bar.style.removeProperty('display');
                     calculateTotals();
                 }
+                syncStickyTotalBarVisibility();
             }
             if (btn) {
                 btn.classList.toggle('active', stickyTotalVisible);
@@ -2675,6 +2683,8 @@ Example:
                 btn.title = stickyTotalVisible ? 'Hide floating quote total' : 'Show floating quote total';
             }
         }
+        window.addEventListener('scroll', syncStickyTotalBarVisibility, { passive: true });
+        window.addEventListener('resize', syncStickyTotalBarVisibility);
 
         // IKEA Quick Quote lives in ikea-quote.js.
 
