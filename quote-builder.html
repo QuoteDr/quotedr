@@ -853,10 +853,10 @@ if (location.search.includes('debug')) {
                         <button class="btn btn-outline-danger btn-sm" onclick="clearMapShapes()"><i class="fas fa-trash me-1"></i>Clear</button>
                     </div>
                     <div id="measureMapContainer" style="flex:1;min-height:0;"></div>
-                    <div class="p-3 bg-light border-top" style="max-height:160px;overflow-y:auto;">
+                    <div class="p-3 bg-light border-top" style="max-height:230px;overflow-y:auto;">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <strong><i class="fas fa-ruler-combined me-1"></i>Measurements</strong>
-                            <small class="text-muted">Click a shape label to rename it</small>
+                            <small class="text-muted">Click a measurement to edit its item, pitch, waste, gates, or openings</small>
                         </div>
                         <div id="measurementsList"><p class="text-muted small mb-0">Draw shapes on the map to measure areas and distances.</p></div>
                     </div>
@@ -864,11 +864,11 @@ if (location.search.includes('debug')) {
                 <div class="modal-footer">
                     <div class="me-auto d-flex align-items-center gap-2 flex-wrap">
                         <select id="mapTargetRoom" class="form-select form-select-sm" style="max-width:180px;"><option value="">Add to room...</option></select>
-                        <select id="mapItemCategory" class="form-select form-select-sm" style="max-width:150px;"><option value="">All Categories</option></select>
-                        <input type="text" id="mapItemName" class="form-control form-control-sm" list="mapItemSuggestions" placeholder="Item name e.g. Roof tear-off" style="max-width:200px;">
+                        <select id="mapItemCategory" class="form-select form-select-sm map-shape-setting" style="max-width:150px;"><option value="">All Categories</option></select>
+                        <input type="text" id="mapItemName" class="form-control form-control-sm map-shape-setting" list="mapItemSuggestions" placeholder="Item name e.g. Roof tear-off" style="max-width:200px;">
                         <datalist id="mapItemSuggestions"></datalist>
-                        <input type="number" id="mapItemRate" class="form-control form-control-sm" placeholder="Rate $" step="0.01" style="max-width:90px;">
-                        <select id="mapQuantityMode" class="form-select form-select-sm" style="max-width:155px;" title="How to turn map measurements into quote quantities">
+                        <input type="number" id="mapItemRate" class="form-control form-control-sm map-shape-setting" placeholder="Rate $" step="0.01" style="max-width:90px;">
+                        <select id="mapQuantityMode" class="form-select form-select-sm map-shape-setting" style="max-width:155px;" title="How to turn map measurements into quote quantities">
                             <option value="auto">Auto quantity</option>
                             <option value="area">Area sq ft</option>
                             <option value="roofArea">Roof area + pitch</option>
@@ -877,9 +877,17 @@ if (location.search.includes('debug')) {
                             <option value="wallArea">Wall area from perimeter</option>
                             <option value="each">Each</option>
                         </select>
-                        <input type="number" id="mapWallHeight" class="form-control form-control-sm" value="9" min="1" step="0.5" style="max-width:75px;" title="Height for siding, fencing, walls, or screens">
+                        <input type="number" id="mapWallHeight" class="form-control form-control-sm map-shape-setting" value="9" min="1" step="0.5" style="max-width:75px;" title="Height for siding, fencing, walls, or screens">
                         <span class="text-muted small">ft high</span>
-                        <select id="mapRoofPitch" class="form-select form-select-sm" style="max-width:130px;" title="Roof pitch correction">
+                        <input type="number" id="mapWastePct" class="form-control form-control-sm map-shape-setting" value="0" min="0" step="1" style="max-width:78px;" title="Waste factor percentage">
+                        <span class="text-muted small">% waste</span>
+                        <input type="number" id="mapOpeningsSqft" class="form-control form-control-sm map-shape-setting" value="0" min="0" step="1" style="max-width:92px;" title="Window/door/opening deduction in square feet">
+                        <span class="text-muted small">sqft deduct</span>
+                        <input type="number" id="mapGateCount" class="form-control form-control-sm map-shape-setting" value="0" min="0" step="1" style="max-width:70px;" title="Fence gate count">
+                        <span class="text-muted small">gates</span>
+                        <input type="number" id="mapGateWidth" class="form-control form-control-sm map-shape-setting" value="4" min="0" step="0.5" style="max-width:70px;" title="Fence gate width in feet">
+                        <span class="text-muted small">ft gate</span>
+                        <select id="mapRoofPitch" class="form-select form-select-sm map-shape-setting" style="max-width:130px;" title="Roof pitch correction">
                             <option value="1">No pitch (flat)</option>
                             <option value="1.014">2/12 pitch</option>
                             <option value="1.031">3/12 pitch</option>
@@ -2696,15 +2704,15 @@ Example:
         // Material estimator moved to quote-calculators.js
 
         // -- Google Maps Measurement -----------------------------------------
-        var _map = null, _mapShapes = [], _mapInited = false, _mapsLoadingPromise = null;
+        var _map = null, _mapShapes = [], _mapInited = false, _mapsLoadingPromise = null, _mapSelectedShapeIndex = -1;
         var _mapsApiUrl = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyD7acqRI6KsoUDTEkyMx36eDNRuuPXdqIA&libraries=drawing,geometry,places&callback=initMeasureMap';
         var _mapTradePresets = {
-            roofing:   { category: 'Roofing', item: 'Roof area', mode: 'roofArea', draw: 'polygon', hint: 'Trace each roof plane. The pitch multiplier adjusts measured flat area.' },
-            siding:    { category: 'Siding', item: 'Siding install', mode: 'wallArea', draw: 'polygon', hint: 'Trace the building footprint. Quantity uses perimeter x height.' },
-            deck:      { category: 'Decks', item: 'Deck surface', mode: 'area', draw: 'polygon', hint: 'Trace deck surface areas. Use Linear Measure for railing or stairs.' },
-            fence:     { category: 'Fencing', item: 'Fence install', mode: 'length', draw: 'polyline', hint: 'Trace fence runs as lines. Use height for notes or custom items.' },
-            driveway:  { category: 'Concrete & Masonry', item: 'Driveway / hardscape', mode: 'area', draw: 'polygon', hint: 'Trace asphalt, concrete, interlock, patios, or walkways.' },
-            landscape: { category: 'Landscaping', item: 'Landscape area', mode: 'area', draw: 'polygon', hint: 'Trace sod, mulch, beds, grading, or hardscape zones.' }
+            roofing:   { category: 'Roofing', item: 'Roof area', mode: 'roofArea', draw: 'polygon', waste: 10, height: 9, openings: 0, gates: 0, gateWidth: 4, room: 'Roof', hint: 'Trace each roof plane. Pitch and waste are stored per roof shape.' },
+            siding:    { category: 'Siding', item: 'Siding install', mode: 'wallArea', draw: 'polygon', waste: 5, height: 9, openings: 120, gates: 0, gateWidth: 4, room: 'Exterior Siding', hint: 'Trace the building footprint. Quantity uses perimeter x height, minus openings, plus waste.' },
+            deck:      { category: 'Decks', item: 'Deck surface', mode: 'area', draw: 'polygon', waste: 5, height: 3, openings: 0, gates: 0, gateWidth: 4, room: 'Deck', hint: 'Trace deck surface areas. Use Linear Measure for railing or stairs.' },
+            fence:     { category: 'Fencing', item: 'Fence install', mode: 'length', draw: 'polyline', waste: 0, height: 6, openings: 0, gates: 1, gateWidth: 4, room: 'Fence', hint: 'Trace fence runs as lines. Gate widths are deducted from linear footage.' },
+            driveway:  { category: 'Concrete & Masonry', item: 'Driveway / hardscape', mode: 'area', draw: 'polygon', waste: 5, height: 0, openings: 0, gates: 0, gateWidth: 4, room: 'Driveway', hint: 'Trace asphalt, concrete, interlock, patios, or walkways.' },
+            landscape: { category: 'Landscaping', item: 'Landscape area', mode: 'area', draw: 'polygon', waste: 5, height: 0, openings: 0, gates: 0, gateWidth: 4, room: 'Landscape', hint: 'Trace sod, mulch, beds, grading, or hardscape zones.' }
         };
 
         function populateMeasureModalCategories() {
@@ -2737,6 +2745,11 @@ Example:
 
         document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('mapItemCategory').addEventListener('change', populateMeasureItemSuggestions);
+            ['mapItemCategory','mapItemName','mapItemRate','mapQuantityMode','mapWallHeight','mapWastePct','mapOpeningsSqft','mapGateCount','mapGateWidth','mapRoofPitch'].forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) el.addEventListener('change', saveMapControlsToSelectedShape);
+                if (el && (el.tagName === 'INPUT')) el.addEventListener('input', saveMapControlsToSelectedShape);
+            });
             document.getElementById('mapItemName').addEventListener('input', function() {
                 var itemName = this.value;
                 var category = document.getElementById('mapItemCategory').value;
@@ -2906,11 +2919,68 @@ Example:
                 if (match) categoryEl.value = match.value;
                 populateMeasureItemSuggestions();
             }
-            if (itemEl && !itemEl.value) itemEl.placeholder = preset.item;
+            if (itemEl) {
+                itemEl.placeholder = preset.item;
+                if (!itemEl.value) itemEl.value = preset.item;
+            }
             if (modeEl) modeEl.value = preset.mode;
+            if (document.getElementById('mapWallHeight')) document.getElementById('mapWallHeight').value = preset.height || 0;
+            if (document.getElementById('mapWastePct')) document.getElementById('mapWastePct').value = preset.waste || 0;
+            if (document.getElementById('mapOpeningsSqft')) document.getElementById('mapOpeningsSqft').value = preset.openings || 0;
+            if (document.getElementById('mapGateCount')) document.getElementById('mapGateCount').value = preset.gates || 0;
+            if (document.getElementById('mapGateWidth')) document.getElementById('mapGateWidth').value = preset.gateWidth || 4;
             if (unitEl) unitEl.value = preset.mode === 'length' || preset.mode === 'perimeter' ? 'LF' : (preset.mode === 'each' ? 'each' : 'sq ft');
+            saveMapControlsToSelectedShape();
             renderMapPresetHint(preset.hint);
             if (preset.draw && !_drawingMode) setDrawMode(preset.draw);
+        }
+
+        function mapCurrentSettings() {
+            return {
+                preset: document.getElementById('mapTradePreset') ? document.getElementById('mapTradePreset').value : '',
+                category: document.getElementById('mapItemCategory') ? document.getElementById('mapItemCategory').value : '',
+                itemName: document.getElementById('mapItemName') ? document.getElementById('mapItemName').value.trim() : '',
+                rate: parseFloat(document.getElementById('mapItemRate') ? document.getElementById('mapItemRate').value : '') || 0,
+                mode: document.getElementById('mapQuantityMode') ? document.getElementById('mapQuantityMode').value : 'auto',
+                height: parseFloat(document.getElementById('mapWallHeight') ? document.getElementById('mapWallHeight').value : '') || 0,
+                wastePct: parseFloat(document.getElementById('mapWastePct') ? document.getElementById('mapWastePct').value : '') || 0,
+                openingsSqft: parseFloat(document.getElementById('mapOpeningsSqft') ? document.getElementById('mapOpeningsSqft').value : '') || 0,
+                gateCount: parseFloat(document.getElementById('mapGateCount') ? document.getElementById('mapGateCount').value : '') || 0,
+                gateWidth: parseFloat(document.getElementById('mapGateWidth') ? document.getElementById('mapGateWidth').value : '') || 0,
+                pitch: parseFloat(document.getElementById('mapRoofPitch') ? document.getElementById('mapRoofPitch').value : '') || 1
+            };
+        }
+
+        function applyMapSettingsToControls(settings) {
+            settings = settings || {};
+            if (document.getElementById('mapTradePreset')) document.getElementById('mapTradePreset').value = settings.preset || '';
+            if (document.getElementById('mapItemCategory')) {
+                document.getElementById('mapItemCategory').value = settings.category || '';
+                populateMeasureItemSuggestions();
+            }
+            if (document.getElementById('mapItemName')) document.getElementById('mapItemName').value = settings.itemName || '';
+            if (document.getElementById('mapItemRate')) document.getElementById('mapItemRate').value = settings.rate || '';
+            if (document.getElementById('mapQuantityMode')) document.getElementById('mapQuantityMode').value = settings.mode || 'auto';
+            if (document.getElementById('mapWallHeight')) document.getElementById('mapWallHeight').value = settings.height !== undefined ? settings.height : 9;
+            if (document.getElementById('mapWastePct')) document.getElementById('mapWastePct').value = settings.wastePct || 0;
+            if (document.getElementById('mapOpeningsSqft')) document.getElementById('mapOpeningsSqft').value = settings.openingsSqft || 0;
+            if (document.getElementById('mapGateCount')) document.getElementById('mapGateCount').value = settings.gateCount || 0;
+            if (document.getElementById('mapGateWidth')) document.getElementById('mapGateWidth').value = settings.gateWidth !== undefined ? settings.gateWidth : 4;
+            if (document.getElementById('mapRoofPitch')) document.getElementById('mapRoofPitch').value = settings.pitch || 1;
+        }
+
+        function saveMapControlsToSelectedShape() {
+            if (_mapSelectedShapeIndex >= 0 && _mapShapes[_mapSelectedShapeIndex]) {
+                _mapShapes[_mapSelectedShapeIndex]._settings = mapCurrentSettings();
+                renderMeasurements();
+            }
+        }
+
+        function selectMapShape(index) {
+            if (!_mapShapes[index]) return;
+            _mapSelectedShapeIndex = index;
+            applyMapSettingsToControls(_mapShapes[index]._settings || {});
+            renderMeasurements();
         }
 
         function renderMapPresetHint(text) {
@@ -3012,9 +3082,11 @@ Example:
                 : new google.maps.Polyline({ path: _activePath, strokeColor: '#ff6600', strokeWeight: 3, editable: true, map: _map });
             shape._label = label;
             shape._type = isPolygon ? 'polygon' : 'polyline';
+            shape._settings = mapCurrentSettings();
             _mapShapes.push(shape);
-            google.maps.event.addListener(shape, 'click', async function() {
-                var nl = await qdPrompt('Rename:', shape._label, { title: 'Rename Measurement' }); if (nl) { shape._label = nl; renderMeasurements(); }
+            _mapSelectedShapeIndex = _mapShapes.length - 1;
+            google.maps.event.addListener(shape, 'click', function() {
+                selectMapShape(_mapShapes.indexOf(shape));
             });
             stopDrawing();
             renderMeasurements();
@@ -3062,7 +3134,10 @@ Example:
         }
 
         function removeMapShape(index) {
-            if (_mapShapes[index]) { _mapShapes[index].setMap(null); _mapShapes.splice(index, 1); } renderMeasurements();
+            if (_mapShapes[index]) { _mapShapes[index].setMap(null); _mapShapes.splice(index, 1); }
+            if (_mapSelectedShapeIndex === index) _mapSelectedShapeIndex = -1;
+            else if (_mapSelectedShapeIndex > index) _mapSelectedShapeIndex--;
+            renderMeasurements();
         }
 
         function getShapeMeasurement(shape) {
@@ -3083,19 +3158,26 @@ Example:
         }
 
         function mapQuantityForShape(shape, measurement) {
-            var mode = document.getElementById('mapQuantityMode').value || 'auto';
-            var pitchMultiplier = parseFloat(document.getElementById('mapRoofPitch').value) || 1;
-            var height = parseFloat(document.getElementById('mapWallHeight').value) || 0;
+            var settings = shape._settings || mapCurrentSettings();
+            var mode = settings.mode || 'auto';
+            var pitchMultiplier = settings.pitch || 1;
+            var height = settings.height || 0;
+            var wasteFactor = 1 + ((settings.wastePct || 0) / 100);
+            var openings = settings.openingsSqft || 0;
+            var gateDeduct = (settings.gateCount || 0) * (settings.gateWidth || 0);
             var qty = measurement.value;
             var unit = measurement.unit;
-            var note = 'Measured from satellite map';
-            if (mode === 'area') { qty = measurement.area || measurement.value; unit = 'sq ft'; }
-            else if (mode === 'roofArea') { qty = (measurement.area || measurement.value) * pitchMultiplier; unit = 'sq ft'; note += ' (roof pitch ' + pitchMultiplier + 'x applied)'; }
-            else if (mode === 'length') { qty = measurement.length || measurement.perimeter || measurement.value; unit = 'LF'; }
-            else if (mode === 'perimeter') { qty = measurement.perimeter || measurement.length || measurement.value; unit = 'LF'; note += ' (perimeter)'; }
-            else if (mode === 'wallArea') { qty = (measurement.perimeter || measurement.length || 0) * height; unit = 'sq ft'; note += ' (perimeter x ' + height + ' ft high)'; }
+            var noteParts = ['Measured from satellite map'];
+            if (mode === 'area') { qty = Math.max(0, (measurement.area || measurement.value) - openings) * wasteFactor; unit = 'sq ft'; }
+            else if (mode === 'roofArea') { qty = Math.max(0, measurement.area || measurement.value) * pitchMultiplier * wasteFactor; unit = 'sq ft'; noteParts.push('roof pitch ' + pitchMultiplier + 'x'); }
+            else if (mode === 'length') { qty = Math.max(0, (measurement.length || measurement.perimeter || measurement.value) - gateDeduct); unit = 'LF'; }
+            else if (mode === 'perimeter') { qty = Math.max(0, (measurement.perimeter || measurement.length || measurement.value) - gateDeduct); unit = 'LF'; noteParts.push('perimeter'); }
+            else if (mode === 'wallArea') { qty = Math.max(0, ((measurement.perimeter || measurement.length || 0) * height) - openings) * wasteFactor; unit = 'sq ft'; noteParts.push('perimeter x ' + height + ' ft high'); }
             else if (mode === 'each') { qty = 1; unit = 'each'; }
-            return { quantity: parseFloat((qty || 0).toFixed(2)), unit: unit, note: note };
+            if (settings.wastePct) noteParts.push(settings.wastePct + '% waste');
+            if (openings) noteParts.push(openings + ' sqft openings deducted');
+            if (gateDeduct) noteParts.push(gateDeduct + ' LF gates deducted');
+            return { quantity: parseFloat((qty || 0).toFixed(2)), unit: unit, note: noteParts.join(' | ') };
         }
 
         function renderMeasurements() {
@@ -3106,15 +3188,37 @@ Example:
             _mapShapes.forEach(function(shape, i) {
                 var m = getShapeMeasurement(shape);
                 if (m.isArea) totalSqft += m.value;
-                html += '<span class="badge bg-' + (m.isArea ? 'primary' : 'warning text-dark') + ' fs-6 p-2">';
+                var q = mapQuantityForShape(shape, m);
+                var selected = i === _mapSelectedShapeIndex;
+                html += '<span class="badge bg-' + (selected ? 'success' : (m.isArea ? 'primary' : 'warning text-dark')) + ' fs-6 p-2" style="cursor:pointer;" onclick="selectMapShape(' + i + ')">';
                 html += '<i class="fas fa-' + (m.isArea ? 'draw-polygon' : 'ruler') + ' me-1"></i>';
-                html += shape._label + ': <strong>' + m.display + '</strong> ';
-                html += '<span style="cursor:pointer;" onclick="removeMapShape(' + i + ')">&times;</span></span>';
+                html += shape._label + ': <strong>' + m.display + '</strong> <span class="ms-1">Quote: ' + q.quantity.toLocaleString() + ' ' + q.unit + '</span> ';
+                html += '<span style="cursor:pointer;" onclick="event.stopPropagation();removeMapShape(' + i + ')">&times;</span></span>';
             });
             html += '</div>';
             var totalLf = _mapShapes.reduce(function(sum, shape) { return sum + (getShapeMeasurement(shape).length || 0); }, 0);
-            if (totalSqft > 0 || totalLf > 0) html += '<div class="mt-2 small text-muted">Totals: <strong>' + totalSqft.toLocaleString() + ' sq ft</strong> area | <strong>' + Math.round(totalLf * 10) / 10 + ' LF</strong> linear/perimeter</div>';
+            var totals = mapMeasurementTotals();
+            if (totalSqft > 0 || totalLf > 0) html += '<div class="mt-2 small text-muted">Measured: <strong>' + totalSqft.toLocaleString() + ' sq ft</strong> area | <strong>' + Math.round(totalLf * 10) / 10 + ' LF</strong> linear/perimeter</div>';
+            html += '<div class="mt-1 small text-muted">Quote totals: ' + totals + '</div>';
             el.innerHTML = html;
+        }
+
+        function mapMeasurementTotals() {
+            var buckets = {};
+            _mapShapes.forEach(function(shape) {
+                var q = mapQuantityForShape(shape, getShapeMeasurement(shape));
+                buckets[q.unit] = (buckets[q.unit] || 0) + q.quantity;
+            });
+            return Object.keys(buckets).map(function(unit) {
+                return '<strong>' + (Math.round(buckets[unit] * 10) / 10).toLocaleString() + ' ' + unit + '</strong>';
+            }).join(' | ') || '<span class="text-muted">No quote quantities yet</span>';
+        }
+
+        function mapShapeSummary(shape) {
+            var m = getShapeMeasurement(shape);
+            var q = mapQuantityForShape(shape, m);
+            var settings = shape._settings || {};
+            return shape._label + ': measured ' + m.display + '; quoted ' + q.quantity + ' ' + q.unit + '; ' + q.note + (settings.itemName ? '; item ' + settings.itemName : '');
         }
 
         function mapSuggestedRoomName() {
@@ -3148,23 +3252,40 @@ Example:
                 room = rooms.find(function(r) { return r.id === roomId; });
             }
             if (!room) return;
-            var itemName = document.getElementById('mapItemName').value.trim();
-            var rate = parseFloat(document.getElementById('mapItemRate').value) || 0;
-            var category = document.getElementById('mapItemCategory').value || 'Miscellaneous';
+            if (!room.mapMeasurements) room.mapMeasurements = [];
+            var summaries = [];
             _mapShapes.forEach(function(shape) {
+                var settings = shape._settings || mapCurrentSettings();
                 var m = getShapeMeasurement(shape);
                 var q = mapQuantityForShape(shape, m);
+                var itemName = settings.itemName || shape._label;
+                var rate = settings.rate || 0;
+                var category = settings.category || 'Miscellaneous';
+                summaries.push(mapShapeSummary(shape));
+                room.mapMeasurements.push({
+                    label: shape._label,
+                    type: shape._type,
+                    measurement: m,
+                    quantity: q,
+                    settings: settings,
+                    addedAt: new Date().toISOString()
+                });
                 room.items.push({
-                    description: itemName || shape._label,
+                    description: itemName,
                     itemDescription: q.note,
                     category: category,
                     quantity: q.quantity,
                     unitType: q.unit,
                     rate: rate,
                     total: q.quantity * rate,
-                    materialCost: 0, supplierUrl: '', notes: ''
+                    materialCost: 0, supplierUrl: '', notes: mapShapeSummary(shape)
                 });
             });
+            room.notes = (room.notes ? room.notes + '\n' : '') + 'Satellite measurements:\n' + summaries.join('\n');
+            try {
+                var quoteId = localStorage.getItem('ald_active_quote_id') || 'unsaved';
+                localStorage.setItem('ald_map_measurements_' + quoteId, JSON.stringify(room.mapMeasurements));
+            } catch(e) {}
             renderRooms(); calculateTotals(); markUnsaved();
             bootstrap.Modal.getInstance(document.getElementById('measureMapModal')).hide();
         }
