@@ -2711,12 +2711,13 @@ Example:
 
         function openMeasureModal() {
             var sel = document.getElementById('mapTargetRoom');
-            sel.innerHTML = '<option value="">Add to room...</option>';
+            sel.innerHTML = '<option value="">Add to room...</option><option value="new">+ New room / area...</option>';
             rooms.forEach(function(r) {
                 var opt = document.createElement('option');
                 opt.value = r.id; opt.textContent = r.name; sel.appendChild(opt);
             });
-            if (rooms.length === 1) sel.value = rooms[0].id;
+            if (rooms.length === 0) sel.value = 'new';
+            else if (rooms.length === 1) sel.value = rooms[0].id;
             populateMeasureModalCategories();
             populateMeasureItemSuggestions();
             renderMapPresetHint('Choose a trade preset or draw area/linear measurements manually.');
@@ -3017,11 +3018,36 @@ Example:
             el.innerHTML = html;
         }
 
+        function mapSuggestedRoomName() {
+            var presetKey = document.getElementById('mapTradePreset') ? document.getElementById('mapTradePreset').value : '';
+            var names = {
+                roofing: 'Roof',
+                siding: 'Exterior Siding',
+                deck: 'Deck',
+                fence: 'Fence',
+                driveway: 'Driveway',
+                landscape: 'Landscape'
+            };
+            if (names[presetKey]) return names[presetKey];
+            if (_mapShapes.length === 1 && _mapShapes[0]._label) return _mapShapes[0]._label;
+            return 'Exterior';
+        }
+
         function addMeasurementsToQuote() {
             if (_mapShapes.length === 0) { qdAlert('Draw at least one shape on the map first.'); return; }
-            var roomId = parseInt(document.getElementById('mapTargetRoom').value);
-            if (!roomId) { qdAlert('Please select a room to add items to.'); return; }
-            var room = rooms.find(function(r) { return r.id === roomId; });
+            var roomValue = document.getElementById('mapTargetRoom').value;
+            var room = null;
+            if (roomValue === 'new') {
+                var suggestedName = mapSuggestedRoomName();
+                var roomName = prompt('Name this new room / area:', suggestedName);
+                if (!roomName) return;
+                room = { id: roomCounter++, name: roomName.trim(), items: [], notes: '', photos: [] };
+                rooms.push(room);
+            } else {
+                var roomId = parseInt(roomValue);
+                if (!roomId) { qdAlert('Please select a room or choose New room / area.'); return; }
+                room = rooms.find(function(r) { return r.id === roomId; });
+            }
             if (!room) return;
             var itemName = document.getElementById('mapItemName').value.trim();
             var rate = parseFloat(document.getElementById('mapItemRate').value) || 0;
