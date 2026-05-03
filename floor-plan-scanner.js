@@ -422,8 +422,8 @@
             var editorTitle = _fpActiveShapeIndex >= 0 && _fpShapes[_fpActiveShapeIndex] ? 'Editing: ' + _fpEscapeHtml(_fpShapes[_fpActiveShapeIndex].name) : 'New Measurement';
             document.getElementById('floorPlanModalBody').innerHTML =
                 '<div class="d-flex justify-content-center gap-1 mb-2">' + _fpStepBadges(2, ['Upload','Calibrate','Review']) + '</div>' +
-                '<div class="row g-2" style="height:calc(100vh - 138px);">' +
-                '<div class="col-lg-8 d-flex flex-column" style="min-height:420px;">' +
+                '<div class="row g-2" style="height:calc(100vh - 138px);min-height:0;">' +
+                '<div class="col-lg-8 d-flex flex-column" style="min-height:420px;min-width:0;">' +
                 '<div class="d-flex flex-wrap align-items-center gap-1 mb-2">' +
                 _fpToolButton('calibrate', 'fa-arrows-left-right', 'Scale') +
                 _fpToolButton('line', 'fa-ruler-horizontal', 'Line') +
@@ -442,7 +442,7 @@
                 '<div class="small text-muted" id="fpToolHelp">' + _fpToolLabel() + '</div>' +
                 '<div class="small text-primary fw-semibold" id="fpPanHint" style="display:' + ((_fpCanvasZoom || 1) > 1.01 ? 'block' : 'none') + ';"><i class="fas fa-hand me-1"></i>Right-click + drag to pan</div>' +
                 '</div>' +
-                '<div id="fpMeasureCanvasWrap" style="flex:1;overflow:auto;border:1px solid #ced4da;border-radius:8px;background:#f8f9fa;">' +
+                '<div id="fpMeasureCanvasWrap" style="flex:1;min-height:0;overflow:scroll;border:1px solid #ced4da;border-radius:8px;background:#f8f9fa;overscroll-behavior:contain;">' +
                 '<canvas id="fpMeasureCanvas" style="display:block;max-width:none;cursor:crosshair;user-select:none;"></canvas>' +
                 '</div>' +
                 '</div>' +
@@ -450,7 +450,7 @@
                 '<div class="border rounded p-2 mb-2" id="fpScalePanel">' +
                 '<div class="d-flex align-items-center justify-content-between mb-2"><strong class="small">Scale</strong><span class="badge bg-light text-dark">' + _fpEscapeHtml(scaleText) + '</span></div>' +
                 '<label class="form-label small mb-1">Known line length in feet</label>' +
-                '<div class="input-group input-group-sm"><input type="number" id="fpKnownLength" class="form-control" min="0.1" step="0.1" placeholder="e.g. 12"><span class="input-group-text">ft</span><button class="btn btn-primary" onclick="_fpApplyScale()">Set</button></div>' +
+                '<div class="input-group input-group-sm"><input type="number" id="fpKnownLength" class="form-control" min="0.1" step="0.1" placeholder="e.g. 12" onkeydown="if(event.key===\'Enter\'){event.preventDefault();_fpApplyScale();}"><span class="input-group-text">ft</span><button class="btn btn-primary" onclick="_fpApplyScale()">Set</button></div>' +
                 '<div class="small fw-semibold mt-2" id="fpKnownLengthCue" style="display:none;color:#b45309;"><i class="fas fa-arrow-up me-1"></i>This is where you put the known feet, then press Set.</div>' +
                 '<div class="text-muted small mt-1">Use the Scale tool on a labeled dimension first.</div>' +
                 '</div>' +
@@ -728,6 +728,25 @@
             if (overlay) overlay.remove();
         }
 
+        function _fpShowCalibratedToast() {
+            var existing = document.getElementById('fpCalibratedToast');
+            if (existing) existing.remove();
+            var toast = document.createElement('div');
+            toast.id = 'fpCalibratedToast';
+            toast.style.cssText = 'position:fixed;left:50%;top:96px;transform:translateX(-50%);z-index:20002;background:#198754;color:white;border-radius:999px;padding:12px 22px;font-weight:800;box-shadow:0 12px 32px rgba(25,135,84,0.32);opacity:0;transition:opacity .18s ease, transform .18s ease;pointer-events:none;';
+            toast.innerHTML = '<i class="fas fa-check-circle me-2"></i>Calibrated';
+            document.body.appendChild(toast);
+            requestAnimationFrame(function() {
+                toast.style.opacity = '1';
+                toast.style.transform = 'translateX(-50%) translateY(6px)';
+            });
+            setTimeout(function() {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(-50%) translateY(-4px)';
+                setTimeout(function() { if (toast.parentNode) toast.remove(); }, 220);
+            }, 1500);
+        }
+
         function _fpCanvasPoint(e) {
             var rect = _fpCanvas.getBoundingClientRect();
             var sx = _fpCanvas.width / rect.width;
@@ -818,6 +837,7 @@
             _fpScale = { pxPerFt: px / known, knownFt: known, line: { start: _fpDraft.start, end: _fpDraft.end } };
             _fpDraft = null;
             _fpTool = 'box';
+            _fpShowCalibratedToast();
             _fpRenderMeasureTool();
         }
 
