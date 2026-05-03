@@ -28,6 +28,11 @@
         var _fpCanvasScrollTop = 0;
         var _fpCanvasReady = false;
         var _fpMouseDown = false;
+        var _fpPanActive = false;
+        var _fpPanStartX = 0;
+        var _fpPanStartY = 0;
+        var _fpPanStartScrollLeft = 0;
+        var _fpPanStartScrollTop = 0;
         var _fpShapeCounter = 1;
         var _fpActiveShapeIndex = -1;
         var _fpPendingRoomName = '';
@@ -430,9 +435,12 @@
                 '<button class="btn btn-outline-secondary btn-sm" onclick="_fpClearShapes()" title="Clear"><i class="fas fa-trash"></i></button>' +
                 '<button class="btn btn-outline-primary btn-sm" onclick="_fpFinishPolygon()" id="fpFinishPolyBtn"><i class="fas fa-check me-1"></i>Finish Polygon</button>' +
                 '</div>' +
-                '<div class="small text-muted mb-1" id="fpToolHelp">' + _fpToolLabel() + '</div>' +
+                '<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">' +
+                '<div class="small text-muted" id="fpToolHelp">' + _fpToolLabel() + '</div>' +
+                '<div class="small text-primary fw-semibold" id="fpPanHint" style="display:' + ((_fpCanvasZoom || 1) > 1.01 ? 'block' : 'none') + ';"><i class="fas fa-hand me-1"></i>Right-click + drag to pan</div>' +
+                '</div>' +
                 '<div id="fpMeasureCanvasWrap" style="flex:1;overflow:auto;border:1px solid #ced4da;border-radius:8px;background:#f8f9fa;">' +
-                '<canvas id="fpMeasureCanvas" style="display:block;max-width:none;cursor:crosshair;"></canvas>' +
+                '<canvas id="fpMeasureCanvas" style="display:block;max-width:none;cursor:crosshair;user-select:none;"></canvas>' +
                 '</div>' +
                 '</div>' +
                 '<div class="col-lg-4 d-flex flex-column">' +
@@ -584,6 +592,7 @@
             _fpCanvas.addEventListener('mousedown', _fpCanvasDown);
             _fpCanvas.addEventListener('mousemove', _fpCanvasMove);
             _fpCanvas.addEventListener('wheel', _fpCanvasWheel, { passive: false });
+            _fpCanvas.addEventListener('contextmenu', function(e) { e.preventDefault(); });
             window.addEventListener('mouseup', _fpCanvasUp);
             _fpCanvas.addEventListener('dblclick', function(e) {
                 if (_fpTool === 'polygon') { e.preventDefault(); _fpFinishPolygon(); }
@@ -604,6 +613,9 @@
             _fpCanvasPixelRatio = _fpCanvas.width / Math.max(1, displayW);
             var badge = document.getElementById('fpZoomBadge');
             if (badge) badge.textContent = Math.round(_fpCanvasZoom * 100) + '%';
+            var hint = document.getElementById('fpPanHint');
+            if (hint) hint.style.display = _fpCanvasZoom > 1.01 ? 'block' : 'none';
+            _fpUpdateCanvasCursor();
         }
 
         function _fpZoomCanvasAt(nextZoom, clientX, clientY) {
@@ -648,6 +660,12 @@
             _fpDrawCanvas();
         }
 
+        function _fpUpdateCanvasCursor() {
+            if (!_fpCanvas) return;
+            if (_fpPanActive) _fpCanvas.style.cursor = 'grabbing';
+            else _fpCanvas.style.cursor = 'crosshair';
+        }
+
         function _fpCanvasPoint(e) {
             var rect = _fpCanvas.getBoundingClientRect();
             var sx = _fpCanvas.width / rect.width;
@@ -657,6 +675,18 @@
 
         function _fpCanvasDown(e) {
             if (!_fpCanvasReady) return;
+            if (e.button === 2) {
+                e.preventDefault();
+                if (!_fpCanvas.parentElement || (_fpCanvasZoom || 1) <= 1.01) return;
+                _fpPanActive = true;
+                _fpPanStartX = e.clientX;
+                _fpPanStartY = e.clientY;
+                _fpPanStartScrollLeft = _fpCanvas.parentElement.scrollLeft || 0;
+                _fpPanStartScrollTop = _fpCanvas.parentElement.scrollTop || 0;
+                _fpUpdateCanvasCursor();
+                return;
+            }
+            if (e.button !== 0) return;
             var pt = _fpCanvasPoint(e);
             if (_fpTool === 'polygon') {
                 if (!_fpScale) { _fpShowMeasureNotice('Calibrate the scale before drawing rooms.'); return; }
@@ -671,6 +701,15 @@
         }
 
         function _fpCanvasMove(e) {
+            if (_fpPanActive && _fpCanvas && _fpCanvas.parentElement) {
+                e.preventDefault();
+                var wrap = _fpCanvas.parentElement;
+                wrap.scrollLeft = _fpPanStartScrollLeft - (e.clientX - _fpPanStartX);
+                wrap.scrollTop = _fpPanStartScrollTop - (e.clientY - _fpPanStartY);
+                _fpCanvasScrollLeft = wrap.scrollLeft;
+                _fpCanvasScrollTop = wrap.scrollTop;
+                return;
+            }
             if (!_fpCanvasReady || !_fpDraft) return;
             var pt = _fpCanvasPoint(e);
             if (_fpTool === 'polygon') {
@@ -682,6 +721,11 @@
         }
 
         function _fpCanvasUp() {
+            if (_fpPanActive) {
+                _fpPanActive = false;
+                _fpUpdateCanvasCursor();
+                return;
+            }
             if (!_fpMouseDown || !_fpDraft) return;
             _fpMouseDown = false;
             if (_fpTool === 'calibrate') {
