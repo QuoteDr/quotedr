@@ -6,6 +6,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+function normalize(value: unknown): string {
+  return String(value ?? '').trim().toLowerCase();
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -26,17 +30,16 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Fetch quotes for this contractor + client (never expose portal_pin in response)
-    let query = supabase
-      .from('quotes')
-      .select('data')
-      .eq('user_id', contractorId);
+    const normalizedEmail = normalize(clientEmail);
+    const normalizedName = normalize(clientName);
+    const enteredPin = String(pin ?? '').trim();
 
-    if (clientEmail) {
-      query = query.filter('data->>clientEmail', 'ilike', clientEmail);
-    } else {
-      query = query.ilike('client_name', clientName);
-    }
+    // Fetch quotes for this contractor, then match the client server-side.
+    // This keeps the stored PIN private while tolerating older quote payload keys.
+    const query = supabase
+      .from('quotes')
+      .select('client_name,data')
+      .eq('user_id', contractorId);
 
     const { data: quotes, error } = await query;
 
@@ -45,11 +48,22 @@ Deno.serve(async (req) => {
     let valid = false;
     let noPinSet = true;
 
-    if (quotes && quotes.length > 0) {
-      for (const quote of quotes) {
+    const matchingQuotes = (quotes || []).filter((quote) => {
+      const data = quote.data || {};
+      const quoteEmail = normalize(data.clientEmail || data.email || data.client_email);
+      const quoteName = normalize(quote.client_name || data.clientName || data.client_name);
+      return (
+        (normalizedEmail && quoteEmail && quoteEmail === normalizedEmail) ||
+        (normalizedName && quoteName && quoteName === normalizedName) ||
+        (normalizedEmail && quoteName && quoteName === normalizedEmail)
+      );
+    });
+
+    if (matchingQuotes.length > 0) {
+      for (const quote of matchingQuotes) {
         if (quote.data && quote.data.portal_pin) {
           noPinSet = false;
-          if (quote.data.portal_pin === pin) {
+          if (String(quote.data.portal_pin).trim() === enteredPin) {
             valid = true;
             break;
           }

@@ -607,8 +607,8 @@
                 // Get email from the first quote's data
                 var clientEmail = '';
                 for (var i = 0; i < quotes.length; i++) {
-                    if (quotes[i].data && quotes[i].data.clientEmail) {
-                        clientEmail = quotes[i].data.clientEmail;
+                    if (quotes[i].data && (quotes[i].data.clientEmail || quotes[i].data.email || quotes[i].data.client_email)) {
+                        clientEmail = quotes[i].data.clientEmail || quotes[i].data.email || quotes[i].data.client_email;
                         break;
                     }
                 }

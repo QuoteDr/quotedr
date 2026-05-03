@@ -312,6 +312,7 @@
     // Load quotes for this client from this contractor
     async function loadQuotes() {
       try {
+        const portalKey = normalizePortalValue(clientEmail || clientName);
         let query = _sbClient
           .from('quotes')
           .select('id, client_name, quote_number, total, status, created_at, updated_at, data')
@@ -319,7 +320,7 @@
           .order('created_at', { ascending: false });
 
         if (clientEmail) {
-          query = query.eq('data->>clientEmail', clientEmail);
+          query = query.or('data->>clientEmail.eq.' + escapePostgrestValue(clientEmail) + ',data->>email.eq.' + escapePostgrestValue(clientEmail) + ',client_name.ilike.' + escapePostgrestValue(clientEmail));
         } else if (clientName) {
           query = query.ilike('client_name', clientName);
         }
@@ -328,7 +329,12 @@
         if (error) throw error;
 
         // Only show quotes explicitly published to portal
-        const quotes = (allQuotes || []).filter(q => q.data && q.data.portal_visible === true);
+        const quotes = (allQuotes || []).filter(function(q) {
+          if (!q.data || q.data.portal_visible !== true) return false;
+          var quoteEmail = normalizePortalValue(q.data.clientEmail || q.data.email || q.data.client_email);
+          var quoteName = normalizePortalValue(q.client_name || q.data.clientName || q.data.client_name);
+          return !portalKey || quoteEmail === portalKey || quoteName === portalKey;
+        });
 
         // Set client name from actual quote data
         if (quotes.length > 0) {
@@ -497,6 +503,14 @@
       return str.replace(/\w\S*/g, (txt) => 
         txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase()
       );
+    }
+
+    function normalizePortalValue(value) {
+      return String(value || '').trim().toLowerCase();
+    }
+
+    function escapePostgrestValue(value) {
+      return String(value || '').replace(/["'(),]/g, '');
     }
 
     // Initialize when page loads
