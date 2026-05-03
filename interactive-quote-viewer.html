@@ -1110,6 +1110,25 @@ if (location.search.includes('debug')) {
             return 'rgba(' + rgb.r + ', ' + rgb.g + ', ' + rgb.b + ', ' + alpha.toFixed(2) + ')';
         }
 
+        function shadeHexColor(hex, amount) {
+            var rgb = hexToRgb(hex);
+            if (!rgb) return hex || '#1a56a0';
+            function clamp(v) { return Math.max(0, Math.min(255, Math.round(v))); }
+            function toHex(v) { return clamp(v).toString(16).padStart(2, '0'); }
+            return '#' + toHex(rgb.r + amount) + toHex(rgb.g + amount) + toHex(rgb.b + amount);
+        }
+
+        function roomHeaderBackground(room, fallbackColor) {
+            var base = room && room.customColor ? room.customColor : fallbackColor;
+            var rgb = hexToRgb(base);
+            if (!rgb) return fallbackColor || '#1a56a0';
+            var darkRgb = hexToRgb(shadeHexColor(base, -55)) || rgb;
+            var intensity = parseInt(room && room.colorIntensity, 10);
+            if (!isFinite(intensity)) intensity = 100;
+            var alpha = Math.max(20, Math.min(intensity, 100)) / 100;
+            return 'linear-gradient(135deg, rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + alpha + ') 0%, rgba(' + darkRgb.r + ',' + darkRgb.g + ',' + darkRgb.b + ',' + alpha + ') 100%), linear-gradient(135deg,#2d2d2d 0%,#111111 100%)';
+        }
+
         function blendColorWithWhite(hex, opacityPercent) {
             var rgb = hexToRgb(hex);
             if (!rgb) return hex || '#ffffff';
@@ -1313,23 +1332,23 @@ if (location.search.includes('debug')) {
 
             // Match color presets from quote builder
             const ROOM_COLORS = [
-                'linear-gradient(135deg,#2d2d2d 0%,#111111 100%)',
-                'linear-gradient(135deg,#1e3a5f 0%,#0a1a2e 100%)',
-                'linear-gradient(135deg,#1a5c38 0%,#0a2e1a 100%)',
-                'linear-gradient(135deg,#6b1a2a 0%,#300a12 100%)',
-                'linear-gradient(135deg,#4a5568 0%,#1a202c 100%)',
-                'linear-gradient(135deg,#0652DD 0%,#023e8a 100%)',
-                'linear-gradient(135deg,#00796b 0%,#004d40 100%)',
-                'linear-gradient(135deg,#6a1b9a 0%,#2e003e 100%)',
-                'linear-gradient(135deg,#b87333 0%,#7c4a00 100%)',
-                'linear-gradient(135deg,#546e7a 0%,#263238 100%)',
-                'linear-gradient(135deg,#c0747a 0%,#7a3540 100%)',
-                'linear-gradient(135deg,#1a1a2e 0%,#000000 100%)'
+                '#2d2d2d',
+                '#1e3a5f',
+                '#1a5c38',
+                '#6b1a2a',
+                '#4a5568',
+                '#0652DD',
+                '#00796b',
+                '#6a1b9a',
+                '#b87333',
+                '#546e7a',
+                '#c0747a',
+                '#1a1a2e'
             ];
 
             quoteData.rooms.forEach((room, roomIdx) => {
                 const roomTotal = room.items.reduce((sum, item) => sum + (item.quantity * item.rate), 0);
-                const headerBg = ROOM_COLORS[room.colorIndex ?? 0] || ROOM_COLORS[0];
+                const headerBg = roomHeaderBackground(room, ROOM_COLORS[room.colorIndex ?? 0] || ROOM_COLORS[0]);
 
                 html += `
                     <div class="card mb-3 quote-room-anchor" id="${roomAnchorId(roomIdx)}">

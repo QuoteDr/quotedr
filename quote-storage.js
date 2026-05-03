@@ -613,7 +613,7 @@ async function saveQuote() {
                             roomCounter = 0;
                             loadedRooms.forEach(room => {
                                 roomCounter++;
-                                rooms.push({ id: roomCounter, name: room.name, items: JSON.parse(JSON.stringify(room.items || [])), colorIndex: room.colorIndex || 0, markup: room.markup || 0, icon: room.icon || null, scopeNotes: room.scopeNotes || '' });
+                                rooms.push({ id: roomCounter, name: room.name, items: JSON.parse(JSON.stringify(room.items || [])), colorIndex: room.colorIndex ?? 0, customColor: room.customColor || '', colorIntensity: room.colorIntensity || 100, markup: room.markup || 0, icon: room.icon || null, scopeNotes: room.scopeNotes || '' });
                             });
                             renderRooms();
                         }

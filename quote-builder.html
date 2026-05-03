@@ -198,6 +198,24 @@
         }
         .color-swatch:hover { transform: scale(1.25); border-color: white; }
         .color-swatch.active { border-color: white; border-width: 3px; transform: scale(1.15); }
+        .color-swatch.custom-picker {
+            background: conic-gradient(#ef4444,#f97316,#eab308,#22c55e,#06b6d4,#2563eb,#8b5cf6,#ef4444);
+            border-color: rgba(255,255,255,0.75);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.55);
+        }
+        .room-color-tools {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.14);
+            border-radius: 8px;
+            padding: 8px 10px 10px;
+        }
+        .room-color-tools label,
+        .room-color-tools .room-intensity-value { color: rgba(255,255,255,0.9); }
+        .room-color-tools .form-range { height: 1rem; }
 
         /* Sticky total bar */
         #stickyTotalBar {
@@ -2255,7 +2273,9 @@ Example:
             rooms.push({
                 id: roomCounter,
                 name: name,
-                items: []
+                items: [],
+                colorIndex: (roomCounter - 1) % ROOM_COLORS.length,
+                colorIntensity: 100
             });
 
             renderRooms();
@@ -2694,20 +2714,100 @@ Example:
         ];
         // Swatch fill colours (mid-point of each gradient for display)
         const SWATCH_COLORS = ['#2d2d2d','#1e3a5f','#1a5c38','#6b1a2a','#4a5568','#0652DD','#00796b','#6a1b9a','#b87333','#546e7a','#c0747a','#1a1a2e'];
+        const ROOM_COLOR_PRESETS_KEY = 'quotedr_room_color_presets';
+
+        function normalizeHexColor(value) {
+            var hex = String(value || '').trim();
+            if (/^#[0-9a-f]{3}$/i.test(hex)) {
+                hex = '#' + hex.slice(1).split('').map(function(ch) { return ch + ch; }).join('');
+            }
+            return /^#[0-9a-f]{6}$/i.test(hex) ? hex.toLowerCase() : '#2d2d2d';
+        }
+
+        function hexToRgb(hex) {
+            hex = normalizeHexColor(hex).slice(1);
+            return {
+                r: parseInt(hex.slice(0, 2), 16),
+                g: parseInt(hex.slice(2, 4), 16),
+                b: parseInt(hex.slice(4, 6), 16)
+            };
+        }
+
+        function shadeHexColor(hex, amount) {
+            var rgb = hexToRgb(hex);
+            function clamp(v) { return Math.max(0, Math.min(255, Math.round(v))); }
+            function toHex(v) { return clamp(v).toString(16).padStart(2, '0'); }
+            return '#' + toHex(rgb.r + amount) + toHex(rgb.g + amount) + toHex(rgb.b + amount);
+        }
+
+        function getRoomHeaderIntensity(room) {
+            var intensity = parseInt(room && room.colorIntensity, 10);
+            if (!Number.isFinite(intensity)) intensity = 100;
+            return Math.max(20, Math.min(100, intensity));
+        }
+
+        function roomHeaderBackground(room) {
+            var colorIdx = (room && room.colorIndex !== undefined) ? room.colorIndex : 0;
+            var base = room && room.customColor ? normalizeHexColor(room.customColor) : (SWATCH_COLORS[colorIdx] || SWATCH_COLORS[0]);
+            var dark = shadeHexColor(base, -55);
+            var opacity = getRoomHeaderIntensity(room) / 100;
+            return 'linear-gradient(135deg, rgba(' + hexToRgb(base).r + ',' + hexToRgb(base).g + ',' + hexToRgb(base).b + ',' + opacity + ') 0%, rgba(' + hexToRgb(dark).r + ',' + hexToRgb(dark).g + ',' + hexToRgb(dark).b + ',' + opacity + ') 100%), linear-gradient(135deg,#2d2d2d 0%,#111111 100%)';
+        }
+
+        function getRoomColorPresets() {
+            try {
+                var saved = JSON.parse(localStorage.getItem(ROOM_COLOR_PRESETS_KEY) || '[]');
+                return Array.isArray(saved) ? saved.filter(function(c) { return /^#[0-9a-f]{6}$/i.test(c); }).slice(0, 8) : [];
+            } catch(e) {
+                return [];
+            }
+        }
+
+        function saveRoomColorPreset(hex) {
+            hex = normalizeHexColor(hex);
+            var presets = getRoomColorPresets().filter(function(c) { return c.toLowerCase() !== hex; });
+            presets.unshift(hex);
+            localStorage.setItem(ROOM_COLOR_PRESETS_KEY, JSON.stringify(presets.slice(0, 8)));
+        }
+
+        function refreshRoomHeader(roomId) {
+            var room = rooms.find(function(r) { return r.id === roomId; });
+            if (!room) return;
+            const header = document.querySelector('.room-card[data-room-id="' + roomId + '"] .room-header');
+            if (header) header.style.background = roomHeaderBackground(room);
+            const label = document.getElementById('roomColorIntensityValue_' + roomId);
+            if (label) label.textContent = getRoomHeaderIntensity(room) + '%';
+        }
 
         function setRoomColor(roomId, colorIndex) {
             const room = rooms.find(r => r.id === roomId);
             if (!room) return;
             room.colorIndex = colorIndex;
-            // Update header background live without full re-render
+            room.customColor = '';
+            refreshRoomHeader(roomId);
             const header = document.querySelector('.room-card[data-room-id="' + roomId + '"] .room-header');
-            if (header) {
-                header.style.background = ROOM_COLORS[colorIndex].gradient;
-                // Update active swatch
-                header.querySelectorAll('.color-swatch').forEach((s, i) => {
-                    s.classList.toggle('active', i === colorIndex);
-                });
-            }
+            if (header) header.querySelectorAll('.color-swatch[data-preset-index]').forEach((s) => {
+                s.classList.toggle('active', parseInt(s.dataset.presetIndex, 10) === colorIndex);
+            });
+            markUnsaved();
+        }
+
+        function setRoomCustomColor(roomId, color) {
+            const room = rooms.find(r => r.id === roomId);
+            if (!room) return;
+            room.customColor = normalizeHexColor(color);
+            room.colorIndex = -1;
+            saveRoomColorPreset(room.customColor);
+            renderRooms();
+            markUnsaved();
+        }
+
+        function updateRoomColorIntensity(roomId, value) {
+            const room = rooms.find(r => r.id === roomId);
+            if (!room) return;
+            room.colorIntensity = Math.max(20, Math.min(100, parseInt(value, 10) || 100));
+            refreshRoomHeader(roomId);
+            markUnsaved();
         }
 
         // Global variable to track if we're editing an existing item
@@ -3606,7 +3706,8 @@ Example:
                 var suggestedName = mapSuggestedRoomName();
                 var roomName = prompt('Name this new room / area:', suggestedName);
                 if (!roomName) return;
-                room = { id: roomCounter++, name: roomName.trim(), items: [], notes: '', photos: [] };
+                roomCounter++;
+                room = { id: roomCounter, name: roomName.trim(), items: [], notes: '', photos: [], colorIndex: (roomCounter - 1) % ROOM_COLORS.length, colorIntensity: 100 };
                 rooms.push(room);
             } else {
                 var roomId = parseInt(roomValue);
@@ -3821,7 +3922,7 @@ Example:
                 }
 
                 const colorIdx = (room.colorIndex !== undefined) ? room.colorIndex : 0;
-                const headerBg = ROOM_COLORS[colorIdx].gradient;
+                const headerBg = roomHeaderBackground(room);
                 html += '<div class="room-card" data-room-id="' + room.id + '">';
                 html += '<div class="room-header" style="background:' + headerBg + '">';
                 html += '<div class="d-flex justify-content-between align-items-start">';
@@ -3833,10 +3934,19 @@ Example:
                 // Color swatches
                 html += '<div class="color-picker-swatches mt-1">';
                 SWATCH_COLORS.forEach(function(color, i) {
-                    html += '<div class="color-swatch' + (i === colorIdx ? ' active' : '') + '" style="background:' + color + '" onclick="setRoomColor(' + room.id + ',' + i + ')" title="' + ROOM_COLORS[i].label + '"></div>';
+                    html += '<div class="color-swatch' + (!room.customColor && i === colorIdx ? ' active' : '') + '" data-preset-index="' + i + '" style="background:' + color + '" onclick="setRoomColor(' + room.id + ',' + i + ')" title="' + ROOM_COLORS[i].label + '"></div>';
                 });
+                getRoomColorPresets().forEach(function(color) {
+                    html += '<div class="color-swatch' + (room.customColor === color ? ' active' : '') + '" style="background:' + color + '" onclick="setRoomCustomColor(' + room.id + ', \'' + color + '\')" title="Saved colour ' + color + '"></div>';
+                });
+                html += '<div class="color-swatch custom-picker" onclick="document.getElementById(\'roomCustomColor_' + room.id + '\').click()" title="Pick custom colour"><i class="fas fa-palette" style="font-size:0.72rem;"></i></div>';
+                html += '<input type="color" id="roomCustomColor_' + room.id + '" value="' + normalizeHexColor(room.customColor || SWATCH_COLORS[colorIdx] || SWATCH_COLORS[0]) + '" style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;" onchange="setRoomCustomColor(' + room.id + ', this.value)">';
                 html += '</div>';
                 html += '</div>'; // end flex row
+                html += '<div class="room-color-tools mt-2">';
+                html += '<div class="d-flex justify-content-between align-items-center gap-2"><label for="roomColorIntensity_' + room.id + '" class="small fw-semibold mb-0">Header colour intensity</label><span id="roomColorIntensityValue_' + room.id + '" class="room-intensity-value small fw-semibold">' + getRoomHeaderIntensity(room) + '%</span></div>';
+                html += '<input type="range" id="roomColorIntensity_' + room.id + '" class="form-range" min="20" max="100" step="5" value="' + getRoomHeaderIntensity(room) + '" oninput="updateRoomColorIntensity(' + room.id + ', this.value)">';
+                html += '</div>';
 
                 // Timeline input field (shown when showTimelines is true)
                 if (showTimelines) {
@@ -4274,7 +4384,10 @@ Example:
                 const newRoom = {
                     id: roomCounter,
                     name: room.name,
-                    items: JSON.parse(JSON.stringify(room.items))
+                    items: JSON.parse(JSON.stringify(room.items)),
+                    colorIndex: room.colorIndex ?? ((roomCounter - 1) % ROOM_COLORS.length),
+                    customColor: room.customColor || '',
+                    colorIntensity: room.colorIntensity || 100
                 };
                 rooms.push(newRoom);
             });
@@ -4304,7 +4417,10 @@ Example:
                 const newRoom = {
                     id: roomCounter,
                     name: room.name,
-                    items: JSON.parse(JSON.stringify(room.items))
+                    items: JSON.parse(JSON.stringify(room.items)),
+                    colorIndex: room.colorIndex ?? ((roomCounter - 1) % ROOM_COLORS.length),
+                    customColor: room.customColor || '',
+                    colorIntensity: room.colorIntensity || 100
                 };
                 rooms.push(newRoom);
             });
