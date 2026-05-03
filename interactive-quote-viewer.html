@@ -14,7 +14,166 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="brand-theme.css?v=1777661601">
     <style>
-        body { background-color: #f8f9fa; }
+        body {
+            background:
+                linear-gradient(180deg, rgba(26,86,160,0.08), rgba(255,255,255,0) 280px),
+                #f6f8fb;
+            color: #102033;
+            padding-bottom: 0;
+        }
+        .proposal-shell {
+            width: min(1120px, calc(100vw - 28px));
+            margin: 0 auto;
+            padding: 24px 0 42px;
+        }
+        .proposal-hero {
+            background: #fff;
+            border: 1px solid #dbe4ef;
+            border-radius: 8px;
+            box-shadow: 0 18px 48px rgba(15,52,96,0.12);
+            overflow: hidden;
+        }
+        .proposal-hero-inner {
+            display: grid;
+            grid-template-columns: minmax(0, 1.15fr) minmax(310px, 0.85fr);
+            gap: 28px;
+            align-items: stretch;
+            padding: 28px;
+        }
+        .brand-lockup {
+            display: flex;
+            align-items: flex-start;
+            gap: 18px;
+            min-width: 0;
+        }
+        .brand-lockup img {
+            width: 116px;
+            max-width: 34vw;
+            height: auto;
+            object-fit: contain;
+            flex: 0 0 auto;
+        }
+        .proposal-eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            border: 1px solid #fed7aa;
+            background: #fff7ed;
+            color: #9a4b05;
+            border-radius: 999px;
+            padding: 5px 10px;
+            font-size: 0.78rem;
+            font-weight: 800;
+            margin-bottom: 12px;
+        }
+        .proposal-title {
+            color: #0f3460;
+            font-weight: 850;
+            font-size: clamp(1.7rem, 4vw, 3rem);
+            line-height: 1.04;
+            margin: 0 0 10px;
+        }
+        .proposal-subtitle {
+            color: #526276;
+            font-size: 1rem;
+            line-height: 1.5;
+            max-width: 620px;
+            margin: 0;
+        }
+        .proposal-detail-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 22px;
+        }
+        .proposal-detail {
+            background: #f8fbff;
+            border: 1px solid #e5edf5;
+            border-radius: 8px;
+            padding: 12px 14px;
+        }
+        .proposal-detail-label {
+            color: #64748b;
+            font-size: 0.74rem;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+        .proposal-detail-value {
+            color: #12243a;
+            font-weight: 750;
+            margin-top: 3px;
+            overflow-wrap: anywhere;
+        }
+        .hero-total-panel {
+            background: linear-gradient(180deg, #fff, #f8fbff);
+            border: 1px solid #dbe4ef;
+            border-top: 5px solid var(--quote-accent, #1a56a0);
+            border-radius: 8px;
+            padding: 20px;
+            color: #102033;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 100%;
+        }
+        .hero-status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            align-self: flex-start;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            color: #1a56a0;
+            border-radius: 999px;
+            padding: 6px 11px;
+            font-size: 0.8rem;
+            font-weight: 800;
+        }
+        .hero-total-label {
+            color: #64748b;
+            font-size: 0.78rem;
+            font-weight: 850;
+            text-transform: uppercase;
+            margin-top: 22px;
+        }
+        .hero-total {
+            color: #0f3460;
+            font-size: clamp(2.1rem, 7vw, 3.5rem);
+            font-weight: 900;
+            line-height: 1;
+            margin-top: 5px;
+        }
+        .hero-actions {
+            display: grid;
+            gap: 10px;
+            margin-top: 18px;
+        }
+        .hero-actions .btn {
+            min-height: 46px;
+            border-radius: 8px;
+        }
+        .client-section-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin: 28px 0 14px;
+        }
+        .client-section-title h4 {
+            margin: 0;
+            color: #0f3460;
+            font-weight: 850;
+        }
+        .client-section-title span {
+            color: #64748b;
+            font-size: 0.92rem;
+        }
+        .premium-card {
+            background: #fff;
+            border: 1px solid #dbe4ef;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(15,52,96,0.08);
+        }
 
         /* Warranty Badge */
         .warranty-section {
@@ -61,14 +220,8 @@
         .warranty-item .label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #f0ad4e; }
         .warranty-item .sublabel { font-size: 0.72rem; opacity: 0.75; margin-top: 2px; }
 
-        .quote-header {
-            margin-bottom: 2rem;
-            padding: 1.25rem 1.5rem 1rem;
-            border-bottom: 2px solid #dee2e6;
-        }
-        .quote-header-summary {
-            padding-right: 1.25rem;
-        }
+        .quote-header { margin-bottom: 0; }
+        .quote-header-summary { padding-right: 0; }
         .upgrade-card {
             background: white;
             border-left: 4px solid #667eea;
@@ -198,9 +351,71 @@
             opacity: 0.9;
             transform: translateY(-1px);
         }
+        #quoteContainer .card {
+            border: 1px solid #dbe4ef;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(15,52,96,0.08);
+        }
+        #quoteContainer .card-header {
+            padding: 16px 18px;
+            border: 0;
+        }
+        #quoteContainer .card-header h5 {
+            font-size: 1.05rem;
+            font-weight: 850;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        #quoteContainer .card-body {
+            padding: 18px;
+        }
+        #quoteContainer .text-uppercase.fw-bold {
+            background: #f8fbff;
+            border: 1px solid #e5edf5;
+            border-radius: 8px;
+            padding: 8px 10px !important;
+            margin-top: 16px !important;
+            color: #1a56a0 !important;
+        }
+        #quoteContainer .py-2.border-bottom {
+            padding: 13px 0 !important;
+            border-color: #e8eef6 !important;
+        }
+        .room-note-section textarea {
+            border-color: #dbe4ef;
+            border-radius: 8px;
+        }
 
         /* Approval & Signature */
         .approval-section { margin-top: 2rem; }
+        .acceptance-panel {
+            background: #fff;
+            border: 1px solid #dbe4ef;
+            border-radius: 8px;
+            box-shadow: 0 12px 34px rgba(15,52,96,0.1);
+            padding: 22px;
+        }
+        .acceptance-steps {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+        .acceptance-step {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #526276;
+            background: #f8fbff;
+            border: 1px solid #e5edf5;
+            border-radius: 8px;
+            padding: 10px;
+            font-size: 0.85rem;
+            font-weight: 750;
+        }
+        .acceptance-step i { color: var(--qd-orange, #f27a1a); }
         @keyframes approvalPulse {
             0%   { box-shadow: 0 0 0 0 rgba(40,167,69,0.55); }
             70%  { box-shadow: 0 0 0 14px rgba(40,167,69,0); }
@@ -234,7 +449,7 @@
         .sig-modal-overlay.active { display: flex; }
         .sig-modal {
             background: white;
-            border-radius: 12px;
+            border-radius: 8px;
             padding: 1.5rem;
             width: 100%;
             max-width: 540px;
@@ -252,6 +467,11 @@
             display: block;
         }
         #signatureCanvas.signed { border-color: #28a745; border-style: solid; }
+        .signature-help {
+            color: #64748b;
+            font-size: 0.88rem;
+            line-height: 1.45;
+        }
         .approval-banner {
             display: none;
             background: linear-gradient(135deg, #d4edda, #c3e6cb);
@@ -275,11 +495,90 @@
             cursor: pointer;
         }
         .item-desc-toggle:hover { text-decoration: underline; }
+        .deposit-card {
+            border: 1px solid #dbeafe;
+            border-top: 5px solid var(--qd-orange, #f27a1a);
+            border-radius: 8px;
+            box-shadow: 0 12px 34px rgba(15,52,96,0.1);
+        }
+        .secure-note {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            color: #64748b;
+            font-size: 0.88rem;
+        }
+        .sticky-client-actions {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 1040;
+            display: none;
+            gap: 8px;
+            padding: 10px;
+            background: rgba(255,255,255,0.96);
+            border-top: 1px solid #dbe4ef;
+            box-shadow: 0 -10px 28px rgba(15,52,96,0.12);
+            backdrop-filter: blur(8px);
+        }
+        .sticky-client-actions .btn {
+            flex: 1;
+            min-height: 44px;
+            border-radius: 8px;
+        }
         @media (max-width: 768px) {
-            .quote-header { padding: 1rem; }
+            body { padding-bottom: 74px; }
+            .proposal-shell {
+                width: min(100vw - 18px, 1120px);
+                padding-top: 9px;
+            }
+            .proposal-hero-inner {
+                grid-template-columns: 1fr;
+                gap: 16px;
+                padding: 16px;
+            }
+            .brand-lockup {
+                gap: 12px;
+            }
+            .brand-lockup img {
+                width: 78px;
+                max-width: 28vw;
+            }
+            .proposal-title {
+                font-size: 1.85rem;
+            }
+            .proposal-detail-grid {
+                grid-template-columns: 1fr;
+                gap: 8px;
+                margin-top: 16px;
+            }
+            .hero-total-panel {
+                padding: 16px;
+            }
+            .hero-actions {
+                display: none;
+            }
+            .sticky-client-actions {
+                display: flex;
+            }
             .quote-header-summary { padding-right: 0; text-align: left !important; margin-top: 1rem; }
+            .client-section-title {
+                display: block;
+                margin-top: 22px;
+            }
+            .client-section-title span {
+                display: block;
+                margin-top: 4px;
+            }
+            .acceptance-steps {
+                grid-template-columns: 1fr 1fr;
+            }
             .total-header, .total-final { display: block; }
             .grand-total { margin-top: 0.35rem; font-size: 2rem; }
+            .warranty-section {
+                padding: 1rem;
+            }
         }
     </style>
 
@@ -295,42 +594,68 @@ if (location.search.includes('debug')) {
 </script>
 </head>
 <body>
-    <div class="container py-4">
+    <div class="proposal-shell">
         <!-- Header -->
-        <div class="quote-header">
-            <div class="row align-items-center">
-                <div class="col-md-7 col-12 mb-2 mb-md-0">
-                    <div class="d-flex align-items-center gap-3">
-                        <img id="businessLogoImg" src="quotedr-logo.svg" alt="Company Logo" style="height: 165px; width: auto; max-width: 340px; display: block;">
+        <section class="proposal-hero quote-header">
+            <div class="proposal-hero-inner">
+                <div>
+                    <div class="brand-lockup">
+                        <img id="businessLogoImg" src="quotedr-logo.svg" alt="Company Logo">
                         <div>
-                            <h2 id="companyNameDisplay" class="mb-0" style="color: #2c3e50;"></h2>
+                            <div class="proposal-eyebrow"><i class="fas fa-file-signature"></i> Client Proposal</div>
+                            <h1 class="proposal-title" id="quoteHeadingDisplay">Your Quote</h1>
+                            <p class="proposal-subtitle">Please review the scope, selected upgrades, terms, and acceptance details below.</p>
+                            <h2 id="companyNameDisplay" class="h5 mt-3 mb-1" style="color:#0f3460;"></h2>
                             <p id="companyTaglineDisplay" class="text-muted mb-0">Professional Services</p>
-                            <div class="mt-2" id="businessInfoDisplay" style="font-size:0.82rem; color:#555; line-height:1.7;"></div>
                         </div>
                     </div>
+                    <div class="proposal-detail-grid">
+                        <div class="proposal-detail">
+                            <div class="proposal-detail-label">Prepared For</div>
+                            <div class="proposal-detail-value" id="clientNameDisplay">Client</div>
+                        </div>
+                        <div class="proposal-detail">
+                            <div class="proposal-detail-label">Project Address</div>
+                            <div class="proposal-detail-value" id="projectAddressDisplay">Project Address</div>
+                        </div>
+                        <div class="proposal-detail">
+                            <div class="proposal-detail-label">Quote Number</div>
+                            <div class="proposal-detail-value" id="quoteNumberDisplay"></div>
+                        </div>
+                        <div class="proposal-detail">
+                            <div class="proposal-detail-label">Prepared On</div>
+                            <div class="proposal-detail-value" id="quoteDateDisplay"></div>
+                        </div>
+                    </div>
+                    <div class="mt-3" id="businessInfoDisplay" style="font-size:0.88rem;color:#526276;line-height:1.7;"></div>
                 </div>
-                <div class="col-md-5 text-end quote-header-summary">
-                    <h5 class="mb-1" style="color: #2c3e50;" id="quoteHeadingDisplay">Your Quote</h5>
-                    <div id="quoteNumberDisplay" class="fw-bold" style="font-size:1.05rem; color:#2c3e50;"></div>
-                    <div id="clientNameDisplay" class="text-muted"></div>
-                    <div class="text-muted small mt-2" id="quoteDateDisplay"></div>
-                </div>
+                <aside class="hero-total-panel">
+                    <div>
+                        <div class="hero-status-pill"><i class="fas fa-shield-alt"></i> Ready for review</div>
+                        <div class="hero-total-label">Current Total</div>
+                        <div class="hero-total" id="heroGrandTotal">$0.00</div>
+                        <div class="text-muted mt-2">Includes selected options and applicable tax.</div>
+                    </div>
+                    <div class="hero-actions">
+                        <button type="button" class="btn btn-warning btn-lg" onclick="handleMainAction()">
+                            <i class="fas fa-signature me-2"></i>Accept & Sign
+                        </button>
+                        <button type="button" class="btn btn-outline-primary" onclick="document.getElementById('quoteContainer').scrollIntoView({behavior:'smooth'});">
+                            <i class="fas fa-list-check me-2"></i>Review Scope
+                        </button>
+                    </div>
+                </aside>
             </div>
-        </div>
+        </section>
 
         <!-- Quote Expiry Notice -->
-        <div id="quoteExpiry" class="mb-3"></div>
-
-        <!-- Project Info -->
-        <div class="card mb-4">
-            <div class="card-body">
-                <h5><i class="fas fa-map-marker-alt"></i> Project Address</h5>
-                <p id="projectAddressDisplay" class="mb-0 text-muted"></p>
-            </div>
-        </div>
+        <div id="quoteExpiry" class="my-3"></div>
 
         <!-- Quote Summary -->
-        <h4 class="mb-3"><i class="fas fa-list"></i> Your Quote Breakdown</h4>
+        <div class="client-section-title">
+            <h4><i class="fas fa-list me-2"></i>Scope & Pricing</h4>
+            <span>Review rooms, optional items, and upgrade choices.</span>
+        </div>
 
         <div id="quoteContainer">
             <!-- Rooms and items will be loaded here -->
@@ -367,7 +692,7 @@ if (location.search.includes('debug')) {
         </div>
 
         <!-- Terms & Conditions Section -->
-        <div class="card mb-4 mt-5">
+        <div class="card premium-card mb-4 mt-5">
             <div class="card-header bg-light">
                 <h6><i class="fas fa-file-contract"></i> Terms & Conditions</h6>
             </div>
@@ -417,14 +742,20 @@ if (location.search.includes('debug')) {
         </div>
 
         <!-- Smart Action Section -->
-        <div class="approval-section" id="approveSection">
+        <div class="approval-section acceptance-panel" id="approveSection">
+            <div class="acceptance-steps">
+                <div class="acceptance-step"><i class="fas fa-eye"></i>Review</div>
+                <div class="acceptance-step"><i class="fas fa-pen-nib"></i>Sign</div>
+                <div class="acceptance-step"><i class="fas fa-credit-card"></i>Deposit</div>
+                <div class="acceptance-step"><i class="fas fa-check"></i>Schedule</div>
+            </div>
             <!-- Notice shown when client has notes -->
             <div class="changes-notice" id="changesNotice">
-                <i class="fas fa-info-circle"></i> <strong>You've added notes to this quote.</strong> Adam will review your requests and send you an updated version.
+                <i class="fas fa-info-circle"></i> <strong>You've added notes to this quote.</strong> Your contractor will review your requests and send you an updated version.
             </div>
 
             <!-- Single smart button - changes based on notes -->
-            <button type="button" class="btn btn-success btn-approve-pulse w-100" id="mainActionBtn"
+            <button type="button" class="btn btn-warning btn-approve-pulse w-100" id="mainActionBtn"
                 style="font-size:1.15rem; font-weight:700; padding:1rem; border-radius:10px; letter-spacing:0.3px;"
                 onclick="handleMainAction()">
                 <i class="fas fa-pen-nib"></i> Review &amp; Approve This Quote
@@ -444,7 +775,8 @@ if (location.search.includes('debug')) {
         <!-- Signature Modal -->
         <div class="sig-modal-overlay" id="sigModalOverlay">
             <div class="sig-modal">
-                <h5 class="mb-3"><i class="fas fa-pen-nib"></i> Approve This Quote</h5>
+                <h5 class="mb-2"><i class="fas fa-pen-nib text-primary"></i> Accept Quote</h5>
+                <p class="signature-help mb-3">Enter your full name, draw your signature, and confirm the terms to approve this quote.</p>
 
                 <div class="mb-3">
                     <label class="form-label fw-bold">Your Full Name <span class="text-danger">*</span></label>
@@ -468,8 +800,8 @@ if (location.search.includes('debug')) {
                     </label>
                 </div>
 
-                <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-success flex-grow-1" onclick="confirmApproval()">
+                <div class="d-flex gap-2 flex-wrap">
+                    <button type="button" class="btn btn-warning flex-grow-1" onclick="confirmApproval()">
                         <i class="fas fa-check-circle"></i> Sign &amp; Approve
                     </button>
                     <button type="button" class="btn btn-outline-secondary" onclick="closeSignatureModal()">Cancel</button>
@@ -485,13 +817,13 @@ if (location.search.includes('debug')) {
 
         <!-- Stripe Deposit Payment Section -->
         <div id="stripeDepositSection" style="display:none;" class="mt-4 mb-4">
-            <div class="card border-0 shadow-sm p-4 text-center">
+            <div class="card deposit-card border-0 p-4 text-center">
                 <h5 class="mb-3"><i class="fas fa-lock me-2 text-success"></i>Secure Your Project</h5>
                 <p class="text-muted mb-3" id="depositPromptText">Pay your deposit to confirm your project start date.</p>
-                <button id="payDepositBtn" class="btn btn-success btn-lg px-5 mb-2" onclick="handleDepositPayment()">
+                <button id="payDepositBtn" class="btn btn-warning btn-lg px-5 mb-2" onclick="handleDepositPayment()">
                     <i class="fas fa-credit-card me-2"></i><span id="depositBtnLabel">Pay Deposit</span>
                 </button>
-                <div class="text-muted small mt-1"><i class="fab fa-stripe me-1"></i>Secure payment powered by Stripe</div>
+                <div class="secure-note mt-1"><i class="fab fa-stripe"></i>Secure payment powered by Stripe. Your remaining balance is due per the quote terms.</div>
                 <hr class="my-3">
                 <p class="text-muted small mb-0">Prefer to pay by e-transfer or cheque? Contact us directly.</p>
             </div>
@@ -502,6 +834,12 @@ if (location.search.includes('debug')) {
         <!--
         <meta http-equiv="refresh" content="3;url=https://ald-direct.com/thank-you">
         -->
+    </div>
+
+    <div class="sticky-client-actions" id="stickyClientActions">
+        <button type="button" class="btn btn-warning" onclick="handleMainAction()"><i class="fas fa-signature me-1"></i>Accept</button>
+        <button type="button" class="btn btn-outline-primary" onclick="document.getElementById('quoteContainer').scrollIntoView({behavior:'smooth'});"><i class="fas fa-list me-1"></i>Scope</button>
+        <button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('termsDisplay').scrollIntoView({behavior:'smooth'});"><i class="fas fa-file-contract me-1"></i>Terms</button>
     </div>
 
     <!-- Scripts -->
@@ -596,7 +934,8 @@ if (location.search.includes('debug')) {
                 styleTag.textContent = ':root { --quote-accent: ' + (accent === '#ffffff' ? '#1a56a0' : accent) + '; }' +
                     'body { background: ' + bg + ' !important; }' +
                     '.quote-header { background: ' + headerBg + ' !important; color: ' + headerColor + ' !important; }' +
-                    '.quote-header h2, .quote-header h5, .quote-header p, .quote-header div { color: ' + headerColor + ' !important; }' +
+                    '.quote-header .brand-lockup h1, .quote-header .brand-lockup h2, .quote-header .brand-lockup p { color: ' + headerColor + ' !important; }' +
+                    '.quote-header .hero-total-panel, .quote-header .hero-total-panel div, .quote-header .proposal-detail, .quote-header .proposal-detail div { color: #102033 !important; }' +
                     '.btn-success { background-color: ' + (accent === '#ffffff' ? '#198754' : accent) + ' !important; border-color: ' + (accent === '#ffffff' ? '#198754' : accent) + ' !important; }' +
                     accentCSS + fontCSS;
                 document.head.appendChild(styleTag);
@@ -771,7 +1110,7 @@ if (location.search.includes('debug')) {
         function renderQuote() {
             // Populate header fields
             if (quoteData.clientName) {
-                document.getElementById('clientNameDisplay').textContent = 'Prepared for: ' + quoteData.clientName;
+                document.getElementById('clientNameDisplay').textContent = quoteData.clientName;
             }
             if (quoteData.projectAddress) {
                 document.getElementById('projectAddressDisplay').textContent = quoteData.projectAddress;
@@ -815,6 +1154,8 @@ if (location.search.includes('debug')) {
             const originalTotal = quoteData.grandTotal || 0;
             document.getElementById('originalTotalDisplay').textContent = '$' + originalTotal.toFixed(2);
             document.getElementById('newGrandTotal').textContent = '$' + originalTotal.toFixed(2);
+            var heroTotal = document.getElementById('heroGrandTotal');
+            if (heroTotal) heroTotal.textContent = '$' + originalTotal.toFixed(2);
 
             // Set hidden form fields
             document.getElementById('quoteId').value = quoteData.id || '';
@@ -836,8 +1177,8 @@ if (location.search.includes('debug')) {
             if (quoteData.data && quoteData.data.client_upgraded && quoteData.data.original_rooms) {
                 var signedAtStr = quoteData.data.client_upgraded_at ? new Date(quoteData.data.client_upgraded_at).toLocaleDateString('en-CA', {year:'numeric',month:'short',day:'numeric'}) : '';
                 html += '<div class="alert mb-4" style="background:#fff8e1;border:2px solid #f0ad4e;border-radius:10px;">' +
-                    '<div class="fw-semibold mb-1"><i class="fas fa-bolt text-warning me-2"></i>Client modified this quote when signing' + (signedAtStr ? ' on ' + signedAtStr : '') + '</div>' +
-                    '<div class="text-muted small">Items marked <span class="badge bg-success">\u2B06 Upgraded</span> were swapped by the client. Items marked <span class="badge bg-danger">Removed</span> were removed by the client. Original values shown in grey.</div>' +
+                    '<div class="fw-semibold mb-1"><i class="fas fa-bolt text-warning me-2"></i>This accepted quote includes requested changes' + (signedAtStr ? ' from ' + signedAtStr : '') + '</div>' +
+                    '<div class="text-muted small">Items marked <span class="badge bg-success">\u2B06 Upgraded</span> were selected as upgrades. Items marked <span class="badge bg-danger">Removed</span> were removed before approval. Original values are shown in grey.</div>' +
                     '</div>';
             }
 
@@ -1004,10 +1345,10 @@ if (location.search.includes('debug')) {
                                 </button>
                                 <div id="roomNoteBox_${roomIdx}" style="display:${savedNote ? 'block' : 'none'}; margin-top:0.5rem;">
                                     <textarea class="form-control" rows="3"
-                                        placeholder="e.g. Can we also add pot lights in here? Or any other requests or questions for Adam..."
+                                        placeholder="e.g. Can we also add pot lights in here? Or any other requests or questions..."
                                         oninput="saveRoomNote(${roomIdx}, this.value)"
                                         style="font-size:0.9rem; border: 1px dashed #0d6efd; border-radius:6px;">${savedNote}</textarea>
-                                    <div class="text-muted mt-1" style="font-size:0.75rem;"><i class="fas fa-info-circle"></i> This note will be sent to Adam with your submission.</div>
+                                    <div class="text-muted mt-1" style="font-size:0.75rem;"><i class="fas fa-info-circle"></i> This note will be sent with your submission.</div>
                                 </div>
                             </div>
                         </div>
@@ -1140,6 +1481,8 @@ if (location.search.includes('debug')) {
                 }
             }
             document.getElementById('newGrandTotal').textContent = `$${total.toFixed(2)}`;
+            var heroTotal = document.getElementById('heroGrandTotal');
+            if (heroTotal) heroTotal.textContent = `$${total.toFixed(2)}`;
         }
 
         function hasClientNotes() {
@@ -1167,8 +1510,8 @@ if (location.search.includes('debug')) {
                 if (notice) notice.classList.add('visible');
             } else {
                 btn.innerHTML = '<i class="fas fa-pen-nib"></i> Review &amp; Approve This Quote';
-                btn.classList.remove('btn-warning');
-                btn.classList.add('btn-success', 'btn-approve-pulse');
+                btn.classList.remove('btn-success');
+                btn.classList.add('btn-warning', 'btn-approve-pulse');
                 if (notice) notice.classList.remove('visible');
             }
         }
@@ -1382,6 +1725,8 @@ if (location.search.includes('debug')) {
             }
 
             document.getElementById('approveSection').style.display = 'none';
+            var stickyActions = document.getElementById('stickyClientActions');
+            if (stickyActions) stickyActions.style.display = 'none';
             closeSignatureModal();
     
             var depSection = document.getElementById('stripeDepositSection');
@@ -1390,20 +1735,7 @@ if (location.search.includes('debug')) {
             }
     
             if (signatureUrl) {
-                const toast = document.createElement('div');
-                toast.textContent = '✓ Signature saved';
-                toast.style.cssText = `
-                    position: fixed;
-                    bottom: 20px;
-                    right: 20px;
-                    background: #4CAF50;
-                    color: white;
-                    padding: 10px 15px;
-                    border-radius: 4px;
-                    z-index: 1000;
-                `;
-                document.body.appendChild(toast);
-                setTimeout(() => toast.remove(), 3000);
+                qdToast({ title: 'Quote Accepted', message: 'Signature saved securely.', type: 'success' });
             }
         }
 
