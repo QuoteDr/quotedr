@@ -20,6 +20,7 @@
         var _fpCanvas = null;
         var _fpCtx = null;
         var _fpPlanImg = null;
+        var _fpGlobalCanvasEventsAttached = false;
         var _fpCanvasPixelRatio = 1;
         var _fpCanvasBaseDisplayWidth = 0;
         var _fpCanvasBaseDisplayHeight = 0;
@@ -29,6 +30,7 @@
         var _fpCanvasReady = false;
         var _fpMouseDown = false;
         var _fpPanActive = false;
+        var _fpPanStarted = false;
         var _fpPanStartX = 0;
         var _fpPanStartY = 0;
         var _fpPanStartScrollLeft = 0;
@@ -37,6 +39,7 @@
         var _fpActiveShapeIndex = -1;
         var _fpPendingRoomName = '';
         var _fpPendingTrades = {};
+        var _fpCalibrationIntroShown = false;
 
         var _fpTradeConfig = [
             { key: 'flooring',    label: 'Flooring',       icon: 'fa-layer-group',     qtyMode: 'area',      defaultEnabled: true },
@@ -133,7 +136,7 @@
         function openFloorPlanModal() {
             _fpImageBase64 = null; _fpMimeType = 'image/jpeg'; _fpImageUrl = null; _fpResults = null; _fpRooms = [];
             _fpSuggestedRoomNames = []; _fpCeilingHeight = 9; _fpScale = null; _fpShapes = []; _fpDraft = null; _fpPolygonDraft = [];
-            _fpCanvasReady = false; _fpCanvasZoom = 1; _fpCanvasScrollLeft = 0; _fpCanvasScrollTop = 0; _fpTool = 'calibrate'; _fpShapeCounter = 1; _fpActiveShapeIndex = -1; _fpPendingRoomName = ''; _fpPendingTrades = {};
+            _fpCanvasReady = false; _fpCanvasZoom = 1; _fpCanvasScrollLeft = 0; _fpCanvasScrollTop = 0; _fpTool = 'calibrate'; _fpShapeCounter = 1; _fpActiveShapeIndex = -1; _fpPendingRoomName = ''; _fpPendingTrades = {}; _fpCalibrationIntroShown = false;
             var modal = new bootstrap.Modal(document.getElementById('floorPlanModal'));
             modal.show();
             setTimeout(_fpMaybeShowIntroPopup, 250);
@@ -444,10 +447,11 @@
                 '</div>' +
                 '</div>' +
                 '<div class="col-lg-4 d-flex flex-column">' +
-                '<div class="border rounded p-2 mb-2">' +
+                '<div class="border rounded p-2 mb-2" id="fpScalePanel">' +
                 '<div class="d-flex align-items-center justify-content-between mb-2"><strong class="small">Scale</strong><span class="badge bg-light text-dark">' + _fpEscapeHtml(scaleText) + '</span></div>' +
                 '<label class="form-label small mb-1">Known line length in feet</label>' +
                 '<div class="input-group input-group-sm"><input type="number" id="fpKnownLength" class="form-control" min="0.1" step="0.1" placeholder="e.g. 12"><span class="input-group-text">ft</span><button class="btn btn-primary" onclick="_fpApplyScale()">Set</button></div>' +
+                '<div class="small fw-semibold mt-2" id="fpKnownLengthCue" style="display:none;color:#b45309;"><i class="fas fa-arrow-up me-1"></i>This is where you put the known feet, then press Set.</div>' +
                 '<div class="text-muted small mt-1">Use the Scale tool on a labeled dimension first.</div>' +
                 '</div>' +
                 '<div class="border rounded p-2 mb-2">' +
@@ -470,7 +474,7 @@
                 '<button class="btn btn-outline-secondary" onclick="_fpRenderStep1()"><i class="fas fa-arrow-left me-1"></i>Back</button>' +
                 '<button class="btn btn-primary" onclick="_fpGoToStep3()" ' + (_fpShapes.length ? '' : 'disabled') + '>Review <i class="fas fa-arrow-right ms-1"></i></button>' +
                 '</div>';
-            setTimeout(function() { _fpLoadCanvas(); }, 0);
+            setTimeout(function() { _fpLoadCanvas(); _fpMaybeShowCalibrationPopup(); }, 0);
         }
 
         function _fpToolButton(tool, icon, label) {
@@ -593,7 +597,11 @@
             _fpCanvas.addEventListener('mousemove', _fpCanvasMove);
             _fpCanvas.addEventListener('wheel', _fpCanvasWheel, { passive: false });
             _fpCanvas.addEventListener('contextmenu', function(e) { e.preventDefault(); });
-            window.addEventListener('mouseup', _fpCanvasUp);
+            if (!_fpGlobalCanvasEventsAttached) {
+                _fpGlobalCanvasEventsAttached = true;
+                window.addEventListener('mousemove', _fpCanvasMove);
+                window.addEventListener('mouseup', _fpCanvasUp);
+            }
             _fpCanvas.addEventListener('dblclick', function(e) {
                 if (_fpTool === 'polygon') { e.preventDefault(); _fpFinishPolygon(); }
             });
@@ -666,6 +674,60 @@
             else _fpCanvas.style.cursor = 'crosshair';
         }
 
+        function _fpEnsureScaleCueStyle() {
+            if (document.getElementById('fpScaleCueStyle')) return;
+            var style = document.createElement('style');
+            style.id = 'fpScaleCueStyle';
+            style.textContent = '@keyframes fpScaleCuePulse{0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,0);transform:translateX(0)}18%{box-shadow:0 0 0 4px rgba(245,158,11,.35);transform:translateX(-4px)}36%{transform:translateX(4px)}54%{transform:translateX(-3px)}72%{transform:translateX(3px)}}.fp-scale-cue{animation:fpScaleCuePulse 1.1s ease-in-out 0s 3;border-color:#f59e0b!important;background:#fffbeb!important;}';
+            document.head.appendChild(style);
+        }
+
+        function _fpPromptKnownLength() {
+            _fpEnsureScaleCueStyle();
+            var panel = document.getElementById('fpScalePanel');
+            var input = document.getElementById('fpKnownLength');
+            var cue = document.getElementById('fpKnownLengthCue');
+            if (cue) cue.style.display = 'block';
+            if (panel) {
+                panel.classList.remove('fp-scale-cue');
+                void panel.offsetWidth;
+                panel.classList.add('fp-scale-cue');
+                panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+            if (input) {
+                setTimeout(function() { input.focus(); input.select(); }, 120);
+            }
+        }
+
+        function _fpMaybeShowCalibrationPopup() {
+            if (_fpScale || localStorage.getItem('fp_calibration_intro_hidden') === '1') return;
+            if (_fpCalibrationIntroShown) return;
+            if (document.getElementById('fpCalibrationIntroOverlay')) return;
+            _fpCalibrationIntroShown = true;
+            var overlay = document.createElement('div');
+            overlay.id = 'fpCalibrationIntroOverlay';
+            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.38);z-index:20001;display:flex;align-items:center;justify-content:center;padding:18px;';
+            overlay.innerHTML =
+                '<div style="background:white;border-radius:10px;box-shadow:0 18px 50px rgba(0,0,0,0.25);max-width:560px;width:100%;overflow:hidden;">' +
+                '<div style="background:#1f5ea8;color:white;padding:14px 18px;font-weight:700;"><i class="fas fa-ruler-combined me-2"></i>Calibrate the scale first</div>' +
+                '<div style="padding:18px;">' +
+                '<p class="mb-3">Trace a dimension you know the length of as accurately as possible, then type it into the <strong>Known line length in feet</strong> field on the right.</p>' +
+                '<p class="text-muted small mb-3">Tip: zoom with your mouse wheel, then right-click and drag to move around while zoomed in.</p>' +
+                '<div class="d-flex align-items-center justify-content-between gap-3">' +
+                '<button class="btn btn-primary" onclick="_fpCloseCalibrationPopup()"><i class="fas fa-check me-1"></i>Got it</button>' +
+                '<label class="form-check-label small text-muted ms-auto"><input class="form-check-input me-1" type="checkbox" id="fpCalibrationDontShow"> Do not show this message again</label>' +
+                '</div>' +
+                '</div></div>';
+            document.body.appendChild(overlay);
+        }
+
+        function _fpCloseCalibrationPopup() {
+            var dontShow = document.getElementById('fpCalibrationDontShow');
+            if (dontShow && dontShow.checked) localStorage.setItem('fp_calibration_intro_hidden', '1');
+            var overlay = document.getElementById('fpCalibrationIntroOverlay');
+            if (overlay) overlay.remove();
+        }
+
         function _fpCanvasPoint(e) {
             var rect = _fpCanvas.getBoundingClientRect();
             var sx = _fpCanvas.width / rect.width;
@@ -679,6 +741,7 @@
                 e.preventDefault();
                 if (!_fpCanvas.parentElement || (_fpCanvasZoom || 1) <= 1.01) return;
                 _fpPanActive = true;
+                _fpPanStarted = false;
                 _fpPanStartX = e.clientX;
                 _fpPanStartY = e.clientY;
                 _fpPanStartScrollLeft = _fpCanvas.parentElement.scrollLeft || 0;
@@ -708,6 +771,7 @@
                 wrap.scrollTop = _fpPanStartScrollTop - (e.clientY - _fpPanStartY);
                 _fpCanvasScrollLeft = wrap.scrollLeft;
                 _fpCanvasScrollTop = wrap.scrollTop;
+                _fpPanStarted = true;
                 return;
             }
             if (!_fpCanvasReady || !_fpDraft) return;
@@ -724,6 +788,10 @@
             if (_fpPanActive) {
                 _fpPanActive = false;
                 _fpUpdateCanvasCursor();
+                if (_fpPanStarted && _fpCanvas && _fpCanvas.parentElement) {
+                    _fpCanvasScrollLeft = _fpCanvas.parentElement.scrollLeft || 0;
+                    _fpCanvasScrollTop = _fpCanvas.parentElement.scrollTop || 0;
+                }
                 return;
             }
             if (!_fpMouseDown || !_fpDraft) return;
@@ -731,6 +799,7 @@
             if (_fpTool === 'calibrate') {
                 _fpDrawCanvas();
                 _fpShowMeasureNotice('Enter the real length and press Set.');
+                _fpPromptKnownLength();
                 return;
             }
             if (!_fpScale) { _fpDraft = null; _fpShowMeasureNotice('Calibrate the scale before drawing rooms.'); _fpDrawCanvas(); return; }
