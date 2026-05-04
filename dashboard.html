@@ -637,10 +637,12 @@
                         break;
                     }
                 }
-                var url = 'https://quotedr.io/client-portal.html?'
-                    + (clientEmail ? 'email=' + encodeURIComponent(clientEmail) : 'client=' + encodeURIComponent(selectedName || clientName))
-                    + '&contractor=' + encodeURIComponent(userId)
-                    + (quoteId ? '&quote=' + encodeURIComponent(quoteId) : '');
+                var portalParams = [];
+                if (clientEmail) portalParams.push('email=' + encodeURIComponent(clientEmail));
+                portalParams.push('client=' + encodeURIComponent(selectedName || clientName || clientEmail || 'Client'));
+                portalParams.push('contractor=' + encodeURIComponent(userId));
+                if (quoteId) portalParams.push('quote=' + encodeURIComponent(quoteId));
+                var url = 'https://quotedr.io/client-portal.html?' + portalParams.join('&');
                 document.getElementById('portalUrlDisplay').value = url;
                 document.getElementById('portalPinDisplay').textContent = pin;
 
