@@ -292,6 +292,14 @@ if (location.search.includes('debug')) {
 							<option value="NZD">🇳🇿 NZD — New Zealand Dollar</option>
 						</select>
 					</div>
+					<div class="col-sm-6">
+						<label class="form-label fw-bold">Units of Measurement<button type="button" class="qd-inline-help-btn" title="Help with units of measurement" aria-label="Help with units of measurement" onclick="qdAlert('Choose Imperial for feet, inches, square feet, and linear feet. Choose Metric for meters, centimeters, and square meters. Quote Dr will use this preference in calculators, map measurements, quote rows, invoices, and client views.', { title: 'Units of Measurement', type: 'info' }); return false;"><i class="fas fa-question"></i></button></label>
+						<select class="form-select" id="measurementSystemSetting" style="max-width:240px;">
+							<option value="imperial">Imperial - ft, in, sq ft, LF</option>
+							<option value="metric">Metric - m, cm, m²</option>
+						</select>
+						<div class="form-text">Controls measurements throughout Quote Dr. Currency is separate.</div>
+					</div>
 				</div>
 			<div class="mt-3 d-flex align-items-center gap-3">
 				<button type="button" class="btn btn-save btn-primary" onclick="saveQuotePrefs()">
@@ -1000,7 +1008,7 @@ Sarah Jones, 905-555-5678"></textarea>
 		// ── Settings Search ──────────────────────────────────────────────────
 		var settingsIndex = [
 			{ tab: 'business', keywords: ['business','company','name','logo','phone','email','address','hst','tagline','owner','city','province','postal'], label: 'Business Profile' },
-			{ tab: 'quotes', keywords: ['quote','prefix','tax','valid','expiry','markup','terms','conditions','heading','number','send','client view','message','deposit','commitment'], label: 'Quote Preferences & Send Settings' },
+			{ tab: 'quotes', keywords: ['quote','prefix','tax','valid','expiry','markup','terms','conditions','heading','number','send','client view','message','deposit','commitment','units','measurement','metric','imperial','feet','inches','meters'], label: 'Quote Preferences & Send Settings' },
 			{ tab: 'pricing', keywords: ['pricing','items','materials','import','export','ai','csv','custom','clients','quickbooks'], label: 'Pricing & Data' },
 			{ tab: 'notifications', keywords: ['email','reminder','followup','follow-up','notification','auto','automatic','days','message'], label: 'Notifications & Reminders' },
 			{ tab: 'feedback', keywords: ['bug','report','feature','request','feedback','idea','problem','issue','broken'], label: 'Feedback & Bug Reports' },
@@ -1188,6 +1196,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			if (document.getElementById('taxRate') && savedPrefs.taxRate !== undefined) document.getElementById('taxRate').value = savedPrefs.taxRate;
 			if (document.getElementById('taxLabel') && savedPrefs.taxLabel) document.getElementById('taxLabel').value = savedPrefs.taxLabel;
 			if (document.getElementById('currencySetting') && savedPrefs.currency) document.getElementById('currencySetting').value = savedPrefs.currency;
+			if (document.getElementById('measurementSystemSetting')) document.getElementById('measurementSystemSetting').value = savedPrefs.measurementSystem === 'metric' ? 'metric' : 'imperial';
 			loadEmailTemplate();
 		});
 
@@ -1456,7 +1465,8 @@ Sarah Jones, 905-555-5678"></textarea>
 				showPrefix: document.getElementById('showPrefix').checked,
 				taxRate: document.getElementById('taxRate') ? document.getElementById('taxRate').value : '13',
 				taxLabel: document.getElementById('taxLabel') ? document.getElementById('taxLabel').value.trim() || 'HST' : 'HST',
-				currency: document.getElementById('currencySetting') ? document.getElementById('currencySetting').value : 'CAD'
+				currency: document.getElementById('currencySetting') ? document.getElementById('currencySetting').value : 'CAD',
+				measurementSystem: document.getElementById('measurementSystemSetting') ? document.getElementById('measurementSystemSetting').value : 'imperial'
 			};
 			localStorage.setItem('ald_quote_prefs', JSON.stringify(prefs));
 			

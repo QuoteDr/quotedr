@@ -1483,7 +1483,7 @@ if (location.search.includes('debug')) {
                                 </div>
                                 <div style="text-align:right; min-width:140px; padding-left:16px;">
                                     <div><strong>$${itemTotal.toFixed(2)}</strong></div>
-                                    <small class="text-muted">${item.quantity} ${item.unitType} @ $${activeRate.toFixed(2)}</small>
+                                    <small class="text-muted">${typeof qdFormatQuantity === 'function' ? qdFormatQuantity(item.quantity, item.unitType || item.unit || '') : (item.quantity + ' ' + (item.unitType || ''))} @ $${activeRate.toFixed(2)}</small>
                                 </div>
                             </div>
                             ${renderExpandableDescription(displayDesc, `itemdesc_${roomIdx}_${itemIndex}`)}

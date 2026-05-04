@@ -753,6 +753,93 @@ async function hasFeature(feature) {
     return (QUOTEDR_PLAN_FEATURES[plan] || QUOTEDR_PLAN_FEATURES.basic).includes(feature);
 }
 
+function getMeasurementSystem() {
+    try {
+        var prefs = JSON.parse(localStorage.getItem('ald_quote_prefs') || '{}');
+        return prefs.measurementSystem === 'metric' ? 'metric' : 'imperial';
+    } catch(e) {
+        return 'imperial';
+    }
+}
+
+function qdNormalizeUnit(unit) {
+    return String(unit || '').trim().toLowerCase().replace(/\./g, '').replace(/\s+/g, '');
+}
+
+function qdMeasurementDecimals(value) {
+    value = Math.abs(parseFloat(value) || 0);
+    if (value >= 100) return 0;
+    if (value >= 10) return 1;
+    return 2;
+}
+
+function qdFormatMeasurementNumber(value, decimals) {
+    value = parseFloat(value) || 0;
+    return value.toLocaleString(undefined, {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: decimals !== undefined ? decimals : qdMeasurementDecimals(value)
+    });
+}
+
+function qdDisplayUnit(unit) {
+    var system = getMeasurementSystem();
+    var normalized = qdNormalizeUnit(unit);
+    if (system === 'metric') {
+        if (['sqft','sf','sqfeet','squarefeet','sqft'].includes(normalized)) return 'm\u00b2';
+        if (['lf','linearft','linearfeet','ft','feet','foot'].includes(normalized)) return 'm';
+        if (['in','inch','inches'].includes(normalized)) return 'cm';
+        if (['m2','m\u00b2','sqm','squaremeter','squaremeters'].includes(normalized)) return 'm\u00b2';
+        if (['m','meter','meters','metre','metres'].includes(normalized)) return 'm';
+        if (['cm','centimeter','centimeters','centimetre','centimetres'].includes(normalized)) return 'cm';
+    }
+    if (['m2','m\u00b2','sqm','squaremeter','squaremeters'].includes(normalized)) return 'sq ft';
+    if (['m','meter','meters','metre','metres'].includes(normalized)) return 'LF';
+    if (['cm','centimeter','centimeters','centimetre','centimetres'].includes(normalized)) return 'in';
+    if (['sqft','sf','sqfeet','squarefeet'].includes(normalized)) return 'sq ft';
+    if (['lf','linearft','linearfeet'].includes(normalized)) return 'LF';
+    if (['ft','feet','foot'].includes(normalized)) return 'ft';
+    if (['in','inch','inches'].includes(normalized)) return 'in';
+    return unit || '';
+}
+
+function qdConvertMeasurementValue(value, unit) {
+    var system = getMeasurementSystem();
+    var normalized = qdNormalizeUnit(unit);
+    value = parseFloat(value) || 0;
+    if (system !== 'metric') {
+        if (['m2','m\u00b2','sqm','squaremeter','squaremeters'].includes(normalized)) return value / 0.09290304;
+        if (['m','meter','meters','metre','metres'].includes(normalized)) return value / 0.3048;
+        if (['cm','centimeter','centimeters','centimetre','centimetres'].includes(normalized)) return value / 2.54;
+        return value;
+    }
+    if (['sqft','sf','sqfeet','squarefeet'].includes(normalized)) return value * 0.09290304;
+    if (['lf','linearft','linearfeet','ft','feet','foot'].includes(normalized)) return value * 0.3048;
+    if (['in','inch','inches'].includes(normalized)) return value * 2.54;
+    return value;
+}
+
+function qdFormatQuantity(quantity, unit) {
+    var converted = qdConvertMeasurementValue(quantity, unit);
+    var displayUnit = qdDisplayUnit(unit);
+    return qdFormatMeasurementNumber(converted) + (displayUnit ? ' ' + displayUnit : '');
+}
+
+function qdConvertMetricInputToImperial(value, unit) {
+    if (getMeasurementSystem() !== 'metric') return parseFloat(value) || 0;
+    var normalized = qdNormalizeUnit(unit);
+    value = parseFloat(value) || 0;
+    if (['sqft','sf','sqfeet','squarefeet'].includes(normalized)) return value / 0.09290304;
+    if (['lf','linearft','linearfeet','ft','feet','foot'].includes(normalized)) return value / 0.3048;
+    if (['in','inch','inches'].includes(normalized)) return value / 2.54;
+    return value;
+}
+
+window.getMeasurementSystem = getMeasurementSystem;
+window.qdDisplayUnit = qdDisplayUnit;
+window.qdFormatQuantity = qdFormatQuantity;
+window.qdConvertMeasurementValue = qdConvertMeasurementValue;
+window.qdConvertMetricInputToImperial = qdConvertMetricInputToImperial;
+
 function showUpgradePrompt(featureName) {
     var label = featureName || 'This feature';
     var msg = label + ' is included with QuoteDr Pro. Upgrade to unlock this tool.';

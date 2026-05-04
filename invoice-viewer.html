@@ -639,7 +639,7 @@ if (location.search.includes('debug')) {
                                     ${isUpgraded ? '<span class="item-upgraded-badge">⬆ Upgraded</span>' : ''}
                                     ${descHtml}
                                 </td>
-                                <td style="text-align:center; vertical-align:top; padding-top:10px;">${item.quantity || 0} ${item.unitType || ''}</td>
+                                <td style="text-align:center; vertical-align:top; padding-top:10px;">${typeof qdFormatQuantity === 'function' ? qdFormatQuantity(item.quantity || 0, item.unitType || item.unit || '') : ((item.quantity || 0) + ' ' + (item.unitType || ''))}</td>
                                 <td style="text-align:right; vertical-align:top; padding-top:10px;">$${activeRate.toFixed(2)}</td>
                                 <td style="text-align:right; vertical-align:top; padding-top:10px; font-weight:600;">$${itemTotal.toFixed(2)}</td>
                             </tr>`;

@@ -1,6 +1,115 @@
 // Quote Dr material estimator and calculator helpers.
 // Extracted from quote-builder.html so the quote builder shell stays easier to maintain.
 
+        function calcIsMetric() {
+            return typeof getMeasurementSystem === 'function' && getMeasurementSystem() === 'metric';
+        }
+
+        function calcAreaUnit() {
+            return calcIsMetric() ? 'm\u00b2' : 'sqft';
+        }
+
+        function calcLengthUnit() {
+            return calcIsMetric() ? 'm' : 'LF';
+        }
+
+        function calcHeightUnit() {
+            return calcIsMetric() ? 'm' : 'ft';
+        }
+
+        function calcFormatQuantity(value, unit) {
+            if (typeof qdFormatQuantity === 'function') return qdFormatQuantity(value, unit);
+            return (parseFloat(value) || 0).toLocaleString() + ' ' + unit;
+        }
+
+        function calcDoorAreaDeduction() {
+            return calcIsMetric() ? 1.86 : 20;
+        }
+
+        function calcWindowAreaDeduction() {
+            return calcIsMetric() ? 1.39 : 15;
+        }
+
+        function calcDoorCasingLength() {
+            return calcIsMetric() ? 10.67 : 35;
+        }
+
+        function calcWindowCasingLength() {
+            return calcIsMetric() ? 5.49 : 18;
+        }
+
+        function applyCalculatorMeasurementLabels() {
+            var area = calcAreaUnit();
+            var height = calcHeightUnit();
+            [
+                ['hardwoodWidth', 'Width (' + height + ')'],
+                ['hardwoodLength', 'Length (' + height + ')'],
+                ['hardwoodTotalSqft', 'Total ' + area],
+                ['hardwoodSqftPerBox', area + ' per Box'],
+                ['paintWidth', 'Width (' + height + ')'],
+                ['paintLength', 'Length (' + height + ')'],
+                ['paintHeight', 'Ceiling Height (' + height + ')'],
+                ['paintWallSqft', 'Wall ' + area],
+                ['paintCeilingSqft', 'Ceiling ' + area + ' (optional)'],
+                ['paintCoverage', 'Coverage per Gallon (' + area + ')'],
+                ['hardwoodScanSqft', 'Total ' + area + ' (scanned)'],
+                ['paintScanSqft', 'Total ' + area + ' (scanned)'],
+                ['drywallScanSqft', 'Total ' + area + ' (scanned)'],
+                ['drywallWidth', 'Width (' + height + ')'],
+                ['drywallLength', 'Length (' + height + ')'],
+                ['drywallHeight', 'Ceiling Height (' + height + ')'],
+                ['drywallWallSqft', 'Wall ' + area],
+                ['drywallCeilingSqft', 'Ceiling ' + area + ' (optional)']
+            ].forEach(function(pair) {
+                var label = document.querySelector('label[for="' + pair[0] + '"]');
+                if (label) label.textContent = pair[1];
+            });
+            var hardwoodToggle = document.querySelector('label[for="hardwoodToggleDimensions"]');
+            var paintToggle = document.querySelector('label[for="paintToggleDimensions"]');
+            var drywallToggle = document.querySelector('label[for="drywallToggleDimensions"]');
+            if (hardwoodToggle) hardwoodToggle.textContent = 'Enter Dimensions (' + height + ') instead of Total ' + area;
+            if (paintToggle) paintToggle.textContent = 'Enter room dimensions instead of ' + area;
+            if (drywallToggle) drywallToggle.textContent = 'Enter room dimensions instead of ' + area;
+            var plankLabel = document.querySelector('label[for="hardwoodPlankWidth"]');
+            var plankSelect = document.getElementById('hardwoodPlankWidth');
+            if (plankLabel && plankSelect) {
+                plankLabel.textContent = calcIsMetric() ? 'Plank Width (mm)' : 'Plank Width (inches)';
+                var plankOptions = calcIsMetric()
+                    ? [['76', '76 mm'], ['102', '102 mm'], ['127', '127 mm'], ['152', '152 mm'], ['178', '178 mm'], ['203', '203 mm']]
+                    : [['3', '3 inches'], ['4', '4 inches'], ['5', '5 inches'], ['6', '6 inches'], ['7', '7 inches'], ['8', '8 inches']];
+                plankSelect.innerHTML = plankOptions.map(function(option, index) {
+                    return '<option value="' + option[0] + '"' + (index === 1 ? ' selected' : '') + '>' + option[1] + '</option>';
+                }).join('');
+            }
+            ['hardwoodTotalSqft','paintWallSqft','paintCeilingSqft','drywallWallSqft','drywallCeilingSqft'].forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) el.placeholder = area;
+            });
+            [
+                ['estWidth', 'Width (' + height + ')'],
+                ['estLength', 'Length (' + height + ')']
+            ].forEach(function(pair) {
+                var input = document.getElementById(pair[0]);
+                var label = input && input.closest('div') ? input.closest('div').querySelector('label') : null;
+                if (label) label.textContent = pair[1];
+            });
+            var ceilingOptions = calcIsMetric()
+                ? [['ceil8', '2.4 m', '2.4'], ['ceil9', '2.7 m', '2.7'], ['ceil10', '3.0 m', '3.0']]
+                : [['ceil8', '8 ft', '8'], ['ceil9', '9 ft', '9'], ['ceil10', '10 ft', '10']];
+            ceilingOptions.forEach(function(option) {
+                var input = document.getElementById(option[0]);
+                var label = document.querySelector('label[for="' + option[0] + '"]');
+                if (input) input.value = option[2];
+                if (label) label.textContent = option[1];
+            });
+            var customCeiling = document.getElementById('estCeilingCustom');
+            if (customCeiling) customCeiling.placeholder = height;
+            var doorsText = document.getElementById('estDoors') && document.getElementById('estDoors').parentElement ? document.getElementById('estDoors').parentElement.querySelector('.form-text') : null;
+            var windowsText = document.getElementById('estWindows') && document.getElementById('estWindows').parentElement ? document.getElementById('estWindows').parentElement.querySelector('.form-text') : null;
+            if (doorsText) doorsText.textContent = 'Each door adds ' + calcDoorCasingLength().toFixed(calcIsMetric() ? 2 : 0) + ' ' + calcLengthUnit() + ' of casing trim';
+            if (windowsText) windowsText.textContent = 'Each window adds ' + calcWindowCasingLength().toFixed(calcIsMetric() ? 2 : 0) + ' ' + calcLengthUnit() + ' of casing trim';
+        }
+
         // -- Material Estimator ---------------------------------------------
 
         var EST_FIELDS = [
@@ -53,8 +162,9 @@
             var html = '';
             EST_FIELDS.forEach(function(f) {
                 var savedRate = (saved[f.key] && saved[f.key].rate) || '';
+                var displayUnit = (f.unit === 'sqft') ? calcAreaUnit() : (f.unit === 'LF' ? calcLengthUnit() : f.unit);
                 html += '<div class="row g-2 align-items-center mb-3">';
-                html += '<div class="col-5"><label class="form-label fw-semibold mb-0">' + f.label + '</label><div class="text-muted small">per ' + f.unit + '</div></div>';
+                html += '<div class="col-5"><label class="form-label fw-semibold mb-0">' + f.label + '</label><div class="text-muted small">per ' + displayUnit + '</div></div>';
                 html += '<div class="col-4">';
                 // Dropdown of matching saved items
                 html += '<select class="form-select form-select-sm" id="epItem_' + f.key + '" onchange="epItemSelected(\'' + f.key + '\')"><option value="">Pick from my items...</option>';
@@ -83,6 +193,7 @@
         }
 
         function openMaterialEstimator() {
+            applyCalculatorMeasurementLabels();
             // Reset to input state
             document.getElementById('estInputSection').style.display = 'block';
             document.getElementById('estResultsSection').style.display = 'none';
@@ -126,8 +237,8 @@
             var floorSqft = Math.round(w * l * 10) / 10;
             var wallSqft = Math.round((2 * w + 2 * l) * ceilH * 10) / 10;
             var perimeter = Math.round((2 * w + 2 * l) * 10) / 10;
-            var doorCasing = doors * 35;
-            var windowCasing = windows * 18;
+            var doorCasing = doors * calcDoorCasingLength();
+            var windowCasing = windows * calcWindowCasingLength();
 
             var pricing = loadEstimatorPricing();
             var hasPricing = Object.keys(pricing).length > 0;
@@ -137,12 +248,12 @@
 
             document.getElementById('estResultRoomName').textContent = name;
             var rows = [
-                { key: 'flooring',     label: 'Flooring',       qty: floorSqft,    unit: 'sqft', cat: 'Flooring',        itemName: 'Flooring - ' + name },
-                { key: 'ceilingPaint', label: 'Ceiling Paint',  qty: floorSqft,    unit: 'sqft', cat: 'Painting',        itemName: 'Ceiling Paint - ' + name },
-                { key: 'wallPaint',    label: 'Wall Paint',     qty: wallSqft,     unit: 'sqft', cat: 'Painting',        itemName: 'Wall Paint - ' + name },
-                { key: 'baseboard',    label: 'Baseboard',      qty: perimeter,    unit: 'LF',   cat: 'Trim & Millwork', itemName: 'Baseboard - ' + name },
-                { key: 'doorCasing',   label: 'Door Casing',    qty: doorCasing,   unit: 'LF',   cat: 'Trim & Millwork', itemName: 'Door Casing - ' + name, hide: doors === 0 },
-                { key: 'windowCasing', label: 'Window Casing',  qty: windowCasing, unit: 'LF',   cat: 'Trim & Millwork', itemName: 'Window Casing - ' + name, hide: windows === 0 },
+                { key: 'flooring',     label: 'Flooring',       qty: floorSqft,    unit: calcAreaUnit(),   cat: 'Flooring',        itemName: 'Flooring - ' + name },
+                { key: 'ceilingPaint', label: 'Ceiling Paint',  qty: floorSqft,    unit: calcAreaUnit(),   cat: 'Painting',        itemName: 'Ceiling Paint - ' + name },
+                { key: 'wallPaint',    label: 'Wall Paint',     qty: wallSqft,     unit: calcAreaUnit(),   cat: 'Painting',        itemName: 'Wall Paint - ' + name },
+                { key: 'baseboard',    label: 'Baseboard',      qty: perimeter,    unit: calcLengthUnit(), cat: 'Trim & Millwork', itemName: 'Baseboard - ' + name },
+                { key: 'doorCasing',   label: 'Door Casing',    qty: doorCasing,   unit: calcLengthUnit(), cat: 'Trim & Millwork', itemName: 'Door Casing - ' + name, hide: doors === 0 },
+                { key: 'windowCasing', label: 'Window Casing',  qty: windowCasing, unit: calcLengthUnit(), cat: 'Trim & Millwork', itemName: 'Window Casing - ' + name, hide: windows === 0 },
             ];
 
             var html = '';
@@ -155,7 +266,7 @@
                 html += '<tr data-cat="' + r.cat + '" data-name="' + r.itemName + '" data-unit="' + r.unit + '" data-qty="' + r.qty + '" data-rate="' + rate + '">';
                 html += '<td><input type="checkbox" class="form-check-input est-check" checked></td>';
                 html += '<td>' + r.label + '</td>';
-                html += '<td>' + r.qty.toLocaleString() + '</td>';
+                html += '<td>' + calcFormatQuantity(r.qty, r.unit) + '</td>';
                 html += '<td class="text-muted">' + r.unit + '</td>';
                 html += '<td>' + (rate > 0 ? '$' + rate.toFixed(2) : '<span class="text-muted">-</span>') + '</td>';
                 html += '<td>' + (total > 0 ? '$' + total.toFixed(2) : '<span class="text-muted">-</span>') + '</td>';
@@ -210,6 +321,7 @@
 // === MATERIAL CALCULATORS (Hardwood/LVP, Paint, Drywall) ===
 // Hardwood/LVP Calculator Functions
 function openHardwoodCalc() {
+    applyCalculatorMeasurementLabels();
     var modal = new bootstrap.Modal(document.getElementById('hardwoodCalcModal'));
     modal.show();
 
@@ -220,7 +332,7 @@ function openHardwoodCalc() {
     document.getElementById('hardwoodTotalSqft').value = '';
     document.getElementById('hardwoodPlankWidth').value = '4';
     document.getElementById('hardwoodWaste').value = '10';
-    document.getElementById('hardwoodSqftPerBox').value = '20';
+    document.getElementById('hardwoodSqftPerBox').value = calcIsMetric() ? '1.86' : '20';
     document.getElementById('hardwoodCostPerBox').value = '';
 
     // Reset results
@@ -274,7 +386,7 @@ function calculateHardwood() {
     const materialCost = costPerBox > 0 ? boxesNeeded * costPerBox : 0;
 
     // Display results
-    let resultText = `Total sqft (with ${wastePercent}% waste): ${totalWithWaste.toFixed(1)} sqft (${totalSqft.toFixed(1)} + ${wastePercent}% waste)<br>`;
+    let resultText = `Total ${calcAreaUnit()} (with ${wastePercent}% waste): ${totalWithWaste.toFixed(1)} ${calcAreaUnit()} (${totalSqft.toFixed(1)} + ${wastePercent}% waste)<br>`;
     resultText += `Boxes needed: ${boxesNeeded}<br>`;
 
     if (costPerBox > 0) {
@@ -304,7 +416,7 @@ function addToHardwoodQuote() {
     room.items.push({
         description: `Hardwood/LVP - ${roomName}`,
         category: 'Flooring',
-        unitType: 'sqft',
+        unitType: calcAreaUnit(),
         quantity: totalSqft,
         rate: 0,
         total: 0,
@@ -333,7 +445,7 @@ function scanHardwoodQuote() {
             var normalizedCatF = (item.category || '').trim().toLowerCase();
             var isFlooring = normalizedCatF === 'flooring' || normalizedCatF === 'subflooring' || normalizedCatF.includes('floor') || (item.description && /flooring|hardwood|lvp|laminate|vinyl|tile/i.test(item.description));
             var normalizedUnitF = (item.unitType || '').trim().toLowerCase().replace(/\s+/g, '');
-            var isSqft = !item.unitType || normalizedUnitF === 'sqft' || normalizedUnitF === 'sf';
+            var isSqft = !item.unitType || normalizedUnitF === 'sqft' || normalizedUnitF === 'sf' || normalizedUnitF === 'm²' || normalizedUnitF === 'm2';
             if (isFlooring && isSqft) {
                 totalSqft += item.quantity;
                 if (!roomMap[room.name]) {
@@ -350,7 +462,7 @@ function scanHardwoodQuote() {
 
     let details = '';
     for (let room in roomMap) {
-        details += `${room} (${roomMap[room].toFixed(1)}sqft), `;
+        details += `${room} (${roomMap[room].toFixed(1)} ${calcAreaUnit()}), `;
     }
     document.getElementById('hardwoodScanDetails').textContent = details.slice(0, -2);
 
@@ -365,6 +477,7 @@ function scanHardwoodQuote() {
 
 // Paint Calculator Functions
 function openPaintCalc() {
+    applyCalculatorMeasurementLabels();
     var modal = new bootstrap.Modal(document.getElementById('paintCalcModal'));
     modal.show();
 
@@ -372,7 +485,7 @@ function openPaintCalc() {
     document.getElementById('paintRoomName').value = 'Living Room';
     document.getElementById('paintWidth').value = '';
     document.getElementById('paintLength').value = '';
-    document.getElementById('paintHeight').value = '9';
+    document.getElementById('paintHeight').value = calcIsMetric() ? '2.7' : '9';
     document.getElementById('paintWallSqft').value = '';
     document.getElementById('paintCeilingSqft').value = '';
     document.getElementById('paintDoors').value = '0';
@@ -380,7 +493,7 @@ function openPaintCalc() {
     document.getElementById('paintCoats1').checked = true;
     document.getElementById('paintIncludeCeiling').checked = true;
     document.getElementById('paintIncludePrimer').checked = false;
-    document.getElementById('paintCoverage').value = '400';
+    document.getElementById('paintCoverage').value = calcIsMetric() ? '37' : '400';
 
     // Reset results
     document.getElementById('paintResults').classList.add('d-none');
@@ -419,8 +532,8 @@ function calculatePaint() {
         // Calculate wall area
         wallSqft = 2 * (width + length) * height;
         // Subtract doors and windows
-        wallSqft -= doors * 20;
-        wallSqft -= windows * 15;
+        wallSqft -= doors * calcDoorAreaDeduction();
+        wallSqft -= windows * calcWindowAreaDeduction();
         if (wallSqft < 0) wallSqft = 0;
 
         ceilingSqft = width * length;
@@ -459,9 +572,9 @@ function calculatePaint() {
     const totalGallons = wallGallons + ceilingGallons + primerGallons;
 
     // Display results
-    let resultText = `Wall sqft: ${wallSqft.toFixed(1)}<br>`;
+    let resultText = `Wall ${calcAreaUnit()}: ${wallSqft.toFixed(1)}<br>`;
     if (includeCeiling && ceilingSqft > 0) {
-        resultText += `Ceiling sqft: ${ceilingSqft.toFixed(1)}<br>`;
+        resultText += `Ceiling ${calcAreaUnit()}: ${ceilingSqft.toFixed(1)}<br>`;
     }
 
     if (wallGallons > 0) {
@@ -502,7 +615,7 @@ function addToPaintQuote() {
     room.items.push({
         description: `Wall Paint - ${roomName}`,
         category: 'Painting',
-        unitType: 'sqft',
+        unitType: calcAreaUnit(),
         quantity: wallSqft,
         rate: 0,
         total: 0,
@@ -518,7 +631,7 @@ function addToPaintQuote() {
         room.items.push({
             description: `Ceiling Paint - ${roomName}`,
             category: 'Painting',
-            unitType: 'sqft',
+            unitType: calcAreaUnit(),
             quantity: ceilingSqft,
             rate: 0,
             total: 0,
@@ -548,7 +661,7 @@ function scanPaintQuote() {
             var normalizedCatP = (item.category || '').trim().toLowerCase();
             var isPainting = normalizedCatP === 'painting' || normalizedCatP.includes('paint') || (item.description && /paint/i.test(item.description));
             var normalizedUnitP = (item.unitType || '').trim().toLowerCase().replace(/\s+/g, '');
-            var isSqftP = !item.unitType || normalizedUnitP === 'sqft' || normalizedUnitP === 'sf';
+            var isSqftP = !item.unitType || normalizedUnitP === 'sqft' || normalizedUnitP === 'sf' || normalizedUnitP === 'm²' || normalizedUnitP === 'm2';
             if (isPainting && isSqftP) {
                 totalSqft += item.quantity;
                 if (!roomMap[room.name]) {
@@ -565,7 +678,7 @@ function scanPaintQuote() {
 
     let details = '';
     for (let room in roomMap) {
-        details += `${room} (${roomMap[room].toFixed(1)}sqft), `;
+        details += `${room} (${roomMap[room].toFixed(1)} ${calcAreaUnit()}), `;
     }
     document.getElementById('paintScanDetails').textContent = details.slice(0, -2);
 
@@ -580,12 +693,13 @@ function scanPaintQuote() {
 
 // Drywall Calculator Functions
 function openDrywallCalc() {
+    applyCalculatorMeasurementLabels();
     var modal = new bootstrap.Modal(document.getElementById('drywallCalcModal'));
     modal.show();
     document.getElementById('drywallRoomName').value = 'Living Room';
     document.getElementById('drywallWidth').value = '';
     document.getElementById('drywallLength').value = '';
-    document.getElementById('drywallHeight').value = '9';
+    document.getElementById('drywallHeight').value = calcIsMetric() ? '2.7' : '9';
     document.getElementById('drywallWallSqft').value = '';
     document.getElementById('drywallCeilingSqft').value = '';
     document.getElementById('drywallDoors').value = '0';
@@ -618,7 +732,7 @@ function calculateDrywall() {
         var h = parseFloat(document.getElementById('drywallHeight').value) || 9;
         doors = parseInt(document.getElementById('drywallDoors').value) || 0;
         windows = parseInt(document.getElementById('drywallWindows').value) || 0;
-        wallSqft = 2 * (w + l) * h - (doors * 20) - (windows * 15);
+        wallSqft = 2 * (w + l) * h - (doors * calcDoorAreaDeduction()) - (windows * calcWindowAreaDeduction());
         if (wallSqft < 0) wallSqft = 0;
         ceilingSqft = w * l;
     } else {
@@ -642,7 +756,7 @@ function calculateDrywall() {
     var screwBoxes = Math.ceil(totalWithWaste / 200);
     var txt = '<table class="table table-sm table-bordered mb-0">';
     txt += '<tr><th colspan="2">Drywall Materials &mdash; ' + roomName + ' (' + (finishLevel === 'level5' ? 'Level 5 finish' : 'Standard 3-coat') + ')</th></tr>';
-    txt += '<tr><td>Total sqft (with ' + waste + '% waste)</td><td><strong>' + totalWithWaste.toFixed(1) + ' sqft</strong> <small class="text-muted">(' + totalSqft.toFixed(1) + ' base)</small></td></tr>';
+    txt += '<tr><td>Total ' + calcAreaUnit() + ' (with ' + waste + '% waste)</td><td><strong>' + totalWithWaste.toFixed(1) + ' ' + calcAreaUnit() + '</strong> <small class="text-muted">(' + totalSqft.toFixed(1) + ' base)</small></td></tr>';
     txt += '<tr><td>Sheets of 4&times;8 drywall</td><td><strong>' + sheets + ' sheets</strong></td></tr>';
     txt += '<tr><td>Joint compound (4.5 gal buckets)</td><td><strong>' + mudBuckets + ' buckets</strong></td></tr>';
     txt += '<tr><td>Paper tape rolls (500ft)</td><td><strong>' + tapeRolls + ' rolls</strong></td></tr>';
@@ -661,8 +775,8 @@ function addToDrywallQuote() {
     if (totalSqft <= 0) { qdAlert('Please calculate before adding to quote.'); return; }
     var room = rooms[0];
     if (!room) { qdAlert('Please create a room in the quote first.'); return; }
-    room.items.push({ description: 'Drywall Hang \u2014 ' + roomName, category: 'Drywall', unitType: 'sqft', quantity: totalSqft, rate: 0, total: 0, notes: 'Auto-calculated', itemDescription: '' });
-    room.items.push({ description: 'Drywall Mud & Tape \u2014 ' + roomName, category: 'Drywall', unitType: 'sqft', quantity: totalSqft, rate: 0, total: 0, notes: 'Auto-calculated', itemDescription: '' });
+    room.items.push({ description: 'Drywall Hang \u2014 ' + roomName, category: 'Drywall', unitType: calcAreaUnit(), quantity: totalSqft, rate: 0, total: 0, notes: 'Auto-calculated', itemDescription: '' });
+    room.items.push({ description: 'Drywall Mud & Tape \u2014 ' + roomName, category: 'Drywall', unitType: calcAreaUnit(), quantity: totalSqft, rate: 0, total: 0, notes: 'Auto-calculated', itemDescription: '' });
     renderQuote();
     bootstrap.Modal.getInstance(document.getElementById('drywallCalcModal')).hide();
     qdAlert('Drywall items added to quote!');
@@ -690,7 +804,7 @@ function scanDrywallQuote() {
             var isDrywall = normalizedCategory === 'drywall' || normalizedCategory.includes('drywall') ||
                             (item.description && /drywall/i.test(item.description));
             var normalizedUnitType = (item.unitType || '').trim().toLowerCase().replace(/\s+/g, '');
-            var isSqft = !item.unitType || normalizedUnitType === 'sqft' || normalizedUnitType === 'sf';
+            var isSqft = !item.unitType || normalizedUnitType === 'sqft' || normalizedUnitType === 'sf' || normalizedUnitType === 'm²' || normalizedUnitType === 'm2';
             if (isDrywall && isSqft) {
                 totalSqft += item.quantity;
                 if (!roomMap[room.name]) roomMap[room.name] = 0;
@@ -708,7 +822,7 @@ function scanDrywallQuote() {
     } else {
         document.getElementById('drywallScanTotal').textContent = totalSqft.toFixed(1);
         document.getElementById('drywallScanRooms').textContent = Object.keys(roomMap).length;
-        var details = Object.keys(roomMap).map(function(r) { return r + ' (' + roomMap[r].toFixed(1) + 'sqft)'; }).join(', ');
+        var details = Object.keys(roomMap).map(function(r) { return r + ' (' + roomMap[r].toFixed(1) + ' ' + calcAreaUnit() + ')'; }).join(', ');
         document.getElementById('drywallScanDetails').textContent = details;
         document.getElementById('drywallScanSqft').value = totalSqft.toFixed(1);
         document.getElementById('drywallScanResults').classList.remove('d-none');

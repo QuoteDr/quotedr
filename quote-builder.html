@@ -1498,6 +1498,8 @@ Example:
                             <datalist id="unitTypeOptions">
                                 <option value="sq ft">
                                 <option value="LF">
+                                <option value="m²">
+                                <option value="m">
                                 <option value="each">
                                 <option value="hourly">
                                 <option value="sheet">
@@ -1627,6 +1629,54 @@ Example:
 
         // Legacy pricing to migrate on first run
         const LEGACY_PRICING = {};
+
+        function isMetricMeasurement() {
+            return typeof getMeasurementSystem === 'function' && getMeasurementSystem() === 'metric';
+        }
+
+        function measurementAreaUnit() {
+            return isMetricMeasurement() ? 'm\u00b2' : 'sq ft';
+        }
+
+        function measurementLengthUnit() {
+            return isMetricMeasurement() ? 'm' : 'LF';
+        }
+
+        function measurementHeightUnit() {
+            return isMetricMeasurement() ? 'm' : 'ft';
+        }
+
+        function preferredLengthDefault(imperialFeet) {
+            return isMetricMeasurement() ? Math.round((imperialFeet * 0.3048) * 100) / 100 : imperialFeet;
+        }
+
+        function preferredAreaDefault(imperialSqft) {
+            return isMetricMeasurement() ? Math.round((imperialSqft * 0.09290304) * 10) / 10 : imperialSqft;
+        }
+
+        function formatQuoteQuantityDisplay(quantity, unit) {
+            if (typeof qdFormatQuantity === 'function') return qdFormatQuantity(quantity, unit);
+            return (parseFloat(quantity) || 0).toLocaleString() + (unit ? ' ' + unit : '');
+        }
+
+        function updateMeasurementUnitLabels() {
+            var areaUnit = measurementAreaUnit();
+            var lengthUnit = measurementLengthUnit();
+            var heightUnit = measurementHeightUnit();
+            var areaOption = document.querySelector('#mapQuantityMode option[value="area"]');
+            var lengthOption = document.querySelector('#mapQuantityMode option[value="length"]');
+            var perimeterOption = document.querySelector('#mapQuantityMode option[value="perimeter"]');
+            if (areaOption) areaOption.textContent = 'Area ' + areaUnit;
+            if (lengthOption) lengthOption.textContent = isMetricMeasurement() ? 'Linear meters' : 'Linear feet';
+            if (perimeterOption) perimeterOption.textContent = 'Perimeter ' + lengthUnit;
+            if (document.getElementById('mapWallHeightLabel')) document.getElementById('mapWallHeightLabel').textContent = heightUnit + ' high';
+            if (document.getElementById('mapOpeningsSqftLabel')) document.getElementById('mapOpeningsSqftLabel').textContent = areaUnit + ' deduct';
+            if (document.getElementById('mapGateWidthLabel')) document.getElementById('mapGateWidthLabel').textContent = heightUnit + ' gate';
+            if (document.getElementById('mapOpeningsSqft')) document.getElementById('mapOpeningsSqft').title = 'Window/door/opening deduction in ' + areaUnit;
+            if (document.getElementById('mapGateWidth')) document.getElementById('mapGateWidth').title = 'Fence gate width in ' + heightUnit;
+            if (document.getElementById('lineUnitType')) document.getElementById('lineUnitType').placeholder = isMetricMeasurement() ? 'm, m\u00b2, each, hourly' : 'LF, sq ft, each, hourly';
+            if (document.getElementById('newItemUnit')) document.getElementById('newItemUnit').placeholder = areaUnit;
+        }
 
         function migrateLegacyPricing() {
             // Merge legacy pricing into localStorage - skip items that already exist by name
@@ -3400,6 +3450,7 @@ Example:
         }
 
         document.addEventListener('DOMContentLoaded', function() {
+            updateMeasurementUnitLabels();
             document.getElementById('mapItemCategory').addEventListener('change', populateMeasureItemSuggestions);
             ['mapTradePreset','mapQuantityMode'].forEach(function(id) {
                 var el = document.getElementById(id);
@@ -3519,6 +3570,7 @@ Example:
         }
 
         function openMeasureModal() {
+            updateMeasurementUnitLabels();
             var sel = document.getElementById('mapTargetRoom');
             sel.innerHTML = '<option value="">Add to room...</option><option value="new">+ New room / area...</option>';
             rooms.forEach(function(r) {
@@ -3582,12 +3634,12 @@ Example:
             }
             if (itemEl) itemEl.placeholder = 'Your Line Item';
             if (modeEl) modeEl.value = preset.mode;
-            if (document.getElementById('mapWallHeight')) document.getElementById('mapWallHeight').value = preset.height || 0;
+            if (document.getElementById('mapWallHeight')) document.getElementById('mapWallHeight').value = preferredLengthDefault(preset.height || 0);
             if (document.getElementById('mapWastePct')) document.getElementById('mapWastePct').value = preset.waste || 0;
-            if (document.getElementById('mapOpeningsSqft')) document.getElementById('mapOpeningsSqft').value = preset.openings || 0;
+            if (document.getElementById('mapOpeningsSqft')) document.getElementById('mapOpeningsSqft').value = preferredAreaDefault(preset.openings || 0);
             if (document.getElementById('mapGateCount')) document.getElementById('mapGateCount').value = preset.gates || 0;
-            if (document.getElementById('mapGateWidth')) document.getElementById('mapGateWidth').value = preset.gateWidth || 4;
-            if (unitEl) unitEl.value = preset.mode === 'length' || preset.mode === 'perimeter' ? 'LF' : (preset.mode === 'each' ? 'each' : 'sq ft');
+            if (document.getElementById('mapGateWidth')) document.getElementById('mapGateWidth').value = preferredLengthDefault(preset.gateWidth || 4);
+            if (unitEl) unitEl.value = preset.mode === 'length' || preset.mode === 'perimeter' ? measurementLengthUnit() : (preset.mode === 'each' ? 'each' : measurementAreaUnit());
             updateMapTradeControlVisibility();
             saveMapControlsToSelectedShape();
             renderMapPresetHint(preset.hint);
@@ -3660,11 +3712,11 @@ Example:
             }
             if (document.getElementById('mapItemRate')) document.getElementById('mapItemRate').value = settings.rate || '';
             if (document.getElementById('mapQuantityMode')) document.getElementById('mapQuantityMode').value = settings.mode || 'auto';
-            if (document.getElementById('mapWallHeight')) document.getElementById('mapWallHeight').value = settings.height !== undefined ? settings.height : 9;
+            if (document.getElementById('mapWallHeight')) document.getElementById('mapWallHeight').value = settings.height !== undefined ? settings.height : preferredLengthDefault(9);
             if (document.getElementById('mapWastePct')) document.getElementById('mapWastePct').value = settings.wastePct || 0;
             if (document.getElementById('mapOpeningsSqft')) document.getElementById('mapOpeningsSqft').value = settings.openingsSqft || 0;
             if (document.getElementById('mapGateCount')) document.getElementById('mapGateCount').value = settings.gateCount || 0;
-            if (document.getElementById('mapGateWidth')) document.getElementById('mapGateWidth').value = settings.gateWidth !== undefined ? settings.gateWidth : 4;
+            if (document.getElementById('mapGateWidth')) document.getElementById('mapGateWidth').value = settings.gateWidth !== undefined ? settings.gateWidth : preferredLengthDefault(4);
             if (document.getElementById('mapRoofPitch')) document.getElementById('mapRoofPitch').value = settings.pitch || 1;
             updateMapTradeControlVisibility();
         }
@@ -3845,15 +3897,15 @@ Example:
             if (isPolygon) {
                 var path = shape.getPath ? shape.getPath() : new google.maps.MVCArray(shape._activePath);
                 var area = google.maps.geometry.spherical.computeArea(path);
-                var sqft = Math.round(area * 10.7639);
+                var areaValue = isMetricMeasurement() ? Math.round(area * 10) / 10 : Math.round(area * 10.7639);
                 var perimeterMeters = google.maps.geometry.spherical.computeLength(path);
-                var perimeterLf = Math.round(perimeterMeters * 3.28084 * 10) / 10;
-                return { value: sqft, area: sqft, perimeter: perimeterLf, length: perimeterLf, unit: 'sq ft', display: sqft.toLocaleString() + ' sq ft | ' + perimeterLf.toLocaleString() + ' LF perimeter', isArea: true };
+                var perimeterValue = isMetricMeasurement() ? Math.round(perimeterMeters * 10) / 10 : Math.round(perimeterMeters * 3.28084 * 10) / 10;
+                return { value: areaValue, area: areaValue, perimeter: perimeterValue, length: perimeterValue, unit: measurementAreaUnit(), display: areaValue.toLocaleString() + ' ' + measurementAreaUnit() + ' | ' + perimeterValue.toLocaleString() + ' ' + measurementLengthUnit() + ' perimeter', isArea: true };
             } else {
                 var path = shape.getPath ? shape.getPath() : new google.maps.MVCArray(shape._activePath);
                 var len = google.maps.geometry.spherical.computeLength(path);
-                var lf = Math.round(len * 3.28084 * 10) / 10;
-                return { value: lf, area: 0, perimeter: lf, length: lf, unit: 'LF', display: lf.toLocaleString() + ' LF', isArea: false };
+                var lengthValue = isMetricMeasurement() ? Math.round(len * 10) / 10 : Math.round(len * 3.28084 * 10) / 10;
+                return { value: lengthValue, area: 0, perimeter: lengthValue, length: lengthValue, unit: measurementLengthUnit(), display: lengthValue.toLocaleString() + ' ' + measurementLengthUnit(), isArea: false };
             }
         }
 
@@ -3868,15 +3920,15 @@ Example:
             var qty = measurement.value;
             var unit = measurement.unit;
             var noteParts = ['Measured from satellite map'];
-            if (mode === 'area') { qty = Math.max(0, (measurement.area || measurement.value) - openings) * wasteFactor; unit = 'sq ft'; }
-            else if (mode === 'roofArea') { qty = Math.max(0, measurement.area || measurement.value) * pitchMultiplier * wasteFactor; unit = 'sq ft'; noteParts.push('roof pitch ' + pitchMultiplier + 'x'); }
-            else if (mode === 'length') { qty = Math.max(0, (measurement.length || measurement.perimeter || measurement.value) - gateDeduct); unit = 'LF'; }
-            else if (mode === 'perimeter') { qty = Math.max(0, (measurement.perimeter || measurement.length || measurement.value) - gateDeduct); unit = 'LF'; noteParts.push('perimeter'); }
-            else if (mode === 'wallArea') { qty = Math.max(0, ((measurement.perimeter || measurement.length || 0) * height) - openings) * wasteFactor; unit = 'sq ft'; noteParts.push('perimeter x ' + height + ' ft high'); }
+            if (mode === 'area') { qty = Math.max(0, (measurement.area || measurement.value) - openings) * wasteFactor; unit = measurementAreaUnit(); }
+            else if (mode === 'roofArea') { qty = Math.max(0, measurement.area || measurement.value) * pitchMultiplier * wasteFactor; unit = measurementAreaUnit(); noteParts.push('roof pitch ' + pitchMultiplier + 'x'); }
+            else if (mode === 'length') { qty = Math.max(0, (measurement.length || measurement.perimeter || measurement.value) - gateDeduct); unit = measurementLengthUnit(); }
+            else if (mode === 'perimeter') { qty = Math.max(0, (measurement.perimeter || measurement.length || measurement.value) - gateDeduct); unit = measurementLengthUnit(); noteParts.push('perimeter'); }
+            else if (mode === 'wallArea') { qty = Math.max(0, ((measurement.perimeter || measurement.length || 0) * height) - openings) * wasteFactor; unit = measurementAreaUnit(); noteParts.push('perimeter x ' + height + ' ' + measurementHeightUnit() + ' high'); }
             else if (mode === 'each') { qty = 1; unit = 'each'; }
             if (settings.wastePct) noteParts.push(settings.wastePct + '% waste');
-            if (openings) noteParts.push(openings + ' sqft openings deducted');
-            if (gateDeduct) noteParts.push(gateDeduct + ' LF gates deducted');
+            if (openings) noteParts.push(openings + ' ' + measurementAreaUnit() + ' openings deducted');
+            if (gateDeduct) noteParts.push(gateDeduct + ' ' + measurementLengthUnit() + ' gates deducted');
             return { quantity: parseFloat((qty || 0).toFixed(2)), unit: unit, note: noteParts.join(' | ') };
         }
 
@@ -3898,7 +3950,7 @@ Example:
             html += '</div>';
             var totalLf = _mapShapes.reduce(function(sum, shape) { return sum + (getShapeMeasurement(shape).length || 0); }, 0);
             var totals = mapMeasurementTotals();
-            if (totalSqft > 0 || totalLf > 0) html += '<div class="mt-2 small text-muted">Measured: <strong>' + totalSqft.toLocaleString() + ' sq ft</strong> area | <strong>' + Math.round(totalLf * 10) / 10 + ' LF</strong> linear/perimeter</div>';
+            if (totalSqft > 0 || totalLf > 0) html += '<div class="mt-2 small text-muted">Measured: <strong>' + totalSqft.toLocaleString() + ' ' + measurementAreaUnit() + '</strong> area | <strong>' + Math.round(totalLf * 10) / 10 + ' ' + measurementLengthUnit() + '</strong> linear/perimeter</div>';
             html += '<div class="mt-1 small text-muted">Quote totals: ' + totals + '</div>';
             el.innerHTML = html;
         }
@@ -4285,7 +4337,7 @@ Example:
                             if (item.itemDescription) html += '<div id="' + _descId + '" style="display:none;"><small class="text-muted fst-italic">' + item.itemDescription + '</small></div>';
                             if (item.notes) html += '<div id="' + _descId + '_notes" style="display:' + (item.itemDescription ? 'none' : 'none') + ';"><small class="text-info"><i class="fas fa-info-circle"></i> ' + item.notes + '</small></div>';
                             html += '</td>';
-                            html += '<td style="white-space:nowrap">' + item.quantity + ' ' + (item.unitType || '') + '</td>';
+                            html += '<td style="white-space:nowrap">' + formatQuoteQuantityDisplay(item.quantity, item.unitType || item.unit || '') + '</td>';
                             html += '<td style="white-space:nowrap">$' + displayRate.toFixed(2) + '</td>';
                             html += '<td style="white-space:nowrap"><strong>$' + displayTotal.toFixed(2) + '</strong></td>';
                             if (hasMaterialCosts) {
@@ -5500,6 +5552,7 @@ Example:
 
         // Set up initial pricing options
         updatePricingOptions();
+        updateMeasurementUnitLabels();
         renderRooms();
 
         // Auto-generate quote number on load if not already set
@@ -6480,7 +6533,7 @@ Example:
                         <button type="button" class="btn btn-primary mb-3" onclick="scanHardwoodQuote()">Scan Quote</button>
                         <div id="hardwoodScanResults" class="d-none">
                             <div class="alert alert-success">
-                                Found <span id="hardwoodScanTotal">0</span> sqft across <span id="hardwoodScanRooms">0</span> rooms:
+                                Found <span id="hardwoodScanTotal">0</span> area across <span id="hardwoodScanRooms">0</span> rooms:
                                 <span id="hardwoodScanDetails"></span>
                             </div>
                             <div class="mb-3">
@@ -6615,7 +6668,7 @@ Example:
                         <button type="button" class="btn btn-primary mb-3" onclick="scanPaintQuote()">Scan Quote</button>
                         <div id="paintScanResults" class="d-none">
                             <div class="alert alert-success">
-                                Found <span id="paintScanTotal">0</span> sqft across <span id="paintScanRooms">0</span> rooms:
+                                Found <span id="paintScanTotal">0</span> area across <span id="paintScanRooms">0</span> rooms:
                                 <span id="paintScanDetails"></span>
                             </div>
                             <div class="mb-3">
@@ -6741,7 +6794,7 @@ Example:
                         <button type="button" class="btn btn-primary mb-3" onclick="scanDrywallQuote()">Scan Quote</button>
                         <div id="drywallScanResults" class="d-none">
                             <div class="alert alert-success">
-                                Found <span id="drywallScanTotal">0</span> sqft across <span id="drywallScanRooms">0</span> rooms:
+                                Found <span id="drywallScanTotal">0</span> area across <span id="drywallScanRooms">0</span> rooms:
                                 <span id="drywallScanDetails"></span>
                             </div>
                             <div class="mb-3">
