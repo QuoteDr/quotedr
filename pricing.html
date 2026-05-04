@@ -10,8 +10,10 @@
     <link rel="stylesheet" href="brand-theme.css?v=1777661601">
     <style>
         body { background: #f8fafc; font-family: 'Segoe UI', sans-serif; }
+        .navbar { min-height: 78px; overflow: visible; }
+        .brand-logo { height: 62px; width: 62px; object-fit: contain; transform: scale(1.65); transform-origin: left center; margin: -8px 0 -8px 4px; }
         .hero { background: linear-gradient(135deg, #0f3460, #1a56a0); color: white; padding: 60px 20px 100px; text-align: center; }
-        .hero h1 { font-size: 2.4rem; font-weight: 800; }
+        .hero h1 { font-size: 2.4rem; font-weight: 800; color: #f27a1a; text-shadow: 0 3px 16px rgba(0,0,0,0.28); }
         .hero p { font-size: 1.1rem; opacity: 0.85; max-width: 500px; margin: 12px auto 0; }
         .plans-row { margin-top: -60px; padding: 0 16px 40px; }
         .plan-card { background: white; border-radius: 20px; padding: 36px 32px; box-shadow: 0 8px 32px rgba(0,0,0,0.10); height: 100%; border: 2px solid transparent; position: relative; }
@@ -42,13 +44,18 @@
         footer { background: #0f3460; color: rgba(255,255,255,0.6); text-align: center; padding: 24px; font-size: 0.85rem; }
         footer a { color: rgba(255,255,255,0.7); text-decoration: none; }
         .ai-badge { background: #ede9fe; color: #6d28d9; font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; margin-left: 4px; vertical-align: middle; }
+        @media (max-width: 576px) {
+            .navbar { min-height: 72px; }
+            .brand-logo { height: 54px; width: 54px; transform: scale(1.55); }
+            .hero h1 { font-size: 2rem; }
+        }
     </style>
 </head>
 <body>
 
 <nav class="navbar navbar-light bg-white shadow-sm px-3 px-md-5">
     <a class="navbar-brand d-flex align-items-center gap-2" href="landing.html">
-        <img src="quotedr-logo.svg" alt="QuoteDr" style="height:34px;">
+        <img src="quotedr-logo.svg" alt="QuoteDr" class="brand-logo">
     </a>
     <div class="d-flex gap-2">
         <a href="login.html" class="btn btn-outline-primary btn-sm">Sign In</a>
@@ -68,18 +75,17 @@
         <div class="col-md-5">
             <div class="plan-card">
                 <div class="plan-name">Basic</div>
-                <div class="plan-tagline">Perfect for solo operators getting organized</div>
+                <div class="plan-tagline">Everything you need to quote, invoice, and track jobs</div>
                 <div class="price">$29<span>/mo</span></div>
                 <ul class="feature-list mt-3">
-                    <li><i class="fas fa-check-circle"></i> Unlimited quotes &amp; invoices</li>
-                    <li><i class="fas fa-check-circle"></i> Professional themes &amp; custom branding</li>
-                    <li><i class="fas fa-check-circle"></i> Client database</li>
-                    <li><i class="fas fa-check-circle"></i> Cross-device sync</li>
-                    <li><i class="fas fa-check-circle"></i> Shareable quote links</li>
-                    <li><i class="fas fa-check-circle"></i> Interactive quote viewer for clients</li>
-                    <li><i class="fas fa-check-circle"></i> Stripe deposits and invoice payments</li>
-                    <li><i class="fas fa-check-circle"></i> Quote templates</li>
-                    <li><i class="fas fa-check-circle"></i> Custom price list import</li>
+                    <li><i class="fas fa-check-circle"></i> Unlimited quotes, invoices, and client links</li>
+                    <li><i class="fas fa-check-circle"></i> Professional themes and custom branding</li>
+                    <li><i class="fas fa-check-circle"></i> Client database and job tracking dashboard</li>
+                    <li><i class="fas fa-check-circle"></i> Quote templates, reusable rooms, and saved items</li>
+                    <li><i class="fas fa-check-circle"></i> Satellite Measure for roofs, fences, decks, and exteriors</li>
+                    <li><i class="fas fa-check-circle"></i> IKEA Quick Quote for kitchen installation takeoffs</li>
+                    <li><i class="fas fa-check-circle"></i> Stripe deposits, invoice payments, and manual payment options</li>
+                    <li><i class="fas fa-check-circle"></i> Custom price list import and cross-device sync</li>
                 </ul>
                 <button class="btn-starter" id="basicBtn" onclick="startCheckout('basic')">Start Free Trial</button>
                 <p class="trial-note">14-day free trial &middot; Cancel anytime</p>
@@ -90,17 +96,18 @@
             <div class="plan-card featured">
                 <div class="badge-popular">⚡ MOST POPULAR</div>
                 <div class="plan-name" style="color:#e87e2a;">Pro</div>
-                <div class="plan-tagline">Everything in Basic, plus AI superpowers</div>
+                <div class="plan-tagline">Everything in Basic, plus the fastest AI quoting tools</div>
                 <div class="price" style="color:#e87e2a;">$55<span>/mo</span></div>
                 <div class="compare-tag mt-3">💡 Competitors charge $500–$1,000/mo for less</div>
                 <ul class="feature-list">
                     <li><i class="fas fa-check-circle"></i> Everything in Basic</li>
-                    <li><i class="fas fa-robot"></i> AI voice-to-quote <span class="ai-badge">AI</span></li>
+                    <li><i class="fas fa-robot"></i> AI voice-to-quote for fast job-site estimates <span class="ai-badge">AI</span></li>
                     <li><i class="fas fa-robot"></i> AI smart import — any file format <span class="ai-badge">AI</span></li>
-                    <li><i class="fas fa-robot"></i> AI assistant built-in <span class="ai-badge">AI</span></li>
-                    <li><i class="fas fa-check-circle"></i> Interactive quote upsells</li>
-                    <li><i class="fas fa-check-circle"></i> Profit margin tracking</li>
-                    <li><i class="fas fa-check-circle"></i> Automated payment reminders <span style="font-size:0.75rem;color:#aaa;">(coming soon)</span></li>
+                    <li><i class="fas fa-robot"></i> Built-in AI assistant for scope, items, and pricing help <span class="ai-badge">AI</span></li>
+                    <li><i class="fas fa-check-circle"></i> Floor plan scanner and room takeoff tools</li>
+                    <li><i class="fas fa-check-circle"></i> QuickBooks integration</li>
+                    <li><i class="fas fa-check-circle"></i> Interactive quote upsells and client approvals</li>
+                    <li><i class="fas fa-check-circle"></i> Profit margin tracking and smarter job reporting</li>
                     <li><i class="fas fa-check-circle"></i> Priority support</li>
                 </ul>
                 <button class="btn-pro" id="proBtn" onclick="startCheckout('pro')">🚀 Get Started with Pro</button>
@@ -155,7 +162,7 @@
     </div>
     <div class="faq-item">
         <h6>What's the difference between Basic and Pro?</h6>
-        <p>Basic is a powerful quoting and invoicing tool with Stripe payments. Pro adds AI — voice-to-quote, smart import, AI assistant, upsells, and margin tracking. If you want to quote faster and smarter, Pro pays for itself.</p>
+        <p>Basic gives you the quoting, invoicing, payments, job tracking, templates, Satellite Measure, and IKEA Quick Quote tools. Pro adds AI voice-to-quote, smart import, the AI assistant, floor plan scanning, QuickBooks, upsells, and profit reporting.</p>
     </div>
     <div class="faq-item">
         <h6>Can I import my existing price list?</h6>
