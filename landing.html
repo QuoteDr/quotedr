@@ -509,6 +509,15 @@
             object-fit: cover;
             border-radius: 12px;
         }
+
+        .main-tutorial-video {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            border-radius: 16px;
+            border: 2px solid rgba(255,255,255,0.18);
+            background: #071d36;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.25);
+        }
     </style>
 </head>
 <body>
@@ -567,13 +576,9 @@
             </div>
             <div class="row justify-content-center">
                 <div class="col-lg-8">
-                    <!-- YouTube embed placeholder - replace src with real video URL when ready -->
-                    <div id="video-placeholder" style="background:rgba(255,255,255,0.05); border:2px dashed rgba(255,255,255,0.2); border-radius:16px; padding:80px 40px; text-align:center;">
-                        <div style="font-size:4rem; margin-bottom:16px;">🎬</div>
-                        <h3 style="color:white; font-weight:600; margin-bottom:8px;">Video Coming Soon</h3>
-                        <p style="color:rgba(255,255,255,0.6);">We're recording a full walkthrough of QuoteDr in action. Check back soon!</p>
-                        <a href="login.html?signup=1" class="btn mt-3" style="background:#e87e2a; color:white; font-weight:600; border-radius:50px; padding:12px 28px;">Try It Yourself →</a>
-                    </div>
+                    <video id="video-placeholder" class="main-tutorial-video" controls preload="metadata" src="videos/tutorials/landing-overview.mp4">
+                        Your browser does not support the video tag.
+                    </video>
                 </div>
             </div>
             <div class="row mt-5 text-center align-items-start">
@@ -582,13 +587,9 @@
                     <h5 style="color:white; font-weight:600;">Customize & Brand</h5>
                     <p style="color:rgba(255,255,255,0.6); font-size:0.95rem; min-height:4.5rem;">Add your logo, choose a style, set your terms. Looks like you hired a designer.</p>
                     <div class="video-placeholder mt-3" data-step="1">
-                        <video class="step-video" autoplay loop muted playsinline style="display:none;" data-src="videos/step1-brand.mp4">
+                        <video class="step-video" autoplay loop muted playsinline preload="metadata" src="videos/tutorials/quickbooks-settings.mp4">
                             Your browser does not support the video tag.
                         </video>
-                        <div class="video-coming-soon">
-                            <span>🎬</span>
-                            <small>Video coming soon</small>
-                        </div>
                     </div>
                 </div>
                 <div class="col-md-4 mb-4">
@@ -596,13 +597,9 @@
                     <h5 style="color:white; font-weight:600;">Add Your Rooms</h5>
                     <p style="color:rgba(255,255,255,0.6); font-size:0.95rem; min-height:4.5rem;">Name each room or area, add line items, and let QuoteDr track your material costs and profit margins automatically.</p>
                     <div class="video-placeholder mt-3" data-step="2">
-                        <video class="step-video" autoplay loop muted playsinline style="display:none;" data-src="videos/step2-rooms.mp4">
+                        <video class="step-video" autoplay loop muted playsinline preload="metadata" src="videos/tutorials/quote-builder-overview.mp4">
                             Your browser does not support the video tag.
                         </video>
-                        <div class="video-coming-soon">
-                            <span>🎬</span>
-                            <small>Video coming soon</small>
-                        </div>
                     </div>
                 </div>
                 <div class="col-md-4 mb-4">
@@ -610,13 +607,9 @@
                     <h5 style="color:white; font-weight:600;">Send to Client</h5>
                     <p style="color:rgba(255,255,255,0.6); font-size:0.95rem; min-height:4.5rem;">One click sends a professional interactive quote your client can view, choose finishes, and request upgrades — all from their phone.</p>
                     <div class="video-placeholder mt-3" data-step="3">
-                        <video class="step-video" autoplay loop muted playsinline style="display:none;" data-src="videos/step3-send.mp4">
+                        <video class="step-video" autoplay loop muted playsinline preload="metadata" src="videos/tutorials/send-client-quote.mp4">
                             Your browser does not support the video tag.
                         </video>
-                        <div class="video-coming-soon">
-                            <span>🎬</span>
-                            <small>Video coming soon</small>
-                        </div>
                     </div>
                 </div>
             </div>

@@ -86,6 +86,15 @@
                 color: var(--qd-muted, #64748b);
                 font-size: 0.9rem;
             }
+            .qd-help-video {
+                display: block;
+                width: 100%;
+                aspect-ratio: 16 / 9;
+                border-radius: 8px;
+                border: 1px solid var(--qd-border, #d7e2ef);
+                background: #0f172a;
+                box-shadow: 0 8px 20px rgba(15, 52, 96, 0.08);
+            }
             @media (max-width: 575.98px) {
                 .qd-modal-help-btn span { display: none; }
                 .qd-modal-help-btn { width: 34px; height: 34px; justify-content: center; padding: 0; }
@@ -161,6 +170,13 @@
         return '<ul class="mb-0 ps-3">' + items.map(item => '<li class="mb-2">' + escapeHtml(item) + '</li>').join('') + '</ul>';
     }
 
+    function videoHtml(topic) {
+        if (!topic || !topic.videoUrl) {
+            return '<div class="qd-help-section-title">Walkthrough Video</div><div class="qd-help-video-placeholder"><i class="fas fa-video me-1"></i>Video walkthrough coming soon.</div>';
+        }
+        return '<div class="qd-help-section-title">Walkthrough Video</div><video class="qd-help-video" controls preload="metadata" src="' + escapeHtml(topic.videoUrl) + '">Your browser does not support the video tag.</video>';
+    }
+
     function escapeHtml(value) {
         return String(value)
             .replace(/&/g, '&amp;')
@@ -186,9 +202,7 @@
             <div class="qd-help-section-title">Steps</div>
             ${listHtml(topic.steps || [])}
             ${topic.tips && topic.tips.length ? '<div class="qd-help-section-title">Tips</div>' + tipsHtml(topic.tips) : ''}
-            ${topic.videoUrl
-                ? '<div class="qd-help-section-title">Walkthrough Video</div><a class="btn btn-primary btn-sm" href="' + escapeHtml(topic.videoUrl) + '" target="_blank" rel="noopener"><i class="fas fa-play me-1"></i>Watch Video</a>'
-                : '<div class="qd-help-section-title">Walkthrough Video</div><div class="qd-help-video-placeholder"><i class="fas fa-video me-1"></i>Video walkthrough coming soon.</div>'}
+            ${videoHtml(topic)}
         `;
         fullLink.href = topic.helpUrl || 'help.html';
 
@@ -214,9 +228,7 @@
             <div class="qd-help-section-title">What To Do</div>
             ${listHtml(topic.steps || [])}
             ${topic.tips && topic.tips.length ? '<div class="qd-help-section-title">Tips</div>' + tipsHtml(topic.tips) : ''}
-            ${topic.videoUrl
-                ? '<div class="qd-help-section-title">Walkthrough Video</div><a class="btn btn-primary btn-sm" href="' + escapeHtml(topic.videoUrl) + '" target="_blank" rel="noopener"><i class="fas fa-play me-1"></i>Watch Video</a>'
-                : '<div class="qd-help-section-title">Walkthrough Video</div><div class="qd-help-video-placeholder"><i class="fas fa-video me-1"></i>Video walkthrough coming soon.</div>'}
+            ${videoHtml(topic)}
         `;
         fullLink.href = topic.helpUrl || 'help.html';
 

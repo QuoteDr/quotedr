@@ -519,6 +519,59 @@
         }
     };
 
+    const TUTORIAL_BASE = 'videos/tutorials/';
+    const TOPIC_TUTORIALS = {
+        addRoomModal: 'quote-builder-overview',
+        addLineModal: 'line-items-pricing',
+        manageItemsModal: 'line-items-pricing',
+        manageClientsModal: 'quote-builder-overview',
+        saveQuoteModal: 'quote-builder-overview',
+        loadQuoteModal: 'quote-builder-overview',
+        quoteStyleModal: 'send-client-quote',
+        interactiveLinkModal: 'send-client-quote',
+        sendInvoiceModal: 'invoice-payments',
+        voiceQuoteModal: 'ai-voice-quote',
+        measureMapModal: 'satellite-measure',
+        floorPlanModal: 'floor-plan-scanner',
+        ikeaQuickQuoteModal: 'ikea-quick-quote',
+        materialEstimatorModal: 'material-calculators',
+        estimatorPricingModal: 'material-calculators',
+        hardwoodCalcModal: 'material-calculators',
+        paintCalcModal: 'material-calculators',
+        drywallCalcModal: 'material-calculators',
+        manageTemplatesModal: 'quote-builder-overview',
+        notesReviewModal: 'send-client-quote',
+        warrantyModal: 'send-client-quote',
+        changeOrderModal: 'send-client-quote',
+        portalShareModal: 'send-client-quote',
+        newQuoteModal: 'quote-builder-overview',
+        depositModal: 'invoice-payments',
+        signatureLightbox: 'send-client-quote',
+        installHelpModal: 'quickbooks-settings'
+    };
+
+    const INLINE_TUTORIALS = {
+        quoteNumber: 'quote-builder-overview',
+        materialCost: 'line-items-pricing',
+        markup: 'line-items-pricing',
+        pricingDetail: 'send-client-quote',
+        depositDisplay: 'invoice-payments',
+        approvalType: 'send-client-quote',
+        stripePayments: 'invoice-payments',
+        taxRate: 'quickbooks-settings'
+    };
+
+    function applyTutorialVideos(collection, map) {
+        Object.keys(map).forEach(function(topicId) {
+            if (collection[topicId]) {
+                collection[topicId].videoUrl = TUTORIAL_BASE + map[topicId] + '.mp4';
+            }
+        });
+    }
+
+    applyTutorialVideos(TOPICS, TOPIC_TUTORIALS);
+    applyTutorialVideos(INLINE_TOPICS, INLINE_TUTORIALS);
+
     window.QuoteDrHelpContent = {
         topics: TOPICS,
         inlineTopics: INLINE_TOPICS,
