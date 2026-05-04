@@ -39,7 +39,13 @@
         .faq-item { background: white; border-radius: 12px; padding: 20px 24px; margin-bottom: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
         .faq-item h6 { color: #0f3460; font-weight: 700; margin-bottom: 6px; }
         .faq-item p { color: #555; margin: 0; font-size: 0.9rem; }
-        .testimonial-card { background: #f8fafc; border-radius: 12px; padding: 22px; }
+        .testimonial-card { background: #f8fafc; border-radius: 12px; padding: 22px; min-height: 190px; display: flex; flex-direction: column; justify-content: space-between; transition: opacity 0.25s ease, transform 0.25s ease; }
+        .testimonial-card.is-changing { opacity: 0; transform: translateY(8px); }
+        .testimonial-quote { color:#333; font-size:0.95rem; line-height:1.45; margin:0; }
+        .testimonial-author { font-size:0.8rem; color:#888; margin-top:14px; }
+        .testimonial-controls { display:flex; justify-content:center; gap:8px; margin-top:18px; }
+        .testimonial-dot { width:9px; height:9px; border-radius:50%; border:0; background:#cbd5e1; padding:0; }
+        .testimonial-dot.active { background:#f27a1a; }
         .stars { color: #f59e0b; margin-bottom: 8px; }
         footer { background: #0f3460; color: rgba(255,255,255,0.6); text-align: center; padding: 24px; font-size: 0.85rem; }
         footer a { color: rgba(255,255,255,0.7); text-decoration: none; }
@@ -120,7 +126,7 @@
 <div style="background:white; padding:50px 20px;">
     <div class="container">
         <div class="section-title">What service pros are saying</div>
-        <div class="row g-3 justify-content-center">
+        <div class="row g-3 justify-content-center" id="testimonialGrid">
             <div class="col-md-4">
                 <div class="testimonial-card">
                     <div class="stars">★★★★★</div>
@@ -143,6 +149,7 @@
                 </div>
             </div>
         </div>
+        <div class="testimonial-controls" id="testimonialDots" aria-label="Review carousel controls"></div>
     </div>
 </div>
 
@@ -175,6 +182,80 @@
 </footer>
 
 <script>
+const testimonialReviews = [
+    [
+        { quote: '"I described a basement reno while walking the job and Quote Dr built the quote before I got back to the truck."', author: '- Rob M., Renovation Contractor' },
+        { quote: '"The AI voice-to-quote is the first tool that actually feels made for contractors. I talk, it organizes the scope, and I clean it up."', author: '- Jason P., General Contractor' },
+        { quote: '"I used to write notes, go home, and build the estimate at night. Now I talk through it on site and send the quote same day."', author: '- Chris L., Handyman' }
+    ],
+    [
+        { quote: '"The IKEA Quick Quote saved me almost three hours on a kitchen install. I uploaded the order and the labour lines were basically ready."', author: '- Marco S., Kitchen Installer' },
+        { quote: '"IKEA jobs used to be spreadsheet work. Now I can price cabinet installs without manually counting every box and panel."', author: '- Dana R., Cabinet Installer' },
+        { quote: '"For IKEA kitchens, this is ridiculous in the best way. Upload, review, adjust rates, done."', author: '- Trevor H., Finish Carpenter' }
+    ],
+    [
+        { quote: '"Satellite Measure helped me quote a fence without driving back to the property. The perimeter was right there."', author: '- Sarah K., Landscaper' },
+        { quote: '"My quotes look more professional, clients can approve upgrades, and I can see margin before I send anything."', author: '- Mike T., General Contractor' },
+        { quote: '"QuickBooks plus Quote Dr finally keeps the quoting side and admin side from fighting each other."', author: '- Amanda C., Painting Contractor' }
+    ],
+    [
+        { quote: '"I was paying for software that still made me do the thinking twice. Quote Dr gets me from walkthrough to quote way faster."', author: '- Dave R., Cleaning Company Owner' },
+        { quote: '"The client link is cleaner than PDFs, and the upsells make it easy for customers to choose the better option."', author: '- Leo B., Deck Builder' },
+        { quote: '"The AI import turned my messy price sheet into usable items. That alone made setup painless."', author: '- Priya N., Flooring Contractor' }
+    ]
+];
+
+let testimonialIndex = 0;
+let testimonialTimer = null;
+
+function renderTestimonials(index) {
+    const grid = document.getElementById('testimonialGrid');
+    const dots = document.getElementById('testimonialDots');
+    if (!grid || !dots) return;
+    testimonialIndex = (index + testimonialReviews.length) % testimonialReviews.length;
+    const cards = Array.from(grid.querySelectorAll('.testimonial-card'));
+    cards.forEach(card => card.classList.add('is-changing'));
+    setTimeout(function() {
+        testimonialReviews[testimonialIndex].forEach(function(review, cardIndex) {
+            const card = cards[cardIndex];
+            if (!card) return;
+            const quoteEl = card.querySelector('p');
+            const authorEl = card.querySelector('div:last-child');
+            if (quoteEl) {
+                quoteEl.className = 'testimonial-quote';
+                quoteEl.textContent = review.quote;
+            }
+            if (authorEl) {
+                authorEl.className = 'testimonial-author';
+                authorEl.textContent = review.author;
+            }
+        });
+        cards.forEach(card => card.classList.remove('is-changing'));
+        dots.querySelectorAll('.testimonial-dot').forEach(function(dot, dotIndex) {
+            dot.classList.toggle('active', dotIndex === testimonialIndex);
+        });
+    }, 220);
+}
+
+function startTestimonials() {
+    const dots = document.getElementById('testimonialDots');
+    if (!dots) return;
+    dots.innerHTML = testimonialReviews.map(function(_, index) {
+        return '<button type="button" class="testimonial-dot" aria-label="Show review set ' + (index + 1) + '" onclick="renderTestimonials(' + index + '); restartTestimonials();"></button>';
+    }).join('');
+    renderTestimonials(0);
+    restartTestimonials();
+}
+
+function restartTestimonials() {
+    if (testimonialTimer) clearInterval(testimonialTimer);
+    testimonialTimer = setInterval(function() {
+        renderTestimonials(testimonialIndex + 1);
+    }, 6500);
+}
+
+document.addEventListener('DOMContentLoaded', startTestimonials);
+
 async function startCheckout(plan) {
     var btn = document.getElementById(plan === 'pro' ? 'proBtn' : 'basicBtn');
     btn.disabled = true;
