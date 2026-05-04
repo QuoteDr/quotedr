@@ -597,6 +597,30 @@ Sarah Jones, 905-555-5678"></textarea>
 				<div id="tab-payments" style="display:none;">
 					<h5 class="mb-3"><i class="fas fa-credit-card me-2" style="color:#28a745"></i>Payments</h5>
 					<div class="card border-0 shadow-sm p-4 mb-3">
+						<h6 class="fw-bold mb-3"><i class="fas fa-money-bill-transfer me-2 text-success"></i>Manual Payment Options</h6>
+						<div class="row g-3 mb-4">
+							<div class="col-md-6">
+								<div class="form-check mb-2">
+									<input class="form-check-input" type="checkbox" id="acceptEtransfer" checked>
+									<label class="form-check-label fw-semibold" for="acceptEtransfer">Accept e-transfer</label>
+								</div>
+								<input type="email" class="form-control form-control-sm" id="etransferEmail" placeholder="E-transfer email">
+							</div>
+							<div class="col-md-6">
+								<div class="form-check mb-2">
+									<input class="form-check-input" type="checkbox" id="acceptCheque" checked>
+									<label class="form-check-label fw-semibold" for="acceptCheque">Accept cheque</label>
+								</div>
+								<div class="form-check">
+									<input class="form-check-input" type="checkbox" id="acceptCash" checked>
+									<label class="form-check-label fw-semibold" for="acceptCash">Accept cash</label>
+								</div>
+							</div>
+							<div class="col-12">
+								<label class="form-label fw-semibold">Payment Instructions</label>
+								<textarea class="form-control" id="paymentInstructions" rows="3" placeholder="Example: Please include the invoice number in your e-transfer message. Cheques can be made payable to your business name."></textarea>
+							</div>
+						</div>
 						<div class="form-check form-switch mb-3">
 							<input class="form-check-input" type="checkbox" id="stripeEnabledToggle" onchange="toggleStripeSettings()">
 							<label class="form-check-label fw-semibold" for="stripeEnabledToggle">Enable Stripe Payments<button type="button" class="qd-inline-help-btn" title="Help with Stripe payments" aria-label="Help with Stripe payments" onclick="QuoteDrModalHelp.openInline('stripePayments'); return false;"><i class="fas fa-question"></i></button></label>
@@ -618,9 +642,11 @@ Sarah Jones, 905-555-5678"></textarea>
 								<input class="form-check-input" type="checkbox" id="acceptFullPayment" checked>
 								<label class="form-check-label" for="acceptFullPayment">Show pay-in-full button on invoices<button type="button" class="qd-inline-help-btn" title="Help with payment buttons" aria-label="Help with payment buttons" onclick="QuoteDrModalHelp.openInline('stripePayments'); return false;"><i class="fas fa-question"></i></button></label>
 							</div>
+							<div class="alert alert-info mt-3 small py-2 mb-0"><i class="fas fa-info-circle me-1"></i>Stripe charges ~2.9% + 30&cent; per transaction. This is optional &mdash; clients can still pay by e-transfer, cash, or cheque.</div>
+						</div>
+						<div class="mt-3">
 							<button class="btn btn-primary" onclick="savePaymentSettingsUI()"><i class="fas fa-save me-1"></i>Save Payment Settings</button>
 							<span class="saved-badge ms-2" id="paymentSaved" style="display:none;"><i class="fas fa-check-circle me-1"></i>Saved!</span>
-							<div class="alert alert-info mt-3 small py-2 mb-0"><i class="fas fa-info-circle me-1"></i>Stripe charges ~2.9% + 30&cent; per transaction. This is optional &mdash; clients can still pay by e-transfer, cash, or cheque.</div>
 						</div>
 					</div>
 				</div><!-- /tab-payments -->
@@ -2001,11 +2027,16 @@ Sarah Jones, 905-555-5678"></textarea>
 		function loadPaymentSettingsUI() {
 			if (typeof loadPaymentSettings !== 'function') return;
 			loadPaymentSettings().then(function(settings) {
-				if (!settings) settings = { stripe_enabled: false, deposit_default_pct: 50, accept_deposit: true, accept_full_payment: true };
+				if (!settings) settings = { stripe_enabled: false, deposit_default_pct: 50, accept_deposit: true, accept_full_payment: true, accept_etransfer: true, accept_cheque: true, accept_cash: true };
 				document.getElementById('stripeEnabledToggle').checked = !!settings.stripe_enabled;
 				document.getElementById('depositDefaultPct').value = settings.deposit_default_pct || 50;
 				document.getElementById('acceptDeposit').checked = settings.accept_deposit !== false;
 				document.getElementById('acceptFullPayment').checked = settings.accept_full_payment !== false;
+				document.getElementById('acceptEtransfer').checked = settings.accept_etransfer !== false;
+				document.getElementById('acceptCheque').checked = settings.accept_cheque !== false;
+				document.getElementById('acceptCash').checked = settings.accept_cash !== false;
+				document.getElementById('etransferEmail').value = settings.etransfer_email || document.getElementById('bizEmail')?.value || '';
+				document.getElementById('paymentInstructions').value = settings.payment_instructions || '';
 				toggleStripeSettings();
 			});
 		}
@@ -2015,7 +2046,12 @@ Sarah Jones, 905-555-5678"></textarea>
 				stripe_enabled: document.getElementById('stripeEnabledToggle').checked,
 				deposit_default_pct: parseInt(document.getElementById('depositDefaultPct').value) || 50,
 				accept_deposit: document.getElementById('acceptDeposit').checked,
-				accept_full_payment: document.getElementById('acceptFullPayment').checked
+				accept_full_payment: document.getElementById('acceptFullPayment').checked,
+				accept_etransfer: document.getElementById('acceptEtransfer').checked,
+				etransfer_email: document.getElementById('etransferEmail').value.trim(),
+				accept_cheque: document.getElementById('acceptCheque').checked,
+				accept_cash: document.getElementById('acceptCash').checked,
+				payment_instructions: document.getElementById('paymentInstructions').value.trim()
 			};
 			if (typeof savePaymentSettings === 'function') {
 				savePaymentSettings(settings).then(function() {

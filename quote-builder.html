@@ -5225,6 +5225,16 @@ Example:
             openManageTemplates();
         }
 
+        function getProfileCompanyName(profile) {
+            profile = profile || {};
+            return profile.business_name || profile.companyName || profile.businessName || profile.company_name || '';
+        }
+
+        function getProfileOwnerName(profile) {
+            profile = profile || {};
+            return profile.owner_name || profile.ownerName || profile.name || '';
+        }
+
         async function generateInvoiceLink() {
             try {
             var invoiceState = await prepareInvoiceForViewer({ markInvoiced: true });
@@ -5248,6 +5258,7 @@ Example:
                                 <div style="border:1px solid #dee2e6; border-radius:8px; padding:14px; background:#f8f9fa; margin-bottom:12px;">
                                     <div class="fw-bold small mb-2"><i class="fas fa-envelope me-1" style="color:#1a56a0;"></i>Email invoice to client</div>
                                     <input type="email" id="sendInvoiceEmail" class="form-control form-control-sm mb-2" placeholder="Client email address">
+                                    <input type="text" id="sendInvoiceSubject" class="form-control form-control-sm mb-2" placeholder="Email subject">
                                     <textarea id="sendInvoiceMessage" class="form-control form-control-sm mb-2" rows="2" placeholder="Optional message..."></textarea>
                                     <button class="btn btn-primary btn-sm w-100" onclick="sendInvoiceByEmail()" id="sendInvoiceEmailBtn">
                                         <i class="fas fa-paper-plane me-1"></i>Send Invoice by Email
@@ -5268,6 +5279,12 @@ Example:
             var clientEmail = document.getElementById('clientEmail')?.value.trim();
             var sendEmailEl = document.getElementById('sendInvoiceEmail');
             if (sendEmailEl) sendEmailEl.value = clientEmail || '';
+            var subjectEl = document.getElementById('sendInvoiceSubject');
+            if (subjectEl) {
+                var profileForSubject = invoiceBusinessProfile || {};
+                var companyForSubject = getProfileCompanyName(profileForSubject) || 'Your Contractor';
+                subjectEl.value = 'Invoice from ' + companyForSubject;
+            }
             var resultEl = document.getElementById('sendInvoiceEmailResult');
             if (resultEl) resultEl.innerHTML = '';
             var savingNote = document.getElementById('invoiceSavingNote');
@@ -5290,6 +5307,7 @@ Example:
         async function sendInvoiceByEmail() {
             var emailEl = document.getElementById('sendInvoiceEmail');
             var msgEl = document.getElementById('sendInvoiceMessage');
+            var subjectEl = document.getElementById('sendInvoiceSubject');
             var resultEl = document.getElementById('sendInvoiceEmailResult');
             var btn = document.getElementById('sendInvoiceEmailBtn');
             var email = emailEl ? emailEl.value.trim() : '';
@@ -5301,6 +5319,17 @@ Example:
             var invoiceData = window._currentInvoiceData || {};
             var profile = {};
             try { profile = JSON.parse(localStorage.getItem('ald_business_profile') || '{}'); } catch(e) {}
+            if (typeof loadBusinessProfile === 'function') {
+                try {
+                    var cloudProfile = await loadBusinessProfile();
+                    if (cloudProfile) profile = cloudProfile;
+                } catch(e) {}
+            }
+            var companyName = getProfileCompanyName(profile) || 'Your Contractor';
+            var contractorName = getProfileOwnerName(profile) || companyName;
+            var replyTo = profile.emailReplyTo || profile.email || profile.business_email || '';
+            var subject = subjectEl ? subjectEl.value.trim() : '';
+            if (!subject) subject = 'Invoice from ' + companyName;
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Sending...';
             resultEl.innerHTML = '';
@@ -5314,18 +5343,17 @@ Example:
                     body: JSON.stringify({
                         to: email,
                         clientName: invoiceData.clientName || '',
-                        contractorName: profile.ownerName || profile.name || '',
-                        companyName: profile.companyName || profile.businessName || '',
+                        contractorName: contractorName,
+                        companyName: companyName,
                         quoteNumber: invoiceData.quoteNumber || '',
                         total: invoiceData.grandTotal || 0,
                         quoteUrl: invoiceUrl,
-                        subject: 'Invoice from ' + (profile.companyName || profile.businessName || 'ALD Direct Inc.'),
                         message: msgEl ? msgEl.value.trim() : '',
                         isInvoice: true,
-                        emailSubject: profile.emailSubject || '',
-                        emailIntro: profile.emailIntro || '',
-                        emailButtonText: profile.emailButtonText || '',
-                        emailReplyTo: profile.emailReplyTo || '',
+                        emailSubject: subject,
+                        emailIntro: '',
+                        emailButtonText: 'View Invoice',
+                        emailReplyTo: replyTo,
                         emailFooter: profile.emailFooter || ''
                     })
                 });

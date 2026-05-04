@@ -43,7 +43,30 @@
         .item-row:last-child { border-bottom: none; }
 
         .item-name { font-weight: 600; }
-        .item-desc { font-size: 0.88rem; color: #666; margin-top: 2px; }
+        .item-desc { font-size: 0.88rem; color: #666; margin-top: 2px; line-height: 1.45; }
+        .item-desc-wrap { margin-top: 2px; }
+        .item-desc-wrap.is-collapsed .item-desc-collapsible {
+            max-height: 4.35em;
+            overflow: hidden;
+            position: relative;
+        }
+        .item-desc-wrap.is-collapsed .item-desc-collapsible::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 1.5em;
+            background: linear-gradient(180deg, rgba(255,255,255,0), #fff);
+        }
+        .item-desc-toggle {
+            border: 0;
+            background: transparent;
+            color: #1a56a0;
+            font-size: 0.78rem;
+            font-weight: 700;
+            padding: 2px 0 0;
+        }
         .item-upgraded-badge {
             display: inline-block;
             background: #fff3cd;
@@ -77,6 +100,24 @@
         }
 
         .terms-section { margin-top: 2rem; }
+        .payment-method-list {
+            display: grid;
+            gap: 0.75rem;
+            text-align: left;
+        }
+        .payment-method-item {
+            border: 1px solid #dfe6ef;
+            border-radius: 8px;
+            padding: 0.85rem 1rem;
+            background: #fff;
+        }
+        .payment-method-item strong { color: #10233d; }
+        .thank-you-message {
+            color: #10233d;
+            font-size: 1.35rem;
+            font-weight: 800;
+            letter-spacing: 0;
+        }
 
         /* Warranty Badge */
         .warranty-section {
@@ -233,24 +274,14 @@ if (location.search.includes('debug')) {
             </div>
         </div>
 
-        <!-- Deposit / Payment Request -->
-        <div class="text-center my-4" id="depositRequestBtn" style="display:none;">
-            <button class="btn btn-success btn-lg px-5" onclick="openDepositModal()">
-                <i class="fas fa-credit-card me-2"></i>Request Deposit
-            </button>
-            <div id="depositRequestedBadge" class="mt-2" style="display:none;">
-                <span class="badge bg-success fs-6"><i class="fas fa-check-circle me-1"></i>Payment Link Sent</span>
-            </div>
-        </div>
+        <div id="depositRequestBtn" style="display:none;"></div>
 
         <!-- Client Payment Section (shown when contractor has Stripe enabled) -->
         <div id="clientPaymentSection" style="display:none;" class="mt-3 mb-4">
             <div class="card border-0 shadow-sm p-4 text-center">
-                <h5 class="mb-3"><i class="fas fa-lock me-2 text-success"></i>Pay This Invoice</h5>
+                <h5 class="mb-3"><i class="fas fa-lock me-2 text-success"></i>Payment Options</h5>
                 <div id="clientPaymentButtons"></div>
-                <div class="text-muted small mt-2"><i class="fab fa-stripe me-1"></i>Secure payment powered by Stripe</div>
-                <hr class="my-3">
-                <p class="text-muted small mb-0">Prefer e-transfer or cheque? Contact us directly.</p>
+                <div id="manualPaymentDetails"></div>
             </div>
         </div>
 
@@ -259,12 +290,12 @@ if (location.search.includes('debug')) {
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title"><i class="fas fa-credit-card me-2"></i>Request Deposit</h5>
+                        <h5 class="modal-title"><i class="fas fa-credit-card me-2"></i>Pay Invoice</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
-                        <p class="text-muted">Set the deposit amount to request from your client. A Stripe payment link will open.</p>
-                        <label class="form-label fw-bold">Deposit Amount</label>
+                        <p class="text-muted">Set the payment amount. A Stripe checkout link will open.</p>
+                        <label class="form-label fw-bold">Payment Amount</label>
                         <div class="input-group mb-2">
                             <span class="input-group-text">$</span>
                             <input type="number" class="form-control" id="depositAmountInput" min="1" step="0.01" placeholder="0.00">
@@ -327,7 +358,7 @@ if (location.search.includes('debug')) {
             </div>
         </div>
 
-        <div class="text-center text-muted mt-4 mb-2" style="font-size:0.85rem;">
+        <div class="text-center thank-you-message mt-4 mb-2">
             Thank you for your business!
         </div>
     </div>
@@ -372,6 +403,32 @@ if (location.search.includes('debug')) {
             var symbols = { CAD:'$', USD:'$', GBP:'\u00a3', EUR:'\u20ac', AUD:'$', NZD:'$' };
             var symbol = symbols[currency || 'CAD'] || '$';
             return symbol + (Number(amount || 0)).toFixed(2);
+        }
+
+        function escapeHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function renderCollapsibleDescription(text, prefixHtml) {
+            if (!text) return '';
+            var clean = escapeHtml(text);
+            var isLong = clean.length > 170;
+            return '<div class="item-desc-wrap' + (isLong ? ' is-collapsed' : '') + '">' +
+                '<div class="item-desc item-desc-collapsible">' + (prefixHtml || '') + clean + '</div>' +
+                (isLong ? '<button type="button" class="item-desc-toggle d-print-none" onclick="toggleItemDescription(this)">Show more</button>' : '') +
+                '</div>';
+        }
+
+        function toggleItemDescription(btn) {
+            var wrap = btn.closest('.item-desc-wrap');
+            if (!wrap) return;
+            var collapsed = wrap.classList.toggle('is-collapsed');
+            btn.textContent = collapsed ? 'Show more' : 'Show less';
         }
 
         const CATEGORY_ORDER = [
@@ -453,12 +510,12 @@ if (location.search.includes('debug')) {
             var localKey = params.get('invoice');
             if (localKey) {
                 var stored = localStorage.getItem(localKey);
-                if (stored) { invoiceData = JSON.parse(stored); renderInvoice(); renderTerms(); return true; }
+                if (stored) { invoiceData = JSON.parse(stored); renderInvoice(); renderTerms(); renderInvoicePaymentOptions(invoiceData.paymentSettings, window._invoiceTotal || 0, invoiceData.supabaseId || invoiceData.id || ''); return true; }
             }
             var lastKey = localStorage.getItem('ald_last_preview_invoice');
             if (lastKey) {
                 var stored2 = localStorage.getItem(lastKey);
-                if (stored2) { invoiceData = JSON.parse(stored2); renderInvoice(); renderTerms(); return true; }
+                if (stored2) { invoiceData = JSON.parse(stored2); renderInvoice(); renderTerms(); renderInvoicePaymentOptions(invoiceData.paymentSettings, window._invoiceTotal || 0, invoiceData.supabaseId || invoiceData.id || ''); return true; }
             }
             return false;
         }
@@ -524,6 +581,7 @@ if (location.search.includes('debug')) {
                 invoiceData = JSON.parse(stored);
                 renderInvoice();
                 renderTerms();
+                renderInvoicePaymentOptions(invoiceData.paymentSettings, window._invoiceTotal || 0, invoiceData.supabaseId || invoiceData.id || '');
             } else {
                 if (!tryLocalStorageFallback()) {
                     document.getElementById('invoiceContainer').innerHTML = '<div class="alert alert-warning">No invoice found.</div>';
@@ -549,7 +607,28 @@ if (location.search.includes('debug')) {
             if (invoiceData.phone) document.getElementById('clientPhoneDisplay').textContent = invoiceData.phone;
 
             // Business info — load from Supabase if available
-            if (typeof getBusinessProfile === 'function') {
+            if (invoiceData.businessLogo) {
+                var embeddedLogoEl = document.getElementById('businessLogoImg');
+                if (embeddedLogoEl) embeddedLogoEl.src = invoiceData.businessLogo;
+            }
+            if (invoiceData.businessProfile) {
+                const b = invoiceData.businessProfile;
+                const nameEl = document.getElementById('companyNameDisplay');
+                const tagEl = document.getElementById('companyTaglineDisplay');
+                if (nameEl) nameEl.textContent = b.business_name || b.companyName || b.businessName || '';
+                if (tagEl) {
+                    tagEl.textContent = b.tagline || '';
+                    tagEl.style.display = b.tagline ? '' : 'none';
+                }
+                const bizEl = document.getElementById('businessInfoDisplay');
+                if (bizEl) bizEl.innerHTML = [
+                    b.address,
+                    b.city ? b.city + (b.province ? ', ' + b.province : '') + (b.postal_code ? ' ' + b.postal_code : '') : '',
+                    b.phone ? 'Phone: ' + b.phone : '',
+                    b.email ? 'Email: ' + b.email : '',
+                    b.hst_number ? 'HST: ' + b.hst_number : ''
+                ].filter(Boolean).map(l => '<div>' + l + '</div>').join('');
+            } else if (typeof getBusinessProfile === 'function') {
                 getBusinessProfile().then(function(result) {
                     var bizEl = document.getElementById('businessInfoDisplay');
                     if (bizEl && result.data) {
@@ -562,10 +641,6 @@ if (location.search.includes('debug')) {
                         bizEl.innerHTML = lines.map(function(l) { return '<div>' + l + '</div>'; }).join('');
                     }
                 });
-            } else if (invoiceData.businessProfile) {
-                const b = invoiceData.businessProfile;
-                const bizEl = document.getElementById('businessInfoDisplay');
-                if (bizEl) bizEl.innerHTML = [b.address, b.city + (b.province ? ', ' + b.province : '') + (b.postal_code ? ' ' + b.postal_code : ''), b.phone ? 'Phone: ' + b.phone : '', b.hst_number ? 'HST: ' + b.hst_number : ''].filter(Boolean).map(l => '<div>' + l + '</div>').join('');
             }
 
             if (!invoiceData.rooms || !invoiceData.rooms.length) {
@@ -628,13 +703,13 @@ if (location.search.includes('debug')) {
                         ? item.upgrade.description
                         : (item.itemDescription || '');
                     const descHtml = settings.showDescriptions !== false
-                        ? ((displayDesc ? `<div class="item-desc">${displayDesc}</div>` : '') + (item.notes ? `<div class="item-desc"><i class="fas fa-info-circle"></i> ${item.notes}</div>` : ''))
+                        ? (renderCollapsibleDescription(displayDesc) + renderCollapsibleDescription(item.notes, '<i class="fas fa-info-circle"></i> '))
                         : '';
 
                     html += `
                             <tr>
                                 <td>
-                                    <span class="item-name">${displayName}</span>
+                                    <span class="item-name">${escapeHtml(displayName)}</span>
                                     ${item.photo ? `<div class="mt-1"><img src="${item.photo}" style="max-width:100px;max-height:70px;border-radius:4px;" alt=""></div>` : ''}
                                     ${isUpgraded ? '<span class="item-upgraded-badge">⬆ Upgraded</span>' : ''}
                                     ${descHtml}
@@ -681,11 +756,10 @@ if (location.search.includes('debug')) {
             if (noteSection) noteSection.style.display = hasNote ? 'block' : 'none';
             if (noteEl) noteEl.textContent = settings.note || '';
             if (termsEl) termsEl.textContent = settings.paymentTerms ? 'Payment terms: ' + settings.paymentTerms : '';
-            // Store total for deposit modal
+            // Store total for payment helpers
             window._invoiceTotal = total;
-            // Update deposit button visibility
             var depBtn = document.getElementById('depositRequestBtn');
-            if (depBtn) depBtn.style.display = (total > 0 && settings.showPaymentOptions !== false) ? 'block' : 'none';
+            if (depBtn) depBtn.style.display = 'none';
         }
 
         function openDepositModal() {
@@ -738,9 +812,16 @@ if (location.search.includes('debug')) {
             if (settings.showTerms === false) return;
             const el = document.getElementById('termsDisplay');
             if (!invoiceData.terms || !invoiceData.terms.length) return;
+            var invoiceTerms = invoiceData.terms.filter(function(t) {
+                return !/\bdeposit\b/i.test(String(t || ''));
+            });
+            if (!invoiceTerms.length) {
+                if (section) section.style.display = 'none';
+                return;
+            }
             let html = '<ul class="list-group list-group-flush">';
-            invoiceData.terms.forEach(t => {
-                html += `<li class="list-group-item"><i class="fas fa-check-circle text-success"></i> ${t}</li>`;
+            invoiceTerms.forEach(t => {
+                html += `<li class="list-group-item"><i class="fas fa-check-circle text-success"></i> ${escapeHtml(t)}</li>`;
             });
             html += '</ul>';
             el.innerHTML = html;
@@ -760,6 +841,59 @@ if (location.search.includes('debug')) {
             } catch(e) { return null; }
         }
 
+        function withDefaultPaymentSettings(settings) {
+            var profile = invoiceData.businessProfile || {};
+            return Object.assign({
+                stripe_enabled: false,
+                accept_full_payment: true,
+                accept_etransfer: true,
+                etransfer_email: profile.email || '',
+                accept_cheque: true,
+                accept_cash: true,
+                payment_instructions: ''
+            }, settings || {});
+        }
+
+        function renderInvoicePaymentOptions(settings, total, invoiceId) {
+            if (getInvoiceSettings().showPaymentOptions === false || !total) return;
+            var s = withDefaultPaymentSettings(settings);
+            _invoicePaymentSettings = s;
+            _invoiceTotalForPayment = total || 0;
+            _invoiceIdForPayment = invoiceId || '';
+
+            var buttonHtml = '';
+            if (s.stripe_enabled && s.accept_full_payment !== false && invoiceId) {
+                buttonHtml += '<button class="btn btn-success btn-lg px-5 mb-3 w-100" onclick="handleClientInvoicePayment(' + Math.round(total * 100) + ', \"Pay Invoice in Full\", \"invoice_full\")">';
+                buttonHtml += '<i class="fas fa-credit-card me-2"></i>Pay Invoice - $' + total.toFixed(2) + '</button>';
+                buttonHtml += '<div class="text-muted small mb-3"><i class="fab fa-stripe me-1"></i>Secure card payment powered by Stripe</div>';
+            }
+
+            var manualHtml = '';
+            if (s.accept_etransfer !== false) {
+                manualHtml += '<div class="payment-method-item"><strong><i class="fas fa-money-bill-transfer me-2 text-success"></i>E-transfer</strong>';
+                manualHtml += '<div class="text-muted small mt-1">' + (s.etransfer_email ? 'Send payment to <strong>' + escapeHtml(s.etransfer_email) + '</strong>.' : 'Contact us for the e-transfer email.') + '</div></div>';
+            }
+            if (s.accept_cheque !== false) {
+                manualHtml += '<div class="payment-method-item"><strong><i class="fas fa-money-check-dollar me-2 text-success"></i>Cheque</strong>';
+                manualHtml += '<div class="text-muted small mt-1">Cheques are accepted for this invoice.</div></div>';
+            }
+            if (s.accept_cash !== false) {
+                manualHtml += '<div class="payment-method-item"><strong><i class="fas fa-money-bill-wave me-2 text-success"></i>Cash</strong>';
+                manualHtml += '<div class="text-muted small mt-1">Cash payments are accepted by arrangement.</div></div>';
+            }
+            if (s.payment_instructions) {
+                manualHtml += '<div class="payment-method-item"><strong><i class="fas fa-circle-info me-2 text-primary"></i>Instructions</strong>';
+                manualHtml += '<div class="text-muted small mt-1">' + escapeHtml(s.payment_instructions).replace(/\n/g, '<br>') + '</div></div>';
+            }
+
+            var buttonsEl = document.getElementById('clientPaymentButtons');
+            var manualEl = document.getElementById('manualPaymentDetails');
+            var section = document.getElementById('clientPaymentSection');
+            if (buttonsEl) buttonsEl.innerHTML = buttonHtml;
+            if (manualEl) manualEl.innerHTML = manualHtml ? '<div class="payment-method-list">' + manualHtml + '</div>' : '<p class="text-muted small mb-0">Please contact us to arrange payment.</p>';
+            if (section && (buttonHtml || manualHtml)) section.style.display = 'block';
+        }
+
         async function initInvoicePaymentSection(contractorUserId, total, invoiceId) {
             if (getInvoiceSettings().showPaymentOptions === false) return;
             _invoiceTotalForPayment = total || 0;
@@ -770,23 +904,7 @@ if (location.search.includes('debug')) {
                 return;
             }
             _invoicePaymentSettings = await loadContractorPaymentSettings(contractorUserId);
-            if (!_invoicePaymentSettings || !_invoicePaymentSettings.stripe_enabled) return;
-            var s = _invoicePaymentSettings;
-            var html = '';
-            if (s.accept_full_payment) {
-                html += '<button class="btn btn-success btn-lg px-5 mb-2 w-100" onclick="handleClientInvoicePayment(' + Math.round(total * 100) + ', \"Pay Invoice in Full\", \"invoice_full\")">';
-                html += '<i class="fas fa-credit-card me-2"></i>Pay Invoice in Full — $' + total.toFixed(2) + '</button>';
-            }
-            if (s.accept_deposit) {
-                var pct = s.deposit_default_pct || 50;
-                var depAmt = (total * pct / 100);
-                html += '<button class="btn btn-outline-success btn-lg px-5 mb-2 w-100 mt-2" onclick="handleClientInvoicePayment(' + Math.round(depAmt * 100) + ', \"Pay Deposit\", \"invoice_deposit\")">';
-                html += '<i class="fas fa-credit-card me-2"></i>Pay ' + pct + '% Deposit — $' + depAmt.toFixed(2) + '</button>';
-            }
-            if (html) {
-                document.getElementById('clientPaymentButtons').innerHTML = html;
-                document.getElementById('clientPaymentSection').style.display = 'block';
-            }
+            renderInvoicePaymentOptions(_invoicePaymentSettings, total, invoiceId);
         }
 
         async function handleClientInvoicePayment(amountCents, description, paymentType) {
