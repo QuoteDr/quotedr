@@ -99,6 +99,30 @@
             padding: 0.75rem 0;
             z-index: 10;
         }
+        .foundation-panel {
+            border: 1px solid #cfe0f5;
+            border-radius: 8px;
+            background: #f8fbff;
+        }
+        .foundation-kicker {
+            color: #1a56a0;
+            font-size: 0.78rem;
+            font-weight: 800;
+            letter-spacing: 0;
+            text-transform: uppercase;
+        }
+        .source-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            border: 1px solid #cfe0f5;
+            border-radius: 999px;
+            background: #edf4ff;
+            color: #174b82;
+            font-size: 0.74rem;
+            font-weight: 700;
+            padding: 0.12rem 0.45rem;
+        }
         @media (max-width: 768px) {
             .metric-value { font-size: 1.2rem; }
             .table-responsive { font-size: 0.88rem; }
@@ -165,8 +189,45 @@
             <div id="importHelp" class="small-muted mt-3">Default totals include tax. Switch to subtotal anytime to see spend before tax. Returns stay negative and reduce the job total. Tracker data saves locally and syncs to your QuoteDr account when logged in.</div>
         </section>
 
+        <section id="expenseFoundationPanel" class="foundation-panel p-3 mb-4 d-none">
+            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+                <div>
+                    <div class="foundation-kicker">Hidden foundation</div>
+                    <h4 class="mb-1">Quick expense capture</h4>
+                    <div class="small-muted">This is the bank/card transaction foundation. It stays hidden unless this browser enables the internal flag.</div>
+                </div>
+                <button class="btn btn-outline-secondary btn-sm" onclick="disableExpenseFoundation()"><i class="fas fa-eye-slash me-1"></i>Hide</button>
+            </div>
+            <div class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Merchant</label>
+                    <input id="quickExpenseMerchant" class="form-control" placeholder="e.g. Home Depot Burlington">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">Amount</label>
+                    <input id="quickExpenseAmount" type="number" step="0.01" class="form-control" placeholder="0.00">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">Date</label>
+                    <input id="quickExpenseDate" type="date" class="form-control">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Job</label>
+                    <select id="quickExpenseProject" class="form-select"></select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">New job</label>
+                    <input id="quickExpenseNewProject" class="form-control" placeholder="Optional">
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-primary w-100" onclick="addQuickExpense()"><i class="fas fa-bolt me-1"></i>Add</button>
+                </div>
+            </div>
+        </section>
+
         <ul class="nav nav-pills mb-3" id="trackerTabs">
             <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#projectsTab" type="button"><i class="fas fa-folder-tree me-1"></i>Jobs</button></li>
+            <li class="nav-item d-none" id="expenseInboxTabNav"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#expenseInboxTab" type="button"><i class="fas fa-inbox me-1"></i>Expense Inbox</button></li>
             <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#reviewTab" type="button"><i class="fas fa-flag me-1"></i>Needs Review</button></li>
             <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#transactionsTab" type="button"><i class="fas fa-receipt me-1"></i>Transactions</button></li>
             <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#importSheetTab" type="button"><i class="fas fa-table me-1"></i>Import Sheet</button></li>
@@ -176,6 +237,18 @@
         <div class="tab-content">
             <section class="tab-pane fade show active" id="projectsTab">
                 <div id="projectsList" class="row g-3"></div>
+            </section>
+            <section class="tab-pane fade" id="expenseInboxTab">
+                <div class="tool-card p-3">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                        <div>
+                            <h4 class="mb-0">Expense inbox</h4>
+                            <div class="small-muted">Future bank/card transactions land here first. Assign them while the purchase is fresh.</div>
+                        </div>
+                        <button class="btn btn-outline-primary btn-sm" onclick="focusQuickExpense()"><i class="fas fa-plus me-1"></i>Quick Expense</button>
+                    </div>
+                    <div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Date</th><th>Source</th><th>Merchant</th><th>Amount</th><th>Job</th><th>Action</th></tr></thead><tbody id="expenseInboxRows"></tbody></table></div>
+                </div>
             </section>
             <section class="tab-pane fade" id="reviewTab">
                 <div class="tool-card p-3">
@@ -239,12 +312,14 @@
     <script>
         const STORE_KEY = 'quotedr_project_tracker_v1';
         const CLOUD_KEY = 'home_depot_project_tracker_v1';
+        const EXPENSE_FOUNDATION_KEY = 'quotedr_expense_foundation_enabled';
         let tracker = loadTracker();
         let importPreview = [];
         let allQuotes = [];
         let lastWorkbookRows = null;
         let cloudSaveTimer = null;
         let reviewProjectFilter = '';
+        let expenseFoundationEnabled = false;
 
         function loadTracker() {
             try {
@@ -304,6 +379,69 @@
 
         function amountFor(tx) {
             return document.getElementById('taxModeSelect').value === 'subtotal' ? (tx.subtotal ?? tx.total) : tx.total;
+        }
+
+        function isExpenseFoundationEnabled() {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('expenseFoundation') === '1') {
+                localStorage.setItem(EXPENSE_FOUNDATION_KEY, 'true');
+                return true;
+            }
+            if (params.get('expenseFoundation') === '0') {
+                localStorage.removeItem(EXPENSE_FOUNDATION_KEY);
+                return false;
+            }
+            return localStorage.getItem(EXPENSE_FOUNDATION_KEY) === 'true';
+        }
+
+        function applyExpenseFoundationVisibility() {
+            expenseFoundationEnabled = isExpenseFoundationEnabled();
+            document.getElementById('expenseFoundationPanel')?.classList.toggle('d-none', !expenseFoundationEnabled);
+            document.getElementById('expenseInboxTabNav')?.classList.toggle('d-none', !expenseFoundationEnabled);
+            renderQuickExpenseProjectOptions();
+        }
+
+        function disableExpenseFoundation() {
+            localStorage.removeItem(EXPENSE_FOUNDATION_KEY);
+            expenseFoundationEnabled = false;
+            applyExpenseFoundationVisibility();
+            const projectsTab = document.querySelector('[data-bs-target="#projectsTab"]');
+            if (projectsTab) bootstrap.Tab.getOrCreateInstance(projectsTab).show();
+        }
+
+        function txMerchant(tx) {
+            return tx.merchant || tx.vendor || tx.location || tx.jobName || tx.txNumber || 'Unknown merchant';
+        }
+
+        function txSourceLabel(tx) {
+            return tx.sourceLabel || tx.source || 'Expense';
+        }
+
+        function normalizeExpenseTransaction(input) {
+            const total = Number(input.total ?? input.amount ?? 0);
+            return Object.assign({
+                id: input.id || idFor('expense'),
+                source: input.source || 'Manual Expense',
+                sourceType: input.sourceType || 'manual',
+                sourceLabel: input.sourceLabel || input.source || 'Manual',
+                merchant: input.merchant || input.vendor || input.location || '',
+                date: input.date || new Date().toISOString().slice(0, 10),
+                txNumber: input.txNumber || '',
+                jobName: input.jobName || '',
+                location: input.location || '',
+                subtotal: input.subtotal == null ? total : input.subtotal,
+                total,
+                taxRate: input.taxRate ?? null,
+                isReturn: total < 0,
+                isOnline: false,
+                reviewReason: input.reviewReason || '',
+                projectId: input.projectId || null,
+                suggestedProjectIds: input.suggestedProjectIds || [],
+                possibleDuplicateIds: input.possibleDuplicateIds || [],
+                excluded: Boolean(input.excluded),
+                raw: input.raw || null,
+                createdAt: input.createdAt || new Date().toISOString()
+            }, input);
         }
 
         function escapeHtml(value) {
@@ -447,10 +585,13 @@
                 return {
                     id: txNumber ? 'hd_' + txNumber.replace(/[^A-Za-z0-9]/g, '_') : idFor('hd'),
                     source: 'Home Depot Pro',
+                    sourceType: 'supplier_import',
+                    sourceLabel: 'Home Depot',
                     row: idx + 2,
                     date: date ? date.toISOString().slice(0, 10) : '',
                     txNumber,
                     location,
+                    merchant: location || 'Home Depot',
                     jobName,
                     status,
                     purchaser: String(clean['Purchaser'] || '').trim(),
@@ -463,7 +604,8 @@
                     projectId: null,
                     suggestedProjectIds: [],
                     possibleDuplicateIds: [],
-                    excluded: false
+                    excluded: false,
+                    raw: clean
                 };
             }).filter(tx => tx.date || tx.txNumber || tx.total);
 
@@ -569,6 +711,8 @@
         function renderAll() {
             renderMetrics();
             renderProjects();
+            renderExpenseInbox();
+            renderQuickExpenseProjectOptions();
             renderReview();
             renderTransactions();
             renderImportSheet();
@@ -583,6 +727,97 @@
             document.getElementById('metricProjects').textContent = effectiveProjects().length;
             document.getElementById('metricReview').textContent = txs.filter(tx => tx.reviewReason && !tx.excluded).length;
             document.getElementById('metricDupes').textContent = txs.filter(tx => tx.possibleDuplicateIds && tx.possibleDuplicateIds.length).length;
+        }
+
+        function renderQuickExpenseProjectOptions() {
+            const select = document.getElementById('quickExpenseProject');
+            if (!select) return;
+            const current = select.value;
+            const options = effectiveProjects().map(p => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)}</option>`).join('');
+            select.innerHTML = '<option value="">Needs assignment</option>' + options;
+            if ([...select.options].some(option => option.value === current)) select.value = current;
+            const dateInput = document.getElementById('quickExpenseDate');
+            if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().slice(0, 10);
+        }
+
+        function addQuickExpense() {
+            const merchantInput = document.getElementById('quickExpenseMerchant');
+            const amountInput = document.getElementById('quickExpenseAmount');
+            const dateInput = document.getElementById('quickExpenseDate');
+            const projectSelect = document.getElementById('quickExpenseProject');
+            const newProjectInput = document.getElementById('quickExpenseNewProject');
+            const merchant = merchantInput.value.trim();
+            const amount = parseMoney(amountInput.value);
+            if (!merchant || amount == null) {
+                alert('Enter a merchant and amount first.');
+                return;
+            }
+            const newProjectName = newProjectInput.value.trim();
+            let projectId = projectSelect.value || null;
+            if (newProjectName) {
+                const project = { id: idFor('project'), name: newProjectName, aliases: [normalizeName(newProjectName)], firstDate: dateInput.value || new Date().toISOString().slice(0, 10), lastDate: dateInput.value || new Date().toISOString().slice(0, 10), quoteIds: [] };
+                tracker.projects = tracker.projects || [];
+                tracker.projects.push(project);
+                projectId = project.id;
+            }
+            const tx = normalizeExpenseTransaction({
+                source: 'Manual Expense',
+                sourceType: 'manual',
+                sourceLabel: 'Manual',
+                merchant,
+                location: merchant,
+                date: dateInput.value || new Date().toISOString().slice(0, 10),
+                total: amount,
+                subtotal: amount,
+                projectId,
+                reviewReason: projectId ? '' : 'Needs job assignment'
+            });
+            tracker.transactions = tracker.transactions || [];
+            tracker.transactions.push(tx);
+            saveTracker();
+            merchantInput.value = '';
+            amountInput.value = '';
+            newProjectInput.value = '';
+            renderAll();
+        }
+
+        function focusQuickExpense() {
+            const panel = document.getElementById('expenseFoundationPanel');
+            if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            setTimeout(function() {
+                document.getElementById('quickExpenseMerchant')?.focus();
+            }, 150);
+        }
+
+        function renderExpenseInbox() {
+            const el = document.getElementById('expenseInboxRows');
+            if (!el) return;
+            if (!expenseFoundationEnabled) {
+                el.innerHTML = '';
+                return;
+            }
+            const rows = allTransactions().filter(tx => !tx.excluded && (!tx.projectId || tx.reviewReason || tx.sourceType === 'bank_card_pending'));
+            if (!rows.length) {
+                el.innerHTML = '<tr><td colspan="6" class="text-center small-muted py-4">No unassigned expenses right now.</td></tr>';
+                return;
+            }
+            el.innerHTML = rows.map(tx => {
+                const suggestion = tx.suggestedProjectIds && tx.suggestedProjectIds[0] ? tx.suggestedProjectIds[0] : '';
+                return `<tr>
+                    <td>${escapeHtml(tx.date)}</td>
+                    <td><span class="source-pill">${escapeHtml(txSourceLabel(tx))}</span></td>
+                    <td><strong>${escapeHtml(txMerchant(tx))}</strong><div class="small-muted">${escapeHtml(tx.reviewReason || tx.txNumber || '')}</div></td>
+                    <td class="${amountFor(tx) < 0 ? 'amount-negative' : 'amount-positive'}">${money(amountFor(tx))}</td>
+                    <td>${projectSelectHtml(tx.projectId, `assignTransaction('${tx.id}', this.value)`, true)}</td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            ${suggestion ? `<button class="btn btn-outline-primary" onclick="assignTransaction('${tx.id}', '${suggestion}')">Use Suggestion</button>` : ''}
+                            <button class="btn btn-outline-success" onclick="markReviewed('${tx.id}')">Done</button>
+                            <button class="btn btn-outline-danger" onclick="excludeTransaction('${tx.id}')">Personal</button>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
         }
 
         function renderProjects() {
@@ -723,9 +958,9 @@
             }
             el.innerHTML = txs.map(tx => `<tr class="${tx.excluded ? 'text-muted' : ''}">
                 <td>${escapeHtml(tx.date)}</td>
-                <td>${escapeHtml(tx.txNumber)}</td>
+                <td>${escapeHtml(tx.txNumber || tx.id)}</td>
                 <td>${escapeHtml(tx.location)}</td>
-                <td>${escapeHtml(tx.jobName || '(blank)')}</td>
+                <td><span class="source-pill">${escapeHtml(txSourceLabel(tx))}</span><div class="mt-1">${escapeHtml(tx.jobName || txMerchant(tx) || '(blank)')}</div></td>
                 <td>${projectSelectHtml(tx.projectId, `assignTransaction('${tx.id}', this.value)`, true)}</td>
                 <td>${tx.subtotal == null ? '-' : money(tx.subtotal)}</td>
                 <td class="${tx.total < 0 ? 'amount-negative' : 'amount-positive'}">${money(tx.total)}</td>
@@ -820,8 +1055,12 @@
 
         function assignTransaction(txId, projectId) {
             [tracker.transactions, importPreview].forEach(list => (list || []).forEach(tx => {
-                if (tx.id === txId) tx.projectId = projectId || null;
+                if (tx.id === txId) {
+                    tx.projectId = projectId || null;
+                    if (projectId && tx.reviewReason === 'Needs job assignment') tx.reviewReason = '';
+                }
             }));
+            if ((tracker.transactions || []).some(tx => tx.id === txId)) saveTracker();
             renderAll();
         }
 
@@ -908,6 +1147,7 @@
             [tracker.transactions, importPreview].forEach(list => (list || []).forEach(tx => {
                 if (tx.id === txId) tx.reviewReason = '';
             }));
+            if ((tracker.transactions || []).some(tx => tx.id === txId)) saveTracker();
             renderAll();
         }
 
@@ -915,6 +1155,7 @@
             [tracker.transactions, importPreview].forEach(list => (list || []).forEach(tx => {
                 if (tx.id === txId) tx.excluded = true;
             }));
+            if ((tracker.transactions || []).some(tx => tx.id === txId)) saveTracker();
             renderAll();
         }
 
@@ -950,10 +1191,11 @@
             effectiveProjects().forEach(p => projectMap[p.id] = Object.assign({}, p, { sourceImport: false }));
             tracker.projects = Object.values(projectMap);
             const txMap = {};
-            allTransactions().forEach(tx => txMap[tx.id] = tx);
+            allTransactions().forEach(tx => txMap[tx.id] = normalizeExpenseTransaction(tx));
             tracker.transactions = Object.values(txMap);
             tracker.previewProjects = [];
             importPreview = [];
+            tracker.imports = tracker.imports || [];
             tracker.imports.push({ id: idFor('import'), importedAt: new Date().toISOString(), count: tracker.transactions.length });
             saveTracker();
             renderAll();
@@ -981,7 +1223,9 @@
         }
 
         document.addEventListener('DOMContentLoaded', async function() {
+            applyExpenseFoundationVisibility();
             await loadCloudTracker();
+            applyExpenseFoundationVisibility();
             await loadQuotes();
             renderAll();
         });
