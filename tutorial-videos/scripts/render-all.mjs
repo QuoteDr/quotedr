@@ -14,6 +14,7 @@ const tutorialIds = [
   "floor-plan-scanner",
   "material-calculators",
   "quickbooks-settings",
+  "customize-brand",
   "landing-overview",
 ];
 

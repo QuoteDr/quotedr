@@ -7,10 +7,10 @@
   "private": true,
   "dependencies": {
     "@remotion/cli": "4.0.457",
+    "@remotion/tailwind-v4": "4.0.457",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "remotion": "4.0.457",
-    "@remotion/tailwind-v4": "4.0.457",
     "tailwindcss": "4.0.0"
   },
   "devDependencies": {
@@ -18,12 +18,14 @@
     "@types/react": "19.2.7",
     "@types/web": "0.0.166",
     "eslint": "9.19.0",
+    "playwright": "^1.59.1",
     "prettier": "3.8.1",
     "typescript": "5.9.3"
   },
   "scripts": {
     "dev": "remotion studio",
     "build": "remotion bundle",
+    "capture:customize-brand": "node scripts/capture-customize-brand.mjs",
     "render:all": "node scripts/render-all.mjs",
     "upgrade": "remotion upgrade",
     "lint": "eslint src && tsc"

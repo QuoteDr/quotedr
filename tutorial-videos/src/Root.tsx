@@ -1,5 +1,6 @@
 import "./index.css";
 import { Composition } from "remotion";
+import { CustomizeBrandComposition } from "./CustomizeBrandComposition";
 import { TutorialComposition } from "./TutorialComposition";
 import { tutorials } from "./tutorialData";
 
@@ -18,6 +19,14 @@ export const RemotionRoot: React.FC = () => {
           defaultProps={{ tutorial }}
         />
       ))}
+      <Composition
+        id="customize-brand"
+        component={CustomizeBrandComposition}
+        durationInFrames={570}
+        fps={30}
+        width={1280}
+        height={720}
+      />
     </>
   );
 };
