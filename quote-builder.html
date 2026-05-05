@@ -187,6 +187,47 @@
             font-weight: 600;
             padding: 7px 18px;
         }
+        @keyframes estimatorPricingShimmer {
+            0% { background-position: -180% 0; transform: translateX(0); }
+            10% { transform: translateX(-2px); }
+            20% { transform: translateX(2px); }
+            30% { transform: translateX(-1px); }
+            40% { transform: translateX(1px); }
+            50% { transform: translateX(0); }
+            100% { background-position: 180% 0; transform: translateX(0); }
+        }
+        #estPricingBanner.qd-pricing-nudge {
+            position: relative;
+            overflow: hidden;
+            border: 2px solid #f59e0b;
+            background: linear-gradient(110deg, #fff3cd 0%, #fff3cd 36%, #ffe08a 48%, #fff8df 58%, #fff3cd 72%, #fff3cd 100%);
+            background-size: 260% 100%;
+            color: #6b4e00;
+            font-size: 0.95rem;
+            font-weight: 700;
+            box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.12), 0 10px 24px rgba(146, 64, 14, 0.18);
+            animation: estimatorPricingShimmer 2.2s ease-in-out infinite;
+        }
+        #estPricingBanner .est-pricing-link {
+            display: inline-flex;
+            align-items: center;
+            margin-left: 8px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: #111827;
+            color: #fff;
+            text-decoration: none;
+            font-weight: 800;
+            box-shadow: 0 2px 8px rgba(17, 24, 39, 0.22);
+        }
+        #estPricingBanner .est-pricing-link:hover,
+        #estPricingBanner .est-pricing-link:focus {
+            background: #0f3460;
+            color: #fff;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            #estPricingBanner.qd-pricing-nudge { animation: none; }
+        }
 
         /* Room header color picker */
         .color-picker-swatches { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
@@ -1265,13 +1306,13 @@ Example:
                                 <div class="form-text">Each window adds 18 LF of casing trim</div>
                             </div>
                         </div>
-                        <div id="estPricingBanner" class="alert alert-warning py-2 small mb-2" style="display:none;">
+                        <div id="estPricingBanner" class="alert alert-warning qd-pricing-nudge py-2 small mb-2" style="display:none;">
                             <i class="fas fa-tag me-1"></i> Rates not set up yet &mdash; items will be added with $0 rate.
-                            <a href="javascript:void(0)" onclick="openEstimatorPricing()" class="alert-link ms-1">Set up pricing &rarr;</a>
+                            <a href="javascript:void(0)" onclick="return openEstimatorPricing(event)" class="alert-link est-pricing-link">Set up pricing &rarr;</a>
                         </div>
                         <div class="d-flex gap-2">
                             <button class="btn btn-info text-white flex-grow-1" onclick="calculateEstimate()"><i class="fas fa-calculator me-2"></i>Calculate</button>
-                            <button class="btn btn-outline-secondary btn-sm" onclick="openEstimatorPricing()" title="Set up pricing"><i class="fas fa-tag"></i></button>
+                            <button class="btn btn-outline-secondary btn-sm" onclick="return openEstimatorPricing(event)" title="Set up pricing"><i class="fas fa-tag"></i></button>
                         </div>
                     </div>
 
@@ -1305,7 +1346,7 @@ Example:
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <p class="text-muted small mb-3">Link each material type to your saved line items, or enter a manual rate. Saved once &mdash; auto-fills every estimate from then on.</p>
+                    <p class="text-muted small mb-3">Link each calculator field to one of your saved line items. Start typing to narrow the list, or use the category dropdown.</p>
                     <div id="estPricingRows"></div>
                 </div>
                 <div class="modal-footer">
@@ -6849,7 +6890,7 @@ Example:
     </div>
 </div>
 
-<script src="quote-calculators.js?v=1777660404"></script>
+<script src="quote-calculators.js?v=1777936600"></script>
 <script src="help-content.js?v=1777741200"></script>
 <script src="modal-help.js?v=1777741200"></script>
 <script>

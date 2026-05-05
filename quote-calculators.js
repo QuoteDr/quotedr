@@ -125,6 +125,82 @@
             return JSON.parse(localStorage.getItem('ald_estimator_pricing') || '{}');
         }
 
+        var _estimatorPricingItems = [];
+
+        function calcEscapeHtml(value) {
+            return String(value === undefined || value === null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function getEstimatorCustomItems() {
+            try {
+                return (typeof customItems !== 'undefined' && customItems && typeof customItems === 'object') ? customItems : {};
+            } catch(e) {
+                return {};
+            }
+        }
+
+        function buildEstimatorPricingItems() {
+            var items = [];
+            var source = getEstimatorCustomItems();
+            Object.keys(source).sort().forEach(function(cat) {
+                var catItems = Array.isArray(source[cat]) ? source[cat] : [];
+                catItems.forEach(function(item) {
+                    var rate = parseFloat(item && item.rate) || 0;
+                    if (rate <= 0) return;
+                    var name = item.name || item.description || 'Saved item';
+                    items.push({
+                        id: cat + '::' + name,
+                        category: cat,
+                        name: name,
+                        rate: rate,
+                        unitType: item.unitType || item.unit || ''
+                    });
+                });
+            });
+            _estimatorPricingItems = items;
+            return items;
+        }
+
+        function estimatorPricingOptionsHtml(key, query, selectedId) {
+            var q = String(query || '').trim().toLowerCase();
+            var filtered = _estimatorPricingItems.filter(function(item) {
+                if (!q) return true;
+                return (item.name + ' ' + item.category + ' ' + item.unitType).toLowerCase().indexOf(q) !== -1;
+            });
+            var html = '<option value="">Pick from my items...</option>';
+            var lastCat = null;
+            filtered.forEach(function(item) {
+                if (lastCat !== item.category) {
+                    if (lastCat !== null) html += '</optgroup>';
+                    lastCat = item.category;
+                    html += '<optgroup label="' + calcEscapeHtml(item.category) + '">';
+                }
+                html += '<option value="' + calcEscapeHtml(item.id) + '" data-rate="' + item.rate + '" data-category="' + calcEscapeHtml(item.category) + '" data-name="' + calcEscapeHtml(item.name) + '" data-unit="' + calcEscapeHtml(item.unitType) + '"' + (String(selectedId) === String(item.id) ? ' selected' : '') + '>' +
+                    calcEscapeHtml(item.name) + ' ($' + item.rate.toFixed(2) + '/' + calcEscapeHtml(item.unitType || key) + ')' +
+                    '</option>';
+            });
+            if (lastCat !== null) html += '</optgroup>';
+            if (filtered.length === 0) html += '<option value="" disabled>No matching saved items</option>';
+            return html;
+        }
+
+        function findEstimatorSavedItemId(saved) {
+            if (!saved) return '';
+            if (saved.itemId !== undefined && _estimatorPricingItems.some(function(item) { return String(item.id) === String(saved.itemId); })) return saved.itemId;
+            if (saved.itemName) {
+                var match = _estimatorPricingItems.find(function(item) {
+                    return item.name === saved.itemName && (!saved.category || item.category === saved.category);
+                });
+                if (match) return match.id;
+            }
+            return '';
+        }
+
         // Re-open estimator after pricing modal closes
         document.addEventListener('hidden.bs.modal', function(e) {
             if (e.target.id === 'estimatorPricingModal') {
@@ -137,7 +213,16 @@
             EST_FIELDS.forEach(function(f) {
                 var rateEl = document.getElementById('epRate_' + f.key);
                 var rate = rateEl ? parseFloat(rateEl.value) || 0 : 0;
-                pricing[f.key] = { rate: rate, unit: f.unit };
+                var sel = document.getElementById('epItem_' + f.key);
+                var opt = sel && sel.selectedOptions ? sel.selectedOptions[0] : null;
+                pricing[f.key] = {
+                    rate: rate,
+                    unit: f.unit,
+                    itemId: sel && sel.value ? sel.value : '',
+                    itemName: opt && opt.dataset ? (opt.dataset.name || '') : '',
+                    category: opt && opt.dataset ? (opt.dataset.category || '') : '',
+                    unitType: opt && opt.dataset ? (opt.dataset.unit || '') : ''
+                };
             });
             localStorage.setItem('ald_estimator_pricing', JSON.stringify(pricing));
             // Also save to Supabase
@@ -157,26 +242,32 @@
             document.getElementById('estPricingBanner').style.display = 'none';
         }
 
-        function openEstimatorPricing() {
+        function openEstimatorPricing(event) {
+            if (event && typeof event.preventDefault === 'function') event.preventDefault();
+            if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
             var saved = loadEstimatorPricing();
+            var items = buildEstimatorPricingItems();
             var html = '';
             EST_FIELDS.forEach(function(f) {
                 var savedRate = (saved[f.key] && saved[f.key].rate) || '';
                 var displayUnit = (f.unit === 'sqft') ? calcAreaUnit() : (f.unit === 'LF' ? calcLengthUnit() : f.unit);
-                html += '<div class="row g-2 align-items-center mb-3">';
-                html += '<div class="col-5"><label class="form-label fw-semibold mb-0">' + f.label + '</label><div class="text-muted small">per ' + displayUnit + '</div></div>';
-                html += '<div class="col-4">';
-                // Dropdown of matching saved items
-                html += '<select class="form-select form-select-sm" id="epItem_' + f.key + '" onchange="epItemSelected(\'' + f.key + '\')"><option value="">Pick from my items...</option>';
-                Object.keys(customItems).forEach(function(cat) {
-                    customItems[cat].forEach(function(item) {
-                        if (item.rate > 0) html += '<option value="' + item.rate + '">' + item.name + ' ($' + item.rate + '/' + (item.unitType || f.unit) + ')</option>';
-                    });
-                });
-                html += '</select></div>';
-                html += '<div class="col-3"><div class="input-group input-group-sm"><span class="input-group-text">$</span><input type="number" class="form-control" id="epRate_' + f.key + '" value="' + savedRate + '" placeholder="0.00" step="0.01" min="0"></div></div>';
+                var selectedId = findEstimatorSavedItemId(saved[f.key]);
+                html += '<div class="row g-2 align-items-end mb-3">';
+                html += '<div class="col-lg-3"><label class="form-label fw-semibold mb-0">' + f.label + '</label><div class="text-muted small">per ' + displayUnit + '</div></div>';
+                html += '<div class="col-lg-4">';
+                html += '<label class="form-label small text-muted mb-1" for="epSearch_' + f.key + '">Find saved item</label>';
+                html += '<input type="search" class="form-control form-control-sm" id="epSearch_' + f.key + '" data-estimator-item-search="' + f.key + '" placeholder="Start typing..." oninput="filterEstimatorPricingItems(\'' + f.key + '\')" autocomplete="off">';
+                html += '</div>';
+                html += '<div class="col-lg-3">';
+                html += '<label class="form-label small text-muted mb-1" for="epItem_' + f.key + '">Category items</label>';
+                html += '<select class="form-select form-select-sm" id="epItem_' + f.key + '" onchange="estimatorPricingItemSelected(\'' + f.key + '\')">' + estimatorPricingOptionsHtml(f.key, '', selectedId) + '</select>';
+                html += '</div>';
+                html += '<div class="col-lg-2"><label class="form-label small text-muted mb-1" for="epRate_' + f.key + '">Rate</label><div class="input-group input-group-sm"><span class="input-group-text">$</span><input type="number" class="form-control" id="epRate_' + f.key + '" value="' + savedRate + '" placeholder="0.00" step="0.01" min="0"></div></div>';
                 html += '</div>';
             });
+            if (items.length === 0) {
+                html = '<div class="alert alert-info mb-0"><i class="fas fa-info-circle me-1"></i>No saved pricing items with rates yet. Add items in Manage Items, or enter manual rates here and save.</div>' + html;
+            }
             document.getElementById('estPricingRows').innerHTML = html;
             // Close estimator first (Bootstrap blocks stacked modals)
             var estModal = bootstrap.Modal.getInstance(document.getElementById('materialEstimatorModal'));
@@ -184,12 +275,35 @@
             setTimeout(function() {
                 new bootstrap.Modal(document.getElementById('estimatorPricingModal')).show();
             }, 300);
+            return false;
+        }
+
+        function estimatorPricingItemSelected(key) {
+            var sel = document.getElementById('epItem_' + key);
+            if (!sel || !sel.value) return;
+            var opt = sel.selectedOptions ? sel.selectedOptions[0] : null;
+            var rate = opt && opt.dataset ? opt.dataset.rate : '';
+            if (rate) document.getElementById('epRate_' + key).value = rate;
+            var search = document.getElementById('epSearch_' + key);
+            if (search && opt && opt.dataset) search.value = opt.dataset.name || '';
+        }
+
+        function filterEstimatorPricingItems(key) {
+            var search = document.getElementById('epSearch_' + key);
+            var sel = document.getElementById('epItem_' + key);
+            if (!sel) return;
+            var query = search ? search.value : '';
+            var matches = _estimatorPricingItems.filter(function(item) {
+                if (!query) return true;
+                return (item.name + ' ' + item.category + ' ' + item.unitType).toLowerCase().indexOf(query.toLowerCase()) !== -1;
+            });
+            var selectedId = matches.length === 1 ? matches[0].id : '';
+            sel.innerHTML = estimatorPricingOptionsHtml(key, query, selectedId);
+            if (matches.length === 1) estimatorPricingItemSelected(key);
         }
 
         function epItemSelected(key) {
-            var sel = document.getElementById('epItem_' + key);
-            var rate = sel.value;
-            if (rate) document.getElementById('epRate_' + key).value = rate;
+            estimatorPricingItemSelected(key);
         }
 
         function openMaterialEstimator() {
