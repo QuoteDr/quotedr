@@ -135,10 +135,13 @@
     <h4 style="color:#1a2940;margin-top:0;">Client Portal</h4>
     <p class="text-muted small mb-2">Enter the 4-digit PIN your contractor provided</p>
     <div class="d-flex gap-2 justify-content-center mb-3" id="pinBoxes">
-      <input type="text" class="form-control text-center fw-bold fs-3" style="width:60px;height:60px;" maxlength="1" id="pin0" inputmode="numeric" autocomplete="off" oninput="pinInput(this,0)" onkeydown="pinKeydown(event,0)" onfocus="this.select()">
-      <input type="text" class="form-control text-center fw-bold fs-3" style="width:60px;height:60px;" maxlength="1" id="pin1" inputmode="numeric" autocomplete="off" oninput="pinInput(this,1)" onkeydown="pinKeydown(event,1)" onfocus="this.select()">
-      <input type="text" class="form-control text-center fw-bold fs-3" style="width:60px;height:60px;" maxlength="1" id="pin2" inputmode="numeric" autocomplete="off" oninput="pinInput(this,2)" onkeydown="pinKeydown(event,2)" onfocus="this.select()">
-      <input type="text" class="form-control text-center fw-bold fs-3" style="width:60px;height:60px;" maxlength="1" id="pin3" inputmode="numeric" autocomplete="off" oninput="pinInput(this,3)" onkeydown="pinKeydown(event,3)" onfocus="this.select()">
+      <input type="text" class="form-control text-center fw-bold fs-3" style="width:60px;height:60px;" maxlength="1" id="pin0" inputmode="numeric" autocomplete="off" oninput="pinInput(this,0)" onkeydown="pinKeydown(event,0)" onpaste="pinPaste(event,0)" onfocus="this.select()">
+      <input type="text" class="form-control text-center fw-bold fs-3" style="width:60px;height:60px;" maxlength="1" id="pin1" inputmode="numeric" autocomplete="off" oninput="pinInput(this,1)" onkeydown="pinKeydown(event,1)" onpaste="pinPaste(event,1)" onfocus="this.select()">
+      <input type="text" class="form-control text-center fw-bold fs-3" style="width:60px;height:60px;" maxlength="1" id="pin2" inputmode="numeric" autocomplete="off" oninput="pinInput(this,2)" onkeydown="pinKeydown(event,2)" onpaste="pinPaste(event,2)" onfocus="this.select()">
+      <input type="text" class="form-control text-center fw-bold fs-3" style="width:60px;height:60px;" maxlength="1" id="pin3" inputmode="numeric" autocomplete="off" oninput="pinInput(this,3)" onkeydown="pinKeydown(event,3)" onpaste="pinPaste(event,3)" onfocus="this.select()">
+    </div>
+    <div class="mb-2">
+      <input type="text" class="form-control text-center fw-semibold" id="pinFull" maxlength="4" inputmode="numeric" autocomplete="one-time-code" placeholder="Or type full PIN" oninput="pinFullInput(this)" onkeydown="pinFullKeydown(event)">
     </div>
     <div id="pinError" class="text-danger small mb-2" style="min-height:1.2rem;"></div>
     <button class="btn btn-primary w-100" onclick="checkPin()" id="pinSubmitBtn">Unlock Portal</button>
@@ -522,11 +525,39 @@
     document.addEventListener('DOMContentLoaded', init);
   
     // === PIN GATE ===
+    function getPinDigits() {
+      return [0, 1, 2, 3].map(function(i) {
+        var el = document.getElementById('pin' + i);
+        return el ? el.value.replace(/[^0-9]/g, '').slice(0, 1) : '';
+      }).join('');
+    }
+
+    function syncPinInputs(pin) {
+      var digits = String(pin || '').replace(/[^0-9]/g, '').slice(0, 4);
+      for (var i = 0; i < 4; i++) {
+        var box = document.getElementById('pin' + i);
+        if (box) box.value = digits[i] || '';
+      }
+      var full = document.getElementById('pinFull');
+      if (full && full.value !== digits) full.value = digits;
+      return digits;
+    }
+
+    function submitWhenPinComplete(pin) {
+      if (pin.length === 4) checkPin();
+    }
+
     function pinInput(el, idx) {
-      // Only keep last digit if user types multiple
-      if (el.value.length > 1) el.value = el.value.slice(-1);
-      // Only allow digits
-      el.value = el.value.replace(/[^0-9]/g, '');
+      var raw = el.value.replace(/[^0-9]/g, '');
+      if (raw.length > 1) {
+        var pastedPin = syncPinInputs(raw);
+        var targetIdx = Math.min(idx + raw.length, 3);
+        document.getElementById('pin' + targetIdx).focus();
+        submitWhenPinComplete(pastedPin);
+        return;
+      }
+      el.value = raw;
+      syncPinInputs(getPinDigits());
       if (el.value.length === 1) {
         if (idx < 3) {
           document.getElementById('pin' + (idx + 1)).focus();
@@ -536,6 +567,30 @@
         }
       }
     }
+
+    function pinPaste(e, idx) {
+      var pasted = (e.clipboardData || window.clipboardData).getData('text');
+      var digits = String(pasted || '').replace(/[^0-9]/g, '').slice(0, 4);
+      if (!digits) return;
+      e.preventDefault();
+      var current = getPinDigits().split('');
+      for (var i = 0; i < digits.length && idx + i < 4; i++) {
+        current[idx + i] = digits[i];
+      }
+      var pin = syncPinInputs(current.join(''));
+      document.getElementById('pin' + Math.min(idx + digits.length, 3)).focus();
+      submitWhenPinComplete(pin);
+    }
+
+    function pinFullInput(el) {
+      var pin = syncPinInputs(el.value);
+      submitWhenPinComplete(pin);
+    }
+
+    function pinFullKeydown(e) {
+      if (e.key === 'Enter') checkPin();
+    }
+
     function pinKeydown(e, idx) {
       // Backspace: clear current and go back
       if (e.key === 'Backspace') {
@@ -550,12 +605,8 @@
     }
     
     async function checkPin() {
-      const pin0 = document.getElementById('pin0').value;
-      const pin1 = document.getElementById('pin1').value;
-      const pin2 = document.getElementById('pin2').value;
-      const pin3 = document.getElementById('pin3').value;
-      
-      const enteredPin = pin0 + pin1 + pin2 + pin3;
+      const fullPin = document.getElementById('pinFull');
+      const enteredPin = syncPinInputs((fullPin && fullPin.value) || getPinDigits());
       
       if (enteredPin.length !== 4 || !/^\d{4}$/.test(enteredPin)) {
         shakeError();
