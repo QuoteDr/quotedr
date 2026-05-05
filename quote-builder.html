@@ -976,8 +976,8 @@ if (location.search.includes('debug')) {
                     <a href="javascript:void(0)" onclick="openMaterialEstimator()" class="btn btn-sm btn-quick-room" title="Estimate materials from room dimensions">
                         <i class="fas fa-ruler-combined"></i> Quick Add Room
                     </a>
-                    <a href="javascript:void(0)" onclick="saveTemplate()" class="btn btn-sm btn-save-template" title="Save current rooms as a template">
-                        <i class="fas fa-save"></i> Save Template
+                    <a href="javascript:void(0)" onclick="saveTemplate()" class="btn btn-sm btn-save-template" title="Save all current rooms as a quote template">
+                        <i class="fas fa-save"></i> Save Quote Template
                     </a>
                     <a href="javascript:void(0)" onclick="openTemplatesMenu(this)" class="btn btn-sm btn-templates" title="Load existing templates">
                         <i class="fas fa-folder-open"></i> Templates
@@ -1005,7 +1005,7 @@ if (location.search.includes('debug')) {
                             <i class="fas fa-ellipsis-v"></i> More
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="#" onclick="saveTemplate(); return false;"><i class="fas fa-save me-2"></i>Save Template</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="saveTemplate(); return false;"><i class="fas fa-save me-2"></i>Save Quote Template</a></li>
                             <li><a class="dropdown-item" href="#" onclick="openTemplatesMenu(this); return false;"><i class="fas fa-folder-open me-2"></i>Load Template</a></li>
                             <li><a class="dropdown-item" href="#" onclick="toggleTimelines(); return false;"><i class="fas fa-eye-slash me-2"></i>Toggle Timelines</a></li>
                             <li><a class="dropdown-item" href="#" onclick="applyGlobalMarkup(); return false;"><i class="fas fa-percent me-2"></i>Markup All</a></li>
@@ -1686,6 +1686,7 @@ Example:
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="quote-dialogs.js?v=1777660407"></script>
+    <script src="quote-template-files.js?v=1778012600"></script>
     <script>window.initMeasureMap = window.initMeasureMap || function(){ window._mapInited = true; };</script>
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD7acqRI6KsoUDTEkyMx36eDNRuuPXdqIA&libraries=drawing,geometry,places&callback=initMeasureMap" async defer></script>
 
@@ -5200,6 +5201,78 @@ Example:
             markUnsaved();
         }
 
+        function sanitizeTemplateFilename(name) {
+            return String(name || 'quotedr-template')
+                .trim()
+                .replace(/[^a-z0-9\-_ ]/gi, '')
+                .replace(/\s+/g, '-')
+                .toLowerCase()
+                .slice(0, 80) || 'quotedr-template';
+        }
+
+        async function askTemplateIncludePricing(templateCount) {
+            return await qdConfirm(
+                'Do you want to include your pricing, or leave blank and only include the items?',
+                {
+                    title: templateCount > 1 ? 'Export Template Pack' : 'Export Template',
+                    okText: 'Include Pricing',
+                    cancelText: 'Items Only',
+                    type: 'warning'
+                }
+            );
+        }
+
+        function downloadTemplatePayload(payload, filenameBase) {
+            var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = sanitizeTemplateFilename(filenameBase) + '.quotedrtemplate';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+        }
+
+        async function exportTemplateById(id) {
+            var templates = _getTemplates();
+            var template = templates.find(function(t) { return t.id === id; });
+            if (!template) { qdAlert('Template not found.'); return; }
+            var includePricing = await askTemplateIncludePricing(1);
+            var payload = QuoteDrTemplateFiles.createExportPayload([template], includePricing);
+            downloadTemplatePayload(payload, template.name || 'quotedr-template');
+        }
+
+        async function exportAllTemplates() {
+            var templates = _getTemplates();
+            if (!templates.length) { qdAlert('No templates to export yet.'); return; }
+            var includePricing = await askTemplateIncludePricing(templates.length);
+            var payload = QuoteDrTemplateFiles.createExportPayload(templates, includePricing);
+            downloadTemplatePayload(payload, 'quotedr-template-pack');
+        }
+
+        function importTemplatesFromFile(input) {
+            var file = input && input.files ? input.files[0] : null;
+            if (!file) return;
+            var reader = new FileReader();
+            reader.onload = function() {
+                try {
+                    var existing = _getTemplates();
+                    var imported = QuoteDrTemplateFiles.prepareTemplatesForImport(reader.result, existing);
+                    if (!imported.length) { qdAlert('No templates found in that file.'); return; }
+                    _saveTemplates(existing.concat(imported));
+                    imported.forEach(function(t) { _syncTemplateToCloud(t.name, t.rooms).catch(function(){}); });
+                    qdAlert(imported.length + ' template' + (imported.length !== 1 ? 's' : '') + ' imported.');
+                    openManageTemplates();
+                } catch(e) {
+                    qdAlert('Could not import template file: ' + (e && e.message ? e.message : e));
+                } finally {
+                    input.value = '';
+                }
+            };
+            reader.readAsText(file);
+        }
+
         async function saveRoomAsTemplate(roomId) {
             var room = rooms.find(function(r) { return r.id === roomId; });
             if (!room) return;
@@ -5247,12 +5320,17 @@ Example:
                 var roomCount = t.rooms ? t.rooms.length : (t.room ? 1 : 0);
                 return '<li class="list-group-item d-flex justify-content-between align-items-center" data-id="'+t.id+'">' +
                     '<span><i class="fas fa-grip-vertical me-2 text-muted" style="cursor:grab"></i><strong>'+t.name+'</strong> <span class="text-muted small">('+roomCount+' room'+(roomCount!==1?'s':'')+')</span></span>' +
-                    '<button class="btn btn-sm btn-outline-danger" onclick="deleteTemplateById('+t.id+')"><i class="fas fa-trash"></i></button></li>';
+                    '<span class="d-flex gap-1"><button class="btn btn-sm btn-outline-primary" onclick="exportTemplateById('+t.id+')" title="Export template"><i class="fas fa-file-export"></i></button>' +
+                    '<button class="btn btn-sm btn-outline-danger" onclick="deleteTemplateById('+t.id+')" title="Delete template"><i class="fas fa-trash"></i></button></span></li>';
             }).join('');
             modal.innerHTML = '<div class="modal-dialog modal-lg"><div class="modal-content">' +
                 '<div class="modal-header"><h5 class="modal-title"><i class="fas fa-bookmark me-2"></i>Manage Templates</h5>' +
                 '<button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>' +
-                '<div class="modal-body"><p class="text-muted small mb-3">Drag to reorder. Top 15 appear in the quick dropdown.</p>' +
+                '<div class="modal-body"><div class="d-flex gap-2 flex-wrap mb-3">' +
+                '<button class="btn btn-sm btn-outline-primary" onclick="document.getElementById(\'templateImportFile\').click()"><i class="fas fa-file-import me-1"></i>Import Template</button>' +
+                '<button class="btn btn-sm btn-outline-success" onclick="exportAllTemplates()"><i class="fas fa-file-export me-1"></i>Export All</button>' +
+                '<input type="file" id="templateImportFile" accept=".quotedrtemplate,.json,application/json" style="display:none" onchange="importTemplatesFromFile(this)">' +
+                '</div><p class="text-muted small mb-3">Drag to reorder. Top 15 appear in the quick dropdown. Exported templates can include pricing or share only the items and quantities.</p>' +
                 '<ul id="manageTemplatesList" class="list-group">' + rows + '</ul></div>' +
                 '<div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>' +
                 '</div></div>';
