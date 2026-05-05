@@ -64,6 +64,7 @@
         <img src="quotedr-logo.svg" alt="QuoteDr" class="brand-logo">
     </a>
     <div class="d-flex gap-2">
+        <a href="blog/index.html" class="btn btn-outline-secondary btn-sm">Blog</a>
         <a href="login.html" class="btn btn-outline-primary btn-sm">Sign In</a>
     </div>
 </nav>
@@ -81,12 +82,12 @@
         <div class="col-md-5">
             <div class="plan-card">
                 <div class="plan-name">Basic</div>
-                <div class="plan-tagline">Everything you need to quote, invoice, and track jobs</div>
+                <div class="plan-tagline">Everything you need to quote, invoice, and track your pipeline</div>
                 <div class="price">$29<span>/mo</span></div>
                 <ul class="feature-list mt-3">
                     <li><i class="fas fa-check-circle"></i> Unlimited quotes, invoices, and client links</li>
                     <li><i class="fas fa-check-circle"></i> Professional themes and custom branding</li>
-                    <li><i class="fas fa-check-circle"></i> Client database and job tracking dashboard</li>
+                    <li><i class="fas fa-check-circle"></i> Client database and quote tracking dashboard</li>
                     <li><i class="fas fa-check-circle"></i> Quote templates, reusable rooms, and saved items</li>
                     <li><i class="fas fa-check-circle"></i> Satellite Measure for roofs, fences, decks, and exteriors</li>
                     <li><i class="fas fa-check-circle"></i> IKEA Quick Quote for kitchen installation takeoffs</li>
@@ -113,7 +114,7 @@
                     <li><i class="fas fa-check-circle"></i> Floor plan scanner and room takeoff tools</li>
                     <li><i class="fas fa-check-circle"></i> QuickBooks integration</li>
                     <li><i class="fas fa-check-circle"></i> Interactive quote upsells and client approvals</li>
-                    <li><i class="fas fa-check-circle"></i> Profit margin tracking and smarter job reporting</li>
+                    <li><i class="fas fa-check-circle"></i> Profit margin tools and smarter quote reporting</li>
                     <li><i class="fas fa-check-circle"></i> Priority support</li>
                 </ul>
                 <button class="btn-pro" id="proBtn" onclick="startCheckout('pro')">🚀 Get Started with Pro</button>
@@ -125,26 +126,26 @@
 
 <div style="background:white; padding:50px 20px;">
     <div class="container">
-        <div class="section-title">What service pros are saying</div>
+        <div class="section-title">Real contractor feedback coming next</div>
         <div class="row g-3 justify-content-center" id="testimonialGrid">
             <div class="col-md-4">
                 <div class="testimonial-card">
                     <div class="stars">★★★★★</div>
-                    <p style="color:#333; font-size:0.9rem;">"I describe the job out loud and the quote is done in 2 minutes. Used to take me an hour."</p>
+                    <p style="color:#333; font-size:0.9rem;">QuoteDr is launching with feedback from contractors using it on real quotes. We will publish real testimonials as they come in.</p>
                     <div style="font-size:0.8rem; color:#888; margin-top:8px;">— Mike T., General Contractor</div>
                 </div>
             </div>
             <div class="col-md-4">
                 <div class="testimonial-card">
                     <div class="stars">★★★★★</div>
-                    <p style="color:#333; font-size:0.9rem;">"Works on my phone at the job site. My clients love getting an interactive quote link instead of a PDF."</p>
+                    <p style="color:#333; font-size:0.9rem;">Trying QuoteDr during launch? Send Adam your honest notes. The roadmap is being shaped by the contractors who use it first.</p>
                     <div style="font-size:0.8rem; color:#888; margin-top:8px;">— Sarah K., Landscaper</div>
                 </div>
             </div>
             <div class="col-md-4">
                 <div class="testimonial-card">
                     <div class="stars">★★★★★</div>
-                    <p style="color:#333; font-size:0.9rem;">"Was paying $800/month for worse software. Switched to QuoteDr Pro and never looked back."</p>
+                    <p style="color:#333; font-size:0.9rem;">Want to help? Record a quick walkthrough of how you used QuoteDr on a real job and what still needs work.</p>
                     <div style="font-size:0.8rem; color:#888; margin-top:8px;">— Dave R., Cleaning Company Owner</div>
                 </div>
             </div>
@@ -169,7 +170,7 @@
     </div>
     <div class="faq-item">
         <h6>What's the difference between Basic and Pro?</h6>
-        <p>Basic gives you the quoting, invoicing, payments, job tracking, templates, Satellite Measure, and IKEA Quick Quote tools. Pro adds AI voice-to-quote, smart import, the AI assistant, floor plan scanning, QuickBooks, upsells, and profit reporting.</p>
+        <p>Basic gives you quoting, invoicing, payments, quote tracking, templates, Satellite Measure, and IKEA Quick Quote tools. Pro adds AI voice-to-quote, smart import, the AI assistant, floor plan scanning, QuickBooks, upsells, and smarter reporting.</p>
     </div>
     <div class="faq-item">
         <h6>Can I import my existing price list?</h6>
@@ -178,32 +179,11 @@
 </div>
 
 <footer>
-    <p>&copy; 2025 QuoteDr &middot; <a href="landing.html">Home</a> &middot; <a href="login.html">Sign In</a></p>
+    <p>&copy; 2026 QuoteDr &middot; <a href="landing.html">Home</a> &middot; <a href="blog/index.html">Blog</a> &middot; <a href="login.html">Sign In</a></p>
 </footer>
 
 <script>
-const testimonialReviews = [
-    [
-        { quote: '"I described a basement reno while walking the job and Quote Dr built the quote before I got back to the truck."', author: '- Rob M., Renovation Contractor' },
-        { quote: '"The AI voice-to-quote is the first tool that actually feels made for contractors. I talk, it organizes the scope, and I clean it up."', author: '- Jason P., General Contractor' },
-        { quote: '"I used to write notes, go home, and build the estimate at night. Now I talk through it on site and send the quote same day."', author: '- Chris L., Handyman' }
-    ],
-    [
-        { quote: '"The IKEA Quick Quote saved me almost three hours on a kitchen install. I uploaded the order and the labour lines were basically ready."', author: '- Marco S., Kitchen Installer' },
-        { quote: '"IKEA jobs used to be spreadsheet work. Now I can price cabinet installs without manually counting every box and panel."', author: '- Dana R., Cabinet Installer' },
-        { quote: '"For IKEA kitchens, this is ridiculous in the best way. Upload, review, adjust rates, done."', author: '- Trevor H., Finish Carpenter' }
-    ],
-    [
-        { quote: '"Satellite Measure helped me quote a fence without driving back to the property. The perimeter was right there."', author: '- Sarah K., Landscaper' },
-        { quote: '"My quotes look more professional, clients can approve upgrades, and I can see margin before I send anything."', author: '- Mike T., General Contractor' },
-        { quote: '"QuickBooks plus Quote Dr finally keeps the quoting side and admin side from fighting each other."', author: '- Amanda C., Painting Contractor' }
-    ],
-    [
-        { quote: '"I was paying for software that still made me do the thinking twice. Quote Dr gets me from walkthrough to quote way faster."', author: '- Dave R., Cleaning Company Owner' },
-        { quote: '"The client link is cleaner than PDFs, and the upsells make it easy for customers to choose the better option."', author: '- Leo B., Deck Builder' },
-        { quote: '"The AI import turned my messy price sheet into usable items. That alone made setup painless."', author: '- Priya N., Flooring Contractor' }
-    ]
-];
+const testimonialReviews = [];
 
 let testimonialIndex = 0;
 let testimonialTimer = null;
@@ -239,6 +219,7 @@ function renderTestimonials(index) {
 
 function startTestimonials() {
     const dots = document.getElementById('testimonialDots');
+    if (!testimonialReviews.length) return;
     if (!dots) return;
     dots.innerHTML = testimonialReviews.map(function(_, index) {
         return '<button type="button" class="testimonial-dot" aria-label="Show review set ' + (index + 1) + '" onclick="renderTestimonials(' + index + '); restartTestimonials();"></button>';
