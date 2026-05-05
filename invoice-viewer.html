@@ -847,8 +847,9 @@ if (location.search.includes('debug')) {
                 stripe_enabled: false,
                 accept_full_payment: true,
                 accept_etransfer: true,
-                etransfer_email: profile.email || '',
+                etransfer_email: '',
                 accept_cheque: true,
+                cheque_payee: '',
                 accept_cash: true,
                 payment_instructions: ''
             }, settings || {});
@@ -875,7 +876,7 @@ if (location.search.includes('debug')) {
             }
             if (s.accept_cheque !== false) {
                 manualHtml += '<div class="payment-method-item"><strong><i class="fas fa-money-check-dollar me-2 text-success"></i>Cheque</strong>';
-                manualHtml += '<div class="text-muted small mt-1">Cheques are accepted for this invoice.</div></div>';
+                manualHtml += '<div class="text-muted small mt-1">' + (s.cheque_payee ? 'Please make cheques payable to <strong>' + escapeHtml(s.cheque_payee) + '</strong>.' : 'Cheques are accepted for this invoice.') + '</div></div>';
             }
             if (s.accept_cash !== false) {
                 manualHtml += '<div class="payment-method-item"><strong><i class="fas fa-money-bill-wave me-2 text-success"></i>Cash</strong>';

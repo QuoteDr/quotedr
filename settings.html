@@ -604,13 +604,15 @@ Sarah Jones, 905-555-5678"></textarea>
 									<input class="form-check-input" type="checkbox" id="acceptEtransfer" checked>
 									<label class="form-check-label fw-semibold" for="acceptEtransfer">Accept e-transfer</label>
 								</div>
-								<input type="email" class="form-control form-control-sm" id="etransferEmail" placeholder="E-transfer email">
+								<input type="email" class="form-control form-control-sm" id="etransferEmail" placeholder="E-transfer email (optional)">
+								<div class="form-text">Leave blank to show clients: "Contact us for the e-transfer email."</div>
 							</div>
 							<div class="col-md-6">
 								<div class="form-check mb-2">
 									<input class="form-check-input" type="checkbox" id="acceptCheque" checked>
 									<label class="form-check-label fw-semibold" for="acceptCheque">Accept cheque</label>
 								</div>
+								<input type="text" class="form-control form-control-sm mb-2" id="chequePayee" placeholder="Cheques payable to (optional)">
 								<div class="form-check">
 									<input class="form-check-input" type="checkbox" id="acceptCash" checked>
 									<label class="form-check-label fw-semibold" for="acceptCash">Accept cash</label>
@@ -2035,7 +2037,8 @@ Sarah Jones, 905-555-5678"></textarea>
 				document.getElementById('acceptEtransfer').checked = settings.accept_etransfer !== false;
 				document.getElementById('acceptCheque').checked = settings.accept_cheque !== false;
 				document.getElementById('acceptCash').checked = settings.accept_cash !== false;
-				document.getElementById('etransferEmail').value = settings.etransfer_email || document.getElementById('bizEmail')?.value || '';
+				document.getElementById('etransferEmail').value = settings.etransfer_email || '';
+				document.getElementById('chequePayee').value = settings.cheque_payee || '';
 				document.getElementById('paymentInstructions').value = settings.payment_instructions || '';
 				toggleStripeSettings();
 			});
@@ -2050,6 +2053,7 @@ Sarah Jones, 905-555-5678"></textarea>
 				accept_etransfer: document.getElementById('acceptEtransfer').checked,
 				etransfer_email: document.getElementById('etransferEmail').value.trim(),
 				accept_cheque: document.getElementById('acceptCheque').checked,
+				cheque_payee: document.getElementById('chequePayee').value.trim(),
 				accept_cash: document.getElementById('acceptCash').checked,
 				payment_instructions: document.getElementById('paymentInstructions').value.trim()
 			};

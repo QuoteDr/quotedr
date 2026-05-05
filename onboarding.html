@@ -119,6 +119,20 @@
                                 <label for="hstNumber" class="form-label">HST Number</label>
                                 <input type="text" class="form-control" id="hstNumber" placeholder="e.g., 123456789 RT0001">
                             </div>
+
+                            <div class="border rounded p-3 mb-3 bg-light">
+                                <h6 class="fw-bold mb-2"><i class="fas fa-money-bill-transfer me-1 text-success"></i>Invoice Payment Details <span class="text-muted small">(optional)</span></h6>
+                                <p class="text-muted small mb-3">These appear on invoice links so clients know how to pay you. You can update them later in Settings.</p>
+                                <div class="mb-3">
+                                    <label for="etransferEmail" class="form-label">Email to Accept E-Transfers</label>
+                                    <input type="email" class="form-control" id="etransferEmail" placeholder="Leave blank to ask clients to contact you">
+                                    <div class="form-text">If blank, invoice links will say "Contact us for the e-transfer email."</div>
+                                </div>
+                                <div class="mb-0">
+                                    <label for="chequePayee" class="form-label">Cheques Should Be Made Out To</label>
+                                    <input type="text" class="form-control" id="chequePayee" placeholder="Usually your business name">
+                                </div>
+                            </div>
                             
                             <div class="d-flex justify-content-between">
                                 <button class="btn btn-outline-secondary" onclick="prevStep()"><i class="fas fa-arrow-left"></i> Back</button>
@@ -393,6 +407,8 @@
             if (typeof saveBusinessProfile === 'function') {
                 saveBusinessProfile(profile);
             }
+
+            saveOnboardingPaymentSettings();
             
             nextStep();
         }
@@ -429,6 +445,7 @@
                 email: document.getElementById('email') ? document.getElementById('email').value : ''
             };
             localStorage.setItem('ald_business_profile', JSON.stringify(profile));
+            saveOnboardingPaymentSettings();
             localStorage.setItem('ald_onboarding_complete', '1');
             if (typeof updateUserProfile === 'function') {
                 updateUserProfile({ onboarding_complete: true }).catch(function(e){ console.warn('onboarding sync error:', e); });
@@ -437,6 +454,7 @@
         }
 
         function completeOnboarding() {
+            saveOnboardingPaymentSettings();
             localStorage.setItem('ald_onboarding_complete', '1');
             if (typeof updateUserProfile === 'function') {
                 updateUserProfile({ onboarding_complete: true }).catch(function(e){ console.warn('onboarding sync error:', e); });
@@ -446,6 +464,27 @@
 
         // Initialize first step
         showStep(1);
+
+        function saveOnboardingPaymentSettings() {
+            var existing = {};
+            try { existing = JSON.parse(localStorage.getItem('ald_payment_settings') || '{}') || {}; } catch(e) {}
+            var settings = Object.assign({
+                stripe_enabled: false,
+                deposit_default_pct: 50,
+                accept_deposit: true,
+                accept_full_payment: true,
+                accept_etransfer: true,
+                accept_cheque: true,
+                accept_cash: true
+            }, existing, {
+                etransfer_email: document.getElementById('etransferEmail') ? document.getElementById('etransferEmail').value.trim() : (existing.etransfer_email || ''),
+                cheque_payee: document.getElementById('chequePayee') ? document.getElementById('chequePayee').value.trim() : (existing.cheque_payee || '')
+            });
+            localStorage.setItem('ald_payment_settings', JSON.stringify(settings));
+            if (typeof savePaymentSettings === 'function') {
+                savePaymentSettings(settings).catch(function(e){ console.warn('payment settings sync error:', e); });
+            }
+        }
         
         var _onboardingTerms = [
             { id: 't1', label: 'Deposit Required', text: 'A deposit of 30\u201350% of the total project cost is required before work begins. Work will not commence until the deposit is received.', defaultOn: true },
