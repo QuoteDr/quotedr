@@ -1305,6 +1305,33 @@ Example:
                                 <input type="number" id="estWindows" class="form-control" value="0" min="0">
                                 <div class="form-text">Each window adds 18 LF of casing trim</div>
                             </div>
+                            <div class="col-12">
+                                <div class="border rounded p-3 bg-light">
+                                    <div class="fw-semibold mb-2"><i class="fas fa-sliders-h me-1 text-info"></i>Estimate Adjustments</div>
+                                    <div class="row g-3">
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-semibold">Flooring Waste (%)</label>
+                                            <input type="number" id="estFloorWaste" class="form-control" value="10" min="0" max="50" step="1">
+                                            <div class="form-text">Adds cut waste to flooring quantity</div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-semibold">Paint Waste (%)</label>
+                                            <input type="number" id="estWallPaintWaste" class="form-control" value="0" min="0" max="50" step="1">
+                                            <div class="form-text">Optional bump for rough walls or extra coats</div>
+                                        </div>
+                                        <div class="col-md-4 d-flex flex-column justify-content-end gap-2">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="estPaintDeductOpenings" checked>
+                                                <label class="form-check-label fw-semibold" for="estPaintDeductOpenings">Deduct doors/windows from wall paint</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="estCeilingPaint" checked>
+                                                <label class="form-check-label fw-semibold" for="estCeilingPaint">Include ceiling paint</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div id="estPricingBanner" class="alert alert-warning qd-pricing-nudge py-2 small mb-2" style="display:none;">
                             <i class="fas fa-tag me-1"></i> Rates not set up yet &mdash; items will be added with $0 rate.
@@ -6890,7 +6917,7 @@ Example:
     </div>
 </div>
 
-<script src="quote-calculators.js?v=1777936600"></script>
+<script src="quote-calculators.js?v=1777938700"></script>
 <script src="help-content.js?v=1777741200"></script>
 <script src="modal-help.js?v=1777741200"></script>
 <script>

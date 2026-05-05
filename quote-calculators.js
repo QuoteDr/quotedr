@@ -22,6 +22,13 @@
             return (parseFloat(value) || 0).toLocaleString() + ' ' + unit;
         }
 
+        function calcPercentInput(id, fallback) {
+            var el = document.getElementById(id);
+            var value = el ? parseFloat(el.value) : fallback;
+            if (!Number.isFinite(value)) value = fallback;
+            return Math.max(0, Math.min(50, value));
+        }
+
         function calcDoorAreaDeduction() {
             return calcIsMetric() ? 1.86 : 20;
         }
@@ -316,6 +323,10 @@
             document.getElementById('estLength').value = '';
             document.getElementById('estDoors').value = '0';
             document.getElementById('estWindows').value = '0';
+            if (document.getElementById('estFloorWaste')) document.getElementById('estFloorWaste').value = '10';
+            if (document.getElementById('estWallPaintWaste')) document.getElementById('estWallPaintWaste').value = '0';
+            if (document.getElementById('estPaintDeductOpenings')) document.getElementById('estPaintDeductOpenings').checked = true;
+            if (document.getElementById('estCeilingPaint')) document.getElementById('estCeilingPaint').checked = true;
             document.getElementById('ceil8').checked = true;
             document.getElementById('estCeilingCustom').style.display = 'none';
             // Populate room dropdown
@@ -348,8 +359,18 @@
             var ceilH = ceilVal === 'custom' ? parseFloat(document.getElementById('estCeilingCustom').value) : parseFloat(ceilVal);
             if (!ceilH || ceilH <= 0) { qdAlert('Please enter a valid ceiling height.'); return; }
 
-            var floorSqft = Math.round(w * l * 10) / 10;
-            var wallSqft = Math.round((2 * w + 2 * l) * ceilH * 10) / 10;
+            var floorWaste = calcPercentInput('estFloorWaste', 10);
+            var paintWaste = calcPercentInput('estWallPaintWaste', 0);
+            var deductOpeningsEl = document.getElementById('estPaintDeductOpenings');
+            var includeCeilingEl = document.getElementById('estCeilingPaint');
+            var deductOpenings = !deductOpeningsEl || deductOpeningsEl.checked;
+            var includeCeilingPaint = !includeCeilingEl || includeCeilingEl.checked;
+            var baseFloorSqft = Math.round(w * l * 10) / 10;
+            var floorSqft = Math.round(baseFloorSqft * (1 + floorWaste / 100) * 10) / 10;
+            var wallGrossSqft = Math.round((2 * w + 2 * l) * ceilH * 10) / 10;
+            var openingDeduction = deductOpenings ? Math.round((doors * calcDoorAreaDeduction() + windows * calcWindowAreaDeduction()) * 10) / 10 : 0;
+            var wallNetSqft = Math.max(0, wallGrossSqft - openingDeduction);
+            var wallSqft = Math.round(wallNetSqft * (1 + paintWaste / 100) * 10) / 10;
             var perimeter = Math.round((2 * w + 2 * l) * 10) / 10;
             var doorCasing = doors * calcDoorCasingLength();
             var windowCasing = windows * calcWindowCasingLength();
@@ -359,12 +380,13 @@
             document.getElementById('estPricingBanner').style.display = hasPricing ? 'none' : 'block';
 
             function getRate(key) { return (pricing[key] && pricing[key].rate) ? pricing[key].rate : 0; }
+            function noteList(parts) { return parts.filter(Boolean).join('; '); }
 
             document.getElementById('estResultRoomName').textContent = name;
             var rows = [
-                { key: 'flooring',     label: 'Flooring',       qty: floorSqft,    unit: calcAreaUnit(),   cat: 'Flooring',        itemName: 'Flooring - ' + name },
-                { key: 'ceilingPaint', label: 'Ceiling Paint',  qty: floorSqft,    unit: calcAreaUnit(),   cat: 'Painting',        itemName: 'Ceiling Paint - ' + name },
-                { key: 'wallPaint',    label: 'Wall Paint',     qty: wallSqft,     unit: calcAreaUnit(),   cat: 'Painting',        itemName: 'Wall Paint - ' + name },
+                { key: 'flooring',     label: 'Flooring',       qty: floorSqft,    unit: calcAreaUnit(),   cat: 'Flooring',        itemName: 'Flooring - ' + name, notes: noteList([floorWaste > 0 ? floorWaste + '% waste added' : '']) },
+                { key: 'ceilingPaint', label: 'Ceiling Paint',  qty: baseFloorSqft, unit: calcAreaUnit(),  cat: 'Painting',        itemName: 'Ceiling Paint - ' + name, hide: !includeCeilingPaint },
+                { key: 'wallPaint',    label: 'Wall Paint',     qty: wallSqft,     unit: calcAreaUnit(),   cat: 'Painting',        itemName: 'Wall Paint - ' + name, notes: noteList([openingDeduction > 0 ? openingDeduction + ' ' + calcAreaUnit() + ' openings deducted' : '', paintWaste > 0 ? paintWaste + '% paint waste added' : '']) },
                 { key: 'baseboard',    label: 'Baseboard',      qty: perimeter,    unit: calcLengthUnit(), cat: 'Trim & Millwork', itemName: 'Baseboard - ' + name },
                 { key: 'doorCasing',   label: 'Door Casing',    qty: doorCasing,   unit: calcLengthUnit(), cat: 'Trim & Millwork', itemName: 'Door Casing - ' + name, hide: doors === 0 },
                 { key: 'windowCasing', label: 'Window Casing',  qty: windowCasing, unit: calcLengthUnit(), cat: 'Trim & Millwork', itemName: 'Window Casing - ' + name, hide: windows === 0 },
@@ -377,9 +399,9 @@
                 var rate = getRate(r.key);
                 var total = Math.round(r.qty * rate * 100) / 100;
                 subtotal += total;
-                html += '<tr data-cat="' + r.cat + '" data-name="' + r.itemName + '" data-unit="' + r.unit + '" data-qty="' + r.qty + '" data-rate="' + rate + '">';
+                html += '<tr data-cat="' + calcEscapeHtml(r.cat) + '" data-name="' + calcEscapeHtml(r.itemName) + '" data-unit="' + calcEscapeHtml(r.unit) + '" data-qty="' + r.qty + '" data-rate="' + rate + '" data-notes="' + calcEscapeHtml(r.notes || '') + '">';
                 html += '<td><input type="checkbox" class="form-check-input est-check" checked></td>';
-                html += '<td>' + r.label + '</td>';
+                html += '<td>' + r.label + (r.notes ? '<div class="text-muted small">' + calcEscapeHtml(r.notes) + '</div>' : '') + '</td>';
                 html += '<td>' + calcFormatQuantity(r.qty, r.unit) + '</td>';
                 html += '<td class="text-muted">' + r.unit + '</td>';
                 html += '<td>' + (rate > 0 ? '$' + rate.toFixed(2) : '<span class="text-muted">-</span>') + '</td>';
@@ -419,8 +441,10 @@
                     description: '',
                     quantity: qty,
                     unit: row.dataset.unit,
+                    unitType: row.dataset.unit,
                     rate: rate,
-                    total: Math.round(qty * rate * 100) / 100
+                    total: Math.round(qty * rate * 100) / 100,
+                    notes: row.dataset.notes || ''
                 };
                 var room = rooms.find(function(r) { return r.id === roomId; });
                 if (room) { room.items.push(item); added++; }
