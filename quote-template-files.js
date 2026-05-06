@@ -88,6 +88,19 @@
         return candidate;
     }
 
+    function uniqueCommunityTemplateName(existingTemplates, desiredName) {
+        var base = desiredName || 'Community Template';
+        var names = asArray(existingTemplates).map(function(t) { return String(t.name || '').toLowerCase(); });
+        if (names.indexOf(base.toLowerCase()) === -1) return base;
+        var candidate = base + ' (Community)';
+        var index = 2;
+        while (names.indexOf(candidate.toLowerCase()) !== -1) {
+            candidate = base + ' (Community ' + index + ')';
+            index++;
+        }
+        return candidate;
+    }
+
     function prepareTemplatesForImport(payloadOrRaw, existingTemplates, options) {
         options = options || {};
         var payload = parseImportPayload(payloadOrRaw);
@@ -112,12 +125,51 @@
         });
     }
 
+    function createCommunityTemplatePayload(template, options) {
+        options = options || {};
+        var normalized = normalizeTemplate(template, false);
+        return {
+            name: normalized.name,
+            description: options.description || '',
+            trade: options.trade || '',
+            region: options.region || '',
+            jobType: options.jobType || options.job_type || '',
+            creatorName: options.creatorName || options.creator_name || '',
+            rooms: normalized.rooms,
+            roomCount: normalized.rooms.length,
+            publishedAt: options.now || new Date().toISOString()
+        };
+    }
+
+    function prepareCommunityTemplateForImport(template, existingTemplates, options) {
+        options = options || {};
+        var now = Number(options.now) || Date.now();
+        var offset = 0;
+        var imported = {
+            id: now + offset++,
+            name: uniqueCommunityTemplateName(existingTemplates, template && template.name),
+            rooms: asArray(template && template.rooms).map(function(room) {
+                var clonedRoom = deepClone(room) || {};
+                clonedRoom.id = now + offset++;
+                return clonedRoom;
+            }),
+            createdAt: new Date().toISOString(),
+            importedAt: new Date().toISOString(),
+            source: 'community',
+            communityTemplateId: template && template.id ? template.id : null,
+            communityCreator: (template && (template.creator_name || template.creatorName)) || ''
+        };
+        return imported;
+    }
+
     global.QuoteDrTemplateFiles = {
         TEMPLATE_FILE_VERSION: TEMPLATE_FILE_VERSION,
         TEMPLATE_FILE_TYPE: TEMPLATE_FILE_TYPE,
         createExportPayload: createExportPayload,
         parseImportPayload: parseImportPayload,
         prepareTemplatesForImport: prepareTemplatesForImport,
+        createCommunityTemplatePayload: createCommunityTemplatePayload,
+        prepareCommunityTemplateForImport: prepareCommunityTemplateForImport,
         stripPricingFromRoom: stripPricingFromRoom
     };
 })(typeof window !== 'undefined' ? window : globalThis);

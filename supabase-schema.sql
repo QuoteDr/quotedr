@@ -118,3 +118,98 @@ create index if not exists quotes_user_id_idx on quotes(user_id);
 create index if not exists quotes_updated_at_idx on quotes(updated_at desc);
 create index if not exists clients_user_id_idx on clients(user_id);
 create index if not exists clients_name_idx on clients(user_id, name);
+
+-- ─── COMMUNITY TEMPLATE MARKETPLACE ──────────────────────────────────────────
+create table if not exists community_templates (
+    id uuid default uuid_generate_v4() primary key,
+    user_id uuid references auth.users(id) on delete cascade not null,
+    name text not null,
+    description text default '',
+    trade text default '',
+    region text default '',
+    job_type text default '',
+    creator_name text default '',
+    rooms jsonb not null default '[]'::jsonb,
+    room_count integer default 0,
+    download_count integer default 0,
+    rating_sum integer default 0,
+    rating_count integer default 0,
+    status text default 'published' check (status in ('published','reported','hidden')),
+    created_at timestamptz default now(),
+    updated_at timestamptz default now()
+);
+
+alter table community_templates enable row level security;
+
+create policy "Authenticated users can browse published community templates"
+    on community_templates for select
+    to authenticated
+    using (status = 'published');
+
+create policy "Users can publish own community templates"
+    on community_templates for insert
+    to authenticated
+    with check (auth.uid() = user_id and status = 'published');
+
+create policy "Users can update own community templates"
+    on community_templates for update
+    to authenticated
+    using (auth.uid() = user_id)
+    with check (auth.uid() = user_id);
+
+create policy "Users can delete own community templates"
+    on community_templates for delete
+    to authenticated
+    using (auth.uid() = user_id);
+
+create index if not exists community_templates_status_idx on community_templates(status, created_at desc);
+create index if not exists community_templates_filters_idx on community_templates(trade, region, job_type);
+
+create table if not exists community_template_reports (
+    id uuid default uuid_generate_v4() primary key,
+    template_id uuid references community_templates(id) on delete cascade not null,
+    user_id uuid references auth.users(id) on delete cascade not null,
+    reason text default '',
+    created_at timestamptz default now(),
+    unique(template_id, user_id)
+);
+
+alter table community_template_reports enable row level security;
+
+create policy "Users can report community templates"
+    on community_template_reports for insert
+    to authenticated
+    with check (auth.uid() = user_id);
+
+create policy "Users can view own community template reports"
+    on community_template_reports for select
+    to authenticated
+    using (auth.uid() = user_id);
+
+create table if not exists community_template_ratings (
+    id uuid default uuid_generate_v4() primary key,
+    template_id uuid references community_templates(id) on delete cascade not null,
+    user_id uuid references auth.users(id) on delete cascade not null,
+    rating integer not null check (rating in (1, -1)),
+    created_at timestamptz default now(),
+    updated_at timestamptz default now(),
+    unique(template_id, user_id)
+);
+
+alter table community_template_ratings enable row level security;
+
+create policy "Users can rate community templates"
+    on community_template_ratings for insert
+    to authenticated
+    with check (auth.uid() = user_id);
+
+create policy "Users can update own community template ratings"
+    on community_template_ratings for update
+    to authenticated
+    using (auth.uid() = user_id)
+    with check (auth.uid() = user_id);
+
+create policy "Users can view own community template ratings"
+    on community_template_ratings for select
+    to authenticated
+    using (auth.uid() = user_id);

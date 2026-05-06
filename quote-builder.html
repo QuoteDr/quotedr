@@ -1007,6 +1007,9 @@ if (location.search.includes('debug')) {
                     <a href="javascript:void(0)" onclick="openTemplatesMenu(this)" class="btn btn-sm btn-templates" title="Load existing templates">
                         <i class="fas fa-folder-open"></i> Templates
                     </a>
+                    <a href="javascript:void(0)" onclick="openCommunityTemplates()" class="btn btn-sm btn-outline-success" title="Browse community quote templates">
+                        <i class="fas fa-users"></i> Community
+                    </a>
                     <a href="javascript:void(0)" id="toggleTimelinesBtn" onclick="toggleTimelines()" class="btn btn-sm btn-timelines" title="Show/hide timeline estimates">
                         <i class="fas fa-eye-slash"></i> Hide Timelines
                     </a>
@@ -1032,6 +1035,7 @@ if (location.search.includes('debug')) {
                         <ul class="dropdown-menu dropdown-menu-end">
                             <li><a class="dropdown-item" href="#" onclick="saveTemplate(); return false;"><i class="fas fa-save me-2"></i>Save Quote Template</a></li>
                             <li><a class="dropdown-item" href="#" onclick="openTemplatesMenu(this); return false;"><i class="fas fa-folder-open me-2"></i>Load Template</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="openCommunityTemplates(); return false;"><i class="fas fa-users me-2"></i>Community Templates</a></li>
                             <li><a class="dropdown-item" href="#" onclick="toggleTimelines(); return false;"><i class="fas fa-eye-slash me-2"></i>Toggle Timelines</a></li>
                             <li><a class="dropdown-item" href="#" onclick="applyGlobalMarkup(); return false;"><i class="fas fa-percent me-2"></i>Markup All</a></li>
                             <li><a class="dropdown-item" href="#" onclick="openManageItemsModal(); return false;"><i class="fas fa-database me-2"></i>Manage Items</a></li>
@@ -5197,7 +5201,10 @@ Example:
             var div = document.createElement('div');
             div.id = '_templateDropdown';
             div.style.cssText = 'position:absolute;background:#fff;border:1px solid #ccc;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.15);z-index:9999;min-width:240px;max-height:360px;overflow-y:auto;padding:4px 0;';
-            var manageHtml = '<div style="padding:8px 16px;border-bottom:1px solid #eee;"><a href="#" onclick="openManageTemplates();return false;" style="font-weight:600;color:#1a56a0;"><i class="fas fa-cog me-1"></i>Manage Templates</a></div>';
+            var manageHtml = '<div style="padding:8px 16px;border-bottom:1px solid #eee;display:grid;gap:6px;">' +
+                '<a href="#" onclick="openManageTemplates();return false;" style="font-weight:600;color:#1a56a0;"><i class="fas fa-cog me-1"></i>Manage Templates</a>' +
+                '<a href="#" onclick="openCommunityTemplates();return false;" style="font-weight:600;color:#198754;"><i class="fas fa-users me-1"></i>Community Templates</a>' +
+                '</div>';
             var itemsHtml = '';
             if (top15.length === 0) {
                 itemsHtml = '<div style="padding:8px 16px;color:#999;">No templates saved yet</div>';
@@ -5282,6 +5289,19 @@ Example:
             setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
         }
 
+        function qdTemplateEscapeHtml(value) {
+            return String(value === undefined || value === null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function qdTemplateOption(value, label, selected) {
+            return '<option value="' + qdTemplateEscapeHtml(value) + '"' + (selected ? ' selected' : '') + '>' + qdTemplateEscapeHtml(label || value) + '</option>';
+        }
+
         async function exportTemplateById(id) {
             var templates = _getTemplates();
             var template = templates.find(function(t) { return t.id === id; });
@@ -5319,6 +5339,225 @@ Example:
                 }
             };
             reader.readAsText(file);
+        }
+
+        async function openShareTemplateModal(id) {
+            var templates = _getTemplates();
+            var template = templates.find(function(t) { return t.id === id; });
+            if (!template) { qdAlert('Template not found.'); return; }
+            var userResult = await _supabase.auth.getUser();
+            if (!userResult.data?.user) {
+                qdAlert('Please sign in before sharing templates to the community.');
+                return;
+            }
+            var profile = {};
+            try {
+                if (typeof loadBusinessProfile === 'function') profile = await loadBusinessProfile();
+                else profile = JSON.parse(localStorage.getItem('ald_business_profile') || '{}');
+            } catch(e) {}
+            var creatorName = getProfileCompanyName(profile) || getProfileOwnerName(profile) || '';
+            var existing = document.getElementById('shareTemplateModal');
+            if (existing) existing.remove();
+            var modal = document.createElement('div');
+            modal.id = 'shareTemplateModal';
+            modal.className = 'modal fade';
+            modal.setAttribute('tabindex', '-1');
+            modal.innerHTML = '<div class="modal-dialog modal-lg"><div class="modal-content">' +
+                '<div class="modal-header"><h5 class="modal-title"><i class="fas fa-users me-2 text-success"></i>Share to Community</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>' +
+                '<div class="modal-body">' +
+                '<div class="alert alert-warning py-2"><i class="fas fa-shield-alt me-1"></i>Rates, material costs, totals, and markup are stripped to $0 before publishing. Only the structure, scope, rooms, quantities, and descriptions are shared.</div>' +
+                '<label class="form-label fw-bold">Template Name</label><input id="communityTemplateName" class="form-control mb-2" value="' + qdTemplateEscapeHtml(template.name || 'QuoteDr Template') + '">' +
+                '<label class="form-label fw-bold">Description</label><textarea id="communityTemplateDescription" class="form-control mb-2" rows="3" placeholder="What job is this best for? What scope does it include?"></textarea>' +
+                '<div class="row g-2">' +
+                '<div class="col-md-4"><label class="form-label fw-bold">Trade</label><select id="communityTemplateTrade" class="form-select">' +
+                qdTemplateOption('', 'Select trade', true) + qdTemplateOption('General Renovation') + qdTemplateOption('Bathroom Renovation') + qdTemplateOption('Kitchen Renovation') + qdTemplateOption('Basement Renovation') + qdTemplateOption('Painting') + qdTemplateOption('Flooring') + qdTemplateOption('Drywall') + qdTemplateOption('Decks & Fences') + qdTemplateOption('Electrical') + qdTemplateOption('Plumbing') +
+                '</select></div>' +
+                '<div class="col-md-4"><label class="form-label fw-bold">Region</label><input id="communityTemplateRegion" class="form-control" placeholder="e.g., Ontario, GTA, Alberta"></div>' +
+                '<div class="col-md-4"><label class="form-label fw-bold">Job Type</label><input id="communityTemplateJobType" class="form-control" placeholder="e.g., Full bathroom"></div>' +
+                '</div>' +
+                '<label class="form-label fw-bold mt-2">Contributor Name</label><input id="communityTemplateCreator" class="form-control" value="' + qdTemplateEscapeHtml(creatorName) + '" placeholder="Business or display name">' +
+                '<div class="form-text">This appears beside the template in the marketplace.</div>' +
+                '</div>' +
+                '<div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-success" onclick="publishTemplateToCommunity(' + id + ')"><i class="fas fa-cloud-upload-alt me-1"></i>Publish Template</button></div>' +
+                '</div></div>';
+            document.body.appendChild(modal);
+            new bootstrap.Modal(modal).show();
+        }
+
+        async function publishTemplateToCommunity(id) {
+            var templates = _getTemplates();
+            var template = templates.find(function(t) { return t.id === id; });
+            if (!template) { qdAlert('Template not found.'); return; }
+            var userResult = await _supabase.auth.getUser();
+            var user = userResult.data?.user;
+            if (!user) { qdAlert('Please sign in before sharing templates.'); return; }
+            var name = document.getElementById('communityTemplateName')?.value.trim() || template.name || 'QuoteDr Template';
+            var metadata = {
+                description: document.getElementById('communityTemplateDescription')?.value.trim() || '',
+                trade: document.getElementById('communityTemplateTrade')?.value || '',
+                region: document.getElementById('communityTemplateRegion')?.value.trim() || '',
+                jobType: document.getElementById('communityTemplateJobType')?.value.trim() || '',
+                creatorName: document.getElementById('communityTemplateCreator')?.value.trim() || ''
+            };
+            if (!metadata.description || !metadata.trade || !metadata.region) {
+                qdAlert('Please add a description, trade, and region before publishing.');
+                return;
+            }
+            var communityPayload = QuoteDrTemplateFiles.createCommunityTemplatePayload({ name: name, rooms: template.rooms || [] }, metadata);
+            var row = {
+                user_id: user.id,
+                name: communityPayload.name,
+                description: communityPayload.description,
+                trade: communityPayload.trade,
+                region: communityPayload.region,
+                job_type: communityPayload.jobType,
+                creator_name: communityPayload.creatorName,
+                rooms: communityPayload.rooms,
+                room_count: communityPayload.roomCount,
+                status: 'published',
+                updated_at: new Date().toISOString()
+            };
+            var result = await _supabase.from('community_templates').insert(row).select().single();
+            if (result.error) {
+                console.warn('Community publish failed:', result.error);
+                qdAlert('Could not publish this template yet. The marketplace table may need to be deployed first.');
+                return;
+            }
+            var modal = bootstrap.Modal.getInstance(document.getElementById('shareTemplateModal'));
+            if (modal) modal.hide();
+            qdAlert('Template published to the community with pricing stripped to $0.');
+        }
+
+        function communityTemplateCardHtml(template) {
+            var rating = template.rating_count ? (template.rating_sum / template.rating_count).toFixed(1) : 'New';
+            var roomCount = template.room_count || (template.rooms ? template.rooms.length : 0);
+            var templateId = qdTemplateEscapeHtml(template.id);
+            return '<div class="col-md-6 col-xl-4 community-template-card" data-trade="' + qdTemplateEscapeHtml(template.trade || '') + '" data-region="' + qdTemplateEscapeHtml(template.region || '') + '" data-job="' + qdTemplateEscapeHtml(template.job_type || '') + '">' +
+                '<div class="border rounded h-100 p-3 bg-white">' +
+                '<div class="d-flex justify-content-between gap-2 mb-1"><strong>' + qdTemplateEscapeHtml(template.name) + '</strong><span class="badge bg-light text-dark">' + roomCount + ' room' + (roomCount !== 1 ? 's' : '') + '</span></div>' +
+                '<div class="small text-muted mb-2">' + qdTemplateEscapeHtml(template.trade || 'Trade') + ' • ' + qdTemplateEscapeHtml(template.region || 'Region') + (template.job_type ? ' • ' + qdTemplateEscapeHtml(template.job_type) : '') + '</div>' +
+                '<p class="small mb-2">' + qdTemplateEscapeHtml(template.description || 'No description yet.') + '</p>' +
+                '<div class="small text-muted mb-3"><i class="fas fa-user me-1"></i>' + qdTemplateEscapeHtml(template.creator_name || 'QuoteDr community') + ' <span class="ms-2"><i class="fas fa-star me-1"></i>' + rating + '</span></div>' +
+                '<div class="d-flex gap-1 flex-wrap">' +
+                '<button class="btn btn-sm btn-success" onclick="importCommunityTemplate(&quot;' + templateId + '&quot;)"><i class="fas fa-download me-1"></i>Add to My Templates</button>' +
+                '<button class="btn btn-sm btn-outline-primary" onclick="rateCommunityTemplate(&quot;' + templateId + '&quot;,1)" title="Helpful"><i class="fas fa-thumbs-up"></i></button>' +
+                '<button class="btn btn-sm btn-outline-secondary" onclick="rateCommunityTemplate(&quot;' + templateId + '&quot;,-1)" title="Not useful"><i class="fas fa-thumbs-down"></i></button>' +
+                '<button class="btn btn-sm btn-outline-danger ms-auto" onclick="reportCommunityTemplate(&quot;' + templateId + '&quot;)" title="Report"><i class="fas fa-flag"></i></button>' +
+                '</div></div></div>';
+        }
+
+        function filterCommunityTemplates() {
+            var q = (document.getElementById('communityTemplateSearch')?.value || '').toLowerCase();
+            var trade = document.getElementById('communityTemplateFilterTrade')?.value || '';
+            var region = (document.getElementById('communityTemplateFilterRegion')?.value || '').toLowerCase();
+            document.querySelectorAll('.community-template-card').forEach(function(card) {
+                var text = card.textContent.toLowerCase();
+                var ok = (!q || text.includes(q)) &&
+                    (!trade || card.getAttribute('data-trade') === trade) &&
+                    (!region || (card.getAttribute('data-region') || '').toLowerCase().includes(region));
+                card.style.display = ok ? '' : 'none';
+            });
+        }
+
+        async function openCommunityTemplates() {
+            var existingDropdown = document.getElementById('_templateDropdown');
+            if (existingDropdown) existingDropdown.remove();
+            var existing = document.getElementById('communityTemplatesModal');
+            if (existing) existing.remove();
+            var modal = document.createElement('div');
+            modal.id = 'communityTemplatesModal';
+            modal.className = 'modal fade';
+            modal.setAttribute('tabindex', '-1');
+            modal.innerHTML = '<div class="modal-dialog modal-xl"><div class="modal-content">' +
+                '<div class="modal-header"><h5 class="modal-title"><i class="fas fa-users me-2 text-success"></i>Community Templates</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>' +
+                '<div class="modal-body">' +
+                '<div class="alert alert-info py-2"><i class="fas fa-info-circle me-1"></i>Community templates import with rates set to $0. Add your own pricing after importing.</div>' +
+                '<div class="row g-2 mb-3"><div class="col-md-5"><input id="communityTemplateSearch" class="form-control form-control-sm" placeholder="Search templates..." oninput="filterCommunityTemplates()"></div>' +
+                '<div class="col-md-3"><select id="communityTemplateFilterTrade" class="form-select form-select-sm" onchange="filterCommunityTemplates()"><option value="">All trades</option><option>General Renovation</option><option>Bathroom Renovation</option><option>Kitchen Renovation</option><option>Basement Renovation</option><option>Painting</option><option>Flooring</option><option>Drywall</option><option>Decks & Fences</option><option>Electrical</option><option>Plumbing</option></select></div>' +
+                '<div class="col-md-4"><input id="communityTemplateFilterRegion" class="form-control form-control-sm" placeholder="Filter by region..." oninput="filterCommunityTemplates()"></div></div>' +
+                '<div id="communityTemplatesList" class="row g-3"><div class="col-12 text-muted small"><i class="fas fa-spinner fa-spin me-1"></i>Loading community templates...</div></div>' +
+                '</div><div class="modal-footer"><button class="btn btn-outline-secondary" onclick="loadCommunityTemplates()"><i class="fas fa-sync me-1"></i>Refresh</button><button class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>' +
+                '</div></div>';
+            document.body.appendChild(modal);
+            new bootstrap.Modal(modal).show();
+            await loadCommunityTemplates();
+        }
+
+        async function loadCommunityTemplates() {
+            var list = document.getElementById('communityTemplatesList');
+            if (!list) return;
+            var userResult = await _supabase.auth.getUser();
+            if (!userResult.data?.user) {
+                list.innerHTML = '<div class="col-12"><div class="alert alert-warning">Please sign in to browse community templates.</div></div>';
+                return;
+            }
+            var result = await _supabase
+                .from('community_templates')
+                .select('id,name,description,trade,region,job_type,creator_name,rooms,room_count,rating_sum,rating_count,created_at')
+                .eq('status', 'published')
+                .order('created_at', { ascending: false })
+                .limit(100);
+            if (result.error) {
+                console.warn('Community template load failed:', result.error);
+                list.innerHTML = '<div class="col-12"><div class="alert alert-warning">Community marketplace is not available yet. Deploy the marketplace migration, then refresh.</div></div>';
+                return;
+            }
+            window._communityTemplateCache = result.data || [];
+            if (!window._communityTemplateCache.length) {
+                list.innerHTML = '<div class="col-12"><div class="alert alert-light border">No community templates yet. Share one from Manage Templates to seed the marketplace.</div></div>';
+                return;
+            }
+            list.innerHTML = window._communityTemplateCache.map(communityTemplateCardHtml).join('');
+            filterCommunityTemplates();
+        }
+
+        async function importCommunityTemplate(id) {
+            var template = (window._communityTemplateCache || []).find(function(t) { return t.id === id; });
+            if (!template) { qdAlert('Template not found. Refresh the marketplace and try again.'); return; }
+            var existing = _getTemplates();
+            var imported = QuoteDrTemplateFiles.prepareCommunityTemplateForImport(template, existing);
+            _saveTemplates(existing.concat([imported]));
+            _syncTemplateToCloud(imported.name, imported.rooms).catch(function(){});
+            qdAlert('Community template added to your library with pricing set to $0.');
+            if (typeof renderTemplateDropdown === 'function') renderTemplateDropdown();
+        }
+
+        async function reportCommunityTemplate(id) {
+            var reason = await qdPrompt('Why are you reporting this template?', '', { title: 'Report Template' });
+            if (reason === null) return;
+            var userResult = await _supabase.auth.getUser();
+            var user = userResult.data?.user;
+            if (!user) { qdAlert('Please sign in to report templates.'); return; }
+            var result = await _supabase.from('community_template_reports').upsert({
+                template_id: id,
+                user_id: user.id,
+                reason: reason || 'Reported from marketplace',
+                created_at: new Date().toISOString()
+            }, { onConflict: 'template_id,user_id' });
+            if (result.error) {
+                console.warn('Template report failed:', result.error);
+                qdAlert('Could not send report yet. Please try again later.');
+                return;
+            }
+            qdAlert('Thanks. The template has been reported for review.');
+        }
+
+        async function rateCommunityTemplate(id, rating) {
+            var userResult = await _supabase.auth.getUser();
+            var user = userResult.data?.user;
+            if (!user) { qdAlert('Please sign in to rate templates.'); return; }
+            var result = await _supabase.from('community_template_ratings').upsert({
+                template_id: id,
+                user_id: user.id,
+                rating: rating,
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'template_id,user_id' });
+            if (result.error) {
+                console.warn('Template rating failed:', result.error);
+                qdAlert('Could not save rating yet. Please try again later.');
+                return;
+            }
+            qdAlert('Rating saved. Thanks for helping surface better templates.');
         }
 
         async function saveRoomAsTemplate(roomId) {
@@ -5368,7 +5607,8 @@ Example:
                 var roomCount = t.rooms ? t.rooms.length : (t.room ? 1 : 0);
                 return '<li class="list-group-item d-flex justify-content-between align-items-center" data-id="'+t.id+'">' +
                     '<span><i class="fas fa-grip-vertical me-2 text-muted" style="cursor:grab"></i><strong>'+t.name+'</strong> <span class="text-muted small">('+roomCount+' room'+(roomCount!==1?'s':'')+')</span></span>' +
-                    '<span class="d-flex gap-1"><button class="btn btn-sm btn-outline-primary" onclick="exportTemplateById('+t.id+')" title="Export template"><i class="fas fa-file-export"></i></button>' +
+                    '<span class="d-flex gap-1"><button class="btn btn-sm btn-outline-success" onclick="openShareTemplateModal('+t.id+')" title="Share to community"><i class="fas fa-users"></i></button>' +
+                    '<button class="btn btn-sm btn-outline-primary" onclick="exportTemplateById('+t.id+')" title="Export template"><i class="fas fa-file-export"></i></button>' +
                     '<button class="btn btn-sm btn-outline-danger" onclick="deleteTemplateById('+t.id+')" title="Delete template"><i class="fas fa-trash"></i></button></span></li>';
             }).join('');
             modal.innerHTML = '<div class="modal-dialog modal-lg"><div class="modal-content">' +
@@ -5377,6 +5617,7 @@ Example:
                 '<div class="modal-body"><div class="d-flex gap-2 flex-wrap mb-3">' +
                 '<button class="btn btn-sm btn-outline-primary" onclick="document.getElementById(\'templateImportFile\').click()"><i class="fas fa-file-import me-1"></i>Import Template</button>' +
                 '<button class="btn btn-sm btn-outline-success" onclick="exportAllTemplates()"><i class="fas fa-file-export me-1"></i>Export All</button>' +
+                '<button class="btn btn-sm btn-success" onclick="openCommunityTemplates()"><i class="fas fa-users me-1"></i>Community Templates</button>' +
                 '<input type="file" id="templateImportFile" accept=".quotedrtemplate,.json,application/json" style="display:none" onchange="importTemplatesFromFile(this)">' +
                 '</div><p class="text-muted small mb-3">Drag to reorder. Top 15 appear in the quick dropdown. Exported templates can include pricing or share only the items and quantities.</p>' +
                 '<ul id="manageTemplatesList" class="list-group">' + rows + '</ul></div>' +
