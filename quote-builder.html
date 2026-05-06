@@ -1538,9 +1538,10 @@ Example:
         <div class="modal-dialog modal-xl" style="max-width:90vw;margin-left:auto;margin-right:auto;width:96%;">
             <!-- On mobile: 96% width, centered. On desktop: capped at 90vw -->
             <div class="modal-content">
-                <div class="modal-header">
+                <div class="modal-header" id="manageItemsTopBar">
                     <h5 class="modal-title"><i class="fas fa-database"></i> Manage Line Items</h5>
                     <button id="undoManageItemsBtn" class="btn btn-sm btn-outline-secondary ms-auto me-2" onclick="undoManageItems()" disabled title="Undo last change"><i class="fas fa-undo me-1"></i>Undo</button>
+                    <button id="hideManageItemsTopBarBtn" type="button" class="btn btn-sm btn-outline-secondary me-2" onclick="toggleManageItemsTopBar(true)" title="Hide the top bar for more editing space"><i class="fas fa-compress-alt me-1"></i>Hide</button>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -1627,9 +1628,15 @@ Example:
                     </div>
                     <div id="itemListBottomAnchor"></div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-success" onclick="saveAllPricingRows()"><i class="fas fa-save"></i> Save All Changes</button>
-                    <button type="button" class="btn btn-secondary" onclick="closeManageItemsModal()">Close</button>
+                <div class="modal-footer justify-content-between flex-wrap gap-2">
+                    <div class="d-flex gap-2 flex-wrap">
+                        <button id="undoManageItemsFooterBtn" type="button" class="btn btn-outline-secondary" onclick="undoManageItems()" disabled style="display:none;" title="Undo last change"><i class="fas fa-undo me-1"></i>Undo</button>
+                        <button id="showManageItemsTopBarBtn" type="button" class="btn btn-outline-primary" onclick="toggleManageItemsTopBar(false)" style="display:none;" title="Show the top bar again"><i class="fas fa-window-maximize me-1"></i>Show Bar</button>
+                    </div>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <button type="button" class="btn btn-success" onclick="saveAllPricingRows()"><i class="fas fa-save"></i> Save All Changes</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeManageItemsModal()">Close</button>
+                    </div>
                 </div>
             </div>
         </div>

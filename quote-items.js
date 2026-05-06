@@ -197,6 +197,8 @@
             const searchEl = document.getElementById('itemSearchFilter');
             if (searchEl) searchEl.value = '';
             renderAllItemsList();
+            toggleManageItemsTopBar(false);
+            syncManageItemsUndoButtons();
 (bootstrap.Modal.getInstance(document.getElementById('manageItemsModal')) || new bootstrap.Modal(document.getElementById('manageItemsModal'))).show();
         }
 
@@ -221,11 +223,42 @@
         let pricingDirty = false; // tracks unsaved changes in Manage Items modal
         let lastDeletedItem = null; // for undo functionality
         var undoStack = [];
+        function syncManageItemsUndoButtons() {
+            const hasUndo = undoStack.length > 0;
+            const buttonConfigs = [
+                {
+                    id: 'undoManageItemsBtn',
+                    enabledClass: 'btn btn-sm btn-danger ms-auto me-2',
+                    disabledClass: 'btn btn-sm btn-outline-secondary ms-auto me-2'
+                },
+                {
+                    id: 'undoManageItemsFooterBtn',
+                    enabledClass: 'btn btn-warning',
+                    disabledClass: 'btn btn-outline-secondary'
+                }
+            ];
+            buttonConfigs.forEach(config => {
+                const btn = document.getElementById(config.id);
+                if (!btn) return;
+                btn.disabled = !hasUndo;
+                btn.className = hasUndo ? config.enabledClass : config.disabledClass;
+            });
+        }
+        function toggleManageItemsTopBar(hidden) {
+            const topBar = document.getElementById('manageItemsTopBar');
+            const footerUndo = document.getElementById('undoManageItemsFooterBtn');
+            const showTopBarBtn = document.getElementById('showManageItemsTopBarBtn');
+            const modal = document.getElementById('manageItemsModal');
+            if (topBar) topBar.style.display = hidden ? 'none' : '';
+            if (footerUndo) footerUndo.style.display = hidden ? '' : 'none';
+            if (showTopBarBtn) showTopBarBtn.style.display = hidden ? '' : 'none';
+            if (modal) modal.classList.toggle('manage-items-top-hidden', hidden);
+            syncManageItemsUndoButtons();
+        }
         function pushUndoState() {
             if (undoStack.length >= 20) undoStack.shift();
             undoStack.push(JSON.parse(JSON.stringify(customItems)));
-            var btn = document.getElementById('undoManageItemsBtn');
-            if (btn) { btn.disabled = false; btn.className = 'btn btn-sm btn-danger ms-auto me-2'; }
+            syncManageItemsUndoButtons();
         }
         function undoManageItems() {
             if (undoStack.length > 0) {
@@ -233,11 +266,7 @@
                 _injectItemsIntoPricingDB(customItems);
                 renderAllItemsList();
                 saveCustomItems();
-                var btn = document.getElementById('undoManageItemsBtn');
-                if (btn) {
-                    btn.disabled = undoStack.length === 0;
-                    btn.className = undoStack.length === 0 ? 'btn btn-sm btn-outline-secondary ms-auto me-2' : 'btn btn-sm btn-danger ms-auto me-2';
-                }
+                syncManageItemsUndoButtons();
             }
         }
 
