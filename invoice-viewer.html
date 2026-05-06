@@ -958,6 +958,10 @@ if (location.search.includes('debug')) {
         }
 
         async function pushInvoiceToQB() {
+            if (typeof requireProFeature === 'function') {
+                var allowed = await requireProFeature('quickbooks', 'QuickBooks sync');
+                if (!allowed) return;
+            }
             if (!confirm('This will create an invoice in the connected QuickBooks company. Continue?')) return;
             const btn = document.getElementById('qbPushBtn');
             btn.disabled = true;
@@ -987,6 +991,7 @@ if (location.search.includes('debug')) {
                 btn.innerHTML = '<i class="fas fa-check me-1"></i> Sent to QuickBooks!';
                 btn.className = 'btn btn-success btn-sm';
                 var qbUrl = result.qb_url || result.deepLink;
+                if (typeof completeProTrialFeature === 'function') completeProTrialFeature('quickbooks', 'QuickBooks sync');
                 if (qbUrl) {
                     setTimeout(() => window.open(qbUrl, '_blank'), 500);
                 }

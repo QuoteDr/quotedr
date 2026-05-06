@@ -651,6 +651,10 @@
             if (!textareaEl || !btnEl) return;
             const currentText = textareaEl.value || '';
             if (!currentText.trim()) { qdAlert('Please enter a description first.'); return; }
+            if (typeof requireProFeature === 'function') {
+                var allowed = await requireProFeature('ai_refine', 'AI Refine');
+                if (!allowed) return;
+            }
             const originalBtnHTML = btnEl.innerHTML;
             btnEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
             btnEl.disabled = true;
@@ -668,6 +672,7 @@
                     textareaEl.value = data.reply.replace(/^["']|["']$/g, '').trim();
                     textareaEl.dispatchEvent(new Event('input', { bubbles: true }));
                     markPricingDirty();
+                    if (typeof completeProTrialFeature === 'function') completeProTrialFeature('ai_refine', 'AI Refine');
                 }
             } catch (error) {
                 console.error('AI refine failed:', error);

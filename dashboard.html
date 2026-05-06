@@ -86,7 +86,7 @@
 
             <!-- Desktop: icon buttons inline -->
             <div class="d-none d-md-flex align-items-center gap-1">
-                <a href="home-depot-tracker.html" class="btn btn-outline-primary btn-sm" title="Job Tracker"><i class="fas fa-folder-tree"></i><span class="ms-1">Jobs</span></a>
+                <a href="home-depot-tracker.html" class="btn btn-outline-primary btn-sm" title="Job Tracker" onclick="return openJobTracker(event)"><i class="fas fa-folder-tree"></i><span class="ms-1">Jobs</span></a>
                 <a href="settings.html" class="btn btn-outline-secondary btn-sm" title="Settings"><i class="fas fa-cog"></i><span class="ms-1">Settings</span></a>
                 <a href="help.html" class="btn btn-outline-secondary btn-sm" title="Help"><i class="fas fa-question-circle"></i><span class="ms-1">Help</span></a>
                 <button onclick="signOut()" class="btn btn-outline-danger btn-sm" title="Sign Out"><i class="fas fa-sign-out-alt"></i><span class="ms-1">Sign Out</span></button>
@@ -100,7 +100,7 @@
                 <ul class="dropdown-menu dropdown-menu-end shadow">
                     <li><span class="dropdown-item-text fw-semibold small text-muted" id="userNameMobile"></span></li>
                     <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="home-depot-tracker.html"><i class="fas fa-folder-tree me-2 text-primary"></i>Job Tracker</a></li>
+                    <li><a class="dropdown-item" href="home-depot-tracker.html" onclick="return openJobTracker(event)"><i class="fas fa-folder-tree me-2 text-primary"></i>Job Tracker</a></li>
                     <li><a class="dropdown-item" href="settings.html"><i class="fas fa-cog me-2 text-secondary"></i>Settings</a></li>
                     <li><a class="dropdown-item" href="help.html"><i class="fas fa-question-circle me-2 text-secondary"></i>Help</a></li>
                     <li><hr class="dropdown-divider"></li>
@@ -158,7 +158,7 @@
                             <button class="btn btn-sm btn-primary" onclick="openNewQuoteModal()">
                                 <i class="fas fa-plus me-1"></i> New Quote
                             </button>
-                            <a class="btn btn-sm btn-outline-primary" href="home-depot-tracker.html">
+                            <a class="btn btn-sm btn-outline-primary" href="home-depot-tracker.html" onclick="return openJobTracker(event)">
                                 <i class="fas fa-folder-tree me-1"></i> Job Tracker
                             </a>
                             <button class="btn btn-sm btn-outline-secondary" onclick="refreshQuotes()">
@@ -251,6 +251,16 @@
 
         function jsAttr(value) {
             return escapeHtml(jsString(value));
+        }
+
+        async function openJobTracker(event) {
+            if (event) event.preventDefault();
+            if (typeof requireProFeature === 'function') {
+                var allowed = await requireProFeature('job_tracker', 'Job Tracker', { crossPage: true });
+                if (!allowed) return false;
+            }
+            window.location.href = 'home-depot-tracker.html';
+            return false;
         }
 
         async function refreshQuotes() {

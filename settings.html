@@ -801,8 +801,11 @@ Sarah Jones, 905-555-5678"></textarea>
 		}
 
 		async function connectQuickBooks() {
-			if (typeof requireFeature === 'function') {
-				var allowed = await requireFeature('quickbooks', 'QuickBooks integration');
+			if (typeof requireProFeature === 'function') {
+				var allowed = await requireProFeature('quickbooks', 'QuickBooks sync');
+				if (!allowed) return;
+			} else if (typeof requireFeature === 'function') {
+				var allowed = await requireFeature('quickbooks', 'QuickBooks sync');
 				if (!allowed) return;
 			}
 			try {
@@ -851,6 +854,10 @@ Sarah Jones, 905-555-5678"></textarea>
 		}
 
 		async function fetchQuickBooksSync(action) {
+			if (typeof requireProFeature === 'function') {
+				var allowed = await requireProFeature('quickbooks', 'QuickBooks sync');
+				if (!allowed) throw new Error('QuickBooks sync is a Pro feature.');
+			}
 			const headers = await getQBAuthHeader();
 			if (!headers) throw new Error('Please sign in first.');
 			const resp = await fetch(SUPABASE_URL + '/functions/v1/qb-sync', {
@@ -947,6 +954,7 @@ Sarah Jones, 905-555-5678"></textarea>
 				window._pendingQBCustomers = (data.customers || []).filter(function(c) { return c.active !== false && c.name; });
 				window._activeQBSyncType = 'customers';
 				renderQBSyncPreview('customers', window._pendingQBCustomers, data);
+				if (typeof completeProTrialFeature === 'function') completeProTrialFeature('quickbooks', 'QuickBooks sync');
 			} catch(e) {
 				resultEl.innerHTML = '<div class="alert alert-danger py-2 small"><i class="fas fa-exclamation-triangle me-1"></i>' + escapeHtml(e.message) + '</div>';
 			}
@@ -960,6 +968,7 @@ Sarah Jones, 905-555-5678"></textarea>
 				window._pendingQBItems = (data.items || []).filter(function(item) { return item.active !== false && item.name; });
 				window._activeQBSyncType = 'items';
 				renderQBSyncPreview('items', window._pendingQBItems, data);
+				if (typeof completeProTrialFeature === 'function') completeProTrialFeature('quickbooks', 'QuickBooks sync');
 			} catch(e) {
 				resultEl.innerHTML = '<div class="alert alert-danger py-2 small"><i class="fas fa-exclamation-triangle me-1"></i>' + escapeHtml(e.message) + '</div>';
 			}

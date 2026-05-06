@@ -707,12 +707,24 @@ const QUOTEDR_PLAN_FEATURES = {
         'ai_voice_quote',
         'ai_assistant',
         'smart_import',
+        'ai_refine',
+        'ikea_quoter',
+        'job_tracker',
         'floor_plan_scanner',
         'quote_upsells',
         'profit_tracking',
         'payment_reminders',
-        'quickbooks'
+        'quickbooks',
+        'bank_card_sync'
     ]
+};
+
+const QUOTEDR_PRO_FEATURE_LABELS = {
+    ikea_quoter: 'IKEA Cabinet Quoter',
+    job_tracker: 'Job Tracker',
+    ai_refine: 'AI Refine',
+    quickbooks: 'QuickBooks sync',
+    bank_card_sync: 'Bank/card sync'
 };
 
 function normalizePlanName(plan) {
@@ -751,6 +763,184 @@ async function getCurrentPlan() {
 async function hasFeature(feature) {
     const plan = await getCurrentPlan();
     return (QUOTEDR_PLAN_FEATURES[plan] || QUOTEDR_PLAN_FEATURES.basic).includes(feature);
+}
+
+async function isCurrentUserPro() {
+    const sub = await loadSubscriptionStatus();
+    return subscriptionAllowsAccess(sub) && normalizePlanName(sub.plan || 'basic') === 'pro';
+}
+
+async function loadProTrialUsage() {
+    const user = await getCurrentUser();
+    if (!user) return JSON.parse(localStorage.getItem('ald_pro_trial_usage') || '{}');
+    const { data, error } = await _supabase
+        .from('user_data')
+        .select('value')
+        .eq('user_id', user.id)
+        .eq('key', 'pro_trial_usage')
+        .maybeSingle();
+    if (!error && data && data.value) {
+        localStorage.setItem('ald_pro_trial_usage', JSON.stringify(data.value));
+        return data.value;
+    }
+    return JSON.parse(localStorage.getItem('ald_pro_trial_usage') || '{}');
+}
+
+async function saveProTrialUsage(usage) {
+    const user = await getCurrentUser();
+    localStorage.setItem('ald_pro_trial_usage', JSON.stringify(usage || {}));
+    if (!user) return { data: null, error: null };
+    return await _supabase
+        .from('user_data')
+        .upsert({ user_id: user.id, key: 'pro_trial_usage', value: usage || {}, updated_at: new Date().toISOString() }, { onConflict: 'user_id,key' });
+}
+
+function qdProPricingUrl(featureKey) {
+    return 'pricing.html?plan=pro&feature=' + encodeURIComponent(featureKey || 'pro');
+}
+
+function qdCaptureEvent(name, props) {
+    try {
+        if (window.posthog && typeof window.posthog.capture === 'function') {
+            window.posthog.capture(name, props || {});
+        }
+    } catch(e) {}
+}
+
+function showProTrialModal(featureKey, featureLabel) {
+    featureLabel = featureLabel || QUOTEDR_PRO_FEATURE_LABELS[featureKey] || 'this Pro tool';
+    return new Promise(function(resolve) {
+        var existing = document.getElementById('quotedrProTrialModal');
+        if (existing) existing.remove();
+
+        var modal = document.createElement('div');
+        modal.id = 'quotedrProTrialModal';
+        modal.className = 'modal fade';
+        modal.tabIndex = -1;
+        modal.innerHTML = '' +
+            '<div class="modal-dialog modal-dialog-centered">' +
+                '<div class="modal-content" style="border-radius:16px;border:0;box-shadow:0 18px 45px rgba(15,23,42,.2);">' +
+                    '<div class="modal-header">' +
+                        '<h5 class="modal-title d-flex align-items-center gap-2">' +
+                            '<span style="width:34px;height:34px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:#e8f2ff;color:#1a56a0;"><i class="fas fa-star"></i></span>' +
+                            '<span>Try a Pro Feature Free</span>' +
+                        '</h5>' +
+                        '<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>' +
+                    '</div>' +
+                    '<div class="modal-body">' +
+                        '<p class="mb-2"><strong>' + featureLabel + '</strong> is a Pro feature, but you can try it once for free.</p>' +
+                        '<p class="text-muted small mb-0">No commitment, no credit card. If it helps, Pro unlocks it permanently.</p>' +
+                    '</div>' +
+                    '<div class="modal-footer">' +
+                        '<button type="button" class="btn btn-outline-secondary" id="quotedrProLearn">Learn About Pro</button>' +
+                        '<button type="button" class="btn btn-primary" id="quotedrProTry">Try It Free</button>' +
+                    '</div>' +
+                '</div>' +
+            '</div>';
+
+        function cleanup(value) {
+            if (window.bootstrap && window.bootstrap.Modal) {
+                var inst = window.bootstrap.Modal.getInstance(modal);
+                if (inst) inst.hide();
+            }
+            setTimeout(function() { if (modal.parentNode) modal.remove(); }, 250);
+            resolve(value);
+        }
+
+        modal.querySelector('#quotedrProTry').addEventListener('click', function() { cleanup('try'); });
+        modal.querySelector('#quotedrProLearn').addEventListener('click', function() {
+            window.location.href = qdProPricingUrl(featureKey);
+            cleanup('learn');
+        });
+        modal.querySelector('.btn-close').addEventListener('click', function() { cleanup(false); });
+        document.body.appendChild(modal);
+
+        if (window.bootstrap && window.bootstrap.Modal) {
+            window.bootstrap.Modal.getOrCreateInstance(modal).show();
+            modal.addEventListener('hidden.bs.modal', function() { resolve(false); }, { once: true });
+        } else {
+            modal.classList.add('show');
+            modal.style.display = 'block';
+            modal.style.background = 'rgba(15,23,42,.45)';
+        }
+    });
+}
+
+function showProTrialCompletePrompt(featureKey, featureLabel) {
+    featureLabel = featureLabel || QUOTEDR_PRO_FEATURE_LABELS[featureKey] || 'this Pro tool';
+    var msg = 'Ready to unlock ' + featureLabel + ' permanently? Pro is $39/month and includes IKEA quoting, job tracking, AI tools, QuickBooks sync, and more.';
+    var pricingUrl = qdProPricingUrl(featureKey);
+    if (typeof window.qdConfirm === 'function') {
+        window.qdConfirm(msg, {
+            title: 'Unlock QuoteDr Pro',
+            okText: 'Upgrade to Pro',
+            cancelText: 'Maybe later',
+            okClass: 'btn-primary',
+            type: 'info'
+        }).then(function(confirmed) {
+            if (confirmed) {
+                qdCaptureEvent('pro_upgrade_clicked', { feature: featureKey });
+                window.location.href = pricingUrl;
+            }
+        });
+        return;
+    }
+    showUpgradePromptFallback(featureLabel, msg, pricingUrl);
+}
+
+async function markProTrialUsed(featureKey, featureLabel, metadata) {
+    var usage = await loadProTrialUsage();
+    var now = new Date();
+    var due = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
+    usage[featureKey] = Object.assign({}, usage[featureKey] || {}, {
+        feature: featureKey,
+        label: featureLabel || QUOTEDR_PRO_FEATURE_LABELS[featureKey] || featureKey,
+        used: true,
+        used_at: now.toISOString(),
+        followup_due_at: due.toISOString(),
+        followup_sent_at: usage[featureKey] && usage[featureKey].followup_sent_at ? usage[featureKey].followup_sent_at : null,
+        metadata: metadata || {}
+    });
+    await saveProTrialUsage(usage);
+    window._quotedrActiveProTrials = window._quotedrActiveProTrials || {};
+    window._quotedrActiveProTrials[featureKey] = true;
+    qdCaptureEvent('pro_trial_used', { feature: featureKey, label: usage[featureKey].label });
+    return usage[featureKey];
+}
+
+async function requireProFeature(featureKey, featureLabel, options) {
+    options = options || {};
+    featureLabel = featureLabel || QUOTEDR_PRO_FEATURE_LABELS[featureKey] || 'This feature';
+    if (await isCurrentUserPro()) return true;
+
+    var usage = await loadProTrialUsage();
+    var passKey = 'quotedr_pro_trial_pass_' + featureKey;
+    try {
+        if (sessionStorage.getItem(passKey) === '1') {
+            sessionStorage.removeItem(passKey);
+            window._quotedrActiveProTrials = window._quotedrActiveProTrials || {};
+            window._quotedrActiveProTrials[featureKey] = true;
+            return true;
+        }
+    } catch(e) {}
+    if (usage && usage[featureKey] && usage[featureKey].used) {
+        showUpgradePrompt(featureLabel);
+        return false;
+    }
+
+    var choice = await showProTrialModal(featureKey, featureLabel);
+    if (choice !== 'try') return false;
+    await markProTrialUsed(featureKey, featureLabel, options.metadata || {});
+    if (options.crossPage) {
+        try { sessionStorage.setItem(passKey, '1'); } catch(e) {}
+    }
+    return true;
+}
+
+function completeProTrialFeature(featureKey, featureLabel) {
+    if (!window._quotedrActiveProTrials || !window._quotedrActiveProTrials[featureKey]) return;
+    delete window._quotedrActiveProTrials[featureKey];
+    setTimeout(function() { showProTrialCompletePrompt(featureKey, featureLabel); }, 500);
 }
 
 function getMeasurementSystem() {

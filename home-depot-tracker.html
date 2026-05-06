@@ -1199,6 +1199,7 @@
             tracker.imports.push({ id: idFor('import'), importedAt: new Date().toISOString(), count: tracker.transactions.length });
             saveTracker();
             renderAll();
+            if (typeof completeProTrialFeature === 'function') completeProTrialFeature('job_tracker', 'Job Tracker');
             alert('Project tracker saved.');
         }
 
@@ -1223,6 +1224,13 @@
         }
 
         document.addEventListener('DOMContentLoaded', async function() {
+            if (typeof requireProFeature === 'function') {
+                var allowed = await requireProFeature('job_tracker', 'Job Tracker');
+                if (!allowed) {
+                    window.location.href = 'dashboard.html';
+                    return;
+                }
+            }
             applyExpenseFoundationVisibility();
             await loadCloudTracker();
             applyExpenseFoundationVisibility();
