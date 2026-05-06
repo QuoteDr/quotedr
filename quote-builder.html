@@ -145,6 +145,62 @@
         }
         .profit-positive { color: #198754; }
         .profit-negative { color: #dc3545; }
+        #manageItemsFooterBar {
+            flex: 0 0 38px;
+        }
+        #manageItemsFooterBar .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        @media (max-width: 768px) {
+            #manageItemsModal.manage-items-top-hidden #manageItemsFooterBar {
+                min-height: 34px !important;
+                max-height: 34px !important;
+                flex-basis: 34px;
+                padding: 3px 6px !important;
+            }
+            #manageItemsModal.manage-items-top-hidden #manageItemsFooterBar .btn {
+                width: 32px;
+                height: 28px;
+                padding: 0 !important;
+                line-height: 1 !important;
+            }
+            #manageItemsModal.manage-items-top-hidden #manageItemsFooterBar .mi-footer-label {
+                display: none;
+            }
+            #manageItemsModal.manage-items-top-hidden #manageItemsFooterBar .btn i {
+                margin-right: 0 !important;
+            }
+        }
+        @media (max-height: 500px) and (orientation: landscape) {
+            #manageItemsModal .modal-dialog {
+                height: 100dvh;
+                margin-top: 0 !important;
+                margin-bottom: 0 !important;
+            }
+            #manageItemsModal .modal-content {
+                height: 100dvh;
+                max-height: 100dvh;
+                display: flex;
+                flex-direction: column;
+            }
+            #manageItemsModal .modal-body {
+                flex: 1 1 auto;
+                min-height: 0;
+                max-height: none !important;
+                overflow-y: auto;
+                padding: 8px;
+            }
+            #manageItemsModal.manage-items-footer-hidden .modal-body {
+                padding-bottom: 4px;
+            }
+            #manageItemsModal #customItemsList {
+                flex: 1 1 auto;
+                min-height: 0;
+                max-height: none !important;
+            }
+        }
 
         /* Sticky toolbar */
         #stickyToolbar {
@@ -1631,12 +1687,12 @@ Example:
                 </div>
                 <div class="modal-footer justify-content-between flex-nowrap gap-2" id="manageItemsFooterBar" style="touch-action:none;padding:4px 8px;min-height:38px;max-height:38px;overflow:hidden;">
                     <div class="d-flex gap-2 flex-nowrap align-items-center">
-                        <button id="undoManageItemsFooterBtn" type="button" class="btn btn-sm btn-outline-secondary text-nowrap" onclick="undoManageItems()" disabled style="display:none;padding:2px 8px;line-height:1.2;" title="Undo last change"><i class="fas fa-undo me-1"></i>Undo</button>
-                        <button id="showManageItemsTopBarBtn" type="button" class="btn btn-sm btn-outline-primary text-nowrap" onclick="toggleManageItemsTopBar(false)" style="display:none;padding:2px 8px;line-height:1.2;" title="Show the top bar again"><i class="fas fa-window-maximize me-1"></i>Show</button>
+                        <button id="undoManageItemsFooterBtn" type="button" class="btn btn-sm btn-outline-secondary text-nowrap" onclick="undoManageItems()" disabled style="display:none;padding:2px 8px;line-height:1.2;" title="Undo last change"><i class="fas fa-undo me-1"></i><span class="mi-footer-label">Undo</span></button>
+                        <button id="showManageItemsTopBarBtn" type="button" class="btn btn-sm btn-outline-primary text-nowrap" onclick="toggleManageItemsTopBar(false)" style="display:none;padding:2px 8px;line-height:1.2;" title="Show the top bar again"><i class="fas fa-window-maximize me-1"></i><span class="mi-footer-label">Show</span></button>
                     </div>
                     <div class="d-flex gap-2 flex-nowrap align-items-center">
-                        <button type="button" class="btn btn-sm btn-success text-nowrap" onclick="saveAllPricingRows()" style="padding:2px 8px;line-height:1.2;"><i class="fas fa-save"></i> Save All</button>
-                        <button type="button" class="btn btn-sm btn-secondary text-nowrap" onclick="closeManageItemsModal()" style="padding:2px 8px;line-height:1.2;">Close</button>
+                        <button type="button" class="btn btn-sm btn-success text-nowrap" onclick="saveAllPricingRows()" style="padding:2px 8px;line-height:1.2;" title="Save all changes"><i class="fas fa-save me-1"></i><span class="mi-footer-label">Save All</span></button>
+                        <button type="button" class="btn btn-sm btn-secondary text-nowrap" onclick="closeManageItemsModal()" style="padding:2px 8px;line-height:1.2;" title="Close"><i class="fas fa-times me-1"></i><span class="mi-footer-label">Close</span></button>
                     </div>
                 </div>
                 <div id="manageItemsFooterPullTab" onclick="toggleManageItemsBottomBar(false)" title="Show bottom bar" aria-label="Show bottom bar" style="display:none;position:absolute;left:50%;bottom:0;transform:translateX(-50%);align-items:center;justify-content:center;width:86px;height:14px;cursor:pointer;touch-action:none;background:#f8f9fa;border:1px solid #dee2e6;border-bottom:0;border-radius:10px 10px 0 0;z-index:5;">
