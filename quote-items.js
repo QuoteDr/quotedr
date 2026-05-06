@@ -236,8 +236,8 @@
                 },
                 {
                     id: 'undoManageItemsFooterBtn',
-                    enabledClass: 'btn btn-sm btn-warning text-nowrap',
-                    disabledClass: 'btn btn-sm btn-outline-secondary text-nowrap'
+                    enabledClass: 'btn btn-sm btn-warning text-nowrap qd-manage-footer-btn',
+                    disabledClass: 'btn btn-sm btn-outline-secondary text-nowrap qd-manage-footer-btn'
                 }
             ];
             buttonConfigs.forEach(config => {
@@ -245,6 +245,10 @@
                 if (!btn) return;
                 btn.disabled = !hasUndo;
                 btn.className = hasUndo ? config.enabledClass : config.disabledClass;
+                if (config.id === 'undoManageItemsFooterBtn') {
+                    btn.style.padding = '2px 8px';
+                    btn.style.lineHeight = '1.2';
+                }
             });
         }
         function toggleManageItemsTopBar(hidden) {
@@ -262,7 +266,13 @@
             const footer = document.getElementById('manageItemsFooterBar');
             const pullTab = document.getElementById('manageItemsFooterPullTab');
             const modal = document.getElementById('manageItemsModal');
-            if (footer) footer.style.display = hidden ? 'none' : '';
+            if (footer) {
+                if (hidden) {
+                    footer.style.setProperty('display', 'none', 'important');
+                } else {
+                    footer.style.removeProperty('display');
+                }
+            }
             if (pullTab) pullTab.style.display = hidden ? 'flex' : 'none';
             if (modal) modal.classList.toggle('manage-items-footer-hidden', hidden);
         }
