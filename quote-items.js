@@ -233,8 +233,8 @@
                 },
                 {
                     id: 'undoManageItemsFooterBtn',
-                    enabledClass: 'btn btn-warning',
-                    disabledClass: 'btn btn-outline-secondary'
+                    enabledClass: 'btn btn-sm btn-warning text-nowrap',
+                    disabledClass: 'btn btn-sm btn-outline-secondary text-nowrap'
                 }
             ];
             buttonConfigs.forEach(config => {
