@@ -110,6 +110,7 @@ if (location.search.includes('debug')) {
 					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('payments',this);return false;"><i class="fas fa-credit-card me-2" style="color:#28a745"></i>Payments</a>
 					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('portal',this);return false;"><i class="fas fa-paint-brush me-2" style="color:#e87e2a"></i>Portal Theme</a>
 					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('integrations',this);return false;"><i class="fas fa-plug me-2" style="color:#2b6cb0"></i>Integrations</a>
+					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('analytics',this);return false;"><i class="fas fa-chart-line me-2" style="color:#198754"></i>Analytics Brief</a>
 					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('account',this);return false;"><i class="fas fa-user-circle me-2" style="color:#6f42c1"></i>Account</a>
 					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('feedback',this);return false;"><i class="fas fa-comment-alt me-2" style="color:#28a745"></i>Feedback</a>
 				</div>
@@ -725,6 +726,25 @@ Sarah Jones, 905-555-5678"></textarea>
 					</div>
 				</div><!-- /tab-integrations -->
 
+				<div id="tab-analytics" style="display:none;">
+					<div class="settings-card">
+						<div class="d-flex align-items-start justify-content-between gap-3 flex-wrap mb-3">
+							<div>
+								<h5 class="mb-1"><i class="fas fa-chart-line me-2" style="color:#198754"></i>AI Analytics Brief</h5>
+								<p class="text-muted small mb-0">Summarizes PostHog usage into a short founder-ready report.</p>
+							</div>
+							<div class="d-flex gap-2">
+								<button type="button" class="btn btn-outline-primary btn-sm" onclick="loadAnalyticsBrief(7)"><i class="fas fa-calendar-week me-1"></i>7 days</button>
+								<button type="button" class="btn btn-outline-primary btn-sm" onclick="loadAnalyticsBrief(30)"><i class="fas fa-calendar-days me-1"></i>30 days</button>
+							</div>
+						</div>
+						<div id="analyticsBriefResult" class="alert alert-light border mb-0">
+							<div class="fw-semibold mb-1">Ready when you are.</div>
+							<div class="small text-muted">Run a brief after adding the PostHog personal API key as a Supabase secret.</div>
+						</div>
+					</div>
+				</div><!-- /tab-analytics -->
+
 				<div id="tab-account" style="display:none;">
 					<div class="settings-card">
 						<h5><i class="fas fa-user-circle me-2" style="color:#6f42c1"></i>Account</h5>
@@ -1034,6 +1054,87 @@ Sarah Jones, 905-555-5678"></textarea>
 		});
 		// === End QuickBooks ===
 
+		function escapeAnalyticsHtml(value) {
+			return String(value === undefined || value === null ? '' : value)
+				.replace(/&/g, '&amp;')
+				.replace(/</g, '&lt;')
+				.replace(/>/g, '&gt;')
+				.replace(/"/g, '&quot;')
+				.replace(/'/g, '&#39;');
+		}
+
+		function analyticsListHtml(items) {
+			if (!items || !items.length) return '<li class="text-muted">Nothing notable yet.</li>';
+			return items.map(function(item) { return '<li>' + escapeAnalyticsHtml(item) + '</li>'; }).join('');
+		}
+
+		function analyticsMetricCardsHtml(brief, metrics) {
+			var funnel = (brief && brief.funnel) || {};
+			var counts = (metrics && metrics.eventCounts) || {};
+			var cards = [
+				['Quotes started', funnel.started || 0],
+				['Quotes sent', funnel.sent || 0],
+				['Quotes signed', funnel.signed || 0],
+				['Send-through', (funnel.sent_from_started || 0) + '%'],
+				['Quick Add opens', counts.quick_add_room_opened || 0],
+				['Invoices created', counts.invoice_created || 0]
+			];
+			return '<div class="row g-2 mb-3">' + cards.map(function(card) {
+				return '<div class="col-sm-6 col-lg-4"><div class="border rounded p-2 bg-white h-100">' +
+					'<div class="small text-muted">' + escapeAnalyticsHtml(card[0]) + '</div>' +
+					'<div class="fs-5 fw-bold">' + escapeAnalyticsHtml(card[1]) + '</div>' +
+				'</div></div>';
+			}).join('') + '</div>';
+		}
+
+		function renderAnalyticsBrief(data) {
+			var resultEl = document.getElementById('analyticsBriefResult');
+			var brief = data.brief || {};
+			var metrics = data.metrics || {};
+			var generated = metrics.generated_at ? new Date(metrics.generated_at).toLocaleString() : '';
+			var topPages = (metrics.topPages || []).slice(0, 6).map(function(p) {
+				return '<span class="badge text-bg-light border me-1 mb-1">' + escapeAnalyticsHtml(p.page) + ': ' + escapeAnalyticsHtml(p.count) + '</span>';
+			}).join('');
+			resultEl.className = 'alert alert-light border mb-0';
+			resultEl.innerHTML =
+				'<div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-2">' +
+					'<div><div class="fw-bold">QuoteDr analytics brief</div><div class="small text-muted">Last ' + escapeAnalyticsHtml(metrics.days || '') + ' days' + (generated ? ' · ' + escapeAnalyticsHtml(generated) : '') + '</div></div>' +
+					'<span class="badge ' + (data.summary ? 'bg-success' : 'bg-secondary') + '">' + (data.summary ? 'AI summary' : 'Rule summary') + '</span>' +
+				'</div>' +
+				analyticsMetricCardsHtml(brief, metrics) +
+				(data.summary ? '<div class="p-3 bg-white border rounded mb-3" style="white-space:pre-wrap;">' + escapeAnalyticsHtml(data.summary) + '</div>' : '') +
+				'<div class="row g-3">' +
+					'<div class="col-md-4"><h6>Highlights</h6><ul class="small mb-0">' + analyticsListHtml(brief.highlights) + '</ul></div>' +
+					'<div class="col-md-4"><h6>Watchouts</h6><ul class="small mb-0">' + analyticsListHtml(brief.risks) + '</ul></div>' +
+					'<div class="col-md-4"><h6>Next moves</h6><ul class="small mb-0">' + analyticsListHtml(brief.recommendations) + '</ul></div>' +
+				'</div>' +
+				(topPages ? '<hr><div class="small text-muted mb-1">Top pages</div>' + topPages : '');
+		}
+
+		async function loadAnalyticsBrief(days) {
+			var resultEl = document.getElementById('analyticsBriefResult');
+			resultEl.className = 'alert alert-info mb-0';
+			resultEl.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Reading PostHog and writing the brief...';
+			try {
+				var headers = await getQBAuthHeader();
+				if (!headers) throw new Error('Please sign in again before loading analytics.');
+				var response = await fetch(SUPABASE_URL + '/functions/v1/analytics-brief', {
+					method: 'POST',
+					headers: headers,
+					body: JSON.stringify({ days: days || 7 })
+				});
+				var data = await response.json();
+				if (!response.ok || data.error) throw new Error(data.error || 'Could not load analytics brief');
+				renderAnalyticsBrief(data);
+				if (typeof qdCaptureEvent === 'function') qdCaptureEvent('analytics_brief_opened', { days: days || 7 });
+			} catch(e) {
+				resultEl.className = 'alert alert-warning mb-0';
+				resultEl.innerHTML = '<div class="fw-bold mb-1">Analytics brief is not ready yet.</div>' +
+					'<div class="small">' + escapeAnalyticsHtml(e.message || e) + '</div>' +
+					'<div class="small text-muted mt-2">Make sure the Supabase function is deployed and the <code>POSTHOG_PERSONAL_API_KEY</code> secret is set.</div>';
+			}
+		}
+
 		function showTab(name, el) {
 			document.querySelectorAll('[id^="tab-"]').forEach(function(t) { t.style.display = 'none'; });
 			var tab = document.getElementById('tab-' + name);
@@ -1051,6 +1152,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			{ tab: 'notifications', keywords: ['email','reminder','followup','follow-up','notification','auto','automatic','days','message'], label: 'Notifications & Reminders' },
 			{ tab: 'feedback', keywords: ['bug','report','feature','request','feedback','idea','problem','issue','broken'], label: 'Feedback & Bug Reports' },
 			{ tab: 'payments', keywords: ['payment','stripe','deposit','credit card','pay','invoice payment','checkout'], label: 'Payments' },
+			{ tab: 'analytics', keywords: ['analytics','posthog','brief','report','summary','funnel','conversion','session','rage click','users'], label: 'AI Analytics Brief' },
 			{ tab: 'account', keywords: ['account','subscription','billing','plan','upgrade','pro'], label: 'Account' },
 		];
 
