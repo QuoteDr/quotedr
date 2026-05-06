@@ -545,7 +545,7 @@
                                 <div class="d-flex justify-content-between align-items-center gap-2">
                                     <small class="text-info fw-bold"><i class="fas fa-align-left"></i> Item Description (shown to clients on interactive quote)</small>
                                     <div class="d-flex align-items-center gap-1">
-                                        <button type="button" class="btn btn-sm btn-outline-secondary undo-refine-desc-btn" onclick="undoRefinedDescription(this)" title="Undo AI refined description" style="display:none;font-size:0.75rem;padding:2px 7px;"><i class="fas fa-undo"></i></button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary undo-refine-desc-btn" onclick="toggleRefinedDescription(this)" title="Undo AI refined description" style="display:none;font-size:0.75rem;padding:2px 7px;"><i class="fas fa-undo"></i></button>
                                         <button type="button" class="btn btn-sm btn-outline-primary refine-desc-btn" style="font-size:0.75rem;padding:2px 8px;">AI Refine</button>
                                     </div>
                                 </div>
@@ -677,6 +677,10 @@
                         const undoBtn = btnEl.parentElement ? btnEl.parentElement.querySelector('.undo-refine-desc-btn') : null;
                         if (undoBtn) {
                             undoBtn._previousDescription = currentText;
+                            undoBtn._refinedDescription = refinedText;
+                            undoBtn._showingRefined = true;
+                            undoBtn.innerHTML = '<i class="fas fa-undo"></i>';
+                            undoBtn.title = 'Undo AI refined description';
                             undoBtn.style.display = '';
                         }
                     }
@@ -698,16 +702,24 @@
             }
         }
 
-        function undoRefinedDescription(btnEl) {
-            if (!btnEl || typeof btnEl._previousDescription !== 'string') return;
+        function toggleRefinedDescription(btnEl) {
+            if (!btnEl || typeof btnEl._previousDescription !== 'string' || typeof btnEl._refinedDescription !== 'string') return;
             const descRow = btnEl.closest('tr');
             const textarea = descRow ? descRow.querySelector('.item-description-textarea') : null;
             if (!textarea) return;
-            textarea.value = btnEl._previousDescription;
+            if (btnEl._showingRefined) {
+                textarea.value = btnEl._previousDescription;
+                btnEl._showingRefined = false;
+                btnEl.innerHTML = '<i class="fas fa-redo"></i>';
+                btnEl.title = 'Redo AI refined description';
+            } else {
+                textarea.value = btnEl._refinedDescription;
+                btnEl._showingRefined = true;
+                btnEl.innerHTML = '<i class="fas fa-undo"></i>';
+                btnEl.title = 'Undo AI refined description';
+            }
             textarea.dispatchEvent(new Event('input', { bubbles: true }));
             markPricingDirty();
-            btnEl._previousDescription = null;
-            btnEl.style.display = 'none';
         }
 
         async function deleteCustomItem(category, name) {
@@ -756,6 +768,6 @@
         window.saveItemFieldEdit = saveItemFieldEdit;
         window.addCustomItem = addCustomItem;
         window.refineDescription = refineDescription;
-        window.undoRefinedDescription = undoRefinedDescription;
+        window.toggleRefinedDescription = toggleRefinedDescription;
         window.deleteCustomItem = deleteCustomItem;
 })();
