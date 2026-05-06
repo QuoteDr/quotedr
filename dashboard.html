@@ -579,9 +579,11 @@
             // Pre-populate with loading state
             var nameEl = document.getElementById('portalClientName');
             var urlEl = document.getElementById('portalUrlDisplay');
+            var adminUrlEl = document.getElementById('portalAdminUrlDisplay');
             var pinEl = document.getElementById('portalPinDisplay');
             if (nameEl) nameEl.textContent = clientName;
             if (urlEl) urlEl.value = 'Loading...';
+            if (adminUrlEl) adminUrlEl.value = 'Loading...';
             if (pinEl) pinEl.textContent = '...';
             window._currentPortalClient = clientName;
             window._currentPortalQuoteId = quoteId || '';
@@ -666,12 +668,17 @@
                 portalParams.push('contractor=' + encodeURIComponent(userId));
                 if (quoteId) portalParams.push('quote=' + encodeURIComponent(quoteId));
                 var url = 'https://quotedr.io/client-portal.html?' + portalParams.join('&');
+                var adminUrl = url + '&admin=1';
                 document.getElementById('portalUrlDisplay').value = url;
+                adminUrlEl = document.getElementById('portalAdminUrlDisplay');
+                if (adminUrlEl) adminUrlEl.value = adminUrl;
                 document.getElementById('portalPinDisplay').textContent = pin;
 
             } catch(err) {
                 console.error('shareClientPortal error:', err);
                 document.getElementById('portalUrlDisplay').value = 'Error loading — try again';
+                var adminUrlErrorEl = document.getElementById('portalAdminUrlDisplay');
+                if (adminUrlErrorEl) adminUrlErrorEl.value = 'Error loading — try again';
                 document.getElementById('portalPinDisplay').textContent = '----';
             }
         }
@@ -681,6 +688,18 @@
             navigator.clipboard.writeText(url).catch(function(){});
             var btn = event.target.closest('button');
             if (btn) { var orig = btn.innerHTML; btn.innerHTML = '<i class="fas fa-check"></i>'; setTimeout(function(){ btn.innerHTML = orig; }, 1500); }
+        }
+
+        function copyPortalAdminUrl() {
+            var url = document.getElementById('portalAdminUrlDisplay').value;
+            navigator.clipboard.writeText(url).catch(function(){});
+            var btn = event.target.closest('button');
+            if (btn) { var orig = btn.innerHTML; btn.innerHTML = '<i class="fas fa-check"></i>'; setTimeout(function(){ btn.innerHTML = orig; }, 1500); }
+        }
+
+        function openPortalAdminUrl() {
+            var url = document.getElementById('portalAdminUrlDisplay').value;
+            if (url) window.open(url, '_blank');
         }
 
         function copyPortalBoth() {
@@ -1860,6 +1879,14 @@ function renderBusinessInsights(quotes) {
         <div class="input-group mb-3">
           <input type="text" class="form-control form-control-sm" id="portalUrlDisplay" readonly>
           <button class="btn btn-outline-secondary btn-sm" onclick="copyPortalUrl()"><i class="fas fa-copy"></i></button>
+        </div>
+        <div class="text-start mb-3">
+          <label class="form-label text-muted small mb-1">Admin preview link (for you only):</label>
+          <div class="input-group">
+            <input type="text" class="form-control form-control-sm" id="portalAdminUrlDisplay" readonly>
+            <button class="btn btn-outline-secondary btn-sm" onclick="copyPortalAdminUrl()"><i class="fas fa-copy"></i></button>
+            <button class="btn btn-outline-primary btn-sm" onclick="openPortalAdminUrl()"><i class="fas fa-arrow-up-right-from-square"></i></button>
+          </div>
         </div>
         <div class="mb-3">
           <div class="text-muted small mb-1">Client PIN (they need this to log in):</div>
