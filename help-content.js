@@ -433,6 +433,20 @@
             ],
             helpUrl: 'help.html#pricing-database'
         },
+        supplierUrl: {
+            title: 'Supplier URL',
+            summary: 'Supplier URL is an optional link to the product or supplier page you used when setting the material price, kept for your records.',
+            steps: [
+                'Paste the page where you found the material price.',
+                'Use it later to confirm pricing before ordering or updating your item database.',
+                'Keep the Material Cost field updated when supplier pricing changes.'
+            ],
+            tips: [
+                'This link is for your internal records and helps you remember where the material cost came from.',
+                'Quote Dr. is working on supplier collaborations so this information can auto-update in the future.'
+            ],
+            helpUrl: 'help.html#pricing-database'
+        },
         markup: {
             title: 'Markup',
             summary: 'Markup adds a percentage on top of a room total. It is usually hidden from the client and rolled into the displayed prices.',
@@ -553,6 +567,7 @@
     const INLINE_TUTORIALS = {
         quoteNumber: 'quote-builder-overview',
         materialCost: 'line-items-pricing',
+        supplierUrl: 'line-items-pricing',
         markup: 'line-items-pricing',
         pricingDetail: 'send-client-quote',
         depositDisplay: 'invoice-payments',
