@@ -151,24 +151,68 @@
             }
         }
 
-        function buildEstimatorPricingItems() {
-            var items = [];
-            var source = getEstimatorCustomItems();
-            Object.keys(source).sort().forEach(function(cat) {
+        function getEstimatorLocalStorageItems() {
+            try {
+                var parsed = JSON.parse(localStorage.getItem('ald_custom_items') || '{}');
+                return parsed && typeof parsed === 'object' ? parsed : {};
+            } catch(e) {
+                return {};
+            }
+        }
+
+        function getEstimatorPricingDatabaseItems() {
+            try {
+                return (typeof pricingDatabase !== 'undefined' && pricingDatabase && typeof pricingDatabase === 'object') ? pricingDatabase : {};
+            } catch(e) {
+                return {};
+            }
+        }
+
+        function addEstimatorPricingItem(items, seen, category, item, sourceLabel) {
+            var rate = parseFloat(item && item.rate) || 0;
+            if (rate <= 0) return;
+            var name = item.name || item.description || 'Saved item';
+            var unitType = item.unitType || item.unit || '';
+            var key = String(category || '') + '::' + String(name || '') + '::' + String(unitType || '') + '::' + String(rate);
+            if (seen[key]) return;
+            seen[key] = true;
+            items.push({
+                id: (sourceLabel || category || 'Item') + '::' + category + '::' + name,
+                category: sourceLabel || category || 'Saved Items',
+                itemCategory: category || '',
+                name: name,
+                rate: rate,
+                unitType: unitType
+            });
+        }
+
+        function collectEstimatorItemsFromMap(items, seen, source, sourceLabel) {
+            Object.keys(source || {}).sort().forEach(function(cat) {
                 var catItems = Array.isArray(source[cat]) ? source[cat] : [];
                 catItems.forEach(function(item) {
-                    var rate = parseFloat(item && item.rate) || 0;
-                    if (rate <= 0) return;
-                    var name = item.name || item.description || 'Saved item';
-                    items.push({
-                        id: cat + '::' + name,
-                        category: cat,
-                        name: name,
-                        rate: rate,
-                        unitType: item.unitType || item.unit || ''
-                    });
+                    addEstimatorPricingItem(items, seen, cat, item, sourceLabel || cat);
                 });
             });
+        }
+
+        function collectEstimatorItemsFromCurrentQuote(items, seen) {
+            try {
+                if (!Array.isArray(rooms)) return;
+                rooms.forEach(function(room) {
+                    (room.items || []).forEach(function(item) {
+                        addEstimatorPricingItem(items, seen, item.category || 'Quote Items', item, 'Current Quote');
+                    });
+                });
+            } catch(e) {}
+        }
+
+        function buildEstimatorPricingItems() {
+            var items = [];
+            var seen = {};
+            collectEstimatorItemsFromMap(items, seen, getEstimatorCustomItems());
+            collectEstimatorItemsFromMap(items, seen, getEstimatorLocalStorageItems());
+            collectEstimatorItemsFromMap(items, seen, getEstimatorPricingDatabaseItems());
+            collectEstimatorItemsFromCurrentQuote(items, seen);
             _estimatorPricingItems = items;
             return items;
         }

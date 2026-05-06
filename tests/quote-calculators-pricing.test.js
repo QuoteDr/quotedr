@@ -95,4 +95,18 @@ assert(html.includes('<optgroup label="Painting">'), 'pricing setup should group
 assert(html.includes('Ceiling Paint Labour'), 'pricing setup should list saved user items');
 assert(html.includes('oninput="filterEstimatorPricingItems'), 'search input should narrow the item dropdown');
 
+const roomFallback = createContext();
+roomFallback.context.customItems = {};
+roomFallback.context.rooms = [{
+  name: 'Kitchen',
+  items: [
+    { description: 'Filler piece', category: 'Millwork & Cabinets', quantity: 4, unitType: 'each', rate: 56, total: 224 },
+    { description: 'Floor tile install', category: 'Tile', quantity: 120, unitType: 'sqft', rate: 12, total: 1440 }
+  ]
+}];
+roomFallback.context.openEstimatorPricing({ preventDefault() {}, stopPropagation() {} });
+const fallbackHtml = roomFallback.elements.estPricingRows.innerHTML;
+assert(fallbackHtml.includes('Filler piece'), 'pricing setup should include priced items from the current quote when saved items are unavailable');
+assert(fallbackHtml.includes('<optgroup label="Current Quote">'), 'current quote fallback items should be grouped separately');
+
 console.log('quote-calculators pricing setup test passed');
