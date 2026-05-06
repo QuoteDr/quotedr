@@ -1592,7 +1592,7 @@ Example:
                             <input type="number" id="newItemMaterialCost" class="form-control" step="0.01" min="0" placeholder="0.00">
                         </div>
                         <div class="col-md-7">
-                            <label class="form-label"><strong>Supplier URL</strong> <span class="text-muted small">(optional - paste product link)</span><button type="button" class="qd-inline-help-btn" title="Help with supplier URLs" aria-label="Help with supplier URLs" onclick="QuoteDrModalHelp.openInline('supplierUrl'); return false;"><i class="fas fa-question"></i></button></label>
+                            <label class="form-label"><strong>Supplier URL</strong> <span class="text-muted small">(optional - paste product link)</span><button type="button" class="qd-inline-help-btn" title="Help with supplier URLs" aria-label="Help with supplier URLs" onclick="if(window.QuoteDrModalHelp){QuoteDrModalHelp.openInline('supplierUrl');} return false;"><i class="fas fa-question"></i></button></label>
                             <input type="url" id="newItemSupplierUrl" class="form-control" placeholder="https://www.homedepot.ca/...">
                         </div>
                         <div class="col-md-2">
@@ -1603,7 +1603,7 @@ Example:
                     </div>
                     <hr>
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h6 class="fw-bold mb-0"><i class="fas fa-list-alt text-secondary"></i> All Items - edit fields, then hit ?? to save each row</h6>
+                        <h6 class="fw-bold mb-0"><i class="fas fa-list-alt text-secondary"></i> All Items - edit fields, then hit Save All to save each row</h6>
                         <div class="d-flex align-items-center gap-2">
                             <span id="pricingUnsavedIndicator" class="badge bg-warning text-dark" style="display:none;">?? Unsaved changes</span>
                             <button onclick="saveAllPricingRows()" class="btn btn-sm btn-success"><i class="fas fa-save"></i> Save All</button>
@@ -5718,7 +5718,7 @@ Example:
 
         // Manage Items behavior lives in quote-items.js.
     </script>
-    <script src="quote-items.js?v=1777660403"></script>
+    <script src="quote-items.js?v=1778055200"></script>
     <script>
         // Load templates from localStorage on startup
         let templates = JSON.parse(localStorage.getItem('ald_quote_templates') || '{}');
@@ -7003,8 +7003,8 @@ Example:
 </div>
 
 <script src="quote-calculators.js?v=1778054900"></script>
-<script src="help-content.js?v=1777741200"></script>
-<script src="modal-help.js?v=1777741200"></script>
+<script src="help-content.js?v=1778055200"></script>
+<script src="modal-help.js?v=1778055200"></script>
 <script>
         function _toggleAiBtn() {
             var btn = document.getElementById('qdAiBtn');

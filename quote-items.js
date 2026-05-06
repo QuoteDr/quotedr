@@ -531,7 +531,7 @@
                     <i class="fas fa-palette me-1"></i>Style
                   </button>
                 </div>`;
-                html += '<table class="table table-sm table-bordered mb-2"><thead class="table-light"><tr><th>Name</th><th style="width:80px">Unit</th><th style="width:90px">Rate ($)</th><th style="width:100px">Mat. Cost ($)</th><th>Supplier URL</th><th style="width:110px"></th></tr></thead><tbody>';
+                html += '<table class="table table-sm table-bordered mb-2"><thead class="table-light"><tr><th>Name</th><th style="width:80px">Unit</th><th style="width:90px">Rate ($)</th><th style="width:100px">Mat. Cost ($)</th><th>Supplier URL <button type="button" class="qd-inline-help-btn" title="Help with supplier URLs" aria-label="Help with supplier URLs" onclick="if(window.QuoteDrModalHelp){QuoteDrModalHelp.openInline(&quot;supplierUrl&quot;);} return false;"><i class="fas fa-question"></i></button></th><th style="width:110px"></th></tr></thead><tbody>';
                 items.forEach(item => {
                     if (!item || !item.name) return; // skip malformed items
                     const safeId = (cat + '_' + item.name).replace(/[^a-z0-9]/gi,'_');
@@ -557,7 +557,12 @@
                         <td><input type="text" class="form-control form-control-sm item-input" value="${item.unitType}" oninput="markPricingDirty()"></td>
                         <td><input type="number" class="form-control form-control-sm item-input" value="${rate}" step="0.01" min="0" oninput="markPricingDirty()"></td>
                         <td><input type="number" class="form-control form-control-sm item-input" value="${matCost}" step="0.01" min="0" oninput="markPricingDirty()"></td>
-                        <td><input type="url" class="form-control form-control-sm item-input" value="${supplier}" placeholder="https://..." oninput="markPricingDirty()"></td>
+                        <td>
+                            <div class="input-group input-group-sm">
+                                <input type="url" class="form-control item-input" value="${supplier}" placeholder="https://..." oninput="markPricingDirty()">
+                                <button type="button" class="btn btn-outline-secondary" title="Help with supplier URLs" aria-label="Help with supplier URLs" onclick="if(window.QuoteDrModalHelp){QuoteDrModalHelp.openInline('supplierUrl');} return false;"><i class="fas fa-question"></i></button>
+                            </div>
+                        </td>
                         <td>
                             <div class="d-flex gap-1 flex-wrap">
                                 <button class="btn btn-sm btn-outline-secondary item-photo-btn" data-cat="${catE}" data-name="${nameE}" data-field="photo" title="Add photo" style="touch-action:manipulation;font-size:0.75em;"><i class="fas fa-camera"></i></button>
@@ -784,6 +789,8 @@
         window.closeManageItemsModal = closeManageItemsModal;
         window.pushUndoState = pushUndoState;
         window.undoManageItems = undoManageItems;
+        window.syncManageItemsUndoButtons = syncManageItemsUndoButtons;
+        window.toggleManageItemsTopBar = toggleManageItemsTopBar;
         window.markPricingDirty = markPricingDirty;
         window.clearPricingDirty = clearPricingDirty;
         window.saveItemRow = saveItemRow;
