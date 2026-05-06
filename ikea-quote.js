@@ -160,6 +160,9 @@
                 var allowed = await requireProFeature('ikea_quoter', 'IKEA Cabinet Quoter');
                 if (!allowed) return;
             }
+            if (typeof qdCaptureEvent === 'function') {
+                qdCaptureEvent('ikea_quoter_opened', { existing_room_count: Array.isArray(rooms) ? rooms.length : 0 });
+            }
             document.getElementById('ikeaOrderInput').value = '';
             document.getElementById('ikeaResults').style.display = 'none';
             document.getElementById('ikeaPdfStatus').style.display = 'none';
@@ -429,6 +432,9 @@
             if (typeof saveQuoteToSupabase === 'function') saveQuoteToSupabase();
             bootstrap.Modal.getInstance(document.getElementById('ikeaQuickQuoteModal')).hide();
             if (typeof completeProTrialFeature === 'function') completeProTrialFeature('ikea_quoter', 'IKEA Cabinet Quoter');
+            if (typeof qdCaptureEvent === 'function') {
+                qdCaptureEvent('ikea_quoter_added_to_quote', { item_count: added });
+            }
             var t2 = document.createElement('div');
             t2.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#198754;color:white;padding:10px 18px;border-radius:8px;z-index:9999;font-size:0.9rem;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
             t2.innerHTML = '<i class="fas fa-check me-2"></i>' + added + ' IKEA install items added!';

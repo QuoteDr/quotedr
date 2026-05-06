@@ -358,6 +358,9 @@
         }
 
         function openMaterialEstimator() {
+            if (typeof qdCaptureEvent === 'function') {
+                qdCaptureEvent('quick_add_room_opened', { existing_room_count: Array.isArray(rooms) ? rooms.length : 0 });
+            }
             applyCalculatorMeasurementLabels();
             // Reset to input state
             document.getElementById('estInputSection').style.display = 'block';
@@ -456,13 +459,23 @@
             document.getElementById('estSubtotal').textContent = subtotal > 0 ? '$' + subtotal.toFixed(2) : '-';
             document.getElementById('estInputSection').style.display = 'none';
             document.getElementById('estResultsSection').style.display = 'block';
+            if (typeof qdCaptureEvent === 'function') {
+                qdCaptureEvent('quick_add_room_calculated', {
+                    item_count: rows.filter(function(r) { return !r.hide; }).length,
+                    total_bucket: typeof qdAnalyticsBucketMoney === 'function' ? qdAnalyticsBucketMoney(subtotal) : undefined,
+                    has_pricing: hasPricing,
+                    doors: doors,
+                    windows: windows
+                });
+            }
         }
 
         async function addEstimateToQuote() {
             var roomId = document.getElementById('estTargetRoom').value;
             var roomName = document.getElementById('estResultRoomName').textContent;
+            var createdRoom = roomId === '__new__';
 
-            if (roomId === '__new__') {
+            if (createdRoom) {
                 // Create new room with the estimator room name
                 var newRoom = { id: Date.now(), name: roomName, items: [], notes: '', scopeNotes: '' };
                 rooms.push(newRoom);
@@ -497,6 +510,12 @@
             renderRooms();
             if (typeof saveQuoteToSupabase === 'function') saveQuoteToSupabase();
             bootstrap.Modal.getInstance(document.getElementById('materialEstimatorModal')).hide();
+            if (typeof qdCaptureEvent === 'function') {
+                qdCaptureEvent('quick_add_room_added', {
+                    item_count: added,
+                    target: createdRoom ? 'new_room' : 'existing_room'
+                });
+            }
             showToast(added + ' items added to ' + roomName, 'success');
         }
 

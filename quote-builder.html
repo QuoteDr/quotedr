@@ -713,7 +713,7 @@
 
 </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-v2.js?v1777137478"></script>
+    <script src="supabase-v2.js?v=1778059000"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <!-- Eruda mobile console (only loads with ?debug in URL) -->
 <script>
@@ -725,6 +725,7 @@ if (location.search.includes('debug')) {
 }
 </script>
 <script src="error-reporter.js"></script>
+    <script src="analytics.js?v=1778059000"></script>
 </head>
 <body>
     <div class="container-fluid py-4">
@@ -5454,6 +5455,12 @@ Example:
 
             // Save to Supabase in background (after modal is visible)
             saveInvoiceForViewer(invoiceState, savingNote, document.getElementById('openInvoiceBtn'));
+            if (typeof qdCaptureEvent === 'function') {
+                qdCaptureEvent('invoice_sent', {
+                    total_bucket: typeof qdAnalyticsBucketMoney === 'function' ? qdAnalyticsBucketMoney(invoiceData.grandTotal || 0) : undefined,
+                    room_count: Array.isArray(invoiceData.rooms) ? invoiceData.rooms.length : 0
+                });
+            }
             } catch(err) {
                 console.error('generateInvoiceLink error:', err);
                 qdAlert('Something went wrong generating the invoice. Please try again.');
@@ -5516,6 +5523,12 @@ Example:
                 var data = await res.json();
                 if (data.error) throw new Error(data.error);
                 resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>Invoice sent to ' + email + '!</span>';
+                if (typeof qdCaptureEvent === 'function') {
+                    qdCaptureEvent('invoice_sent', {
+                        method: 'email',
+                        total_bucket: typeof qdAnalyticsBucketMoney === 'function' ? qdAnalyticsBucketMoney(invoiceData.grandTotal || 0) : undefined
+                    });
+                }
                 if (msgEl) msgEl.value = '';
             } catch(e) {
                 resultEl.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>' + e.message + '</span>';
@@ -5575,6 +5588,13 @@ Example:
                 var data = await res.json();
                 if (data.error) throw new Error(data.error);
                 resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>Quote sent to ' + email + '!</span>';
+                if (typeof qdCaptureEvent === 'function') {
+                    qdCaptureEvent('quote_sent', {
+                        method: 'email',
+                        room_count: Array.isArray(qData.rooms) ? qData.rooms.length : 0,
+                        total_bucket: typeof qdAnalyticsBucketMoney === 'function' ? qdAnalyticsBucketMoney(qData.grandTotal || 0) : undefined
+                    });
+                }
                 emailEl.value = '';
                 if (msgEl) msgEl.value = '';
                 // Auto-fill client email for next time
@@ -5721,7 +5741,7 @@ Example:
 
         // Manage Items behavior lives in quote-items.js.
     </script>
-    <script src="quote-items.js?v=1778055900"></script>
+    <script src="quote-items.js?v=1778059000"></script>
     <script>
         // Load templates from localStorage on startup
         let templates = JSON.parse(localStorage.getItem('ald_quote_templates') || '{}');
@@ -6168,7 +6188,7 @@ Example:
 
     <script src="quote-clients.js?v=1777660402"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
-    <script src="ikea-quote.js?v=1777304471"></script>
+    <script src="ikea-quote.js?v=1778059000"></script>
     <script src="quote-style.js?v=1777923001"></script>
 
     <!-- Quote Style Modal -->
@@ -7005,7 +7025,7 @@ Example:
     </div>
 </div>
 
-<script src="quote-calculators.js?v=1778054900"></script>
+<script src="quote-calculators.js?v=1778059000"></script>
 <script src="help-content.js?v=1778055200"></script>
 <script src="modal-help.js?v=1778055200"></script>
 <script>

@@ -128,6 +128,7 @@
             .table-responsive { font-size: 0.88rem; }
         }
     </style>
+    <script src="analytics.js?v=1778059000"></script>
 </head>
 <body>
     <nav class="navbar navbar-light px-3 py-2" style="background:#f8fbff; border-bottom:1px solid #d7e2ef;">
@@ -308,7 +309,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script src="supabase-v2.js?v1777304470"></script>
+    <script src="supabase-v2.js?v=1778059000"></script>
     <script>
         const STORE_KEY = 'quotedr_project_tracker_v1';
         const CLOUD_KEY = 'home_depot_project_tracker_v1';
@@ -1200,6 +1201,12 @@
             saveTracker();
             renderAll();
             if (typeof completeProTrialFeature === 'function') completeProTrialFeature('job_tracker', 'Job Tracker');
+            if (typeof qdCaptureEvent === 'function') {
+                qdCaptureEvent('hd_import_completed', {
+                    transaction_count: tracker.transactions.length,
+                    project_count: tracker.projects.length
+                });
+            }
             alert('Project tracker saved.');
         }
 

@@ -26,6 +26,7 @@ async function checkAuthStatus() {
         console.error('Auth error:', error);
         return null;
     }
+    if (session?.user) qdIdentifyAnalyticsUser(session.user);
     return session?.user || null;
 }
 
@@ -45,6 +46,7 @@ async function signInWithEmail(email, password) {
     });
     if (error) throw error;
     currentUser = data.user;
+    qdIdentifyAnalyticsUser(currentUser);
     return data;
 }
 
@@ -56,6 +58,7 @@ async function signUpWithEmail(email, password) {
     });
     if (error) throw error;
     currentUser = data.user;
+    qdIdentifyAnalyticsUser(currentUser);
     return data;
 }
 
@@ -64,6 +67,7 @@ async function signOut() {
     const { error } = await _supabase.auth.signOut();
     if (error) console.error('Sign out error:', error);
     currentUser = null;
+    if (window.QuoteDrAnalytics && typeof window.QuoteDrAnalytics.reset === 'function') window.QuoteDrAnalytics.reset();
     window.location.href = 'login.html';
 }
 
@@ -376,6 +380,21 @@ async function saveQuote(quoteData) {
         console.error('Quote save error:', error);
         return { error };
     }
+    var savedQuote = Array.isArray(data) ? data[0] : data;
+    var quoteKey = (savedQuote && savedQuote.id) || quoteData.supabaseId || quoteData.quoteNumber || now;
+    var roomCount = Array.isArray(quoteData.rooms) ? quoteData.rooms.length : 0;
+    var itemCount = Array.isArray(quoteData.rooms) ? quoteData.rooms.reduce(function(sum, room) { return sum + ((room.items || []).length); }, 0) : 0;
+    var quoteProps = {
+        quote_id: savedQuote && savedQuote.id,
+        status: quoteData.status || 'draft',
+        room_count: roomCount,
+        item_count: itemCount,
+        total_bucket: qdAnalyticsBucketMoney(quoteData.grandTotal || 0)
+    };
+    if (!quoteData.supabaseId) qdCaptureOnce('quote_started', quoteKey, quoteProps);
+    if (roomCount > 0 && itemCount > 0 && (parseFloat(quoteData.grandTotal) || 0) > 0) {
+        qdCaptureOnce('quote_completed', quoteKey, quoteProps);
+    }
     return { data };
 }
 
@@ -428,6 +447,13 @@ async function saveInvoiceForSharing(invoiceData) {
         }
     }
     if (error) console.error('saveInvoiceForSharing error:', error);
+    if (!error && data) {
+        qdCaptureOnce('invoice_created', data.id || invoiceData.supabaseId || invoiceData.id || now, {
+            invoice_id: data.id,
+            total_bucket: qdAnalyticsBucketMoney(invoiceData.grandTotal || 0),
+            room_count: Array.isArray(invoiceData.rooms) ? invoiceData.rooms.length : 0
+        });
+    }
     return { data, error };
 }
 
@@ -801,10 +827,47 @@ function qdProPricingUrl(featureKey) {
 
 function qdCaptureEvent(name, props) {
     try {
+        if (window.QuoteDrAnalytics && typeof window.QuoteDrAnalytics.capture === 'function') {
+            window.QuoteDrAnalytics.capture(name, props || {});
+            return;
+        }
         if (window.posthog && typeof window.posthog.capture === 'function') {
             window.posthog.capture(name, props || {});
         }
     } catch(e) {}
+}
+
+function qdCaptureOnce(name, key, props) {
+    try {
+        if (window.QuoteDrAnalytics && typeof window.QuoteDrAnalytics.captureOnce === 'function') {
+            window.QuoteDrAnalytics.captureOnce(name, key, props || {});
+            return;
+        }
+    } catch(e) {}
+    qdCaptureEvent(name, props);
+}
+
+function qdIdentifyAnalyticsUser(user) {
+    try {
+        if (window.QuoteDrAnalytics && typeof window.QuoteDrAnalytics.identifyUser === 'function') {
+            window.QuoteDrAnalytics.identifyUser(user);
+        }
+    } catch(e) {}
+}
+
+function qdAnalyticsBucketMoney(value) {
+    try {
+        if (window.QuoteDrAnalytics && typeof window.QuoteDrAnalytics.bucketMoney === 'function') {
+            return window.QuoteDrAnalytics.bucketMoney(value);
+        }
+    } catch(e) {}
+    var amount = parseFloat(value) || 0;
+    if (amount <= 0) return '0';
+    if (amount < 500) return '<500';
+    if (amount < 2500) return '500-2499';
+    if (amount < 10000) return '2500-9999';
+    if (amount < 25000) return '10000-24999';
+    return '25000+';
 }
 
 function showProTrialModal(featureKey, featureLabel) {

@@ -175,6 +175,9 @@
         }
 
         function openManageItemsModal() {
+            if (typeof qdCaptureEvent === 'function') {
+                qdCaptureEvent('manage_items_opened', { source: 'quote_builder' });
+            }
             // Always re-inject customItems into pricingDatabase before rendering
             if (typeof customItems === 'object' && typeof _injectItemsIntoPricingDB === 'function') {
                 _injectItemsIntoPricingDB(customItems);

@@ -658,6 +658,7 @@ if (location.search.includes('debug')) {
     document.head.appendChild(s);
 }
 </script>
+    <script src="analytics.js?v=1778059000"></script>
 </head>
 <body>
     <div class="proposal-shell">
@@ -939,7 +940,7 @@ if (location.search.includes('debug')) {
             );
         } catch(e) { console.warn('Supabase init failed:', e); }
     </script>
-    <script src="supabase-v2.js?v1777137478"></script>
+    <script src="supabase-v2.js?v=1778059000"></script>
 
     <script>
         let quoteData = {};
@@ -1904,6 +1905,13 @@ if (location.search.includes('debug')) {
                 };
 
                 await _supabase.from('quotes').update(updateData).eq('id', quoteId);
+                if (typeof qdCaptureEvent === 'function') {
+                    qdCaptureEvent('quote_signed', {
+                        quote_id: quoteId,
+                        had_client_changes: _hasUpgrades || _hasRemovals,
+                        room_count: Array.isArray(updatedRooms) ? updatedRooms.length : 0
+                    });
+                }
             }
 
             document.getElementById('approveSection').style.display = 'none';
