@@ -367,6 +367,10 @@
                 var changeOrders = (allQuotes || []).filter(function(row) { return window.QuoteDrChangeOrders && QuoteDrChangeOrders.parentQuoteId(row) === q.id; });
                 var pendingCos = changeOrders.filter(function(row) { return row.status === 'pending_approval'; }).length;
                 var portalVisible = !!(q.data && q.data.portal_visible);
+                var payments = q.data && Array.isArray(q.data.payments) ? q.data.payments : [];
+                var depositPaid = !!(q.data && (q.data.deposit_paid === true || q.data.paymentStatus === 'partially_paid' || q.data.paymentStatus === 'paid' || payments.some(function(payment) { return ['deposit', 'invoice_deposit'].includes(payment.type) && payment.paid_at; })));
+                var depositPayment = payments.slice().reverse().find(function(payment) { return ['deposit', 'invoice_deposit'].includes(payment.type) && payment.paid_at; });
+                var depositAmount = depositPayment && depositPayment.amount_cents ? '$' + (depositPayment.amount_cents / 100).toFixed(2) : 'Deposit';
                 return `
                 <div class="quote-card">
                     <div class="d-flex justify-content-between align-items-start">
@@ -405,6 +409,7 @@
                         </div>
                     </div>
                     ${status === 'accepted' && q.data && q.data.client_upgraded ? `<div class="alert alert-warning py-1 px-2 mt-2 mb-0 small"><i class="fas fa-bolt me-1"></i><strong>Client made upgrades</strong> when signing - <a href="interactive-quote-viewer.html?id=${encodeURIComponent(q.id)}" class="alert-link">review quote</a></div>` : ''}
+                    ${depositPaid ? `<div class="alert alert-success py-1 px-2 mt-2 mb-0 small"><i class="fas fa-credit-card me-1"></i><strong>${escapeHtml(depositAmount)} paid</strong>${depositPayment && depositPayment.paid_at ? ' on ' + escapeHtml(formatDate(depositPayment.paid_at)) : ''}</div>` : ''}
                     ${pendingCos ? `<div class="alert alert-info py-1 px-2 mt-2 mb-0 small"><i class="fas fa-file-circle-plus me-1"></i><strong>${pendingCos} pending change order${pendingCos === 1 ? '' : 's'}</strong></div>` : ''}
                     ${status === 'in_review' ? `<button class="btn btn-warning btn-sm w-100 mt-2" onclick="openNotesReview(${jsAttr(q.id)}, ${jsAttr(clientName)})"><i class="fas fa-comments me-1"></i> Review Client Notes</button>` : ''}
                     ${(!isChangeOrder && (status === 'accepted' || status === 'invoiced')) ? `<button class="btn btn-warning btn-sm w-100 mt-1" onclick="openQuoteForChangeOrder(${jsAttr(q.id)})"><i class="fas fa-file-circle-plus me-1"></i>Create Change Order</button>` : ''}

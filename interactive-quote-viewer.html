@@ -1056,17 +1056,50 @@ if (location.search.includes('debug')) {
             applyCommitmentBanner();
             displayTerms();
             updateTotal();
+            applyQuoteCompletionState();
             showPaymentReturnNotice();
             setupMobileJumpVisibility();
         });
 
-        function showPaymentReturnNotice() {
+        async function showPaymentReturnNotice() {
             var params = new URLSearchParams(window.location.search);
             if (params.get('payment') !== 'success') return;
             var section = document.getElementById('stripeDepositSection');
             if (!section) return;
             section.style.display = 'block';
-            section.innerHTML = '<div class="alert alert-success mb-0"><i class="fas fa-check-circle me-1"></i>Payment received. Your contractor has been notified.</div>';
+            section.innerHTML = '<div class="alert alert-success mb-0"><i class="fas fa-spinner fa-spin me-1"></i>Confirming payment...</div>';
+            await syncCheckoutPaymentReturn(params);
+            section.innerHTML = '<div class="alert alert-success mb-0"><i class="fas fa-check-circle me-1"></i>Deposit received. Your contractor has been notified.</div>';
+            applyQuoteCompletionState();
+        }
+
+        async function syncCheckoutPaymentReturn(params) {
+            var sessionId = params.get('session_id');
+            var quoteId = params.get('id');
+            if (!sessionId || !quoteId) return;
+            try {
+                var resp = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/stripe-deposit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'verify_checkout', sessionId: sessionId, quoteId: quoteId })
+                });
+                var result = await resp.json();
+                if (!resp.ok || !result.paid) return;
+                quoteData.paymentStatus = result.paymentType === 'invoice_full' ? 'paid' : 'partially_paid';
+                quoteData.deposit_paid = result.paymentType === 'deposit' ? true : quoteData.deposit_paid;
+                quoteData.deposit_paid_at = quoteData.deposit_paid_at || new Date().toISOString();
+                quoteData.payments = Array.isArray(quoteData.payments) ? quoteData.payments : [];
+                if (!quoteData.payments.some(function(payment) { return payment.stripe_checkout_session_id === sessionId; })) {
+                    quoteData.payments.push({
+                        type: result.paymentType || 'deposit',
+                        amount_cents: result.amountCents || 0,
+                        stripe_checkout_session_id: sessionId,
+                        paid_at: new Date().toISOString()
+                    });
+                }
+            } catch (error) {
+                console.warn('Could not sync payment return:', error);
+            }
         }
 
         async function loadQuoteFromURL() {
@@ -1098,15 +1131,42 @@ if (location.search.includes('debug')) {
                     // Init payment section after quote loads
                     var contractorId = result.data.user_id;
                     var quoteTotal = quoteData.grandTotal || quoteData.total || 0;
+                    await reconcileQuotePaymentState(supabaseId);
                     if (contractorId && quoteTotal && quoteData.style?.depositMode !== 'hide') initPaymentSection(contractorId, quoteTotal);
                     return;
                 } else {
                     qdAlert('Quote not found or could not be loaded. The link may be invalid.');
                     return;
                 }
-            }
+        }
 
-            // Legacy fallback: load from localStorage by ?quote= param
+        async function reconcileQuotePaymentState(quoteId) {
+            if (!quoteId) return;
+            try {
+                var resp = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/stripe-deposit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'reconcile_quote_payments', quoteId: quoteId })
+                });
+                var result = await resp.json();
+                if (!resp.ok || !result.paid) return;
+                quoteData.paymentStatus = result.paymentType === 'invoice_full' ? 'paid' : 'partially_paid';
+                quoteData.deposit_paid = result.paymentType === 'deposit' ? true : quoteData.deposit_paid;
+                quoteData.deposit_paid_at = quoteData.deposit_paid_at || new Date().toISOString();
+                quoteData.payments = Array.isArray(quoteData.payments) ? quoteData.payments : [];
+                if (result.amountCents && !quoteData.payments.some(function(payment) { return payment.type === result.paymentType && payment.amount_cents === result.amountCents; })) {
+                    quoteData.payments.push({
+                        type: result.paymentType || 'deposit',
+                        amount_cents: result.amountCents,
+                        paid_at: new Date().toISOString()
+                    });
+                }
+            } catch (error) {
+                console.warn('Could not reconcile quote payment state:', error);
+            }
+        }
+
+        // Legacy fallback: load from localStorage by ?quote= param
             let legacyQuoteId = params.get('quote');
             if (!legacyQuoteId) {
                 legacyQuoteId = localStorage.getItem('ald_last_preview_quote');
@@ -1768,7 +1828,53 @@ if (location.search.includes('debug')) {
             });
         }
 
+        function quoteIsAccepted() {
+            return ['accepted', 'approved', 'invoiced', 'paid'].includes(String(quoteData.status || quoteData.data?.status || '').toLowerCase())
+                || !!(quoteData.signature_url || quoteData.signed_at || quoteData.approved_at);
+        }
+
+        function quoteDepositIsPaid() {
+            var payments = Array.isArray(quoteData.payments) ? quoteData.payments : [];
+            return quoteData.deposit_paid === true
+                || ['partially_paid', 'paid'].includes(String(quoteData.paymentStatus || '').toLowerCase())
+                || payments.some(function(payment) { return ['deposit', 'invoice_deposit'].includes(payment.type) && payment.paid_at; });
+        }
+
+        function applyQuoteCompletionState() {
+            if (!quoteIsAccepted()) return;
+
+            var signedBy = quoteData.signed_by || quoteData.approved_by || quoteData.accepted_by || 'Client';
+            var signedAtRaw = quoteData.signed_at || quoteData.approved_at || quoteData.accepted_at;
+            var signedAt = signedAtRaw ? new Date(signedAtRaw).toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+            var sigPreview = document.getElementById('approvalSigPreview');
+            if (sigPreview && quoteData.signature_url) sigPreview.src = quoteData.signature_url;
+            var approvalMeta = document.getElementById('approvalMeta');
+            if (approvalMeta) approvalMeta.textContent = 'Signed by ' + signedBy + (signedAt ? ' on ' + signedAt : '');
+            var approvalBanner = document.getElementById('approvalBanner');
+            if (approvalBanner) approvalBanner.classList.add('visible');
+
+            var approveSection = document.getElementById('approveSection');
+            if (approveSection) {
+                approveSection.style.display = 'block';
+                approveSection.innerHTML = '<div class="alert alert-success mb-0"><i class="fas fa-check-circle me-1"></i>This quote has already been accepted and signed.</div>';
+            }
+            var stickyActions = document.getElementById('stickyClientActions');
+            if (stickyActions) stickyActions.style.display = 'none';
+
+            if (quoteDepositIsPaid()) {
+                var depSection = document.getElementById('stripeDepositSection');
+                if (depSection) {
+                    depSection.style.display = 'block';
+                    depSection.innerHTML = '<div class="alert alert-success mb-0"><i class="fas fa-check-circle me-1"></i>Deposit received. Your project is secured.</div>';
+                }
+            }
+        }
+
         function handleMainAction() {
+            if (quoteIsAccepted()) {
+                applyQuoteCompletionState();
+                return;
+            }
             openSignatureModal();
         }
 
@@ -1972,6 +2078,7 @@ if (location.search.includes('debug')) {
                 };
 
                 await _supabase.from('quotes').update(updateData).eq('id', quoteId);
+                quoteData = Object.assign({}, quoteData, updateData.data, { status: updateData.status });
                 if (typeof qdCaptureEvent === 'function') {
                     qdCaptureEvent('quote_signed', {
                         quote_id: quoteId,
@@ -2095,6 +2202,10 @@ if (location.search.includes('debug')) {
         async function initPaymentSection(contractorUserId, total) {
             _quoteTotal = total || 0;
             if (!contractorUserId || !total) return;
+            if (quoteDepositIsPaid()) {
+                applyQuoteCompletionState();
+                return;
+            }
             if (new URLSearchParams(window.location.search).get('payment') === 'success') {
                 showPaymentReturnNotice();
                 return;

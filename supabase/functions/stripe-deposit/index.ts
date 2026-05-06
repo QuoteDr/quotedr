@@ -18,12 +18,38 @@ function sanitizePaymentType(value: unknown) {
   return ["deposit", "invoice_full", "invoice_deposit"].includes(type) ? type : "deposit";
 }
 
+async function updateQuotePaymentState(supabase: any, quoteId: string, paymentType: string, amountCents: number, session: any) {
+  const { data: row } = await supabase.from("quotes").select("id,status,data").eq("id", quoteId).maybeSingle();
+  if (!row) return;
+  const paidAt = new Date().toISOString();
+  const existingData = row.data || {};
+  const payments = Array.isArray(existingData.payments) ? existingData.payments : [];
+  const alreadyRecorded = payments.some((payment: any) => payment.stripe_checkout_session_id === session.id);
+  const nextData = {
+    ...existingData,
+    paymentStatus: paymentType === "invoice_full" ? "paid" : "partially_paid",
+    deposit_paid: paymentType === "deposit" ? true : existingData.deposit_paid,
+    deposit_paid_at: paymentType === "deposit" ? (existingData.deposit_paid_at || paidAt) : existingData.deposit_paid_at,
+    lastPaymentAt: paidAt,
+    payments: alreadyRecorded ? payments : payments.concat([{
+      type: paymentType,
+      amount_cents: amountCents,
+      currency: session.currency || "cad",
+      stripe_checkout_session_id: session.id,
+      stripe_payment_intent_id: session.payment_intent || "",
+      paid_at: paidAt,
+    }]),
+  };
+  await supabase.from("quotes").update({ data: nextData, updated_at: paidAt }).eq("id", quoteId);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   try {
     const body = await req.json();
+    const action = String(body.action || "");
     const amount = Number(body.amount);
     const quoteId = body.quoteId || body.invoiceId || "";
     const paymentType = sanitizePaymentType(body.paymentType);
@@ -32,9 +58,6 @@ Deno.serve(async (req) => {
     const successUrl = String(body.successUrl || "https://quotedr.io");
     const cancelUrl = String(body.cancelUrl || "https://quotedr.io");
 
-    if (!amount || amount < 50) return json({ error: "Amount must be at least $0.50" }, 400);
-    if (!quoteId) return json({ error: "Missing quote or invoice id" }, 400);
-
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "https://axmoffknvblluibuitrq.supabase.co";
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -42,6 +65,102 @@ Deno.serve(async (req) => {
     if (!serviceKey) return json({ error: "Supabase service key not configured" }, 500);
 
     const supabase = createClient(supabaseUrl, serviceKey);
+
+    if (action === "verify_checkout") {
+      const sessionId = String(body.sessionId || "");
+      if (!sessionId || !sessionId.startsWith("cs_")) return json({ error: "Missing checkout session" }, 400);
+
+      const sessionResp = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`, {
+        headers: { "Authorization": `Bearer ${stripeKey}` },
+      });
+      if (!sessionResp.ok) return json({ error: "Could not verify Stripe session" }, 400);
+
+      const session = await sessionResp.json();
+      const verifiedPaymentType = sanitizePaymentType(session.metadata?.payment_type);
+      const verifiedQuoteId = String(session.metadata?.quote_id || quoteId || "");
+      const paymentRecordId = String(session.metadata?.payment_record_id || "");
+      const amountCents = Number(session.amount_total || 0);
+      const paid = session.payment_status === "paid" || session.payment_status === "no_payment_required";
+      if (!paid || !verifiedQuoteId) return json({ paid: false, status: session.payment_status || "unpaid" });
+
+      if (paymentRecordId) {
+        await supabase
+          .from("payment_records")
+          .update({
+            status: "paid",
+            amount_cents: amountCents || undefined,
+            stripe_checkout_session_id: session.id,
+            stripe_payment_intent_id: session.payment_intent || null,
+            stripe_customer_id: session.customer || null,
+            paid_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", paymentRecordId);
+      }
+
+      await updateQuotePaymentState(supabase, verifiedQuoteId, verifiedPaymentType, amountCents, session);
+      return json({ paid: true, quoteId: verifiedQuoteId, paymentType: verifiedPaymentType, amountCents });
+    }
+
+    if (action === "reconcile_quote_payments") {
+      if (!quoteId) return json({ error: "Missing quote or invoice id" }, 400);
+      const { data: records } = await supabase
+        .from("payment_records")
+        .select("*")
+        .or(`quote_id.eq.${quoteId},invoice_id.eq.${quoteId}`)
+        .order("created_at", { ascending: false });
+
+      let paidRecord: any = (records || []).find((record: any) => record.status === "paid");
+      if (!paidRecord) {
+        for (const record of records || []) {
+          if (!record.stripe_checkout_session_id) continue;
+          const sessionResp = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(record.stripe_checkout_session_id)}`, {
+            headers: { "Authorization": `Bearer ${stripeKey}` },
+          });
+          if (!sessionResp.ok) continue;
+          const session = await sessionResp.json();
+          const paid = session.payment_status === "paid" || session.payment_status === "no_payment_required";
+          if (!paid) continue;
+          paidRecord = {
+            ...record,
+            status: "paid",
+            amount_cents: Number(session.amount_total || record.amount_cents || 0),
+            stripe_payment_intent_id: session.payment_intent || record.stripe_payment_intent_id || null,
+            stripe_customer_id: session.customer || record.stripe_customer_id || null,
+            paid_at: record.paid_at || new Date().toISOString(),
+          };
+          await supabase
+            .from("payment_records")
+            .update({
+              status: "paid",
+              amount_cents: paidRecord.amount_cents,
+              stripe_payment_intent_id: paidRecord.stripe_payment_intent_id,
+              stripe_customer_id: paidRecord.stripe_customer_id,
+              paid_at: paidRecord.paid_at,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", record.id);
+          await updateQuotePaymentState(supabase, quoteId, sanitizePaymentType(record.payment_type), paidRecord.amount_cents, session);
+          break;
+        }
+      } else {
+        await updateQuotePaymentState(supabase, quoteId, sanitizePaymentType(paidRecord.payment_type), Number(paidRecord.amount_cents || 0), {
+          id: paidRecord.stripe_checkout_session_id || "",
+          currency: paidRecord.currency || "cad",
+          payment_intent: paidRecord.stripe_payment_intent_id || "",
+        });
+      }
+
+      return json({
+        paid: !!paidRecord,
+        paymentType: paidRecord ? sanitizePaymentType(paidRecord.payment_type) : null,
+        amountCents: paidRecord ? Number(paidRecord.amount_cents || 0) : 0,
+      });
+    }
+
+    if (!amount || amount < 50) return json({ error: "Amount must be at least $0.50" }, 400);
+    if (!quoteId) return json({ error: "Missing quote or invoice id" }, 400);
+
     const { data: quoteRow, error: quoteError } = await supabase
       .from("quotes")
       .select("id,user_id,quote_number,client_name,total,data")
