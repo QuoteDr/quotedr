@@ -12,3 +12,6 @@ verify_jwt = false
 
 [functions.stripe-webhook]
 verify_jwt = false
+
+[functions.pro-trial-followup]
+verify_jwt = false
