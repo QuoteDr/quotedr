@@ -340,7 +340,18 @@ async function saveQuote(quoteData) {
         quote_number: quoteData.quoteNumber || '',
         total: quoteData.grandTotal || 0,
         status: quoteData.status || 'draft',
+        type: quoteData.type || quoteData.documentType || 'quote',
+        parent_quote_id: quoteData.parentQuoteId || null,
+        change_order_number: quoteData.changeOrderNumber || null,
         data: {
+            type: quoteData.type || quoteData.documentType || 'quote',
+            documentType: quoteData.type || quoteData.documentType || 'quote',
+            parentQuoteId: quoteData.parentQuoteId || '',
+            parentQuoteNumber: quoteData.parentQuoteNumber || '',
+            parentQuoteTotal: quoteData.parentQuoteTotal || 0,
+            changeOrderNumber: quoteData.changeOrderNumber || null,
+            changeReason: quoteData.changeReason || '',
+            status: quoteData.status || 'draft',
             quoteTitle: quoteData.quoteTitle || '',
             clientName: quoteData.clientName || '',
             quoteNumber: quoteData.quoteNumber || '',
@@ -359,21 +370,30 @@ async function saveQuote(quoteData) {
     };
 
     let data, error;
+    async function runSave(savePayload) {
     if (quoteData.supabaseId) {
         // Update existing quote
-        ({ data, error } = await _supabase
+        return await _supabase
             .from('quotes')
-            .update(payload)
+            .update(savePayload)
             .eq('id', quoteData.supabaseId)
             .eq('user_id', user.id)
-            .select());
+            .select();
     } else {
         // Insert new quote
-        payload.created_at = new Date().toISOString();
-        ({ data, error } = await _supabase
+        savePayload.created_at = new Date().toISOString();
+        return await _supabase
             .from('quotes')
-            .insert(payload)
-            .select());
+            .insert(savePayload)
+            .select();
+    }
+    }
+    ({ data, error } = await runSave(payload));
+    if (error && /type|parent_quote_id|change_order_number|schema cache/i.test(error.message || '')) {
+        delete payload.type;
+        delete payload.parent_quote_id;
+        delete payload.change_order_number;
+        ({ data, error } = await runSave(payload));
     }
 
     if (error) {
@@ -512,20 +532,35 @@ var loadQuoteFromSupabase = function(quoteId) {
 async function saveQuoteForSharing(quoteData) {
     const user = await getCurrentUser();
     const now = new Date().toISOString();
-    const { data, error } = await _supabase
-        .from('quotes')
-        .upsert({
+    const payload = {
             id: quoteData.supabaseId || undefined,
             user_id: user ? user.id : null,
             client_name: quoteData.clientName || '',
             quote_number: quoteData.quoteNumber || '',
             total: quoteData.grandTotal || quoteData.total || 0,
             data: quoteData,
-            status: 'sent',
+            status: (quoteData.type === 'change_order' || quoteData.documentType === 'change_order') ? (quoteData.status === 'draft' ? 'pending_approval' : (quoteData.status || 'pending_approval')) : 'sent',
+            type: quoteData.type || quoteData.documentType || 'quote',
+            parent_quote_id: quoteData.parentQuoteId || null,
+            change_order_number: quoteData.changeOrderNumber || null,
             updated_at: now
-        }, { onConflict: 'id' })
+        };
+    var data, error;
+    ({ data, error } = await _supabase
+        .from('quotes')
+        .upsert(payload, { onConflict: 'id' })
         .select()
-        .single();
+        .single());
+    if (error && /type|parent_quote_id|change_order_number|schema cache/i.test(error.message || '')) {
+        delete payload.type;
+        delete payload.parent_quote_id;
+        delete payload.change_order_number;
+        ({ data, error } = await _supabase
+            .from('quotes')
+            .upsert(payload, { onConflict: 'id' })
+            .select()
+            .single());
+    }
     return { data, error };
 }
 

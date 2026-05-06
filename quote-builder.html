@@ -143,64 +143,17 @@
             gap: 0.55rem;
             margin-top: 0.85rem;
         }
+        .change-order-banner {
+            border: 1px solid #ffe08a;
+            border-left: 5px solid #f0ad4e;
+            background: #fff8e1;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+            display: none;
+        }
         .profit-positive { color: #198754; }
         .profit-negative { color: #dc3545; }
-        #manageItemsFooterBar {
-            flex: 0 0 38px;
-        }
-        #manageItemsFooterBar .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        }
-        @media (max-width: 768px) {
-            #manageItemsModal.manage-items-top-hidden #manageItemsFooterBar {
-                min-height: 34px !important;
-                max-height: 34px !important;
-                flex-basis: 34px;
-                padding: 3px 6px !important;
-            }
-            #manageItemsModal.manage-items-top-hidden #manageItemsFooterBar .btn {
-                width: 32px;
-                height: 28px;
-                padding: 0 !important;
-                line-height: 1 !important;
-            }
-            #manageItemsModal.manage-items-top-hidden #manageItemsFooterBar .mi-footer-label {
-                display: none;
-            }
-            #manageItemsModal.manage-items-top-hidden #manageItemsFooterBar .btn i {
-                margin-right: 0 !important;
-            }
-        }
-        @media (max-height: 500px) and (orientation: landscape) {
-            #manageItemsModal .modal-dialog {
-                height: 100dvh;
-                margin-top: 0 !important;
-                margin-bottom: 0 !important;
-            }
-            #manageItemsModal .modal-content {
-                height: 100dvh;
-                max-height: 100dvh;
-                display: flex;
-                flex-direction: column;
-            }
-            #manageItemsModal .modal-body {
-                flex: 1 1 auto;
-                min-height: 0;
-                max-height: none !important;
-                overflow-y: auto;
-                padding: 8px;
-            }
-            #manageItemsModal.manage-items-footer-hidden .modal-body {
-                padding-bottom: 4px;
-            }
-            #manageItemsModal #customItemsList {
-                flex: 1 1 auto;
-                min-height: 0;
-                max-height: none !important;
-            }
-        }
 
         /* Sticky toolbar */
         #stickyToolbar {
@@ -834,7 +787,8 @@ if (location.search.includes('debug')) {
                         </button>
                         <ul class="dropdown-menu w-100">
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openQuoteSendSettingsModal(true)"><i class="fas fa-sliders-h me-2 text-primary"></i>Quote Settings</a></li>
-                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="generateInteractiveLink()"><i class="fas fa-link me-2 text-success"></i>Generate Quote Link</a></li>
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="generateInteractiveLink()"><i class="fas fa-link me-2 text-success"></i><span id="quoteGenerateLinkLabel">Generate Quote Link</span></a></li>
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="createChangeOrderFromCurrentQuote()" id="createChangeOrderMenuItem" style="display:none;"><i class="fas fa-file-circle-plus me-2 text-warning"></i>Create Change Order</a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="previewInteractiveQuote()"><i class="fas fa-eye me-2 text-warning"></i>Preview Quote</a></li>
                         </ul>
                     </div>
@@ -887,6 +841,18 @@ if (location.search.includes('debug')) {
         <button onclick="saveQuote()" class="btn btn-sm btn-light ms-3" style="font-size:0.8rem; padding:2px 10px; font-weight:600;">
             <i class="fas fa-save me-1"></i>Save to File Now
         </button>
+    </div>
+    <div id="changeOrderBanner" class="change-order-banner">
+        <div class="d-flex flex-wrap justify-content-between gap-2 align-items-start">
+            <div>
+                <div class="fw-bold"><i class="fas fa-file-signature me-1"></i><span id="changeOrderBannerTitle">Change Order</span></div>
+                <div class="small text-muted" id="changeOrderBannerMeta"></div>
+            </div>
+            <span class="badge bg-warning text-dark" id="changeOrderStatusBadge">Draft</span>
+        </div>
+        <label for="changeOrderReason" class="form-label fw-semibold mt-2 mb-1">Reason / scope change</label>
+        <textarea id="changeOrderReason" class="form-control form-control-sm" rows="2" placeholder="Explain what changed, why it changed, and what this change order adds or credits." oninput="markUnsaved()"></textarea>
+        <div class="small text-muted mt-1">Only add the changed work here. Approved change orders stay linked to the original quote forever.</div>
     </div>
 
     <div id="builderGuideCard" class="builder-guide-card">
@@ -948,10 +914,12 @@ if (location.search.includes('debug')) {
                         <div class="d-flex align-items-center gap-3">
                             <label class="mb-0"><strong>Quote #:</strong><button type="button" class="qd-inline-help-btn" title="Help with quote numbers" aria-label="Help with quote numbers" onclick="QuoteDrModalHelp.openInline('quoteNumber'); return false;"><i class="fas fa-question"></i></button></label>
                             <input type="text" id="quoteNumber" class="form-control" style="max-width: 200px; font-weight: bold; font-size: 1.1rem;" placeholder="2026-001" id="quoteNumber" oninput="checkQuoteNumberDuplicate()">
-                            <select id="quoteStatus" class="form-select form-select-sm d-inline-block" style="width:auto; font-size:0.8rem;" onchange="markUnsaved()">
+                            <select id="quoteStatus" class="form-select form-select-sm d-inline-block" style="width:auto; font-size:0.8rem;" onchange="markUnsaved(); updateChangeOrderModeUI();">
                                 <option value="draft">Draft</option>
                                 <option value="sent">Sent</option>
                                 <option value="accepted">Accepted</option>
+                                <option value="pending_approval">Pending CO Approval</option>
+                                <option value="approved">CO Approved</option>
                                 <option value="declined">Declined</option>
                                 <option value="invoiced">Invoiced</option>
                             </select>
@@ -1687,13 +1655,12 @@ Example:
                 </div>
                 <div class="modal-footer justify-content-between flex-nowrap gap-2" id="manageItemsFooterBar" style="touch-action:none;padding:4px 8px;min-height:38px;max-height:38px;overflow:hidden;">
                     <div class="d-flex gap-2 flex-nowrap align-items-center">
-                        <button id="undoManageItemsFooterBtn" type="button" class="btn btn-sm btn-outline-secondary text-nowrap" onclick="undoManageItems()" disabled style="display:none;padding:2px 8px;line-height:1.2;" title="Undo last change"><i class="fas fa-undo me-1"></i><span class="mi-footer-label">Undo</span></button>
-                        <button id="showManageItemsTopBarBtn" type="button" class="btn btn-sm btn-outline-primary text-nowrap" onclick="toggleManageItemsTopBar(false)" style="display:none;padding:2px 8px;line-height:1.2;" title="Show the top bar again"><i class="fas fa-window-maximize me-1"></i><span class="mi-footer-label">Show</span></button>
+                        <button id="undoManageItemsFooterBtn" type="button" class="btn btn-sm btn-outline-secondary text-nowrap" onclick="undoManageItems()" disabled style="display:none;padding:2px 8px;line-height:1.2;" title="Undo last change"><i class="fas fa-undo me-1"></i>Undo</button>
+                        <button id="showManageItemsTopBarBtn" type="button" class="btn btn-sm btn-outline-primary text-nowrap" onclick="toggleManageItemsTopBar(false)" style="display:none;padding:2px 8px;line-height:1.2;" title="Show the top bar again"><i class="fas fa-window-maximize me-1"></i>Show</button>
                     </div>
                     <div class="d-flex gap-2 flex-nowrap align-items-center">
-                        <button type="button" class="btn btn-sm btn-success text-nowrap" onclick="saveAllPricingRows()" style="padding:2px 8px;line-height:1.2;" title="Save all changes"><i class="fas fa-save me-1"></i><span class="mi-footer-label">Save All</span></button>
-                        <button type="button" class="btn btn-sm btn-secondary text-nowrap" onclick="closeManageItemsModal()" style="padding:2px 8px;line-height:1.2;" title="Close"><i class="fas fa-times me-1"></i><span class="mi-footer-label">Close</span></button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary text-nowrap" onclick="toggleManageItemsBottomBar(true)" style="padding:2px 8px;line-height:1.2;" title="Hide bottom bar" aria-label="Hide bottom bar"><i class="fas fa-chevron-down me-1"></i><span class="mi-footer-label">Hide</span></button>
+                        <button type="button" class="btn btn-sm btn-success text-nowrap" onclick="saveAllPricingRows()" style="padding:2px 8px;line-height:1.2;"><i class="fas fa-save"></i> Save All</button>
+                        <button type="button" class="btn btn-sm btn-secondary text-nowrap" onclick="closeManageItemsModal()" style="padding:2px 8px;line-height:1.2;">Close</button>
                     </div>
                 </div>
                 <div id="manageItemsFooterPullTab" onclick="toggleManageItemsBottomBar(false)" title="Show bottom bar" aria-label="Show bottom bar" style="display:none;position:absolute;left:50%;bottom:0;transform:translateX(-50%);align-items:center;justify-content:center;width:86px;height:14px;cursor:pointer;touch-action:none;background:#f8f9fa;border:1px solid #dee2e6;border-bottom:0;border-radius:10px 10px 0 0;z-index:5;">
@@ -4542,6 +4509,7 @@ Example:
             container.innerHTML = html;
             calculateTotals();
             markUnsaved();
+            updateChangeOrderModeUI();
             initSortable();
         }
 
@@ -4760,6 +4728,17 @@ Example:
             }
             var invoiceId = 'invoice_' + Date.now();
             var invoiceData = buildInvoiceData(invoiceId);
+            if (window._supabaseQuoteId && window.QuoteDrChangeOrders && typeof _supabase !== 'undefined') {
+                try {
+                    var coRes = await _supabase.from('quotes').select('*').eq('parent_quote_id', window._supabaseQuoteId).order('change_order_number', { ascending: true });
+                    if (coRes.error) coRes = await _supabase.from('quotes').select('*').contains('data', { parentQuoteId: window._supabaseQuoteId });
+                    if (coRes.data && coRes.data.length) {
+                        invoiceData = QuoteDrChangeOrders.mergeApprovedIntoInvoice(invoiceData, coRes.data);
+                    }
+                } catch(e) {
+                    console.warn('Could not include approved change orders in invoice:', e);
+                }
+            }
             var invoiceBaseUrl = getInvoiceBaseUrl();
             var invoiceUrl = invoiceBaseUrl + '?invoice=' + invoiceId;
             localStorage.setItem(invoiceId, JSON.stringify(invoiceData));
@@ -5019,6 +4998,7 @@ Example:
             });
 
             renderRooms();
+            updateChangeOrderModeUI();
             qdAlert(`Loaded quote from ${new Date(quote.savedAt).toLocaleString()}!`);
         }
 
@@ -5681,9 +5661,97 @@ Example:
             });
         }
 
+        window._quoteDocumentType = window._quoteDocumentType || 'quote';
+        window._parentQuoteId = window._parentQuoteId || '';
+        window._parentQuoteNumber = window._parentQuoteNumber || '';
+        window._parentQuoteTotal = window._parentQuoteTotal || 0;
+        window._changeOrderNumber = window._changeOrderNumber || 0;
+
+        function updateChangeOrderModeUI() {
+            var isCo = window._quoteDocumentType === 'change_order';
+            var banner = document.getElementById('changeOrderBanner');
+            if (banner) banner.style.display = isCo ? 'block' : 'none';
+            var title = document.getElementById('changeOrderBannerTitle');
+            if (title) title.textContent = 'Change Order #' + (window._changeOrderNumber || '');
+            var meta = document.getElementById('changeOrderBannerMeta');
+            if (meta) {
+                meta.textContent = isCo
+                    ? 'Linked to Quote #' + (window._parentQuoteNumber || '') + ' | Original total: $' + (parseFloat(window._parentQuoteTotal || 0) || 0).toFixed(2)
+                    : '';
+            }
+            var badge = document.getElementById('changeOrderStatusBadge');
+            var status = document.getElementById('quoteStatus')?.value || 'draft';
+            if (badge) badge.textContent = status.replace(/_/g, ' ').replace(/\b\w/g, function(ch) { return ch.toUpperCase(); });
+            var linkLabel = document.getElementById('quoteGenerateLinkLabel');
+            if (linkLabel) linkLabel.textContent = isCo ? 'Send Change Order' : 'Generate Quote Link';
+            var coMenu = document.getElementById('createChangeOrderMenuItem');
+            if (coMenu) {
+                var baseStatus = document.getElementById('quoteStatus')?.value || '';
+                coMenu.style.display = (!isCo && window._supabaseQuoteId && ['accepted','invoiced','paid'].includes(baseStatus)) ? '' : 'none';
+            }
+        }
+
+        async function createChangeOrderFromCurrentQuote() {
+            if (!window._supabaseQuoteId) {
+                qdAlert('Save the original quote to the cloud before creating a change order.');
+                return;
+            }
+            var status = document.getElementById('quoteStatus')?.value || '';
+            if (!['accepted','invoiced','paid'].includes(status)) {
+                qdAlert('Change orders are available once the original quote is accepted or invoiced.');
+                return;
+            }
+            if (!await qdConfirm('Create a new change order linked to this quote? The original quote stays unchanged.', {
+                title: 'Create Change Order',
+                okText: 'Create',
+                okClass: 'btn-warning',
+                type: 'warning'
+            })) return;
+
+            var parentData = collectQuoteData();
+            var parentId = window._supabaseQuoteId;
+            var nextNumber = 1;
+            try {
+                var siblingRes = await _supabase.from('quotes').select('change_order_number,data').eq('parent_quote_id', parentId);
+                (siblingRes.data || []).forEach(function(row) {
+                    var n = parseInt(row.change_order_number || row.data?.changeOrderNumber || 0, 10);
+                    if (n >= nextNumber) nextNumber = n + 1;
+                });
+            } catch(e) {
+                console.warn('Could not inspect existing change orders:', e);
+            }
+
+            window._quoteDocumentType = 'change_order';
+            window._parentQuoteId = parentId;
+            window._parentQuoteNumber = parentData.quoteNumber || '';
+            window._parentQuoteTotal = parentData.grandTotal || 0;
+            window._changeOrderNumber = nextNumber;
+            window._supabaseQuoteId = null;
+            localStorage.removeItem('ald_active_quote_id');
+
+            if (document.getElementById('quoteNumber')) {
+                document.getElementById('quoteNumber').value = (parentData.quoteNumber || 'Quote') + '-CO' + nextNumber;
+            }
+            if (document.getElementById('quoteStatus')) document.getElementById('quoteStatus').value = 'draft';
+            if (document.getElementById('quoteTitle')) document.getElementById('quoteTitle').value = 'Change Order #' + nextNumber;
+            if (document.getElementById('changeOrderReason')) document.getElementById('changeOrderReason').value = '';
+            rooms = [];
+            roomCounter = 1;
+            rooms.push({ id: 1, name: 'Change Order #' + nextNumber, items: [], colorIndex: 2, scopeNotes: '' });
+            renderRooms();
+            updateChangeOrderModeUI();
+            markUnsaved();
+            if (typeof qdToast === 'function') {
+                qdToast({ title: 'Change Order Started', message: 'Add only the added work or credits, then send it for approval.', type: 'success' });
+            } else {
+                qdAlert('Change order started.');
+            }
+        }
+
         // Save/load/session core moved to quote-storage.js
     </script>
-    <script src="quote-storage.js?v=1777660405"></script>
+    <script src="change-orders.js?v=1778060200"></script>
+    <script src="quote-storage.js?v=1778060200"></script>
     <script>
         // -- End Save / Load ------------------------------------------------------
 
@@ -6246,7 +6314,7 @@ Example:
     <script src="quote-clients.js?v=1777660402"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
     <script src="ikea-quote.js?v=1778059000"></script>
-    <script src="quote-style.js?v=1777923001"></script>
+<script src="quote-style.js?v=1778060200"></script>
 
     <!-- Quote Style Modal -->
     <div class="modal fade" id="quoteStyleModal" tabindex="-1">

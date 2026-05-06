@@ -659,6 +659,13 @@
             }
 
             const quoteData = collectQuoteData();
+            if (quoteData.type === 'change_order') {
+                var reason = (quoteData.changeReason || '').trim();
+                if (!reason) throw new Error('Add a short reason/scope-change note before sending the change order.');
+                quoteData.status = 'pending_approval';
+                var statusEl = document.getElementById('quoteStatus');
+                if (statusEl) statusEl.value = 'pending_approval';
+            }
             quoteData.style = JSON.parse(JSON.stringify(_quoteStyle));
             if (window._supabaseQuoteId) quoteData.supabaseId = window._supabaseQuoteId;
 

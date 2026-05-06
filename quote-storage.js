@@ -14,9 +14,20 @@
 
         function collectQuoteData() {
             var grandTotal = parseFloat((document.getElementById('grandTotalDisplay')?.textContent || '0').replace(/[^0-9.]/g, '')) || 0;
+            var isChangeOrder = window._quoteDocumentType === 'change_order';
+            var statusEl = document.getElementById('quoteStatus');
+            var status = statusEl ? statusEl.value : (isChangeOrder ? 'draft' : 'draft');
             return {
                 version: 1,
                 savedAt: new Date().toISOString(),
+                type: window._quoteDocumentType || 'quote',
+                documentType: window._quoteDocumentType || 'quote',
+                parentQuoteId: window._parentQuoteId || '',
+                parentQuoteNumber: window._parentQuoteNumber || '',
+                parentQuoteTotal: parseFloat(window._parentQuoteTotal || 0) || 0,
+                changeOrderNumber: parseInt(window._changeOrderNumber || 0, 10) || null,
+                changeReason: document.getElementById('changeOrderReason')?.value || '',
+                status: status,
                 quoteTitle:     document.getElementById('quoteTitle')?.value     || '',
                 clientName:     document.getElementById('clientName')?.value     || '',
                 quoteNumber:    document.getElementById('quoteNumber')?.value    || '',
@@ -49,6 +60,8 @@
             initDone = false; // suppress markUnsaved during load
             if (document.getElementById('quoteTitle'))     document.getElementById('quoteTitle').value     = data.quoteTitle || '';
             if (document.getElementById('clientName'))     document.getElementById('clientName').value     = data.clientName || data.client_name || '';
+            if (document.getElementById('quoteNumber'))    document.getElementById('quoteNumber').value    = data.quoteNumber || data.quote_number || '';
+            if (document.getElementById('quoteStatus'))    document.getElementById('quoteStatus').value    = data.status || 'draft';
             if (document.getElementById('projectAddress')) document.getElementById('projectAddress').value = data.projectAddress || data.project_address || '';
             if (document.getElementById('clientPhone'))    document.getElementById('clientPhone').value    = data.clientPhone || data.phone || '';
             if (document.getElementById('clientEmail'))    document.getElementById('clientEmail').value    = data.clientEmail || data.email || '';
@@ -60,6 +73,15 @@
             }
             rooms = data.rooms || [];
             roomCounter = data.roomCounter || rooms.length;
+            window._quoteDocumentType = data.type || data.documentType || 'quote';
+            window._parentQuoteId = data.parentQuoteId || data.parent_quote_id || '';
+            window._parentQuoteNumber = data.parentQuoteNumber || '';
+            window._parentQuoteTotal = parseFloat(data.parentQuoteTotal || 0) || 0;
+            window._changeOrderNumber = parseInt(data.changeOrderNumber || data.change_order_number || 0, 10) || 0;
+            setTimeout(function() {
+                if (document.getElementById('changeOrderReason')) document.getElementById('changeOrderReason').value = data.changeReason || '';
+                if (typeof updateChangeOrderModeUI === 'function') updateChangeOrderModeUI();
+            }, 0);
             // Restore Supabase ID so autosave overwrites the correct record
             if (data.supabaseId) {
                 window._supabaseQuoteId = data.supabaseId;
@@ -127,6 +149,12 @@
             document.getElementById('quoteNumber').value = nextQuoteNumberValue();
             checkQuoteNumberDuplicate();
             currentQuoteId = null;
+            window._quoteDocumentType = 'quote';
+            window._parentQuoteId = '';
+            window._parentQuoteNumber = '';
+            window._parentQuoteTotal = 0;
+            window._changeOrderNumber = 0;
+            if (typeof updateChangeOrderModeUI === 'function') updateChangeOrderModeUI();
             saveFileHandle = null; // force "Save As" on next save
             unsavedChanges = false;
             document.title = 'Quote Builder - QuoteDr';
@@ -941,7 +969,12 @@ async function saveQuote() {
                     history.replaceState(null, "", window.location.pathname + window.location.search);
                     return;
                 }
-                if ((window.location.hash === "#manage-items" || window.location.hash === "#send-quote-settings") && attempt < 25) {
+                if (window.location.hash === "#change-order" && typeof createChangeOrderFromCurrentQuote === "function" && window._supabaseQuoteId) {
+                    createChangeOrderFromCurrentQuote();
+                    history.replaceState(null, "", window.location.pathname + window.location.search);
+                    return;
+                }
+                if ((window.location.hash === "#manage-items" || window.location.hash === "#send-quote-settings" || window.location.hash === "#change-order") && attempt < 25) {
                     setTimeout(function() { openBuilderHashTarget(attempt + 1); }, 250);
                 }
             }

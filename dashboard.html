@@ -230,6 +230,7 @@
     <script src="quote-dialogs.js?v=1777660407"></script>
     <script src="help-content.js?v=1777741200"></script>
     <script src="modal-help.js?v=1777741200"></script>
+    <script src="change-orders.js?v=1778060200"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-v2.js?v=1778059000"></script>
     <script>
@@ -362,6 +363,9 @@
                 var quoteNumber = q.quote_number || '';
                 var clientEmail = q.data && q.data.clientEmail ? q.data.clientEmail : '';
                 var status = q.status || 'draft';
+                var isChangeOrder = window.QuoteDrChangeOrders && QuoteDrChangeOrders.isChangeOrder(q);
+                var changeOrders = (allQuotes || []).filter(function(row) { return window.QuoteDrChangeOrders && QuoteDrChangeOrders.parentQuoteId(row) === q.id; });
+                var pendingCos = changeOrders.filter(function(row) { return row.status === 'pending_approval'; }).length;
                 var portalVisible = !!(q.data && q.data.portal_visible);
                 return `
                 <div class="quote-card">
@@ -369,7 +373,7 @@
                         <div onclick="openQuote(${jsAttr(q.id)})" style="flex:1; cursor:pointer;">
                             ${q.id === lastOpenedId ? '<span class="badge bg-primary me-1" style="font-size:0.65rem; vertical-align:middle;">Last Opened</span>' : ''}
                             <div class="d-flex align-items-center gap-1" id="title-row-${escapeHtml(q.id)}">
-                              <div class="fw-bold" id="title-display-${escapeHtml(q.id)}">${escapeHtml(displayTitle)}</div>
+                              <div class="fw-bold" id="title-display-${escapeHtml(q.id)}">${isChangeOrder ? '<span class="badge bg-info me-1">CO #' + escapeHtml(QuoteDrChangeOrders.number(q) || '') + '</span>' : ''}${escapeHtml(displayTitle)}</div>
                               <button class="btn btn-link btn-sm p-0 text-muted" onclick="event.stopPropagation();startEditTitle(${jsAttr(q.id)})" title="Edit title" style="font-size:0.75rem;"><i class="fas fa-pencil-alt"></i></button>
                             </div>
                             <div id="title-edit-${escapeHtml(q.id)}" style="display:none; gap:0.25rem;" class="mt-1">
@@ -391,6 +395,8 @@
                                 <option value="in_review" ${status === 'in_review' ? 'selected' : ''}>In Review</option>
                                 <option value="accepted" ${status === 'accepted' ? 'selected' : ''}>Accepted</option>
                                 <option value="invoiced" ${status === 'invoiced' ? 'selected' : ''}>Invoiced</option>
+                                <option value="pending_approval" ${status === 'pending_approval' ? 'selected' : ''}>Pending CO Approval</option>
+                                <option value="approved" ${status === 'approved' ? 'selected' : ''}>CO Approved</option>
                                 <option value="declined" ${status === 'declined' ? 'selected' : ''}>Declined</option>
                             </select>
                             <button class="btn btn-outline-danger" onclick="deleteQuote(${jsAttr(q.id)})">
@@ -399,7 +405,9 @@
                         </div>
                     </div>
                     ${status === 'accepted' && q.data && q.data.client_upgraded ? `<div class="alert alert-warning py-1 px-2 mt-2 mb-0 small"><i class="fas fa-bolt me-1"></i><strong>Client made upgrades</strong> when signing - <a href="interactive-quote-viewer.html?id=${encodeURIComponent(q.id)}" class="alert-link">review quote</a></div>` : ''}
+                    ${pendingCos ? `<div class="alert alert-info py-1 px-2 mt-2 mb-0 small"><i class="fas fa-file-circle-plus me-1"></i><strong>${pendingCos} pending change order${pendingCos === 1 ? '' : 's'}</strong></div>` : ''}
                     ${status === 'in_review' ? `<button class="btn btn-warning btn-sm w-100 mt-2" onclick="openNotesReview(${jsAttr(q.id)}, ${jsAttr(clientName)})"><i class="fas fa-comments me-1"></i> Review Client Notes</button>` : ''}
+                    ${(!isChangeOrder && (status === 'accepted' || status === 'invoiced')) ? `<button class="btn btn-warning btn-sm w-100 mt-1" onclick="openQuoteForChangeOrder(${jsAttr(q.id)})"><i class="fas fa-file-circle-plus me-1"></i>Create Change Order</button>` : ''}
                     <button class="btn btn-sm w-100 mt-1 ${portalVisible ? 'btn-success' : 'btn-outline-secondary'}" onclick="togglePortalVisibility(${jsAttr(q.id)}, ${!portalVisible})" title="${portalVisible ? 'Remove from client portal' : 'Publish to client portal'}"><i class="fas ${portalVisible ? 'fa-eye' : 'fa-eye-slash'} me-1"></i> ${portalVisible ? 'In Portal' : 'Add to Portal'}</button>
                     <button class="btn btn-outline-info btn-sm w-100 mt-1" onclick="shareClientPortal(${jsAttr(q.id)}, ${jsAttr(clientName)}, ${jsAttr(clientEmail)})" title="Share client portal"><i class="fas fa-external-link-alt me-1"></i> Client Portal</button>
                     ${(status === 'sent' || status === 'viewed') ? `<button class="btn btn-outline-primary btn-sm w-100 mt-1" onclick="sendFollowUpReminder(${jsAttr(q.id)}, ${jsAttr(clientName)}, ${jsAttr(clientEmail)})"><i class="fas fa-bell me-1"></i> Send Follow-up</button>` : ''}
@@ -426,6 +434,10 @@
 
         function openQuote(quoteId) {
             window.location.href = 'quote-builder.html?load=' + quoteId;
+        }
+
+        function openQuoteForChangeOrder(quoteId) {
+            window.location.href = 'quote-builder.html?load=' + quoteId + '#change-order';
         }
 
         var currentNotesQuoteId = null;
@@ -859,6 +871,8 @@
                                 { status: 'viewed', label: 'Viewed', color: '#6f42c1', icon: 'fa-eye' },
                                 { status: 'in_review', label: 'In Review', color: '#ffc107', icon: 'fa-comments' },
                                 { status: 'accepted', label: 'Accepted', color: '#198754', icon: 'fa-check-circle' },
+                                { status: 'pending_approval', label: 'Pending CO', color: '#0dcaf0', icon: 'fa-file-signature' },
+                                { status: 'approved', label: 'CO Approved', color: '#20c997', icon: 'fa-file-circle-check' },
                                 { status: 'invoiced', label: 'Invoiced', color: '#fd7e14', icon: 'fa-file-invoice-dollar' },
                                 { status: 'paid', label: 'Paid', color: '#006400', icon: 'fa-dollar-sign' }
                             ];
