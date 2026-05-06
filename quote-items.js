@@ -542,9 +542,12 @@
                     <tr id="desc_${safeId}" style="display:none; background:#e7f3ff;" data-cat="${catE}" data-name="${nameE}">
                         <td colspan="6">
                             <div class="p-2">
-                                <div class="d-flex justify-content-between align-items-center">
+                                <div class="d-flex justify-content-between align-items-center gap-2">
                                     <small class="text-info fw-bold"><i class="fas fa-align-left"></i> Item Description (shown to clients on interactive quote)</small>
-                                    <button type="button" class="btn btn-sm btn-outline-primary refine-desc-btn" style="font-size:0.75rem;padding:2px 8px;">AI ✨ Refine</button>
+                                    <div class="d-flex align-items-center gap-1">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary undo-refine-desc-btn" onclick="undoRefinedDescription(this)" title="Undo AI refined description" style="display:none;font-size:0.75rem;padding:2px 7px;"><i class="fas fa-undo"></i></button>
+                                        <button type="button" class="btn btn-sm btn-outline-primary refine-desc-btn" style="font-size:0.75rem;padding:2px 8px;">AI Refine</button>
+                                    </div>
                                 </div>
                                 <textarea class="form-control form-control-sm item-description-textarea mt-2" rows="3" placeholder="e.g., Complete drywall installation including hanging, mudding, taping, sanding and priming. Professional finish ready for paint." spellcheck="true" oninput="markPricingDirty()">${item.itemDescription || ''}</textarea>
                             </div>
@@ -669,7 +672,15 @@
                 const data = await response.json();
                 if (!response.ok || data.error) throw new Error(data.error || 'AI refine failed');
                 if (data.reply) {
-                    textareaEl.value = data.reply.replace(/^["']|["']$/g, '').trim();
+                    const refinedText = data.reply.replace(/^["']|["']$/g, '').trim();
+                    if (refinedText && refinedText !== currentText) {
+                        const undoBtn = btnEl.parentElement ? btnEl.parentElement.querySelector('.undo-refine-desc-btn') : null;
+                        if (undoBtn) {
+                            undoBtn._previousDescription = currentText;
+                            undoBtn.style.display = '';
+                        }
+                    }
+                    textareaEl.value = refinedText;
                     textareaEl.dispatchEvent(new Event('input', { bubbles: true }));
                     markPricingDirty();
                     if (typeof completeProTrialFeature === 'function') completeProTrialFeature('ai_refine', 'AI Refine');
@@ -685,6 +696,18 @@
                 btnEl.innerHTML = originalBtnHTML;
                 btnEl.disabled = false;
             }
+        }
+
+        function undoRefinedDescription(btnEl) {
+            if (!btnEl || typeof btnEl._previousDescription !== 'string') return;
+            const descRow = btnEl.closest('tr');
+            const textarea = descRow ? descRow.querySelector('.item-description-textarea') : null;
+            if (!textarea) return;
+            textarea.value = btnEl._previousDescription;
+            textarea.dispatchEvent(new Event('input', { bubbles: true }));
+            markPricingDirty();
+            btnEl._previousDescription = null;
+            btnEl.style.display = 'none';
         }
 
         async function deleteCustomItem(category, name) {
@@ -733,5 +756,6 @@
         window.saveItemFieldEdit = saveItemFieldEdit;
         window.addCustomItem = addCustomItem;
         window.refineDescription = refineDescription;
+        window.undoRefinedDescription = undoRefinedDescription;
         window.deleteCustomItem = deleteCustomItem;
 })();
