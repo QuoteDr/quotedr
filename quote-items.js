@@ -198,6 +198,8 @@
             if (searchEl) searchEl.value = '';
             renderAllItemsList();
             toggleManageItemsTopBar(false);
+            toggleManageItemsBottomBar(false);
+            initManageItemsFooterSwipe();
             syncManageItemsUndoButtons();
 (bootstrap.Modal.getInstance(document.getElementById('manageItemsModal')) || new bootstrap.Modal(document.getElementById('manageItemsModal'))).show();
         }
@@ -223,6 +225,7 @@
         let pricingDirty = false; // tracks unsaved changes in Manage Items modal
         let lastDeletedItem = null; // for undo functionality
         var undoStack = [];
+        let manageItemsFooterSwipeInitialized = false;
         function syncManageItemsUndoButtons() {
             const hasUndo = undoStack.length > 0;
             const buttonConfigs = [
@@ -254,6 +257,60 @@
             if (showTopBarBtn) showTopBarBtn.style.display = hidden ? '' : 'none';
             if (modal) modal.classList.toggle('manage-items-top-hidden', hidden);
             syncManageItemsUndoButtons();
+        }
+        function toggleManageItemsBottomBar(hidden) {
+            const footer = document.getElementById('manageItemsFooterBar');
+            const pullTab = document.getElementById('manageItemsFooterPullTab');
+            const modal = document.getElementById('manageItemsModal');
+            if (footer) footer.style.display = hidden ? 'none' : '';
+            if (pullTab) pullTab.style.display = hidden ? 'flex' : 'none';
+            if (modal) modal.classList.toggle('manage-items-footer-hidden', hidden);
+        }
+        function initManageItemsFooterSwipe() {
+            if (manageItemsFooterSwipeInitialized) return;
+            const footer = document.getElementById('manageItemsFooterBar');
+            const pullTab = document.getElementById('manageItemsFooterPullTab');
+            if (!footer || !pullTab) return;
+            manageItemsFooterSwipeInitialized = true;
+
+            let footerStartY = null;
+            let pullStartY = null;
+
+            footer.addEventListener('pointerdown', function(e) {
+                if (e.pointerType === 'mouse' && e.button !== 0) return;
+                footerStartY = e.clientY;
+                footer.setPointerCapture?.(e.pointerId);
+            });
+            footer.addEventListener('pointerup', function(e) {
+                if (footerStartY === null) return;
+                const dragDistance = e.clientY - footerStartY;
+                footerStartY = null;
+                if (dragDistance > 28) {
+                    e.preventDefault();
+                    toggleManageItemsBottomBar(true);
+                }
+            });
+            footer.addEventListener('pointercancel', function() {
+                footerStartY = null;
+            });
+
+            pullTab.addEventListener('pointerdown', function(e) {
+                if (e.pointerType === 'mouse' && e.button !== 0) return;
+                pullStartY = e.clientY;
+                pullTab.setPointerCapture?.(e.pointerId);
+            });
+            pullTab.addEventListener('pointerup', function(e) {
+                if (pullStartY === null) return;
+                const dragDistance = pullStartY - e.clientY;
+                pullStartY = null;
+                if (dragDistance > 18) {
+                    e.preventDefault();
+                    toggleManageItemsBottomBar(false);
+                }
+            });
+            pullTab.addEventListener('pointercancel', function() {
+                pullStartY = null;
+            });
         }
         function pushUndoState() {
             if (undoStack.length >= 20) undoStack.shift();
@@ -791,6 +848,8 @@
         window.undoManageItems = undoManageItems;
         window.syncManageItemsUndoButtons = syncManageItemsUndoButtons;
         window.toggleManageItemsTopBar = toggleManageItemsTopBar;
+        window.toggleManageItemsBottomBar = toggleManageItemsBottomBar;
+        window.initManageItemsFooterSwipe = initManageItemsFooterSwipe;
         window.markPricingDirty = markPricingDirty;
         window.clearPricingDirty = clearPricingDirty;
         window.saveItemRow = saveItemRow;
