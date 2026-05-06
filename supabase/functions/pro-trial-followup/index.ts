@@ -49,8 +49,13 @@ function upgradeUrl(feature: string) {
   return `https://quotedr.io/pricing.html?plan=pro&feature=${encodeURIComponent(feature || "pro")}`;
 }
 
+function feedbackSubject(featureLabel: string) {
+  return encodeURIComponent(`Feedback on ${featureLabel}`);
+}
+
 function emailHtml(name: string, featureLabel: string, featureKey: string) {
   const firstName = name ? name.split(/\s+/)[0] : "there";
+  const feedbackUrl = `mailto:support@quotedr.io?subject=${feedbackSubject(featureLabel)}`;
   return `<!DOCTYPE html>
 <html>
 <body style="margin:0;padding:0;background:#f8f9fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;">
@@ -67,6 +72,11 @@ function emailHtml(name: string, featureLabel: string, featureKey: string) {
           <p style="color:#444;line-height:1.6;margin:0 0 24px;">If it helped, Pro unlocks it permanently along with IKEA quoting, job tracking, AI tools, QuickBooks sync, and more.</p>
           <div style="text-align:center;margin:28px 0;">
             <a href="${upgradeUrl(featureKey)}" style="display:inline-block;background:#e87e2a;color:white;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:800;">Upgrade to Pro</a>
+          </div>
+          <div style="background:#f0f7ff;border:1px solid #d7e8fb;border-radius:10px;padding:16px 18px;margin:0 0 20px;">
+            <p style="color:#334155;font-size:14px;line-height:1.6;margin:0 0 10px;"><strong>Help us make QuoteDr better.</strong> We are constantly trying to improve QuoteDr, so if there was something you did not like about ${escapeHtml(featureLabel)}, or something we could improve, please let us know.</p>
+            <p style="color:#334155;font-size:14px;line-height:1.6;margin:0 0 12px;">Good feedback submissions may unlock Pro tools for a set time as a thank you.</p>
+            <a href="${feedbackUrl}" style="color:#1a56a0;font-weight:700;text-decoration:none;">Send feedback to support@quotedr.io</a>
           </div>
           <p style="color:#777;font-size:13px;line-height:1.5;margin:0;">Not ready yet? No worries. Your regular QuoteDr tools are still there.</p>
         </td></tr>
