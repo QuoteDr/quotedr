@@ -6702,6 +6702,7 @@ Example:
                 applyAIQuote(result);
                 return;
             }
+            console.log('[QuoteDr AI Voice] Opening review for parse result:', result);
             var mappings = [];
             if (typeof getUserLearnedMappings === 'function') {
                 try { mappings = await getUserLearnedMappings(); } catch(e) { mappings = []; }
@@ -6714,7 +6715,22 @@ Example:
             if (!reviewModalEl) {
                 throw new Error('AI voice review modal is missing from the page');
             }
-            new bootstrap.Modal(reviewModalEl).show();
+            try {
+                if (window.bootstrap) {
+                    new bootstrap.Modal(reviewModalEl).show();
+                } else {
+                    _forceOpenAiVoiceReviewModal();
+                }
+            } catch(e) {
+                console.warn('[QuoteDr AI Voice] Bootstrap modal failed, forcing review open:', e);
+                _forceOpenAiVoiceReviewModal();
+            }
+            setTimeout(function() {
+                if (!reviewModalEl.classList.contains('show')) {
+                    console.warn('[QuoteDr AI Voice] Review modal was not visible after show; forcing it open.');
+                    _forceOpenAiVoiceReviewModal();
+                }
+            }, 150);
         }
 
         function _hideBootstrapModalAndWait(modalId) {
@@ -6729,9 +6745,56 @@ Example:
                     resolve();
                     return;
                 }
-                modalEl.addEventListener('hidden.bs.modal', function() { resolve(); }, { once: true });
-                modal.hide();
+                var settled = false;
+                var timer = setTimeout(function() {
+                    if (!settled) {
+                        settled = true;
+                        resolve();
+                    }
+                }, 450);
+                modalEl.addEventListener('hidden.bs.modal', function() {
+                    if (!settled) {
+                        settled = true;
+                        clearTimeout(timer);
+                        resolve();
+                    }
+                }, { once: true });
+                try { modal.hide(); } catch(e) {
+                    clearTimeout(timer);
+                    resolve();
+                }
             });
+        }
+
+        function _forceOpenAiVoiceReviewModal() {
+            var reviewModalEl = document.getElementById('aiVoiceReviewModal');
+            if (!reviewModalEl) return;
+            document.querySelectorAll('.modal-backdrop').forEach(function(backdrop) { backdrop.remove(); });
+            reviewModalEl.style.display = 'block';
+            reviewModalEl.removeAttribute('aria-hidden');
+            reviewModalEl.setAttribute('aria-modal', 'true');
+            reviewModalEl.setAttribute('role', 'dialog');
+            reviewModalEl.classList.add('show');
+            document.body.classList.add('modal-open');
+            document.body.style.overflow = 'hidden';
+            var backdrop = document.createElement('div');
+            backdrop.className = 'modal-backdrop fade show';
+            backdrop.setAttribute('data-ai-voice-review-backdrop', 'true');
+            document.body.appendChild(backdrop);
+        }
+
+        function _forceCloseAiVoiceReviewModal() {
+            var reviewModalEl = document.getElementById('aiVoiceReviewModal');
+            if (!reviewModalEl) return;
+            reviewModalEl.classList.remove('show');
+            reviewModalEl.style.display = 'none';
+            reviewModalEl.setAttribute('aria-hidden', 'true');
+            reviewModalEl.removeAttribute('aria-modal');
+            document.querySelectorAll('[data-ai-voice-review-backdrop="true"]').forEach(function(backdrop) { backdrop.remove(); });
+            if (!document.querySelector('.modal.show')) {
+                document.body.classList.remove('modal-open');
+                document.body.style.overflow = '';
+            }
         }
 
         async function confirmAiVoiceReview() {
@@ -6761,6 +6824,7 @@ Example:
             await Promise.all(saveTasks);
             var modal = bootstrap.Modal.getInstance(document.getElementById('aiVoiceReviewModal'));
             if (modal) modal.hide();
+            _forceCloseAiVoiceReviewModal();
             var reviewed = _voiceReviewResult;
             _voiceReviewResult = null;
             _voiceReviewRows = [];
@@ -6770,6 +6834,7 @@ Example:
         function skipAiVoiceReview() {
             var modal = bootstrap.Modal.getInstance(document.getElementById('aiVoiceReviewModal'));
             if (modal) modal.hide();
+            _forceCloseAiVoiceReviewModal();
             var reviewed = _voiceReviewResult;
             _voiceReviewResult = null;
             _voiceReviewRows = [];
@@ -6815,6 +6880,9 @@ Example:
                 document.getElementById('voiceLoading').style.display = 'none';
                 document.getElementById('voiceActions').style.display = 'block';
                 document.getElementById('voiceStatus').textContent = 'Error: ' + err.message + '. Try again.';
+                if (!document.getElementById('voiceQuoteModal')?.classList.contains('show')) {
+                    qdAlert('AI Voice could not open the review step: ' + err.message);
+                }
             }
         }
 
