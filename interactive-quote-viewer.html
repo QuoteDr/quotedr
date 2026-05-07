@@ -316,6 +316,33 @@
             padding: 14px;
             margin-bottom: 18px;
         }
+        .change-order-price-card {
+            background: #fff8e1;
+            border: 1px solid #f0d98c;
+            border-left: 5px solid #f0ad4e;
+            border-radius: 10px;
+            padding: 14px 16px;
+            margin: 12px 0 18px;
+        }
+        .change-order-price-card .co-price-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 0.35rem 0;
+            border-bottom: 1px solid rgba(146, 64, 14, 0.1);
+        }
+        .change-order-price-card .co-price-row:last-child {
+            border-bottom: 0;
+        }
+        .change-order-price-card .co-price-final {
+            margin-top: 0.45rem;
+            padding-top: 0.65rem;
+            border-top: 2px solid rgba(146, 64, 14, 0.22);
+            font-weight: 850;
+            font-size: 1.08rem;
+        }
+        .co-positive { color: #198754; }
+        .co-negative { color: #dc3545; }
         .total-header {
             display: flex;
             justify-content: space-between;
@@ -952,7 +979,7 @@ if (location.search.includes('debug')) {
         } catch(e) { console.warn('Supabase init failed:', e); }
     </script>
     <script src="supabase-v2.js?v=1778059000"></script>
-    <script src="change-orders.js?v=1778060200"></script>
+    <script src="change-orders.js?v=1778152100"></script>
 
     <script>
         let quoteData = {};
@@ -1439,6 +1466,12 @@ if (location.search.includes('debug')) {
             const showUpgrades = sendStyle.showUpgrades !== false;
             const showScopeNotes = sendStyle.showScopeNotes !== false;
 
+            function money(value, showSign) {
+                var amount = parseFloat(value) || 0;
+                var sign = showSign ? (amount >= 0 ? '+' : '-') : (amount < 0 ? '-' : '');
+                return sign + '$' + Math.abs(amount).toFixed(2);
+            }
+
             if (sendStyle.clientMessage) {
                 html += '<div class="alert mb-4" style="background:#f8fbff;border:1px solid #cfe2ff;border-left:4px solid ' + (sendStyle.accent || '#1a56a0') + ';border-radius:10px;">' +
                     '<div class="fw-semibold mb-1"><i class="fas fa-message me-2"></i>Message from your contractor</div>' +
@@ -1449,17 +1482,41 @@ if (location.search.includes('debug')) {
             if (isChangeOrder) {
                 var ctx = quoteData.changeOrderContext || {};
                 var parentTotal = parseFloat(quoteData.parentQuoteTotal || ctx.parentTotal || 0) || 0;
-                var previousApproved = parseFloat(ctx.previousApprovedTotal || 0) || 0;
+                var previousApproved = parseFloat(ctx.previousApprovedTotal || quoteData.changeOrderPreviousApprovedTotal || 0) || 0;
                 var netChange = parseFloat(quoteData.grandTotal || quoteData.total || 0) || 0;
                 var projectedTotal = parentTotal + previousApproved + netChange;
+                var coSummary = quoteData.changeOrderPriceSummary || {};
+                if (!coSummary.addedSubtotal && !coSummary.creditSubtotal) {
+                    var addedFallback = 0;
+                    var creditFallback = 0;
+                    (quoteData.rooms || []).forEach(function(room) {
+                        (room.items || []).forEach(function(item) {
+                            var line = parseFloat(item.total) || 0;
+                            if (line > 0) addedFallback += line;
+                            if (line < 0) creditFallback += Math.abs(line);
+                        });
+                    });
+                    var netSubtotalFallback = addedFallback - creditFallback;
+                    coSummary = Object.assign({}, coSummary, {
+                        addedSubtotal: addedFallback,
+                        creditSubtotal: creditFallback,
+                        netSubtotal: netSubtotalFallback,
+                        tax: netChange - netSubtotalFallback
+                    });
+                }
                 html += '<div class="change-order-summary">' +
                     '<div class="fw-bold mb-1"><i class="fas fa-file-circle-plus me-2"></i>Change Order #' + escapeHtml(quoteData.changeOrderNumber || '') + ' for Quote #' + escapeHtml(quoteData.parentQuoteNumber || '') + '</div>' +
                     '<div class="text-muted mb-2">' + escapeHtml(quoteData.changeReason || 'Scope change submitted for approval.') + '</div>' +
-                    '<div class="row g-2 small">' +
-                    '<div class="col-md-3"><strong>Original:</strong><br>$' + parentTotal.toFixed(2) + '</div>' +
-                    '<div class="col-md-3"><strong>Approved COs:</strong><br>$' + previousApproved.toFixed(2) + '</div>' +
-                    '<div class="col-md-3"><strong>This change:</strong><br>' + (netChange >= 0 ? '+' : '-') + '$' + Math.abs(netChange).toFixed(2) + '</div>' +
-                    '<div class="col-md-3"><strong>Projected total:</strong><br>$' + projectedTotal.toFixed(2) + '</div>' +
+                    '<div class="change-order-price-card">' +
+                    '<div class="fw-bold mb-2"><i class="fas fa-file-invoice-dollar me-1"></i>Price breakdown</div>' +
+                    '<div class="co-price-row"><span>Original accepted quote</span><strong>' + money(parentTotal, false) + '</strong></div>' +
+                    '<div class="co-price-row"><span>Approved previous change orders</span><strong>' + money(previousApproved, previousApproved !== 0) + '</strong></div>' +
+                    '<div class="co-price-row"><span>Added work</span><strong class="co-positive">' + money(coSummary.addedSubtotal || 0, true) + '</strong></div>' +
+                    '<div class="co-price-row"><span>Credits / deductions</span><strong class="co-negative">-$' + Math.abs(parseFloat(coSummary.creditSubtotal || 0) || 0).toFixed(2) + '</strong></div>' +
+                    '<div class="co-price-row"><span>Net change before tax</span><strong>' + money(coSummary.netSubtotal || 0, true) + '</strong></div>' +
+                    '<div class="co-price-row"><span>Tax on this change</span><strong>' + money(coSummary.tax || 0, true) + '</strong></div>' +
+                    '<div class="co-price-row"><span>This change order total</span><strong>' + money(netChange, true) + '</strong></div>' +
+                    '<div class="co-price-row co-price-final"><span>Updated project total if approved</span><strong>' + money(projectedTotal, false) + '</strong></div>' +
                     '</div>' +
                     '</div>';
                 document.getElementById('originalTotalDisplay').textContent = '$' + parentTotal.toFixed(2);
@@ -1780,7 +1837,23 @@ if (location.search.includes('debug')) {
             if (isChangeOrder) {
                 var ctx = quoteData.changeOrderContext || {};
                 var parentTotal = parseFloat(quoteData.parentQuoteTotal || ctx.parentTotal || 0) || 0;
-                var projectedTotal = parentTotal + (parseFloat(ctx.previousApprovedTotal || 0) || 0) + total;
+                var previousApproved = parseFloat(ctx.previousApprovedTotal || quoteData.changeOrderPreviousApprovedTotal || 0) || 0;
+                var projectedTotal = parentTotal + previousApproved + total;
+                var summary = quoteData.changeOrderPriceSummary || {};
+                var baseElCo = document.getElementById('originalTotalDisplay');
+                if (baseElCo) baseElCo.textContent = `$${parentTotal.toFixed(2)}`;
+                var upgradesElCo = document.getElementById('upgradesTotalDisplay');
+                if (upgradesElCo) {
+                    upgradesElCo.style.display = 'flex';
+                    upgradesElCo.innerHTML = `<span>This change order</span><strong>${total >= 0 ? '+' : '-'}$${Math.abs(total).toFixed(2)}</strong>`;
+                }
+                if (quoteData.changeOrderPriceSummary) {
+                    quoteData.changeOrderPriceSummary = Object.assign({}, summary, {
+                        previousApprovedTotal: previousApproved,
+                        netChange: total,
+                        updatedTotal: projectedTotal
+                    });
+                }
                 document.getElementById('newGrandTotal').textContent = `$${projectedTotal.toFixed(2)}`;
                 var heroTotal = document.getElementById('heroGrandTotal');
                 if (heroTotal) heroTotal.textContent = `${total >= 0 ? '+' : '-'}$${Math.abs(total).toFixed(2)}`;

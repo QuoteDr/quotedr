@@ -187,6 +187,42 @@
             color: #6c757d;
             font-size: 0.74rem;
         }
+        .change-order-price-summary {
+            display: none;
+            margin: 0.85rem 0 0;
+            padding: 0.9rem 1rem;
+            background: #fff8e1;
+            border: 1px solid #f0d98c;
+            border-left: 5px solid #f0ad4e;
+            border-radius: 8px;
+        }
+        .change-order-price-summary.visible {
+            display: block;
+        }
+        .change-order-price-summary .co-summary-title {
+            font-weight: 800;
+            color: #6b4e00;
+            margin-bottom: 0.45rem;
+        }
+        .change-order-price-summary .co-summary-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 0.28rem 0;
+            border-bottom: 1px solid rgba(146, 64, 14, 0.1);
+        }
+        .change-order-price-summary .co-summary-row:last-child {
+            border-bottom: 0;
+        }
+        .change-order-price-summary .co-summary-final {
+            margin-top: 0.45rem;
+            padding-top: 0.55rem;
+            border-top: 2px solid rgba(146, 64, 14, 0.22);
+            font-size: 1.05rem;
+            font-weight: 850;
+        }
+        .co-positive { color: #198754; }
+        .co-negative { color: #dc3545; }
         .profit-positive { color: #198754; }
         .profit-negative { color: #dc3545; }
 
@@ -1121,6 +1157,7 @@ if (location.search.includes('debug')) {
                             <span id="taxDisplay">$0.00</span>
                         </div>
                     </div>
+                    <div id="changeOrderPriceSummary" class="change-order-price-summary" aria-live="polite"></div>
                     <!-- Deposit Calculator -->
                     <div class="deposit-section mt-3 mb-2 p-3 rounded" style="display:none;" id="depositSection">
                         <label><strong>Deposit:</strong></label>
@@ -3485,6 +3522,8 @@ Example:
 
         function calculateTotals() {
             let subtotal = 0;
+            let coAddedSubtotal = 0;
+            let coCreditSubtotal = 0;
 
             rooms.forEach(room => {
                 const baseTotal = room.items.reduce((sum, item) => sum + item.total, 0);
@@ -3492,6 +3531,14 @@ Example:
                 const roomTotal = baseTotal * (1 + markup / 100);
                 room.roomTotal = roomTotal;
                 subtotal += roomTotal;
+                if (window._quoteDocumentType === 'change_order') {
+                    const markupFactor = 1 + markup / 100;
+                    room.items.forEach(function(item) {
+                        var lineTotal = (parseFloat(item.total) || 0) * markupFactor;
+                        if (lineTotal > 0) coAddedSubtotal += lineTotal;
+                        if (lineTotal < 0) coCreditSubtotal += Math.abs(lineTotal);
+                    });
+                }
             });
 
             var _qprefs = {}; try { _qprefs = JSON.parse(localStorage.getItem('ald_quote_prefs') || '{}'); } catch(e) {}
@@ -3503,19 +3550,37 @@ Example:
             const tax = subtotal * _taxRate;
             const total = subtotal + tax;
 
-            document.getElementById('subtotalDisplay').textContent = _sym + subtotal.toFixed(2);
+            document.getElementById('subtotalDisplay').textContent = window._quoteDocumentType === 'change_order'
+                ? coMoney(subtotal, _sym, true)
+                : _sym + subtotal.toFixed(2);
             var taxLabelEl = document.getElementById('taxLabelDisplay');
             if (taxLabelEl) taxLabelEl.textContent = _taxLabel + ' (' + (_taxRate*100).toFixed(1).replace(/\.0$/,'') + '%)';
-            document.getElementById('taxDisplay').textContent = _sym + tax.toFixed(2);
-            document.getElementById('grandTotalDisplay').textContent = _sym + total.toFixed(2);
+            document.getElementById('taxDisplay').textContent = window._quoteDocumentType === 'change_order'
+                ? coMoney(tax, _sym, true)
+                : _sym + tax.toFixed(2);
+            document.getElementById('grandTotalDisplay').textContent = window._quoteDocumentType === 'change_order'
+                ? coMoney(total, _sym, true)
+                : _sym + total.toFixed(2);
 
             // Keep sticky total bar in sync
             const stickyAmt = document.getElementById('stickyTotalAmount');
             const stickySub = document.getElementById('stickySubtotal');
             const stickyTax = document.getElementById('stickyTax');
-            if (stickyAmt) stickyAmt.textContent = _sym + total.toFixed(2);
-            if (stickySub) stickySub.textContent = 'Subtotal: ' + _sym + subtotal.toFixed(2);
-            if (stickyTax) stickyTax.textContent = _taxLabel + ': ' + _sym + tax.toFixed(2);
+            if (stickyAmt) stickyAmt.textContent = window._quoteDocumentType === 'change_order'
+                ? coMoney(total, _sym, true)
+                : _sym + total.toFixed(2);
+            if (stickySub) stickySub.textContent = 'Subtotal: ' + (window._quoteDocumentType === 'change_order' ? coMoney(subtotal, _sym, true) : _sym + subtotal.toFixed(2));
+            if (stickyTax) stickyTax.textContent = _taxLabel + ': ' + (window._quoteDocumentType === 'change_order' ? coMoney(tax, _sym, true) : _sym + tax.toFixed(2));
+            updateChangeOrderPriceSummary({
+                addedSubtotal: coAddedSubtotal,
+                creditSubtotal: coCreditSubtotal,
+                subtotal: subtotal,
+                tax: tax,
+                total: total,
+                taxLabel: _taxLabel,
+                taxRate: _taxRate,
+                symbol: _sym
+            });
 
             // Update deposit calculator
             const depositBtn = document.getElementById('depositToggleBtn');
@@ -3527,6 +3592,52 @@ Example:
             if (depositAmtEl) depositAmtEl.textContent = depositAmt.toFixed(2);
             if (remainingEl) remainingEl.textContent = remaining.toFixed(2);
             updateProfitReport();
+        }
+
+        function coMoney(value, symbol, showSign) {
+            var amount = parseFloat(value) || 0;
+            var sign = showSign ? (amount >= 0 ? '+' : '-') : (amount < 0 ? '-' : '');
+            return sign + (symbol || '$') + Math.abs(amount).toFixed(2);
+        }
+
+        function updateChangeOrderPriceSummary(summary) {
+            var el = document.getElementById('changeOrderPriceSummary');
+            if (!el) return;
+            if (window._quoteDocumentType !== 'change_order') {
+                el.classList.remove('visible');
+                el.innerHTML = '';
+                return;
+            }
+            summary = summary || {};
+            var symbol = summary.symbol || '$';
+            var originalTotal = parseFloat(window._parentQuoteTotal || 0) || 0;
+            var previousApproved = parseFloat(window._previousApprovedChangeOrderTotal || window._changeOrderPreviousApprovedTotal || 0) || 0;
+            var netChange = parseFloat(summary.total || 0) || 0;
+            var updatedTotal = originalTotal + previousApproved + netChange;
+            var taxLabel = summary.taxLabel || 'Tax';
+            var taxPct = ((parseFloat(summary.taxRate) || 0) * 100).toFixed(1).replace(/\.0$/, '');
+            window._changeOrderPreviousApprovedTotal = previousApproved;
+            window._changeOrderPriceSummary = {
+                originalTotal: originalTotal,
+                previousApprovedTotal: previousApproved,
+                addedSubtotal: parseFloat(summary.addedSubtotal || 0) || 0,
+                creditSubtotal: parseFloat(summary.creditSubtotal || 0) || 0,
+                netSubtotal: parseFloat(summary.subtotal || 0) || 0,
+                tax: parseFloat(summary.tax || 0) || 0,
+                netChange: netChange,
+                updatedTotal: updatedTotal
+            };
+            el.innerHTML =
+                '<div class="co-summary-title"><i class="fas fa-file-invoice-dollar me-1"></i>Change order price breakdown</div>' +
+                '<div class="co-summary-row"><span>Original accepted quote</span><strong>' + coMoney(originalTotal, symbol, false) + '</strong></div>' +
+                '<div class="co-summary-row"><span>Approved previous change orders</span><strong>' + coMoney(previousApproved, symbol, previousApproved !== 0) + '</strong></div>' +
+                '<div class="co-summary-row"><span>Added work</span><strong class="co-positive">' + coMoney(summary.addedSubtotal || 0, symbol, true) + '</strong></div>' +
+                '<div class="co-summary-row"><span>Credits / deductions</span><strong class="co-negative">-' + symbol + Math.abs(parseFloat(summary.creditSubtotal || 0) || 0).toFixed(2) + '</strong></div>' +
+                '<div class="co-summary-row"><span>Net change before tax</span><strong>' + coMoney(summary.subtotal || 0, symbol, true) + '</strong></div>' +
+                '<div class="co-summary-row"><span>' + qdTemplateEscapeHtml(taxLabel) + ' on this change' + (taxPct ? ' (' + taxPct + '%)' : '') + '</span><strong>' + coMoney(summary.tax || 0, symbol, true) + '</strong></div>' +
+                '<div class="co-summary-row"><span>This change order total</span><strong>' + coMoney(netChange, symbol, true) + '</strong></div>' +
+                '<div class="co-summary-row co-summary-final"><span>Updated project total if approved</span><strong>' + coMoney(updatedTotal, symbol, false) + '</strong></div>';
+            el.classList.add('visible');
         }
 
         var stickyTotalVisible = false;
@@ -6108,6 +6219,10 @@ Example:
             if (linkLabel) linkLabel.textContent = isCo ? 'Send Change Order' : 'Generate Quote Link';
             var totalStatus = document.querySelector('.quote-total-status');
             if (totalStatus) totalStatus.textContent = isCo ? 'Change order total' : 'Client-ready estimate';
+            var totalTitle = document.querySelector('.quote-total-title');
+            if (totalTitle) totalTitle.innerHTML = isCo ? '<i class="fas fa-calculator"></i> Change Order Total' : '<i class="fas fa-calculator"></i> Quote Total';
+            var finalLabel = document.querySelector('.quote-total-final-label');
+            if (finalLabel) finalLabel.textContent = isCo ? 'Net Change' : 'Total';
             var coMenu = document.getElementById('createChangeOrderMenuItem');
             if (coMenu) {
                 var baseStatus = document.getElementById('quoteStatus')?.value || '';
@@ -6135,11 +6250,15 @@ Example:
             var parentData = collectQuoteData();
             var parentId = window._supabaseQuoteId;
             var nextNumber = 1;
+            var previousApprovedTotal = 0;
             try {
-                var siblingRes = await _supabase.from('quotes').select('change_order_number,data').eq('parent_quote_id', parentId);
+                var siblingRes = await _supabase.from('quotes').select('status,total,change_order_number,data').eq('parent_quote_id', parentId);
                 (siblingRes.data || []).forEach(function(row) {
                     var n = parseInt(row.change_order_number || row.data?.changeOrderNumber || 0, 10);
                     if (n >= nextNumber) nextNumber = n + 1;
+                    if ((row.status || row.data?.status) === 'approved') {
+                        previousApprovedTotal += parseFloat(row.total || row.data?.grandTotal || row.data?.total || 0) || 0;
+                    }
                 });
             } catch(e) {
                 console.warn('Could not inspect existing change orders:', e);
@@ -6149,6 +6268,8 @@ Example:
             window._parentQuoteId = parentId;
             window._parentQuoteNumber = parentData.quoteNumber || '';
             window._parentQuoteTotal = parentData.grandTotal || 0;
+            window._previousApprovedChangeOrderTotal = previousApprovedTotal;
+            window._changeOrderPreviousApprovedTotal = previousApprovedTotal;
             window._changeOrderNumber = nextNumber;
             window._supabaseQuoteId = null;
             window._changeOrderDraftInProgress = true;
@@ -6182,8 +6303,8 @@ Example:
 
         // Save/load/session core moved to quote-storage.js
     </script>
-    <script src="change-orders.js?v=1778150800"></script>
-    <script src="quote-storage.js?v=1778150800"></script>
+    <script src="change-orders.js?v=1778152100"></script>
+    <script src="quote-storage.js?v=1778152100"></script>
     <script>
         // -- End Save / Load ------------------------------------------------------
 

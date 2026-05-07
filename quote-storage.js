@@ -12,8 +12,15 @@
         let supabaseQuoteId = null;
         currentUser = null;
 
+        function parseQuoteMoney(value) {
+            var raw = String(value || '');
+            var negative = /-/.test(raw) || /\(.+\)/.test(raw);
+            var amount = parseFloat(raw.replace(/[^0-9.]/g, '')) || 0;
+            return negative ? -amount : amount;
+        }
+
         function collectQuoteData() {
-            var grandTotal = parseFloat((document.getElementById('grandTotalDisplay')?.textContent || '0').replace(/[^0-9.]/g, '')) || 0;
+            var grandTotal = parseQuoteMoney(document.getElementById('grandTotalDisplay')?.textContent || '0');
             var isChangeOrder = window._quoteDocumentType === 'change_order';
             var statusEl = document.getElementById('quoteStatus');
             var status = statusEl ? statusEl.value : (isChangeOrder ? 'draft' : 'draft');
@@ -30,6 +37,8 @@
                 parentQuoteNumber: window._parentQuoteNumber || '',
                 parentQuoteTotal: parseFloat(window._parentQuoteTotal || 0) || 0,
                 changeOrderBaseRooms: window._changeOrderBaseRooms || [],
+                changeOrderPreviousApprovedTotal: parseFloat(window._changeOrderPreviousApprovedTotal || window._previousApprovedChangeOrderTotal || 0) || 0,
+                changeOrderPriceSummary: window._changeOrderPriceSummary || null,
                 changeOrderNumber: parseInt(window._changeOrderNumber || 0, 10) || null,
                 changeReason: document.getElementById('changeOrderReason')?.value || '',
                 status: status,
@@ -83,6 +92,9 @@
             window._parentQuoteNumber = data.parentQuoteNumber || '';
             window._parentQuoteTotal = parseFloat(data.parentQuoteTotal || 0) || 0;
             window._changeOrderBaseRooms = data.changeOrderBaseRooms || [];
+            window._changeOrderPreviousApprovedTotal = parseFloat(data.changeOrderPreviousApprovedTotal || data.previousApprovedChangeOrderTotal || 0) || 0;
+            window._previousApprovedChangeOrderTotal = window._changeOrderPreviousApprovedTotal;
+            window._changeOrderPriceSummary = data.changeOrderPriceSummary || null;
             window._changeOrderNumber = parseInt(data.changeOrderNumber || data.change_order_number || 0, 10) || 0;
             setTimeout(function() {
                 if (document.getElementById('changeOrderReason')) document.getElementById('changeOrderReason').value = data.changeReason || '';
