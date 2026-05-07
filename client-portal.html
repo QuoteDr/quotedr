@@ -290,8 +290,8 @@
     <div class="row mb-4">
       <div class="col-md-3 col-sm-6">
         <div class="card summary-card">
-          <div class="summary-value" id="total-spent">$0.00</div>
-          <div class="summary-label">Total Spent</div>
+          <div class="summary-value" id="balance-due">$0.00</div>
+          <div class="summary-label">Balance Due</div>
         </div>
       </div>
       <div class="col-md-3 col-sm-6">
@@ -302,14 +302,14 @@
       </div>
       <div class="col-md-3 col-sm-6">
         <div class="card summary-card">
-          <div class="summary-value" id="active-jobs">0</div>
-          <div class="summary-label">Active Jobs</div>
+          <div class="summary-value" id="invoice-count">0</div>
+          <div class="summary-label">Invoices</div>
         </div>
       </div>
       <div class="col-md-3 col-sm-6">
         <div class="card summary-card">
-          <div class="summary-value" id="completed-jobs">0</div>
-          <div class="summary-label">Completed Jobs</div>
+          <div class="summary-value" id="paid-to-date">$0.00</div>
+          <div class="summary-label" id="paid-to-date-label">Paid to Date</div>
         </div>
       </div>
     </div>
@@ -374,10 +374,11 @@
     const noQuotesEl = document.getElementById('no-quotes');
     
     // Summary cards
-    const totalSpentEl = document.getElementById('total-spent');
+    const balanceDueEl = document.getElementById('balance-due');
     const openQuotesEl = document.getElementById('open-quotes');
-    const activeJobsEl = document.getElementById('active-jobs');
-    const completedJobsEl = document.getElementById('completed-jobs');
+    const invoiceCountEl = document.getElementById('invoice-count');
+    const paidToDateEl = document.getElementById('paid-to-date');
+    const paidToDateLabelEl = document.getElementById('paid-to-date-label');
 
     // Initialize page
     async function init() {
@@ -706,37 +707,44 @@
 
     // Update summary cards
     function updateSummaryCards(quotes) {
-      let totalSpent = 0;
+      let balanceDue = 0;
+      let paidToDate = 0;
+      let clientLifetimeValue = 0;
       let openQuotes = 0;
-      let activeJobs = 0;
-      let completedJobs = 0;
+      let invoiceCount = 0;
       
       quotes.forEach(quote => {
-        if (quote.status === 'paid' || quote.status === 'invoiced') {
-          totalSpent += quote.total;
-        }
+        const total = parseFloat(quote.total || 0) || 0;
+        const payments = quote.data && Array.isArray(quote.data.payments) ? quote.data.payments : [];
+        const paidAmount = payments.reduce(function(sum, payment) {
+          return sum + ((parseFloat(payment.amount_cents || 0) || 0) / 100);
+        }, 0);
+        const paymentStatus = String(quote.data?.paymentStatus || '').toLowerCase();
+        const status = String(quote.status || '').toLowerCase();
+        const isInvoice = status === 'invoiced' || status === 'paid' || quote.type === 'invoice' || quote.data?.documentType === 'invoice';
+
+        paidToDate += paidAmount;
+        if (status === 'paid' && !paidAmount) paidToDate += total;
+        if (status === 'accepted' || status === 'invoiced' || status === 'paid') clientLifetimeValue += total;
+        if (isInvoice) invoiceCount++;
+        if (status === 'invoiced') balanceDue += Math.max(total - paidAmount, 0);
+        if (paymentStatus === 'partially_paid' && status !== 'invoiced') balanceDue += Math.max(total - paidAmount, 0);
         
-        if (quote.status === 'sent' || quote.status === 'draft') {
+        if (status === 'sent' || status === 'draft' || status === 'viewed') {
           openQuotes++;
-        }
-        
-        if (quote.status === 'accepted') {
-          activeJobs++;
-        }
-        
-        if (quote.status === 'paid') {
-          completedJobs++;
         }
       });
       
-      totalSpentEl.textContent = new Intl.NumberFormat('en-US', {
+      const money = new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: 'CAD'
-      }).format(totalSpent);
+      });
       
+      balanceDueEl.textContent = money.format(balanceDue);
       openQuotesEl.textContent = openQuotes;
-      activeJobsEl.textContent = activeJobs;
-      completedJobsEl.textContent = completedJobs;
+      invoiceCountEl.textContent = invoiceCount;
+      paidToDateEl.textContent = money.format(portalIsAdminView ? clientLifetimeValue : paidToDate);
+      paidToDateLabelEl.textContent = portalIsAdminView ? 'Client Lifetime Value' : 'Paid to Date';
     }
 
     // Open signature in lightbox
