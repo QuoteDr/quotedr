@@ -164,6 +164,12 @@
             document.title = 'Quote Builder - QuoteDr';
         }
 
+        function qdAfterManualQuoteSave() {
+            if (typeof qdMaybeShowSecondQuoteUpgradePrompt === 'function') {
+                setTimeout(function() { qdMaybeShowSecondQuoteUpgradePrompt(); }, 500);
+            }
+        }
+
 async function saveQuote() {
             // Always show save dialog first
             var qData = collectQuoteData();
@@ -299,6 +305,7 @@ async function saveQuote() {
                 updateSaveStatus('saved', 'Saved to cloud ?');
                 updateDraftWarning();
                 bootstrap.Modal.getInstance(document.getElementById('saveQuoteModal')).hide();
+                qdAfterManualQuoteSave();
                 // Update client name field if changed
                 if (document.getElementById('clientName')) document.getElementById('clientName').value = _saveDialogData.clientName;
             } catch(e) {
@@ -329,6 +336,7 @@ async function saveQuote() {
                 updateSaveStatus('saved', 'Saved to cloud ?');
                 updateDraftWarning();
                 bootstrap.Modal.getInstance(document.getElementById('saveQuoteModal')).hide();
+                qdAfterManualQuoteSave();
             } catch(e) {
                 qdAlert('Save failed: ' + e.message);
             } finally {

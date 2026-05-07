@@ -792,6 +792,13 @@
                     textareaEl.dispatchEvent(new Event('input', { bubbles: true }));
                     markPricingDirty();
                     if (typeof completeProTrialFeature === 'function') completeProTrialFeature('ai_refine', 'AI Refine');
+                    if (typeof qdMaybeShowProUpgradePrompt === 'function') {
+                        qdMaybeShowProUpgradePrompt('ai_refine_success', {
+                            featureKey: 'ai_refine',
+                            featureLabel: 'AI Refine',
+                            message: 'AI made this easier. Keep it with Pro access.'
+                        });
+                    }
                 }
             } catch (error) {
                 console.error('AI refine failed:', error);

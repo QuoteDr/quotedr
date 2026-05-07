@@ -11,6 +11,10 @@ type TrialEntry = {
   label?: string;
   used?: boolean;
   used_at?: string;
+  started_at?: string;
+  expires_at?: string;
+  source?: string;
+  activations?: number;
   followup_due_at?: string;
   followup_sent_at?: string | null;
 };
@@ -68,13 +72,13 @@ function emailHtml(name: string, featureLabel: string, featureKey: string) {
         </td></tr>
         <tr><td style="padding:36px;">
           <p style="font-size:17px;font-weight:700;color:#10233d;margin:0 0 16px;">Hey ${escapeHtml(firstName)},</p>
-          <p style="color:#444;line-height:1.6;margin:0 0 16px;">You tried <strong>${escapeHtml(featureLabel)}</strong> in QuoteDr. I wanted you to get one real run with it before asking you to upgrade.</p>
+          <p style="color:#444;line-height:1.6;margin:0 0 16px;">You started Play For a Day with <strong>${escapeHtml(featureLabel)}</strong> in QuoteDr. I wanted you to get real hands-on time with it before asking you to upgrade.</p>
           <p style="color:#444;line-height:1.6;margin:0 0 24px;">If it helped, Pro unlocks it permanently along with IKEA quoting, job tracking, AI tools, QuickBooks sync, and more.</p>
           <div style="text-align:center;margin:28px 0;">
             <a href="${upgradeUrl(featureKey)}" style="display:inline-block;background:#e87e2a;color:white;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:800;">Upgrade to Pro</a>
           </div>
           <div style="background:#f0f7ff;border:1px solid #d7e8fb;border-radius:10px;padding:16px 18px;margin:0 0 20px;">
-            <p style="color:#334155;font-size:14px;line-height:1.6;margin:0 0 10px;"><strong>Help us make QuoteDr better.</strong> We are constantly trying to improve QuoteDr, so if there was something you did not like about ${escapeHtml(featureLabel)}, or something we could improve, please let us know.</p>
+            <p style="color:#334155;font-size:14px;line-height:1.6;margin:0 0 10px;"><strong>Help us make QuoteDr better.</strong> We are constantly trying to improve QuoteDr, so if there was something you did not like about your Play For a Day experience with ${escapeHtml(featureLabel)}, or something we could improve, please let us know.</p>
             <p style="color:#334155;font-size:14px;line-height:1.6;margin:0 0 12px;">Good feedback submissions may unlock Pro tools for a set time as a thank you.</p>
             <a href="${feedbackUrl}" style="color:#1a56a0;font-weight:700;text-decoration:none;">Send feedback to support@quotedr.io</a>
           </div>
@@ -155,7 +159,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           from: "QuoteDr <welcome@quotedr.io>",
           to: [userData.user.email],
-          subject: `Want to keep using ${label}?`,
+          subject: `Want to keep using ${label} after Play For a Day?`,
           html: emailHtml(name, label, featureKey),
         }),
       });

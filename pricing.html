@@ -34,6 +34,8 @@
         .btn-pro:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(232,126,42,0.45); }
         button:disabled { opacity: 0.65; transform: none !important; cursor: default; }
         .trial-note { text-align: center; color: #888; font-size: 0.82rem; margin-top: 10px; }
+        .play-day-pricing-nudge { display:none; max-width:760px; margin:-72px auto 28px; background:#fff7ed; border:1px solid #fed7aa; border-radius:14px; padding:16px 20px; color:#7c2d12; box-shadow:0 10px 28px rgba(124,45,18,0.14); position:relative; z-index:2; }
+        .play-day-pricing-nudge strong { color:#9a3412; }
         .compare-tag { background: #f0f9ff; border-left: 3px solid #1a56a0; padding: 10px 16px; border-radius: 0 8px 8px 0; font-size: 0.85rem; color: #1a56a0; margin-bottom: 20px; }
         .section-title { text-align: center; color: #0f3460; font-weight: 800; font-size: 1.6rem; margin-bottom: 30px; }
         .faq-item { background: white; border-radius: 12px; padding: 20px 24px; margin-bottom: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
@@ -73,6 +75,13 @@
     <div class="container">
         <h1>Simple or AI-Powered.<br>You Choose.</h1>
         <p>Start free. Upgrade when you're ready. 14-day free trial &middot; Cancel anytime.</p>
+    </div>
+</div>
+
+<div class="container px-3">
+    <div id="playDayPricingNudge" class="play-day-pricing-nudge">
+        <strong>Play For a Day is running.</strong>
+        Get unlimited access with QuoteDr Pro before your trial timer runs out.
     </div>
 </div>
 
@@ -255,7 +264,39 @@ function restartTestimonials() {
     }, 6500);
 }
 
-document.addEventListener('DOMContentLoaded', startTestimonials);
+function getPlayDayPricingEntries() {
+    try {
+        var usage = JSON.parse(localStorage.getItem('ald_pro_trial_usage') || '{}');
+        var now = Date.now();
+        var grace = 30 * 60 * 1000;
+        return Object.keys(usage).filter(function(key) {
+            var trial = usage[key] || {};
+            if (!trial.expires_at) return false;
+            var expires = new Date(trial.expires_at).getTime();
+            return expires && now <= expires + grace;
+        });
+    } catch(e) {
+        return [];
+    }
+}
+
+function showPlayDayPricingNudge() {
+    var nudge = document.getElementById('playDayPricingNudge');
+    if (!nudge) return;
+    var entries = getPlayDayPricingEntries();
+    if (!entries.length) return;
+    nudge.style.display = 'block';
+    try {
+        if (window.QuoteDrAnalytics && typeof window.QuoteDrAnalytics.capture === 'function') {
+            window.QuoteDrAnalytics.capture('pro_upgrade_prompt_shown', { trigger: 'pricing_page_trial', active_trial_count: entries.length });
+        }
+    } catch(e) {}
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    startTestimonials();
+    showPlayDayPricingNudge();
+});
 
 async function startCheckout(plan) {
     var btn = document.getElementById(plan === 'pro' ? 'proBtn' : 'basicBtn');

@@ -1004,7 +1004,6 @@ function showProTrialModal(featureKey, featureLabel) {
                     '<div class="modal-header">' +
                         '<h5 class="modal-title d-flex align-items-center gap-2">' +
                             '<span style="width:34px;height:34px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:#e8f2ff;color:#1a56a0;"><i class="fas fa-star"></i></span>' +
-                            '<span>Try a Pro Feature Free</span>' +
                             '<span>Play For a Day</span>' +
                         '</h5>' +
                         '<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>' +
@@ -1178,8 +1177,8 @@ async function requireProFeature(featureKey, featureLabel, options) {
         return false;
     }
 
-    var choice = await showProTrialModal(featureKey, featureLabel);
     qdCaptureEvent('pro_play_day_prompt_shown', { feature: featureKey, label: featureLabel });
+    var choice = await showProTrialModal(featureKey, featureLabel);
     if (choice !== 'try') {
         qdCaptureEvent('pro_play_day_declined', { feature: featureKey, label: featureLabel });
         return false;
@@ -1365,7 +1364,6 @@ document.addEventListener('DOMContentLoaded', function() {
 window.qdMaybeShowProUpgradePrompt = qdMaybeShowProUpgradePrompt;
 window.qdMaybeShowSecondQuoteUpgradePrompt = qdMaybeShowSecondQuoteUpgradePrompt;
 window.refreshPlayForADayWidget = refreshPlayForADayWidget;
-}
 
 function getMeasurementSystem() {
     try {
