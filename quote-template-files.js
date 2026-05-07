@@ -127,14 +127,18 @@
 
     function createCommunityTemplatePayload(template, options) {
         options = options || {};
-        var normalized = normalizeTemplate(template, false);
+        var includePricing = !!options.includePricing || !!options.include_pricing;
+        var isAnonymous = !!options.isAnonymous || !!options.is_anonymous;
+        var normalized = normalizeTemplate(template, includePricing);
         return {
             name: normalized.name,
             description: options.description || '',
             trade: options.trade || '',
             region: options.region || '',
             jobType: options.jobType || options.job_type || '',
-            creatorName: options.creatorName || options.creator_name || '',
+            creatorName: isAnonymous ? '' : (options.creatorName || options.creator_name || ''),
+            includePricing: includePricing,
+            isAnonymous: isAnonymous,
             rooms: normalized.rooms,
             roomCount: normalized.rooms.length,
             publishedAt: options.now || new Date().toISOString()
@@ -157,7 +161,9 @@
             importedAt: new Date().toISOString(),
             source: 'community',
             communityTemplateId: template && template.id ? template.id : null,
-            communityCreator: (template && (template.creator_name || template.creatorName)) || ''
+            communityCreator: (template && (template.creator_name || template.creatorName)) || '',
+            communityIncludePricing: !!(template && (template.include_pricing || template.includePricing)),
+            communityIsAnonymous: !!(template && (template.is_anonymous || template.isAnonymous))
         };
         return imported;
     }

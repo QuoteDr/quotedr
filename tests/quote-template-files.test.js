@@ -73,16 +73,38 @@ assert(community.rooms[0].items[0].rate === 0, 'community payload should always 
 assert(community.rooms[0].items[0].total === 0, 'community payload should always strip totals');
 assert(community.rooms[0].items[0].upgrade.rate === 0, 'community payload should always strip upgrade rates');
 assert(community.rooms[0].markup === 0, 'community payload should always strip markup');
+assert(community.includePricing === false, 'community payload should strip pricing by default');
+assert(community.isAnonymous === false, 'community payload should be named by default');
+
+const pricedAnonymousCommunity = files.createCommunityTemplatePayload(template, {
+  description: 'Premium GTA pricing example',
+  trade: 'Bathroom Renovation',
+  region: 'GTA',
+  includePricing: true,
+  isAnonymous: true,
+  creatorName: 'Adam'
+});
+assert(pricedAnonymousCommunity.includePricing === true, 'community payload should include pricing only by opt-in');
+assert(pricedAnonymousCommunity.isAnonymous === true, 'community payload should support anonymous posting');
+assert(pricedAnonymousCommunity.creatorName === '', 'anonymous payload should not expose creator name');
+assert(pricedAnonymousCommunity.rooms[0].items[0].rate === 14, 'opt-in priced community payload should keep item rates');
+assert(pricedAnonymousCommunity.rooms[0].items[0].total === 1120, 'opt-in priced community payload should keep totals');
+assert(pricedAnonymousCommunity.rooms[0].items[0].upgrade.rate === 18, 'opt-in priced community payload should keep upgrade rates');
+assert(pricedAnonymousCommunity.rooms[0].markup === 12, 'opt-in priced community payload should keep markup');
 
 const communityImport = files.prepareCommunityTemplateForImport({
   name: 'Basement Bathroom',
   rooms: community.rooms,
-  creator_name: 'Adam'
+  creator_name: 'Adam',
+  include_pricing: false,
+  is_anonymous: false
 }, [{ id: 1, name: 'Basement Bathroom', rooms: [] }], { now: 2000 });
 assert(communityImport.id === 2000, 'community import should assign a fresh id');
 assert(communityImport.name === 'Basement Bathroom (Community)', 'community import should avoid name collisions');
 assert(communityImport.source === 'community', 'community import should mark source');
 assert(communityImport.communityCreator === 'Adam', 'community import should keep creator attribution');
+assert(communityImport.communityIncludePricing === false, 'community import should track pricing policy');
+assert(communityImport.communityIsAnonymous === false, 'community import should track anonymous flag');
 assert(communityImport.rooms[0].id === 2001, 'community import should assign fresh room ids');
 
 console.log('quote-template file helper test passed');

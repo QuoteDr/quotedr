@@ -129,6 +129,8 @@ create table if not exists community_templates (
     region text default '',
     job_type text default '',
     creator_name text default '',
+    include_pricing boolean default false,
+    is_anonymous boolean default false,
     rooms jsonb not null default '[]'::jsonb,
     room_count integer default 0,
     download_count integer default 0,
