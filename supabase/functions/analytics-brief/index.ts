@@ -13,6 +13,10 @@ const POSTHOG_PERSONAL_API_KEY = Deno.env.get("POSTHOG_PERSONAL_API_KEY") ?? "";
 const POSTHOG_PROJECT_ID = Deno.env.get("POSTHOG_PROJECT_ID") ?? "411455";
 const POSTHOG_HOST = Deno.env.get("POSTHOG_HOST") ?? "https://us.posthog.com";
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
+const ANALYTICS_ADMIN_EMAILS = (Deno.env.get("ANALYTICS_ADMIN_EMAILS") ?? "info@alddirect.ca")
+  .split(",")
+  .map((email) => email.trim().toLowerCase())
+  .filter(Boolean);
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -67,6 +71,10 @@ async function verifyUser(req: Request) {
   const token = authHeader.substring(7);
   const { data, error } = await supabase.auth.getUser(token);
   if (error || !data?.user) throw new Error("Invalid authorization");
+  const email = String(data.user.email || "").trim().toLowerCase();
+  if (!ANALYTICS_ADMIN_EMAILS.includes(email)) {
+    throw new Error("Forbidden");
+  }
   return data.user;
 }
 
@@ -267,7 +275,7 @@ serve(async (req) => {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Internal server error";
-    const status = /authorization/i.test(message) ? 401 : /configured/i.test(message) ? 500 : 500;
+    const status = /authorization/i.test(message) ? 401 : /forbidden/i.test(message) ? 403 : /configured/i.test(message) ? 500 : 500;
     return jsonResponse({ error: message }, status);
   }
 });

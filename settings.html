@@ -110,7 +110,7 @@ if (location.search.includes('debug')) {
 					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('payments',this);return false;"><i class="fas fa-credit-card me-2" style="color:#28a745"></i>Payments</a>
 					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('portal',this);return false;"><i class="fas fa-paint-brush me-2" style="color:#e87e2a"></i>Portal Theme</a>
 					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('integrations',this);return false;"><i class="fas fa-plug me-2" style="color:#2b6cb0"></i>Integrations</a>
-					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('analytics',this);return false;"><i class="fas fa-chart-line me-2" style="color:#198754"></i>Analytics Brief</a>
+					<a href="#" id="analyticsBriefTabLink" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('analytics',this);return false;" style="display:none;"><i class="fas fa-chart-line me-2" style="color:#198754"></i>Analytics Brief</a>
 					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('account',this);return false;"><i class="fas fa-user-circle me-2" style="color:#6f42c1"></i>Account</a>
 					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('feedback',this);return false;"><i class="fas fa-comment-alt me-2" style="color:#28a745"></i>Feedback</a>
 				</div>
@@ -1054,6 +1054,27 @@ Sarah Jones, 905-555-5678"></textarea>
 		});
 		// === End QuickBooks ===
 
+		const QUOTEDR_ANALYTICS_ADMIN_EMAILS = ['info@alddirect.ca'];
+
+		function isAnalyticsAdminUser(user) {
+			var email = String((user && user.email) || '').trim().toLowerCase();
+			return QUOTEDR_ANALYTICS_ADMIN_EMAILS.indexOf(email) !== -1;
+		}
+
+		function applyAnalyticsAdminVisibility(user) {
+			var isAdmin = isAnalyticsAdminUser(user);
+			var tabLink = document.getElementById('analyticsBriefTabLink');
+			var tabPanel = document.getElementById('tab-analytics');
+			if (tabLink) tabLink.style.display = isAdmin ? '' : 'none';
+			if (!isAdmin && tabPanel) {
+				tabPanel.style.display = 'none';
+				if (localStorage.getItem('ald_settings_tab') === 'analytics') {
+					localStorage.setItem('ald_settings_tab', 'business');
+				}
+			}
+			return isAdmin;
+		}
+
 		function escapeAnalyticsHtml(value) {
 			return String(value === undefined || value === null ? '' : value)
 				.replace(/&/g, '&amp;')
@@ -1136,6 +1157,10 @@ Sarah Jones, 905-555-5678"></textarea>
 		}
 
 		function showTab(name, el) {
+			if (name === 'analytics' && !isAnalyticsAdminUser(window.currentUser)) {
+				name = 'business';
+				el = document.querySelector("#settingsTabs [onclick*=\"'business'\"]");
+			}
 			document.querySelectorAll('[id^="tab-"]').forEach(function(t) { t.style.display = 'none'; });
 			var tab = document.getElementById('tab-' + name);
 			if (tab) tab.style.display = '';
@@ -1288,8 +1313,10 @@ Sarah Jones, 905-555-5678"></textarea>
 			const { data: { session } } = await _supabase.auth.getSession();
 			if (!session) { window.location.href = 'login.html'; return; }
 			window.currentUser = session.user;
+			applyAnalyticsAdminVisibility(window.currentUser);
 			// Restore last active tab
 			var lastTab = localStorage.getItem('ald_settings_tab') || 'business';
+			if (lastTab === 'analytics' && !isAnalyticsAdminUser(window.currentUser)) lastTab = 'business';
 			var tabEl = document.querySelector('#settingsTabs [onclick*="\'' + lastTab + '\'"]');
 			showTab(lastTab, tabEl);
 			// Load notification settings
