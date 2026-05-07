@@ -650,6 +650,14 @@ async function saveQuote() {
                         window._quoteFullyLoaded = true; // allow autosave now
                         updateSaveStatus('saved', 'Quote loaded ?');
                         updateDraftWarning();
+                        if (window.location.hash === "#change-order" && typeof createChangeOrderFromCurrentQuote === "function") {
+                            setTimeout(function() {
+                                if (window.location.hash === "#change-order") {
+                                    createChangeOrderFromCurrentQuote();
+                                    history.replaceState(null, "", window.location.pathname + window.location.search);
+                                }
+                            }, 0);
+                        }
                         // Show client notes banner if ?shownotes=1
                         if (urlParams.get('shownotes') === '1') {
                             window._loadedQuoteData = q;
@@ -974,6 +982,11 @@ async function saveQuote() {
                 if (window.location.hash === "#send-quote-settings" && typeof openQuoteSendSettingsModal === "function") {
                     openQuoteSendSettingsModal(true);
                     history.replaceState(null, "", window.location.pathname + window.location.search);
+                    return;
+                }
+                var isLoadingSpecificQuote = new URLSearchParams(window.location.search).get("load");
+                if (window.location.hash === "#change-order" && isLoadingSpecificQuote && !window._quoteFullyLoaded && attempt < 25) {
+                    setTimeout(function() { openBuilderHashTarget(attempt + 1); }, 250);
                     return;
                 }
                 if (window.location.hash === "#change-order" && typeof createChangeOrderFromCurrentQuote === "function" && window._supabaseQuoteId) {
