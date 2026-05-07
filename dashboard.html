@@ -232,7 +232,7 @@
     <script src="modal-help.js?v=1777741200"></script>
     <script src="change-orders.js?v=1778060200"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-v2.js?v=1778059000"></script>
+    <script src="supabase-v2.js?v=1778146200"></script>
     <script>
         // ─── DASHBOARD FUNCTIONS ─────────────────────────────────────────────────────
 
@@ -265,13 +265,29 @@
             return false;
         }
 
+        async function fetchDashboardQuotes() {
+            const { data: { session } } = await _supabase.auth.getSession();
+            if (!session || !session.user) return { error: 'Not authenticated' };
+            const result = await _supabase
+                .from('quotes')
+                .select('*')
+                .eq('user_id', session.user.id)
+                .order('created_at', { ascending: false });
+            return result;
+        }
+
         async function refreshQuotes() {
             try {
-                const { data, error } = await listQuotesFromSupabase();
+                let { data, error } = await fetchDashboardQuotes();
+                if (error && typeof listQuotesFromSupabase === 'function') {
+                    const fallback = await listQuotesFromSupabase();
+                    data = fallback.data;
+                    error = fallback.error;
+                }
                 if (error === 'Not authenticated') {
                     // Retry after delay — session may not be ready yet
                     setTimeout(async function() {
-                        const retry = await listQuotesFromSupabase();
+                        const retry = await fetchDashboardQuotes();
                         if (!retry.error) {
                             allQuotes = autocleanDuplicates(retry.data || []);
                             renderQuotes(allQuotes);
@@ -852,7 +868,8 @@
             var attempts = 0;
             async function loadWithRetry() {
                 attempts++;
-                var result = await listQuotesFromSupabase();
+                var result = await fetchDashboardQuotes();
+                if (result.error && typeof listQuotesFromSupabase === 'function') result = await listQuotesFromSupabase();
                 if (result.error === 'Not authenticated' && attempts < 3) {
                     setTimeout(loadWithRetry, 800 * attempts);
                 } else if (!result.error) {
