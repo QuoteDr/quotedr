@@ -6830,6 +6830,99 @@ Example:
             }) || null;
         }
 
+        function _voiceMappingAsItem(mapping) {
+            if (!mapping) return null;
+            return {
+                category: mapping.mapped_item_category || 'Miscellaneous',
+                name: mapping.mapped_item_name || '',
+                unitType: mapping.mapped_unit || 'ls',
+                rate: parseFloat(mapping.mapped_price || 0) || 0
+            };
+        }
+
+        async function openAiVoiceMemorySettings() {
+            await loadAiVoiceMemorySettings();
+            new bootstrap.Modal(document.getElementById('aiVoiceMemoryModal')).show();
+        }
+
+        async function loadAiVoiceMemorySettings() {
+            var list = document.getElementById('aiVoiceMemoryList');
+            var options = document.getElementById('aiVoiceMemoryItemOptions');
+            if (!list || !options) return;
+            list.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm me-2"></span>Loading AI memories...</div>';
+            _voiceReviewItems = _flattenVoicePricingItems();
+            options.innerHTML = '';
+            _voiceReviewItems.forEach(function(item) {
+                var option = document.createElement('option');
+                option.value = _voiceItemDisplay(item);
+                options.appendChild(option);
+            });
+            if (typeof getUserLearnedMappings !== 'function') {
+                list.innerHTML = '<div class="alert alert-warning small mb-0">AI memory helpers are not loaded yet.</div>';
+                return;
+            }
+            var mappings = await getUserLearnedMappings();
+            if (!mappings.length) {
+                list.innerHTML = '<div class="alert alert-light border small mb-0">No AI memories yet. Correct an AI Voice item and leave "Remember this phrase" checked.</div>';
+                return;
+            }
+            list.innerHTML = '';
+            mappings.forEach(function(mapping, index) {
+                var card = document.createElement('div');
+                card.className = 'border rounded p-3 mb-3';
+                card.innerHTML = ''
+                    + '<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">'
+                    + '<div><div class="small text-muted">Learned phrase</div><input class="form-control form-control-sm ai-memory-phrase" data-index="' + index + '" value="' + _escapeHtml(mapping.spoken_phrase || '') + '"></div>'
+                    + '<span class="badge bg-primary align-self-start">' + (parseInt(mapping.usage_count, 10) || 0) + ' uses</span>'
+                    + '</div>'
+                    + '<label class="form-label small fw-semibold" for="aiMemoryItem' + index + '">Mapped saved item</label>'
+                    + '<input class="form-control form-control-sm ai-memory-item" id="aiMemoryItem' + index + '" list="aiVoiceMemoryItemOptions" data-index="' + index + '" value="' + _escapeHtml(_voiceItemDisplay(_voiceMappingAsItem(mapping))) + '">'
+                    + '<label class="form-label small fw-semibold mt-2" for="aiMemoryNote' + index + '">Note</label>'
+                    + '<input class="form-control form-control-sm ai-memory-note" id="aiMemoryNote' + index + '" data-index="' + index + '" value="' + _escapeHtml(mapping.user_note || '') + '" placeholder="Optional note">'
+                    + '<div class="d-flex justify-content-end gap-2 mt-3">'
+                    + '<button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteAiVoiceMemory(\'' + mapping.id + '\')"><i class="fas fa-trash me-1"></i>Forget</button>'
+                    + '<button type="button" class="btn btn-primary btn-sm" onclick="saveAiVoiceMemory(' + index + ', \'' + mapping.id + '\')"><i class="fas fa-save me-1"></i>Save</button>'
+                    + '</div>';
+                list.appendChild(card);
+            });
+        }
+
+        async function saveAiVoiceMemory(index, mappingId) {
+            var phrase = document.querySelector('.ai-memory-phrase[data-index="' + index + '"]');
+            var itemInput = document.querySelector('.ai-memory-item[data-index="' + index + '"]');
+            var note = document.querySelector('.ai-memory-note[data-index="' + index + '"]');
+            var selected = _resolveVoiceReviewSelection(itemInput ? itemInput.value : '');
+            if (!phrase || !phrase.value.trim()) {
+                qdAlert('Please enter a phrase for this AI memory.');
+                return;
+            }
+            if (!selected) {
+                qdAlert('Please choose a saved item from the item field.');
+                return;
+            }
+            if (typeof updateLearnedMapping !== 'function') {
+                qdAlert('AI memory update helper is not loaded yet.');
+                return;
+            }
+            var result = await updateLearnedMapping(mappingId, phrase.value.trim(), selected, note ? note.value.trim() : '');
+            if (result && result.error) {
+                qdAlert('Could not save AI memory: ' + (result.error.message || result.error));
+                return;
+            }
+            await loadAiVoiceMemorySettings();
+        }
+
+        async function deleteAiVoiceMemory(mappingId) {
+            if (!mappingId) return;
+            if (!await qdConfirm('Forget this AI memory?', { title: 'Forget AI Memory', okText: 'Forget', cancelText: 'Cancel', type: 'warning' })) return;
+            if (typeof deleteLearnedMapping !== 'function') {
+                qdAlert('AI memory delete helper is not loaded yet.');
+                return;
+            }
+            await deleteLearnedMapping(mappingId);
+            await loadAiVoiceMemorySettings();
+        }
+
         function _buildVoiceReviewRows(result, mappings) {
             var rows = [];
             var mappingByPhrase = {};
@@ -7836,10 +7929,34 @@ Example:
                         <button onclick="submitVoiceQuote()" class="btn btn-success me-2"><i class="fas fa-magic me-1"></i>Generate Quote</button>
                         <button onclick="clearVoiceTranscript()" class="btn btn-outline-secondary"><i class="fas fa-redo me-1"></i>Try Again</button>
                     </div>
+                    <button type="button" class="btn btn-link btn-sm mt-2" onclick="openAiVoiceMemorySettings()"><i class="fas fa-brain me-1"></i>AI Memory</button>
                     <div id="voiceLoading" style="display:none;">
                         <div class="spinner-border" style="color:#7c3aed;" role="status"></div>
                         <div class="mt-2 text-muted">AI is building your quote...</div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Voice Memory Modal -->
+    <div class="modal fade" id="aiVoiceMemoryModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header" style="background:#1a56a0; color:white;">
+                    <h5 class="modal-title"><i class="fas fa-brain me-2"></i>AI Memory</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-light border small">
+                        Edit what QuoteDr remembers from your voice corrections. These mappings are private to your account.
+                    </div>
+                    <datalist id="aiVoiceMemoryItemOptions"></datalist>
+                    <div id="aiVoiceMemoryList"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" onclick="loadAiVoiceMemorySettings()"><i class="fas fa-sync-alt me-1"></i>Refresh</button>
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
                 </div>
             </div>
         </div>

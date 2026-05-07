@@ -842,6 +842,33 @@ async function incrementLearnedMappingUsage(mappingId) {
         .single();
 }
 
+async function updateLearnedMapping(mappingId, phrase, mappedItem, note) {
+    const user = await getCurrentUser();
+    if (!user) return { data: null, error: 'Not authenticated' };
+    if (!mappingId) return { data: null, error: 'Missing mapping id' };
+    const phraseKey = normalizeAiPhraseKey(phrase);
+    if (!phraseKey) return { data: null, error: 'Missing phrase' };
+    const payload = {
+        spoken_phrase: String(phrase || '').trim(),
+        phrase_key: phraseKey,
+        user_note: note || '',
+        updated_at: new Date().toISOString()
+    };
+    if (mappedItem) {
+        payload.mapped_item_category = mappedItem.category || 'Miscellaneous';
+        payload.mapped_item_name = mappedItem.name || mappedItem.description || '';
+        payload.mapped_unit = mappedItem.unitType || mappedItem.unit || 'ls';
+        payload.mapped_price = parseFloat(mappedItem.rate || mappedItem.price || 0) || 0;
+    }
+    return await _supabase
+        .from('ai_learned_mappings')
+        .update(payload)
+        .eq('id', mappingId)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+}
+
 async function deleteLearnedMapping(mappingId) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
