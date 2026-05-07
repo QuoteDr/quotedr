@@ -6458,6 +6458,7 @@ Example:
         var _voiceReviewResult = null;
         var _voiceReviewRows = [];
         var _voiceReviewItems = [];
+        var _voiceMeasurementResult = null;
 
         async function startVoiceQuote() {
             if (typeof requireFeature === 'function') {
@@ -6707,6 +6708,106 @@ Example:
             item.total = (parseFloat(item.quantity) || 1) * rate;
             if (mapped.user_note && !item.notes) item.notes = mapped.user_note;
             return item;
+        }
+
+        function _isWallPaintVoiceItem(item) {
+            var label = ((item && item.category) || '') + ' ' + ((item && item.description) || '') + ' ' + ((item && item.spokenPhrase) || '');
+            label = label.toLowerCase();
+            return label.indexOf('wall') >= 0 && (label.indexOf('paint') >= 0 || label.indexOf('painting') >= 0);
+        }
+
+        function _voiceRoundQuantity(value) {
+            var parsed = parseFloat(value);
+            if (!isFinite(parsed)) return 0;
+            return Math.round(parsed * 100) / 100;
+        }
+
+        function _findVoiceMissingMeasurements(result) {
+            var roomsNeedingHeight = [];
+            if (!result || !Array.isArray(result.rooms)) return roomsNeedingHeight;
+            result.rooms.forEach(function(room, roomIndex) {
+                var dims = room && room.dimensions;
+                if (!dims || !dims.length || !dims.width || dims.heightProvided) return;
+                var hasWallPaint = Array.isArray(room.items) && room.items.some(function(item) {
+                    return item && (item.needsMeasurement === 'ceiling_height' || _isWallPaintVoiceItem(item));
+                });
+                if (hasWallPaint) {
+                    roomsNeedingHeight.push({ room: room, roomIndex: roomIndex, dimensions: dims });
+                }
+            });
+            return roomsNeedingHeight;
+        }
+
+        function _recalculateVoiceRoomWallPaint(room, height) {
+            if (!room || !room.dimensions || !Array.isArray(room.items)) return;
+            var length = parseFloat(room.dimensions.length);
+            var width = parseFloat(room.dimensions.width);
+            var parsedHeight = parseFloat(height);
+            if (!isFinite(length) || !isFinite(width) || !isFinite(parsedHeight) || parsedHeight <= 0) return;
+            var wallArea = _voiceRoundQuantity((length + width) * 2 * parsedHeight);
+            room.dimensions.height = parsedHeight;
+            room.dimensions.heightProvided = true;
+            room.dimensions.wallArea = wallArea;
+            room.items.forEach(function(item) {
+                if (!_isWallPaintVoiceItem(item)) return;
+                item.quantity = wallArea;
+                item.unit = item.unit || 'sqft';
+                item.unitType = item.unitType || item.unit || 'sqft';
+                item.calculation = 'Wall paint sqft = perimeter x height = (' + length + '+' + width + ')x2x' + parsedHeight + ' = ' + wallArea + ' sqft';
+                item.needsMeasurement = undefined;
+                item.total = _voiceRoundQuantity((parseFloat(item.rate) || 0) * wallArea);
+            });
+        }
+
+        function showAiVoiceMeasurementModal(result) {
+            return new Promise(function(resolve) {
+                var missing = _findVoiceMissingMeasurements(result);
+                if (!missing.length) {
+                    resolve(result);
+                    return;
+                }
+                _voiceMeasurementResult = result;
+                var list = document.getElementById('aiVoiceMeasurementList');
+                if (!list) {
+                    resolve(result);
+                    return;
+                }
+                list.innerHTML = '';
+                missing.forEach(function(entry, index) {
+                    var dims = entry.dimensions;
+                    var card = document.createElement('div');
+                    card.className = 'border rounded p-3 mb-3';
+                    card.innerHTML = ''
+                        + '<div class="fw-semibold mb-1">' + _escapeHtml(entry.room.name || ('Room ' + (entry.roomIndex + 1))) + '</div>'
+                        + '<div class="small text-muted mb-2">I heard ' + _escapeHtml(dims.length) + ' ft x ' + _escapeHtml(dims.width) + ' ft and need the ceiling height to calculate wall paint.</div>'
+                        + '<label class="form-label small fw-semibold" for="aiVoiceHeightInput' + index + '">Ceiling height (ft)</label>'
+                        + '<input type="number" min="1" step="0.25" class="form-control ai-voice-height-input" id="aiVoiceHeightInput' + index + '" data-room-index="' + entry.roomIndex + '" value="' + _escapeHtml(dims.height || 8) + '">';
+                    list.appendChild(card);
+                });
+                var modalEl = document.getElementById('aiVoiceMeasurementModal');
+                if (!modalEl) {
+                    resolve(result);
+                    return;
+                }
+                modalEl._voiceResolve = resolve;
+                new bootstrap.Modal(modalEl).show();
+            });
+        }
+
+        function confirmAiVoiceMeasurements() {
+            var result = _voiceMeasurementResult;
+            document.querySelectorAll('.ai-voice-height-input').forEach(function(input) {
+                var roomIndex = parseInt(input.getAttribute('data-room-index'), 10);
+                var height = parseFloat(input.value);
+                if (!result || !result.rooms || !result.rooms[roomIndex] || !isFinite(height) || height <= 0) return;
+                _recalculateVoiceRoomWallPaint(result.rooms[roomIndex], height);
+            });
+            var modalEl = document.getElementById('aiVoiceMeasurementModal');
+            var modal = modalEl ? bootstrap.Modal.getInstance(modalEl) : null;
+            if (modal) modal.hide();
+            var resolve = modalEl && modalEl._voiceResolve;
+            _voiceMeasurementResult = null;
+            if (resolve) resolve(result);
         }
 
         function _voiceItemDisplay(item) {
@@ -7002,7 +7103,8 @@ Example:
                 if (result.error) throw new Error(result.error);
                 document.getElementById('voiceLoading').style.display = 'none';
                 await _hideBootstrapModalAndWait('voiceQuoteModal');
-                await showAiVoiceReview(result);
+                const measuredResult = await showAiVoiceMeasurementModal(result);
+                await showAiVoiceReview(measuredResult);
             } catch(err) {
                 console.error('Voice quote error:', err);
                 document.getElementById('voiceLoading').style.display = 'none';
@@ -7738,6 +7840,26 @@ Example:
                         <div class="spinner-border" style="color:#7c3aed;" role="status"></div>
                         <div class="mt-2 text-muted">AI is building your quote...</div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Voice Missing Measurements Modal -->
+    <div class="modal fade" id="aiVoiceMeasurementModal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header" style="background:#7c3aed; color:white;">
+                    <h5 class="modal-title"><i class="fas fa-ruler-combined me-2"></i>Missing Measurement</h5>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-light border small">
+                        Wall paint needs ceiling height so QuoteDr can use perimeter x height instead of guessing.
+                    </div>
+                    <div id="aiVoiceMeasurementList"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" onclick="confirmAiVoiceMeasurements()"><i class="fas fa-check me-1"></i>Continue Review</button>
                 </div>
             </div>
         </div>

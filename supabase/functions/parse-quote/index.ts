@@ -18,16 +18,21 @@ function extractRoomDimensions(text: string) {
   const width = parseFloat(dimMatch[2]);
   if (!isFinite(length) || !isFinite(width) || length <= 0 || width <= 0) return null;
   let height = 8;
+  let heightProvided = false;
   const heightMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:ft|feet|foot|')?\s*(?:high|height|ceilings?|walls?)/)
     || lower.match(/(?:ceiling|wall)\s*(?:height|is|are)?\s*(\d+(?:\.\d+)?)\s*(?:ft|feet|foot|')?/);
   if (heightMatch) {
     const parsedHeight = parseFloat(heightMatch[1]);
-    if (isFinite(parsedHeight) && parsedHeight > 0) height = parsedHeight;
+    if (isFinite(parsedHeight) && parsedHeight > 0) {
+      height = parsedHeight;
+      heightProvided = true;
+    }
   }
   return {
     length,
     width,
     height,
+    heightProvided,
     floorArea: roundQuantity(length * width),
     wallArea: roundQuantity((length + width) * 2 * height),
   };
@@ -38,6 +43,14 @@ function normalizePaintQuantities(parsed: any, transcript: string) {
   if (!dims || !parsed || !Array.isArray(parsed.rooms)) return parsed;
   parsed.rooms.forEach((room: any) => {
     if (!room || !Array.isArray(room.items)) return;
+    room.dimensions = {
+      length: dims.length,
+      width: dims.width,
+      height: dims.height,
+      heightProvided: dims.heightProvided,
+      floorArea: dims.floorArea,
+      wallArea: dims.wallArea,
+    };
     room.items.forEach((item: any) => {
       const label = `${item.category || ''} ${item.description || ''} ${item.spokenPhrase || ''}`.toLowerCase();
       const isPaint = label.includes('paint') || label.includes('painting');
@@ -46,6 +59,7 @@ function normalizePaintQuantities(parsed: any, transcript: string) {
         item.quantity = dims.wallArea;
         item.unit = item.unit || 'sqft';
         item.calculation = `Wall paint sqft = perimeter x height = (${dims.length}+${dims.width})x2x${dims.height} = ${dims.wallArea} sqft`;
+        item.needsMeasurement = dims.heightProvided ? undefined : 'ceiling_height';
         item.total = roundQuantity((parseFloat(item.rate) || 0) * dims.wallArea);
       } else if (label.includes('ceiling')) {
         item.quantity = dims.floorArea;
