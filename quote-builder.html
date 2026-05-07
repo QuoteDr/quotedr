@@ -6182,6 +6182,7 @@ Example:
         // ============================================================
         var _voiceRecognition = null;
         var _voiceRecording = false;
+        var _voicePaused = false;
         var _voiceTranscriptFull = '';
         var _voiceLastResultIndex = 0;
         var _voiceVerificationResolve = null;
@@ -6208,12 +6209,22 @@ Example:
             micBtn.style.background = '#7c3aed';
             micBtn.innerHTML = '<i class="fas fa-microphone"></i>';
             _voiceRecording = false;
+            _voicePaused = false;
+            _setVoicePauseButton(false);
             var modal = new bootstrap.Modal(document.getElementById('voiceQuoteModal'));
             modal.show();
         }
 
         function toggleVoiceRecording() {
             if (_voiceRecording) { stopVoiceRecording(); } else { startVoiceRecording(); }
+        }
+
+        function _setVoicePauseButton(enabled) {
+            var pauseBtn = document.getElementById('voicePauseBtn');
+            if (!pauseBtn) return;
+            pauseBtn.disabled = !enabled;
+            pauseBtn.innerHTML = _voicePaused ? '<i class="fas fa-play me-1"></i>Resume' : '<i class="fas fa-pause me-1"></i>Pause';
+            pauseBtn.className = _voicePaused ? 'btn btn-outline-success me-2' : 'btn btn-outline-warning me-2';
         }
 
         function _createRecognition() {
@@ -6239,20 +6250,18 @@ Example:
                 }
             };
             r.onend = function() {
-                if (_voiceRecording) {
-                    // Show brief 'paused' indicator then restart
+                if (_voiceRecording && !_voicePaused) {
                     var el = document.getElementById('voiceStatus');
-                    if (el) el.textContent = '??? Listening...';
+                    if (el) el.textContent = 'Listening...';
                     setTimeout(function() {
-                        if (_voiceRecording) {
+                        if (_voiceRecording && !_voicePaused) {
                             _voiceRecognition = _createRecognition();
                             try {
                                 _voiceRecognition.start();
-                                if (el) el.textContent = '??? Recording - speak your quote';
+                                if (el) el.textContent = 'Recording - speak your quote';
                             } catch(e) {
-                                // Back off and retry once more
                                 setTimeout(function() {
-                                    if (_voiceRecording) {
+                                    if (_voiceRecording && !_voicePaused) {
                                         _voiceRecognition = _createRecognition();
                                         try { _voiceRecognition.start(); } catch(e2) {}
                                     }
@@ -6265,8 +6274,10 @@ Example:
             return r;
         }
 
-        function startVoiceRecording() {
-            _voiceTranscriptFull = '';
+        function startVoiceRecording(resetTranscript) {
+            if (resetTranscript !== false && !_voiceTranscriptFull.trim()) {
+                _voiceTranscriptFull = '';
+            }
             _voiceRecognition = _createRecognition();
             try {
                 _voiceRecognition.start();
@@ -6275,14 +6286,38 @@ Example:
                 return;
             }
             _voiceRecording = true;
+            _voicePaused = false;
             var micBtn = document.getElementById('voiceMicBtn');
             micBtn.style.background = '#dc3545';
             micBtn.innerHTML = '<i class="fas fa-stop"></i>';
-            document.getElementById('voiceStatus').textContent = 'Recording... tap stop when done';
+            document.getElementById('voiceStatus').textContent = 'Recording... pause if you need a moment, or stop when done';
+            document.getElementById('voiceActions').style.display = 'none';
+            _setVoicePauseButton(true);
+        }
+
+        function toggleVoicePause() {
+            if (!_voiceRecording && !_voicePaused) return;
+            if (_voicePaused) {
+                startVoiceRecording(false);
+                return;
+            }
+            _voicePaused = true;
+            _voiceRecording = false;
+            if (_voiceRecognition) {
+                try { _voiceRecognition.abort(); } catch(e) {}
+                _voiceRecognition = null;
+            }
+            document.getElementById('voiceStatus').textContent = _voiceTranscriptFull.trim() ? 'Paused. Resume when ready, or generate from what you have.' : 'Paused. Resume when ready.';
+            document.getElementById('voiceActions').style.display = _voiceTranscriptFull.trim() ? 'block' : 'none';
+            var micBtn = document.getElementById('voiceMicBtn');
+            micBtn.style.background = '#7c3aed';
+            micBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+            _setVoicePauseButton(true);
         }
 
         function stopVoiceRecording() {
             _voiceRecording = false;
+            _voicePaused = false;
             if (_voiceRecognition) {
                 try { _voiceRecognition.abort(); } catch(e) {}
                 _voiceRecognition = null;
@@ -6296,13 +6331,24 @@ Example:
             } else {
                 document.getElementById('voiceStatus').textContent = 'Nothing recorded. Tap the mic to try again.';
             }
+            _setVoicePauseButton(false);
         }
 
         function clearVoiceTranscript() {
             _voiceTranscriptFull = '';
+            _voicePaused = false;
+            _voiceRecording = false;
+            if (_voiceRecognition) {
+                try { _voiceRecognition.abort(); } catch(e) {}
+                _voiceRecognition = null;
+            }
             document.getElementById('voiceTranscript').textContent = 'Your words will appear here...';
             document.getElementById('voiceStatus').textContent = 'Tap the mic and describe the job';
             document.getElementById('voiceActions').style.display = 'none';
+            var micBtn = document.getElementById('voiceMicBtn');
+            micBtn.style.background = '#7c3aed';
+            micBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+            _setVoicePauseButton(false);
         }
 
         function _voicePhraseKey(phrase) {
@@ -6565,6 +6611,13 @@ Example:
         async function submitVoiceQuote() {
             var transcript = _voiceTranscriptFull.trim();
             if (!transcript) return;
+            _voiceRecording = false;
+            _voicePaused = false;
+            if (_voiceRecognition) {
+                try { _voiceRecognition.abort(); } catch(e) {}
+                _voiceRecognition = null;
+            }
+            _setVoicePauseButton(false);
             document.getElementById('voiceActions').style.display = 'none';
             document.getElementById('voiceLoading').style.display = 'block';
             document.getElementById('voiceStatus').textContent = 'AI is analyzing your description...';
@@ -7310,6 +7363,9 @@ Example:
                     <button id="voiceMicBtn" onclick="toggleVoiceRecording()" class="btn btn-lg rounded-circle" style="width:80px; height:80px; background:#7c3aed; color:white; font-size:1.8rem; border:none; margin-bottom:20px;">
                         <i class="fas fa-microphone"></i>
                     </button>
+                    <div class="mb-3">
+                        <button id="voicePauseBtn" onclick="toggleVoicePause()" class="btn btn-outline-warning me-2" disabled><i class="fas fa-pause me-1"></i>Pause</button>
+                    </div>
                     <div id="voiceTranscript" class="text-muted" style="min-height:60px; font-style:italic; padding:10px; background:#f8f9fa; border-radius:8px; text-align:left; margin-bottom:16px;">Your words will appear here...</div>
                     <div id="voiceActions" style="display:none;">
                         <button onclick="submitVoiceQuote()" class="btn btn-success me-2"><i class="fas fa-magic me-1"></i>Generate Quote</button>
