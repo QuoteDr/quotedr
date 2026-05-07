@@ -6664,8 +6664,12 @@ Example:
                 options.appendChild(option);
             });
             var needsReview = _voiceReviewRows.filter(function(row) { return row.sortRank < 2; }).length;
-            summary.textContent = _voiceReviewRows.length + ' item' + (_voiceReviewRows.length === 1 ? '' : 's') + ' parsed. ' + (needsReview ? needsReview + ' need a closer look.' : 'Everything has a strong match.');
+            summary.textContent = _voiceReviewRows.length + ' item' + (_voiceReviewRows.length === 1 ? '' : 's') + ' parsed. ' + (_voiceReviewRows.length ? (needsReview ? needsReview + ' need a closer look.' : 'Everything has a strong match.') : 'Nothing is ready to add yet.');
             list.innerHTML = '';
+            if (!_voiceReviewRows.length) {
+                list.innerHTML = '<div class="alert alert-warning mb-0">AI did not find any line items in that recording. Keep the recording and try again with more detail, or close this review and enter items manually.</div>';
+                return;
+            }
             _voiceReviewRows.forEach(function(row, index) {
                 var item = row.item;
                 var selectedText = row.mapping ? _voiceMappingDisplay(row.mapping) : _voiceItemDisplay(row.selected);
@@ -6705,12 +6709,29 @@ Example:
             _voiceReviewResult = result;
             _voiceReviewItems = _flattenVoicePricingItems();
             _voiceReviewRows = _buildVoiceReviewRows(result, mappings);
-            if (!_voiceReviewRows.length) {
-                applyAIQuote(result);
-                return;
-            }
             _renderAiVoiceReviewModal();
-            new bootstrap.Modal(document.getElementById('aiVoiceReviewModal')).show();
+            var reviewModalEl = document.getElementById('aiVoiceReviewModal');
+            if (!reviewModalEl) {
+                throw new Error('AI voice review modal is missing from the page');
+            }
+            new bootstrap.Modal(reviewModalEl).show();
+        }
+
+        function _hideBootstrapModalAndWait(modalId) {
+            return new Promise(function(resolve) {
+                var modalEl = document.getElementById(modalId);
+                if (!modalEl || !window.bootstrap) {
+                    resolve();
+                    return;
+                }
+                var modal = bootstrap.Modal.getInstance(modalEl);
+                if (!modal || !modalEl.classList.contains('show')) {
+                    resolve();
+                    return;
+                }
+                modalEl.addEventListener('hidden.bs.modal', function() { resolve(); }, { once: true });
+                modal.hide();
+            });
         }
 
         async function confirmAiVoiceReview() {
@@ -6786,9 +6807,8 @@ Example:
                 if (!response.ok) throw new Error('Server error: ' + response.status);
                 const result = await response.json();
                 if (result.error) throw new Error(result.error);
-                var modal = bootstrap.Modal.getInstance(document.getElementById('voiceQuoteModal'));
-                if (modal) modal.hide();
                 document.getElementById('voiceLoading').style.display = 'none';
+                await _hideBootstrapModalAndWait('voiceQuoteModal');
                 await showAiVoiceReview(result);
             } catch(err) {
                 console.error('Voice quote error:', err);
