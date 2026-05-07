@@ -631,26 +631,21 @@ async function saveQuote() {
                     if (error) {
                         console.warn('Could not load quote from cloud:', error.message);
                     } else if (data) {
-                        const q = data.data || {};
+                        const q = Object.assign({}, data.data || {});
+                        q.supabaseId = data.id;
+                        q.clientName = data.client_name || q.clientName || '';
+                        q.quoteNumber = data.quote_number || q.quoteNumber || '';
+                        q.status = data.status || q.status || 'draft';
+                        q.type = data.type || q.type || q.documentType || 'quote';
+                        q.documentType = q.type;
+                        q.parentQuoteId = data.parent_quote_id || q.parentQuoteId || '';
+                        q.changeOrderNumber = data.change_order_number || q.changeOrderNumber || null;
+                        if (!q.projectAddress) q.projectAddress = q.project_address || '';
+                        if (!q.clientEmail) q.clientEmail = q.email || '';
+                        if (!q.clientPhone) q.clientPhone = q.phone || '';
                         window._supabaseQuoteId = data.id;
                         localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
-                        // Populate top-level fields
-                        if (document.getElementById('clientName')) document.getElementById('clientName').value = data.client_name || q.clientName || '';
-                        if (document.getElementById('quoteNumber')) document.getElementById('quoteNumber').value = data.quote_number || q.quoteNumber || '';
-                        if (document.getElementById('projectAddress')) document.getElementById('projectAddress').value = q.projectAddress || q.project_address || '';
-                        if (document.getElementById('clientEmail')) document.getElementById('clientEmail').value = q.clientEmail || q.email || '';
-                        if (document.getElementById('clientPhone')) document.getElementById('clientPhone').value = q.clientPhone || q.phone || '';
-                        // Load rooms
-                        const loadedRooms = q.rooms || [];
-                        if (loadedRooms.length > 0) {
-                            rooms = [];
-                            roomCounter = 0;
-                            loadedRooms.forEach(room => {
-                                roomCounter++;
-                                rooms.push({ id: roomCounter, name: room.name, items: JSON.parse(JSON.stringify(room.items || [])), colorIndex: room.colorIndex ?? 0, customColor: room.customColor || '', colorIntensity: room.colorIntensity || 100, markup: room.markup || 0, icon: room.icon || null, scopeNotes: room.scopeNotes || '' });
-                            });
-                            renderRooms();
-                        }
+                        applyQuoteData(q);
                         unsavedChanges = false;
                         window._quoteFullyLoaded = true; // allow autosave now
                         updateSaveStatus('saved', 'Quote loaded ?');

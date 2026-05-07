@@ -5376,7 +5376,7 @@ Example:
             modal.innerHTML = '<div class="modal-dialog modal-lg"><div class="modal-content">' +
                 '<div class="modal-header"><h5 class="modal-title"><i class="fas fa-users me-2 text-success"></i>Share to Community</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>' +
                 '<div class="modal-body">' +
-                '<div class="alert alert-warning py-2"><i class="fas fa-shield-alt me-1"></i>By default, rates, material costs, totals, and markup are stripped to $0. You can opt in to share your pricing if you want other contractors to see it.</div>' +
+                '<div class="alert alert-warning py-2"><i class="fas fa-shield-alt me-1"></i>Rates, material costs, totals, and markup are stripped to $0 before publishing. Only the structure, scope, rooms, quantities, and descriptions are shared.</div>' +
                 '<label class="form-label fw-bold">Template Name</label><input id="communityTemplateName" class="form-control mb-2" value="' + qdTemplateEscapeHtml(template.name || 'QuoteDr Template') + '">' +
                 '<label class="form-label fw-bold">Description</label><textarea id="communityTemplateDescription" class="form-control mb-2" rows="3" placeholder="What job is this best for? What scope does it include?"></textarea>' +
                 '<div class="row g-2">' +
@@ -5386,28 +5386,13 @@ Example:
                 '<div class="col-md-4"><label class="form-label fw-bold">Region</label><input id="communityTemplateRegion" class="form-control" placeholder="e.g., Ontario, GTA, Alberta"></div>' +
                 '<div class="col-md-4"><label class="form-label fw-bold">Job Type</label><input id="communityTemplateJobType" class="form-control" placeholder="e.g., Full bathroom"></div>' +
                 '</div>' +
-                '<div class="border rounded p-2 mt-3 bg-light">' +
-                '<div class="form-check form-switch mb-2"><input class="form-check-input" type="checkbox" id="communityTemplateIncludePricing"><label class="form-check-label fw-bold" for="communityTemplateIncludePricing">Include my pricing</label><div class="form-text">If off, QuoteDr publishes this template with all rates set to $0.</div></div>' +
-                '<div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="communityTemplateAnonymous" onchange="toggleCommunityTemplateAnonymous()"><label class="form-check-label fw-bold" for="communityTemplateAnonymous">Post anonymously</label><div class="form-text">Useful if you want to share pricing without showing your business name.</div></div>' +
-                '</div>' +
                 '<label class="form-label fw-bold mt-2">Contributor Name</label><input id="communityTemplateCreator" class="form-control" value="' + qdTemplateEscapeHtml(creatorName) + '" placeholder="Business or display name">' +
-                '<div class="form-text" id="communityTemplateCreatorHelp">This appears beside the template in the marketplace.</div>' +
+                '<div class="form-text">This appears beside the template in the marketplace.</div>' +
                 '</div>' +
                 '<div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-success" onclick="publishTemplateToCommunity(' + id + ')"><i class="fas fa-cloud-upload-alt me-1"></i>Publish Template</button></div>' +
                 '</div></div>';
             document.body.appendChild(modal);
             new bootstrap.Modal(modal).show();
-            toggleCommunityTemplateAnonymous();
-        }
-
-        function toggleCommunityTemplateAnonymous() {
-            var anonymous = !!document.getElementById('communityTemplateAnonymous')?.checked;
-            var creatorInput = document.getElementById('communityTemplateCreator');
-            var help = document.getElementById('communityTemplateCreatorHelp');
-            if (creatorInput) {
-                creatorInput.disabled = anonymous;
-            }
-            if (help) help.textContent = anonymous ? 'Your name will not appear on this marketplace post.' : 'This appears beside the template in the marketplace.';
         }
 
         async function publishTemplateToCommunity(id) {
@@ -5423,9 +5408,7 @@ Example:
                 trade: document.getElementById('communityTemplateTrade')?.value || '',
                 region: document.getElementById('communityTemplateRegion')?.value.trim() || '',
                 jobType: document.getElementById('communityTemplateJobType')?.value.trim() || '',
-                creatorName: document.getElementById('communityTemplateCreator')?.value.trim() || '',
-                includePricing: !!document.getElementById('communityTemplateIncludePricing')?.checked,
-                isAnonymous: !!document.getElementById('communityTemplateAnonymous')?.checked
+                creatorName: document.getElementById('communityTemplateCreator')?.value.trim() || ''
             };
             if (!metadata.description || !metadata.trade || !metadata.region) {
                 qdAlert('Please add a description, trade, and region before publishing.');
@@ -5440,8 +5423,6 @@ Example:
                 region: communityPayload.region,
                 job_type: communityPayload.jobType,
                 creator_name: communityPayload.creatorName,
-                include_pricing: communityPayload.includePricing,
-                is_anonymous: communityPayload.isAnonymous,
                 rooms: communityPayload.rooms,
                 room_count: communityPayload.roomCount,
                 status: 'published',
@@ -5455,22 +5436,19 @@ Example:
             }
             var modal = bootstrap.Modal.getInstance(document.getElementById('shareTemplateModal'));
             if (modal) modal.hide();
-            qdAlert(communityPayload.includePricing ? 'Template published to the community with pricing included.' : 'Template published to the community with pricing stripped to $0.');
+            qdAlert('Template published to the community with pricing stripped to $0.');
         }
 
         function communityTemplateCardHtml(template) {
             var rating = template.rating_count ? (template.rating_sum / template.rating_count).toFixed(1) : 'New';
             var roomCount = template.room_count || (template.rooms ? template.rooms.length : 0);
             var templateId = qdTemplateEscapeHtml(template.id);
-            var includePricing = !!template.include_pricing;
-            var creatorLabel = template.is_anonymous ? 'Anonymous contributor' : (template.creator_name || 'QuoteDr community');
             return '<div class="col-md-6 col-xl-4 community-template-card" data-trade="' + qdTemplateEscapeHtml(template.trade || '') + '" data-region="' + qdTemplateEscapeHtml(template.region || '') + '" data-job="' + qdTemplateEscapeHtml(template.job_type || '') + '">' +
                 '<div class="border rounded h-100 p-3 bg-white">' +
                 '<div class="d-flex justify-content-between gap-2 mb-1"><strong>' + qdTemplateEscapeHtml(template.name) + '</strong><span class="badge bg-light text-dark">' + roomCount + ' room' + (roomCount !== 1 ? 's' : '') + '</span></div>' +
-                '<div class="mb-2"><span class="badge ' + (includePricing ? 'bg-warning text-dark' : 'bg-secondary') + '">' + (includePricing ? 'Pricing included' : 'No pricing') + '</span></div>' +
                 '<div class="small text-muted mb-2">' + qdTemplateEscapeHtml(template.trade || 'Trade') + ' • ' + qdTemplateEscapeHtml(template.region || 'Region') + (template.job_type ? ' • ' + qdTemplateEscapeHtml(template.job_type) : '') + '</div>' +
                 '<p class="small mb-2">' + qdTemplateEscapeHtml(template.description || 'No description yet.') + '</p>' +
-                '<div class="small text-muted mb-3"><i class="fas fa-user me-1"></i>' + qdTemplateEscapeHtml(creatorLabel) + ' <span class="ms-2"><i class="fas fa-star me-1"></i>' + rating + '</span></div>' +
+                '<div class="small text-muted mb-3"><i class="fas fa-user me-1"></i>' + qdTemplateEscapeHtml(template.creator_name || 'QuoteDr community') + ' <span class="ms-2"><i class="fas fa-star me-1"></i>' + rating + '</span></div>' +
                 '<div class="d-flex gap-1 flex-wrap">' +
                 '<button class="btn btn-sm btn-success" onclick="importCommunityTemplate(&quot;' + templateId + '&quot;)"><i class="fas fa-download me-1"></i>Add to My Templates</button>' +
                 '<button class="btn btn-sm btn-outline-primary" onclick="rateCommunityTemplate(&quot;' + templateId + '&quot;,1)" title="Helpful"><i class="fas fa-thumbs-up"></i></button>' +
@@ -5504,7 +5482,7 @@ Example:
             modal.innerHTML = '<div class="modal-dialog modal-xl"><div class="modal-content">' +
                 '<div class="modal-header"><h5 class="modal-title"><i class="fas fa-users me-2 text-success"></i>Community Templates</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>' +
                 '<div class="modal-body">' +
-                '<div class="alert alert-info py-2"><i class="fas fa-info-circle me-1"></i>Most community templates import with rates set to $0. Some contributors choose to share pricing. Review and adjust pricing for your market before sending a quote.</div>' +
+                '<div class="alert alert-info py-2"><i class="fas fa-info-circle me-1"></i>Community templates import with rates set to $0. Add your own pricing after importing.</div>' +
                 '<div class="row g-2 mb-3"><div class="col-md-5"><input id="communityTemplateSearch" class="form-control form-control-sm" placeholder="Search templates..." oninput="filterCommunityTemplates()"></div>' +
                 '<div class="col-md-3"><select id="communityTemplateFilterTrade" class="form-select form-select-sm" onchange="filterCommunityTemplates()"><option value="">All trades</option><option>General Renovation</option><option>Bathroom Renovation</option><option>Kitchen Renovation</option><option>Basement Renovation</option><option>Painting</option><option>Flooring</option><option>Drywall</option><option>Decks & Fences</option><option>Electrical</option><option>Plumbing</option></select></div>' +
                 '<div class="col-md-4"><input id="communityTemplateFilterRegion" class="form-control form-control-sm" placeholder="Filter by region..." oninput="filterCommunityTemplates()"></div></div>' +
@@ -5526,7 +5504,7 @@ Example:
             }
             var result = await _supabase
                 .from('community_templates')
-                .select('id,name,description,trade,region,job_type,creator_name,include_pricing,is_anonymous,rooms,room_count,rating_sum,rating_count,created_at')
+                .select('id,name,description,trade,region,job_type,creator_name,rooms,room_count,rating_sum,rating_count,created_at')
                 .eq('status', 'published')
                 .order('created_at', { ascending: false })
                 .limit(100);
@@ -5549,10 +5527,9 @@ Example:
             if (!template) { qdAlert('Template not found. Refresh the marketplace and try again.'); return; }
             var existing = _getTemplates();
             var imported = QuoteDrTemplateFiles.prepareCommunityTemplateForImport(template, existing);
-            var okText = template.include_pricing ? 'This template includes contributor pricing. Review and adjust it for your market before sending a quote.' : 'This template uses $0 pricing. Add your own rates after importing.';
             _saveTemplates(existing.concat([imported]));
             _syncTemplateToCloud(imported.name, imported.rooms).catch(function(){});
-            qdAlert('Community template added to your library. ' + okText);
+            qdAlert('Community template added to your library with pricing set to $0.');
             if (typeof renderTemplateDropdown === 'function') renderTemplateDropdown();
         }
 
@@ -6035,8 +6012,8 @@ Example:
 
         // Save/load/session core moved to quote-storage.js
     </script>
-    <script src="change-orders.js?v=1778144400"></script>
-    <script src="quote-storage.js?v=1778144400"></script>
+    <script src="change-orders.js?v=1778147600"></script>
+    <script src="quote-storage.js?v=1778147600"></script>
     <script>
         // -- End Save / Load ------------------------------------------------------
 
