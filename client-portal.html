@@ -175,6 +175,14 @@
       color: #6c757d;
       font-size: 0.9rem;
     }
+
+    .portal-controls {
+      background: white;
+      border-radius: 12px;
+      box-shadow: var(--card-shadow);
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
     
     .no-quotes {
       text-align: center;
@@ -308,8 +316,8 @@
       </div>
       <div class="col-md-3 col-sm-6">
         <div class="card summary-card">
-          <div class="summary-value" id="paid-to-date">$0.00</div>
-          <div class="summary-label" id="paid-to-date-label">Paid to Date</div>
+          <div class="summary-value" id="jobs-completed">0</div>
+          <div class="summary-label" id="jobs-completed-label">Jobs Completed</div>
         </div>
       </div>
     </div>
@@ -317,7 +325,33 @@
     <!-- Quotes List -->
     <div class="row">
       <div class="col-12">
-        <h2>Quotes & Invoices</h2>
+        <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-3">
+          <h2 class="mb-0">Quotes & Invoices</h2>
+          <div class="portal-controls d-flex gap-2 flex-wrap align-items-end mb-0">
+            <div>
+              <label class="form-label small text-muted mb-1" for="portalShowFilter">Show</label>
+              <select id="portalShowFilter" class="form-select form-select-sm" onchange="renderPortalDocuments()">
+                <option value="all">Everything</option>
+                <option value="quotes">Quotes</option>
+                <option value="invoices">Invoices</option>
+                <option value="change_orders">Change Orders</option>
+                <option value="open">Open</option>
+                <option value="accepted">Accepted Jobs</option>
+                <option value="completed">Completed Jobs</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label small text-muted mb-1" for="portalSortBy">Sort by</label>
+              <select id="portalSortBy" class="form-select form-select-sm" onchange="renderPortalDocuments()">
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+                <option value="amount_desc">Highest amount</option>
+                <option value="amount_asc">Lowest amount</option>
+                <option value="status">Status</option>
+              </select>
+            </div>
+          </div>
+        </div>
         <div id="quotes-container">
           <!-- Quotes will be loaded here -->
         </div>
@@ -377,8 +411,9 @@
     const balanceDueEl = document.getElementById('balance-due');
     const openQuotesEl = document.getElementById('open-quotes');
     const invoiceCountEl = document.getElementById('invoice-count');
-    const paidToDateEl = document.getElementById('paid-to-date');
-    const paidToDateLabelEl = document.getElementById('paid-to-date-label');
+    const jobsCompletedEl = document.getElementById('jobs-completed');
+    const jobsCompletedLabelEl = document.getElementById('jobs-completed-label');
+    let portalQuotesCache = [];
 
     // Initialize page
     async function init() {
@@ -575,7 +610,8 @@
         noQuotesEl.classList.add('d-none');
         
         // Process and display quotes
-        processQuotes(quotes);
+        portalQuotesCache = quotes;
+        renderPortalDocuments();
         
         // Update summary cards
         updateSummaryCards(quotes);
@@ -585,12 +621,49 @@
       }
     }
 
+    function renderPortalDocuments() {
+      processQuotes(getFilteredSortedQuotes(portalQuotesCache));
+    }
+
+    function getFilteredSortedQuotes(quotes) {
+      const show = document.getElementById('portalShowFilter')?.value || 'all';
+      const sort = document.getElementById('portalSortBy')?.value || 'newest';
+      const co = window.QuoteDrChangeOrders;
+      const filtered = (quotes || []).filter(function(quote) {
+        const status = String(quote.status || '').toLowerCase();
+        const isChangeOrder = !!(co && co.isChangeOrder(quote));
+        const isInvoice = status === 'invoiced' || status === 'paid' || quote.type === 'invoice' || quote.data?.documentType === 'invoice';
+        if (show === 'quotes') return !isChangeOrder && !isInvoice;
+        if (show === 'invoices') return isInvoice;
+        if (show === 'change_orders') return isChangeOrder;
+        if (show === 'open') return ['draft', 'sent', 'viewed', 'in_review', 'pending_approval'].includes(status);
+        if (show === 'accepted') return ['accepted', 'approved', 'invoiced'].includes(status);
+        if (show === 'completed') return status === 'paid' || quote.data?.paymentStatus === 'paid';
+        return true;
+      });
+
+      return filtered.sort(function(a, b) {
+        if (a.id === portalQuoteId) return -1;
+        if (b.id === portalQuoteId) return 1;
+        if (sort === 'oldest') return new Date(a.created_at || 0) - new Date(b.created_at || 0);
+        if (sort === 'amount_desc') return (parseFloat(b.total || 0) || 0) - (parseFloat(a.total || 0) || 0);
+        if (sort === 'amount_asc') return (parseFloat(a.total || 0) || 0) - (parseFloat(b.total || 0) || 0);
+        if (sort === 'status') return String(a.status || '').localeCompare(String(b.status || ''));
+        return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+      });
+    }
+
     // Process and display quotes
     function processQuotes(quotes) {
       quotesContainer.innerHTML = '';
       const co = window.QuoteDrChangeOrders;
       const parents = quotes.filter(q => !(co && co.isChangeOrder(q)));
       const children = quotes.filter(q => co && co.isChangeOrder(q));
+
+      if (!quotes.length) {
+        quotesContainer.innerHTML = '<div class="card quote-card"><div class="card-body text-center text-muted py-4"><i class="fas fa-filter me-2"></i>No documents match this filter.</div></div>';
+        return;
+      }
 
       parents.forEach(quote => {
         const quoteCard = createQuoteCard(quote);
@@ -708,10 +781,10 @@
     // Update summary cards
     function updateSummaryCards(quotes) {
       let balanceDue = 0;
-      let paidToDate = 0;
       let clientLifetimeValue = 0;
       let openQuotes = 0;
       let invoiceCount = 0;
+      let jobsCompleted = 0;
       
       quotes.forEach(quote => {
         const total = parseFloat(quote.total || 0) || 0;
@@ -723,10 +796,9 @@
         const status = String(quote.status || '').toLowerCase();
         const isInvoice = status === 'invoiced' || status === 'paid' || quote.type === 'invoice' || quote.data?.documentType === 'invoice';
 
-        paidToDate += paidAmount;
-        if (status === 'paid' && !paidAmount) paidToDate += total;
         if (status === 'accepted' || status === 'invoiced' || status === 'paid') clientLifetimeValue += total;
         if (isInvoice) invoiceCount++;
+        if (status === 'paid' || quote.data?.paymentStatus === 'paid') jobsCompleted++;
         if (status === 'invoiced') balanceDue += Math.max(total - paidAmount, 0);
         if (paymentStatus === 'partially_paid' && status !== 'invoiced') balanceDue += Math.max(total - paidAmount, 0);
         
@@ -743,8 +815,8 @@
       balanceDueEl.textContent = money.format(balanceDue);
       openQuotesEl.textContent = openQuotes;
       invoiceCountEl.textContent = invoiceCount;
-      paidToDateEl.textContent = money.format(portalIsAdminView ? clientLifetimeValue : paidToDate);
-      paidToDateLabelEl.textContent = portalIsAdminView ? 'Client Lifetime Value' : 'Paid to Date';
+      jobsCompletedEl.textContent = portalIsAdminView ? money.format(clientLifetimeValue) : jobsCompleted;
+      jobsCompletedLabelEl.textContent = portalIsAdminView ? 'Client Lifetime Value' : 'Jobs Completed';
     }
 
     // Open signature in lightbox
