@@ -879,6 +879,80 @@ async function deleteLearnedMapping(mappingId) {
         .eq('user_id', user.id);
 }
 
+async function getUserAiTradeRules() {
+    const user = await getCurrentUser();
+    if (!user) return [];
+    const { data, error } = await _supabase
+        .from('ai_trade_rules')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+    if (error) {
+        console.warn('AI trade rules load failed:', error);
+        return [];
+    }
+    return data || [];
+}
+
+async function saveAiTradeRule(rule) {
+    const user = await getCurrentUser();
+    if (!user) return { data: null, error: 'Not authenticated' };
+    const phraseKey = normalizeAiPhraseKey(rule && rule.trigger_phrase);
+    if (!phraseKey) return { data: null, error: 'Missing trigger phrase' };
+    const payload = {
+        user_id: user.id,
+        trigger_phrase: String(rule.trigger_phrase || '').trim(),
+        phrase_key: phraseKey,
+        mapped_item_category: rule.mapped_item_category || rule.category || 'Miscellaneous',
+        mapped_item_name: rule.mapped_item_name || rule.name || '',
+        mapped_unit: rule.mapped_unit || rule.unitType || rule.unit || 'ls',
+        mapped_price: parseFloat(rule.mapped_price !== undefined ? rule.mapped_price : rule.rate) || 0,
+        quantity_mode: rule.quantity_mode || 'per_count',
+        quantity_value: parseFloat(rule.quantity_value || 1) || 1,
+        count_unit_label: rule.count_unit_label || '',
+        default_count: parseFloat(rule.default_count || 1) || 1,
+        user_note: rule.user_note || '',
+        active: rule.active !== false,
+        updated_at: new Date().toISOString()
+    };
+    if (rule.id) payload.id = rule.id;
+    return await _supabase
+        .from('ai_trade_rules')
+        .upsert(payload, { onConflict: 'user_id,phrase_key' })
+        .select()
+        .single();
+}
+
+async function deleteAiTradeRule(ruleId) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    return await _supabase
+        .from('ai_trade_rules')
+        .delete()
+        .eq('id', ruleId)
+        .eq('user_id', user.id);
+}
+
+async function incrementAiTradeRuleUsage(ruleId) {
+    if (!ruleId) return { data: null, error: 'Missing rule id' };
+    const user = await getCurrentUser();
+    if (!user) return { data: null, error: 'Not authenticated' };
+    const { data: existing, error: loadError } = await _supabase
+        .from('ai_trade_rules')
+        .select('usage_count')
+        .eq('id', ruleId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+    if (loadError || !existing) return { data: null, error: loadError || 'Rule not found' };
+    return await _supabase
+        .from('ai_trade_rules')
+        .update({ usage_count: (parseInt(existing.usage_count, 10) || 0) + 1, updated_at: new Date().toISOString() })
+        .eq('id', ruleId)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+}
+
 const QUOTEDR_PLAN_FEATURES = {
     basic: [
         'quotes',

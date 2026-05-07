@@ -6722,6 +6722,90 @@ Example:
             return Math.round(parsed * 100) / 100;
         }
 
+        function _voiceRuleTextKey(value) {
+            return String(value || '')
+                .toLowerCase()
+                .replace(/[^a-z0-9\s]/g, ' ')
+                .split(/\s+/)
+                .filter(function(token) { return token && ['a', 'an', 'the'].indexOf(token) < 0; })
+                .map(function(token) { return token.length > 3 ? token.replace(/s$/, '') : token; })
+                .join(' ');
+        }
+
+        function _voiceRuleMatchesTranscript(rule, transcript) {
+            var trigger = _voiceRuleTextKey(rule && rule.trigger_phrase);
+            var text = _voiceRuleTextKey(transcript);
+            if (!trigger || !text) return false;
+            var tokens = trigger.split(' ').filter(Boolean);
+            return tokens.every(function(token) { return text.indexOf(token) >= 0; });
+        }
+
+        function _voiceWordNumber(value) {
+            var numbers = {
+                one: 1, two: 2, three: 3, four: 4, five: 5,
+                six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+                eleven: 11, twelve: 12
+            };
+            return numbers[String(value || '').toLowerCase()] || null;
+        }
+
+        function _extractVoiceRuleCount(rule, transcript) {
+            if (!rule || rule.quantity_mode === 'fixed') return 1;
+            var label = _voiceRuleTextKey(rule.count_unit_label || '');
+            var text = String(transcript || '').toLowerCase();
+            if (label) {
+                var escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                var regex = new RegExp('(\\d+(?:\\.\\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\\s+' + escaped + 's?\\b');
+                var match = text.match(regex);
+                if (match) return parseFloat(match[1]) || _voiceWordNumber(match[1]) || 1;
+            }
+            var trigger = String(rule.trigger_phrase || '').toLowerCase().replace(/\ba\b|\ban\b|\bthe\b/g, '').trim();
+            if (trigger) {
+                var triggerRegex = new RegExp(trigger.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+'));
+                var before = text.slice(0, Math.max(0, text.search(triggerRegex)));
+                var nearby = before.match(/(\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s*$/);
+                if (nearby) return parseFloat(nearby[1]) || _voiceWordNumber(nearby[1]) || 1;
+            }
+            return parseFloat(rule.default_count || 1) || 1;
+        }
+
+        async function _applyAiTradeRulesToVoiceResult(result, transcript) {
+            if (!result || !Array.isArray(result.rooms) || typeof getUserAiTradeRules !== 'function') return result;
+            var rules = [];
+            try { rules = await getUserAiTradeRules(); } catch(e) { rules = []; }
+            var activeRules = (rules || []).filter(function(rule) { return rule && rule.active !== false && _voiceRuleMatchesTranscript(rule, transcript); });
+            if (!activeRules.length) return result;
+            if (!result.rooms.length) result.rooms.push({ name: 'AI Trade Rules', items: [] });
+            var targetRoom = result.rooms[0];
+            if (!Array.isArray(targetRoom.items)) targetRoom.items = [];
+            activeRules.forEach(function(rule) {
+                var count = _extractVoiceRuleCount(rule, transcript);
+                var eachQty = parseFloat(rule.quantity_value || 1) || 1;
+                var quantity = rule.quantity_mode === 'fixed' ? eachQty : _voiceRoundQuantity(eachQty * count);
+                var rate = parseFloat(rule.mapped_price || 0) || 0;
+                var unit = rule.mapped_unit || 'ls';
+                var description = rule.mapped_item_name || rule.trigger_phrase || 'AI trade rule item';
+                targetRoom.items.push({
+                    category: rule.mapped_item_category || 'Miscellaneous',
+                    description: description,
+                    serviceName: description,
+                    quantity: quantity,
+                    unit: unit,
+                    unitType: unit,
+                    rate: rate,
+                    total: _voiceRoundQuantity(quantity * rate),
+                    spokenPhrase: rule.trigger_phrase || description,
+                    calculation: rule.quantity_mode === 'fixed'
+                        ? 'AI trade rule: fixed ' + quantity + ' ' + unit
+                        : 'AI trade rule: ' + eachQty + ' ' + unit + ' x ' + count + ' ' + (rule.count_unit_label || 'count') + ' = ' + quantity + ' ' + unit,
+                    notes: rule.user_note || '',
+                    aiTradeRuleId: rule.id
+                });
+                if (typeof incrementAiTradeRuleUsage === 'function') incrementAiTradeRuleUsage(rule.id).catch(function(){});
+            });
+            return result;
+        }
+
         function _findVoiceMissingMeasurements(result) {
             var roomsNeedingHeight = [];
             if (!result || !Array.isArray(result.rooms)) return roomsNeedingHeight;
@@ -7196,7 +7280,8 @@ Example:
                 if (result.error) throw new Error(result.error);
                 document.getElementById('voiceLoading').style.display = 'none';
                 await _hideBootstrapModalAndWait('voiceQuoteModal');
-                const measuredResult = await showAiVoiceMeasurementModal(result);
+                const ruledResult = await _applyAiTradeRulesToVoiceResult(result, transcript);
+                const measuredResult = await showAiVoiceMeasurementModal(ruledResult);
                 await showAiVoiceReview(measuredResult);
             } catch(err) {
                 console.error('Voice quote error:', err);

@@ -452,6 +452,61 @@ Sarah Jones, 905-555-5678"></textarea>
 			</div>
 		</div>
 
+		<!-- AI Trade Rules -->
+		<div class="settings-card">
+			<div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+				<div>
+					<h5><i class="fas fa-hammer me-2" style="color:#7c3aed"></i>AI Trade Rules</h5>
+					<p class="text-muted small mb-2">Teach QuoteDr reusable contractor math like “case a door = 35 LF per door”.</p>
+				</div>
+				<button class="btn btn-outline-primary btn-sm" onclick="loadAiTradeRulesUI()">
+					<i class="fas fa-sync-alt me-1"></i>Refresh
+				</button>
+			</div>
+			<datalist id="aiTradeRuleItemOptions"></datalist>
+			<div class="border rounded p-3 mb-3 bg-light">
+				<div class="row g-2">
+					<div class="col-md-4">
+						<label class="form-label small fw-semibold" for="aiTradePhrase">When I say</label>
+						<input id="aiTradePhrase" class="form-control form-control-sm" placeholder="case a door">
+					</div>
+					<div class="col-md-4">
+						<label class="form-label small fw-semibold" for="aiTradeItem">Add saved item</label>
+						<input id="aiTradeItem" class="form-control form-control-sm" list="aiTradeRuleItemOptions" placeholder="Start typing item...">
+					</div>
+					<div class="col-md-2">
+						<label class="form-label small fw-semibold" for="aiTradeQuantity">Quantity</label>
+						<input id="aiTradeQuantity" type="number" step="0.01" class="form-control form-control-sm" value="35">
+					</div>
+					<div class="col-md-2">
+						<label class="form-label small fw-semibold" for="aiTradeCountLabel">Per</label>
+						<input id="aiTradeCountLabel" class="form-control form-control-sm" placeholder="door" value="door">
+					</div>
+					<div class="col-md-3">
+						<label class="form-label small fw-semibold" for="aiTradeMode">Formula</label>
+						<select id="aiTradeMode" class="form-select form-select-sm">
+							<option value="per_count">Quantity per count</option>
+							<option value="fixed">Fixed quantity</option>
+						</select>
+					</div>
+					<div class="col-md-3">
+						<label class="form-label small fw-semibold" for="aiTradeDefaultCount">Default count</label>
+						<input id="aiTradeDefaultCount" type="number" step="0.01" class="form-control form-control-sm" value="1">
+					</div>
+					<div class="col-md-4">
+						<label class="form-label small fw-semibold" for="aiTradeNote">Note</label>
+						<input id="aiTradeNote" class="form-control form-control-sm" placeholder="Optional note">
+					</div>
+					<div class="col-md-2 d-flex align-items-end">
+						<button class="btn btn-primary btn-sm w-100" onclick="saveAiTradeRuleFromSettings()"><i class="fas fa-plus me-1"></i>Add Rule</button>
+					</div>
+				</div>
+			</div>
+			<div id="aiTradeRulesList" class="mt-2">
+				<div class="text-muted small">Loading trade rules...</div>
+			</div>
+		</div>
+
 		<!-- Export Section -->
 		<div class="settings-card">
 			<h5><i class="fas fa-download me-2" style="color:#1a56a0"></i>Export Your Data</h5>
@@ -1341,6 +1396,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			loadPaymentSettingsUI();
 			// Load AI voice learning mappings
 			if (typeof loadAiLearnedMappingsUI === 'function') loadAiLearnedMappingsUI();
+			if (typeof loadAiTradeRulesUI === 'function') loadAiTradeRulesUI();
 			// Load portal theme settings
 			loadPortalTheme();
 			// Populate username in nav
@@ -2170,6 +2226,120 @@ Sarah Jones, 905-555-5678"></textarea>
 		}
 
 		// ── Payment Settings ──────────────────────────────────────────
+		function getAiTradeItemsForSettings() {
+			var items = {};
+			try { items = JSON.parse(localStorage.getItem('ald_custom_items') || '{}'); } catch(e) { items = {}; }
+			var all = [];
+			function eachItem(category, value) {
+				var arr = Array.isArray(value) ? value : (value && typeof value === 'object' ? Object.values(value) : []);
+				arr.forEach(function(item) {
+					if (!item || !(item.name || item.description)) return;
+					all.push({
+						category: category || item.category || 'Miscellaneous',
+						name: item.name || item.description,
+						unitType: item.unitType || item.unit || 'ls',
+						rate: parseFloat(item.rate || item.price || 0) || 0
+					});
+				});
+			}
+			Object.keys(items || {}).forEach(function(category) { eachItem(category, items[category]); });
+			return all;
+		}
+
+		function aiTradeItemDisplay(item) {
+			if (!item) return '';
+			return (item.category || 'Miscellaneous') + ' - ' + (item.name || '') + ' - $' + (parseFloat(item.rate || 0) || 0).toFixed(2) + '/' + (item.unitType || 'ls');
+		}
+
+		function resolveAiTradeItem(value) {
+			var key = String(value || '').trim().toLowerCase();
+			if (!key) return null;
+			return getAiTradeItemsForSettings().find(function(item) {
+				return aiTradeItemDisplay(item).toLowerCase() === key
+					|| String(item.name || '').trim().toLowerCase() === key
+					|| ((item.category || 'Miscellaneous') + ' - ' + (item.name || '')).toLowerCase() === key;
+			}) || null;
+		}
+
+		function fillAiTradeRuleItemOptions() {
+			var options = document.getElementById('aiTradeRuleItemOptions');
+			if (!options) return;
+			options.innerHTML = '';
+			getAiTradeItemsForSettings().forEach(function(item) {
+				var option = document.createElement('option');
+				option.value = aiTradeItemDisplay(item);
+				options.appendChild(option);
+			});
+		}
+
+		async function loadAiTradeRulesUI() {
+			fillAiTradeRuleItemOptions();
+			var list = document.getElementById('aiTradeRulesList');
+			if (!list) return;
+			if (typeof getUserAiTradeRules !== 'function') {
+				list.innerHTML = '<div class="alert alert-warning small py-2 mb-0">AI trade rule helpers are not loaded yet.</div>';
+				return;
+			}
+			list.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm me-2"></span>Loading trade rules...</div>';
+			var rules = await getUserAiTradeRules();
+			if (!rules.length) {
+				list.innerHTML = '<div class="alert alert-light border small mb-0">No trade rules yet. Add one above, like “case a door” = 35 LF per door.</div>';
+				return;
+			}
+			var html = '<div class="table-responsive"><table class="table table-sm align-middle mb-0">';
+			html += '<thead><tr><th>Phrase</th><th>Action</th><th>Formula</th><th>Uses</th><th></th></tr></thead><tbody>';
+			rules.forEach(function(rule) {
+				var item = (rule.mapped_item_category || 'Miscellaneous') + ' - ' + (rule.mapped_item_name || '');
+				var formula = rule.quantity_mode === 'fixed'
+					? (parseFloat(rule.quantity_value || 0) + ' ' + (rule.mapped_unit || 'ls') + ' fixed')
+					: (parseFloat(rule.quantity_value || 0) + ' ' + (rule.mapped_unit || 'ls') + ' per ' + (rule.count_unit_label || 'count'));
+				html += '<tr>';
+				html += '<td><strong>' + escapeHtml(rule.trigger_phrase || '') + '</strong>' + (rule.user_note ? '<div class="text-muted small">' + escapeHtml(rule.user_note) + '</div>' : '') + '</td>';
+				html += '<td>' + escapeHtml(item) + '<div class="text-muted small">$' + (parseFloat(rule.mapped_price || 0)).toFixed(2) + '/' + escapeHtml(rule.mapped_unit || 'ls') + '</div></td>';
+				html += '<td>' + escapeHtml(formula) + '</td>';
+				html += '<td><span class="badge bg-primary">' + (rule.usage_count || 0) + '</span></td>';
+				html += '<td class="text-end"><button class="btn btn-outline-danger btn-sm" onclick="deleteAiTradeRuleFromSettings(\'' + rule.id + '\')"><i class="fas fa-trash me-1"></i>Delete</button></td>';
+				html += '</tr>';
+			});
+			html += '</tbody></table></div>';
+			list.innerHTML = html;
+		}
+
+		async function saveAiTradeRuleFromSettings() {
+			var item = resolveAiTradeItem(document.getElementById('aiTradeItem')?.value || '');
+			var phrase = (document.getElementById('aiTradePhrase')?.value || '').trim();
+			if (!phrase) { qdAlert('Enter the phrase the user will say.'); return; }
+			if (!item) { qdAlert('Choose a saved item for this trade rule.'); return; }
+			if (typeof saveAiTradeRule !== 'function') { qdAlert('AI trade rule helper is not loaded yet.'); return; }
+			var payload = {
+				trigger_phrase: phrase,
+				mapped_item_category: item.category,
+				mapped_item_name: item.name,
+				mapped_unit: item.unitType,
+				mapped_price: item.rate,
+				quantity_mode: document.getElementById('aiTradeMode')?.value || 'per_count',
+				quantity_value: parseFloat(document.getElementById('aiTradeQuantity')?.value || 1) || 1,
+				count_unit_label: (document.getElementById('aiTradeCountLabel')?.value || '').trim(),
+				default_count: parseFloat(document.getElementById('aiTradeDefaultCount')?.value || 1) || 1,
+				user_note: (document.getElementById('aiTradeNote')?.value || '').trim(),
+				active: true
+			};
+			var result = await saveAiTradeRule(payload);
+			if (result && result.error) { qdAlert('Could not save trade rule: ' + (result.error.message || result.error)); return; }
+			document.getElementById('aiTradePhrase').value = '';
+			document.getElementById('aiTradeItem').value = '';
+			document.getElementById('aiTradeNote').value = '';
+			await loadAiTradeRulesUI();
+		}
+
+		async function deleteAiTradeRuleFromSettings(ruleId) {
+			if (!ruleId) return;
+			if (!confirm('Delete this AI trade rule?')) return;
+			if (typeof deleteAiTradeRule !== 'function') return;
+			await deleteAiTradeRule(ruleId);
+			loadAiTradeRulesUI();
+		}
+
 		function toggleStripeSettings() {
 			var enabled = document.getElementById('stripeEnabledToggle').checked;
 			document.getElementById('stripeSettingsSection').style.display = enabled ? 'block' : 'none';
