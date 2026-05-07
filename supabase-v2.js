@@ -331,6 +331,12 @@ async function saveQuote(quoteData) {
     if (!user) return { error: 'Not authenticated' };
 
     const now = new Date().toISOString();
+    if ((quoteData.type === 'change_order' || quoteData.documentType === 'change_order') &&
+        quoteData.supabaseId &&
+        quoteData.parentQuoteId &&
+        quoteData.supabaseId === quoteData.parentQuoteId) {
+        quoteData.supabaseId = null;
+    }
     const clientEmail = quoteData.clientEmail || quoteData.email || '';
     const clientPhone = quoteData.clientPhone || quoteData.phone || '';
     const projectAddress = quoteData.projectAddress || '';
@@ -532,6 +538,12 @@ var loadQuoteFromSupabase = function(quoteId) {
 async function saveQuoteForSharing(quoteData) {
     const user = await getCurrentUser();
     const now = new Date().toISOString();
+    if ((quoteData.type === 'change_order' || quoteData.documentType === 'change_order') &&
+        quoteData.supabaseId &&
+        quoteData.parentQuoteId &&
+        quoteData.supabaseId === quoteData.parentQuoteId) {
+        quoteData.supabaseId = null;
+    }
     const payload = {
             id: quoteData.supabaseId || undefined,
             user_id: user ? user.id : null,
@@ -905,6 +917,77 @@ function qdAnalyticsBucketMoney(value) {
     return '25000+';
 }
 
+const QD_PLAY_DAY_MS = 24 * 60 * 60 * 1000;
+const QD_PLAY_DAY_GRACE_MS = 30 * 60 * 1000;
+const QD_PLAY_DAY_WARNING_MS = 2 * 60 * 60 * 1000;
+
+function qdEscapeHtml(value) {
+    return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function qdTrialLabel(featureKey, featureLabel) {
+    return featureLabel || QUOTEDR_PRO_FEATURE_LABELS[featureKey] || 'this Pro tool';
+}
+
+function qdTrialActivationId(trial) {
+    return trial && (trial.started_at || trial.expires_at || trial.used_at || 'unknown');
+}
+
+function qdGetTrialStatus(trial, now) {
+    now = now || new Date();
+    if (!trial) return 'none';
+    if (trial.expires_at) {
+        var expiresAt = new Date(trial.expires_at);
+        if (isNaN(expiresAt.getTime())) return 'expired';
+        if (now <= expiresAt) return 'active';
+        if (now <= new Date(expiresAt.getTime() + QD_PLAY_DAY_GRACE_MS)) return 'grace';
+        return 'expired';
+    }
+    return trial.used ? 'expired' : 'none';
+}
+
+function qdTrialTimeRemaining(trial, now) {
+    now = now || new Date();
+    if (!trial || !trial.expires_at) return 0;
+    var expiresAt = new Date(trial.expires_at);
+    if (isNaN(expiresAt.getTime())) return 0;
+    return expiresAt.getTime() - now.getTime();
+}
+
+function qdFormatTrialRemaining(ms) {
+    if (ms <= 0) return 'grace period';
+    var minutes = Math.ceil(ms / 60000);
+    if (minutes < 60) return minutes + ' min left';
+    var hours = Math.floor(minutes / 60);
+    var rem = minutes % 60;
+    return hours + 'h' + (rem ? ' ' + rem + 'm' : '') + ' left';
+}
+
+function qdActiveTrialEntries(usage, includeGrace) {
+    usage = usage || {};
+    var now = new Date();
+    return Object.entries(usage).map(function(pair) {
+        var key = pair[0];
+        var trial = pair[1] || {};
+        var status = qdGetTrialStatus(trial, now);
+        if (status !== 'active' && (!includeGrace || status !== 'grace')) return null;
+        return {
+            key: key,
+            trial: trial,
+            status: status,
+            label: trial.label || trial.feature || QUOTEDR_PRO_FEATURE_LABELS[key] || key,
+            remainingMs: qdTrialTimeRemaining(trial, now)
+        };
+    }).filter(Boolean).sort(function(a, b) {
+        return a.remainingMs - b.remainingMs;
+    });
+}
+
 function showProTrialModal(featureKey, featureLabel) {
     featureLabel = featureLabel || QUOTEDR_PRO_FEATURE_LABELS[featureKey] || 'this Pro tool';
     return new Promise(function(resolve) {
@@ -922,16 +1005,17 @@ function showProTrialModal(featureKey, featureLabel) {
                         '<h5 class="modal-title d-flex align-items-center gap-2">' +
                             '<span style="width:34px;height:34px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:#e8f2ff;color:#1a56a0;"><i class="fas fa-star"></i></span>' +
                             '<span>Try a Pro Feature Free</span>' +
+                            '<span>Play For a Day</span>' +
                         '</h5>' +
                         '<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>' +
                     '</div>' +
                     '<div class="modal-body">' +
-                        '<p class="mb-2"><strong>' + featureLabel + '</strong> is a Pro feature, but you can try it once for free.</p>' +
-                        '<p class="text-muted small mb-0">No commitment, no credit card. If it helps, Pro unlocks it permanently.</p>' +
+                        '<p class="mb-2"><strong>' + qdEscapeHtml(featureLabel) + '</strong> is a Pro feature, but we will let you play with it for 24 hours.</p>' +
+                        '<p class="text-muted small mb-0">The timer starts when you click start. No commitment, no credit card.</p>' +
                     '</div>' +
                     '<div class="modal-footer">' +
-                        '<button type="button" class="btn btn-outline-secondary" id="quotedrProLearn">Learn About Pro</button>' +
-                        '<button type="button" class="btn btn-primary" id="quotedrProTry">Try It Free</button>' +
+                        '<button type="button" class="btn btn-outline-secondary" id="quotedrProBack">Go Back</button>' +
+                        '<button type="button" class="btn btn-primary" id="quotedrProTry">Start 24-Hour Trial</button>' +
                     '</div>' +
                 '</div>' +
             '</div>';
@@ -946,10 +1030,7 @@ function showProTrialModal(featureKey, featureLabel) {
         }
 
         modal.querySelector('#quotedrProTry').addEventListener('click', function() { cleanup('try'); });
-        modal.querySelector('#quotedrProLearn').addEventListener('click', function() {
-            window.location.href = qdProPricingUrl(featureKey);
-            cleanup('learn');
-        });
+        modal.querySelector('#quotedrProBack').addEventListener('click', function() { cleanup(false); });
         modal.querySelector('.btn-close').addEventListener('click', function() { cleanup(false); });
         document.body.appendChild(modal);
 
@@ -964,13 +1045,14 @@ function showProTrialModal(featureKey, featureLabel) {
     });
 }
 
-function showProTrialCompletePrompt(featureKey, featureLabel) {
-    featureLabel = featureLabel || QUOTEDR_PRO_FEATURE_LABELS[featureKey] || 'this Pro tool';
-    var msg = 'Ready to unlock ' + featureLabel + ' permanently? Pro is $39/month and includes IKEA quoting, job tracking, AI tools, QuickBooks sync, and more.';
+function qdShowProUpgradePrompt(featureKey, featureLabel, message, title) {
+    featureLabel = qdTrialLabel(featureKey, featureLabel);
+    var msg = message || ('Ready to unlock ' + featureLabel + ' permanently? Pro includes IKEA quoting, job tracking, AI tools, QuickBooks sync, and more.');
     var pricingUrl = qdProPricingUrl(featureKey);
+    qdCaptureEvent('pro_upgrade_prompt_shown', { feature: featureKey, label: featureLabel, title: title || 'Unlock QuoteDr Pro' });
     if (typeof window.qdConfirm === 'function') {
         window.qdConfirm(msg, {
-            title: 'Unlock QuoteDr Pro',
+            title: title || 'Unlock QuoteDr Pro',
             okText: 'Upgrade to Pro',
             cancelText: 'Maybe later',
             okClass: 'btn-primary',
@@ -986,24 +1068,75 @@ function showProTrialCompletePrompt(featureKey, featureLabel) {
     showUpgradePromptFallback(featureLabel, msg, pricingUrl);
 }
 
-async function markProTrialUsed(featureKey, featureLabel, metadata) {
+function showProTrialCompletePrompt(featureKey, featureLabel) {
+    qdShowProUpgradePrompt(featureKey, featureLabel, 'Nice. You have started using ' + qdTrialLabel(featureKey, featureLabel) + '. Upgrade whenever you are ready to keep it permanently.', 'Keep This Pro Tool');
+}
+
+async function startPlayForADayTrial(featureKey, featureLabel, metadata, source) {
     var usage = await loadProTrialUsage();
     var now = new Date();
+    var expires = new Date(now.getTime() + QD_PLAY_DAY_MS);
     var due = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
+    var previous = usage[featureKey] || {};
     usage[featureKey] = Object.assign({}, usage[featureKey] || {}, {
         feature: featureKey,
         label: featureLabel || QUOTEDR_PRO_FEATURE_LABELS[featureKey] || featureKey,
+        status: 'active',
         used: true,
         used_at: now.toISOString(),
+        started_at: now.toISOString(),
+        expires_at: expires.toISOString(),
+        source: source || 'self_started',
+        activations: (parseInt(previous.activations || 0, 10) || 0) + 1,
         followup_due_at: due.toISOString(),
-        followup_sent_at: usage[featureKey] && usage[featureKey].followup_sent_at ? usage[featureKey].followup_sent_at : null,
+        followup_sent_at: null,
         metadata: metadata || {}
     });
-    await saveProTrialUsage(usage);
+    var result = await saveProTrialUsage(usage);
+    if (result && result.error) throw result.error;
     window._quotedrActiveProTrials = window._quotedrActiveProTrials || {};
     window._quotedrActiveProTrials[featureKey] = true;
+    qdCaptureEvent('pro_play_day_started', { feature: featureKey, label: usage[featureKey].label, expires_at: usage[featureKey].expires_at });
     qdCaptureEvent('pro_trial_used', { feature: featureKey, label: usage[featureKey].label });
+    refreshPlayForADayWidget(usage);
     return usage[featureKey];
+}
+
+async function markProTrialUsed(featureKey, featureLabel, metadata) {
+    return startPlayForADayTrial(featureKey, featureLabel, metadata, 'self_started');
+}
+
+function qdOpenFeedbackForTrial(featureKey, featureLabel) {
+    var subject = encodeURIComponent('QuoteDr feedback for ' + qdTrialLabel(featureKey, featureLabel));
+    window.location.href = 'mailto:support@quotedr.io?subject=' + subject;
+}
+
+function showProGracePrompt(featureKey, featureLabel, trial) {
+    var guardKey = 'quotedr_play_day_grace_' + featureKey + '_' + qdTrialActivationId(trial);
+    try {
+        if (sessionStorage.getItem(guardKey) === '1') return;
+        sessionStorage.setItem(guardKey, '1');
+    } catch(e) {}
+    qdCaptureEvent('pro_play_day_grace_access', { feature: featureKey, label: qdTrialLabel(featureKey, featureLabel) });
+    var msg = 'Your Play For a Day trial for ' + qdTrialLabel(featureKey, featureLabel) + ' ended, but you have 30 more minutes. Upgrade now to keep access, or send feedback about what worked and what did not.';
+    if (typeof window.qdConfirm === 'function') {
+        window.qdConfirm(msg, {
+            title: 'Trial Grace Period',
+            okText: 'Upgrade Now',
+            cancelText: 'Send Feedback',
+            okClass: 'btn-warning',
+            type: 'warning'
+        }).then(function(confirmed) {
+            if (confirmed) {
+                qdCaptureEvent('pro_upgrade_prompt_clicked', { feature: featureKey, trigger: 'grace' });
+                window.location.href = qdProPricingUrl(featureKey);
+            } else {
+                qdOpenFeedbackForTrial(featureKey, featureLabel);
+            }
+        });
+        return;
+    }
+    qdShowProUpgradePrompt(featureKey, featureLabel, msg, 'Trial Grace Period');
 }
 
 async function requireProFeature(featureKey, featureLabel, options) {
@@ -1018,17 +1151,46 @@ async function requireProFeature(featureKey, featureLabel, options) {
             sessionStorage.removeItem(passKey);
             window._quotedrActiveProTrials = window._quotedrActiveProTrials || {};
             window._quotedrActiveProTrials[featureKey] = true;
+            qdCaptureEvent('pro_play_day_active_access', { feature: featureKey, label: featureLabel, cross_page: true });
             return true;
         }
     } catch(e) {}
-    if (usage && usage[featureKey] && usage[featureKey].used) {
-        showUpgradePrompt(featureLabel);
+
+    var trial = usage && usage[featureKey] ? usage[featureKey] : null;
+    var status = qdGetTrialStatus(trial);
+    if (status === 'active') {
+        window._quotedrActiveProTrials = window._quotedrActiveProTrials || {};
+        window._quotedrActiveProTrials[featureKey] = true;
+        qdCaptureEvent('pro_play_day_active_access', { feature: featureKey, label: featureLabel });
+        refreshPlayForADayWidget(usage);
+        return true;
+    }
+    if (status === 'grace') {
+        window._quotedrActiveProTrials = window._quotedrActiveProTrials || {};
+        window._quotedrActiveProTrials[featureKey] = true;
+        showProGracePrompt(featureKey, featureLabel, trial);
+        refreshPlayForADayWidget(usage);
+        return true;
+    }
+    if (trial && (trial.used || trial.expires_at)) {
+        qdCaptureEvent('pro_play_day_expired', { feature: featureKey, label: featureLabel });
+        qdShowProUpgradePrompt(featureKey, featureLabel, 'Your Play For a Day access for ' + featureLabel + ' has ended. Upgrade to Pro to unlock it permanently.', 'Play For a Day Ended');
         return false;
     }
 
     var choice = await showProTrialModal(featureKey, featureLabel);
-    if (choice !== 'try') return false;
-    await markProTrialUsed(featureKey, featureLabel, options.metadata || {});
+    qdCaptureEvent('pro_play_day_prompt_shown', { feature: featureKey, label: featureLabel });
+    if (choice !== 'try') {
+        qdCaptureEvent('pro_play_day_declined', { feature: featureKey, label: featureLabel });
+        return false;
+    }
+    try {
+        await startPlayForADayTrial(featureKey, featureLabel, options.metadata || {}, options.source || 'self_started');
+    } catch(e) {
+        if (typeof qdAlert === 'function') qdAlert('Could not start the 24-hour trial. Please try again.');
+        else alert('Could not start the 24-hour trial. Please try again.');
+        return false;
+    }
     if (options.crossPage) {
         try { sessionStorage.setItem(passKey, '1'); } catch(e) {}
     }
@@ -1037,8 +1199,172 @@ async function requireProFeature(featureKey, featureLabel, options) {
 
 function completeProTrialFeature(featureKey, featureLabel) {
     if (!window._quotedrActiveProTrials || !window._quotedrActiveProTrials[featureKey]) return;
-    delete window._quotedrActiveProTrials[featureKey];
-    setTimeout(function() { showProTrialCompletePrompt(featureKey, featureLabel); }, 500);
+    qdMaybeShowProUpgradePrompt('feature_completed', {
+        featureKey: featureKey,
+        featureLabel: featureLabel,
+        message: 'That was a Pro workflow. Upgrade when you are ready to keep ' + qdTrialLabel(featureKey, featureLabel) + ' permanently.'
+    });
+}
+
+function qdSmartPromptKey(trigger, featureKey, trial) {
+    return 'quotedr_smart_prompt_' + trigger + '_' + (featureKey || 'general') + '_' + qdTrialActivationId(trial || {});
+}
+
+async function qdMaybeShowProUpgradePrompt(trigger, options) {
+    options = options || {};
+    if (await isCurrentUserPro()) return false;
+    try {
+        if (sessionStorage.getItem('quotedr_smart_prompt_session') === '1') return false;
+    } catch(e) {}
+    var usage = await loadProTrialUsage();
+    var entries = qdActiveTrialEntries(usage, true);
+    if (!entries.length) return false;
+    var featureKey = options.featureKey || entries[0].key;
+    var entry = entries.find(function(item) { return item.key === featureKey; }) || entries[0];
+    var key = qdSmartPromptKey(trigger, entry.key, entry.trial);
+    try {
+        if (localStorage.getItem(key) === '1') return false;
+        localStorage.setItem(key, '1');
+        sessionStorage.setItem('quotedr_smart_prompt_session', '1');
+    } catch(e) {}
+    var message = options.message || 'Get unlimited access with QuoteDr Pro.';
+    qdCaptureEvent('pro_upgrade_prompt_shown', { trigger: trigger, feature: entry.key, label: entry.label });
+    if (typeof window.qdConfirm === 'function') {
+        window.qdConfirm(message, {
+            title: options.title || 'Keep Building With Pro',
+            okText: 'Upgrade to Pro',
+            cancelText: 'Not now',
+            okClass: 'btn-primary',
+            type: 'info'
+        }).then(function(confirmed) {
+            if (confirmed) {
+                qdCaptureEvent('pro_upgrade_prompt_clicked', { trigger: trigger, feature: entry.key });
+                window.location.href = qdProPricingUrl(entry.key);
+            }
+        });
+    } else {
+        showUpgradePromptFallback(entry.label, message, qdProPricingUrl(entry.key));
+    }
+    return true;
+}
+
+async function qdMaybeShowSecondQuoteUpgradePrompt() {
+    try {
+        if (await isCurrentUserPro()) return false;
+        var user = await getCurrentUser();
+        if (!user) return false;
+        var active = qdActiveTrialEntries(await loadProTrialUsage(), true);
+        if (!active.length) return false;
+        var res = await _supabase
+            .from('quotes')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+            .neq('quote_number', '__ITEMS_BACKUP__');
+        if (!res.error && (res.count || 0) >= 2) {
+            return qdMaybeShowProUpgradePrompt('second_quote_saved', {
+                message: 'Love QuoteDr? Upgrade now and keep building with unlimited Pro tools.'
+            });
+        }
+    } catch(e) {}
+    return false;
+}
+
+function showPlayForADayStatusModal(entries) {
+    var existing = document.getElementById('quotedrPlayDayStatusModal');
+    if (existing) existing.remove();
+    var rows = entries.map(function(entry) {
+        var remaining = entry.status === 'grace' ? 'Grace period' : qdFormatTrialRemaining(entry.remainingMs);
+        return '<div style="display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #eef2f7;">' +
+            '<div><strong>' + qdEscapeHtml(entry.label) + '</strong><div class="text-muted small">' + (entry.status === 'grace' ? 'Trial ended, grace access active' : 'Play For a Day active') + '</div></div>' +
+            '<div style="font-weight:800;color:' + (entry.status === 'grace' ? '#b45309' : '#1a56a0') + ';white-space:nowrap;">' + remaining + '</div>' +
+        '</div>';
+    }).join('');
+    var modal = document.createElement('div');
+    modal.id = 'quotedrPlayDayStatusModal';
+    modal.className = 'modal fade';
+    modal.tabIndex = -1;
+    modal.innerHTML = '' +
+        '<div class="modal-dialog modal-dialog-centered">' +
+            '<div class="modal-content" style="border-radius:16px;border:0;box-shadow:0 18px 45px rgba(15,23,42,.2);">' +
+                '<div class="modal-header">' +
+                    '<h5 class="modal-title"><i class="fas fa-hourglass-half me-2 text-warning"></i>Play For a Day</h5>' +
+                    '<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>' +
+                '</div>' +
+                '<div class="modal-body">' + rows + '</div>' +
+                '<div class="modal-footer">' +
+                    '<button type="button" class="btn btn-outline-secondary" id="quotedrPlayDayFeedback">Send Feedback</button>' +
+                    '<button type="button" class="btn btn-primary" id="quotedrPlayDayUpgrade">Upgrade to Pro</button>' +
+                '</div>' +
+            '</div>' +
+        '</div>';
+    document.body.appendChild(modal);
+    modal.querySelector('#quotedrPlayDayUpgrade').addEventListener('click', function() {
+        qdCaptureEvent('pro_upgrade_prompt_clicked', { trigger: 'trial_status', feature: entries[0] && entries[0].key });
+        window.location.href = qdProPricingUrl(entries[0] && entries[0].key);
+    });
+    modal.querySelector('#quotedrPlayDayFeedback').addEventListener('click', function() {
+        qdOpenFeedbackForTrial(entries[0] && entries[0].key, entries[0] && entries[0].label);
+    });
+    qdCaptureEvent('pro_play_day_status_opened', { active_count: entries.length });
+    if (window.bootstrap && window.bootstrap.Modal) {
+        window.bootstrap.Modal.getOrCreateInstance(modal).show();
+        modal.addEventListener('hidden.bs.modal', function() { modal.remove(); }, { once: true });
+    } else {
+        alert(entries.map(function(entry) { return entry.label + ': ' + qdFormatTrialRemaining(entry.remainingMs); }).join('\n'));
+        modal.remove();
+    }
+}
+
+async function refreshPlayForADayWidget(cachedUsage) {
+    try {
+        if (await isCurrentUserPro()) {
+            var proExisting = document.getElementById('quotedrPlayDayWidget');
+            if (proExisting) proExisting.remove();
+            return;
+        }
+        var usage = cachedUsage || await loadProTrialUsage();
+        var entries = qdActiveTrialEntries(usage, true);
+        var existing = document.getElementById('quotedrPlayDayWidget');
+        if (!entries.length) {
+            if (existing) existing.remove();
+            return;
+        }
+        var soonest = entries[0];
+        if (!existing) {
+            existing = document.createElement('button');
+            existing.id = 'quotedrPlayDayWidget';
+            existing.type = 'button';
+            existing.style.cssText = 'position:fixed;left:18px;bottom:18px;z-index:1040;border:0;border-radius:999px;background:#0f3460;color:#fff;padding:10px 14px;box-shadow:0 8px 24px rgba(15,52,96,.28);font-weight:800;font-size:0.86rem;display:flex;align-items:center;gap:8px;';
+            existing.addEventListener('click', function() { showPlayForADayStatusModal(entries); });
+            document.body.appendChild(existing);
+        }
+        existing.innerHTML = '<i class="fas fa-hourglass-half"></i><span>Play Day: ' + qdEscapeHtml(qdFormatTrialRemaining(soonest.remainingMs)) + '</span>';
+        existing.onclick = function() { showPlayForADayStatusModal(entries); };
+
+        entries.forEach(function(entry) {
+            if (entry.status === 'active' && entry.remainingMs > 0 && entry.remainingMs <= QD_PLAY_DAY_WARNING_MS) {
+                qdMaybeShowProUpgradePrompt('two_hours_remaining', {
+                    featureKey: entry.key,
+                    featureLabel: entry.label,
+                    title: 'Pro Access Expires Soon',
+                    message: 'Your Play For a Day access to ' + entry.label + ' expires soon. Upgrade now to keep it.'
+                });
+            }
+            if (entry.status === 'grace') {
+                showProGracePrompt(entry.key, entry.label, entry.trial);
+            }
+        });
+    } catch(e) {}
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() { refreshPlayForADayWidget(); }, 900);
+    setInterval(function() { refreshPlayForADayWidget(); }, 60000);
+});
+
+window.qdMaybeShowProUpgradePrompt = qdMaybeShowProUpgradePrompt;
+window.qdMaybeShowSecondQuoteUpgradePrompt = qdMaybeShowSecondQuoteUpgradePrompt;
+window.refreshPlayForADayWidget = refreshPlayForADayWidget;
 }
 
 function getMeasurementSystem() {

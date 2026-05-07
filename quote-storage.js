@@ -17,6 +17,10 @@
             var isChangeOrder = window._quoteDocumentType === 'change_order';
             var statusEl = document.getElementById('quoteStatus');
             var status = statusEl ? statusEl.value : (isChangeOrder ? 'draft' : 'draft');
+            var supabaseId = window._supabaseQuoteId || null;
+            if (isChangeOrder && supabaseId && window._parentQuoteId && supabaseId === window._parentQuoteId) {
+                supabaseId = null;
+            }
             return {
                 version: 1,
                 savedAt: new Date().toISOString(),
@@ -39,7 +43,7 @@
                 roomCounter: roomCounter,
                 grandTotal: grandTotal,
                 total: grandTotal,
-                supabaseId: window._supabaseQuoteId || null,
+                supabaseId: supabaseId,
                 currency: (function(){ try { return JSON.parse(localStorage.getItem('ald_quote_prefs')||'{}').currency||'CAD'; } catch(e){return 'CAD';} })()
             };
         }

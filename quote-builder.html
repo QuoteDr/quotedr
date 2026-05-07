@@ -152,6 +152,13 @@
             margin-bottom: 12px;
             display: none;
         }
+        body.change-order-mode #quoteNumber {
+            border-color: #f0ad4e;
+            background: #fff8e1;
+        }
+        body.change-order-mode .quote-total-status {
+            color: #856404;
+        }
         .profit-positive { color: #198754; }
         .profit-negative { color: #dc3545; }
 
@@ -1043,6 +1050,10 @@ if (location.search.includes('debug')) {
                         </ul>
                     </div>
                 </div>
+            </div>
+            <div id="changeOrderWorkAreaBanner" class="alert alert-warning m-3 mb-0" style="display:none; border-left:5px solid #f0ad4e;">
+                <div class="fw-bold"><i class="fas fa-file-circle-plus me-1"></i>You are building a Change Order, not editing the original quote.</div>
+                <div class="small">Add only the changed scope, credits, or extras. The original quote stays linked and unchanged.</div>
             </div>
             <div class="card-body" id="roomsContainer">
                 <!-- Rooms will be added here dynamically -->
@@ -5910,8 +5921,11 @@ Example:
 
         function updateChangeOrderModeUI() {
             var isCo = window._quoteDocumentType === 'change_order';
+            document.body.classList.toggle('change-order-mode', isCo);
             var banner = document.getElementById('changeOrderBanner');
             if (banner) banner.style.display = isCo ? 'block' : 'none';
+            var workBanner = document.getElementById('changeOrderWorkAreaBanner');
+            if (workBanner) workBanner.style.display = isCo ? 'block' : 'none';
             var title = document.getElementById('changeOrderBannerTitle');
             if (title) title.textContent = 'Change Order #' + (window._changeOrderNumber || '');
             var meta = document.getElementById('changeOrderBannerMeta');
@@ -5925,6 +5939,8 @@ Example:
             if (badge) badge.textContent = status.replace(/_/g, ' ').replace(/\b\w/g, function(ch) { return ch.toUpperCase(); });
             var linkLabel = document.getElementById('quoteGenerateLinkLabel');
             if (linkLabel) linkLabel.textContent = isCo ? 'Send Change Order' : 'Generate Quote Link';
+            var totalStatus = document.querySelector('.quote-total-status');
+            if (totalStatus) totalStatus.textContent = isCo ? 'Change order total' : 'Client-ready estimate';
             var coMenu = document.getElementById('createChangeOrderMenuItem');
             if (coMenu) {
                 var baseStatus = document.getElementById('quoteStatus')?.value || '';
@@ -5968,6 +5984,10 @@ Example:
             window._parentQuoteTotal = parentData.grandTotal || 0;
             window._changeOrderNumber = nextNumber;
             window._supabaseQuoteId = null;
+            window._changeOrderDraftInProgress = true;
+            window._quoteFullyLoaded = true;
+            if (typeof _autoSaveTimer !== 'undefined') clearTimeout(_autoSaveTimer);
+            if (typeof autoSaveTimer !== 'undefined') clearTimeout(autoSaveTimer);
             localStorage.removeItem('ald_active_quote_id');
 
             if (document.getElementById('quoteNumber')) {
@@ -5981,6 +6001,7 @@ Example:
             rooms.push({ id: 1, name: 'Change Order #' + nextNumber, items: [], colorIndex: 2, scopeNotes: '' });
             renderRooms();
             updateChangeOrderModeUI();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
             markUnsaved();
             if (typeof qdToast === 'function') {
                 qdToast({ title: 'Change Order Started', message: 'Add only the added work or credits, then send it for approval.', type: 'success' });
@@ -5991,8 +6012,8 @@ Example:
 
         // Save/load/session core moved to quote-storage.js
     </script>
-    <script src="change-orders.js?v=1778060200"></script>
-    <script src="quote-storage.js?v=1778060200"></script>
+    <script src="change-orders.js?v=1778144400"></script>
+    <script src="quote-storage.js?v=1778144400"></script>
     <script>
         // -- End Save / Load ------------------------------------------------------
 
