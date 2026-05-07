@@ -7007,6 +7007,98 @@ Example:
             await loadAiVoiceMemorySettings();
         }
 
+        async function openAiVoiceTradeRulesSettings() {
+            await loadAiVoiceTradeRulesSettings();
+            new bootstrap.Modal(document.getElementById('aiVoiceTradeRulesModal')).show();
+        }
+
+        async function loadAiVoiceTradeRulesSettings() {
+            var list = document.getElementById('aiVoiceTradeRulesList');
+            var options = document.getElementById('aiVoiceTradeRuleItemOptions');
+            if (!list || !options) return;
+            list.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm me-2"></span>Loading trade rules...</div>';
+            _voiceReviewItems = _flattenVoicePricingItems();
+            options.innerHTML = '';
+            _voiceReviewItems.forEach(function(item) {
+                var option = document.createElement('option');
+                option.value = _voiceItemDisplay(item);
+                options.appendChild(option);
+            });
+            if (typeof getUserAiTradeRules !== 'function') {
+                list.innerHTML = '<div class="alert alert-warning small mb-0">AI trade rule helpers are not loaded yet.</div>';
+                return;
+            }
+            var rules = await getUserAiTradeRules();
+            if (!rules.length) {
+                list.innerHTML = '<div class="alert alert-light border small mb-0">No trade rules yet. Add one above, like “case a door” = 35 LF per door.</div>';
+                return;
+            }
+            list.innerHTML = '';
+            rules.forEach(function(rule) {
+                var itemDisplay = _voiceItemDisplay({
+                    category: rule.mapped_item_category || 'Miscellaneous',
+                    name: rule.mapped_item_name || '',
+                    unitType: rule.mapped_unit || 'ls',
+                    rate: parseFloat(rule.mapped_price || 0) || 0
+                });
+                var formula = rule.quantity_mode === 'fixed'
+                    ? (parseFloat(rule.quantity_value || 0) + ' ' + (rule.mapped_unit || 'ls') + ' fixed')
+                    : (parseFloat(rule.quantity_value || 0) + ' ' + (rule.mapped_unit || 'ls') + ' per ' + (rule.count_unit_label || 'count'));
+                var card = document.createElement('div');
+                card.className = 'border rounded p-3 mb-3';
+                card.innerHTML = ''
+                    + '<div class="d-flex flex-wrap justify-content-between gap-2 mb-1">'
+                    + '<div><strong>' + _escapeHtml(rule.trigger_phrase || '') + '</strong><div class="text-muted small">' + _escapeHtml(formula) + '</div></div>'
+                    + '<span class="badge bg-primary align-self-start">' + (parseInt(rule.usage_count, 10) || 0) + ' uses</span>'
+                    + '</div>'
+                    + '<div class="small mb-2">' + _escapeHtml(itemDisplay) + '</div>'
+                    + (rule.user_note ? '<div class="small text-muted mb-2">' + _escapeHtml(rule.user_note) + '</div>' : '')
+                    + '<div class="text-end"><button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteAiVoiceTradeRule(\'' + rule.id + '\')"><i class="fas fa-trash me-1"></i>Delete</button></div>';
+                list.appendChild(card);
+            });
+        }
+
+        async function saveAiVoiceTradeRule() {
+            var phrase = (document.getElementById('aiVoiceTradePhrase')?.value || '').trim();
+            var selected = _resolveVoiceReviewSelection(document.getElementById('aiVoiceTradeItem')?.value || '');
+            if (!phrase) { qdAlert('Enter the phrase the user will say.'); return; }
+            if (!selected) { qdAlert('Choose a saved item for this trade rule.'); return; }
+            if (typeof saveAiTradeRule !== 'function') { qdAlert('AI trade rule helper is not loaded yet.'); return; }
+            var payload = {
+                trigger_phrase: phrase,
+                mapped_item_category: selected.category,
+                mapped_item_name: selected.name,
+                mapped_unit: selected.unitType,
+                mapped_price: selected.rate,
+                quantity_mode: document.getElementById('aiVoiceTradeMode')?.value || 'per_count',
+                quantity_value: parseFloat(document.getElementById('aiVoiceTradeQuantity')?.value || 1) || 1,
+                count_unit_label: (document.getElementById('aiVoiceTradeCountLabel')?.value || '').trim(),
+                default_count: parseFloat(document.getElementById('aiVoiceTradeDefaultCount')?.value || 1) || 1,
+                user_note: (document.getElementById('aiVoiceTradeNote')?.value || '').trim(),
+                active: true
+            };
+            var result = await saveAiTradeRule(payload);
+            if (result && result.error) {
+                qdAlert('Could not save trade rule: ' + (result.error.message || result.error));
+                return;
+            }
+            document.getElementById('aiVoiceTradePhrase').value = '';
+            document.getElementById('aiVoiceTradeItem').value = '';
+            document.getElementById('aiVoiceTradeNote').value = '';
+            await loadAiVoiceTradeRulesSettings();
+        }
+
+        async function deleteAiVoiceTradeRule(ruleId) {
+            if (!ruleId) return;
+            if (!await qdConfirm('Delete this AI trade rule?', { title: 'Delete Trade Rule', okText: 'Delete', cancelText: 'Cancel', type: 'warning' })) return;
+            if (typeof deleteAiTradeRule !== 'function') {
+                qdAlert('AI trade rule delete helper is not loaded yet.');
+                return;
+            }
+            await deleteAiTradeRule(ruleId);
+            await loadAiVoiceTradeRulesSettings();
+        }
+
         function _buildVoiceReviewRows(result, mappings) {
             var rows = [];
             var mappingByPhrase = {};
@@ -7085,9 +7177,13 @@ Example:
                 card.className = 'border rounded p-3 mb-3';
                 card.innerHTML = ''
                     + '<div class="d-flex flex-wrap justify-content-between gap-2 mb-2">'
-                    + '<div><div class="small text-muted">What AI heard</div><div class="fw-semibold">"' + _escapeHtml(row.phrase || item.description || 'Item') + '"</div></div>'
+                    + '<div class="form-check">'
+                    + '<input class="form-check-input ai-voice-review-include" type="checkbox" id="aiVoiceReviewInclude' + index + '" data-row-index="' + index + '" checked>'
+                    + '<label class="form-check-label fw-semibold" for="aiVoiceReviewInclude' + index + '">Add to quote</label>'
+                    + '</div>'
                     + '<span class="badge ' + badgeClass + ' align-self-start">' + _escapeHtml(row.confidence) + '</span>'
                     + '</div>'
+                    + '<div class="small text-muted">What AI heard</div><div class="fw-semibold mb-2">"' + _escapeHtml(row.phrase || item.description || 'Item') + '"</div>'
                     + '<div class="small text-muted">AI parsed</div>'
                     + '<div class="mb-2">' + _escapeHtml(item.description || 'Item') + ' - ' + _escapeHtml(formatQuoteQuantityDisplay(item.quantity || 1, item.unit || item.unitType || 'ls')) + ' @ $' + (parseFloat(item.rate || 0) || 0).toFixed(2) + calculation + '</div>'
                     + '<label class="form-label small fw-semibold" for="aiVoiceReviewMatch' + index + '">Match to saved item</label>'
@@ -7207,6 +7303,11 @@ Example:
             if (!_voiceReviewResult) return;
             var saveTasks = [];
             _voiceReviewRows.forEach(function(row, index) {
+                var include = document.getElementById('aiVoiceReviewInclude' + index);
+                if (include && !include.checked) {
+                    row.item._excludeFromQuote = true;
+                    return;
+                }
                 var input = document.getElementById('aiVoiceReviewMatch' + index);
                 var remember = document.getElementById('aiVoiceReviewRemember' + index);
                 var note = document.querySelector('.ai-voice-review-note[data-row-index="' + index + '"]');
@@ -7234,7 +7335,20 @@ Example:
             var reviewed = _voiceReviewResult;
             _voiceReviewResult = null;
             _voiceReviewRows = [];
+            _removeExcludedAiVoiceItems(reviewed);
             applyAIQuote(reviewed);
+        }
+
+        function _removeExcludedAiVoiceItems(result) {
+            if (!result || !Array.isArray(result.rooms)) return result;
+            result.rooms.forEach(function(room) {
+                if (!room || !Array.isArray(room.items)) return;
+                room.items = room.items.filter(function(item) { return !item._excludeFromQuote; });
+            });
+            result.rooms = result.rooms.filter(function(room) {
+                return room && Array.isArray(room.items) && room.items.length > 0;
+            });
+            return result;
         }
 
         function skipAiVoiceReview() {
@@ -8014,7 +8128,10 @@ Example:
                         <button onclick="submitVoiceQuote()" class="btn btn-success me-2"><i class="fas fa-magic me-1"></i>Generate Quote</button>
                         <button onclick="clearVoiceTranscript()" class="btn btn-outline-secondary"><i class="fas fa-redo me-1"></i>Try Again</button>
                     </div>
-                    <button type="button" class="btn btn-link btn-sm mt-2" onclick="openAiVoiceMemorySettings()"><i class="fas fa-brain me-1"></i>AI Memory</button>
+                    <div class="d-flex justify-content-center gap-2 flex-wrap mt-2">
+                        <button type="button" class="btn btn-link btn-sm" onclick="openAiVoiceMemorySettings()"><i class="fas fa-brain me-1"></i>AI Memory</button>
+                        <button type="button" class="btn btn-link btn-sm" onclick="openAiVoiceTradeRulesSettings()"><i class="fas fa-hammer me-1"></i>AI Trade Rules</button>
+                    </div>
                     <div id="voiceLoading" style="display:none;">
                         <div class="spinner-border" style="color:#7c3aed;" role="status"></div>
                         <div class="mt-2 text-muted">AI is building your quote...</div>
@@ -8041,6 +8158,67 @@ Example:
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" onclick="loadAiVoiceMemorySettings()"><i class="fas fa-sync-alt me-1"></i>Refresh</button>
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Voice Trade Rules Modal -->
+    <div class="modal fade" id="aiVoiceTradeRulesModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header" style="background:#1a56a0; color:white;">
+                    <h5 class="modal-title"><i class="fas fa-hammer me-2"></i>AI Trade Rules</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-light border small">
+                        Teach QuoteDr reusable contractor math, like “case a door” = 35 LF per door.
+                    </div>
+                    <datalist id="aiVoiceTradeRuleItemOptions"></datalist>
+                    <div class="border rounded p-3 mb-3 bg-light">
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <label class="form-label small fw-semibold" for="aiVoiceTradePhrase">When I say</label>
+                                <input id="aiVoiceTradePhrase" class="form-control form-control-sm" placeholder="case a door">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-semibold" for="aiVoiceTradeItem">Add saved item</label>
+                                <input id="aiVoiceTradeItem" class="form-control form-control-sm" list="aiVoiceTradeRuleItemOptions" placeholder="Start typing item...">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small fw-semibold" for="aiVoiceTradeQuantity">Quantity</label>
+                                <input id="aiVoiceTradeQuantity" type="number" step="0.01" class="form-control form-control-sm" value="35">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small fw-semibold" for="aiVoiceTradeCountLabel">Per</label>
+                                <input id="aiVoiceTradeCountLabel" class="form-control form-control-sm" value="door">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-semibold" for="aiVoiceTradeMode">Formula</label>
+                                <select id="aiVoiceTradeMode" class="form-select form-select-sm">
+                                    <option value="per_count">Quantity per count</option>
+                                    <option value="fixed">Fixed quantity</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-semibold" for="aiVoiceTradeDefaultCount">Default count</label>
+                                <input id="aiVoiceTradeDefaultCount" type="number" step="0.01" class="form-control form-control-sm" value="1">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-semibold" for="aiVoiceTradeNote">Note</label>
+                                <input id="aiVoiceTradeNote" class="form-control form-control-sm" placeholder="Optional note">
+                            </div>
+                        </div>
+                        <div class="text-end mt-3">
+                            <button type="button" class="btn btn-primary btn-sm" onclick="saveAiVoiceTradeRule()"><i class="fas fa-plus me-1"></i>Add Rule</button>
+                        </div>
+                    </div>
+                    <div id="aiVoiceTradeRulesList"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" onclick="loadAiVoiceTradeRulesSettings()"><i class="fas fa-sync-alt me-1"></i>Refresh</button>
                     <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
                 </div>
             </div>
