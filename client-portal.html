@@ -153,6 +153,11 @@
     .quote-card {
       background-color: white;
     }
+
+    .quote-card.portal-focus {
+      border: 2px solid #f27a1a;
+      box-shadow: 0 8px 20px rgba(242, 122, 26, 0.18);
+    }
     
     .summary-card {
       background-color: white;
@@ -511,16 +516,15 @@
     // Load quotes for this client from this contractor
     async function loadQuotes() {
       try {
-        const portalKey = normalizePortalValue(clientEmail || clientName);
+        const requestedClientNameKey = normalizePortalValue(clientName);
+        const requestedClientEmailKey = normalizePortalValue(clientEmail);
         let query = _sbClient
           .from('quotes')
           .select('*')
           .eq('user_id', contractorId)
           .order('created_at', { ascending: false });
 
-        if (portalQuoteId) {
-          query = query.eq('id', portalQuoteId);
-        } else if (clientEmail) {
+        if (!clientName && clientEmail && !portalQuoteId) {
           query = query.or('data->>clientEmail.eq.' + escapePostgrestValue(clientEmail) + ',data->>email.eq.' + escapePostgrestValue(clientEmail) + ',client_name.ilike.' + escapePostgrestValue(clientEmail));
         } else if (clientName) {
           query = query.ilike('client_name', clientName);
@@ -529,15 +533,27 @@
         const { data: allQuotes, error } = await query;
         if (error) throw error;
 
+        const selectedQuote = portalQuoteId ? (allQuotes || []).find(function(q) { return q.id === portalQuoteId; }) : null;
+        const selectedData = selectedQuote?.data || {};
+        const clientNameKey = requestedClientNameKey || normalizePortalValue(selectedQuote?.client_name || selectedData.clientName || selectedData.client_name);
+        const clientEmailKey = requestedClientEmailKey || normalizePortalValue(selectedData.clientEmail || selectedData.email || selectedData.client_email);
+
         // Only show quotes explicitly published to portal
         const visibleBaseQuotes = (allQuotes || []).filter(function(q) {
           if (!q.data || q.data.portal_visible !== true) return false;
           var quoteEmail = normalizePortalValue(q.data.clientEmail || q.data.email || q.data.client_email);
           var quoteName = normalizePortalValue(q.client_name || q.data.clientName || q.data.client_name);
-          return q.id === portalQuoteId || !portalKey || quoteEmail === portalKey || quoteName === portalKey;
+          if (clientNameKey) return quoteName === clientNameKey;
+          if (clientEmailKey) return quoteEmail === clientEmailKey || quoteName === clientEmailKey;
+          return q.id === portalQuoteId;
         });
         const visibleBaseIds = visibleBaseQuotes.map(function(q) { return q.id; });
-        const quotes = visibleBaseQuotes.concat((allQuotes || []).filter(function(q) {
+        const sortedBaseQuotes = visibleBaseQuotes.sort(function(a, b) {
+          if (a.id === portalQuoteId) return -1;
+          if (b.id === portalQuoteId) return 1;
+          return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+        });
+        const quotes = sortedBaseQuotes.concat((allQuotes || []).filter(function(q) {
           return window.QuoteDrChangeOrders &&
             QuoteDrChangeOrders.isChangeOrder(q) &&
             visibleBaseIds.includes(QuoteDrChangeOrders.parentQuoteId(q));
@@ -603,6 +619,7 @@
     function createQuoteCard(quote) {
       const card = document.createElement('div');
       card.className = 'card quote-card';
+      if (quote.id === portalQuoteId) card.classList.add('portal-focus');
       
       const statusClass = `status-${quote.status}`;
       const statusText = titleCase(quote.status);

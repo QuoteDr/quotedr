@@ -638,7 +638,8 @@
                     var d = q.data || {};
                     var qEmail = normalizePortalDashboardValue(d.clientEmail || d.email || d.client_email);
                     var qName = normalizePortalDashboardValue(q.client_name || d.clientName || d.client_name);
-                    return (clientKeyEmail && qEmail === clientKeyEmail) || (clientKeyName && qName === clientKeyName);
+                    if (clientKeyName) return qName === clientKeyName;
+                    return clientKeyEmail && (qEmail === clientKeyEmail || qName === clientKeyEmail);
                 });
                 if (selectedQuote && !quotes.some(function(q) { return q.id === selectedQuote.id; })) quotes.push(selectedQuote);
                 var pin = null;
@@ -732,7 +733,8 @@
                 var d = q.data || {};
                 var qEmail = normalizePortalDashboardValue(d.clientEmail || d.email || d.client_email);
                 var qName = normalizePortalDashboardValue(q.client_name || d.clientName || d.client_name);
-                return (emailKey && qEmail === emailKey) || (nameKey && qName === nameKey);
+                if (nameKey) return qName === nameKey;
+                return emailKey && (qEmail === emailKey || qName === emailKey);
             });
             if (quotes && quotes.length > 0) {
                 for (var q of quotes) {
