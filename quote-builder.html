@@ -6512,6 +6512,13 @@ Example:
         function _flattenVoicePricingItems() {
             var all = [];
             var seen = {};
+            function itemsFromCategory(value) {
+                if (Array.isArray(value)) return value;
+                if (!value || typeof value !== 'object') return [];
+                return Object.values(value).filter(function(item) {
+                    return item && typeof item === 'object';
+                });
+            }
             function addItem(category, item) {
                 if (!item || !(item.name || item.description)) return;
                 var name = item.name || item.description;
@@ -6528,10 +6535,10 @@ Example:
                 });
             }
             Object.keys(pricingDatabase || {}).forEach(function(category) {
-                (pricingDatabase[category] || []).forEach(function(item) { addItem(category, item); });
+                itemsFromCategory(pricingDatabase[category]).forEach(function(item) { addItem(category, item); });
             });
             Object.keys(customItems || {}).forEach(function(category) {
-                (customItems[category] || []).forEach(function(item) { addItem(category, item); });
+                itemsFromCategory(customItems[category]).forEach(function(item) { addItem(category, item); });
             });
             return all;
         }
