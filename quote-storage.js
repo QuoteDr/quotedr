@@ -29,6 +29,7 @@
                 parentQuoteId: window._parentQuoteId || '',
                 parentQuoteNumber: window._parentQuoteNumber || '',
                 parentQuoteTotal: parseFloat(window._parentQuoteTotal || 0) || 0,
+                changeOrderBaseRooms: window._changeOrderBaseRooms || [],
                 changeOrderNumber: parseInt(window._changeOrderNumber || 0, 10) || null,
                 changeReason: document.getElementById('changeOrderReason')?.value || '',
                 status: status,
@@ -81,6 +82,7 @@
             window._parentQuoteId = data.parentQuoteId || data.parent_quote_id || '';
             window._parentQuoteNumber = data.parentQuoteNumber || '';
             window._parentQuoteTotal = parseFloat(data.parentQuoteTotal || 0) || 0;
+            window._changeOrderBaseRooms = data.changeOrderBaseRooms || [];
             window._changeOrderNumber = parseInt(data.changeOrderNumber || data.change_order_number || 0, 10) || 0;
             setTimeout(function() {
                 if (document.getElementById('changeOrderReason')) document.getElementById('changeOrderReason').value = data.changeReason || '';

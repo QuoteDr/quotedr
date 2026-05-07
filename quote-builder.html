@@ -159,6 +159,34 @@
         body.change-order-mode .quote-total-status {
             color: #856404;
         }
+        body.change-order-mode .co-item-unchanged {
+            opacity: 0.74;
+            background: #f8f9fa;
+        }
+        body.change-order-mode .co-item-added {
+            background: #ecfdf3;
+            border-left: 4px solid #198754;
+        }
+        body.change-order-mode .co-item-changed {
+            background: #fff8e1;
+            border-left: 4px solid #f0ad4e;
+        }
+        body.change-order-mode .co-item-removed {
+            background: #fff1f2;
+            border-left: 4px solid #dc3545;
+        }
+        .co-change-note {
+            margin-top: 4px;
+            font-size: 0.78rem;
+            color: #856404;
+            font-weight: 600;
+        }
+        .co-original-summary {
+            display: block;
+            margin-top: 2px;
+            color: #6c757d;
+            font-size: 0.74rem;
+        }
         .profit-positive { color: #198754; }
         .profit-negative { color: #dc3545; }
 
@@ -3242,6 +3270,7 @@ Example:
                 // If editing existing item, update it; otherwise add new
                 if (editingItemIndex !== null && rooms[roomIndex].items[editingItemIndex]) {
                     const item = rooms[roomIndex].items[editingItemIndex];
+                    if (window._quoteDocumentType === 'change_order') item._coRemoved = false;
                     item.description = description;
                     item.category = category;
                     item.serviceName = document.getElementById('lineService').value;
@@ -3252,6 +3281,7 @@ Example:
                     item.materialCost = materialCost;
                     item.supplierUrl = document.getElementById('supplierLinkBtn')?.href !== '#' ? document.getElementById('supplierLinkBtn')?.href : '';
                     item.total = quantity * rate;
+                    coRefreshItemDelta(item);
                 } else {
                     // Carry upgrade option from pricing database if available
                     const svcName = document.getElementById('lineService').value;
@@ -3274,6 +3304,9 @@ Example:
                         itemDescription: dbItem?.itemDescription || '',
                         total: quantity * rate
                     });
+                    if (window._quoteDocumentType === 'change_order') {
+                        coRefreshItemDelta(rooms[roomIndex].items[rooms[roomIndex].items.length - 1]);
+                    }
                 }
 
                 // Reset editing state
@@ -3438,7 +3471,14 @@ Example:
             const room = rooms.find(r => r.id === roomId);
             if (room) {
                 _pushUndo();
-                room.items.splice(itemIndex, 1);
+                var item = room.items[itemIndex];
+                if (window._quoteDocumentType === 'change_order' && item && item._coOriginal) {
+                    item._coRemoved = true;
+                    item.quantity = 0;
+                    coRefreshItemDelta(item);
+                } else {
+                    room.items.splice(itemIndex, 1);
+                }
                 renderRooms();
             }
         }
@@ -4445,13 +4485,25 @@ Example:
                             const hasUpgrade = !!(item.upgrade && item.upgrade.name);
                             const isUpgraded = !!item.upgraded;
                             const isOptional = !!item.optional;
-                            const rowStyle = isOptional ? ' style="border-left:3px dashed #0dcaf0;"' : '';
-                            html += '<tr' + rowStyle + '>';
+                            var coStatus = window._quoteDocumentType === 'change_order' ? (item._coChangeStatus || 'added') : '';
+                            var rowClass = coStatus ? ' class="co-item-' + coStatus + '"' : '';
+                            const rowStyle = isOptional && !coStatus ? ' style="border-left:3px dashed #0dcaf0;"' : '';
+                            html += '<tr' + rowClass + rowStyle + '>';
                             html += '<td style="width:30px">' + displayNum + (isOptional ? ' <span class="badge bg-info" style="font-size:0.6em;">opt</span>' : '') + '</td>';
                             var _hasDesc = !!(item.itemDescription || item.notes);
                             var _descId = 'itemdesc_' + room.id + '_' + origIndex;
                             html += '<td style="cursor:' + (_hasDesc ? 'pointer' : 'default') + ';" ' + (_hasDesc ? 'onclick="toggleItemDesc(\''+_descId+'\')" title="Click to expand description"' : '') + '>';
                             html += '<strong>' + item.description + '</strong>';
+                            if (coStatus) {
+                                var badgeClass = coStatus === 'added' ? 'bg-success' : (coStatus === 'removed' ? 'bg-danger' : (coStatus === 'changed' ? 'bg-warning text-dark' : 'bg-secondary'));
+                                html += ' <span class="badge ' + badgeClass + '">' + coStatus.replace(/^\w/, function(ch) { return ch.toUpperCase(); }) + '</span>';
+                            }
+                            if (item._coOriginal) {
+                                html += '<span class="co-original-summary">Original: ' + qdTemplateEscapeHtml(coFormatQty(item._coOriginal.quantity, item._coOriginal.unitType || item.unitType || item.unit || '')) + ' @ $' + (parseFloat(item._coOriginal.rate) || 0).toFixed(2) + '</span>';
+                            }
+                            if (item.changeOrderNote) {
+                                html += '<div class="co-change-note"><i class="fas fa-pen-to-square me-1"></i>' + qdTemplateEscapeHtml(item.changeOrderNote) + '</div>';
+                            }
                             if (_hasDesc) html += ' <small class="text-muted" id="' + _descId + '_icon">&#9660;</small>';
                             if (item.itemDescription) html += '<div id="' + _descId + '" style="display:none;"><small class="text-muted fst-italic">' + item.itemDescription + '</small></div>';
                             if (item.notes) html += '<div id="' + _descId + '_notes" style="display:' + (item.itemDescription ? 'none' : 'none') + ';"><small class="text-info"><i class="fas fa-info-circle"></i> ' + item.notes + '</small></div>';
@@ -4472,7 +4524,8 @@ Example:
                                 upgradeBtn = '<button onclick="toggleItemUpgrade(' + room.id + ', ' + origIndex + ')" class="btn btn-sm ' + (isUpgraded ? 'btn-warning' : 'btn-outline-warning') + '" title="' + (isUpgraded ? 'Upgraded: ' + item.upgrade.name : 'Upgrade: ' + item.upgrade.name) + '"><i class="fas fa-arrow-up"></i> ' + (isUpgraded ? 'Upgraded' : 'Upgrade') + '</button>';
                             }
                             const optionalBtn = '<button onclick="toggleItemOptional(' + room.id + ', ' + origIndex + ')" class="btn btn-sm ' + (isOptional ? 'btn-info' : 'btn-outline-secondary') + '" title="' + (isOptional ? 'Client can remove this item' : 'Mark as removable by client') + '"><i class="fas fa-' + (isOptional ? 'toggle-on' : 'toggle-off') + '"></i> Optional</button>';
-                            html += '<td><div class="d-flex gap-1 flex-wrap">' + upgradeBtn + optionalBtn + '<button onclick="editLineItem(' + room.id + ', ' + origIndex + ')" class="btn btn-sm btn-outline-primary" title="Edit"><i class="fas fa-edit"></i></button><button onclick="deleteItem(' + room.id + ', ' + origIndex + ')" class="btn btn-sm btn-danger" title="Delete"><i class="fas fa-trash"></i></button></div></td>';
+                            var deleteTitle = (window._quoteDocumentType === 'change_order' && item._coOriginal) ? 'Mark as removed from this change order' : 'Delete';
+                            html += '<td><div class="d-flex gap-1 flex-wrap">' + upgradeBtn + optionalBtn + '<button onclick="editLineItem(' + room.id + ', ' + origIndex + ')" class="btn btn-sm btn-outline-primary" title="Edit"><i class="fas fa-edit"></i></button><button onclick="deleteItem(' + room.id + ', ' + origIndex + ')" class="btn btn-sm btn-danger" title="' + deleteTitle + '"><i class="fas fa-trash"></i></button></div></td>';
                             html += '</tr>';
                             displayNum++;
                         });
@@ -5942,6 +5995,97 @@ Example:
         window._parentQuoteTotal = window._parentQuoteTotal || 0;
         window._changeOrderNumber = window._changeOrderNumber || 0;
 
+        function coLineAmount(item) {
+            return (parseFloat(item && item.quantity) || 0) * (parseFloat(item && item.rate) || 0);
+        }
+
+        function coSnapshotItem(item) {
+            item = item || {};
+            return {
+                description: item.description || '',
+                category: item.category || '',
+                serviceName: item.serviceName || '',
+                unitType: item.unitType || item.unit || '',
+                quantity: parseFloat(item.quantity) || 0,
+                rate: parseFloat(item.rate) || 0,
+                materialCost: parseFloat(item.materialCost) || 0,
+                notes: item.notes || '',
+                itemDescription: item.itemDescription || '',
+                total: item.total !== undefined ? parseFloat(item.total) || 0 : coLineAmount(item)
+            };
+        }
+
+        function coFormatQty(value, unit) {
+            var qty = parseFloat(value) || 0;
+            var formatted = Number.isInteger(qty) ? String(qty) : qty.toFixed(2).replace(/\.?0+$/, '');
+            if (!formatted) formatted = '0';
+            return formatted + (unit ? ' ' + unit : '');
+        }
+
+        function coRefreshItemDelta(item) {
+            if (!item || window._quoteDocumentType !== 'change_order') return item;
+            var original = item._coOriginal || null;
+            var unit = item.unitType || item.unit || (original && original.unitType) || '';
+            if (!original) {
+                item._coChangeStatus = 'added';
+                item.changeOrderNote = 'Added ' + coFormatQty(item.quantity, unit) + ' @ $' + (parseFloat(item.rate) || 0).toFixed(2) + '.';
+                item.total = coLineAmount(item);
+                return item;
+            }
+
+            var originalTotal = original.total !== undefined ? parseFloat(original.total) || 0 : coLineAmount(original);
+            if (item._coRemoved) {
+                item._coChangeStatus = 'removed';
+                item.changeOrderNote = 'Removed original line: ' + coFormatQty(original.quantity, original.unitType || unit) + ' @ $' + (parseFloat(original.rate) || 0).toFixed(2) + '.';
+                item.total = -Math.abs(originalTotal);
+                return item;
+            }
+
+            var currentTotal = coLineAmount(item);
+            var qtyChanged = Math.abs((parseFloat(item.quantity) || 0) - (parseFloat(original.quantity) || 0)) > 0.0001;
+            var rateChanged = Math.abs((parseFloat(item.rate) || 0) - (parseFloat(original.rate) || 0)) > 0.0001;
+            var descChanged = (item.description || '') !== (original.description || '');
+            var categoryChanged = (item.category || '') !== (original.category || '');
+            var unitChanged = (item.unitType || item.unit || '') !== (original.unitType || '');
+            var delta = currentTotal - originalTotal;
+
+            if (!qtyChanged && !rateChanged && !descChanged && !categoryChanged && !unitChanged && Math.abs(delta) < 0.005) {
+                item._coChangeStatus = 'unchanged';
+                item.changeOrderNote = '';
+                item.total = 0;
+                return item;
+            }
+
+            var parts = [];
+            if (qtyChanged) parts.push('quantity ' + coFormatQty(original.quantity, original.unitType || unit) + ' to ' + coFormatQty(item.quantity, unit));
+            if (rateChanged) parts.push('rate $' + (parseFloat(original.rate) || 0).toFixed(2) + ' to $' + (parseFloat(item.rate) || 0).toFixed(2));
+            if (descChanged) parts.push('item renamed from "' + original.description + '"');
+            if (categoryChanged || unitChanged) parts.push('item details updated');
+            item._coChangeStatus = 'changed';
+            item.changeOrderNote = 'Changed ' + (parts.length ? parts.join(', ') : 'line item') + '. Net ' + (delta >= 0 ? 'add' : 'credit') + ': $' + Math.abs(delta).toFixed(2) + '.';
+            item.total = delta;
+            return item;
+        }
+
+        function coPrepareRoomsFromParent(parentRooms) {
+            roomCounter = 0;
+            return JSON.parse(JSON.stringify(parentRooms || [])).map(function(room) {
+                roomCounter++;
+                var copy = Object.assign({}, room);
+                copy.id = roomCounter;
+                copy._coOriginalRoomName = room.name || '';
+                copy.items = (room.items || []).map(function(item) {
+                    var next = Object.assign({}, item);
+                    next._coOriginal = coSnapshotItem(item);
+                    next._coChangeStatus = 'unchanged';
+                    next.changeOrderNote = '';
+                    next.total = 0;
+                    return next;
+                });
+                return copy;
+            });
+        }
+
         function updateChangeOrderModeUI() {
             var isCo = window._quoteDocumentType === 'change_order';
             document.body.classList.toggle('change-order-mode', isCo);
@@ -6019,15 +6163,18 @@ Example:
             if (document.getElementById('quoteStatus')) document.getElementById('quoteStatus').value = 'draft';
             if (document.getElementById('quoteTitle')) document.getElementById('quoteTitle').value = 'Change Order #' + nextNumber;
             if (document.getElementById('changeOrderReason')) document.getElementById('changeOrderReason').value = '';
-            rooms = [];
-            roomCounter = 1;
-            rooms.push({ id: 1, name: 'Change Order #' + nextNumber, items: [], colorIndex: 2, scopeNotes: '' });
+            window._changeOrderBaseRooms = JSON.parse(JSON.stringify(parentData.rooms || []));
+            rooms = coPrepareRoomsFromParent(parentData.rooms || []);
+            if (!rooms.length) {
+                roomCounter = 1;
+                rooms.push({ id: 1, name: 'Change Order #' + nextNumber, items: [], colorIndex: 2, scopeNotes: '' });
+            }
             renderRooms();
             updateChangeOrderModeUI();
             window.scrollTo({ top: 0, behavior: 'smooth' });
             markUnsaved();
             if (typeof qdToast === 'function') {
-                qdToast({ title: 'Change Order Started', message: 'Add only the added work or credits, then send it for approval.', type: 'success' });
+                qdToast({ title: 'Change Order Started', message: 'Edit the copied quote. QuoteDr will highlight changes and total only the net add or credit.', type: 'success' });
             } else {
                 qdAlert('Change order started.');
             }
@@ -6035,8 +6182,8 @@ Example:
 
         // Save/load/session core moved to quote-storage.js
     </script>
-    <script src="change-orders.js?v=1778149200"></script>
-    <script src="quote-storage.js?v=1778149200"></script>
+    <script src="change-orders.js?v=1778150800"></script>
+    <script src="quote-storage.js?v=1778150800"></script>
     <script>
         // -- End Save / Load ------------------------------------------------------
 
