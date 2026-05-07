@@ -757,6 +757,101 @@ async function loadPaymentSettings() {
     return JSON.parse(localStorage.getItem('ald_payment_settings') || 'null');
 }
 
+function normalizeAiPhraseKey(phrase) {
+    return String(phrase || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+async function getUserLearnedMappings() {
+    const user = await getCurrentUser();
+    if (!user) return [];
+    const { data, error } = await _supabase
+        .from('ai_learned_mappings')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('usage_count', { ascending: false });
+    if (error) {
+        console.warn('AI learned mappings load failed:', error);
+        return [];
+    }
+    return data || [];
+}
+
+async function checkLearnedMapping(spokenPhrase) {
+    const user = await getCurrentUser();
+    if (!user) return null;
+    const phraseKey = normalizeAiPhraseKey(spokenPhrase);
+    if (!phraseKey) return null;
+    const { data, error } = await _supabase
+        .from('ai_learned_mappings')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('phrase_key', phraseKey)
+        .maybeSingle();
+    if (error) {
+        console.warn('AI learned mapping check failed:', error);
+        return null;
+    }
+    return data || null;
+}
+
+async function saveLearnedMapping(phrase, mappedItem, note) {
+    const user = await getCurrentUser();
+    if (!user || !mappedItem) return { data: null, error: 'Not authenticated' };
+    const phraseKey = normalizeAiPhraseKey(phrase);
+    if (!phraseKey) return { data: null, error: 'Missing phrase' };
+    const payload = {
+        user_id: user.id,
+        spoken_phrase: String(phrase || '').trim(),
+        phrase_key: phraseKey,
+        mapped_item_category: mappedItem.category || 'Miscellaneous',
+        mapped_item_name: mappedItem.name || mappedItem.description || '',
+        mapped_unit: mappedItem.unitType || mappedItem.unit || 'ls',
+        mapped_price: parseFloat(mappedItem.rate || mappedItem.price || 0) || 0,
+        user_note: note || '',
+        usage_count: 1,
+        updated_at: new Date().toISOString()
+    };
+    return await _supabase
+        .from('ai_learned_mappings')
+        .upsert(payload, { onConflict: 'user_id,phrase_key' })
+        .select()
+        .single();
+}
+
+async function incrementLearnedMappingUsage(mappingId) {
+    if (!mappingId) return { data: null, error: 'Missing mapping id' };
+    const user = await getCurrentUser();
+    if (!user) return { data: null, error: 'Not authenticated' };
+    const { data: existing, error: loadError } = await _supabase
+        .from('ai_learned_mappings')
+        .select('usage_count')
+        .eq('id', mappingId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+    if (loadError || !existing) return { data: null, error: loadError || 'Mapping not found' };
+    return await _supabase
+        .from('ai_learned_mappings')
+        .update({ usage_count: (parseInt(existing.usage_count, 10) || 0) + 1, updated_at: new Date().toISOString() })
+        .eq('id', mappingId)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+}
+
+async function deleteLearnedMapping(mappingId) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    return await _supabase
+        .from('ai_learned_mappings')
+        .delete()
+        .eq('id', mappingId)
+        .eq('user_id', user.id);
+}
+
 const QUOTEDR_PLAN_FEATURES = {
     basic: [
         'quotes',

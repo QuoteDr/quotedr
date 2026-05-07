@@ -6184,6 +6184,8 @@ Example:
         var _voiceRecording = false;
         var _voiceTranscriptFull = '';
         var _voiceLastResultIndex = 0;
+        var _voiceVerificationResolve = null;
+        var _voiceVerificationItems = [];
 
         async function startVoiceQuote() {
             if (typeof requireFeature === 'function') {
@@ -6300,6 +6302,180 @@ Example:
             document.getElementById('voiceActions').style.display = 'none';
         }
 
+        function _voicePhraseKey(phrase) {
+            if (typeof normalizeAiPhraseKey === 'function') return normalizeAiPhraseKey(phrase);
+            return String(phrase || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+        }
+
+        function _flattenVoicePricingItems() {
+            var all = [];
+            var seen = {};
+            function addItem(category, item) {
+                if (!item || !(item.name || item.description)) return;
+                var name = item.name || item.description;
+                var key = category + '|' + name;
+                if (seen[key]) return;
+                seen[key] = true;
+                all.push({
+                    category: category || item.category || 'Miscellaneous',
+                    name: name,
+                    unitType: item.unitType || item.unit || 'ls',
+                    rate: parseFloat(item.rate || item.price || 0) || 0,
+                    itemDescription: item.itemDescription || '',
+                    notes: item.notes || ''
+                });
+            }
+            Object.keys(pricingDatabase || {}).forEach(function(category) {
+                (pricingDatabase[category] || []).forEach(function(item) { addItem(category, item); });
+            });
+            Object.keys(customItems || {}).forEach(function(category) {
+                (customItems[category] || []).forEach(function(item) { addItem(category, item); });
+            });
+            return all;
+        }
+
+        function _scoreVoiceItemMatch(phrase, item) {
+            var phraseKey = _voicePhraseKey(phrase);
+            var itemKey = _voicePhraseKey((item.name || '') + ' ' + (item.category || ''));
+            if (!phraseKey || !itemKey) return 0;
+            if (phraseKey === _voicePhraseKey(item.name)) return 100;
+            if (phraseKey.indexOf(_voicePhraseKey(item.name)) >= 0 || itemKey.indexOf(phraseKey) >= 0) return 80;
+            var tokens = phraseKey.split(' ').filter(function(t) { return t.length > 2; });
+            if (!tokens.length) return 0;
+            var hits = tokens.filter(function(t) { return itemKey.indexOf(t) >= 0; }).length;
+            return Math.round((hits / tokens.length) * 70);
+        }
+
+        function _findExactVoiceItem(item) {
+            var phrase = item.spokenPhrase || item.description || '';
+            var items = _flattenVoicePricingItems();
+            var exact = items.find(function(candidate) {
+                return _voicePhraseKey(candidate.name) === _voicePhraseKey(item.description)
+                    || _voicePhraseKey(candidate.name) === _voicePhraseKey(phrase);
+            });
+            return exact || null;
+        }
+
+        function _findSimilarVoiceItems(phrase) {
+            return _flattenVoicePricingItems()
+                .map(function(item) { return Object.assign({}, item, { _score: _scoreVoiceItemMatch(phrase, item) }); })
+                .filter(function(item) { return item._score >= 20; })
+                .sort(function(a, b) { return b._score - a._score || a.name.localeCompare(b.name); })
+                .slice(0, 12);
+        }
+
+        function _applyVoiceMappedItem(item, mapped) {
+            var rate = parseFloat(mapped.mapped_price !== undefined ? mapped.mapped_price : mapped.rate) || 0;
+            var unit = mapped.mapped_unit || mapped.unitType || mapped.unit || 'ls';
+            var name = mapped.mapped_item_name || mapped.name || item.description || '';
+            item.category = mapped.mapped_item_category || mapped.category || item.category || 'Miscellaneous';
+            item.description = name;
+            item.serviceName = name;
+            item.unit = unit;
+            item.unitType = unit;
+            item.rate = rate;
+            item.total = (parseFloat(item.quantity) || 1) * rate;
+            if (mapped.user_note && !item.notes) item.notes = mapped.user_note;
+            return item;
+        }
+
+        function _showVoiceVerificationModal(item, similarItems) {
+            return new Promise(function(resolve) {
+                _voiceVerificationResolve = resolve;
+                _voiceVerificationItems = similarItems || [];
+                var phrase = item.spokenPhrase || item.description || '';
+                document.getElementById('aiVerifyPhrase').textContent = '"' + phrase + '"';
+                document.getElementById('aiVerifyCurrentItem').textContent = (item.description || 'AI item') + ' - ' + formatQuoteQuantityDisplay(item.quantity || 1, item.unit || item.unitType || 'ls');
+                var select = document.getElementById('aiVerifyItemSelect');
+                select.innerHTML = '<option value="">Keep AI suggestion as-is</option>';
+                _voiceVerificationItems.forEach(function(candidate, index) {
+                    var option = document.createElement('option');
+                    option.value = String(index);
+                    option.textContent = candidate.category + ' - ' + candidate.name + ' - $' + (parseFloat(candidate.rate) || 0).toFixed(2) + '/' + (candidate.unitType || 'ls');
+                    select.appendChild(option);
+                });
+                document.getElementById('aiVerifyRemember').checked = true;
+                document.getElementById('aiVerifyNote').value = '';
+                var modal = new bootstrap.Modal(document.getElementById('aiVerificationModal'));
+                modal.show();
+            });
+        }
+
+        async function confirmAiVerificationMapping() {
+            var select = document.getElementById('aiVerifyItemSelect');
+            var selectedIndex = select.value === '' ? -1 : parseInt(select.value, 10);
+            var selectedItem = selectedIndex >= 0 ? _voiceVerificationItems[selectedIndex] : null;
+            var result = {
+                item: selectedItem,
+                remember: document.getElementById('aiVerifyRemember').checked,
+                note: document.getElementById('aiVerifyNote').value.trim()
+            };
+            var modal = bootstrap.Modal.getInstance(document.getElementById('aiVerificationModal'));
+            if (modal) modal.hide();
+            if (_voiceVerificationResolve) _voiceVerificationResolve(result);
+            _voiceVerificationResolve = null;
+        }
+
+        function skipAiVerificationMapping() {
+            var modal = bootstrap.Modal.getInstance(document.getElementById('aiVerificationModal'));
+            if (modal) modal.hide();
+            if (_voiceVerificationResolve) _voiceVerificationResolve({ item: null, remember: false, note: '' });
+            _voiceVerificationResolve = null;
+        }
+
+        async function _reviewAiVoiceLearning(result) {
+            if (!result || !Array.isArray(result.rooms)) return result;
+            var mappings = [];
+            if (typeof getUserLearnedMappings === 'function') {
+                try { mappings = await getUserLearnedMappings(); } catch(e) { mappings = []; }
+            }
+            for (var r = 0; r < result.rooms.length; r++) {
+                var aiRoom = result.rooms[r];
+                if (!aiRoom || !Array.isArray(aiRoom.items)) continue;
+                for (var i = 0; i < aiRoom.items.length; i++) {
+                    var item = aiRoom.items[i];
+                    var phrase = item.spokenPhrase || item.description || '';
+                    var phraseKey = _voicePhraseKey(phrase);
+                    var mapping = mappings.find(function(m) { return m.phrase_key === phraseKey; });
+                    if (mapping && (parseInt(mapping.usage_count, 10) || 0) >= 3) {
+                        _applyVoiceMappedItem(item, mapping);
+                        if (typeof incrementLearnedMappingUsage === 'function') incrementLearnedMappingUsage(mapping.id).catch(function(){});
+                        continue;
+                    }
+                    if (mapping) {
+                        var confirmed = await qdConfirm('You taught QuoteDr that "' + phrase + '" means "' + mapping.mapped_item_name + '". Add that item?', {
+                            title: 'Confirm AI learned item',
+                            okText: 'Use Learned Item',
+                            cancelText: 'Show Options',
+                            type: 'info'
+                        });
+                        if (confirmed) {
+                            _applyVoiceMappedItem(item, mapping);
+                            if (typeof incrementLearnedMappingUsage === 'function') incrementLearnedMappingUsage(mapping.id).catch(function(){});
+                            continue;
+                        }
+                    }
+                    var exact = _findExactVoiceItem(item);
+                    if (exact) {
+                        _applyVoiceMappedItem(item, exact);
+                        continue;
+                    }
+                    var similarItems = _findSimilarVoiceItems(phrase || item.description || '');
+                    if (!similarItems.length) continue;
+                    var choice = await _showVoiceVerificationModal(item, similarItems);
+                    if (choice && choice.item) {
+                        _applyVoiceMappedItem(item, choice.item);
+                        if (choice.remember && typeof saveLearnedMapping === 'function') {
+                            await saveLearnedMapping(phrase, choice.item, choice.note).catch(function(e) {
+                                console.warn('Could not save AI learned mapping:', e);
+                            });
+                        }
+                    }
+                }
+            }
+            return result;
+        }
+
         async function submitVoiceQuote() {
             var transcript = _voiceTranscriptFull.trim();
             if (!transcript) return;
@@ -6317,7 +6493,8 @@ Example:
                         transcript: transcript,
                         customItems: (function() {
                             try { return JSON.parse(localStorage.getItem('ald_custom_items') || '{}'); } catch(e) { return {}; }
-                        })()
+                        })(),
+                        learnedMappings: (typeof getUserLearnedMappings === 'function') ? await getUserLearnedMappings() : []
                     })
                 });
                 if (!response.ok) throw new Error('Server error: ' + response.status);
@@ -6325,6 +6502,8 @@ Example:
                 if (result.error) throw new Error(result.error);
                 var modal = bootstrap.Modal.getInstance(document.getElementById('voiceQuoteModal'));
                 if (modal) modal.hide();
+                document.getElementById('voiceLoading').style.display = 'none';
+                await _reviewAiVoiceLearning(result);
                 applyAIQuote(result);
             } catch(err) {
                 console.error('Voice quote error:', err);
@@ -6354,7 +6533,10 @@ Example:
                 var newRoom = { id: roomCounter, name: aiRoom.name || 'Room ' + roomCounter, colorIndex: (roomCounter - 1) % ROOM_COLORS.length, items: [] };
                 if (aiRoom.items && Array.isArray(aiRoom.items)) {
                     aiRoom.items.forEach(function(item) {
-                        newRoom.items.push({ category: item.category || 'Miscellaneous', description: item.description || '', quantity: parseFloat(item.quantity) || 1, unit: item.unit || 'ls', rate: parseFloat(item.rate) || 0, materialCost: 0, total: parseFloat(item.total) || 0, optional: false, upgrade: false });
+                        var quantity = parseFloat(item.quantity) || 1;
+                        var rate = parseFloat(item.rate) || 0;
+                        var total = item.total !== undefined ? parseFloat(item.total) || 0 : quantity * rate;
+                        newRoom.items.push({ category: item.category || 'Miscellaneous', description: item.description || '', serviceName: item.serviceName || item.description || '', quantity: quantity, unit: item.unit || item.unitType || 'ls', unitType: item.unitType || item.unit || 'ls', rate: rate, materialCost: 0, total: total, notes: item.notes || item.calculation || '', optional: false, upgrade: false });
                     });
                 }
                 rooms.push(newRoom);
@@ -7052,6 +7234,38 @@ Example:
                         <div class="spinner-border" style="color:#7c3aed;" role="status"></div>
                         <div class="mt-2 text-muted">AI is building your quote...</div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Voice Verification Modal -->
+    <div class="modal fade" id="aiVerificationModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header" style="background:#1a56a0; color:white;">
+                    <h5 class="modal-title"><i class="fas fa-brain me-2"></i>Verify AI Item</h5>
+                    <button type="button" class="btn-close btn-close-white" onclick="skipAiVerificationMapping()"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-2 small text-muted">You said</div>
+                    <div class="fw-bold mb-3" id="aiVerifyPhrase"></div>
+                    <div class="alert alert-light border py-2 small">
+                        <div class="text-muted mb-1">AI suggested</div>
+                        <div id="aiVerifyCurrentItem" class="fw-semibold"></div>
+                    </div>
+                    <label class="form-label fw-semibold" for="aiVerifyItemSelect">Map this to one of your saved items</label>
+                    <select class="form-select mb-3" id="aiVerifyItemSelect"></select>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="aiVerifyRemember" checked>
+                        <label class="form-check-label" for="aiVerifyRemember">Remember this for next time</label>
+                    </div>
+                    <label class="form-label small" for="aiVerifyNote">Custom note</label>
+                    <textarea id="aiVerifyNote" class="form-control" rows="2" placeholder="Optional. Example: Always use the premium install item."></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" onclick="skipAiVerificationMapping()">Keep AI Suggestion</button>
+                    <button type="button" class="btn btn-primary" onclick="confirmAiVerificationMapping()"><i class="fas fa-check me-1"></i>Save & Continue</button>
                 </div>
             </div>
         </div>

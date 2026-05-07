@@ -436,6 +436,22 @@ Sarah Jones, 905-555-5678"></textarea>
 			</div>
 		</div>
 
+		<!-- AI Voice Learning -->
+		<div class="settings-card">
+			<div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+				<div>
+					<h5><i class="fas fa-brain me-2" style="color:#7c3aed"></i>AI Voice Learning</h5>
+					<p class="text-muted small mb-2">Review phrases QuoteDr has learned from your voice corrections.</p>
+				</div>
+				<button class="btn btn-outline-primary btn-sm" onclick="loadAiLearnedMappingsUI()">
+					<i class="fas fa-sync-alt me-1"></i>Refresh
+				</button>
+			</div>
+			<div id="aiLearnedMappingsList" class="mt-2">
+				<div class="text-muted small">Loading learned mappings...</div>
+			</div>
+		</div>
+
 		<!-- Export Section -->
 		<div class="settings-card">
 			<h5><i class="fas fa-download me-2" style="color:#1a56a0"></i>Export Your Data</h5>
@@ -1323,6 +1339,8 @@ Sarah Jones, 905-555-5678"></textarea>
 			loadNotificationSettings();
 			// Load payment settings
 			loadPaymentSettingsUI();
+			// Load AI voice learning mappings
+			if (typeof loadAiLearnedMappingsUI === 'function') loadAiLearnedMappingsUI();
 			// Load portal theme settings
 			loadPortalTheme();
 			// Populate username in nav
@@ -2114,6 +2132,41 @@ Sarah Jones, 905-555-5678"></textarea>
 				}
 			};
 			reader.readAsText(file);
+		}
+
+		async function loadAiLearnedMappingsUI() {
+			var list = document.getElementById('aiLearnedMappingsList');
+			if (!list) return;
+			if (typeof getUserLearnedMappings !== 'function') {
+				list.innerHTML = '<div class="alert alert-warning small py-2 mb-0">AI learning helpers are not loaded yet.</div>';
+				return;
+			}
+			list.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm me-2"></span>Loading learned phrases...</div>';
+			var mappings = await getUserLearnedMappings();
+			if (!mappings.length) {
+				list.innerHTML = '<div class="alert alert-light border small mb-0">No learned phrases yet. Use AI Quote, correct an item, and leave "Remember this" checked.</div>';
+				return;
+			}
+			var html = '<div class="table-responsive"><table class="table table-sm align-middle mb-0">';
+			html += '<thead><tr><th>Spoken phrase</th><th>Mapped item</th><th>Uses</th><th></th></tr></thead><tbody>';
+			mappings.forEach(function(m) {
+				html += '<tr>';
+				html += '<td><strong>' + (m.spoken_phrase || '') + '</strong>' + (m.user_note ? '<div class="text-muted small">' + m.user_note + '</div>' : '') + '</td>';
+				html += '<td>' + (m.mapped_item_category || 'Miscellaneous') + ' - ' + (m.mapped_item_name || '') + '<div class="text-muted small">$' + (parseFloat(m.mapped_price || 0)).toFixed(2) + '/' + (m.mapped_unit || 'ls') + '</div></td>';
+				html += '<td><span class="badge bg-primary">' + (m.usage_count || 0) + '</span></td>';
+				html += '<td class="text-end"><button class="btn btn-outline-danger btn-sm" onclick="forgetAiLearnedMapping(\'' + m.id + '\')"><i class="fas fa-trash me-1"></i>Forget</button></td>';
+				html += '</tr>';
+			});
+			html += '</tbody></table></div>';
+			list.innerHTML = html;
+		}
+
+		async function forgetAiLearnedMapping(mappingId) {
+			if (!mappingId) return;
+			if (!confirm('Forget this AI voice mapping?')) return;
+			if (typeof deleteLearnedMapping !== 'function') return;
+			await deleteLearnedMapping(mappingId);
+			loadAiLearnedMappingsUI();
 		}
 
 		// ── Payment Settings ──────────────────────────────────────────
