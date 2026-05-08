@@ -13,6 +13,10 @@ function assert(condition, message) {
   assert(voice.dailyLimit === 300, 'voice quote daily limit should be easy to tune in one policy file');
   assert(voice.maxOutputTokens === 2000, 'voice quote output token cap should be explicit');
 
+  const refine = policy.getAiFeaturePolicy('ai_refine');
+  assert(refine.hourlyLimit === 160, 'AI refine hourly limit should support bulk item cleanup');
+  assert(refine.dailyLimit === 800, 'AI refine daily limit should support initial catalog cleanup');
+
   const floorPlan = policy.getAiFeaturePolicy('floor_plan');
   assert(floorPlan.hourlyLimit === 20, 'floor plan hourly limit should allow normal scan-heavy sessions');
   assert(floorPlan.dailyLimit === 80, 'floor plan daily limit should protect spend while staying generous');

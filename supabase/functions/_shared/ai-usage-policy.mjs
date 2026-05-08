@@ -20,8 +20,8 @@ export const AI_USAGE_LIMITS = Object.freeze({
   ai_refine: Object.freeze({
     feature: 'ai_refine',
     label: 'AI description refine',
-    hourlyLimit: 80,
-    dailyLimit: 400,
+    hourlyLimit: 160,
+    dailyLimit: 800,
     maxInputChars: 2500,
     maxOutputTokens: 350,
   }),
