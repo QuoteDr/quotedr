@@ -44,8 +44,8 @@ export const AI_USAGE_LIMITS = Object.freeze({
   floor_plan: Object.freeze({
     feature: 'floor_plan',
     label: 'AI floor plan scan',
-    hourlyLimit: 10,
-    dailyLimit: 40,
+    hourlyLimit: 20,
+    dailyLimit: 80,
     maxInputChars: 8500000,
     maxOutputTokens: 300,
   }),
