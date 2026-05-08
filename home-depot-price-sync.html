@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuoteDr - Home Depot Price Sync Lab</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="brand-theme.css?v=1777661601">
+    <style>
+        body {
+            background: #eef4fb;
+            color: #102033;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+        }
+        .sync-shell { max-width: 1180px; }
+        .tool-card {
+            border: 1px solid #d7e2ef;
+            border-radius: 8px;
+            background: #fff;
+            box-shadow: 0 8px 24px rgba(16, 32, 51, 0.05);
+        }
+        .small-muted { color: #6b7b8c; font-size: 0.88rem; }
+        .lab-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            background: #fff4d6;
+            color: #7a5200;
+            border: 1px solid #f3d685;
+            border-radius: 999px;
+            padding: 0.2rem 0.65rem;
+            font-size: 0.78rem;
+            font-weight: 800;
+        }
+        .match-card {
+            border: 1px solid #d7e2ef;
+            border-radius: 8px;
+            background: #fff;
+        }
+        .product-option {
+            border: 1px solid #e1e8f0;
+            border-radius: 8px;
+            padding: 0.7rem;
+            background: #f8fbff;
+        }
+        .price-up { color: #b42318; font-weight: 800; }
+        .price-down { color: #067647; font-weight: 800; }
+        .price-same { color: #475467; font-weight: 800; }
+        textarea.form-control { min-height: 160px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 0.84rem; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-light px-3 py-2" style="background:#f8fbff; border-bottom:1px solid #d7e2ef;">
+        <a href="dashboard.html" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>Dashboard</a>
+        <span class="navbar-brand mx-auto fw-bold" style="color:#0f3460;">Home Depot Price Sync Lab</span>
+        <a href="quote-builder.html" class="btn btn-primary btn-sm"><i class="fas fa-file-invoice me-1"></i>Builder</a>
+    </nav>
+
+    <main class="container-fluid sync-shell py-4">
+        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+            <div>
+                <span class="lab-badge"><i class="fas fa-flask"></i>Hidden internal lab</span>
+                <h1 class="mt-2 mb-1 fw-bold" style="color:#123b66;">Home Depot Price Sync</h1>
+                <p class="small-muted mb-0">Use this page to test feed ingestion, match saved material items, and preview price updates before the affiliate feed is approved.</p>
+            </div>
+            <div class="tool-card p-3" style="min-width:260px;">
+                <div class="small-muted">Signed in as</div>
+                <div id="userStatus" class="fw-bold">Checking...</div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-md-4"><div class="tool-card p-3"><div class="small-muted">Saved material items</div><div class="fs-4 fw-bold" id="metricItems">0</div></div></div>
+            <div class="col-md-4"><div class="tool-card p-3"><div class="small-muted">Match groups</div><div class="fs-4 fw-bold" id="metricMatches">0</div></div></div>
+            <div class="col-md-4"><div class="tool-card p-3"><div class="small-muted">Pending price updates</div><div class="fs-4 fw-bold" id="metricUpdates">0</div></div></div>
+        </div>
+
+        <section class="tool-card p-3 mb-4">
+            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+                <div>
+                    <h4 class="mb-1">1. Test product feed</h4>
+                    <div class="small-muted">Paste a sample affiliate CSV now. Later, this can run from the real feed URL using Supabase secrets.</div>
+                </div>
+                <button class="btn btn-outline-secondary btn-sm" onclick="loadSampleFeed()"><i class="fas fa-vial me-1"></i>Sample CSV</button>
+            </div>
+            <div class="row g-3">
+                <div class="col-lg-8">
+                    <label class="form-label fw-semibold">CSV feed</label>
+                    <textarea id="feedCsv" class="form-control" spellcheck="false" placeholder="SKU,Price,InventoryStatus,ProductName,Category,Brand"></textarea>
+                </div>
+                <div class="col-lg-4">
+                    <label class="form-label fw-semibold">Admin token</label>
+                    <input id="adminToken" type="password" class="form-control mb-2" placeholder="HD_PRICE_SYNC_ADMIN_TOKEN">
+                    <label class="form-label fw-semibold">Affiliate URL template</label>
+                    <input id="affiliateTemplate" class="form-control mb-2" placeholder="Optional, e.g. https://...{product_url}">
+                    <label class="form-label fw-semibold">Country</label>
+                    <select id="countrySelect" class="form-select mb-3">
+                        <option value="CA">Canada</option>
+                        <option value="US">United States</option>
+                    </select>
+                    <button class="btn btn-success w-100" onclick="ingestFeed()"><i class="fas fa-cloud-upload-alt me-1"></i>Ingest Feed</button>
+                    <div id="feedStatus" class="small-muted mt-2"></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="tool-card p-3 mb-4">
+            <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-3">
+                <div>
+                    <h4 class="mb-1">2. Match saved materials</h4>
+                    <div class="small-muted">Reads your saved QuoteDr material/pricing items from this browser and asks the catalog for likely Home Depot matches.</div>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button class="btn btn-outline-secondary" onclick="reloadItems()"><i class="fas fa-sync-alt me-1"></i>Reload Items</button>
+                    <button class="btn btn-primary" onclick="matchMaterials()"><i class="fas fa-search me-1"></i>Find Matches</button>
+                </div>
+            </div>
+            <div id="matchResults" class="row g-3"></div>
+        </section>
+
+        <section class="tool-card p-3 mb-4">
+            <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-3">
+                <div>
+                    <h4 class="mb-1">3. Preview synced prices</h4>
+                    <div class="small-muted">Shows saved Home Depot links that can update your material costs. Applying updates writes to local items and the cloud item backup.</div>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button class="btn btn-outline-primary" onclick="syncMaterials()"><i class="fas fa-tags me-1"></i>Preview Updates</button>
+                    <button class="btn btn-success" onclick="applyUpdates()"><i class="fas fa-check me-1"></i>Apply Updates</button>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead><tr><th>Item</th><th>Home Depot product</th><th>Old cost</th><th>New cost</th><th>Change</th><th>Status</th></tr></thead>
+                    <tbody id="updateRows"><tr><td colspan="6" class="text-center small-muted py-4">Preview updates after saving at least one match.</td></tr></tbody>
+                </table>
+            </div>
+            <div id="applyStatus" class="small-muted"></div>
+        </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-v2.js?v1777304470"></script>
+    <script>
+        const FUNCTION_URL = 'https://axmoffknvblluibuitrq.supabase.co/functions/v1/hd-price-sync';
+        let customItems = {};
+        let matchPayload = [];
+        let pendingUpdates = [];
+
+        function escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function money(value) {
+            const num = Number(value || 0);
+            return num.toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });
+        }
+
+        function itemKey(item) {
+            return slug(item.category || 'general') + '::' + slug(item.name || '');
+        }
+
+        function slug(value) {
+            return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        }
+
+        async function authHeaders() {
+            const { data: { session }, error } = await _supabase.auth.getSession();
+            if (error) throw error;
+            if (!session || !session.access_token) throw new Error('Please sign in before using the sync lab.');
+            return {
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': 'Bearer ' + session.access_token
+            };
+        }
+
+        async function updateUserStatus() {
+            const { data: { session } } = await _supabase.auth.getSession();
+            const el = document.getElementById('userStatus');
+            if (!session || !session.user) {
+                el.innerHTML = '<span class="text-danger">Not signed in</span>';
+                return;
+            }
+            el.textContent = session.user.email || session.user.id;
+        }
+
+        function reloadItems() {
+            try {
+                customItems = JSON.parse(localStorage.getItem('ald_custom_items') || '{}');
+            } catch (e) {
+                customItems = {};
+            }
+            matchPayload = flattenItems(customItems);
+            document.getElementById('metricItems').textContent = matchPayload.length;
+            renderMatchPlaceholder();
+        }
+
+        function flattenItems(itemsObj) {
+            const rows = [];
+            Object.entries(itemsObj || {}).forEach(function(entry) {
+                const category = entry[0];
+                const items = entry[1];
+                if (!Array.isArray(items)) return;
+                items.forEach(function(item) {
+                    if (!item || !item.name) return;
+                    rows.push({
+                        category,
+                        name: item.name,
+                        description: item.itemDescription || item.description || '',
+                        unitType: item.unitType || '',
+                        materialCost: Number(item.materialCost || 0),
+                        supplierUrl: item.supplierUrl || ''
+                    });
+                });
+            });
+            return rows;
+        }
+
+        function renderMatchPlaceholder() {
+            document.getElementById('metricMatches').textContent = '0';
+            document.getElementById('matchResults').innerHTML = matchPayload.length
+                ? '<div class="col-12"><div class="small-muted">Loaded ' + matchPayload.length + ' saved material items. Click Find Matches when the catalog has test products.</div></div>'
+                : '<div class="col-12"><div class="small-muted">No saved material items found in this browser yet.</div></div>';
+        }
+
+        function loadSampleFeed() {
+            document.getElementById('feedCsv').value = [
+                'SKU,Price,InventoryStatus,ProductName,Category,Brand,Product URL',
+                'HD-BEHR-PAINT-5GAL,189.00,in_stock,BEHR Premium Plus Interior Paint 18.9 L,Paint,BEHR,https://www.homedepot.ca/product/sample-paint',
+                'HD-DRYWALL-4X8,18.25,in_stock,CGC Sheetrock Drywall Panel 1/2 in. x 4 ft. x 8 ft.,Drywall,CGC,https://www.homedepot.ca/product/sample-drywall',
+                'HD-TILE-MORTAR,22.98,limited,Custom Building Products VersaBond Mortar 50 lb.,Tile,Custom Building Products,https://www.homedepot.ca/product/sample-mortar'
+            ].join('\\n');
+        }
+
+        async function ingestFeed() {
+            const csvText = document.getElementById('feedCsv').value.trim();
+            const adminToken = document.getElementById('adminToken').value.trim();
+            const status = document.getElementById('feedStatus');
+            if (!csvText || !adminToken) {
+                status.textContent = 'Paste CSV and enter the admin token first.';
+                return;
+            }
+            status.textContent = 'Ingesting feed...';
+            try {
+                const response = await fetch(FUNCTION_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-hd-admin-token': adminToken
+                    },
+                    body: JSON.stringify({
+                        action: 'ingestFeed',
+                        country: document.getElementById('countrySelect').value,
+                        csvText,
+                        affiliateUrlTemplate: document.getElementById('affiliateTemplate').value.trim()
+                    })
+                });
+                const data = await response.json();
+                if (!response.ok || data.error) throw new Error(data.error || 'Feed ingest failed');
+                status.innerHTML = '<span class="text-success">Imported ' + data.upserted + ' products, detected ' + data.priceChanges + ' price changes.</span>';
+            } catch (err) {
+                status.innerHTML = '<span class="text-danger">' + escapeHtml(err.message) + '</span>';
+            }
+        }
+
+        async function matchMaterials() {
+            const results = document.getElementById('matchResults');
+            if (!matchPayload.length) reloadItems();
+            if (!matchPayload.length) return;
+            results.innerHTML = '<div class="col-12"><div class="small-muted">Finding matches...</div></div>';
+            try {
+                const response = await fetch(FUNCTION_URL, {
+                    method: 'POST',
+                    headers: await authHeaders(),
+                    body: JSON.stringify({
+                        action: 'matchMaterials',
+                        country: document.getElementById('countrySelect').value,
+                        items: matchPayload
+                    })
+                });
+                const data = await response.json();
+                if (!response.ok || data.error) throw new Error(data.error || 'Matching failed');
+                renderMatches(data.matches || []);
+            } catch (err) {
+                results.innerHTML = '<div class="col-12"><div class="alert alert-danger">' + escapeHtml(err.message) + '</div></div>';
+            }
+        }
+
+        function renderMatches(matches) {
+            document.getElementById('metricMatches').textContent = matches.length;
+            const results = document.getElementById('matchResults');
+            const withMatches = matches.filter(function(group) { return group.matches && group.matches.length; });
+            if (!withMatches.length) {
+                results.innerHTML = '<div class="col-12"><div class="small-muted">No matches found yet. Add a richer feed sample or wait for the affiliate catalog.</div></div>';
+                return;
+            }
+            results.innerHTML = withMatches.map(function(group) {
+                const item = { category: group.category, name: group.name };
+                return '<div class="col-lg-6"><div class="match-card p-3 h-100">' +
+                    '<div class="d-flex justify-content-between gap-2 mb-2"><div><strong>' + escapeHtml(group.name) + '</strong><div class="small-muted">' + escapeHtml(group.category) + ' - Current material cost ' + money(group.currentMaterialCost) + '</div></div></div>' +
+                    group.matches.map(function(match) {
+                        return '<div class="product-option mb-2">' +
+                            '<div class="d-flex justify-content-between gap-2"><strong>' + escapeHtml(match.productName) + '</strong><span class="badge text-bg-primary">' + match.confidence + '%</span></div>' +
+                            '<div class="small-muted">' + escapeHtml([match.brand, match.sku || match.productId, match.inventoryStatus].filter(Boolean).join(' - ')) + '</div>' +
+                            '<div class="d-flex justify-content-between align-items-center gap-2 mt-2"><span class="fw-bold">' + money(match.currentPrice) + '</span>' +
+                            '<button class="btn btn-sm btn-success" onclick=\'' + saveMatchClickPayload(item, match) + '\'><i class="fas fa-link me-1"></i>Save Link</button></div>' +
+                            '</div>';
+                    }).join('') +
+                    '</div></div>';
+            }).join('');
+        }
+
+        function saveMatchClickPayload(item, match) {
+            const payload = encodeURIComponent(JSON.stringify({ item, match }));
+            return 'saveMatch(JSON.parse(decodeURIComponent("' + payload + '")))';
+        }
+
+        async function saveMatch(payload) {
+            try {
+                const response = await fetch(FUNCTION_URL, {
+                    method: 'POST',
+                    headers: await authHeaders(),
+                    body: JSON.stringify({
+                        action: 'saveLink',
+                        item: payload.item,
+                        homeDepotProductId: payload.match.homeDepotProductId,
+                        matchConfidence: payload.match.confidence,
+                        matchType: 'operator_verified'
+                    })
+                });
+                const data = await response.json();
+                if (!response.ok || data.error) throw new Error(data.error || 'Saving link failed');
+                alert('Saved Home Depot link for ' + payload.item.name + '.');
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+
+        async function syncMaterials() {
+            const rows = document.getElementById('updateRows');
+            rows.innerHTML = '<tr><td colspan="6" class="text-center small-muted py-4">Checking linked products...</td></tr>';
+            try {
+                const response = await fetch(FUNCTION_URL, {
+                    method: 'POST',
+                    headers: await authHeaders(),
+                    body: JSON.stringify({ action: 'syncMaterials', customItems })
+                });
+                const data = await response.json();
+                if (!response.ok || data.error) throw new Error(data.error || 'Sync preview failed');
+                pendingUpdates = data.updates || [];
+                document.getElementById('metricUpdates').textContent = pendingUpdates.length;
+                renderUpdates();
+            } catch (err) {
+                rows.innerHTML = '<tr><td colspan="6" class="text-danger py-3">' + escapeHtml(err.message) + '</td></tr>';
+            }
+        }
+
+        function renderUpdates() {
+            const rows = document.getElementById('updateRows');
+            if (!pendingUpdates.length) {
+                rows.innerHTML = '<tr><td colspan="6" class="text-center small-muted py-4">No linked material updates found.</td></tr>';
+                return;
+            }
+            rows.innerHTML = pendingUpdates.map(function(update) {
+                const diff = Number(update.newMaterialCost || 0) - Number(update.oldMaterialCost || 0);
+                const cls = diff > 0 ? 'price-up' : diff < 0 ? 'price-down' : 'price-same';
+                return '<tr><td><strong>' + escapeHtml(update.name) + '</strong><div class="small-muted">' + escapeHtml(update.category) + '</div></td>' +
+                    '<td>' + escapeHtml(update.productName || update.sku || '') + '<div class="small-muted">' + escapeHtml(update.inventoryStatus || '') + '</div></td>' +
+                    '<td>' + money(update.oldMaterialCost) + '</td><td>' + money(update.newMaterialCost) + '</td>' +
+                    '<td class="' + cls + '">' + (diff >= 0 ? '+' : '') + money(diff) + '</td>' +
+                    '<td>' + (Math.abs(diff) >= 0.01 ? 'Will update' : 'No change') + '</td></tr>';
+            }).join('');
+        }
+
+        async function applyUpdates() {
+            const status = document.getElementById('applyStatus');
+            if (!pendingUpdates.length) {
+                status.textContent = 'Preview updates first.';
+                return;
+            }
+            let changed = 0;
+            pendingUpdates.forEach(function(update) {
+                const items = customItems[update.category];
+                if (!Array.isArray(items)) return;
+                const item = items.find(function(candidate) { return itemKey({ category: update.category, name: candidate.name }) === update.itemKey; });
+                if (!item) return;
+                item.materialCost = Number(update.newMaterialCost || 0);
+                item.supplierUrl = update.affiliateUrl || update.productUrl || item.supplierUrl || '';
+                item.hdSku = update.sku || item.hdSku || '';
+                changed++;
+            });
+            localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
+            status.textContent = 'Saved ' + changed + ' local item updates. Backing up to cloud...';
+            try {
+                await backupItemsToCloud(customItems);
+                status.innerHTML = '<span class="text-success">Saved ' + changed + ' item updates locally and to cloud backup.</span>';
+            } catch (err) {
+                status.innerHTML = '<span class="text-warning">Saved locally, but cloud backup failed: ' + escapeHtml(err.message) + '</span>';
+            }
+            reloadItems();
+        }
+
+        async function backupItemsToCloud(items) {
+            const { data: { session } } = await _supabase.auth.getSession();
+            if (!session || !session.user) throw new Error('Not signed in.');
+            const { error } = await _supabase.from('quotes').upsert({
+                user_id: session.user.id,
+                quote_number: '__ITEMS_BACKUP__',
+                client_name: 'Items Backup',
+                status: 'system',
+                total: 0,
+                data: {
+                    items_snapshot: items,
+                    backup_type: 'items',
+                    updated_at: new Date().toISOString(),
+                    source: 'home_depot_price_sync'
+                },
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'user_id,quote_number' });
+            if (error) throw error;
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            updateUserStatus();
+            reloadItems();
+        });
+    </script>
+</body>
+</html>

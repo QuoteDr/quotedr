@@ -18,3 +18,6 @@ verify_jwt = false
 
 [functions.analytics-brief]
 verify_jwt = false
+
+[functions.hd-price-sync]
+verify_jwt = false
