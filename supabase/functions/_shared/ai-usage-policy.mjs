@@ -38,8 +38,8 @@ export const AI_USAGE_LIMITS = Object.freeze({
     label: 'AI smart import',
     hourlyLimit: 20,
     dailyLimit: 80,
-    maxInputChars: 8000,
-    maxOutputTokens: 4000,
+    maxInputChars: 30000,
+    maxOutputTokens: 8000,
   }),
   floor_plan: Object.freeze({
     feature: 'floor_plan',

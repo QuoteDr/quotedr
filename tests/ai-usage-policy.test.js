@@ -21,6 +21,10 @@ function assert(condition, message) {
   assert(floorPlan.hourlyLimit === 20, 'floor plan hourly limit should allow normal scan-heavy sessions');
   assert(floorPlan.dailyLimit === 80, 'floor plan daily limit should protect spend while staying generous');
 
+  const smartImport = policy.getAiFeaturePolicy('smart_import');
+  assert(smartImport.maxInputChars === 30000, 'smart import should accept large messy pasted files');
+  assert(smartImport.maxOutputTokens === 8000, 'smart import should have room to return complete import JSON');
+
   const unknown = policy.getAiFeaturePolicy('unknown_feature');
   assert(unknown.feature === 'default', 'unknown AI features should fall back to a safe default policy');
   assert(unknown.dailyLimit < voice.dailyLimit, 'default policy should be more conservative than voice quote');

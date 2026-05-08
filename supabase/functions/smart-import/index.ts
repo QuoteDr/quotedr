@@ -56,6 +56,8 @@ Return ONLY valid JSON in this exact format:
 }
 
 Rules:
+- Extract EVERY valid item from the whole input. Do not return only a sample or the first 10 rows.
+- Merge obvious duplicate items only when they clearly refer to the same item and same price/unit.
 - Group items by category. If no category is obvious, use "General" or infer from context (e.g. tile items → "Tile & Stone", labour items → "Labour")
 - unitType should be one of: sqft, lf, ea, hr, ls, bag, sheet, box — pick closest match
 - rate is the price/cost as a number (no $ sign)
@@ -63,6 +65,7 @@ Rules:
 - If the data has columns, figure out which column is name, which is price, which is unit
 - Clean up item names — capitalize properly, remove weird characters
 - If something is clearly not a price list item (headers, totals, notes), skip it
+- The count must equal the total number of item objects returned across all categories.
 - Return ONLY the JSON, no explanation`;
     } else if (type === 'clients') {
       systemPrompt = `You are a data parser for a renovation contractor app. Parse the user's client list into structured JSON.
@@ -74,15 +77,19 @@ Return ONLY valid JSON in this exact format:
   "clients": [
     { "name": "Full Name", "phone": "416-555-1234", "email": "email@example.com", "address": "123 Main St", "city": "Toronto", "notes": "" }
   ],
-  "count": 10
+  "count": 42
 }
 
 Rules:
+- Extract EVERY valid client/person/household from the whole input. Do not stop at 10 and do not return only a preview.
+- Merge obvious duplicates into one best client record, preserving alternate spellings or job labels in notes when useful.
 - Extract name, phone, email, address, city, notes from whatever format is given
 - Name should be "First Last" format
 - Phone should be formatted as XXX-XXX-XXXX if possible
 - Leave fields empty string "" if not found
 - Skip obviously invalid entries (just numbers, empty lines, etc)
+- Job-name-only rows with no contact details should usually be notes on a nearby matching client, not separate clients.
+- The count must equal the number of client objects returned.
 - Return ONLY the JSON, no explanation`;
     }
 
@@ -97,10 +104,11 @@ Rules:
         model,
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: String(content).slice(0, 8000) }
+          { role: 'user', content: String(content) }
         ],
         temperature: 0.1,
         max_tokens: usageGuard.policy.maxOutputTokens,
+        response_format: { type: 'json_object' },
       }),
     });
 
