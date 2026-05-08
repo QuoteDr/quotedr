@@ -359,12 +359,12 @@ window._qdAiSend = async function() {
   msgEl.scrollTop = msgEl.scrollHeight;
 
   try {
+    if (typeof getSupabaseFunctionAuthHeaders !== 'function') {
+      throw new Error('Please sign in before using the AI assistant.');
+    }
     var res = await fetch(FUNCTION_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + ANON_KEY
-      },
+      headers: await getSupabaseFunctionAuthHeaders(),
       body: JSON.stringify({
         messages: messages.slice(-6) // last 6 messages for context
       })

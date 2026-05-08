@@ -1,4 +1,9 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import {
+  aiGuardErrorResponse,
+  assertWithinAiInputLimit,
+  startAiUsage,
+} from "../_shared/ai-guard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -19,7 +24,7 @@ function extractJsonObject(text: string) {
   return JSON.parse(match ? match[0] : cleaned);
 }
 
-async function callOpenAI(openaiKey: string, imageBase64: string, mimeType: string, prompt: string) {
+async function callOpenAI(openaiKey: string, imageBase64: string, mimeType: string, prompt: string, maxTokens: number) {
   const model = Deno.env.get("FLOOR_PLAN_OPENAI_MODEL") || "gpt-4o";
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -30,7 +35,7 @@ async function callOpenAI(openaiKey: string, imageBase64: string, mimeType: stri
     body: JSON.stringify({
       model,
       response_format: { type: "json_object" },
-      max_tokens: 300,
+      max_tokens: maxTokens,
       messages: [
         {
           role: "user",
@@ -61,7 +66,11 @@ async function callOpenAI(openaiKey: string, imageBase64: string, mimeType: stri
   }
 
   const result = await response.json();
-  return result.choices?.[0]?.message?.content || "{}";
+  return {
+    content: result.choices?.[0]?.message?.content || "{}",
+    model,
+    usage: result.usage || {},
+  };
 }
 
 Deno.serve(async (req) => {
@@ -69,6 +78,7 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  let usageGuard: any = null;
   try {
     const body = await req.json();
     const { mode, imageBase64, mimeType } = body;
@@ -76,6 +86,13 @@ Deno.serve(async (req) => {
     if (!imageBase64) {
       return jsonResponse({ error: "Missing required field: imageBase64" }, 400);
     }
+
+    usageGuard = await startAiUsage(req, {
+      feature: "floor_plan",
+      endpoint: "analyze-floor-plan",
+      inputChars: String(imageBase64).length,
+    });
+    assertWithinAiInputLimit(usageGuard.policy, imageBase64, "Floor plan image");
 
     const openaiKey = Deno.env.get("OPENAI_API_KEY");
     if (!openaiKey) {
@@ -94,14 +111,21 @@ Deno.serve(async (req) => {
       "Use title case. Max 20 rooms."
     ].join(" ");
 
-    const content = await callOpenAI(openaiKey, imageBase64, mimeType, prompt);
-    const parsed = extractJsonObject(content);
+    const aiResult = await callOpenAI(openaiKey, imageBase64, mimeType, prompt, usageGuard.policy.maxOutputTokens);
+    const parsed = extractJsonObject(aiResult.content);
     const rooms = Array.isArray(parsed.rooms) && parsed.rooms.length
       ? parsed.rooms.map((room: unknown) => String(room).trim()).filter(Boolean).slice(0, 20)
       : ["Living Room", "Kitchen", "Dining", "Bathroom", "Bedroom"];
 
+    await usageGuard.recordSuccess({
+      model: aiResult.model,
+      usage: aiResult.usage,
+      metadata: { label: usageGuard.policy.label, mode, mimeType },
+    });
+
     return jsonResponse({ rooms });
   } catch (e) {
-    return jsonResponse({ error: e instanceof Error ? e.message : String(e) }, 500);
+    if (usageGuard) await usageGuard.recordFailure(e);
+    return aiGuardErrorResponse(e, corsHeaders);
   }
 });

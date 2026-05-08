@@ -1,4 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import {
+  aiGuardErrorResponse,
+  assertWithinAiInputLimit,
+  jsonResponse,
+  startAiUsage,
+} from "../_shared/ai-guard.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -55,22 +61,27 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  let usageGuard: any = null;
   try {
     const body = await req.json();
     const text = body.text;
     if (!text || text.trim().length < 5) {
-      return new Response(JSON.stringify({ error: 'No order text provided' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      return jsonResponse({ error: 'No order text provided' }, 400, corsHeaders);
     }
+
+    usageGuard = await startAiUsage(req, {
+      feature: 'ikea_parser',
+      endpoint: 'ikea-parser',
+      inputChars: String(text).length,
+    });
+    assertWithinAiInputLimit(usageGuard.policy, text, 'IKEA order text');
 
     const apiKey = Deno.env.get('OPENAI_API_KEY');
     if (!apiKey) {
-      return new Response(JSON.stringify({ error: 'OpenAI API key not configured' }), {
-        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      return jsonResponse({ error: 'OpenAI API key not configured' }, 500, corsHeaders);
     }
 
+    const model = 'gpt-4o-mini';
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -78,12 +89,13 @@ Deno.serve(async (req) => {
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: text.substring(0, 8000) },
         ],
         temperature: 0,
+        max_tokens: usageGuard.policy.maxOutputTokens,
       }),
     });
 
@@ -125,14 +137,16 @@ Deno.serve(async (req) => {
     }
 
     const items = parsed.filter((item: any) => item.type !== 'skip' && item.qty > 0);
-
-    return new Response(JSON.stringify({ items }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    await usageGuard.recordSuccess({
+      model,
+      usage: data.usage || {},
+      metadata: { label: usageGuard.policy.label, itemCount: items.length },
     });
+
+    return jsonResponse({ items }, 200, corsHeaders);
 
   } catch (err) {
-    return new Response(JSON.stringify({ error: (err as Error).message }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    if (usageGuard) await usageGuard.recordFailure(err);
+    return aiGuardErrorResponse(err, corsHeaders);
   }
 });

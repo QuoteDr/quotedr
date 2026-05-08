@@ -38,6 +38,18 @@ async function getCurrentUser() {
     return currentUser;
 }
 
+// Auth headers for Supabase Edge Functions that need the current signed-in user.
+async function getSupabaseFunctionAuthHeaders() {
+    const { data: { session }, error } = await _supabase.auth.getSession();
+    if (error) throw error;
+    if (!session?.access_token) throw new Error('Please sign in again before using this feature.');
+    return {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': 'Bearer ' + session.access_token
+    };
+}
+
 // Sign in with email and password
 async function signInWithEmail(email, password) {
     const { data, error } = await _supabase.auth.signInWithPassword({

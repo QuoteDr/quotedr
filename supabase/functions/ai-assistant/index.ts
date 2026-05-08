@@ -1,4 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import {
+  aiGuardErrorResponse,
+  assertWithinAiInputLimit,
+  jsonResponse,
+  startAiUsage,
+} from "../_shared/ai-guard.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,23 +16,23 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  let usageGuard: any = null;
   try {
-    const { messages } = await req.json();
+    const { messages, feature } = await req.json();
 
     if (!messages || !Array.isArray(messages)) {
-      return new Response(JSON.stringify({ error: 'No messages provided' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      return jsonResponse({ error: 'No messages provided' }, 400, corsHeaders);
     }
+
+    const aiFeature = feature === 'ai_refine' ? 'ai_refine' : 'ai_assistant';
+    const inputChars = JSON.stringify(messages).length;
+    usageGuard = await startAiUsage(req, { feature: aiFeature, endpoint: 'ai-assistant', inputChars });
+    assertWithinAiInputLimit(usageGuard.policy, messages, usageGuard.policy.label);
 
     const openaiKey = Deno.env.get('OPENAI_API_KEY');
 
     if (!openaiKey) {
-      return new Response(JSON.stringify({ error: 'OpenAI key not configured' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      return jsonResponse({ error: 'OpenAI key not configured' }, 500, corsHeaders);
     }
 
     const systemPrompt = `You are QuoteDr Assistant, a helpful AI built into QuoteDr.io — a quoting and invoicing app for renovation contractors. You help contractors with:
@@ -45,6 +51,7 @@ QuoteDr App Flow:
 
 Keep answers concise and practical. Use bullet points for steps. If asked how to do something in the app, give clear step-by-step instructions. You are friendly, helpful, and speak like a knowledgeable contractor buddy.`;
 
+    const model = 'gpt-4o-mini';
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -52,13 +59,13 @@ Keep answers concise and practical. Use bullet points for steps. If asked how to
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model,
         messages: [
           { role: 'system', content: systemPrompt },
           ...messages,
         ],
         temperature: 0.7,
-        max_tokens: 500,
+        max_tokens: usageGuard.policy.maxOutputTokens,
       }),
     });
 
@@ -69,14 +76,15 @@ Keep answers concise and practical. Use bullet points for steps. If asked how to
 
     const data = await response.json();
     const reply = data.choices[0].message.content.trim();
+    await usageGuard.recordSuccess({
+      model,
+      usage: data.usage || {},
+      metadata: { label: usageGuard.policy.label, messageCount: messages.length },
+    });
 
-    return new Response(JSON.stringify({ reply }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    return jsonResponse({ reply }, 200, corsHeaders);
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    if (usageGuard) await usageGuard.recordFailure(err);
+    return aiGuardErrorResponse(err, corsHeaders);
   }
 });

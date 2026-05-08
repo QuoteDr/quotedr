@@ -1,5 +1,10 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
+import {
+  aiGuardErrorResponse,
+  assertWithinAiInputLimit,
+  startAiUsage,
+} from "../_shared/ai-guard.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,10 +18,6 @@ const POSTHOG_PERSONAL_API_KEY = Deno.env.get("POSTHOG_PERSONAL_API_KEY") ?? "";
 const POSTHOG_PROJECT_ID = Deno.env.get("POSTHOG_PROJECT_ID") ?? "411455";
 const POSTHOG_HOST = Deno.env.get("POSTHOG_HOST") ?? "https://us.posthog.com";
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
-const ANALYTICS_ADMIN_EMAILS = (Deno.env.get("ANALYTICS_ADMIN_EMAILS") ?? "info@alddirect.ca")
-  .split(",")
-  .map((email) => email.trim().toLowerCase())
-  .filter(Boolean);
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -71,10 +72,6 @@ async function verifyUser(req: Request) {
   const token = authHeader.substring(7);
   const { data, error } = await supabase.auth.getUser(token);
   if (error || !data?.user) throw new Error("Invalid authorization");
-  const email = String(data.user.email || "").trim().toLowerCase();
-  if (!ANALYTICS_ADMIN_EMAILS.includes(email)) {
-    throw new Error("Forbidden");
-  }
   return data.user;
 }
 
@@ -172,9 +169,10 @@ function buildBrief(metrics: any) {
   };
 }
 
-async function generateAiNarrative(metrics: any, deterministicBrief: any) {
+async function generateAiNarrative(metrics: any, deterministicBrief: any, maxTokens: number) {
   if (!OPENAI_API_KEY) return null;
 
+  const model = "gpt-4o-mini";
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -182,9 +180,9 @@ async function generateAiNarrative(metrics: any, deterministicBrief: any) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "gpt-4o-mini",
+      model,
       temperature: 0.2,
-      max_tokens: 700,
+      max_tokens: maxTokens,
       messages: [
         {
           role: "system",
@@ -200,7 +198,11 @@ async function generateAiNarrative(metrics: any, deterministicBrief: any) {
 
   if (!response.ok) return null;
   const data = await response.json();
-  return data?.choices?.[0]?.message?.content?.trim() || null;
+  return {
+    summary: data?.choices?.[0]?.message?.content?.trim() || null,
+    model,
+    usage: data.usage || {},
+  };
 }
 
 serve(async (req) => {
@@ -264,7 +266,30 @@ serve(async (req) => {
     };
 
     const deterministicBrief = buildBrief(metrics);
-    const aiSummary = body.ai === false ? null : await generateAiNarrative(metrics, deterministicBrief);
+    let aiSummary = null;
+    let usageGuard: any = null;
+    if (body.ai !== false) {
+      try {
+        const aiInput = JSON.stringify({ metrics, deterministicBrief });
+        usageGuard = await startAiUsage(req, {
+          feature: "analytics_brief",
+          endpoint: "analytics-brief",
+          inputChars: aiInput.length,
+        });
+        assertWithinAiInputLimit(usageGuard.policy, aiInput, "Analytics brief input");
+        const aiResult = await generateAiNarrative(metrics, deterministicBrief, usageGuard.policy.maxOutputTokens);
+        aiSummary = aiResult?.summary || null;
+        await usageGuard.recordSuccess({
+          model: aiResult?.model || "gpt-4o-mini",
+          usage: aiResult?.usage || {},
+          metadata: { label: usageGuard.policy.label, days },
+        });
+      } catch (aiError) {
+        if (usageGuard) await usageGuard.recordFailure(aiError);
+        if (aiError instanceof Error && aiError.name === "AiGuardError") throw aiError;
+        aiSummary = null;
+      }
+    }
 
     return jsonResponse({
       success: true,
@@ -274,8 +299,11 @@ serve(async (req) => {
       source: aiSummary ? "openai_and_posthog" : "posthog",
     });
   } catch (error) {
+    if (error instanceof Error && error.name === "AiGuardError") {
+      return aiGuardErrorResponse(error, corsHeaders);
+    }
     const message = error instanceof Error ? error.message : "Internal server error";
-    const status = /authorization/i.test(message) ? 401 : /forbidden/i.test(message) ? 403 : /configured/i.test(message) ? 500 : 500;
+    const status = /authorization/i.test(message) ? 401 : /configured/i.test(message) ? 500 : 500;
     return jsonResponse({ error: message }, status);
   }
 });

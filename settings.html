@@ -1797,6 +1797,13 @@ Sarah Jones, 905-555-5678"></textarea>
 		const AI_IMPORT_URL = 'https://axmoffknvblluibuitrq.supabase.co/functions/v1/smart-import';
 		const AI_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso';
 
+		async function getAiImportHeaders() {
+			if (typeof getSupabaseFunctionAuthHeaders !== 'function') {
+				throw new Error('Please sign in again before using AI import.');
+			}
+			return await getSupabaseFunctionAuthHeaders();
+		}
+
 		function switchImportTab(tab) {
 			document.getElementById('importTabPricing').style.display = tab === 'pricing' ? '' : 'none';
 			document.getElementById('importTabClients').style.display = tab === 'clients' ? '' : 'none';
@@ -1901,7 +1908,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			try {
 				var res = await fetch(AI_IMPORT_URL, {
 					method: 'POST',
-					headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + AI_ANON_KEY },
+					headers: await getAiImportHeaders(),
 					body: JSON.stringify({ content: content, type: type === 'pricing' ? 'materials' : 'clients' })
 				});
 				var data = await res.json();
@@ -1941,7 +1948,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			try {
 				var res = await fetch(AI_IMPORT_URL, {
 					method: 'POST',
-					headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + AI_ANON_KEY },
+					headers: await getAiImportHeaders(),
 					body: JSON.stringify({ content: fixPrompt, type: type === 'pricing' ? 'materials' : 'clients' })
 				});
 				var data = await res.json();
@@ -2136,10 +2143,7 @@ Sarah Jones, 905-555-5678"></textarea>
 				try {
 					var res = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/smart-import', {
 						method: 'POST',
-						headers: {
-							'Content-Type': 'application/json',
-							'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso'
-						},
+						headers: await getAiImportHeaders(),
 						body: JSON.stringify({ content: e.target.result, type: 'materials' })
 					});
 					var data = await res.json();
@@ -2167,10 +2171,7 @@ Sarah Jones, 905-555-5678"></textarea>
 				try {
 					var res = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/smart-import', {
 						method: 'POST',
-						headers: {
-							'Content-Type': 'application/json',
-							'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso'
-						},
+						headers: await getAiImportHeaders(),
 						body: JSON.stringify({ content: e.target.result, type: 'clients' })
 					});
 					var data = await res.json();

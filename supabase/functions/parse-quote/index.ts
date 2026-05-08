@@ -1,4 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import {
+  aiGuardErrorResponse,
+  assertWithinAiInputLimit,
+  jsonResponse,
+  startAiUsage,
+} from "../_shared/ai-guard.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -77,21 +83,23 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  let usageGuard: any = null;
   try {
     const { transcript, customItems, learnedMappings } = await req.json();
     if (!transcript) {
-      return new Response(JSON.stringify({ error: 'No transcript provided' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      return jsonResponse({ error: 'No transcript provided' }, 400, corsHeaders);
     }
+
+    usageGuard = await startAiUsage(req, {
+      feature: 'voice_quote',
+      endpoint: 'parse-quote',
+      inputChars: String(transcript).length,
+    });
+    assertWithinAiInputLimit(usageGuard.policy, transcript, 'Voice quote transcript');
 
     const openaiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openaiKey) {
-      return new Response(JSON.stringify({ error: 'OpenAI key not configured' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      return jsonResponse({ error: 'OpenAI key not configured' }, 500, corsHeaders);
     }
 
     const systemPrompt = `You are a renovation quoting assistant. Parse the contractor's spoken description into a structured quote.
@@ -160,6 +168,7 @@ Rules:
       learningRef = `\n\nUSER'S LEARNED VOICE DICTIONARY (prefer these mappings when the spoken phrase matches):\n${lines.join('\n')}`;
     }
 
+    const model = Deno.env.get('OPENAI_VOICE_MODEL') || 'gpt-4o-mini';
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -167,13 +176,13 @@ Rules:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: Deno.env.get('OPENAI_VOICE_MODEL') || 'gpt-4o-mini',
+        model,
         messages: [
           { role: 'system', content: systemPrompt + materialsRef + learningRef },
           { role: 'user', content: transcript }
         ],
         temperature: 0.3,
-        max_tokens: 2000,
+        max_tokens: usageGuard.policy.maxOutputTokens,
       }),
     });
 
@@ -188,15 +197,20 @@ Rules:
     // Strip markdown code blocks if present
     const jsonStr = content.replace(/^```json?\n?/, '').replace(/\n?```$/, '');
     const parsed = normalizePaintQuantities(JSON.parse(jsonStr), transcript);
-
-    return new Response(JSON.stringify(parsed), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    await usageGuard.recordSuccess({
+      model,
+      usage: data.usage || {},
+      metadata: {
+        label: usageGuard.policy.label,
+        customItemCategories: customItems && typeof customItems === 'object' ? Object.keys(customItems).length : 0,
+        learnedMappings: Array.isArray(learnedMappings) ? learnedMappings.length : 0,
+      },
     });
+
+    return jsonResponse(parsed, 200, corsHeaders);
 
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    if (usageGuard) await usageGuard.recordFailure(err);
+    return aiGuardErrorResponse(err, corsHeaders);
   }
 });

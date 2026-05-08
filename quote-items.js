@@ -767,11 +767,11 @@
             btnEl.disabled = true;
             try {
                 const prompt = 'Improve this renovation line item description so it is clear, professional, client-friendly, and concise. Return only the improved description, no heading or quotes.\n\nDescription: ' + currentText;
-                const anonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso';
+                if (typeof getSupabaseFunctionAuthHeaders !== 'function') throw new Error('Please sign in again before using AI Refine.');
                 const response = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/ai-assistant', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': 'Bearer ' + anonKey },
-                    body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] })
+                    headers: await getSupabaseFunctionAuthHeaders(),
+                    body: JSON.stringify({ feature: 'ai_refine', messages: [{ role: 'user', content: prompt }] })
                 });
                 const data = await response.json();
                 if (!response.ok || data.error) throw new Error(data.error || 'AI refine failed');

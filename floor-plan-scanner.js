@@ -1020,10 +1020,10 @@
         async function _fpLoadRoomSuggestions() {
             _fpSuggestedRoomNames = ['Living Room','Kitchen','Dining','Bathroom','Bedroom'];
             try {
-                var ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso';
+                if (typeof getSupabaseFunctionAuthHeaders !== 'function') throw new Error('Please sign in before using AI room suggestions.');
                 var res = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/analyze-floor-plan', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ANON_KEY, 'apikey': ANON_KEY },
+                    headers: await getSupabaseFunctionAuthHeaders(),
                     body: JSON.stringify({ mode: 'rooms_only', imageBase64: _fpImageBase64, mimeType: _fpMimeType })
                 });
                 var data = await res.json();

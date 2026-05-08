@@ -1,4 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import {
+  aiGuardErrorResponse,
+  assertWithinAiInputLimit,
+  jsonResponse,
+  startAiUsage,
+} from "../_shared/ai-guard.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,19 +16,26 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  let usageGuard: any = null;
   try {
     const { content, type } = await req.json();
     if (!content || !type) {
-      return new Response(JSON.stringify({ error: 'Missing content or type' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      return jsonResponse({ error: 'Missing content or type' }, 400, corsHeaders);
     }
+    if (type !== 'materials' && type !== 'clients') {
+      return jsonResponse({ error: 'Unsupported smart import type' }, 400, corsHeaders);
+    }
+
+    usageGuard = await startAiUsage(req, {
+      feature: 'smart_import',
+      endpoint: 'smart-import',
+      inputChars: String(content).length,
+    });
+    assertWithinAiInputLimit(usageGuard.policy, content, 'Import file content');
 
     const openaiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openaiKey) {
-      return new Response(JSON.stringify({ error: 'OpenAI key not configured' }), {
-        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      return jsonResponse({ error: 'OpenAI key not configured' }, 500, corsHeaders);
     }
 
     let systemPrompt = '';
@@ -73,6 +86,7 @@ Rules:
 - Return ONLY the JSON, no explanation`;
     }
 
+    const model = 'gpt-4o-mini';
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -80,13 +94,13 @@ Rules:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: String(content).slice(0, 8000) }
         ],
         temperature: 0.1,
-        max_tokens: 4000,
+        max_tokens: usageGuard.policy.maxOutputTokens,
       }),
     });
 
@@ -99,14 +113,16 @@ Rules:
     const result = data.choices[0].message.content.trim();
     const jsonStr = result.replace(/^```json?\n?/, '').replace(/\n?```$/, '');
     const parsed = JSON.parse(jsonStr);
-
-    return new Response(JSON.stringify(parsed), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    await usageGuard.recordSuccess({
+      model,
+      usage: data.usage || {},
+      metadata: { label: usageGuard.policy.label, importType: type },
     });
+
+    return jsonResponse(parsed, 200, corsHeaders);
 
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    if (usageGuard) await usageGuard.recordFailure(err);
+    return aiGuardErrorResponse(err, corsHeaders);
   }
 });
