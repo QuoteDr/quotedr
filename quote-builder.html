@@ -6699,6 +6699,7 @@ Example:
             var rate = parseFloat(mapped.mapped_price !== undefined ? mapped.mapped_price : mapped.rate) || 0;
             var unit = mapped.mapped_unit || mapped.unitType || mapped.unit || 'ls';
             var name = mapped.mapped_item_name || mapped.name || item.description || '';
+            var savedItem = _findVoiceSavedItemForMapped(mapped);
             item.category = mapped.mapped_item_category || mapped.category || item.category || 'Miscellaneous';
             item.description = name;
             item.serviceName = name;
@@ -6706,8 +6707,23 @@ Example:
             item.unitType = unit;
             item.rate = rate;
             item.total = (parseFloat(item.quantity) || 1) * rate;
+            item.itemDescription = mapped.itemDescription || (savedItem && savedItem.itemDescription) || item.itemDescription || '';
             if (mapped.user_note && !item.notes) item.notes = mapped.user_note;
             return item;
+        }
+
+        function _findVoiceSavedItemForMapped(mapped) {
+            if (!mapped) return null;
+            var name = mapped.mapped_item_name || mapped.name || mapped.description || '';
+            var category = mapped.mapped_item_category || mapped.category || '';
+            var nameKey = _voicePhraseKey(name);
+            var categoryKey = _voicePhraseKey(category);
+            if (!nameKey) return null;
+            return _flattenVoicePricingItems().find(function(item) {
+                var itemNameKey = _voicePhraseKey(item.name || item.description || '');
+                var itemCategoryKey = _voicePhraseKey(item.category || '');
+                return itemNameKey === nameKey && (!categoryKey || itemCategoryKey === categoryKey);
+            }) || null;
         }
 
         function _isWallPaintVoiceItem(item) {
@@ -6805,6 +6821,7 @@ Example:
             var targetRoom = result.rooms[0];
             if (!Array.isArray(targetRoom.items)) targetRoom.items = [];
             activeRules.forEach(function(rule) {
+                var savedItem = _findVoiceSavedItemForMapped(rule);
                 var count = _extractVoiceRuleCount(rule, transcript);
                 var eachQty = parseFloat(rule.quantity_value || 1) || 1;
                 var quantity = rule.quantity_mode === 'fixed' ? eachQty : _voiceRoundQuantity(eachQty * count);
@@ -6824,6 +6841,7 @@ Example:
                     calculation: rule.quantity_mode === 'fixed'
                         ? 'AI trade rule: fixed ' + quantity + ' ' + unit
                         : 'AI trade rule: ' + eachQty + ' ' + unit + ' x ' + count + ' ' + (rule.count_unit_label || 'count') + ' = ' + quantity + ' ' + unit,
+                    itemDescription: (savedItem && savedItem.itemDescription) || '',
                     notes: rule.user_note || '',
                     aiTradeRuleId: rule.id
                 });
@@ -7457,7 +7475,7 @@ Example:
                         var quantity = parseFloat(item.quantity) || 1;
                         var rate = parseFloat(item.rate) || 0;
                         var total = item.total !== undefined ? parseFloat(item.total) || 0 : quantity * rate;
-                        newRoom.items.push({ category: item.category || 'Miscellaneous', description: item.description || '', serviceName: item.serviceName || item.description || '', quantity: quantity, unit: item.unit || item.unitType || 'ls', unitType: item.unitType || item.unit || 'ls', rate: rate, materialCost: 0, total: total, notes: item.notes || item.calculation || '', optional: false, upgrade: false });
+                        newRoom.items.push({ category: item.category || 'Miscellaneous', description: item.description || '', serviceName: item.serviceName || item.description || '', quantity: quantity, unit: item.unit || item.unitType || 'ls', unitType: item.unitType || item.unit || 'ls', rate: rate, materialCost: 0, total: total, itemDescription: item.itemDescription || '', notes: item.notes || '', optional: false, upgrade: false });
                     });
                 }
                 rooms.push(newRoom);
