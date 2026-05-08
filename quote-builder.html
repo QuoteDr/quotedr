@@ -6740,6 +6740,31 @@ Example:
             return tokens.every(function(token) { return text.indexOf(token) >= 0; });
         }
 
+        function _voiceRuleMatchesParsedItem(rule, item) {
+            if (!rule || !item || item.aiTradeRuleId) return false;
+            var triggerTokens = _voiceRuleTextKey(rule.trigger_phrase).split(' ').filter(Boolean);
+            var countLabel = _voiceRuleTextKey(rule.count_unit_label || '').split(' ').filter(Boolean);
+            var mappedTokens = _voiceRuleTextKey((rule.mapped_item_name || '') + ' ' + (rule.mapped_item_category || '')).split(' ').filter(Boolean);
+            var itemText = _voiceRuleTextKey((item.spokenPhrase || '') + ' ' + (item.description || '') + ' ' + (item.category || ''));
+            if (!itemText || !triggerTokens.length) return false;
+            var triggerHits = triggerTokens.filter(function(token) { return itemText.indexOf(token) >= 0; }).length;
+            var countHit = countLabel.some(function(token) { return itemText.indexOf(token) >= 0; });
+            var mappedHit = mappedTokens.some(function(token) { return token.length > 2 && itemText.indexOf(token) >= 0; });
+            return triggerHits === triggerTokens.length || (triggerHits > 0 && (countHit || mappedHit));
+        }
+
+        function _suppressAiItemsCoveredByTradeRules(result, activeRules) {
+            if (!result || !Array.isArray(result.rooms) || !activeRules || !activeRules.length) return result;
+            result.rooms.forEach(function(room) {
+                if (!room || !Array.isArray(room.items)) return;
+                room.items = room.items.filter(function(item) {
+                    if (item && item.aiTradeRuleId) return true;
+                    return !activeRules.some(function(rule) { return _voiceRuleMatchesParsedItem(rule, item); });
+                });
+            });
+            return result;
+        }
+
         function _voiceWordNumber(value) {
             var numbers = {
                 one: 1, two: 2, three: 3, four: 4, five: 5,
@@ -6775,6 +6800,7 @@ Example:
             try { rules = await getUserAiTradeRules(); } catch(e) { rules = []; }
             var activeRules = (rules || []).filter(function(rule) { return rule && rule.active !== false && _voiceRuleMatchesTranscript(rule, transcript); });
             if (!activeRules.length) return result;
+            _suppressAiItemsCoveredByTradeRules(result, activeRules);
             if (!result.rooms.length) result.rooms.push({ name: 'AI Trade Rules', items: [] });
             var targetRoom = result.rooms[0];
             if (!Array.isArray(targetRoom.items)) targetRoom.items = [];
