@@ -40,6 +40,8 @@
         var _fpPendingRoomName = '';
         var _fpPendingTrades = {};
         var _fpCalibrationIntroShown = false;
+        var _fpCreatorRows = [];
+        var _fpGeneratedPlan = false;
 
         var _fpTradeConfig = [
             { key: 'flooring',    label: 'Flooring',       icon: 'fa-layer-group',     qtyMode: 'area',      defaultEnabled: true },
@@ -137,6 +139,7 @@
             _fpImageBase64 = null; _fpMimeType = 'image/jpeg'; _fpImageUrl = null; _fpResults = null; _fpRooms = [];
             _fpSuggestedRoomNames = []; _fpCeilingHeight = 9; _fpScale = null; _fpShapes = []; _fpDraft = null; _fpPolygonDraft = [];
             _fpCanvasReady = false; _fpCanvasZoom = 1; _fpCanvasScrollLeft = 0; _fpCanvasScrollTop = 0; _fpTool = 'calibrate'; _fpShapeCounter = 1; _fpActiveShapeIndex = -1; _fpPendingRoomName = ''; _fpPendingTrades = {}; _fpCalibrationIntroShown = false;
+            _fpCreatorRows = []; _fpGeneratedPlan = false;
             var modal = new bootstrap.Modal(document.getElementById('floorPlanModal'));
             modal.show();
             setTimeout(_fpMaybeShowIntroPopup, 250);
@@ -275,8 +278,22 @@
         function _fpRenderStep1() {
             document.getElementById('floorPlanModalBody').innerHTML =
                 '<div class="text-center mb-3">' +
-                '<div class="d-flex justify-content-center gap-1 mb-3">' + _fpStepBadges(1, ['Upload','Calibrate','Review']) + '</div>' +
-                '<p class="text-muted small">Upload a floor plan, then calibrate the scale from one known dimension. AI will only suggest room names.</p>' +
+                '<div class="d-flex justify-content-center gap-1 mb-3">' + _fpStepBadges(1, ['Start','Measure','Review']) + '</div>' +
+                '<p class="text-muted small">Upload an existing drawing or create a clean, measured floorplan from scratch.</p>' +
+                '</div>' +
+                '<div class="row g-3 mb-3">' +
+                '<div class="col-md-6">' +
+                '<button type="button" class="btn btn-outline-primary w-100 h-100 p-3 text-start" onclick="document.getElementById(\'fpFileInput\').click()">' +
+                '<div class="fw-bold"><i class="fas fa-cloud-upload-alt me-2"></i>Upload premade drawing</div>' +
+                '<div class="small text-muted mt-1">Use a photo, PDF, or plan you already have, then calibrate it.</div>' +
+                '</button>' +
+                '</div>' +
+                '<div class="col-md-6">' +
+                '<button type="button" class="btn btn-primary w-100 h-100 p-3 text-start" onclick="_fpRenderCreator()">' +
+                '<div class="fw-bold"><i class="fas fa-pen-ruler me-2"></i>Create drawing</div>' +
+                '<div class="small text-white-50 mt-1">Enter room dimensions and send a known-good plan into the scanner.</div>' +
+                '</button>' +
+                '</div>' +
                 '</div>' +
                 '<div id="fpDropZone" onclick="document.getElementById(\'fpFileInput\').click()" style="border:2px dashed #1a56a0;border-radius:12px;padding:40px 20px;text-align:center;cursor:pointer;background:#f8f9ff;" ondragover="event.preventDefault();this.style.background=\'#e8f0ff\'" ondragleave="this.style.background=\'#f8f9ff\'" ondrop="event.preventDefault();_fpHandleFile(event.dataTransfer.files[0])">' +
                 '<i class="fas fa-cloud-upload-alt fa-3x mb-3" style="color:#1a56a0;"></i>' +
@@ -302,8 +319,145 @@
                 '</div>';
         }
 
+        function _fpDefaultCreatorRows() {
+            return [
+                { name: 'Kitchen', length: 12, width: 10, ceiling: _fpCeilingHeight || 9 },
+                { name: 'Living Room', length: 14, width: 12, ceiling: _fpCeilingHeight || 9 }
+            ];
+        }
+
+        function _fpRenderCreator() {
+            if (!_fpCreatorRows || !_fpCreatorRows.length) _fpCreatorRows = _fpDefaultCreatorRows();
+            var rowsHtml = _fpCreatorRows.map(function(row, i) {
+                return '<div class="row g-2 align-items-end border-bottom py-2" id="fpCreatorRow_' + i + '">' +
+                    '<div class="col-sm-4"><label class="form-label small mb-1">Room name</label><input type="text" class="form-control form-control-sm" id="fpCreatorName_' + i + '" value="' + _fpEscapeHtml(row.name) + '" placeholder="Kitchen"></div>' +
+                    '<div class="col-sm-2"><label class="form-label small mb-1">Length</label><div class="input-group input-group-sm"><input type="number" class="form-control" id="fpCreatorLength_' + i + '" value="' + _fpEscapeHtml(row.length) + '" min="1" step="0.1"><span class="input-group-text">ft</span></div></div>' +
+                    '<div class="col-sm-2"><label class="form-label small mb-1">Width</label><div class="input-group input-group-sm"><input type="number" class="form-control" id="fpCreatorWidth_' + i + '" value="' + _fpEscapeHtml(row.width) + '" min="1" step="0.1"><span class="input-group-text">ft</span></div></div>' +
+                    '<div class="col-sm-2"><label class="form-label small mb-1">Ceiling</label><div class="input-group input-group-sm"><input type="number" class="form-control" id="fpCreatorCeiling_' + i + '" value="' + _fpEscapeHtml(row.ceiling || _fpCeilingHeight || 9) + '" min="6" max="20" step="0.5"><span class="input-group-text">ft</span></div></div>' +
+                    '<div class="col-sm-2"><button class="btn btn-outline-danger btn-sm w-100" onclick="_fpRemoveCreatorRow(' + i + ')" ' + (_fpCreatorRows.length <= 1 ? 'disabled' : '') + '><i class="fas fa-times me-1"></i>Remove</button></div>' +
+                    '</div>';
+            }).join('');
+            document.getElementById('floorPlanModalBody').innerHTML =
+                '<div class="d-flex justify-content-center gap-1 mb-3">' + _fpStepBadges(1, ['Create','Measure','Review']) + '</div>' +
+                '<div class="d-flex align-items-start justify-content-between gap-3 mb-3">' +
+                '<div><h5 class="mb-1"><i class="fas fa-pen-ruler me-2 text-primary"></i>Create floorplan</h5>' +
+                '<p class="text-muted small mb-0">Start simple: add each room with known dimensions. QuoteDr will create a scaled plan and recognize each room without AI.</p></div>' +
+                '<button class="btn btn-outline-secondary btn-sm" onclick="_fpRenderStep1()"><i class="fas fa-arrow-left me-1"></i>Back</button>' +
+                '</div>' +
+                '<div class="alert alert-info py-2 small"><i class="fas fa-info-circle me-1"></i>Rooms are laid out left-to-right for this first version. You can fine-tune the drawing in the scanner after it is generated.</div>' +
+                '<div id="fpCreatorRows">' + rowsHtml + '</div>' +
+                '<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">' +
+                '<button class="btn btn-outline-primary btn-sm" onclick="_fpAddCreatorRow()"><i class="fas fa-plus me-1"></i>Add room</button>' +
+                '<button class="btn btn-primary" onclick="_fpGenerateCreatedPlan()"><i class="fas fa-wand-magic-sparkles me-1"></i>Create plan and measure</button>' +
+                '</div>' +
+                '<div id="fpCreatorError" class="alert alert-danger mt-3" style="display:none;"></div>';
+        }
+
+        function _fpReadCreatorRows() {
+            return (_fpCreatorRows || []).map(function(row, i) {
+                return {
+                    name: (document.getElementById('fpCreatorName_' + i) || {}).value || row.name || ('Room ' + (i + 1)),
+                    length: parseFloat((document.getElementById('fpCreatorLength_' + i) || {}).value) || 0,
+                    width: parseFloat((document.getElementById('fpCreatorWidth_' + i) || {}).value) || 0,
+                    ceiling: parseFloat((document.getElementById('fpCreatorCeiling_' + i) || {}).value) || _fpCeilingHeight || 9
+                };
+            });
+        }
+
+        function _fpAddCreatorRow() {
+            _fpCreatorRows = _fpReadCreatorRows();
+            _fpCreatorRows.push({ name: 'Room ' + (_fpCreatorRows.length + 1), length: 10, width: 10, ceiling: _fpCeilingHeight || 9 });
+            _fpRenderCreator();
+        }
+
+        function _fpRemoveCreatorRow(index) {
+            _fpCreatorRows = _fpReadCreatorRows().filter(function(_, i) { return i !== index; });
+            if (!_fpCreatorRows.length) _fpCreatorRows = _fpDefaultCreatorRows().slice(0, 1);
+            _fpRenderCreator();
+        }
+
+        function _fpSvgDataUrl(svg) {
+            return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+        }
+
+        function _fpGenerateCreatedPlan() {
+            var error = document.getElementById('fpCreatorError');
+            _fpCreatorRows = _fpReadCreatorRows();
+            var valid = _fpCreatorRows.filter(function(r) { return r.length > 0 && r.width > 0; });
+            if (!valid.length) {
+                if (error) { error.textContent = 'Add at least one room with valid length and width.'; error.style.display = ''; }
+                return;
+            }
+            var pxPerFt = 28;
+            var pad = 70;
+            var gap = 34;
+            var labelBand = 42;
+            var totalW = pad * 2 + gap * Math.max(0, valid.length - 1);
+            var maxH = 0;
+            valid.forEach(function(r) {
+                totalW += r.length * pxPerFt;
+                maxH = Math.max(maxH, r.width * pxPerFt);
+            });
+            var svgW = Math.max(720, Math.ceil(totalW));
+            var svgH = Math.max(480, Math.ceil(pad * 2 + maxH + labelBand));
+            var x = pad;
+            var yBase = pad + labelBand;
+            var shapes = [];
+            var svgRooms = valid.map(function(r, i) {
+                var w = r.length * pxPerFt;
+                var h = r.width * pxPerFt;
+                var y = yBase + (maxH - h) / 2;
+                var points = [
+                    { x: x, y: y },
+                    { x: x + w, y: y },
+                    { x: x + w, y: y + h },
+                    { x: x, y: y + h }
+                ];
+                var cleanName = r.name || ('Room ' + (i + 1));
+                shapes.push({
+                    id: i + 1,
+                    type: 'box',
+                    name: cleanName,
+                    points: points,
+                    trades: {},
+                    dimensions: { length: r.length, width: r.width, area: r.length * r.width, perimeter: (r.length + r.width) * 2 }
+                });
+                var roomSvg = '<g>' +
+                    '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" fill="#eef6ff" stroke="#1a56a0" stroke-width="4"/>' +
+                    '<text x="' + (x + w / 2) + '" y="' + (y + h / 2 - 7) + '" text-anchor="middle" font-family="Arial" font-size="18" font-weight="700" fill="#0f3460">' + _fpEscapeHtml(cleanName) + '</text>' +
+                    '<text x="' + (x + w / 2) + '" y="' + (y + h / 2 + 18) + '" text-anchor="middle" font-family="Arial" font-size="15" fill="#475569">' + _fpRound(r.length, 1) + ' ft x ' + _fpRound(r.width, 1) + ' ft</text>' +
+                    '<text x="' + (x + w / 2) + '" y="' + (y - 16) + '" text-anchor="middle" font-family="Arial" font-size="14" fill="#0f3460">' + _fpRound(r.length, 1) + ' ft</text>' +
+                    '<text x="' + (x - 18) + '" y="' + (y + h / 2) + '" text-anchor="middle" font-family="Arial" font-size="14" fill="#0f3460" transform="rotate(-90 ' + (x - 18) + ' ' + (y + h / 2) + ')">' + _fpRound(r.width, 1) + ' ft</text>' +
+                    '</g>';
+                x += w + gap;
+                return roomSvg;
+            }).join('');
+            var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + svgW + '" height="' + svgH + '" viewBox="0 0 ' + svgW + ' ' + svgH + '">' +
+                '<rect width="100%" height="100%" fill="#ffffff"/>' +
+                '<text x="' + pad + '" y="34" font-family="Arial" font-size="22" font-weight="700" fill="#0f3460">QuoteDr Created Floorplan</text>' +
+                '<text x="' + pad + '" y="58" font-family="Arial" font-size="14" fill="#64748b">Scale: ' + pxPerFt + ' px/ft. Measurements entered by user.</text>' +
+                svgRooms +
+                '</svg>';
+            _fpImageUrl = _fpSvgDataUrl(svg);
+            _fpImageBase64 = _fpImageUrl.split(',')[1];
+            _fpMimeType = 'image/svg+xml';
+            _fpPdfDoc = null;
+            _fpCurrentPage = 1;
+            _fpScale = { pxPerFt: pxPerFt, knownFt: 10, line: { start: { x: pad, y: svgH - 34 }, end: { x: pad + (10 * pxPerFt), y: svgH - 34 } } };
+            _fpShapes = shapes;
+            _fpShapeCounter = shapes.length + 1;
+            _fpActiveShapeIndex = shapes.length ? 0 : -1;
+            _fpSuggestedRoomNames = shapes.map(function(s) { return s.name; });
+            _fpCeilingHeight = valid[0].ceiling || _fpCeilingHeight || 9;
+            _fpCanvasZoom = 1; _fpCanvasScrollLeft = 0; _fpCanvasScrollTop = 0;
+            _fpGeneratedPlan = true;
+            _fpTool = 'box';
+            _fpRenderMeasureTool();
+        }
+
         async function _fpHandleFile(file) {
             if (!file) return;
+            _fpGeneratedPlan = false;
             var errEl = document.getElementById('fpStep1Error');
             errEl.style.display = 'none';
             if (file.type === 'application/pdf') {
