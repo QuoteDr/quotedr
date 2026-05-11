@@ -49,6 +49,10 @@
         var _fpCreatorCanvas = null;
         var _fpCreatorCtx = null;
         var _fpCreatorRoomName = 'Room 1';
+        var _fpCreatorMode = 'wall';
+        var _fpCreatorOpenings = [];
+        var _fpCreatorOpeningDraft = null;
+        var _fpCreatorSelectedOpening = -1;
         var _fpGeneratedPlan = false;
 
         var _fpTradeConfig = [
@@ -147,7 +151,7 @@
             _fpImageBase64 = null; _fpMimeType = 'image/jpeg'; _fpImageUrl = null; _fpResults = null; _fpRooms = [];
             _fpSuggestedRoomNames = []; _fpCeilingHeight = 9; _fpScale = null; _fpShapes = []; _fpDraft = null; _fpPolygonDraft = [];
             _fpCanvasReady = false; _fpCanvasZoom = 1; _fpCanvasScrollLeft = 0; _fpCanvasScrollTop = 0; _fpTool = 'calibrate'; _fpShapeCounter = 1; _fpActiveShapeIndex = -1; _fpPendingRoomName = ''; _fpPendingTrades = {}; _fpCalibrationIntroShown = false;
-            _fpCreatorPoints = []; _fpCreatorClosed = false; _fpCreatorDraft = null; _fpCreatorMouseDown = false; _fpCreatorSelectedWall = -1; _fpCreatorRoomName = 'Room 1'; _fpGeneratedPlan = false;
+            _fpCreatorPoints = []; _fpCreatorClosed = false; _fpCreatorDraft = null; _fpCreatorMouseDown = false; _fpCreatorSelectedWall = -1; _fpCreatorRoomName = 'Room 1'; _fpCreatorMode = 'wall'; _fpCreatorOpenings = []; _fpCreatorOpeningDraft = null; _fpCreatorSelectedOpening = -1; _fpGeneratedPlan = false;
             var modal = new bootstrap.Modal(document.getElementById('floorPlanModal'));
             modal.show();
             setTimeout(_fpMaybeShowIntroPopup, 250);
@@ -329,6 +333,8 @@
 
         function _fpRenderCreator() {
             var selectedLength = _fpCreatorSelectedWall >= 0 ? _fpRound(_fpCreatorWallLength(_fpCreatorSelectedWall), 2) : '';
+            var selectedOpening = _fpCreatorSelectedOpening >= 0 ? _fpCreatorOpenings[_fpCreatorSelectedOpening] : null;
+            var selectedOpeningWidth = selectedOpening ? _fpRound(selectedOpening.widthFt, 2) : '';
             document.getElementById('floorPlanModalBody').innerHTML =
                 '<div class="d-flex justify-content-center gap-1 mb-3">' + _fpStepBadges(1, ['Create','Measure','Review']) + '</div>' +
                 '<div class="d-flex align-items-start justify-content-between gap-3 mb-3">' +
@@ -338,11 +344,17 @@
                 '</div>' +
                 '<div class="row g-3">' +
                 '<div class="col-lg-8">' +
+                '<div class="d-flex flex-wrap gap-1 mb-2">' +
+                _fpCreatorModeButton('wall', 'fa-grip-lines', 'Walls') +
+                _fpCreatorModeButton('door', 'fa-door-open', 'Door') +
+                _fpCreatorModeButton('opening', 'fa-archway', 'Opening') +
+                _fpCreatorModeButton('window', 'fa-window-maximize', 'Window') +
+                '</div>' +
                 '<div class="border rounded bg-light" style="position:relative;overflow:hidden;">' +
                 '<canvas id="fpCreatorCanvas" width="980" height="620" style="display:block;width:100%;height:min(62vh,620px);cursor:crosshair;touch-action:none;"></canvas>' +
                 '<div id="fpCreatorLiveLabel" class="badge bg-primary" style="position:absolute;left:12px;top:12px;display:none;"></div>' +
                 '</div>' +
-                '<div class="small text-muted mt-2"><i class="fas fa-info-circle me-1"></i>Release near the first point to close the room. Click a wall to edit its exact length.</div>' +
+                '<div class="small text-muted mt-2"><i class="fas fa-info-circle me-1"></i>Draw walls first. Then choose Door, Window, or Opening and drag along a wall to place it.</div>' +
                 '</div>' +
                 '<div class="col-lg-4">' +
                 '<div class="border rounded p-3 mb-3">' +
@@ -353,15 +365,21 @@
                 '<label class="form-label small mb-1">Selected wall exact length</label>' +
                 '<div class="input-group input-group-sm mb-2"><input type="number" id="fpCreatorWallLength" class="form-control" value="' + selectedLength + '" min="0.1" step="0.1" ' + (_fpCreatorSelectedWall >= 0 ? '' : 'disabled') + ' onkeydown="if(event.key===\'Enter\'){event.preventDefault();_fpCreatorApplyWallLength();}"><span class="input-group-text">ft</span><button class="btn btn-primary" onclick="_fpCreatorApplyWallLength()" ' + (_fpCreatorSelectedWall >= 0 ? '' : 'disabled') + '>Set</button></div>' +
                 '<div class="small text-muted mb-0" id="fpCreatorSelectedHint">' + (_fpCreatorSelectedWall >= 0 ? 'Editing wall ' + (_fpCreatorSelectedWall + 1) + '.' : 'No wall selected yet.') + '</div>' +
+                '<hr>' +
+                '<label class="form-label small mb-1">Selected door/window/opening width</label>' +
+                '<div class="input-group input-group-sm mb-2"><input type="number" id="fpCreatorOpeningWidth" class="form-control" value="' + selectedOpeningWidth + '" min="0.5" step="0.1" ' + (selectedOpening ? '' : 'disabled') + ' onkeydown="if(event.key===\'Enter\'){event.preventDefault();_fpCreatorApplyOpeningWidth();}"><span class="input-group-text">ft</span><button class="btn btn-primary" onclick="_fpCreatorApplyOpeningWidth()" ' + (selectedOpening ? '' : 'disabled') + '>Set</button></div>' +
+                '<div class="small text-muted">' + (selectedOpening ? 'Editing ' + _fpEscapeHtml(selectedOpening.type) + ' on wall ' + (selectedOpening.wallIndex + 1) + '.' : 'No door, window, or opening selected yet.') + '</div>' +
                 '</div>' +
                 '<div class="border rounded p-3 mb-3">' +
                 '<div class="d-flex justify-content-between"><span class="small text-muted">Walls</span><strong>' + _fpCreatorWallCount() + '</strong></div>' +
+                '<div class="d-flex justify-content-between"><span class="small text-muted">Openings</span><strong>' + _fpCreatorOpenings.length + '</strong></div>' +
                 '<div class="d-flex justify-content-between"><span class="small text-muted">Status</span><strong>' + (_fpCreatorClosed ? 'Closed room' : 'Open outline') + '</strong></div>' +
                 '<div class="d-flex justify-content-between"><span class="small text-muted">Perimeter</span><strong>' + _fpRound(_fpCreatorPerimeter(), 1) + ' ft</strong></div>' +
                 '</div>' +
                 '<div class="d-grid gap-2">' +
                 '<button class="btn btn-outline-primary btn-sm" onclick="_fpCreatorCloseRoom()" ' + (_fpCreatorCanClose() && !_fpCreatorClosed ? '' : 'disabled') + '><i class="fas fa-vector-square me-1"></i>Close room</button>' +
                 '<button class="btn btn-outline-secondary btn-sm" onclick="_fpCreatorUndo()"><i class="fas fa-undo me-1"></i>Undo wall</button>' +
+                '<button class="btn btn-outline-secondary btn-sm" onclick="_fpCreatorRemoveSelectedOpening()" ' + (selectedOpening ? '' : 'disabled') + '><i class="fas fa-eraser me-1"></i>Remove selected opening</button>' +
                 '<button class="btn btn-outline-danger btn-sm" onclick="_fpCreatorClear()"><i class="fas fa-trash me-1"></i>Clear</button>' +
                 '<button class="btn btn-primary" onclick="_fpGenerateCreatedPlan()" ' + (_fpCreatorClosed ? '' : 'disabled') + '><i class="fas fa-arrow-right me-1"></i>Use this floorplan</button>' +
                 '</div>' +
@@ -369,6 +387,17 @@
                 '</div>' +
                 '<div id="fpCreatorError" class="alert alert-danger mt-3" style="display:none;"></div>';
             setTimeout(_fpCreatorInitCanvas, 0);
+        }
+
+        function _fpCreatorModeButton(mode, icon, label) {
+            return '<button class="btn btn-' + (_fpCreatorMode === mode ? 'primary' : 'outline-primary') + ' btn-sm" onclick="_fpCreatorSetMode(\'' + mode + '\')"><i class="fas ' + icon + ' me-1"></i>' + label + '</button>';
+        }
+
+        function _fpCreatorSetMode(mode) {
+            _fpCreatorMode = mode;
+            _fpCreatorDraft = null;
+            _fpCreatorOpeningDraft = null;
+            _fpRenderCreator();
         }
 
         function _fpCreatorInitCanvas() {
@@ -390,8 +419,33 @@
         function _fpCreatorDown(e) {
             if (!_fpCreatorCanvas) return;
             var pt = _fpCreatorPoint(e);
+            if (_fpCreatorMode !== 'wall') {
+                if (!_fpCreatorClosed) return;
+                var existingOpening = _fpCreatorNearestOpening(pt);
+                if (existingOpening >= 0) {
+                    _fpCreatorSelectedOpening = existingOpening;
+                    _fpCreatorSelectedWall = -1;
+                    _fpRenderCreator();
+                    return;
+                }
+                var wallIndex = _fpCreatorNearestWall(pt);
+                if (wallIndex < 0) return;
+                var t = _fpCreatorProjectWallT(pt, wallIndex);
+                _fpCreatorOpeningDraft = { type: _fpCreatorMode, wallIndex: wallIndex, startT: t, endT: t };
+                _fpCreatorMouseDown = true;
+                _fpCreatorSelectedWall = -1;
+                _fpCreatorDraw();
+                return;
+            }
             if (_fpCreatorClosed) {
-                _fpCreatorSelectedWall = _fpCreatorNearestWall(pt);
+                var openingIndex = _fpCreatorNearestOpening(pt);
+                if (openingIndex >= 0) {
+                    _fpCreatorSelectedOpening = openingIndex;
+                    _fpCreatorSelectedWall = -1;
+                } else {
+                    _fpCreatorSelectedWall = _fpCreatorNearestWall(pt);
+                    _fpCreatorSelectedOpening = -1;
+                }
                 _fpRenderCreator();
                 return;
             }
@@ -402,8 +456,19 @@
         }
 
         function _fpCreatorMove(e) {
-            if (!_fpCreatorMouseDown || !_fpCreatorDraft) return;
+            if (!_fpCreatorMouseDown) return;
             var pt = _fpCreatorPoint(e);
+            if (_fpCreatorOpeningDraft) {
+                _fpCreatorOpeningDraft.endT = _fpCreatorProjectWallT(pt, _fpCreatorOpeningDraft.wallIndex);
+                var openingLabel = document.getElementById('fpCreatorLiveLabel');
+                if (openingLabel) {
+                    openingLabel.style.display = 'inline-block';
+                    openingLabel.textContent = _fpRound(_fpCreatorOpeningDraftWidthFt(_fpCreatorOpeningDraft), 1) + ' ft';
+                }
+                _fpCreatorDraw();
+                return;
+            }
+            if (!_fpCreatorDraft) return;
             if (_fpCreatorPoints.length >= 3 && _fpDistance(pt, _fpCreatorPoints[0]) < 18) pt = _fpCreatorPoints[0];
             _fpCreatorDraft.end = pt;
             var label = document.getElementById('fpCreatorLiveLabel');
@@ -415,8 +480,28 @@
         }
 
         function _fpCreatorUp() {
-            if (!_fpCreatorMouseDown || !_fpCreatorDraft) return;
+            if (!_fpCreatorMouseDown) return;
             _fpCreatorMouseDown = false;
+            if (_fpCreatorOpeningDraft) {
+                if (_fpCreatorOpeningDraftWidthFt(_fpCreatorOpeningDraft) >= 0.4) {
+                    var t1 = Math.min(_fpCreatorOpeningDraft.startT, _fpCreatorOpeningDraft.endT);
+                    var t2 = Math.max(_fpCreatorOpeningDraft.startT, _fpCreatorOpeningDraft.endT);
+                    _fpCreatorOpenings.push({
+                        type: _fpCreatorOpeningDraft.type,
+                        wallIndex: _fpCreatorOpeningDraft.wallIndex,
+                        startT: t1,
+                        endT: t2,
+                        widthFt: _fpRound((t2 - t1) * _fpCreatorWallLength(_fpCreatorOpeningDraft.wallIndex), 2)
+                    });
+                    _fpCreatorSelectedOpening = _fpCreatorOpenings.length - 1;
+                }
+                _fpCreatorOpeningDraft = null;
+                var openingLabel = document.getElementById('fpCreatorLiveLabel');
+                if (openingLabel) openingLabel.style.display = 'none';
+                _fpRenderCreator();
+                return;
+            }
+            if (!_fpCreatorDraft) return;
             var end = _fpCreatorDraft.end;
             var start = _fpCreatorDraft.start;
             if (_fpDistance(start, end) >= 8) {
@@ -483,10 +568,67 @@
             _fpRenderCreator();
         }
 
+        function _fpCreatorProjectWallT(pt, wallIndex) {
+            var a = _fpCreatorPoints[wallIndex];
+            var b = _fpCreatorPoints[(wallIndex + 1) % _fpCreatorPoints.length];
+            if (!a || !b) return 0;
+            var dx = b.x - a.x, dy = b.y - a.y;
+            var len2 = dx * dx + dy * dy || 1;
+            return Math.max(0, Math.min(1, ((pt.x - a.x) * dx + (pt.y - a.y) * dy) / len2));
+        }
+
+        function _fpCreatorPointOnWall(wallIndex, t) {
+            var a = _fpCreatorPoints[wallIndex];
+            var b = _fpCreatorPoints[(wallIndex + 1) % _fpCreatorPoints.length];
+            return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+        }
+
+        function _fpCreatorOpeningDraftWidthFt(opening) {
+            if (!opening) return 0;
+            return Math.abs((opening.endT || 0) - (opening.startT || 0)) * _fpCreatorWallLength(opening.wallIndex);
+        }
+
+        function _fpCreatorNearestOpening(pt) {
+            var best = -1, bestDist = Infinity;
+            _fpCreatorOpenings.forEach(function(opening, index) {
+                var a = _fpCreatorPointOnWall(opening.wallIndex, opening.startT);
+                var b = _fpCreatorPointOnWall(opening.wallIndex, opening.endT);
+                var dist = _fpPointToSegmentDistance(pt, a, b);
+                if (dist < bestDist) { bestDist = dist; best = index; }
+            });
+            return bestDist < 24 ? best : -1;
+        }
+
+        function _fpCreatorApplyOpeningWidth() {
+            var opening = _fpCreatorOpenings[_fpCreatorSelectedOpening];
+            var input = document.getElementById('fpCreatorOpeningWidth');
+            var width = parseFloat(input ? input.value : '');
+            if (!opening || !width || width <= 0) return;
+            var wallLength = _fpCreatorWallLength(opening.wallIndex);
+            if (!wallLength) return;
+            var center = (opening.startT + opening.endT) / 2;
+            var half = (width / wallLength) / 2;
+            opening.startT = Math.max(0, center - half);
+            opening.endT = Math.min(1, center + half);
+            if (opening.endT - opening.startT < (width / wallLength) * 0.8) {
+                opening.startT = Math.max(0, opening.endT - (width / wallLength));
+            }
+            opening.widthFt = _fpRound((opening.endT - opening.startT) * wallLength, 2);
+            _fpRenderCreator();
+        }
+
+        function _fpCreatorRemoveSelectedOpening() {
+            if (_fpCreatorSelectedOpening < 0) return;
+            _fpCreatorOpenings.splice(_fpCreatorSelectedOpening, 1);
+            _fpCreatorSelectedOpening = -1;
+            _fpRenderCreator();
+        }
+
         function _fpCreatorUndo() {
             if (_fpCreatorClosed) { _fpCreatorClosed = false; _fpCreatorSelectedWall = Math.max(0, _fpCreatorPoints.length - 2); }
             else if (_fpCreatorPoints.length) _fpCreatorPoints.pop();
             _fpCreatorDraft = null;
+            _fpCreatorOpenings = _fpCreatorOpenings.filter(function(opening) { return opening.wallIndex < _fpCreatorWallCount(); });
             _fpRenderCreator();
         }
 
@@ -495,6 +637,9 @@
             _fpCreatorClosed = false;
             _fpCreatorDraft = null;
             _fpCreatorSelectedWall = -1;
+            _fpCreatorOpenings = [];
+            _fpCreatorOpeningDraft = null;
+            _fpCreatorSelectedOpening = -1;
             _fpRenderCreator();
         }
 
@@ -529,9 +674,11 @@
             if (_fpCreatorPoints.length) {
                 ctx.lineWidth = 5;
                 for (var i = 0; i < _fpCreatorWallCount(); i++) _fpCreatorDrawWall(i, i === _fpCreatorSelectedWall ? '#e87e2a' : '#1a56a0');
+                _fpCreatorOpenings.forEach(function(opening, index) { _fpCreatorDrawOpening(opening, index === _fpCreatorSelectedOpening); });
                 if (!_fpCreatorClosed && _fpCreatorPoints.length > 1) _fpCreatorDrawPoint(_fpCreatorPoints[0], '#198754');
                 _fpCreatorPoints.forEach(function(p) { _fpCreatorDrawPoint(p, '#1a56a0'); });
             }
+            if (_fpCreatorOpeningDraft) _fpCreatorDrawOpening(_fpCreatorOpeningDraft, true);
             if (_fpCreatorDraft) {
                 ctx.strokeStyle = '#0d6efd';
                 ctx.lineWidth = 4;
@@ -550,6 +697,38 @@
             ctx.lineCap = 'round';
             ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
             _fpCreatorDrawWallLabel(a, b, _fpRound(_fpCreatorWallLength(index), 1) + ' ft');
+        }
+
+        function _fpCreatorOpeningColor(type) {
+            if (type === 'door') return '#16a34a';
+            if (type === 'window') return '#0ea5e9';
+            return '#a855f7';
+        }
+
+        function _fpCreatorDrawOpening(opening, selected) {
+            var a = _fpCreatorPointOnWall(opening.wallIndex, Math.min(opening.startT, opening.endT));
+            var b = _fpCreatorPointOnWall(opening.wallIndex, Math.max(opening.startT, opening.endT));
+            var color = _fpCreatorOpeningColor(opening.type);
+            var ctx = _fpCreatorCtx;
+            ctx.save();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = selected ? 12 : 9;
+            ctx.lineCap = 'butt';
+            ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+            if (opening.type === 'door') {
+                var dx = b.x - a.x, dy = b.y - a.y;
+                var len = Math.sqrt(dx * dx + dy * dy) || 1;
+                var nx = -dy / len, ny = dx / len;
+                ctx.strokeStyle = 'rgba(22,163,74,0.55)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(a.x, a.y);
+                ctx.quadraticCurveTo(a.x + nx * len * 0.55, a.y + ny * len * 0.55, b.x, b.y);
+                ctx.stroke();
+            }
+            ctx.restore();
+            var width = opening.widthFt || _fpCreatorOpeningDraftWidthFt(opening);
+            _fpCreatorDrawWallLabel(a, b, (opening.type === 'opening' ? 'open' : opening.type) + ' ' + _fpRound(width, 1) + ' ft');
         }
 
         function _fpCreatorDrawPoint(p, color) {
@@ -603,6 +782,19 @@
                 var y = (p.y + b.y) / 2 - 10;
                 return '<text x="' + x + '" y="' + y + '" text-anchor="middle" font-family="Arial" font-size="14" fill="#0f3460">' + len + ' ft</text>';
             }).join('');
+            var openingSvg = _fpCreatorOpenings.map(function(opening) {
+                var a = points[opening.wallIndex];
+                var b = points[(opening.wallIndex + 1) % points.length];
+                if (!a || !b) return '';
+                var p1 = { x: a.x + (b.x - a.x) * opening.startT, y: a.y + (b.y - a.y) * opening.startT };
+                var p2 = { x: a.x + (b.x - a.x) * opening.endT, y: a.y + (b.y - a.y) * opening.endT };
+                var color = opening.type === 'door' ? '#16a34a' : (opening.type === 'window' ? '#0ea5e9' : '#a855f7');
+                var label = opening.type === 'opening' ? 'Opening' : (opening.type === 'door' ? 'Door' : 'Window');
+                var mx = (p1.x + p2.x) / 2;
+                var my = (p1.y + p2.y) / 2 + 18;
+                return '<line x1="' + p1.x + '" y1="' + p1.y + '" x2="' + p2.x + '" y2="' + p2.y + '" stroke="' + color + '" stroke-width="9" stroke-linecap="butt"/>' +
+                    '<text x="' + mx + '" y="' + my + '" text-anchor="middle" font-family="Arial" font-size="13" fill="' + color + '">' + label + ' ' + _fpRound(opening.widthFt, 1) + ' ft</text>';
+            }).join('');
             _fpScale = { pxPerFt: pxPerFt, knownFt: 10, line: { start: { x: pad, y: svgH - 34 }, end: { x: pad + (10 * pxPerFt), y: svgH - 34 } } };
             var dimensions = _fpShapeDimensions('polygon', points);
             var shapes = [{
@@ -611,13 +803,15 @@
                 name: _fpCreatorRoomName,
                 points: points,
                 trades: {},
-                dimensions: dimensions
+                dimensions: dimensions,
+                openings: _fpCreatorOpenings.map(function(o) { return Object.assign({}, o); })
             }];
             var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + svgW + '" height="' + svgH + '" viewBox="0 0 ' + svgW + ' ' + svgH + '">' +
                 '<rect width="100%" height="100%" fill="#ffffff"/>' +
                 '<text x="' + pad + '" y="34" font-family="Arial" font-size="22" font-weight="700" fill="#0f3460">QuoteDr Created Floorplan</text>' +
                 '<text x="' + pad + '" y="58" font-family="Arial" font-size="14" fill="#64748b">Scale: ' + pxPerFt + ' px/ft. Measurements entered by user.</text>' +
                 '<polygon points="' + pointsAttr + '" fill="#eef6ff" stroke="#1a56a0" stroke-width="4"/>' +
+                openingSvg +
                 labels +
                 '<text x="' + (svgW / 2) + '" y="' + (pad + labelBand + 26) + '" text-anchor="middle" font-family="Arial" font-size="18" font-weight="700" fill="#0f3460">' + _fpEscapeHtml(_fpCreatorRoomName) + '</text>' +
                 '</svg>';
