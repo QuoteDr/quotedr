@@ -130,6 +130,7 @@ Demolition, Concrete & Masonry, Waterproofing, Rough Framing, Windows & Exterior
 
 Rules:
 - Group items logically by room or area
+- If the transcript says "next room", start a new room/area at that point and keep following items in that new room.
 - If no specific price is mentioned, set rate and total to 0 (contractor will fill in)
 - Use realistic unit types: sqft, lf, ea, hr, ls (lump sum)
 - Keep descriptions concise and professional
@@ -148,8 +149,10 @@ Rules:
     if (customItems && typeof customItems === 'object') {
       const lines: string[] = [];
       for (const [category, items] of Object.entries(customItems)) {
-        if (!Array.isArray(items)) continue;
-        for (const item of items as any[]) {
+        const itemList = Array.isArray(items)
+          ? items
+          : (items && typeof items === 'object' ? Object.values(items as Record<string, any>) : []);
+        for (const item of itemList as any[]) {
           if (item.name && item.rate) {
             lines.push(`${category} | ${item.name} | ${item.unitType || item.unit || 'ls'} | $${parseFloat(item.rate).toFixed(2)}`);
           }

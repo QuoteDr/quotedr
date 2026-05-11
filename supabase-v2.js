@@ -815,6 +815,12 @@ async function saveLearnedMapping(phrase, mappedItem, note) {
     if (!user || !mappedItem) return { data: null, error: 'Not authenticated' };
     const phraseKey = normalizeAiPhraseKey(phrase);
     if (!phraseKey) return { data: null, error: 'Missing phrase' };
+    const { data: existing } = await _supabase
+        .from('ai_learned_mappings')
+        .select('usage_count')
+        .eq('user_id', user.id)
+        .eq('phrase_key', phraseKey)
+        .maybeSingle();
     const payload = {
         user_id: user.id,
         spoken_phrase: String(phrase || '').trim(),
@@ -824,7 +830,7 @@ async function saveLearnedMapping(phrase, mappedItem, note) {
         mapped_unit: mappedItem.unitType || mappedItem.unit || 'ls',
         mapped_price: parseFloat(mappedItem.rate || mappedItem.price || 0) || 0,
         user_note: note || '',
-        usage_count: 1,
+        usage_count: (parseInt(existing && existing.usage_count, 10) || 0) + 1,
         updated_at: new Date().toISOString()
     };
     return await _supabase
@@ -961,6 +967,41 @@ async function incrementAiTradeRuleUsage(ruleId) {
         .update({ usage_count: (parseInt(existing.usage_count, 10) || 0) + 1, updated_at: new Date().toISOString() })
         .eq('id', ruleId)
         .eq('user_id', user.id)
+        .select()
+        .single();
+}
+
+async function getUserAiVoiceTemplates() {
+    const user = await getCurrentUser();
+    if (!user) return JSON.parse(localStorage.getItem('ald_ai_voice_templates') || '[]');
+    const { data, error } = await _supabase
+        .from('user_data')
+        .select('value')
+        .eq('user_id', user.id)
+        .eq('key', 'ai_voice_templates')
+        .maybeSingle();
+    if (error) {
+        console.warn('AI voice templates load failed:', error);
+        return JSON.parse(localStorage.getItem('ald_ai_voice_templates') || '[]');
+    }
+    const templates = Array.isArray(data && data.value) ? data.value : [];
+    localStorage.setItem('ald_ai_voice_templates', JSON.stringify(templates));
+    return templates;
+}
+
+async function saveUserAiVoiceTemplates(templates) {
+    const safeTemplates = Array.isArray(templates) ? templates : [];
+    localStorage.setItem('ald_ai_voice_templates', JSON.stringify(safeTemplates));
+    const user = await getCurrentUser();
+    if (!user) return { data: safeTemplates, error: null };
+    return await _supabase
+        .from('user_data')
+        .upsert({
+            user_id: user.id,
+            key: 'ai_voice_templates',
+            value: safeTemplates,
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id,key' })
         .select()
         .single();
 }

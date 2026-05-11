@@ -6459,6 +6459,8 @@ Example:
         var _voiceReviewRows = [];
         var _voiceReviewItems = [];
         var _voiceMeasurementResult = null;
+        var _aiVoiceTemplateDraftItems = [];
+        var _aiVoiceTemplateCache = [];
 
         async function startVoiceQuote() {
             if (typeof requireFeature === 'function') {
@@ -6620,6 +6622,15 @@ Example:
             _setVoicePauseButton(false);
         }
 
+        function addVoiceNextRoomMarker() {
+            if (_voiceRecording) toggleVoicePause();
+            var current = _voiceTranscriptFull.trim();
+            _voiceTranscriptFull = (current ? current + ' ' : '') + 'Next room. ';
+            document.getElementById('voiceTranscript').textContent = _voiceTranscriptFull;
+            document.getElementById('voiceStatus').textContent = 'Next room marker added. Resume and describe the next room.';
+            document.getElementById('voiceActions').style.display = 'block';
+        }
+
         function _voicePhraseKey(phrase) {
             if (typeof normalizeAiPhraseKey === 'function') return normalizeAiPhraseKey(phrase);
             return String(phrase || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -6693,6 +6704,57 @@ Example:
                 .filter(function(item) { return item._score >= 20; })
                 .sort(function(a, b) { return b._score - a._score || a.name.localeCompare(b.name); })
                 .slice(0, 12);
+        }
+
+        function _voiceReviewConfidence(row) {
+            var usage = row && row.mapping ? (parseInt(row.mapping.usage_count, 10) || 0) : 0;
+            if (row && row.item && row.item.aiTradeRuleId) return { score: 98, label: '98% Trade rule', rank: 4, reason: 'Your trade rule created this item.' };
+            if (row && row.duplicateOf !== undefined) return { score: 20, label: '20% Possible duplicate', rank: -1, reason: 'Looks covered by another parsed item, so it is unchecked by default.' };
+            if (row && row.requiresChoice) return { score: 35, label: '35% Choose item', rank: 0, reason: 'You have multiple saved items that could match this phrase.' };
+            if (row && row.mapping && usage >= 3) return { score: 95, label: '95% Learned', rank: 3, reason: 'This phrase has been confirmed several times.' };
+            if (row && row.mapping) return { score: 75, label: '75% Learned', rank: 1, reason: 'QuoteDr remembers this phrase but still wants confirmation.' };
+            if (row && row.exact) return { score: 90, label: '90% Exact match', rank: 2, reason: 'The phrase matches a saved item name.' };
+            var similarScore = row && row.similar && row.similar[0] ? (parseInt(row.similar[0]._score, 10) || 0) : 0;
+            if (similarScore >= 55) return { score: Math.min(84, Math.max(55, similarScore)), label: Math.min(84, Math.max(55, similarScore)) + '% Possible match', rank: 1, reason: 'Best saved item match by keyword overlap.' };
+            return { score: Math.max(10, similarScore || 25), label: 'Needs review', rank: 0, reason: 'QuoteDr needs you to choose the saved item.' };
+        }
+
+        function _findAmbiguousVoiceFamilyItems(phrase) {
+            var key = _voicePhraseKey(phrase);
+            if (!key) return [];
+            var families = [
+                { name: 'baseboard', tokens: ['baseboard', 'baseboards'] },
+                { name: 'trim', tokens: ['trim', 'casing', 'case', 'millwork'] },
+                { name: 'door', tokens: ['door', 'doors'] },
+                { name: 'paint', tokens: ['paint', 'painting'] },
+                { name: 'floor', tokens: ['floor', 'flooring'] }
+            ];
+            var family = families.find(function(entry) {
+                return entry.tokens.some(function(token) { return key.indexOf(token) >= 0; });
+            });
+            if (!family) return [];
+            var items = _flattenVoicePricingItems().filter(function(item) {
+                var itemKey = _voicePhraseKey((item.category || '') + ' ' + (item.name || ''));
+                return family.tokens.some(function(token) { return itemKey.indexOf(token) >= 0; });
+            });
+            var seen = {};
+            var unique = items.filter(function(item) {
+                var sig = _voicePhraseKey((item.category || '') + ' ' + (item.name || ''));
+                if (seen[sig]) return false;
+                seen[sig] = true;
+                return true;
+            });
+            return unique.length > 1 ? unique.slice(0, 12) : [];
+        }
+
+        function _voiceReviewDuplicateKey(row) {
+            if (!row || !row.item) return '';
+            var selected = row.mapping || row.selected || row.exact || null;
+            var name = selected ? (selected.mapped_item_name || selected.name || selected.description || '') : (row.item.description || '');
+            var category = selected ? (selected.mapped_item_category || selected.category || '') : (row.item.category || '');
+            var qty = _voiceRoundQuantity(row.item.quantity || 1);
+            var unit = row.item.unit || row.item.unitType || '';
+            return _voicePhraseKey(category + ' ' + name + ' ' + qty + ' ' + unit);
         }
 
         function _applyVoiceMappedItem(item, mapped) {
@@ -7143,6 +7205,252 @@ Example:
             await loadAiVoiceTradeRulesSettings();
         }
 
+        async function openAiVoiceTemplatesSettings() {
+            await loadAiVoiceTemplatesSettings();
+            new bootstrap.Modal(document.getElementById('aiVoiceTemplatesModal')).show();
+        }
+
+        function _renderAiVoiceTemplateDraft() {
+            var list = document.getElementById('aiVoiceTemplateDraftList');
+            if (!list) return;
+            if (!_aiVoiceTemplateDraftItems.length) {
+                list.textContent = 'No template lines added yet.';
+                return;
+            }
+            list.innerHTML = _aiVoiceTemplateDraftItems.map(function(line, index) {
+                return '<div class="d-flex justify-content-between align-items-center border-top py-2">'
+                    + '<span>' + _escapeHtml(line.mapped_item_name) + ' - ' + _escapeHtml(line.quantity_value) + ' x ' + _escapeHtml(line.quantity_basis) + '</span>'
+                    + '<button type="button" class="btn btn-link btn-sm text-danger" onclick="removeAiVoiceTemplateDraftItem(' + index + ')">Remove</button>'
+                    + '</div>';
+            }).join('');
+        }
+
+        function addAiVoiceTemplateDraftItem() {
+            var selected = _resolveVoiceReviewSelection(document.getElementById('aiVoiceTemplateItem')?.value || '');
+            if (!selected) { qdAlert('Choose a saved item for this template line.'); return; }
+            _aiVoiceTemplateDraftItems.push({
+                mapped_item_category: selected.category,
+                mapped_item_name: selected.name,
+                mapped_unit: selected.unitType,
+                mapped_price: selected.rate,
+                itemDescription: selected.itemDescription || '',
+                quantity_value: parseFloat(document.getElementById('aiVoiceTemplateQuantity')?.value || 1) || 1,
+                quantity_basis: document.getElementById('aiVoiceTemplateBasis')?.value || 'fixed'
+            });
+            document.getElementById('aiVoiceTemplateItem').value = '';
+            _renderAiVoiceTemplateDraft();
+        }
+
+        function removeAiVoiceTemplateDraftItem(index) {
+            _aiVoiceTemplateDraftItems.splice(index, 1);
+            _renderAiVoiceTemplateDraft();
+        }
+
+        async function loadAiVoiceTemplatesSettings() {
+            var list = document.getElementById('aiVoiceTemplatesList');
+            var options = document.getElementById('aiVoiceTemplateItemOptions');
+            if (!list || !options) return;
+            _voiceReviewItems = _flattenVoicePricingItems();
+            options.innerHTML = '';
+            _voiceReviewItems.forEach(function(item) {
+                var option = document.createElement('option');
+                option.value = _voiceItemDisplay(item);
+                options.appendChild(option);
+            });
+            _aiVoiceTemplateDraftItems = [];
+            _renderAiVoiceTemplateDraft();
+            list.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm me-2"></span>Loading voice templates...</div>';
+            if (typeof getUserAiVoiceTemplates !== 'function') {
+                list.innerHTML = '<div class="alert alert-warning small mb-0">Voice template helpers are not loaded yet.</div>';
+                return;
+            }
+            _aiVoiceTemplateCache = await getUserAiVoiceTemplates();
+            if (!_aiVoiceTemplateCache.length) {
+                list.innerHTML = '<div class="alert alert-light border small mb-0">No voice templates yet.</div>';
+                return;
+            }
+            list.innerHTML = '';
+            _aiVoiceTemplateCache.forEach(function(template) {
+                var card = document.createElement('div');
+                card.className = 'border rounded p-3 mb-3';
+                card.innerHTML = ''
+                    + '<div class="d-flex flex-wrap justify-content-between gap-2">'
+                    + '<div><div class="fw-semibold">' + _escapeHtml(template.name || template.trigger_phrase || 'Voice template') + '</div>'
+                    + '<div class="small text-muted">Say: "' + _escapeHtml(template.trigger_phrase || template.name || '') + '"</div></div>'
+                    + '<button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteAiVoiceTemplate(\'' + _escapeHtml(template.id || '') + '\')"><i class="fas fa-trash me-1"></i>Delete</button>'
+                    + '</div>'
+                    + '<div class="small mt-2">' + (template.items || []).map(function(line) { return _escapeHtml(line.mapped_item_name || 'Item') + ' (' + _escapeHtml(line.quantity_basis || 'fixed') + ')'; }).join(', ') + '</div>';
+                list.appendChild(card);
+            });
+        }
+
+        async function saveAiVoiceTemplateDraft() {
+            var name = (document.getElementById('aiVoiceTemplateName')?.value || '').trim();
+            var phrase = (document.getElementById('aiVoiceTemplatePhrase')?.value || name).trim();
+            if (!name) { qdAlert('Name the voice template.'); return; }
+            if (!_aiVoiceTemplateDraftItems.length) { qdAlert('Add at least one line to this template.'); return; }
+            var templates = _aiVoiceTemplateCache || [];
+            var phraseKey = _voicePhraseKey(phrase);
+            templates = templates.filter(function(template) { return _voicePhraseKey(template.trigger_phrase || template.name) !== phraseKey; });
+            templates.push({
+                id: (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()),
+                name: name,
+                trigger_phrase: phrase,
+                active: true,
+                items: _aiVoiceTemplateDraftItems.slice()
+            });
+            if (typeof saveUserAiVoiceTemplates !== 'function') { qdAlert('Voice template save helper is not loaded yet.'); return; }
+            var result = await saveUserAiVoiceTemplates(templates);
+            if (result && result.error) { qdAlert('Could not save voice template: ' + (result.error.message || result.error)); return; }
+            document.getElementById('aiVoiceTemplateName').value = '';
+            document.getElementById('aiVoiceTemplatePhrase').value = '';
+            _aiVoiceTemplateDraftItems = [];
+            await loadAiVoiceTemplatesSettings();
+        }
+
+        async function deleteAiVoiceTemplate(templateId) {
+            if (!templateId) return;
+            if (!await qdConfirm('Delete this voice template?', { title: 'Delete Voice Template', okText: 'Delete', cancelText: 'Cancel', type: 'warning' })) return;
+            var templates = (_aiVoiceTemplateCache || []).filter(function(template) { return String(template.id) !== String(templateId); });
+            if (typeof saveUserAiVoiceTemplates === 'function') await saveUserAiVoiceTemplates(templates);
+            await loadAiVoiceTemplatesSettings();
+        }
+
+        function _prefillAiTradeRuleFromReview(row, selected) {
+            if (!row || !selected) return;
+            var phraseEl = document.getElementById('aiVoiceTradePhrase');
+            var itemEl = document.getElementById('aiVoiceTradeItem');
+            var qtyEl = document.getElementById('aiVoiceTradeQuantity');
+            var countEl = document.getElementById('aiVoiceTradeCountLabel');
+            var defaultCountEl = document.getElementById('aiVoiceTradeDefaultCount');
+            if (phraseEl) phraseEl.value = row.phrase || row.item.description || '';
+            if (itemEl) itemEl.value = _voiceItemDisplay(selected);
+            if (qtyEl) qtyEl.value = _voiceRoundQuantity(row.item.quantity || 1) || 1;
+            if (countEl && !countEl.value) countEl.value = (row.item.unit || row.item.unitType || '').toLowerCase().indexOf('lf') >= 0 ? 'door' : 'item';
+            if (defaultCountEl) defaultCountEl.value = 1;
+        }
+
+        async function _maybeSuggestAiTradeRule(candidates) {
+            candidates = (candidates || []).filter(function(candidate) { return candidate && candidate.row && candidate.selected; });
+            if (!candidates.length || typeof qdConfirm !== 'function') return;
+            var first = candidates[0];
+            var ok = await qdConfirm('QuoteDr has seen you correct "' + (first.row.phrase || first.row.item.description || 'this phrase') + '" more than once. Create a trade rule so it can also handle quantity math automatically next time?', {
+                title: 'Create AI Trade Rule?',
+                okText: 'Create Rule',
+                cancelText: 'Not Now',
+                type: 'info'
+            });
+            if (!ok) return;
+            await openAiVoiceTradeRulesSettings();
+            setTimeout(function() { _prefillAiTradeRuleFromReview(first.row, first.selected); }, 150);
+        }
+
+        function _extractVoiceTemplateDimensions(transcript, result) {
+            var roomDims = result && result.rooms && result.rooms[0] && result.rooms[0].dimensions;
+            if (roomDims && roomDims.length && roomDims.width) return roomDims;
+            var text = String(transcript || '').toLowerCase();
+            var match = text.match(/(\d+(?:\.\d+)?)\s*(?:ft|feet|foot|')?\s*(?:x|by)\s*(\d+(?:\.\d+)?)\s*(?:ft|feet|foot|')?/);
+            if (!match) return null;
+            var length = parseFloat(match[1]);
+            var width = parseFloat(match[2]);
+            var heightMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:ft|feet|foot|')?\s*(?:high|height|ceilings?|walls?)/);
+            var height = heightMatch ? parseFloat(heightMatch[1]) : 8;
+            if (!isFinite(length) || !isFinite(width)) return null;
+            return {
+                length: length,
+                width: width,
+                height: isFinite(height) && height > 0 ? height : 8,
+                floorArea: _voiceRoundQuantity(length * width),
+                wallArea: _voiceRoundQuantity((length + width) * 2 * (isFinite(height) && height > 0 ? height : 8))
+            };
+        }
+
+        function _voiceTemplateMatches(template, transcript) {
+            var trigger = _voiceRuleTextKey((template && (template.trigger_phrase || template.name)) || '');
+            var text = _voiceRuleTextKey(transcript);
+            if (!trigger || !text) return false;
+            return trigger.split(' ').filter(Boolean).every(function(token) { return text.indexOf(token) >= 0; });
+        }
+
+        function _voiceTemplateQuantity(line, dims) {
+            var value = parseFloat(line.quantity_value || 1) || 1;
+            var basis = line.quantity_basis || 'fixed';
+            if (basis === 'floor_area') return dims ? _voiceRoundQuantity((dims.floorArea || ((dims.length || 0) * (dims.width || 0))) * value) : value;
+            if (basis === 'perimeter') return dims ? _voiceRoundQuantity(((dims.length || 0) + (dims.width || 0)) * 2 * value) : value;
+            if (basis === 'wall_area') return dims ? _voiceRoundQuantity((dims.wallArea || (((dims.length || 0) + (dims.width || 0)) * 2 * (dims.height || 8))) * value) : value;
+            return value;
+        }
+
+        async function _applyAiVoiceTemplatesToResult(result, transcript) {
+            if (!result || !Array.isArray(result.rooms) || typeof getUserAiVoiceTemplates !== 'function') return result;
+            var templates = [];
+            try { templates = await getUserAiVoiceTemplates(); } catch(e) { templates = []; }
+            var active = (templates || []).filter(function(template) { return template && template.active !== false && _voiceTemplateMatches(template, transcript); });
+            if (!active.length) return result;
+            var dims = _extractVoiceTemplateDimensions(transcript, result);
+            if (!result.rooms.length) result.rooms.push({ name: 'AI Voice Template', items: [] });
+            var targetRoom = result.rooms[0];
+            if (!Array.isArray(targetRoom.items)) targetRoom.items = [];
+            active.forEach(function(template) {
+                (template.items || []).forEach(function(line) {
+                    var qty = _voiceTemplateQuantity(line, dims);
+                    var rate = parseFloat(line.mapped_price || 0) || 0;
+                    var unit = line.mapped_unit || 'ls';
+                    var name = line.mapped_item_name || 'Template item';
+                    targetRoom.items.push({
+                        category: line.mapped_item_category || 'Miscellaneous',
+                        description: name,
+                        serviceName: name,
+                        quantity: qty,
+                        unit: unit,
+                        unitType: unit,
+                        rate: rate,
+                        total: _voiceRoundQuantity(qty * rate),
+                        spokenPhrase: template.trigger_phrase || template.name || name,
+                        calculation: 'AI voice template: ' + (template.name || template.trigger_phrase || 'template') + ' / ' + (line.quantity_basis || 'fixed'),
+                        itemDescription: line.itemDescription || '',
+                        notes: line.user_note || '',
+                        aiVoiceTemplateId: template.id || template.name
+                    });
+                });
+            });
+            return result;
+        }
+
+        function _generateAiRoomScopeNote(room) {
+            if (!room || room.scopeNotes) return room ? (room.scopeNotes || '') : '';
+            var names = (room.items || []).filter(function(item) { return item && !item._excludeFromQuote; }).map(function(item) { return item.description || item.serviceName || ''; }).filter(Boolean);
+            if (!names.length) return '';
+            var unique = [];
+            names.forEach(function(name) {
+                if (unique.indexOf(name) < 0) unique.push(name);
+            });
+            var list = unique.slice(0, 5).join(', ');
+            return 'Includes ' + list + (unique.length > 5 ? ', and related work' : '') + ' for this area. Final quantities and finishes to be confirmed on site.';
+        }
+
+        function _renderAiVoiceScopeNotesReview() {
+            var wrap = document.getElementById('aiVoiceScopeNotesReview');
+            if (!wrap || !_voiceReviewResult || !Array.isArray(_voiceReviewResult.rooms)) return;
+            wrap.innerHTML = '';
+            _voiceReviewResult.rooms.forEach(function(room, index) {
+                var note = _generateAiRoomScopeNote(room);
+                if (!note) return;
+                room.scopeNotes = room.scopeNotes || note;
+                var card = document.createElement('div');
+                card.className = 'border rounded p-3 mb-3 bg-light';
+                card.innerHTML = ''
+                    + '<div class="d-flex justify-content-between gap-2 flex-wrap mb-2">'
+                    + '<div class="fw-semibold"><i class="fas fa-clipboard-list me-1"></i>Scope note for ' + _escapeHtml(room.name || ('Room ' + (index + 1))) + '</div>'
+                    + '<div class="form-check">'
+                    + '<input class="form-check-input ai-voice-scope-keep" type="checkbox" id="aiVoiceScopeKeep' + index + '" data-room-index="' + index + '" checked>'
+                    + '<label class="form-check-label small" for="aiVoiceScopeKeep' + index + '">Use note</label>'
+                    + '</div></div>'
+                    + '<textarea class="form-control form-control-sm ai-voice-scope-note" data-room-index="' + index + '" rows="2">' + _escapeHtml(note) + '</textarea>';
+                wrap.appendChild(card);
+            });
+        }
+
         function _buildVoiceReviewRows(result, mappings) {
             var rows = [];
             var mappingByPhrase = {};
@@ -7155,38 +7463,46 @@ Example:
                     var phraseKey = _voicePhraseKey(phrase);
                     var mapping = mappingByPhrase[phraseKey] || null;
                     var exact = mapping ? null : _findExactVoiceItem(item);
-                    var similar = mapping ? [] : _findSimilarVoiceItems(phrase || item.description || '');
-                    var selected = mapping || exact || similar[0] || null;
-                    var usageCount = mapping ? (parseInt(mapping.usage_count, 10) || 0) : 0;
-                    var confidence = 'Needs review';
-                    var sortRank = 0;
-                    if (mapping && usageCount >= 3) {
-                        confidence = 'Learned';
-                        sortRank = 3;
-                    } else if (mapping) {
-                        confidence = 'Learned, confirm';
-                        sortRank = 1;
-                    } else if (exact) {
-                        confidence = 'Exact match';
-                        sortRank = 2;
-                    } else if (similar[0] && similar[0]._score >= 55) {
-                        confidence = 'Possible match';
-                        sortRank = 1;
-                    }
-                    rows.push({
+                    var familyItems = mapping || exact ? [] : _findAmbiguousVoiceFamilyItems(phrase || item.description || '');
+                    var requiresChoice = familyItems.length > 1;
+                    var similar = mapping ? [] : (requiresChoice ? familyItems : _findSimilarVoiceItems(phrase || item.description || ''));
+                    var selected = mapping || exact || (requiresChoice ? null : similar[0]) || null;
+                    var row = {
                         roomIndex: roomIndex,
                         itemIndex: itemIndex,
                         item: item,
                         phrase: phrase,
                         phraseKey: phraseKey,
                         mapping: mapping,
+                        exact: exact,
                         selected: selected,
                         similar: similar,
-                        confidence: confidence,
-                        sortRank: sortRank,
+                        requiresChoice: requiresChoice,
                         originalIndex: rows.length
-                    });
+                    };
+                    var conf = _voiceReviewConfidence(row);
+                    row.confidence = conf.label;
+                    row.confidenceScore = conf.score;
+                    row.confidenceReason = conf.reason;
+                    row.sortRank = conf.rank;
+                    rows.push(row);
                 });
+            });
+            var seenKeys = {};
+            rows.forEach(function(row, index) {
+                if (row.item && row.item.aiTradeRuleId) return;
+                var duplicateKey = _voiceReviewDuplicateKey(row);
+                if (!duplicateKey) return;
+                if (seenKeys[duplicateKey] !== undefined) {
+                    row.duplicateOf = seenKeys[duplicateKey];
+                    var conf = _voiceReviewConfidence(row);
+                    row.confidence = conf.label;
+                    row.confidenceScore = conf.score;
+                    row.confidenceReason = conf.reason;
+                    row.sortRank = conf.rank;
+                } else {
+                    seenKeys[duplicateKey] = index;
+                }
             });
             rows.sort(function(a, b) {
                 return a.sortRank - b.sortRank || a.originalIndex - b.originalIndex;
@@ -7206,7 +7522,8 @@ Example:
                 options.appendChild(option);
             });
             var needsReview = _voiceReviewRows.filter(function(row) { return row.sortRank < 2; }).length;
-            summary.textContent = _voiceReviewRows.length + ' item' + (_voiceReviewRows.length === 1 ? '' : 's') + ' parsed. ' + (_voiceReviewRows.length ? (needsReview ? needsReview + ' need a closer look.' : 'Everything has a strong match.') : 'Nothing is ready to add yet.');
+            var duplicates = _voiceReviewRows.filter(function(row) { return row.duplicateOf !== undefined; }).length;
+            summary.textContent = _voiceReviewRows.length + ' item' + (_voiceReviewRows.length === 1 ? '' : 's') + ' parsed. ' + (_voiceReviewRows.length ? (needsReview ? needsReview + ' need a closer look.' : 'Everything has a strong match.') : 'Nothing is ready to add yet.') + (duplicates ? ' ' + duplicates + ' likely duplicate' + (duplicates === 1 ? '' : 's') + ' unchecked.' : '');
             list.innerHTML = '';
             if (!_voiceReviewRows.length) {
                 list.innerHTML = '<div class="alert alert-warning mb-0">AI did not find any line items in that recording. Keep the recording and try again with more detail, or close this review and enter items manually.</div>';
@@ -7216,13 +7533,30 @@ Example:
                 var item = row.item;
                 var selectedText = row.mapping ? _voiceMappingDisplay(row.mapping) : _voiceItemDisplay(row.selected);
                 var calculation = item.calculation ? '<div class="small text-muted mt-1">' + _escapeHtml(item.calculation) + '</div>' : '';
-                var badgeClass = row.sortRank >= 2 ? 'bg-success' : (row.mapping ? 'bg-info text-dark' : 'bg-warning text-dark');
+                var badgeClass = row.duplicateOf !== undefined ? 'bg-secondary' : (row.sortRank >= 2 ? 'bg-success' : (row.mapping ? 'bg-info text-dark' : 'bg-warning text-dark'));
+                var includeChecked = row.duplicateOf !== undefined ? '' : 'checked';
+                var helper = '';
+                if (row.requiresChoice) {
+                    helper = '<div class="alert alert-warning py-2 px-3 small mt-2 mb-0">You have multiple saved items for this kind of work. Choose the right one, or check Remember this phrase so QuoteDr stops asking for this wording.</div>';
+                } else if (row.duplicateOf !== undefined) {
+                    helper = '<div class="alert alert-secondary py-2 px-3 small mt-2 mb-0">Possible duplicate of another reviewed item. It is unchecked by default, but you can add it if this is separate work.</div>';
+                } else if (row.confidenceReason) {
+                    helper = '<div class="small text-muted mt-1">' + _escapeHtml(row.confidenceReason) + '</div>';
+                }
+                var suggestions = '';
+                if (row.similar && row.similar.length) {
+                    suggestions = '<div class="d-flex flex-wrap gap-1 mt-2">'
+                        + row.similar.slice(0, 4).map(function(match) {
+                            return '<button type="button" class="btn btn-outline-secondary btn-sm ai-voice-suggestion" data-row-index="' + index + '" data-value="' + _escapeHtml(_voiceItemDisplay(match)) + '">' + _escapeHtml(match.name || match.description || 'Item') + '</button>';
+                        }).join('')
+                        + '</div>';
+                }
                 var card = document.createElement('div');
-                card.className = 'border rounded p-3 mb-3';
+                card.className = 'border rounded p-3 mb-3 ai-voice-review-card' + (row.duplicateOf !== undefined ? ' bg-light' : '');
                 card.innerHTML = ''
                     + '<div class="d-flex flex-wrap justify-content-between gap-2 mb-2">'
                     + '<div class="form-check">'
-                    + '<input class="form-check-input ai-voice-review-include" type="checkbox" id="aiVoiceReviewInclude' + index + '" data-row-index="' + index + '" checked>'
+                    + '<input class="form-check-input ai-voice-review-include" type="checkbox" id="aiVoiceReviewInclude' + index + '" data-row-index="' + index + '" ' + includeChecked + '>'
                     + '<label class="form-check-label fw-semibold" for="aiVoiceReviewInclude' + index + '">Add to quote</label>'
                     + '</div>'
                     + '<span class="badge ' + badgeClass + ' align-self-start">' + _escapeHtml(row.confidence) + '</span>'
@@ -7231,15 +7565,23 @@ Example:
                     + '<div class="small text-muted">AI parsed</div>'
                     + '<div class="mb-2">' + _escapeHtml(item.description || 'Item') + ' - ' + _escapeHtml(formatQuoteQuantityDisplay(item.quantity || 1, item.unit || item.unitType || 'ls')) + ' @ $' + (parseFloat(item.rate || 0) || 0).toFixed(2) + calculation + '</div>'
                     + '<label class="form-label small fw-semibold" for="aiVoiceReviewMatch' + index + '">Match to saved item</label>'
-                    + '<input class="form-control ai-voice-review-match" id="aiVoiceReviewMatch' + index + '" list="aiVoiceItemOptions" data-row-index="' + index + '" value="' + _escapeHtml(selectedText || '') + '" placeholder="Start typing a saved item name...">'
+                    + '<input class="form-control ai-voice-review-match" id="aiVoiceReviewMatch' + index + '" list="aiVoiceItemOptions" data-row-index="' + index + '" value="' + _escapeHtml(selectedText || '') + '" placeholder="' + (row.requiresChoice ? 'Choose which saved item this means...' : 'Start typing a saved item name...') + '">'
+                    + suggestions
+                    + helper
                     + '<div class="d-flex flex-wrap gap-3 align-items-center mt-2">'
                     + '<div class="form-check">'
                     + '<input class="form-check-input ai-voice-review-remember" type="checkbox" id="aiVoiceReviewRemember' + index + '" data-row-index="' + index + '" ' + (selectedText ? 'checked' : '') + '>'
-                    + '<label class="form-check-label small" for="aiVoiceReviewRemember' + index + '">Remember this phrase</label>'
+                    + '<label class="form-check-label small" for="aiVoiceReviewRemember' + index + '">' + (row.requiresChoice ? 'Remember this choice / do not ask again' : 'Remember this phrase') + '</label>'
                     + '</div>'
                     + '<input class="form-control form-control-sm ai-voice-review-note" data-row-index="' + index + '" placeholder="Optional note" style="max-width:320px;">'
                     + '</div>';
                 list.appendChild(card);
+            });
+            list.querySelectorAll('.ai-voice-suggestion').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var input = document.getElementById('aiVoiceReviewMatch' + this.getAttribute('data-row-index'));
+                    if (input) input.value = this.getAttribute('data-value') || '';
+                });
             });
         }
 
@@ -7256,6 +7598,7 @@ Example:
             _voiceReviewResult = result;
             _voiceReviewItems = _flattenVoicePricingItems();
             _voiceReviewRows = _buildVoiceReviewRows(result, mappings);
+            _renderAiVoiceScopeNotesReview();
             _renderAiVoiceReviewModal();
             var reviewModalEl = document.getElementById('aiVoiceReviewModal');
             if (!reviewModalEl) {
@@ -7346,6 +7689,7 @@ Example:
         async function confirmAiVoiceReview() {
             if (!_voiceReviewResult) return;
             var saveTasks = [];
+            var ruleSuggestionCandidates = [];
             _voiceReviewRows.forEach(function(row, index) {
                 var include = document.getElementById('aiVoiceReviewInclude' + index);
                 if (include && !include.checked) {
@@ -7366,11 +7710,21 @@ Example:
                 } else if (selected) {
                     _applyVoiceMappedItem(row.item, selected);
                     if (remember && remember.checked && typeof saveLearnedMapping === 'function') {
-                        saveTasks.push(saveLearnedMapping(row.phrase || row.item.description, selected, note ? note.value.trim() : '').catch(function(e) {
+                        saveTasks.push(saveLearnedMapping(row.phrase || row.item.description, selected, note ? note.value.trim() : '').then(function(result) {
+                            var uses = parseInt(result && result.data && result.data.usage_count, 10) || 0;
+                            if (uses >= 2 && !row.item.aiTradeRuleId) ruleSuggestionCandidates.push({ row: row, selected: selected });
+                            return result;
+                        }).catch(function(e) {
                             console.warn('Could not save AI learned mapping:', e);
                         }));
                     }
                 }
+            });
+            document.querySelectorAll('.ai-voice-scope-note').forEach(function(input) {
+                var roomIndex = parseInt(input.getAttribute('data-room-index'), 10);
+                var keep = document.getElementById('aiVoiceScopeKeep' + roomIndex);
+                if (!_voiceReviewResult.rooms || !_voiceReviewResult.rooms[roomIndex]) return;
+                _voiceReviewResult.rooms[roomIndex].scopeNotes = keep && keep.checked ? input.value.trim() : '';
             });
             await Promise.all(saveTasks);
             var modal = bootstrap.Modal.getInstance(document.getElementById('aiVoiceReviewModal'));
@@ -7381,6 +7735,7 @@ Example:
             _voiceReviewRows = [];
             _removeExcludedAiVoiceItems(reviewed);
             applyAIQuote(reviewed);
+            _maybeSuggestAiTradeRule(ruleSuggestionCandidates).catch(function(e) { console.warn('AI trade rule suggestion failed:', e); });
         }
 
         function _removeExcludedAiVoiceItems(result) {
@@ -7438,7 +7793,8 @@ Example:
                 if (result.error) throw new Error(result.error);
                 document.getElementById('voiceLoading').style.display = 'none';
                 await _hideBootstrapModalAndWait('voiceQuoteModal');
-                const ruledResult = await _applyAiTradeRulesToVoiceResult(result, transcript);
+                const templatedResult = await _applyAiVoiceTemplatesToResult(result, transcript);
+                const ruledResult = await _applyAiTradeRulesToVoiceResult(templatedResult, transcript);
                 const measuredResult = await showAiVoiceMeasurementModal(ruledResult);
                 await showAiVoiceReview(measuredResult);
             } catch(err) {
@@ -7469,7 +7825,7 @@ Example:
             if (action === 'replace') { rooms = []; roomCounter = 0; }
             result.rooms.forEach(function(aiRoom) {
                 roomCounter++;
-                var newRoom = { id: roomCounter, name: aiRoom.name || 'Room ' + roomCounter, colorIndex: (roomCounter - 1) % ROOM_COLORS.length, items: [] };
+                var newRoom = { id: roomCounter, name: aiRoom.name || 'Room ' + roomCounter, colorIndex: (roomCounter - 1) % ROOM_COLORS.length, scopeNotes: aiRoom.scopeNotes || '', items: [] };
                 if (aiRoom.items && Array.isArray(aiRoom.items)) {
                     aiRoom.items.forEach(function(item) {
                         var quantity = parseFloat(item.quantity) || 1;
@@ -8151,6 +8507,36 @@ Example:
         </div>
     </div>
 
+    <style>
+        @media (max-width: 576px) {
+            #aiVoiceReviewModal .modal-dialog,
+            #aiVoiceTemplatesModal .modal-dialog,
+            #aiVoiceTradeRulesModal .modal-dialog,
+            #aiVoiceMemoryModal .modal-dialog {
+                margin: 0;
+                max-width: 100%;
+                min-height: 100%;
+            }
+            #aiVoiceReviewModal .modal-content,
+            #aiVoiceTemplatesModal .modal-content,
+            #aiVoiceTradeRulesModal .modal-content,
+            #aiVoiceMemoryModal .modal-content {
+                min-height: 100vh;
+                border-radius: 0;
+            }
+            .ai-voice-review-card {
+                padding: 12px !important;
+            }
+            .ai-voice-review-card .btn-sm {
+                min-height: 34px;
+            }
+            #voiceMicBtn {
+                width: 72px !important;
+                height: 72px !important;
+            }
+        }
+    </style>
+
     <!-- Voice Quote Modal -->
     <div class="modal fade" id="voiceQuoteModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
@@ -8166,6 +8552,7 @@ Example:
                     </button>
                     <div class="mb-3">
                         <button id="voicePauseBtn" onclick="toggleVoicePause()" class="btn btn-outline-warning me-2" disabled><i class="fas fa-pause me-1"></i>Pause</button>
+                        <button type="button" onclick="addVoiceNextRoomMarker()" class="btn btn-outline-primary"><i class="fas fa-door-open me-1"></i>Next Room</button>
                     </div>
                     <div id="voiceTranscript" class="text-muted" style="min-height:60px; font-style:italic; padding:10px; background:#f8f9fa; border-radius:8px; text-align:left; margin-bottom:16px;">Your words will appear here...</div>
                     <div id="voiceActions" style="display:none;">
@@ -8175,11 +8562,69 @@ Example:
                     <div class="d-flex justify-content-center gap-2 flex-wrap mt-2">
                         <button type="button" class="btn btn-link btn-sm" onclick="openAiVoiceMemorySettings()"><i class="fas fa-brain me-1"></i>AI Memory</button>
                         <button type="button" class="btn btn-link btn-sm" onclick="openAiVoiceTradeRulesSettings()"><i class="fas fa-hammer me-1"></i>AI Trade Rules</button>
+                        <button type="button" class="btn btn-link btn-sm" onclick="openAiVoiceTemplatesSettings()"><i class="fas fa-layer-group me-1"></i>Voice Templates</button>
                     </div>
                     <div id="voiceLoading" style="display:none;">
                         <div class="spinner-border" style="color:#7c3aed;" role="status"></div>
                         <div class="mt-2 text-muted">AI is building your quote...</div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Voice Templates Modal -->
+    <div class="modal fade" id="aiVoiceTemplatesModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header" style="background:#1a56a0; color:white;">
+                    <h5 class="modal-title"><i class="fas fa-layer-group me-2"></i>Voice Templates</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-light border small">
+                        Build phrases like "standard bedroom package" that add a saved set of items. Quantity can be fixed, floor area, room perimeter, or wall area.
+                    </div>
+                    <datalist id="aiVoiceTemplateItemOptions"></datalist>
+                    <div class="border rounded p-3 mb-3 bg-light">
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <label class="form-label small fw-semibold" for="aiVoiceTemplateName">Template name</label>
+                                <input id="aiVoiceTemplateName" class="form-control form-control-sm" placeholder="Standard bedroom package">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-semibold" for="aiVoiceTemplatePhrase">Trigger phrase</label>
+                                <input id="aiVoiceTemplatePhrase" class="form-control form-control-sm" placeholder="standard bedroom package">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-semibold" for="aiVoiceTemplateItem">Saved item</label>
+                                <input id="aiVoiceTemplateItem" class="form-control form-control-sm" list="aiVoiceTemplateItemOptions" placeholder="Start typing item...">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-semibold" for="aiVoiceTemplateQuantity">Quantity multiplier</label>
+                                <input id="aiVoiceTemplateQuantity" type="number" step="0.01" class="form-control form-control-sm" value="1">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-semibold" for="aiVoiceTemplateBasis">Quantity basis</label>
+                                <select id="aiVoiceTemplateBasis" class="form-select form-select-sm">
+                                    <option value="fixed">Fixed quantity</option>
+                                    <option value="floor_area">Room floor area</option>
+                                    <option value="perimeter">Room perimeter</option>
+                                    <option value="wall_area">Wall area</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end gap-2">
+                                <button type="button" class="btn btn-outline-primary btn-sm w-100" onclick="addAiVoiceTemplateDraftItem()"><i class="fas fa-plus me-1"></i>Add Line</button>
+                                <button type="button" class="btn btn-primary btn-sm w-100" onclick="saveAiVoiceTemplateDraft()"><i class="fas fa-save me-1"></i>Save Template</button>
+                            </div>
+                        </div>
+                        <div id="aiVoiceTemplateDraftList" class="small mt-3 text-muted">No template lines added yet.</div>
+                    </div>
+                    <div id="aiVoiceTemplatesList"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" onclick="loadAiVoiceTemplatesSettings()"><i class="fas fa-sync-alt me-1"></i>Refresh</button>
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
                 </div>
             </div>
         </div>
@@ -8306,6 +8751,7 @@ Example:
                         <div class="small text-muted">Type any saved item name to teach QuoteDr what that phrase means.</div>
                     </div>
                     <datalist id="aiVoiceItemOptions"></datalist>
+                    <div id="aiVoiceScopeNotesReview"></div>
                     <div id="aiVoiceReviewList"></div>
                 </div>
                 <div class="modal-footer">
