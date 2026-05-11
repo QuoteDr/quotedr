@@ -345,6 +345,7 @@
                 '<div class="row g-3">' +
                 '<div class="col-lg-8">' +
                 '<div class="d-flex flex-wrap gap-1 mb-2">' +
+                _fpCreatorModeButton('select', 'fa-mouse-pointer', 'Select') +
                 _fpCreatorModeButton('wall', 'fa-grip-lines', 'Walls') +
                 _fpCreatorModeButton('door', 'fa-door-open', 'Door') +
                 _fpCreatorModeButton('opening', 'fa-archway', 'Opening') +
@@ -354,7 +355,7 @@
                 '<canvas id="fpCreatorCanvas" width="980" height="620" style="display:block;width:100%;height:min(62vh,620px);cursor:crosshair;touch-action:none;"></canvas>' +
                 '<div id="fpCreatorLiveLabel" class="badge bg-primary" style="position:absolute;left:12px;top:12px;display:none;"></div>' +
                 '</div>' +
-                '<div class="small text-muted mt-2"><i class="fas fa-info-circle me-1"></i>Draw walls first. Then choose Door, Window, or Opening and drag along a wall to place it.</div>' +
+                '<div class="small text-muted mt-2"><i class="fas fa-info-circle me-1"></i>Hold <strong>SHIFT</strong> while drawing a wall to lock it straight horizontally or vertically. Use Select to edit walls, doors, windows, and openings.</div>' +
                 '</div>' +
                 '<div class="col-lg-4">' +
                 '<div class="border rounded p-3 mb-3">' +
@@ -369,6 +370,7 @@
                 '<label class="form-label small mb-1">Selected door/window/opening width</label>' +
                 '<div class="input-group input-group-sm mb-2"><input type="number" id="fpCreatorOpeningWidth" class="form-control" value="' + selectedOpeningWidth + '" min="0.5" step="0.1" ' + (selectedOpening ? '' : 'disabled') + ' onkeydown="if(event.key===\'Enter\'){event.preventDefault();_fpCreatorApplyOpeningWidth();}"><span class="input-group-text">ft</span><button class="btn btn-primary" onclick="_fpCreatorApplyOpeningWidth()" ' + (selectedOpening ? '' : 'disabled') + '>Set</button></div>' +
                 '<div class="small text-muted">' + (selectedOpening ? 'Editing ' + _fpEscapeHtml(selectedOpening.type) + ' on wall ' + (selectedOpening.wallIndex + 1) + '.' : 'No door, window, or opening selected yet.') + '</div>' +
+                (selectedOpening && selectedOpening.type === 'door' ? '<div class="d-flex gap-2 mt-2"><button class="btn btn-outline-secondary btn-sm flex-fill" onclick="_fpCreatorFlipDoorHinge()"><i class="fas fa-right-left me-1"></i>Flip hinge</button><button class="btn btn-outline-secondary btn-sm flex-fill" onclick="_fpCreatorFlipDoorSwing()"><i class="fas fa-rotate me-1"></i>Flip swing</button></div>' : '') +
                 '</div>' +
                 '<div class="border rounded p-3 mb-3">' +
                 '<div class="d-flex justify-content-between"><span class="small text-muted">Walls</span><strong>' + _fpCreatorWallCount() + '</strong></div>' +
@@ -416,9 +418,27 @@
             return { x: (e.clientX - rect.left) * (_fpCreatorCanvas.width / rect.width), y: (e.clientY - rect.top) * (_fpCreatorCanvas.height / rect.height) };
         }
 
+        function _fpCreatorStraightPoint(start, pt) {
+            var dx = pt.x - start.x;
+            var dy = pt.y - start.y;
+            return Math.abs(dx) >= Math.abs(dy) ? { x: pt.x, y: start.y } : { x: start.x, y: pt.y };
+        }
+
         function _fpCreatorDown(e) {
             if (!_fpCreatorCanvas) return;
             var pt = _fpCreatorPoint(e);
+            if (_fpCreatorMode === 'select') {
+                var selectedOpeningIndex = _fpCreatorNearestOpening(pt);
+                if (selectedOpeningIndex >= 0) {
+                    _fpCreatorSelectedOpening = selectedOpeningIndex;
+                    _fpCreatorSelectedWall = -1;
+                } else {
+                    _fpCreatorSelectedWall = _fpCreatorNearestWall(pt);
+                    _fpCreatorSelectedOpening = -1;
+                }
+                _fpRenderCreator();
+                return;
+            }
             if (_fpCreatorMode !== 'wall') {
                 if (!_fpCreatorClosed) return;
                 var existingOpening = _fpCreatorNearestOpening(pt);
@@ -469,7 +489,11 @@
                 return;
             }
             if (!_fpCreatorDraft) return;
-            if (_fpCreatorPoints.length >= 3 && _fpDistance(pt, _fpCreatorPoints[0]) < 18) pt = _fpCreatorPoints[0];
+            if (_fpCreatorPoints.length >= 3 && _fpDistance(pt, _fpCreatorPoints[0]) < 18) {
+                pt = _fpCreatorPoints[0];
+            } else if (e.shiftKey) {
+                pt = _fpCreatorStraightPoint(_fpCreatorDraft.start, pt);
+            }
             _fpCreatorDraft.end = pt;
             var label = document.getElementById('fpCreatorLiveLabel');
             if (label) {
@@ -486,13 +510,18 @@
                 if (_fpCreatorOpeningDraftWidthFt(_fpCreatorOpeningDraft) >= 0.4) {
                     var t1 = Math.min(_fpCreatorOpeningDraft.startT, _fpCreatorOpeningDraft.endT);
                     var t2 = Math.max(_fpCreatorOpeningDraft.startT, _fpCreatorOpeningDraft.endT);
-                    _fpCreatorOpenings.push({
+                    var opening = {
                         type: _fpCreatorOpeningDraft.type,
                         wallIndex: _fpCreatorOpeningDraft.wallIndex,
                         startT: t1,
                         endT: t2,
                         widthFt: _fpRound((t2 - t1) * _fpCreatorWallLength(_fpCreatorOpeningDraft.wallIndex), 2)
-                    });
+                    };
+                    if (opening.type === 'door') {
+                        opening.hinge = 'start';
+                        opening.swing = 1;
+                    }
+                    _fpCreatorOpenings.push(opening);
                     _fpCreatorSelectedOpening = _fpCreatorOpenings.length - 1;
                 }
                 _fpCreatorOpeningDraft = null;
@@ -624,6 +653,20 @@
             _fpRenderCreator();
         }
 
+        function _fpCreatorFlipDoorHinge() {
+            var opening = _fpCreatorOpenings[_fpCreatorSelectedOpening];
+            if (!opening || opening.type !== 'door') return;
+            opening.hinge = opening.hinge === 'end' ? 'start' : 'end';
+            _fpRenderCreator();
+        }
+
+        function _fpCreatorFlipDoorSwing() {
+            var opening = _fpCreatorOpenings[_fpCreatorSelectedOpening];
+            if (!opening || opening.type !== 'door') return;
+            opening.swing = (opening.swing || 1) * -1;
+            _fpRenderCreator();
+        }
+
         function _fpCreatorUndo() {
             if (_fpCreatorClosed) { _fpCreatorClosed = false; _fpCreatorSelectedWall = Math.max(0, _fpCreatorPoints.length - 2); }
             else if (_fpCreatorPoints.length) _fpCreatorPoints.pop();
@@ -705,26 +748,68 @@
             return '#a855f7';
         }
 
+        function _fpCreatorDoorGeometry(a, b, opening) {
+            var hinge = opening.hinge === 'end' ? b : a;
+            var closed = opening.hinge === 'end' ? a : b;
+            var dx = closed.x - hinge.x;
+            var dy = closed.y - hinge.y;
+            var len = Math.sqrt(dx * dx + dy * dy) || 1;
+            var ux = dx / len;
+            var uy = dy / len;
+            var swing = opening.swing || 1;
+            var nx = -uy * swing;
+            var ny = ux * swing;
+            return {
+                hinge: hinge,
+                closed: closed,
+                openEnd: { x: hinge.x + nx * len, y: hinge.y + ny * len },
+                radius: len,
+                startAngle: Math.atan2(dy, dx),
+                endAngle: Math.atan2(ny, nx),
+                anticlockwise: swing < 0,
+                control: { x: hinge.x + (ux + nx) * len * 0.58, y: hinge.y + (uy + ny) * len * 0.58 }
+            };
+        }
+
         function _fpCreatorDrawOpening(opening, selected) {
             var a = _fpCreatorPointOnWall(opening.wallIndex, Math.min(opening.startT, opening.endT));
             var b = _fpCreatorPointOnWall(opening.wallIndex, Math.max(opening.startT, opening.endT));
             var color = _fpCreatorOpeningColor(opening.type);
             var ctx = _fpCreatorCtx;
             ctx.save();
-            ctx.strokeStyle = color;
-            ctx.lineWidth = selected ? 12 : 9;
+            if (selected) {
+                ctx.strokeStyle = 'rgba(232,126,42,0.34)';
+                ctx.lineWidth = 18;
+                ctx.lineCap = 'butt';
+                ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+            }
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 11;
             ctx.lineCap = 'butt';
             ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
-            if (opening.type === 'door') {
-                var dx = b.x - a.x, dy = b.y - a.y;
-                var len = Math.sqrt(dx * dx + dy * dy) || 1;
-                var nx = -dy / len, ny = dx / len;
-                ctx.strokeStyle = 'rgba(22,163,74,0.55)';
+            ctx.strokeStyle = color;
+            ctx.lineWidth = opening.type === 'opening' ? 2 : 4;
+            ctx.setLineDash(opening.type === 'opening' ? [7, 5] : []);
+            ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+            ctx.setLineDash([]);
+            if (opening.type === 'window') {
+                var wx = b.x - a.x, wy = b.y - a.y;
+                var wLen = Math.sqrt(wx * wx + wy * wy) || 1;
+                var offsetX = (-wy / wLen) * 5;
+                var offsetY = (wx / wLen) * 5;
                 ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.moveTo(a.x, a.y);
-                ctx.quadraticCurveTo(a.x + nx * len * 0.55, a.y + ny * len * 0.55, b.x, b.y);
-                ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(a.x + offsetX, a.y + offsetY); ctx.lineTo(b.x + offsetX, b.y + offsetY); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(a.x - offsetX, a.y - offsetY); ctx.lineTo(b.x - offsetX, b.y - offsetY); ctx.stroke();
+            } else if (opening.type === 'door') {
+                var door = _fpCreatorDoorGeometry(a, b, opening);
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 4;
+                ctx.beginPath(); ctx.moveTo(door.hinge.x, door.hinge.y); ctx.lineTo(door.openEnd.x, door.openEnd.y); ctx.stroke();
+                ctx.strokeStyle = 'rgba(22,163,74,0.72)';
+                ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.arc(door.hinge.x, door.hinge.y, door.radius, door.startAngle, door.endAngle, door.anticlockwise); ctx.stroke();
+                ctx.fillStyle = color;
+                ctx.beginPath(); ctx.arc(door.hinge.x, door.hinge.y, 4, 0, Math.PI * 2); ctx.fill();
             }
             ctx.restore();
             var width = opening.widthFt || _fpCreatorOpeningDraftWidthFt(opening);
@@ -792,8 +877,19 @@
                 var label = opening.type === 'opening' ? 'Opening' : (opening.type === 'door' ? 'Door' : 'Window');
                 var mx = (p1.x + p2.x) / 2;
                 var my = (p1.y + p2.y) / 2 + 18;
-                return '<line x1="' + p1.x + '" y1="' + p1.y + '" x2="' + p2.x + '" y2="' + p2.y + '" stroke="' + color + '" stroke-width="9" stroke-linecap="butt"/>' +
-                    '<text x="' + mx + '" y="' + my + '" text-anchor="middle" font-family="Arial" font-size="13" fill="' + color + '">' + label + ' ' + _fpRound(opening.widthFt, 1) + ' ft</text>';
+                var symbol = '<line x1="' + p1.x + '" y1="' + p1.y + '" x2="' + p2.x + '" y2="' + p2.y + '" stroke="#ffffff" stroke-width="12" stroke-linecap="butt"/>';
+                if (opening.type === 'door') {
+                    var door = _fpCreatorDoorGeometry(p1, p2, opening);
+                    symbol += '<line x1="' + p1.x + '" y1="' + p1.y + '" x2="' + p2.x + '" y2="' + p2.y + '" stroke="' + color + '" stroke-width="3" stroke-linecap="butt"/>' +
+                        '<line x1="' + door.hinge.x + '" y1="' + door.hinge.y + '" x2="' + door.openEnd.x + '" y2="' + door.openEnd.y + '" stroke="' + color + '" stroke-width="4" stroke-linecap="round"/>' +
+                        '<path d="M ' + door.closed.x + ' ' + door.closed.y + ' Q ' + door.control.x + ' ' + door.control.y + ' ' + door.openEnd.x + ' ' + door.openEnd.y + '" fill="none" stroke="' + color + '" stroke-width="2"/>' +
+                        '<circle cx="' + door.hinge.x + '" cy="' + door.hinge.y + '" r="4" fill="' + color + '"/>';
+                } else if (opening.type === 'window') {
+                    symbol += '<line x1="' + p1.x + '" y1="' + p1.y + '" x2="' + p2.x + '" y2="' + p2.y + '" stroke="' + color + '" stroke-width="4" stroke-linecap="butt"/>';
+                } else {
+                    symbol += '<line x1="' + p1.x + '" y1="' + p1.y + '" x2="' + p2.x + '" y2="' + p2.y + '" stroke="' + color + '" stroke-width="3" stroke-dasharray="7 5" stroke-linecap="butt"/>';
+                }
+                return symbol + '<text x="' + mx + '" y="' + my + '" text-anchor="middle" font-family="Arial" font-size="13" fill="' + color + '">' + label + ' ' + _fpRound(opening.widthFt, 1) + ' ft</text>';
             }).join('');
             _fpScale = { pxPerFt: pxPerFt, knownFt: 10, line: { start: { x: pad, y: svgH - 34 }, end: { x: pad + (10 * pxPerFt), y: svgH - 34 } } };
             var dimensions = _fpShapeDimensions('polygon', points);
