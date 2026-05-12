@@ -46,6 +46,9 @@
         var _fpCreatorMouseDown = false;
         var _fpCreatorSelectedWall = -1;
         var _fpCreatorPxPerFt = 24;
+        var _fpCreatorZoom = 1;
+        var _fpCreatorBaseWidth = 980;
+        var _fpCreatorBaseHeight = 620;
         var _fpCreatorCanvas = null;
         var _fpCreatorCtx = null;
         var _fpCreatorRoomName = 'Room 1';
@@ -129,6 +132,7 @@
                 '#floorPlanModal .fp-touch-btn{min-height:42px;}' +
                 '#floorPlanModal .fp-tool-strip{gap:6px;}' +
                 '#floorPlanModal .fp-tool-strip .dropdown{flex:0 0 auto;}' +
+                '#floorPlanModal .fp-tool-strip .dropdown-menu{z-index:21000;}' +
                 '#floorPlanModal .fp-tool-strip .dropdown-menu .active i{color:inherit!important;}' +
                 '#floorPlanModal .fp-canvas-shell{position:relative;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}' +
                 '#floorPlanModal .fp-mobile-hint{display:none;}' +
@@ -139,7 +143,7 @@
                 '#floorPlanModal .fp-step-badges{overflow-x:auto;justify-content:flex-start!important;padding-bottom:2px;}' +
                 '#floorPlanModal .fp-step-badges .badge{white-space:nowrap;}' +
                 '#floorPlanModal .fp-mobile-hint{display:block;}' +
-                '#floorPlanModal .fp-tool-strip{flex-wrap:nowrap!important;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin;}' +
+                '#floorPlanModal .fp-tool-strip{flex-wrap:wrap!important;overflow:visible;padding-bottom:4px;}' +
                 '#floorPlanModal .fp-tool-strip .btn{min-height:44px;white-space:nowrap;flex:0 0 auto;}' +
                 '#floorPlanModal .fp-start-action{min-height:86px;}' +
                 '#floorPlanModal #fpDropZone{padding:24px 14px!important;}' +
@@ -218,7 +222,7 @@
             _fpImageBase64 = null; _fpMimeType = 'image/jpeg'; _fpImageUrl = null; _fpResults = null; _fpRooms = [];
             _fpSuggestedRoomNames = []; _fpCeilingHeight = 9; _fpScale = null; _fpShapes = []; _fpDraft = null; _fpPolygonDraft = [];
             _fpCanvasReady = false; _fpCanvasZoom = 1; _fpCanvasScrollLeft = 0; _fpCanvasScrollTop = 0; _fpTool = 'calibrate'; _fpShapeCounter = 1; _fpActiveShapeIndex = -1; _fpPendingRoomName = ''; _fpPendingTrades = {}; _fpCalibrationIntroShown = false;
-            _fpCreatorPoints = []; _fpCreatorClosed = false; _fpCreatorDraft = null; _fpCreatorMouseDown = false; _fpCreatorSelectedWall = -1; _fpCreatorRoomName = 'Room 1'; _fpCreatorMode = 'wall'; _fpCreatorAngleLock = 'none'; _fpCreatorTouchPointers = {}; _fpCreatorTwoFingerScroll = false; _fpMeasureTouchPointers = {}; _fpMeasureTwoFingerScroll = false; _fpCreatorOpenings = []; _fpCreatorOpeningDraft = null; _fpCreatorSelectedOpening = -1; _fpGeneratedPlan = false;
+            _fpCreatorPoints = []; _fpCreatorClosed = false; _fpCreatorDraft = null; _fpCreatorMouseDown = false; _fpCreatorSelectedWall = -1; _fpCreatorRoomName = 'Room 1'; _fpCreatorMode = 'wall'; _fpCreatorAngleLock = 'none'; _fpCreatorZoom = 1; _fpCreatorTouchPointers = {}; _fpCreatorTwoFingerScroll = false; _fpMeasureTouchPointers = {}; _fpMeasureTwoFingerScroll = false; _fpCreatorOpenings = []; _fpCreatorOpeningDraft = null; _fpCreatorSelectedOpening = -1; _fpGeneratedPlan = false;
             var modal = new bootstrap.Modal(document.getElementById('floorPlanModal'));
             modal.show();
             setTimeout(_fpMaybeShowIntroPopup, 250);
@@ -421,12 +425,17 @@
                 '<button class="btn btn-outline-secondary btn-sm fp-touch-btn" onclick="_fpCreatorUndo()" title="Undo last wall"><i class="fas fa-undo me-1"></i>Undo</button>' +
                 _fpCreatorBuildMenu() +
                 _fpCreatorLockMenu() +
+                '<div class="btn-group btn-group-sm" role="group" aria-label="Creator zoom controls">' +
+                '<button class="btn btn-outline-secondary fp-touch-btn" onclick="_fpCreatorZoomCanvas(0.8)" title="Zoom out for longer walls"><i class="fas fa-magnifying-glass-minus"></i></button>' +
+                '<button class="btn btn-outline-secondary fp-touch-btn" onclick="_fpCreatorResetZoom()" title="Reset zoom"><span id="fpCreatorZoomBadge">' + Math.round(_fpCreatorZoom * 100) + '%</span></button>' +
+                '<button class="btn btn-outline-secondary fp-touch-btn" onclick="_fpCreatorZoomCanvas(1.25)" title="Zoom in"><i class="fas fa-magnifying-glass-plus"></i></button>' +
+                '</div>' +
                 '</div>' +
                 '<div class="border rounded bg-light fp-canvas-shell fp-creator-canvas-shell" style="position:relative;overflow:auto;">' +
                 '<canvas id="fpCreatorCanvas" width="980" height="620" style="display:block;width:100%;height:min(62vh,620px);cursor:crosshair;touch-action:none;"></canvas>' +
                 '<div id="fpCreatorLiveLabel" class="badge bg-primary" style="position:absolute;left:12px;top:12px;display:none;"></div>' +
                 '</div>' +
-                '<div class="small text-muted mt-2"><i class="fas fa-info-circle me-1"></i>Hold <strong>SHIFT</strong> for a quick 90&deg; lock, or use the Lock menu for 90&deg; and 45&deg; walls. On touch screens, use two fingers on the drawing pad to scroll.</div>' +
+                '<div class="small text-muted mt-2"><i class="fas fa-info-circle me-1"></i>Use zoom out for longer walls, Lock for 90&deg; or 45&deg; angles, and two fingers on the drawing pad to scroll on touch screens.</div>' +
                 '</div>' +
                 '<div class="col-lg-4 fp-creator-side">' +
                 '<div class="border rounded p-3 mb-3">' +
@@ -525,9 +534,34 @@
             _fpRenderCreator();
         }
 
+        function _fpCreatorClampZoom(value) {
+            return Math.max(0.45, Math.min(1.8, value || 1));
+        }
+
+        function _fpCreatorWorkspaceSize() {
+            var zoom = _fpCreatorClampZoom(_fpCreatorZoom);
+            return {
+                width: Math.round(_fpCreatorBaseWidth / zoom),
+                height: Math.round(_fpCreatorBaseHeight / zoom)
+            };
+        }
+
+        function _fpCreatorZoomCanvas(factor) {
+            _fpCreatorZoom = _fpCreatorClampZoom((_fpCreatorZoom || 1) * factor);
+            _fpRenderCreator();
+        }
+
+        function _fpCreatorResetZoom() {
+            _fpCreatorZoom = 1;
+            _fpRenderCreator();
+        }
+
         function _fpCreatorInitCanvas() {
             _fpCreatorCanvas = document.getElementById('fpCreatorCanvas');
             if (!_fpCreatorCanvas) return;
+            var workspace = _fpCreatorWorkspaceSize();
+            _fpCreatorCanvas.width = workspace.width;
+            _fpCreatorCanvas.height = workspace.height;
             _fpCreatorCtx = _fpCreatorCanvas.getContext('2d');
             if (window.PointerEvent) {
                 _fpCreatorCanvas.onpointerdown = _fpCreatorPointerDown;
