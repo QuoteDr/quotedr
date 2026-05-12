@@ -1,0 +1,190 @@
+body {
+    background: #f8fafc;
+    color: #1f2937;
+    font-family: Inter, "Segoe UI", sans-serif;
+}
+
+.marketing-nav {
+    background: #fff;
+    border-bottom: 2px solid #eef4fb;
+    box-shadow: 0 2px 10px rgba(15, 52, 96, 0.08);
+}
+
+.marketing-nav .navbar-brand img {
+    height: 58px;
+    width: auto;
+}
+
+.marketing-nav .nav-link {
+    color: #0f3460;
+    font-weight: 600;
+}
+
+.marketing-nav .nav-link:hover,
+.marketing-nav .nav-link.active {
+    color: #e87e2a;
+}
+
+.nav-cta {
+    align-items: center;
+    background: #e87e2a;
+    border-radius: 22px;
+    color: #fff !important;
+    display: inline-flex;
+    font-weight: 800;
+    justify-content: center;
+    padding: 7px 16px !important;
+}
+
+.nav-cta:hover {
+    background: #d47024;
+}
+
+.page-hero {
+    background: #0f3460;
+    color: #fff;
+    padding: 76px 0 64px;
+}
+
+.page-hero h1 {
+    color: #fff;
+    font-size: clamp(2.15rem, 5vw, 4rem);
+    font-weight: 850;
+    letter-spacing: 0;
+    line-height: 1.06;
+    max-width: 860px;
+}
+
+.page-hero .lead {
+    color: rgba(255, 255, 255, 0.82);
+    max-width: 760px;
+}
+
+.eyebrow {
+    color: #e87e2a;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.content-section {
+    padding: 64px 0;
+}
+
+.section-title {
+    color: #0f3460;
+    font-weight: 850;
+    letter-spacing: 0;
+}
+
+.plain-panel {
+    background: #fff;
+    border: 1px solid #e5eaf1;
+    border-radius: 8px;
+    box-shadow: 0 4px 18px rgba(15, 52, 96, 0.08);
+    height: 100%;
+    padding: 28px;
+}
+
+.plain-panel h2,
+.plain-panel h3 {
+    color: #0f3460;
+    font-weight: 800;
+}
+
+.btn-brand {
+    background: #e87e2a;
+    border-color: #e87e2a;
+    border-radius: 24px;
+    color: #fff;
+    font-weight: 800;
+    padding: 10px 22px;
+}
+
+.btn-brand:hover {
+    background: #d47024;
+    border-color: #d47024;
+    color: #fff;
+}
+
+.btn-outline-brand {
+    border-color: #0f3460;
+    border-radius: 24px;
+    color: #0f3460;
+    font-weight: 800;
+    padding: 10px 22px;
+}
+
+.btn-outline-brand:hover {
+    background: #0f3460;
+    color: #fff;
+}
+
+.marketing-footer {
+    background: #0f3460;
+    color: rgba(255, 255, 255, 0.72);
+    padding: 34px 0;
+}
+
+.marketing-footer img {
+    filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.55)) drop-shadow(0 0 26px rgba(255, 255, 255, 0.28));
+    height: 54px;
+}
+
+.marketing-footer a {
+    color: #fff;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.marketing-footer a:hover {
+    color: #f2a05f;
+}
+
+.article {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 18px rgba(15, 52, 96, 0.08);
+    margin: 40px auto;
+    max-width: 780px;
+    padding: 36px;
+}
+
+.article h1,
+.article h2 {
+    color: #0f3460;
+}
+
+.article h1 {
+    font-weight: 850;
+}
+
+.article .cta {
+    background: #0f3460;
+    border-radius: 8px;
+    color: #fff;
+    margin-top: 32px;
+    padding: 24px;
+}
+
+.article .cta a {
+    color: #fff;
+    font-weight: 800;
+}
+
+.tutorial-video {
+    aspect-ratio: 16 / 9;
+    background: #071d36;
+    border-radius: 8px;
+    display: block;
+    width: 100%;
+}
+
+@media (max-width: 1199.98px) {
+    .marketing-nav .navbar-collapse {
+        border-top: 1px solid #eef4fb;
+        margin-top: 8px;
+        padding: 8px 0 12px;
+    }
+}
