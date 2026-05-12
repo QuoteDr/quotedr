@@ -183,6 +183,66 @@
       padding: 1rem;
       margin-bottom: 1rem;
     }
+
+    .portal-toolbar-title {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+
+    .portal-section-title {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--primary-dark);
+      font-size: 1.05rem;
+      font-weight: 800;
+      margin: 1.5rem 0 0.75rem;
+    }
+
+    .portal-section-title .badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    .doc-type-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      border-radius: 999px;
+      padding: 0.35rem 0.65rem;
+      background: #eef4fb;
+      color: #123761;
+      font-size: 0.78rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+
+    .doc-type-invoice { background: #e7f7ed; color: #146c43; }
+    .doc-type-change-order { background: #fff4e8; color: #a44b00; }
+
+    .client-status-line {
+      color: #495057;
+      font-size: 0.9rem;
+      margin-top: 0.35rem;
+    }
+
+    .client-status-line.needs-action {
+      color: #a44b00;
+      font-weight: 700;
+    }
+
+    .admin-meta-line {
+      display: none;
+      color: #6c757d;
+      font-size: 0.78rem;
+      margin-top: 0.35rem;
+    }
+
+    .admin-mode .admin-meta-line {
+      display: block;
+    }
     
     .no-quotes {
       text-align: center;
@@ -233,6 +293,14 @@
 
       .portal-admin-tools {
         justify-content: center;
+      }
+
+      .portal-controls {
+        width: 100%;
+      }
+
+      .portal-controls > div {
+        flex: 1 1 150px;
       }
 
       .action-buttons .btn {
@@ -326,12 +394,13 @@
     <div class="row">
       <div class="col-12">
         <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-3">
-          <h2 class="mb-0">Quotes & Invoices</h2>
+          <h2 class="portal-toolbar-title mb-0"><i class="fas fa-folder-open"></i> Quotes & Invoices</h2>
           <div class="portal-controls d-flex gap-2 flex-wrap align-items-end mb-0">
             <div>
               <label class="form-label small text-muted mb-1" for="portalShowFilter">Show</label>
               <select id="portalShowFilter" class="form-select form-select-sm" onchange="renderPortalDocuments()">
                 <option value="all">Everything</option>
+                <option value="needs_action">Needs Action</option>
                 <option value="quotes">Quotes</option>
                 <option value="invoices">Invoices</option>
                 <option value="change_orders">Change Orders</option>
@@ -467,6 +536,7 @@
       }
       if (tools) tools.style.display = isAdmin ? 'flex' : 'none';
       if (tagline) tagline.textContent = isAdmin ? 'Admin Portal Preview' : 'Secure Client Portal';
+      document.body.classList.toggle('admin-mode', !!isAdmin);
     }
 
     // Get contractor company name from user_data table
@@ -630,15 +700,17 @@
       const sort = document.getElementById('portalSortBy')?.value || 'newest';
       const co = window.QuoteDrChangeOrders;
       const filtered = (quotes || []).filter(function(quote) {
-        const status = String(quote.status || '').toLowerCase();
         const isChangeOrder = !!(co && co.isChangeOrder(quote));
-        const isInvoice = status === 'invoiced' || status === 'paid' || quote.type === 'invoice' || quote.data?.documentType === 'invoice';
+        const isInvoice = isInvoiceDocument(quote);
+        const status = quoteStatus(quote);
+        const needsAction = documentNeedsAction(quote);
         if (show === 'quotes') return !isChangeOrder && !isInvoice;
         if (show === 'invoices') return isInvoice;
         if (show === 'change_orders') return isChangeOrder;
+        if (show === 'needs_action') return needsAction;
         if (show === 'open') return ['draft', 'sent', 'viewed', 'in_review', 'pending_approval'].includes(status);
         if (show === 'accepted') return ['accepted', 'approved', 'invoiced'].includes(status);
-        if (show === 'completed') return status === 'paid' || quote.data?.paymentStatus === 'paid';
+        if (show === 'completed') return documentIsCompleted(quote);
         return true;
       });
 
@@ -656,6 +728,7 @@
     // Process and display quotes
     function processQuotes(quotes) {
       quotesContainer.innerHTML = '';
+      const show = document.getElementById('portalShowFilter')?.value || 'all';
       const co = window.QuoteDrChangeOrders;
       const parents = quotes.filter(q => !(co && co.isChangeOrder(q)));
       const children = quotes.filter(q => co && co.isChangeOrder(q));
@@ -665,9 +738,58 @@
         return;
       }
 
-      parents.forEach(quote => {
-        const quoteCard = createQuoteCard(quote);
-        quotesContainer.appendChild(quoteCard);
+      if (show === 'all') {
+        renderGroupedPortalDocuments(parents, children, co);
+        return;
+      }
+
+      parents.forEach(quote => renderParentDocument(quote, children, co));
+
+      const shownParentIds = parents.map(function(q) { return q.id; });
+      children
+        .filter(function(child) { return co && !shownParentIds.includes(co.parentQuoteId(child)); })
+        .forEach(function(child) {
+          quotesContainer.appendChild(createChangeOrderCard(child, false, co));
+        });
+    }
+
+    function renderGroupedPortalDocuments(parents, children, co) {
+      const groups = [
+        { key: 'needs', icon: 'fa-circle-exclamation', title: 'Needs Action', items: parents.filter(documentNeedsAction) },
+        { key: 'open', icon: 'fa-folder-open', title: 'Open', items: parents.filter(function(q) { return !documentNeedsAction(q) && !documentIsCompleted(q); }) },
+        { key: 'completed', icon: 'fa-circle-check', title: 'Completed', items: parents.filter(documentIsCompleted) }
+      ];
+
+      groups.forEach(function(group) {
+        if (!group.items.length) return;
+        const heading = document.createElement('div');
+        heading.className = 'portal-section-title';
+        heading.innerHTML = '<i class="fas ' + group.icon + '"></i>' + group.title + ' <span class="badge bg-secondary">' + group.items.length + '</span>';
+        quotesContainer.appendChild(heading);
+        group.items.forEach(function(quote) {
+          renderParentDocument(quote, children, co);
+        });
+      });
+
+      const shownParentIds = parents.map(function(q) { return q.id; });
+      const standaloneChangeOrders = co ? children.filter(function(child) {
+        return !shownParentIds.includes(co.parentQuoteId(child));
+      }) : [];
+      if (standaloneChangeOrders.length) {
+        const heading = document.createElement('div');
+        heading.className = 'portal-section-title';
+        heading.innerHTML = '<i class="fas fa-file-circle-plus"></i>Change Orders <span class="badge bg-secondary">' + standaloneChangeOrders.length + '</span>';
+        quotesContainer.appendChild(heading);
+        standaloneChangeOrders.forEach(function(child) {
+          quotesContainer.appendChild(createChangeOrderCard(child, false, co));
+        });
+      }
+    }
+
+    function renderParentDocument(quote, children, co) {
+      const quoteCard = createQuoteCard(quote);
+      quotesContainer.appendChild(quoteCard);
+      if (!co) return;
         const linked = children.filter(child => co.parentQuoteId(child) === quote.id);
         if (linked.length) {
           const history = document.createElement('div');
@@ -675,18 +797,11 @@
           const approvedTotal = linked.filter(row => row.status === 'approved').reduce((sum, row) => sum + (parseFloat(row.total || 0) || 0), 0);
           history.innerHTML = '<div class="small fw-bold text-muted mb-2">Change order history</div>' +
             linked.map(row => {
-              const amount = parseFloat(row.total || 0) || 0;
-              const sign = amount >= 0 ? '+' : '-';
-              return '<div class="card quote-card mb-2"><div class="card-body py-2">' +
-                '<div class="d-flex justify-content-between gap-2"><div><strong>Change Order #' + (co.number(row) || '') + '</strong><div class="text-muted small">' + (row.data?.changeReason || 'Scope change') + '</div></div>' +
-                '<div class="text-end"><span class="status-badge status-' + row.status + '">' + titleCase(row.status || '') + '</span><div class="fw-bold">' + sign + '$' + Math.abs(amount).toFixed(2) + '</div></div></div>' +
-                '<a href="interactive-quote-viewer.html?id=' + row.id + '" class="btn btn-outline-primary btn-sm mt-2"><i class="fas fa-eye me-1"></i>View Change Order</a>' +
-                '</div></div>';
+              return createChangeOrderCardMarkup(row, co);
             }).join('') +
             '<div class="alert alert-info py-2 small"><strong>Running approved total:</strong> $' + ((parseFloat(quote.total || 0) || 0) + approvedTotal).toFixed(2) + '</div>';
           quotesContainer.appendChild(history);
         }
-      });
     }
 
     // Create a quote card element
@@ -695,9 +810,15 @@
       card.className = 'card quote-card';
       if (quote.id === portalQuoteId) card.classList.add('portal-focus');
       
-      const statusClass = `status-${quote.status}`;
-      const statusText = titleCase(quote.status);
-      const statusIcon = getStatusIcon(quote.status);
+      const status = quoteStatus(quote);
+      const statusClass = statusClassName(status);
+      const statusText = getClientStatusText(quote);
+      const statusIcon = getStatusIcon(status);
+      const docType = getDocumentType(quote);
+      const needsAction = documentNeedsAction(quote);
+      const primaryHref = isInvoiceDocument(quote)
+        ? 'invoice-viewer.html?id=' + encodeURIComponent(quote.id)
+        : 'interactive-quote-viewer.html?id=' + encodeURIComponent(quote.id);
       
       // Format date
       const date = new Date(quote.created_at).toLocaleDateString('en-US', {
@@ -719,30 +840,28 @@
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-start mb-3">
             <div>
-              <h5 class="quote-number">${quote.quote_number}</h5>
-              <p class="project-address">${projectAddress}</p>
+              <div class="d-flex gap-2 flex-wrap align-items-center mb-2">
+                <span class="doc-type-badge ${docType.className}"><i class="fas ${docType.icon}"></i>${docType.label}</span>
+                <span class="status-badge ${statusClass}"><i class="fas ${statusIcon} me-1"></i> ${escapeHtml(statusText)}</span>
+              </div>
+              <h5 class="quote-number">${escapeHtml(quote.quote_number || docType.label)}</h5>
+              <p class="project-address">${escapeHtml(projectAddress)}</p>
+              <div class="client-status-line ${needsAction ? 'needs-action' : ''}">${escapeHtml(getClientActionLine(quote))}</div>
+              <div class="admin-meta-line"><i class="fas fa-shield-halved me-1"></i>${escapeHtml(getAdminMetaLine(quote))}</div>
             </div>
-            <span class="status-badge ${statusClass}">
-              <i class="fas ${statusIcon} me-1"></i> ${statusText}
-            </span>
           </div>
           
           <div class="d-flex justify-content-between align-items-center mb-3">
             <div>
               <h6>Total: ${total}</h6>
               <small class="text-muted">Created: ${date}</small>
-              <div class="text-muted small mt-1">${portalIsAdminView ? 'Admin preview of the client portal card.' : 'Open the quote to sign, approve, or request changes.'}</div>
             </div>
             <div class="action-buttons text-end">
-              <a href="interactive-quote-viewer.html?id=${quote.id}" class="btn btn-outline-primary btn-sm">
-                <i class="fas fa-pen-nib me-1"></i> Review / Sign Quote
+              <a href="${primaryHref}" class="btn btn-outline-primary btn-sm">
+                <i class="fas ${docType.actionIcon} me-1"></i> ${docType.actionLabel}
               </a>
-              ${quote.status === 'invoiced' || quote.status === 'paid' ? 
-                `<a href="invoice-viewer.html?id=${quote.id}" class="btn btn-outline-success btn-sm">
-                  <i class="fas fa-file-invoice-dollar me-1"></i> View / Pay Invoice
-                </a>` : ''}
               ${portalIsAdminView ?
-                `<a href="quote-builder.html?id=${quote.id}" class="btn btn-outline-dark btn-sm">
+                `<a href="quote-builder.html?id=${encodeURIComponent(quote.id)}" class="btn btn-outline-dark btn-sm">
                   <i class="fas fa-pen-to-square me-1"></i> Edit in Builder
                 </a>` : ''}
               ${quote.data?.signature_url ? 
@@ -764,6 +883,95 @@
       }
       
       return card;
+    }
+
+    function createChangeOrderCard(row, nested, co) {
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = createChangeOrderCardMarkup(row, co);
+      const card = wrapper.firstElementChild;
+      if (!nested && card && row.id === portalQuoteId) card.classList.add('portal-focus');
+      return card;
+    }
+
+    function createChangeOrderCardMarkup(row, co) {
+      const amount = parseFloat(row.total || 0) || 0;
+      const sign = amount >= 0 ? '+' : '-';
+      const status = quoteStatus(row);
+      return '<div class="card quote-card mb-2">' +
+        '<div class="card-body py-3">' +
+        '<div class="d-flex justify-content-between gap-2 flex-wrap">' +
+        '<div><div class="d-flex gap-2 flex-wrap align-items-center mb-2"><span class="doc-type-badge doc-type-change-order"><i class="fas fa-file-circle-plus"></i>Change Order</span><span class="status-badge ' + statusClassName(status) + '">' + escapeHtml(getClientStatusText(row)) + '</span></div>' +
+        '<strong>Change Order #' + escapeHtml((co && co.number(row)) || '') + '</strong><div class="text-muted small">' + escapeHtml(row.data?.changeReason || 'Scope change') + '</div>' +
+        '<div class="client-status-line ' + (documentNeedsAction(row) ? 'needs-action' : '') + '">' + escapeHtml(getClientActionLine(row)) + '</div></div>' +
+        '<div class="text-end"><div class="fw-bold">' + sign + '$' + Math.abs(amount).toFixed(2) + '</div><a href="interactive-quote-viewer.html?id=' + encodeURIComponent(row.id) + '" class="btn btn-outline-primary btn-sm mt-2"><i class="fas fa-pen-nib me-1"></i>Review Change Order</a></div>' +
+        '</div></div></div>';
+    }
+
+    function quoteStatus(quote) {
+      return String(quote.status || quote.data?.status || 'draft').toLowerCase();
+    }
+
+    function statusClassName(status) {
+      return 'status-' + String(status || 'draft').toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+    }
+
+    function isInvoiceDocument(quote) {
+      const status = quoteStatus(quote);
+      return status === 'invoiced' || status === 'paid' || quote.type === 'invoice' || quote.data?.documentType === 'invoice';
+    }
+
+    function documentIsCompleted(quote) {
+      return quoteStatus(quote) === 'paid' || quote.data?.paymentStatus === 'paid';
+    }
+
+    function documentNeedsAction(quote) {
+      const status = quoteStatus(quote);
+      const paymentStatus = String(quote.data?.paymentStatus || '').toLowerCase();
+      return ['sent', 'viewed', 'in_review', 'pending_approval'].includes(status) ||
+        status === 'invoiced' ||
+        paymentStatus === 'partially_paid';
+    }
+
+    function getDocumentType(quote) {
+      const co = window.QuoteDrChangeOrders;
+      if (co && co.isChangeOrder(quote)) {
+        return { label: 'Change Order', icon: 'fa-file-circle-plus', className: 'doc-type-change-order', actionIcon: 'fa-pen-nib', actionLabel: 'Review Change Order' };
+      }
+      if (isInvoiceDocument(quote)) {
+        return { label: 'Invoice', icon: 'fa-file-invoice-dollar', className: 'doc-type-invoice', actionIcon: 'fa-file-invoice-dollar', actionLabel: quoteStatus(quote) === 'paid' ? 'View Invoice' : 'View / Pay Invoice' };
+      }
+      return { label: 'Quote', icon: 'fa-file-signature', className: '', actionIcon: quoteStatus(quote) === 'accepted' ? 'fa-eye' : 'fa-pen-nib', actionLabel: quoteStatus(quote) === 'accepted' ? 'View Quote' : 'Review / Sign Quote' };
+    }
+
+    function getClientStatusText(quote) {
+      const status = quoteStatus(quote);
+      const paymentStatus = String(quote.data?.paymentStatus || '').toLowerCase();
+      if (documentIsCompleted(quote)) return 'Paid';
+      if (status === 'invoiced') return paymentStatus === 'partially_paid' ? 'Partially Paid' : 'Invoice Due';
+      if (status === 'accepted' || status === 'approved') return 'Accepted';
+      if (status === 'pending_approval') return 'Needs Approval';
+      if (status === 'declined') return 'Declined';
+      if (status === 'sent' || status === 'viewed') return 'Needs Review';
+      if (status === 'in_review') return 'Under Review';
+      return titleCase(status || 'Available');
+    }
+
+    function getClientActionLine(quote) {
+      const status = quoteStatus(quote);
+      if (documentIsCompleted(quote)) return 'Completed and paid.';
+      if (status === 'invoiced') return 'Invoice is ready for review and payment.';
+      if (status === 'accepted' || status === 'approved') return 'Accepted. Your contractor has this on file.';
+      if (status === 'pending_approval') return 'Please review this change order.';
+      if (status === 'sent' || status === 'viewed') return 'Please review and sign when ready.';
+      if (status === 'in_review') return 'Your requested changes are with the contractor.';
+      return 'Available in your portal.';
+    }
+
+    function getAdminMetaLine(quote) {
+      const visible = quote.data?.portal_visible ? 'Visible to client' : 'Hidden from client';
+      const viewed = quote.viewed_at ? 'viewed ' + new Date(quote.viewed_at).toLocaleDateString('en-CA') : 'not viewed yet';
+      const payment = quote.data?.paymentStatus ? 'payment: ' + quote.data.paymentStatus : 'payment: none recorded';
+      return visible + ' | ' + viewed + ' | ' + payment;
     }
 
     // Get status icon based on status
