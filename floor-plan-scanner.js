@@ -292,6 +292,7 @@
                 '<div class="text-center mb-3">' +
                 '<div class="d-flex justify-content-center gap-1 mb-3">' + _fpStepBadges(1, ['Start','Measure','Review']) + '</div>' +
                 '<p class="text-muted small">Upload an existing drawing or create a clean, measured floorplan from scratch.</p>' +
+                '<div class="alert alert-info text-start small py-2 mb-0"><i class="fas fa-desktop me-1"></i>Floor plan tools work best on desktop or tablet right now. Mobile support is coming, but drawing and editing may be harder on a phone.</div>' +
                 '</div>' +
                 '<div class="row g-3 mb-3">' +
                 '<div class="col-md-6">' +
