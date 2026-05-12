@@ -50,6 +50,7 @@
         var _fpCreatorCtx = null;
         var _fpCreatorRoomName = 'Room 1';
         var _fpCreatorMode = 'wall';
+        var _fpCreatorStraightLock = false;
         var _fpCreatorOpenings = [];
         var _fpCreatorOpeningDraft = null;
         var _fpCreatorSelectedOpening = -1;
@@ -93,6 +94,45 @@
             var dx = (a.x || 0) - (b.x || 0);
             var dy = (a.y || 0) - (b.y || 0);
             return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        function _fpEnsureMobileStyles() {
+            if (document.getElementById('fpScannerMobileStyles')) return;
+            var style = document.createElement('style');
+            style.id = 'fpScannerMobileStyles';
+            style.textContent =
+                '#floorPlanModalBody{overscroll-behavior:contain;}' +
+                '#floorPlanModal .fp-touch-btn{min-height:42px;}' +
+                '#floorPlanModal .fp-tool-strip{gap:6px;}' +
+                '#floorPlanModal .fp-canvas-shell{position:relative;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}' +
+                '#floorPlanModal .fp-mobile-hint{display:none;}' +
+                '@media (max-width:767.98px){' +
+                '#floorPlanModal .modal-header{padding:.55rem .75rem;}' +
+                '#floorPlanModal .modal-title{font-size:1rem;}' +
+                '#floorPlanModalBody{padding:.65rem!important;}' +
+                '#floorPlanModal .fp-step-badges{overflow-x:auto;justify-content:flex-start!important;padding-bottom:2px;}' +
+                '#floorPlanModal .fp-step-badges .badge{white-space:nowrap;}' +
+                '#floorPlanModal .fp-mobile-hint{display:block;}' +
+                '#floorPlanModal .fp-tool-strip{flex-wrap:nowrap!important;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin;}' +
+                '#floorPlanModal .fp-tool-strip .btn{min-height:44px;white-space:nowrap;flex:0 0 auto;}' +
+                '#floorPlanModal .fp-start-action{min-height:86px;}' +
+                '#floorPlanModal #fpDropZone{padding:24px 14px!important;}' +
+                '#floorPlanModal #fpCreatorCanvas{width:760px!important;max-width:none!important;height:520px!important;}' +
+                '#floorPlanModal .fp-creator-canvas-shell{max-height:58dvh;}' +
+                '#floorPlanModal .fp-creator-side{margin-top:.5rem;}' +
+                '#floorPlanModal .fp-creator-side .border{padding:.75rem!important;}' +
+                '#floorPlanModal .fp-creator-actions{grid-template-columns:1fr 1fr;display:grid!important;}' +
+                '#floorPlanModal .fp-creator-actions .btn-primary{grid-column:1 / -1;}' +
+                '#floorPlanModal .fp-measure-layout{height:auto!important;}' +
+                '#floorPlanModal .fp-measure-canvas-col{height:62dvh!important;min-height:380px!important;}' +
+                '#floorPlanModal .fp-measure-canvas-wrap{min-height:300px;}' +
+                '#floorPlanModal .fp-measure-side{margin-top:.5rem;}' +
+                '#floorPlanModal .fp-measure-side .border{flex-grow:0!important;max-height:none!important;}' +
+                '#floorPlanModal .fp-bottom-actions{position:sticky;bottom:0;z-index:3;background:#fff;padding:.5rem 0 0;}' +
+                '#floorPlanModal input,#floorPlanModal select{min-height:42px;}' +
+                '}' +
+                '@media (max-width:480px){#floorPlanModal #fpCreatorCanvas{width:700px!important;height:500px!important;}#floorPlanModal .fp-measure-canvas-col{height:58dvh!important;min-height:340px!important;}}';
+            document.head.appendChild(style);
         }
 
         function _fpEnsureMapping() {
@@ -148,10 +188,11 @@
         }
 
         function openFloorPlanModal() {
+            _fpEnsureMobileStyles();
             _fpImageBase64 = null; _fpMimeType = 'image/jpeg'; _fpImageUrl = null; _fpResults = null; _fpRooms = [];
             _fpSuggestedRoomNames = []; _fpCeilingHeight = 9; _fpScale = null; _fpShapes = []; _fpDraft = null; _fpPolygonDraft = [];
             _fpCanvasReady = false; _fpCanvasZoom = 1; _fpCanvasScrollLeft = 0; _fpCanvasScrollTop = 0; _fpTool = 'calibrate'; _fpShapeCounter = 1; _fpActiveShapeIndex = -1; _fpPendingRoomName = ''; _fpPendingTrades = {}; _fpCalibrationIntroShown = false;
-            _fpCreatorPoints = []; _fpCreatorClosed = false; _fpCreatorDraft = null; _fpCreatorMouseDown = false; _fpCreatorSelectedWall = -1; _fpCreatorRoomName = 'Room 1'; _fpCreatorMode = 'wall'; _fpCreatorOpenings = []; _fpCreatorOpeningDraft = null; _fpCreatorSelectedOpening = -1; _fpGeneratedPlan = false;
+            _fpCreatorPoints = []; _fpCreatorClosed = false; _fpCreatorDraft = null; _fpCreatorMouseDown = false; _fpCreatorSelectedWall = -1; _fpCreatorRoomName = 'Room 1'; _fpCreatorMode = 'wall'; _fpCreatorStraightLock = false; _fpCreatorOpenings = []; _fpCreatorOpeningDraft = null; _fpCreatorSelectedOpening = -1; _fpGeneratedPlan = false;
             var modal = new bootstrap.Modal(document.getElementById('floorPlanModal'));
             modal.show();
             setTimeout(_fpMaybeShowIntroPopup, 250);
@@ -170,6 +211,7 @@
         }
 
         function openFpScannerSetup() {
+            _fpEnsureMobileStyles();
             var modal = new bootstrap.Modal(document.getElementById('floorPlanModal'));
             modal.show();
             _fpRenderSetup(1);
@@ -288,21 +330,22 @@
         }
 
         function _fpRenderStep1() {
+            _fpEnsureMobileStyles();
             document.getElementById('floorPlanModalBody').innerHTML =
                 '<div class="text-center mb-3">' +
-                '<div class="d-flex justify-content-center gap-1 mb-3">' + _fpStepBadges(1, ['Start','Measure','Review']) + '</div>' +
+                '<div class="d-flex justify-content-center gap-1 mb-3 fp-step-badges">' + _fpStepBadges(1, ['Start','Measure','Review']) + '</div>' +
                 '<p class="text-muted small">Upload an existing drawing or create a clean, measured floorplan from scratch.</p>' +
-                '<div class="alert alert-info text-start small py-2 mb-0"><i class="fas fa-desktop me-1"></i>Floor plan tools work best on desktop or tablet right now. Mobile support is coming, but drawing and editing may be harder on a phone.</div>' +
+                '<div class="alert alert-info text-start small py-2 mb-0"><i class="fas fa-desktop me-1"></i>Floor plan tools work best on desktop or tablet. On a phone, rotate landscape and use the zoom/pan controls for a better drawing experience.</div>' +
                 '</div>' +
                 '<div class="row g-3 mb-3">' +
                 '<div class="col-md-6">' +
-                '<button type="button" class="btn btn-outline-primary w-100 h-100 p-3 text-start" onclick="document.getElementById(\'fpFileInput\').click()">' +
+                '<button type="button" class="btn btn-outline-primary w-100 h-100 p-3 text-start fp-touch-btn fp-start-action" onclick="document.getElementById(\'fpFileInput\').click()">' +
                 '<div class="fw-bold"><i class="fas fa-cloud-upload-alt me-2"></i>Upload premade drawing</div>' +
                 '<div class="small text-muted mt-1">Use a photo, PDF, or plan you already have, then calibrate it.</div>' +
                 '</button>' +
                 '</div>' +
                 '<div class="col-md-6">' +
-                '<button type="button" class="btn btn-primary w-100 h-100 p-3 text-start" onclick="_fpRenderCreator()">' +
+                '<button type="button" class="btn btn-primary w-100 h-100 p-3 text-start fp-touch-btn fp-start-action" onclick="_fpRenderCreator()">' +
                 '<div class="fw-bold"><i class="fas fa-pen-ruler me-2"></i>Create drawing</div>' +
                 '<div class="small text-white-50 mt-1">Enter room dimensions and send a known-good plan into the scanner.</div>' +
                 '</button>' +
@@ -333,32 +376,35 @@
         }
 
         function _fpRenderCreator() {
+            _fpEnsureMobileStyles();
             var selectedLength = _fpCreatorSelectedWall >= 0 ? _fpRound(_fpCreatorWallLength(_fpCreatorSelectedWall), 2) : '';
             var selectedOpening = _fpCreatorSelectedOpening >= 0 ? _fpCreatorOpenings[_fpCreatorSelectedOpening] : null;
             var selectedOpeningWidth = selectedOpening ? _fpRound(selectedOpening.widthFt, 2) : '';
             document.getElementById('floorPlanModalBody').innerHTML =
-                '<div class="d-flex justify-content-center gap-1 mb-3">' + _fpStepBadges(1, ['Create','Measure','Review']) + '</div>' +
+                '<div class="d-flex justify-content-center gap-1 mb-3 fp-step-badges">' + _fpStepBadges(1, ['Create','Measure','Review']) + '</div>' +
                 '<div class="d-flex align-items-start justify-content-between gap-3 mb-3">' +
                 '<div><h5 class="mb-1"><i class="fas fa-pen-ruler me-2 text-primary"></i>Create floorplan</h5>' +
-                '<p class="text-muted small mb-0">Click and drag connected wall lines. The length updates as you draw, and you can type the exact wall measurement after selecting a wall.</p></div>' +
-                '<button class="btn btn-outline-secondary btn-sm" onclick="_fpRenderStep1()"><i class="fas fa-arrow-left me-1"></i>Back</button>' +
+                '<p class="text-muted small mb-0">Click or tap connected wall lines. The length updates as you draw, and you can type the exact wall measurement after selecting a wall.</p></div>' +
+                '<button class="btn btn-outline-secondary btn-sm fp-touch-btn" onclick="_fpRenderStep1()"><i class="fas fa-arrow-left me-1"></i>Back</button>' +
                 '</div>' +
-                '<div class="row g-3">' +
+                '<div class="alert alert-light border small py-2 mb-3 fp-mobile-hint"><i class="fas fa-mobile-screen-button me-1 text-primary"></i>Phone tip: use 90&deg; lock for straight walls, drag the canvas area sideways to reach more workspace, and use Select to edit exact sizes.</div>' +
+                '<div class="row g-3 fp-creator-layout">' +
                 '<div class="col-lg-8">' +
-                '<div class="d-flex flex-wrap gap-1 mb-2">' +
+                '<div class="d-flex flex-wrap gap-1 mb-2 fp-tool-strip">' +
                 _fpCreatorModeButton('select', 'fa-mouse-pointer', 'Select') +
                 _fpCreatorModeButton('wall', 'fa-grip-lines', 'Walls') +
                 _fpCreatorModeButton('door', 'fa-door-open', 'Door') +
                 _fpCreatorModeButton('opening', 'fa-archway', 'Opening') +
                 _fpCreatorModeButton('window', 'fa-window-maximize', 'Window') +
+                '<button class="btn btn-' + (_fpCreatorStraightLock ? 'primary' : 'outline-primary') + ' btn-sm fp-touch-btn" onclick="_fpCreatorToggleStraightLock()" title="Lock walls horizontal or vertical"><i class="fas fa-ruler-combined me-1"></i>90&deg; lock</button>' +
                 '</div>' +
-                '<div class="border rounded bg-light" style="position:relative;overflow:hidden;">' +
+                '<div class="border rounded bg-light fp-canvas-shell fp-creator-canvas-shell" style="position:relative;overflow:auto;">' +
                 '<canvas id="fpCreatorCanvas" width="980" height="620" style="display:block;width:100%;height:min(62vh,620px);cursor:crosshair;touch-action:none;"></canvas>' +
                 '<div id="fpCreatorLiveLabel" class="badge bg-primary" style="position:absolute;left:12px;top:12px;display:none;"></div>' +
                 '</div>' +
-                '<div class="small text-muted mt-2"><i class="fas fa-info-circle me-1"></i>Hold <strong>SHIFT</strong> while drawing a wall to lock it straight horizontally or vertically. Use Select to edit walls, doors, windows, and openings.</div>' +
+                '<div class="small text-muted mt-2"><i class="fas fa-info-circle me-1"></i>Hold <strong>SHIFT</strong> or turn on <strong>90&deg; lock</strong> to keep walls horizontal or vertical. Use Select to edit walls, doors, windows, and openings.</div>' +
                 '</div>' +
-                '<div class="col-lg-4">' +
+                '<div class="col-lg-4 fp-creator-side">' +
                 '<div class="border rounded p-3 mb-3">' +
                 '<label class="form-label small mb-1">Room name</label>' +
                 '<input type="text" class="form-control form-control-sm mb-2" id="fpCreatorRoomName" value="' + _fpEscapeHtml(_fpCreatorRoomName) + '" oninput="_fpCreatorRoomName=this.value||\'Room 1\'">' +
@@ -379,12 +425,12 @@
                 '<div class="d-flex justify-content-between"><span class="small text-muted">Status</span><strong>' + (_fpCreatorClosed ? 'Closed room' : 'Open outline') + '</strong></div>' +
                 '<div class="d-flex justify-content-between"><span class="small text-muted">Perimeter</span><strong>' + _fpRound(_fpCreatorPerimeter(), 1) + ' ft</strong></div>' +
                 '</div>' +
-                '<div class="d-grid gap-2">' +
-                '<button class="btn btn-outline-primary btn-sm" onclick="_fpCreatorCloseRoom()" ' + (_fpCreatorCanClose() && !_fpCreatorClosed ? '' : 'disabled') + '><i class="fas fa-vector-square me-1"></i>Close room</button>' +
-                '<button class="btn btn-outline-secondary btn-sm" onclick="_fpCreatorUndo()"><i class="fas fa-undo me-1"></i>Undo wall</button>' +
-                '<button class="btn btn-outline-secondary btn-sm" onclick="_fpCreatorRemoveSelectedOpening()" ' + (selectedOpening ? '' : 'disabled') + '><i class="fas fa-eraser me-1"></i>Remove selected opening</button>' +
-                '<button class="btn btn-outline-danger btn-sm" onclick="_fpCreatorClear()"><i class="fas fa-trash me-1"></i>Clear</button>' +
-                '<button class="btn btn-primary" onclick="_fpGenerateCreatedPlan()" ' + (_fpCreatorClosed ? '' : 'disabled') + '><i class="fas fa-arrow-right me-1"></i>Use this floorplan</button>' +
+                '<div class="d-grid gap-2 fp-creator-actions">' +
+                '<button class="btn btn-outline-primary btn-sm fp-touch-btn" onclick="_fpCreatorCloseRoom()" ' + (_fpCreatorCanClose() && !_fpCreatorClosed ? '' : 'disabled') + '><i class="fas fa-vector-square me-1"></i>Close room</button>' +
+                '<button class="btn btn-outline-secondary btn-sm fp-touch-btn" onclick="_fpCreatorUndo()"><i class="fas fa-undo me-1"></i>Undo wall</button>' +
+                '<button class="btn btn-outline-secondary btn-sm fp-touch-btn" onclick="_fpCreatorRemoveSelectedOpening()" ' + (selectedOpening ? '' : 'disabled') + '><i class="fas fa-eraser me-1"></i>Remove selected opening</button>' +
+                '<button class="btn btn-outline-danger btn-sm fp-touch-btn" onclick="_fpCreatorClear()"><i class="fas fa-trash me-1"></i>Clear</button>' +
+                '<button class="btn btn-primary fp-touch-btn" onclick="_fpGenerateCreatedPlan()" ' + (_fpCreatorClosed ? '' : 'disabled') + '><i class="fas fa-arrow-right me-1"></i>Use this floorplan</button>' +
                 '</div>' +
                 '</div>' +
                 '</div>' +
@@ -393,7 +439,7 @@
         }
 
         function _fpCreatorModeButton(mode, icon, label) {
-            return '<button class="btn btn-' + (_fpCreatorMode === mode ? 'primary' : 'outline-primary') + ' btn-sm" onclick="_fpCreatorSetMode(\'' + mode + '\')"><i class="fas ' + icon + ' me-1"></i>' + label + '</button>';
+            return '<button class="btn btn-' + (_fpCreatorMode === mode ? 'primary' : 'outline-primary') + ' btn-sm fp-touch-btn" onclick="_fpCreatorSetMode(\'' + mode + '\')"><i class="fas ' + icon + ' me-1"></i>' + label + '</button>';
         }
 
         function _fpCreatorSetMode(mode) {
@@ -403,15 +449,51 @@
             _fpRenderCreator();
         }
 
+        function _fpCreatorToggleStraightLock() {
+            _fpCreatorStraightLock = !_fpCreatorStraightLock;
+            _fpRenderCreator();
+        }
+
         function _fpCreatorInitCanvas() {
             _fpCreatorCanvas = document.getElementById('fpCreatorCanvas');
             if (!_fpCreatorCanvas) return;
             _fpCreatorCtx = _fpCreatorCanvas.getContext('2d');
-            _fpCreatorCanvas.onmousedown = _fpCreatorDown;
-            _fpCreatorCanvas.onmousemove = _fpCreatorMove;
-            _fpCreatorCanvas.onmouseup = _fpCreatorUp;
-            _fpCreatorCanvas.onmouseleave = _fpCreatorUp;
+            if (window.PointerEvent) {
+                _fpCreatorCanvas.onpointerdown = _fpCreatorPointerDown;
+                _fpCreatorCanvas.onpointermove = _fpCreatorPointerMove;
+                _fpCreatorCanvas.onpointerup = _fpCreatorPointerUp;
+                _fpCreatorCanvas.onpointercancel = _fpCreatorPointerUp;
+                _fpCreatorCanvas.onpointerleave = _fpCreatorPointerUp;
+                _fpCreatorCanvas.onmousedown = null;
+                _fpCreatorCanvas.onmousemove = null;
+                _fpCreatorCanvas.onmouseup = null;
+                _fpCreatorCanvas.onmouseleave = null;
+            } else {
+                _fpCreatorCanvas.onmousedown = _fpCreatorDown;
+                _fpCreatorCanvas.onmousemove = _fpCreatorMove;
+                _fpCreatorCanvas.onmouseup = _fpCreatorUp;
+                _fpCreatorCanvas.onmouseleave = _fpCreatorUp;
+            }
             _fpCreatorDraw();
+        }
+
+        function _fpCreatorPointerDown(e) {
+            if (e.pointerType !== 'mouse') e.preventDefault();
+            if (_fpCreatorCanvas.setPointerCapture) _fpCreatorCanvas.setPointerCapture(e.pointerId);
+            _fpCreatorDown(e);
+        }
+
+        function _fpCreatorPointerMove(e) {
+            if (e.pointerType !== 'mouse') e.preventDefault();
+            _fpCreatorMove(e);
+        }
+
+        function _fpCreatorPointerUp(e) {
+            if (e && e.pointerType !== 'mouse') e.preventDefault();
+            if (e && _fpCreatorCanvas.releasePointerCapture) {
+                try { _fpCreatorCanvas.releasePointerCapture(e.pointerId); } catch(ignore) {}
+            }
+            _fpCreatorUp();
         }
 
         function _fpCreatorPoint(e) {
@@ -471,6 +553,7 @@
                 return;
             }
             if (!_fpCreatorPoints.length) _fpCreatorPoints.push(pt);
+            else if (_fpCreatorStraightLock) pt = _fpCreatorStraightPoint(_fpCreatorPoints[_fpCreatorPoints.length - 1], pt);
             _fpCreatorDraft = { start: _fpCreatorPoints[_fpCreatorPoints.length - 1], end: pt };
             _fpCreatorMouseDown = true;
             _fpCreatorDraw();
@@ -492,7 +575,7 @@
             if (!_fpCreatorDraft) return;
             if (_fpCreatorPoints.length >= 3 && _fpDistance(pt, _fpCreatorPoints[0]) < 18) {
                 pt = _fpCreatorPoints[0];
-            } else if (e.shiftKey) {
+            } else if (e.shiftKey || _fpCreatorStraightLock) {
                 pt = _fpCreatorStraightPoint(_fpCreatorDraft.start, pt);
             }
             _fpCreatorDraft.end = pt;
@@ -1018,6 +1101,7 @@
         }
 
         function _fpToolLabel() {
+            if (_fpTool === 'pan') return 'Drag the plan to move around, then switch back to a measuring tool.';
             if (_fpTool === 'calibrate') return 'Draw over a known dimension, then enter its real length.';
             if (_fpTool === 'line') return 'Drag a line for linear footage.';
             if (_fpTool === 'box') return 'Drag a rectangle around a room.';
@@ -1025,6 +1109,7 @@
         }
 
         function _fpRenderMeasureTool() {
+            _fpEnsureMobileStyles();
             var oldCanvasWrap = document.getElementById('fpMeasureCanvasWrap');
             if (oldCanvasWrap) {
                 _fpCanvasScrollLeft = oldCanvasWrap.scrollLeft || 0;
@@ -1047,10 +1132,12 @@
             var scaleText = _fpScale ? (_fpRound(_fpScale.pxPerFt, 2) + ' px/ft') : 'Not calibrated';
             var editorTitle = _fpActiveShapeIndex >= 0 && _fpShapes[_fpActiveShapeIndex] ? 'Editing: ' + _fpEscapeHtml(_fpShapes[_fpActiveShapeIndex].name) : 'New Measurement';
             document.getElementById('floorPlanModalBody').innerHTML =
-                '<div class="d-flex justify-content-center gap-1 mb-2">' + _fpStepBadges(2, ['Upload','Calibrate','Review']) + '</div>' +
-                '<div class="row g-2" style="height:calc(100vh - 138px);min-height:0;">' +
-                '<div class="col-lg-8 d-flex flex-column" style="height:100%;min-height:420px;min-width:0;overflow:hidden;">' +
-                '<div class="d-flex flex-wrap align-items-center gap-1 mb-2">' +
+                '<div class="d-flex justify-content-center gap-1 mb-2 fp-step-badges">' + _fpStepBadges(2, ['Upload','Calibrate','Review']) + '</div>' +
+                '<div class="alert alert-light border small py-2 mb-2 fp-mobile-hint"><i class="fas fa-mobile-screen-button me-1 text-primary"></i>Phone tip: use Pan to move around the plan, zoom in before drawing, and rotate landscape when possible.</div>' +
+                '<div class="row g-2 fp-measure-layout" style="height:calc(100vh - 138px);min-height:0;">' +
+                '<div class="col-lg-8 d-flex flex-column fp-measure-canvas-col" style="height:100%;min-height:420px;min-width:0;overflow:hidden;">' +
+                '<div class="d-flex flex-wrap align-items-center gap-1 mb-2 fp-tool-strip">' +
+                _fpToolButton('pan', 'fa-hand', 'Pan') +
                 _fpToolButton('calibrate', 'fa-arrows-left-right', 'Scale') +
                 _fpToolButton('line', 'fa-ruler-horizontal', 'Line') +
                 _fpToolButton('box', 'fa-vector-square', 'Box') +
@@ -1066,15 +1153,15 @@
                 '</div>' +
                 '<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">' +
                 '<div class="small text-muted" id="fpToolHelp">' + _fpToolLabel() + '</div>' +
-                '<div class="small text-primary fw-semibold" id="fpPanHint" style="display:' + ((_fpCanvasZoom || 1) > 1.01 ? 'block' : 'none') + ';"><i class="fas fa-hand me-1"></i>Right-click + drag to pan</div>' +
+                '<div class="small text-primary fw-semibold" id="fpPanHint" style="display:' + (((_fpCanvasZoom || 1) > 1.01 || _fpTool === 'pan') ? 'block' : 'none') + ';"><i class="fas fa-hand me-1"></i>Use Pan, or right-click + drag while zoomed</div>' +
                 '</div>' +
-                '<div id="fpMeasureCanvasWrap" style="flex:1;min-height:0;height:100%;overflow:scroll;border:1px solid #ced4da;border-radius:8px;background:#f8f9fa;overscroll-behavior:contain;">' +
+                '<div id="fpMeasureCanvasWrap" class="fp-canvas-shell fp-measure-canvas-wrap" style="flex:1;min-height:0;height:100%;overflow:scroll;border:1px solid #ced4da;border-radius:8px;background:#f8f9fa;overscroll-behavior:contain;">' +
                 '<div id="fpMeasureCanvasStage" style="position:relative;width:1px;height:1px;">' +
-                '<canvas id="fpMeasureCanvas" style="display:block;max-width:none;cursor:crosshair;user-select:none;"></canvas>' +
+                '<canvas id="fpMeasureCanvas" style="display:block;max-width:none;cursor:crosshair;user-select:none;touch-action:none;"></canvas>' +
                 '</div>' +
                 '</div>' +
                 '</div>' +
-                '<div class="col-lg-4 d-flex flex-column">' +
+                '<div class="col-lg-4 d-flex flex-column fp-measure-side">' +
                 '<div class="border rounded p-2 mb-2" id="fpScalePanel">' +
                 '<div class="d-flex align-items-center justify-content-between mb-2"><strong class="small">Scale</strong><span class="badge bg-light text-dark">' + _fpEscapeHtml(scaleText) + '</span></div>' +
                 '<label class="form-label small mb-1">Known line length in feet</label>' +
@@ -1098,20 +1185,22 @@
                 '</div>' +
                 '</div>' +
                 '</div>' +
-                '<div class="d-flex justify-content-between mt-2">' +
-                '<button class="btn btn-outline-secondary" onclick="_fpRenderStep1()"><i class="fas fa-arrow-left me-1"></i>Back</button>' +
-                '<button class="btn btn-primary" onclick="_fpGoToStep3()" ' + (_fpShapes.length ? '' : 'disabled') + '>Review <i class="fas fa-arrow-right ms-1"></i></button>' +
+                '<div class="d-flex justify-content-between mt-2 fp-bottom-actions">' +
+                '<button class="btn btn-outline-secondary fp-touch-btn" onclick="_fpRenderStep1()"><i class="fas fa-arrow-left me-1"></i>Back</button>' +
+                '<button class="btn btn-primary fp-touch-btn" onclick="_fpGoToStep3()" ' + (_fpShapes.length ? '' : 'disabled') + '>Review <i class="fas fa-arrow-right ms-1"></i></button>' +
                 '</div>';
             setTimeout(function() { _fpLoadCanvas(); _fpMaybeShowCalibrationPopup(); }, 0);
         }
 
         function _fpToolButton(tool, icon, label) {
-            return '<button class="btn btn-' + (_fpTool === tool ? 'primary' : 'outline-primary') + ' btn-sm" onclick="_fpSetTool(\'' + tool + '\')" title="' + _fpEscapeHtml(label) + '"><i class="fas ' + icon + ' me-1"></i>' + label + '</button>';
+            return '<button class="btn btn-' + (_fpTool === tool ? 'primary' : 'outline-primary') + ' btn-sm fp-touch-btn" onclick="_fpSetTool(\'' + tool + '\')" title="' + _fpEscapeHtml(label) + '"><i class="fas ' + icon + ' me-1"></i>' + label + '</button>';
         }
 
         function _fpSetTool(tool) {
+            var previousTool = _fpTool;
             _fpTool = tool;
-            _fpDraft = null;
+            if (tool === 'pan') { _fpRenderMeasureTool(); return; }
+            if (!(previousTool === 'pan' && tool === 'polygon' && _fpPolygonDraft.length)) _fpDraft = null;
             if (tool !== 'polygon') _fpPolygonDraft = [];
             _fpRenderMeasureTool();
         }
@@ -1222,14 +1311,26 @@
         function _fpAttachCanvasEvents() {
             if (!_fpCanvas || _fpCanvas._fpEventsAttached) return;
             _fpCanvas._fpEventsAttached = true;
-            _fpCanvas.addEventListener('mousedown', _fpCanvasDown);
-            _fpCanvas.addEventListener('mousemove', _fpCanvasMove);
+            if (window.PointerEvent) {
+                _fpCanvas.addEventListener('pointerdown', _fpCanvasPointerDown);
+                _fpCanvas.addEventListener('pointermove', _fpCanvasPointerMove);
+                _fpCanvas.addEventListener('pointerup', _fpCanvasPointerUp);
+                _fpCanvas.addEventListener('pointercancel', _fpCanvasPointerUp);
+            } else {
+                _fpCanvas.addEventListener('mousedown', _fpCanvasDown);
+                _fpCanvas.addEventListener('mousemove', _fpCanvasMove);
+            }
             _fpCanvas.addEventListener('wheel', _fpCanvasWheel, { passive: false });
             _fpCanvas.addEventListener('contextmenu', function(e) { e.preventDefault(); });
             if (!_fpGlobalCanvasEventsAttached) {
                 _fpGlobalCanvasEventsAttached = true;
-                window.addEventListener('mousemove', _fpCanvasMove);
-                window.addEventListener('mouseup', _fpCanvasUp);
+                if (window.PointerEvent) {
+                    window.addEventListener('pointermove', _fpCanvasPointerMove);
+                    window.addEventListener('pointerup', _fpCanvasPointerUp);
+                } else {
+                    window.addEventListener('mousemove', _fpCanvasMove);
+                    window.addEventListener('mouseup', _fpCanvasUp);
+                }
             }
             _fpCanvas.addEventListener('dblclick', function(e) {
                 if (_fpTool === 'polygon') { e.preventDefault(); _fpFinishPolygon(); }
@@ -1260,7 +1361,7 @@
             var badge = document.getElementById('fpZoomBadge');
             if (badge) badge.textContent = Math.round(_fpCanvasZoom * 100) + '%';
             var hint = document.getElementById('fpPanHint');
-            if (hint) hint.style.display = _fpCanvasZoom > 1.01 ? 'block' : 'none';
+            if (hint) hint.style.display = (_fpCanvasZoom > 1.01 || _fpTool === 'pan') ? 'block' : 'none';
             _fpUpdateCanvasCursor();
         }
 
@@ -1311,6 +1412,7 @@
         function _fpUpdateCanvasCursor() {
             if (!_fpCanvas) return;
             if (_fpPanActive) _fpCanvas.style.cursor = 'grabbing';
+            else if (_fpTool === 'pan') _fpCanvas.style.cursor = 'grab';
             else _fpCanvas.style.cursor = 'crosshair';
         }
 
@@ -1352,7 +1454,7 @@
                 '<div style="background:#1f5ea8;color:white;padding:14px 18px;font-weight:700;"><i class="fas fa-ruler-combined me-2"></i>Calibrate the scale first</div>' +
                 '<div style="padding:18px;">' +
                 '<p class="mb-3">Trace a dimension you know the length of as accurately as possible, then type it into the <strong>Known line length in feet</strong> field on the right.</p>' +
-                '<p class="text-muted small mb-3">Tip: zoom with your mouse wheel, then right-click and drag to move around while zoomed in.</p>' +
+                '<p class="text-muted small mb-3">Tip: zoom in first, then use Pan to move around. On desktop, you can also use the mouse wheel and right-click drag.</p>' +
                 '<div class="d-flex align-items-center justify-content-between gap-3">' +
                 '<button class="btn btn-primary" onclick="_fpCloseCalibrationPopup()"><i class="fas fa-check me-1"></i>Got it</button>' +
                 '<label class="form-check-label small text-muted ms-auto"><input class="form-check-input me-1" type="checkbox" id="fpCalibrationDontShow"> Do not show this message again</label>' +
@@ -1394,12 +1496,31 @@
             return { x: (e.clientX - rect.left) * sx, y: (e.clientY - rect.top) * sy };
         }
 
+        function _fpCanvasPointerDown(e) {
+            if (e.pointerType !== 'mouse') e.preventDefault();
+            if (_fpCanvas.setPointerCapture) _fpCanvas.setPointerCapture(e.pointerId);
+            _fpCanvasDown(e);
+        }
+
+        function _fpCanvasPointerMove(e) {
+            if (e.pointerType !== 'mouse') e.preventDefault();
+            _fpCanvasMove(e);
+        }
+
+        function _fpCanvasPointerUp(e) {
+            if (e && e.pointerType !== 'mouse') e.preventDefault();
+            if (e && _fpCanvas && _fpCanvas.releasePointerCapture) {
+                try { _fpCanvas.releasePointerCapture(e.pointerId); } catch(ignore) {}
+            }
+            _fpCanvasUp();
+        }
+
         function _fpCanvasDown(e) {
             if (!_fpCanvasReady) return;
-            if (e.button === 2) {
+            if (_fpTool === 'pan' || e.button === 2) {
                 e.preventDefault();
                 var wrap = _fpCanvasWrap();
-                if (!wrap || (_fpCanvasZoom || 1) <= 1.01) return;
+                if (!wrap || (e.button === 2 && (_fpCanvasZoom || 1) <= 1.01)) return;
                 _fpPanActive = true;
                 _fpPanStarted = false;
                 _fpPanStartX = e.clientX;
