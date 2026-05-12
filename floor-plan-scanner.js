@@ -50,7 +50,13 @@
         var _fpCreatorCtx = null;
         var _fpCreatorRoomName = 'Room 1';
         var _fpCreatorMode = 'wall';
-        var _fpCreatorStraightLock = false;
+        var _fpCreatorAngleLock = 'none';
+        var _fpCreatorTouchPointers = {};
+        var _fpCreatorTwoFingerScroll = false;
+        var _fpCreatorTwoFingerLastY = 0;
+        var _fpMeasureTouchPointers = {};
+        var _fpMeasureTwoFingerScroll = false;
+        var _fpMeasureTwoFingerLastY = 0;
         var _fpCreatorOpenings = [];
         var _fpCreatorOpeningDraft = null;
         var _fpCreatorSelectedOpening = -1;
@@ -96,14 +102,34 @@
             return Math.sqrt(dx * dx + dy * dy);
         }
 
+        function _fpModalBody() {
+            return document.getElementById('floorPlanModalBody');
+        }
+
+        function _fpPointerAverageY(pointerMap) {
+            var keys = Object.keys(pointerMap || {});
+            if (!keys.length) return 0;
+            var total = 0;
+            keys.forEach(function(id) { total += pointerMap[id].clientY || 0; });
+            return total / keys.length;
+        }
+
+        function _fpScrollModalBy(deltaY) {
+            var body = _fpModalBody();
+            if (!body) return;
+            body.scrollTop += deltaY;
+        }
+
         function _fpEnsureMobileStyles() {
             if (document.getElementById('fpScannerMobileStyles')) return;
             var style = document.createElement('style');
             style.id = 'fpScannerMobileStyles';
             style.textContent =
-                '#floorPlanModalBody{overscroll-behavior:contain;}' +
+                '#floorPlanModalBody{overscroll-behavior:contain;overflow-y:auto;}' +
                 '#floorPlanModal .fp-touch-btn{min-height:42px;}' +
                 '#floorPlanModal .fp-tool-strip{gap:6px;}' +
+                '#floorPlanModal .fp-tool-strip .dropdown{flex:0 0 auto;}' +
+                '#floorPlanModal .fp-tool-strip .dropdown-menu .active i{color:inherit!important;}' +
                 '#floorPlanModal .fp-canvas-shell{position:relative;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}' +
                 '#floorPlanModal .fp-mobile-hint{display:none;}' +
                 '@media (max-width:767.98px){' +
@@ -192,7 +218,7 @@
             _fpImageBase64 = null; _fpMimeType = 'image/jpeg'; _fpImageUrl = null; _fpResults = null; _fpRooms = [];
             _fpSuggestedRoomNames = []; _fpCeilingHeight = 9; _fpScale = null; _fpShapes = []; _fpDraft = null; _fpPolygonDraft = [];
             _fpCanvasReady = false; _fpCanvasZoom = 1; _fpCanvasScrollLeft = 0; _fpCanvasScrollTop = 0; _fpTool = 'calibrate'; _fpShapeCounter = 1; _fpActiveShapeIndex = -1; _fpPendingRoomName = ''; _fpPendingTrades = {}; _fpCalibrationIntroShown = false;
-            _fpCreatorPoints = []; _fpCreatorClosed = false; _fpCreatorDraft = null; _fpCreatorMouseDown = false; _fpCreatorSelectedWall = -1; _fpCreatorRoomName = 'Room 1'; _fpCreatorMode = 'wall'; _fpCreatorStraightLock = false; _fpCreatorOpenings = []; _fpCreatorOpeningDraft = null; _fpCreatorSelectedOpening = -1; _fpGeneratedPlan = false;
+            _fpCreatorPoints = []; _fpCreatorClosed = false; _fpCreatorDraft = null; _fpCreatorMouseDown = false; _fpCreatorSelectedWall = -1; _fpCreatorRoomName = 'Room 1'; _fpCreatorMode = 'wall'; _fpCreatorAngleLock = 'none'; _fpCreatorTouchPointers = {}; _fpCreatorTwoFingerScroll = false; _fpMeasureTouchPointers = {}; _fpMeasureTwoFingerScroll = false; _fpCreatorOpenings = []; _fpCreatorOpeningDraft = null; _fpCreatorSelectedOpening = -1; _fpGeneratedPlan = false;
             var modal = new bootstrap.Modal(document.getElementById('floorPlanModal'));
             modal.show();
             setTimeout(_fpMaybeShowIntroPopup, 250);
@@ -387,22 +413,20 @@
                 '<p class="text-muted small mb-0">Click or tap connected wall lines. The length updates as you draw, and you can type the exact wall measurement after selecting a wall.</p></div>' +
                 '<button class="btn btn-outline-secondary btn-sm fp-touch-btn" onclick="_fpRenderStep1()"><i class="fas fa-arrow-left me-1"></i>Back</button>' +
                 '</div>' +
-                '<div class="alert alert-light border small py-2 mb-3 fp-mobile-hint"><i class="fas fa-mobile-screen-button me-1 text-primary"></i>Phone tip: use 90&deg; lock for straight walls, drag the canvas area sideways to reach more workspace, and use Select to edit exact sizes.</div>' +
+                '<div class="alert alert-light border small py-2 mb-3 fp-mobile-hint"><i class="fas fa-mobile-screen-button me-1 text-primary"></i>Phone tip: use Lock for straight or diagonal walls, use two fingers on the drawing pad to scroll this page, and use Select to edit exact sizes.</div>' +
                 '<div class="row g-3 fp-creator-layout">' +
                 '<div class="col-lg-8">' +
                 '<div class="d-flex flex-wrap gap-1 mb-2 fp-tool-strip">' +
                 _fpCreatorModeButton('select', 'fa-mouse-pointer', 'Select') +
-                _fpCreatorModeButton('wall', 'fa-grip-lines', 'Walls') +
-                _fpCreatorModeButton('door', 'fa-door-open', 'Door') +
-                _fpCreatorModeButton('opening', 'fa-archway', 'Opening') +
-                _fpCreatorModeButton('window', 'fa-window-maximize', 'Window') +
-                '<button class="btn btn-' + (_fpCreatorStraightLock ? 'primary' : 'outline-primary') + ' btn-sm fp-touch-btn" onclick="_fpCreatorToggleStraightLock()" title="Lock walls horizontal or vertical"><i class="fas fa-ruler-combined me-1"></i>90&deg; lock</button>' +
+                '<button class="btn btn-outline-secondary btn-sm fp-touch-btn" onclick="_fpCreatorUndo()" title="Undo last wall"><i class="fas fa-undo me-1"></i>Undo</button>' +
+                _fpCreatorBuildMenu() +
+                _fpCreatorLockMenu() +
                 '</div>' +
                 '<div class="border rounded bg-light fp-canvas-shell fp-creator-canvas-shell" style="position:relative;overflow:auto;">' +
                 '<canvas id="fpCreatorCanvas" width="980" height="620" style="display:block;width:100%;height:min(62vh,620px);cursor:crosshair;touch-action:none;"></canvas>' +
                 '<div id="fpCreatorLiveLabel" class="badge bg-primary" style="position:absolute;left:12px;top:12px;display:none;"></div>' +
                 '</div>' +
-                '<div class="small text-muted mt-2"><i class="fas fa-info-circle me-1"></i>Hold <strong>SHIFT</strong> or turn on <strong>90&deg; lock</strong> to keep walls horizontal or vertical. Use Select to edit walls, doors, windows, and openings.</div>' +
+                '<div class="small text-muted mt-2"><i class="fas fa-info-circle me-1"></i>Hold <strong>SHIFT</strong> for a quick 90&deg; lock, or use the Lock menu for 90&deg; and 45&deg; walls. On touch screens, use two fingers on the drawing pad to scroll.</div>' +
                 '</div>' +
                 '<div class="col-lg-4 fp-creator-side">' +
                 '<div class="border rounded p-3 mb-3">' +
@@ -427,7 +451,7 @@
                 '</div>' +
                 '<div class="d-grid gap-2 fp-creator-actions">' +
                 '<button class="btn btn-outline-primary btn-sm fp-touch-btn" onclick="_fpCreatorCloseRoom()" ' + (_fpCreatorCanClose() && !_fpCreatorClosed ? '' : 'disabled') + '><i class="fas fa-vector-square me-1"></i>Close room</button>' +
-                '<button class="btn btn-outline-secondary btn-sm fp-touch-btn" onclick="_fpCreatorUndo()"><i class="fas fa-undo me-1"></i>Undo wall</button>' +
+                '<button class="btn btn-outline-secondary btn-sm fp-touch-btn" onclick="_fpCreatorUndo()"><i class="fas fa-undo me-1"></i>Undo</button>' +
                 '<button class="btn btn-outline-secondary btn-sm fp-touch-btn" onclick="_fpCreatorRemoveSelectedOpening()" ' + (selectedOpening ? '' : 'disabled') + '><i class="fas fa-eraser me-1"></i>Remove selected opening</button>' +
                 '<button class="btn btn-outline-danger btn-sm fp-touch-btn" onclick="_fpCreatorClear()"><i class="fas fa-trash me-1"></i>Clear</button>' +
                 '<button class="btn btn-primary fp-touch-btn" onclick="_fpGenerateCreatedPlan()" ' + (_fpCreatorClosed ? '' : 'disabled') + '><i class="fas fa-arrow-right me-1"></i>Use this floorplan</button>' +
@@ -442,6 +466,53 @@
             return '<button class="btn btn-' + (_fpCreatorMode === mode ? 'primary' : 'outline-primary') + ' btn-sm fp-touch-btn" onclick="_fpCreatorSetMode(\'' + mode + '\')"><i class="fas ' + icon + ' me-1"></i>' + label + '</button>';
         }
 
+        function _fpCreatorModeLabel(mode) {
+            if (mode === 'door') return 'Door';
+            if (mode === 'opening') return 'Opening';
+            if (mode === 'window') return 'Window';
+            return 'Walls';
+        }
+
+        function _fpCreatorBuildMenuItem(mode, icon, label) {
+            var active = _fpCreatorMode === mode ? ' active' : '';
+            return '<li><button type="button" class="dropdown-item' + active + '" onclick="_fpCreatorSetMode(\'' + mode + '\')"><i class="fas ' + icon + ' me-2"></i>' + label + '</button></li>';
+        }
+
+        function _fpCreatorBuildMenu() {
+            var buildActive = ['wall', 'door', 'opening', 'window'].indexOf(_fpCreatorMode) >= 0;
+            return '<div class="dropdown">' +
+                '<button class="btn btn-' + (buildActive ? 'primary' : 'outline-primary') + ' btn-sm fp-touch-btn dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport"><i class="fas fa-hammer me-1"></i>Build: ' + _fpCreatorModeLabel(_fpCreatorMode) + '</button>' +
+                '<ul class="dropdown-menu">' +
+                _fpCreatorBuildMenuItem('wall', 'fa-grip-lines', 'Walls') +
+                _fpCreatorBuildMenuItem('door', 'fa-door-open', 'Door') +
+                _fpCreatorBuildMenuItem('opening', 'fa-archway', 'Opening') +
+                _fpCreatorBuildMenuItem('window', 'fa-window-maximize', 'Window') +
+                '</ul>' +
+                '</div>';
+        }
+
+        function _fpCreatorLockLabel() {
+            if (_fpCreatorAngleLock === '90') return '90';
+            if (_fpCreatorAngleLock === '45') return '45';
+            return 'Off';
+        }
+
+        function _fpCreatorLockMenuItem(mode, icon, label) {
+            var active = _fpCreatorAngleLock === mode ? ' active' : '';
+            return '<li><button type="button" class="dropdown-item' + active + '" onclick="_fpCreatorSetAngleLock(\'' + mode + '\')"><i class="fas ' + icon + ' me-2"></i>' + label + '</button></li>';
+        }
+
+        function _fpCreatorLockMenu() {
+            return '<div class="dropdown">' +
+                '<button class="btn btn-' + (_fpCreatorAngleLock !== 'none' ? 'primary' : 'outline-primary') + ' btn-sm fp-touch-btn dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport"><i class="fas fa-ruler-combined me-1"></i>Lock: ' + _fpCreatorLockLabel() + '</button>' +
+                '<ul class="dropdown-menu">' +
+                _fpCreatorLockMenuItem('none', 'fa-unlock', 'No angle lock') +
+                _fpCreatorLockMenuItem('90', 'fa-square', '90 degree walls') +
+                _fpCreatorLockMenuItem('45', 'fa-diamond', '45 degree walls') +
+                '</ul>' +
+                '</div>';
+        }
+
         function _fpCreatorSetMode(mode) {
             _fpCreatorMode = mode;
             _fpCreatorDraft = null;
@@ -449,8 +520,8 @@
             _fpRenderCreator();
         }
 
-        function _fpCreatorToggleStraightLock() {
-            _fpCreatorStraightLock = !_fpCreatorStraightLock;
+        function _fpCreatorSetAngleLock(mode) {
+            _fpCreatorAngleLock = mode || 'none';
             _fpRenderCreator();
         }
 
@@ -478,18 +549,53 @@
         }
 
         function _fpCreatorPointerDown(e) {
-            if (e.pointerType !== 'mouse') e.preventDefault();
             if (_fpCreatorCanvas.setPointerCapture) _fpCreatorCanvas.setPointerCapture(e.pointerId);
+            if (e.pointerType !== 'mouse') {
+                _fpCreatorTouchPointers[e.pointerId] = { clientY: e.clientY };
+                if (Object.keys(_fpCreatorTouchPointers).length >= 2) {
+                    e.preventDefault();
+                    _fpCreatorTwoFingerScroll = true;
+                    _fpCreatorTwoFingerLastY = _fpPointerAverageY(_fpCreatorTouchPointers);
+                    _fpCreatorDraft = null;
+                    _fpCreatorOpeningDraft = null;
+                    _fpCreatorMouseDown = false;
+                    var label = document.getElementById('fpCreatorLiveLabel');
+                    if (label) label.style.display = 'none';
+                    _fpCreatorDraw();
+                    return;
+                }
+                e.preventDefault();
+            }
             _fpCreatorDown(e);
         }
 
         function _fpCreatorPointerMove(e) {
-            if (e.pointerType !== 'mouse') e.preventDefault();
+            if (e.pointerType !== 'mouse') {
+                if (_fpCreatorTouchPointers[e.pointerId]) _fpCreatorTouchPointers[e.pointerId] = { clientY: e.clientY };
+                if (_fpCreatorTwoFingerScroll && Object.keys(_fpCreatorTouchPointers).length >= 2) {
+                    e.preventDefault();
+                    var avgY = _fpPointerAverageY(_fpCreatorTouchPointers);
+                    _fpScrollModalBy(_fpCreatorTwoFingerLastY - avgY);
+                    _fpCreatorTwoFingerLastY = avgY;
+                    return;
+                }
+                e.preventDefault();
+            }
             _fpCreatorMove(e);
         }
 
         function _fpCreatorPointerUp(e) {
-            if (e && e.pointerType !== 'mouse') e.preventDefault();
+            if (e && e.pointerType !== 'mouse') {
+                e.preventDefault();
+                delete _fpCreatorTouchPointers[e.pointerId];
+                if (_fpCreatorTwoFingerScroll) {
+                    if (Object.keys(_fpCreatorTouchPointers).length < 2) _fpCreatorTwoFingerScroll = false;
+                    if (e && _fpCreatorCanvas.releasePointerCapture) {
+                        try { _fpCreatorCanvas.releasePointerCapture(e.pointerId); } catch(ignore) {}
+                    }
+                    return;
+                }
+            }
             if (e && _fpCreatorCanvas.releasePointerCapture) {
                 try { _fpCreatorCanvas.releasePointerCapture(e.pointerId); } catch(ignore) {}
             }
@@ -505,6 +611,24 @@
             var dx = pt.x - start.x;
             var dy = pt.y - start.y;
             return Math.abs(dx) >= Math.abs(dy) ? { x: pt.x, y: start.y } : { x: start.x, y: pt.y };
+        }
+
+        function _fpCreatorAngleLockedPoint(start, pt, mode) {
+            if (mode === '90') return _fpCreatorStraightPoint(start, pt);
+            if (mode !== '45') return pt;
+            var dx = pt.x - start.x;
+            var dy = pt.y - start.y;
+            var len = Math.sqrt(dx * dx + dy * dy);
+            if (!len) return pt;
+            var step = Math.PI / 4;
+            var angle = Math.atan2(dy, dx);
+            var snapped = Math.round(angle / step) * step;
+            return { x: start.x + Math.cos(snapped) * len, y: start.y + Math.sin(snapped) * len };
+        }
+
+        function _fpCreatorActiveLockMode(e) {
+            if (_fpCreatorAngleLock && _fpCreatorAngleLock !== 'none') return _fpCreatorAngleLock;
+            return e && e.shiftKey ? '90' : 'none';
         }
 
         function _fpCreatorDown(e) {
@@ -553,7 +677,7 @@
                 return;
             }
             if (!_fpCreatorPoints.length) _fpCreatorPoints.push(pt);
-            else if (_fpCreatorStraightLock) pt = _fpCreatorStraightPoint(_fpCreatorPoints[_fpCreatorPoints.length - 1], pt);
+            else pt = _fpCreatorAngleLockedPoint(_fpCreatorPoints[_fpCreatorPoints.length - 1], pt, _fpCreatorActiveLockMode(e));
             _fpCreatorDraft = { start: _fpCreatorPoints[_fpCreatorPoints.length - 1], end: pt };
             _fpCreatorMouseDown = true;
             _fpCreatorDraw();
@@ -575,8 +699,8 @@
             if (!_fpCreatorDraft) return;
             if (_fpCreatorPoints.length >= 3 && _fpDistance(pt, _fpCreatorPoints[0]) < 18) {
                 pt = _fpCreatorPoints[0];
-            } else if (e.shiftKey || _fpCreatorStraightLock) {
-                pt = _fpCreatorStraightPoint(_fpCreatorDraft.start, pt);
+            } else {
+                pt = _fpCreatorAngleLockedPoint(_fpCreatorDraft.start, pt, _fpCreatorActiveLockMode(e));
             }
             _fpCreatorDraft.end = pt;
             var label = document.getElementById('fpCreatorLiveLabel');
@@ -752,6 +876,19 @@
         }
 
         function _fpCreatorUndo() {
+            if (_fpCreatorOpeningDraft || _fpCreatorDraft) {
+                _fpCreatorOpeningDraft = null;
+                _fpCreatorDraft = null;
+                _fpCreatorMouseDown = false;
+                _fpRenderCreator();
+                return;
+            }
+            if (_fpCreatorClosed && _fpCreatorOpenings.length) {
+                _fpCreatorOpenings.pop();
+                _fpCreatorSelectedOpening = -1;
+                _fpRenderCreator();
+                return;
+            }
             if (_fpCreatorClosed) { _fpCreatorClosed = false; _fpCreatorSelectedWall = Math.max(0, _fpCreatorPoints.length - 2); }
             else if (_fpCreatorPoints.length) _fpCreatorPoints.pop();
             _fpCreatorDraft = null;
@@ -1497,18 +1634,52 @@
         }
 
         function _fpCanvasPointerDown(e) {
-            if (e.pointerType !== 'mouse') e.preventDefault();
             if (_fpCanvas.setPointerCapture) _fpCanvas.setPointerCapture(e.pointerId);
+            if (e.pointerType !== 'mouse') {
+                _fpMeasureTouchPointers[e.pointerId] = { clientY: e.clientY };
+                if (Object.keys(_fpMeasureTouchPointers).length >= 2) {
+                    e.preventDefault();
+                    _fpMeasureTwoFingerScroll = true;
+                    _fpMeasureTwoFingerLastY = _fpPointerAverageY(_fpMeasureTouchPointers);
+                    _fpPanActive = false;
+                    _fpMouseDown = false;
+                    _fpDraft = null;
+                    _fpUpdateCanvasCursor();
+                    _fpDrawCanvas();
+                    return;
+                }
+                e.preventDefault();
+            }
             _fpCanvasDown(e);
         }
 
         function _fpCanvasPointerMove(e) {
-            if (e.pointerType !== 'mouse') e.preventDefault();
+            if (e.pointerType !== 'mouse') {
+                if (_fpMeasureTouchPointers[e.pointerId]) _fpMeasureTouchPointers[e.pointerId] = { clientY: e.clientY };
+                if (_fpMeasureTwoFingerScroll && Object.keys(_fpMeasureTouchPointers).length >= 2) {
+                    e.preventDefault();
+                    var avgY = _fpPointerAverageY(_fpMeasureTouchPointers);
+                    _fpScrollModalBy(_fpMeasureTwoFingerLastY - avgY);
+                    _fpMeasureTwoFingerLastY = avgY;
+                    return;
+                }
+                e.preventDefault();
+            }
             _fpCanvasMove(e);
         }
 
         function _fpCanvasPointerUp(e) {
-            if (e && e.pointerType !== 'mouse') e.preventDefault();
+            if (e && e.pointerType !== 'mouse') {
+                e.preventDefault();
+                delete _fpMeasureTouchPointers[e.pointerId];
+                if (_fpMeasureTwoFingerScroll) {
+                    if (Object.keys(_fpMeasureTouchPointers).length < 2) _fpMeasureTwoFingerScroll = false;
+                    if (e && _fpCanvas && _fpCanvas.releasePointerCapture) {
+                        try { _fpCanvas.releasePointerCapture(e.pointerId); } catch(ignore) {}
+                    }
+                    return;
+                }
+            }
             if (e && _fpCanvas && _fpCanvas.releasePointerCapture) {
                 try { _fpCanvas.releasePointerCapture(e.pointerId); } catch(ignore) {}
             }
