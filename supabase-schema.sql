@@ -215,3 +215,63 @@ create policy "Users can view own community template ratings"
     on community_template_ratings for select
     to authenticated
     using (auth.uid() = user_id);
+
+-- LABOUR TRACKING ------------------------------------------------------------
+create table if not exists labor_job_sites (
+    id uuid default uuid_generate_v4() primary key,
+    user_id uuid references auth.users(id) on delete cascade not null,
+    quote_id uuid references quotes(id) on delete set null,
+    quote_number text default '' not null,
+    client_name text default '' not null,
+    name text not null,
+    address text default '' not null,
+    latitude numeric(10, 7),
+    longitude numeric(10, 7),
+    geofence_radius_m integer default 75 not null check (geofence_radius_m between 25 and 1000),
+    active boolean default true not null,
+    notes text default '' not null,
+    created_at timestamptz default now() not null,
+    updated_at timestamptz default now() not null
+);
+
+create table if not exists labor_time_sessions (
+    id uuid default uuid_generate_v4() primary key,
+    user_id uuid references auth.users(id) on delete cascade not null,
+    job_site_id uuid references labor_job_sites(id) on delete cascade not null,
+    quote_id uuid references quotes(id) on delete set null,
+    source text default 'manual' not null check (source in ('manual', 'gps', 'import', 'adjusted')),
+    status text default 'pending_review' not null check (status in ('pending_review', 'approved', 'rejected')),
+    started_at timestamptz not null,
+    ended_at timestamptz,
+    duration_minutes integer default 0 not null check (duration_minutes >= 0),
+    break_minutes integer default 0 not null check (break_minutes >= 0),
+    worker_name text default '' not null,
+    notes text default '' not null,
+    raw_location jsonb default '{}'::jsonb not null,
+    review_notes text default '' not null,
+    approved_at timestamptz,
+    created_at timestamptz default now() not null,
+    updated_at timestamptz default now() not null,
+    constraint labor_time_sessions_time_check check (ended_at is null or ended_at >= started_at)
+);
+
+alter table labor_job_sites enable row level security;
+alter table labor_time_sessions enable row level security;
+
+create policy "Users can manage own labor job sites"
+    on labor_job_sites for all
+    to authenticated
+    using (auth.uid() = user_id)
+    with check (auth.uid() = user_id);
+
+create policy "Users can manage own labor time sessions"
+    on labor_time_sessions for all
+    to authenticated
+    using (auth.uid() = user_id)
+    with check (auth.uid() = user_id);
+
+create index if not exists labor_job_sites_user_active_idx on labor_job_sites(user_id, active, updated_at desc);
+create index if not exists labor_job_sites_quote_idx on labor_job_sites(quote_id) where quote_id is not null;
+create index if not exists labor_time_sessions_user_started_idx on labor_time_sessions(user_id, started_at desc);
+create index if not exists labor_time_sessions_job_started_idx on labor_time_sessions(job_site_id, started_at desc);
+create index if not exists labor_time_sessions_review_idx on labor_time_sessions(user_id, status, started_at desc);

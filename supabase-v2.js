@@ -527,6 +527,159 @@ async function listClientsFromSupabase() {
     return { data, error };
 }
 
+function qdLaborNumber(value, fallback) {
+    var parsed = parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function qdLaborDurationMinutes(startedAt, endedAt, breakMinutes) {
+    var start = new Date(startedAt);
+    var end = new Date(endedAt);
+    if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) return 0;
+    var raw = Math.round((end.getTime() - start.getTime()) / 60000);
+    return Math.max(0, raw - Math.max(0, parseInt(breakMinutes || 0, 10) || 0));
+}
+
+function qdNormalizeLaborJobSite(site, userId) {
+    var now = new Date().toISOString();
+    return {
+        user_id: userId,
+        quote_id: site.quote_id || site.quoteId || null,
+        quote_number: site.quote_number || site.quoteNumber || '',
+        client_name: site.client_name || site.clientName || '',
+        name: site.name || site.client_name || site.clientName || 'Job Site',
+        address: site.address || '',
+        latitude: site.latitude == null || site.latitude === '' ? null : qdLaborNumber(site.latitude, null),
+        longitude: site.longitude == null || site.longitude === '' ? null : qdLaborNumber(site.longitude, null),
+        geofence_radius_m: Math.max(25, Math.min(1000, parseInt(site.geofence_radius_m || site.radius || 75, 10) || 75)),
+        active: site.active !== false,
+        notes: site.notes || '',
+        updated_at: now
+    };
+}
+
+function qdNormalizeLaborSession(session, userId) {
+    var now = new Date().toISOString();
+    var startedAt = session.started_at || session.startedAt;
+    var endedAt = session.ended_at || session.endedAt || null;
+    var breakMinutes = Math.max(0, parseInt(session.break_minutes || session.breakMinutes || 0, 10) || 0);
+    return {
+        user_id: userId,
+        job_site_id: session.job_site_id || session.jobSiteId,
+        quote_id: session.quote_id || session.quoteId || null,
+        source: session.source || 'manual',
+        status: session.status || 'pending_review',
+        started_at: startedAt,
+        ended_at: endedAt,
+        duration_minutes: parseInt(session.duration_minutes || session.durationMinutes || qdLaborDurationMinutes(startedAt, endedAt, breakMinutes), 10) || 0,
+        break_minutes: breakMinutes,
+        worker_name: session.worker_name || session.workerName || '',
+        notes: session.notes || '',
+        raw_location: session.raw_location || session.rawLocation || {},
+        review_notes: session.review_notes || session.reviewNotes || '',
+        approved_at: session.approved_at || session.approvedAt || null,
+        updated_at: now
+    };
+}
+
+// Labour tracker: list job sites for current user
+async function listLaborJobSites(options) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    options = options || {};
+    var query = _supabase
+        .from('labor_job_sites')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false });
+    if (options.activeOnly !== false) query = query.eq('active', true);
+    const { data, error } = await query;
+    if (error) console.error('Labor job sites list error:', error);
+    return { data, error };
+}
+
+// Labour tracker: create or update a job site
+async function saveLaborJobSite(site) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    var payload = qdNormalizeLaborJobSite(site || {}, user.id);
+    if (site && site.id) payload.id = site.id;
+    if (!payload.name || !payload.name.trim()) return { error: 'Job site name is required' };
+    const { data, error } = await _supabase
+        .from('labor_job_sites')
+        .upsert(payload)
+        .select();
+    if (error) console.error('Labor job site save error:', error);
+    return { data, error };
+}
+
+async function archiveLaborJobSite(siteId) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    const { data, error } = await _supabase
+        .from('labor_job_sites')
+        .update({ active: false, updated_at: new Date().toISOString() })
+        .eq('id', siteId)
+        .eq('user_id', user.id)
+        .select();
+    if (error) console.error('Labor job site archive error:', error);
+    return { data, error };
+}
+
+// Labour tracker: list sessions for review/reporting
+async function listLaborSessions(options) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    options = options || {};
+    var query = _supabase
+        .from('labor_time_sessions')
+        .select('*, labor_job_sites(name,address,client_name,quote_number)')
+        .eq('user_id', user.id)
+        .order('started_at', { ascending: false });
+    if (options.status) query = query.eq('status', options.status);
+    if (options.jobSiteId) query = query.eq('job_site_id', options.jobSiteId);
+    if (options.since) query = query.gte('started_at', options.since);
+    if (options.until) query = query.lte('started_at', options.until);
+    if (options.limit) query = query.limit(options.limit);
+    const { data, error } = await query;
+    if (error) console.error('Labor sessions list error:', error);
+    return { data, error };
+}
+
+async function saveLaborSession(session) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    var payload = qdNormalizeLaborSession(session || {}, user.id);
+    if (session && session.id) payload.id = session.id;
+    if (!payload.job_site_id) return { error: 'Job site is required' };
+    if (!payload.started_at || !payload.ended_at) return { error: 'Start and end times are required' };
+    const { data, error } = await _supabase
+        .from('labor_time_sessions')
+        .upsert(payload)
+        .select();
+    if (error) console.error('Labor session save error:', error);
+    return { data, error };
+}
+
+async function updateLaborSessionStatus(sessionId, status, reviewNotes) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    var payload = {
+        status: status,
+        review_notes: reviewNotes || '',
+        approved_at: status === 'approved' ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString()
+    };
+    const { data, error } = await _supabase
+        .from('labor_time_sessions')
+        .update(payload)
+        .eq('id', sessionId)
+        .eq('user_id', user.id)
+        .select();
+    if (error) console.error('Labor session status update error:', error);
+    return { data, error };
+}
+
 // Aliases for consistent naming
 var listQuotesFromSupabase = listQuotes;
 var listInvoicesFromSupabase = listInvoices;
@@ -1032,6 +1185,7 @@ const QUOTEDR_PLAN_FEATURES = {
         'ai_refine',
         'ikea_quoter',
         'job_tracker',
+        'labor_tracker',
         'floor_plan_scanner',
         'quote_upsells',
         'profit_tracking',
@@ -1044,6 +1198,7 @@ const QUOTEDR_PLAN_FEATURES = {
 const QUOTEDR_PRO_FEATURE_LABELS = {
     ikea_quoter: 'IKEA Cabinet Quoter',
     job_tracker: 'Job Tracker',
+    labor_tracker: 'Labour Tracker',
     ai_refine: 'AI Refine',
     quickbooks: 'QuickBooks sync',
     bank_card_sync: 'Bank/card sync'

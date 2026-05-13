@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuoteDr.io - Labour Tracker</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="brand-theme.css?v=1777661601">
+    <style>
+        body {
+            background: #eef4fb;
+            color: #102033;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+        }
+        .tracker-shell { max-width: 1240px; }
+        .page-title { color: #123b66; font-weight: 800; letter-spacing: 0; }
+        .small-muted { color: #6b7b8c; font-size: 0.9rem; }
+        .metric-card, .tool-panel {
+            border: 1px solid #d7e2ef;
+            border-radius: 8px;
+            background: #fff;
+            box-shadow: 0 8px 24px rgba(16, 32, 51, 0.05);
+        }
+        .metric-label {
+            color: #66778a;
+            font-size: 0.78rem;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+        .metric-value {
+            color: #0f3460;
+            font-size: 1.55rem;
+            font-weight: 800;
+        }
+        .section-title {
+            color: #123b66;
+            font-size: 1.05rem;
+            font-weight: 800;
+        }
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            border-radius: 999px;
+            padding: 0.18rem 0.55rem;
+            font-size: 0.78rem;
+            font-weight: 800;
+            border: 1px solid transparent;
+        }
+        .status-pending { background: #fff4d6; color: #7a4b00; border-color: #ffe0a1; }
+        .status-approved { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
+        .status-rejected { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
+        .source-pill {
+            background: #edf4ff;
+            color: #174b82;
+            border: 1px solid #cfe0f5;
+        }
+        .table-sm td, .table-sm th { padding: 0.55rem; vertical-align: middle; }
+        .empty-state {
+            border: 1px dashed #b9c9da;
+            border-radius: 8px;
+            background: #f8fbff;
+            color: #5c6f84;
+        }
+        .job-site-row.archived { opacity: 0.55; }
+        .daily-panel {
+            border-left: 4px solid #f59e0b;
+        }
+        .coming-next {
+            background: #f7fbff;
+            border: 1px solid #cfe0f5;
+            border-radius: 8px;
+        }
+        @media (max-width: 768px) {
+            .metric-value { font-size: 1.2rem; }
+            .table-responsive { font-size: 0.88rem; }
+            .navbar-brand { font-size: 1rem; }
+        }
+    </style>
+    <script src="analytics.js?v=1778059000"></script>
+</head>
+<body>
+    <nav class="navbar navbar-light px-3 py-2" style="background:#f8fbff; border-bottom:1px solid #d7e2ef;">
+        <a href="dashboard.html" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>Dashboard</a>
+        <span class="navbar-brand mx-auto fw-bold" style="color:#0f3460;">QuoteDr Labour Tracker</span>
+        <a href="quote-builder.html" class="btn btn-primary btn-sm"><i class="fas fa-file-invoice me-1"></i>Builder</a>
+    </nav>
+
+    <main class="container-fluid tracker-shell py-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+            <div>
+                <h1 class="page-title mb-1">Labour Tracker</h1>
+                <div class="small-muted">Review draft hours daily, approve what really happened, and keep each job tied back to the quote.</div>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                <button class="btn btn-outline-primary" onclick="importSitesFromQuotes()"><i class="fas fa-file-import me-1"></i>Import From Quotes</button>
+                <button class="btn btn-primary" onclick="focusManualEntry()"><i class="fas fa-clock me-1"></i>Add Time</button>
+            </div>
+        </div>
+
+        <div id="dbAlert" class="alert alert-warning d-none" role="alert"></div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-md-3 col-6"><div class="metric-card p-3"><div class="metric-label">Pending Review</div><div class="metric-value" id="metricPending">0</div></div></div>
+            <div class="col-md-3 col-6"><div class="metric-card p-3"><div class="metric-label">Approved This Week</div><div class="metric-value" id="metricWeek">0h</div></div></div>
+            <div class="col-md-3 col-6"><div class="metric-card p-3"><div class="metric-label">Approved Today</div><div class="metric-value" id="metricToday">0h</div></div></div>
+            <div class="col-md-3 col-6"><div class="metric-card p-3"><div class="metric-label">Active Job Sites</div><div class="metric-value" id="metricSites">0</div></div></div>
+        </div>
+
+        <section class="tool-panel daily-panel p-3 mb-4">
+            <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
+                <div>
+                    <div class="section-title"><i class="fas fa-clipboard-check me-2 text-warning"></i>Daily Review</div>
+                    <div class="small-muted">Only approved sessions count toward real labour totals.</div>
+                </div>
+                <button class="btn btn-outline-secondary btn-sm" onclick="loadLaborData()"><i class="fas fa-sync-alt me-1"></i>Refresh</button>
+            </div>
+            <div id="pendingSessions"></div>
+        </section>
+
+        <div class="row g-4 mb-4">
+            <div class="col-lg-5">
+                <section class="tool-panel p-3 h-100">
+                    <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+                        <div>
+                            <div class="section-title"><i class="fas fa-location-dot me-2 text-primary"></i>Job Sites</div>
+                            <div class="small-muted">Import from saved quotes or add a site manually.</div>
+                        </div>
+                    </div>
+                    <form id="siteForm" class="row g-2 mb-3" onsubmit="saveSiteForm(event)">
+                        <input type="hidden" id="siteId">
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Site Name</label>
+                            <input id="siteName" class="form-control" placeholder="e.g. Adam Basement" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Address</label>
+                            <input id="siteAddress" class="form-control" placeholder="123 Main St, Toronto">
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label fw-semibold">Quote</label>
+                            <select id="siteQuote" class="form-select"></select>
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label fw-semibold">Radius</label>
+                            <div class="input-group">
+                                <input id="siteRadius" type="number" class="form-control" value="75" min="25" max="1000">
+                                <span class="input-group-text">m</span>
+                            </div>
+                        </div>
+                        <div class="col-12 d-flex gap-2">
+                            <button class="btn btn-primary" type="submit"><i class="fas fa-save me-1"></i>Save Site</button>
+                            <button class="btn btn-outline-secondary" type="button" onclick="resetSiteForm()">Clear</button>
+                        </div>
+                    </form>
+                    <div id="jobSitesList"></div>
+                </section>
+            </div>
+
+            <div class="col-lg-7">
+                <section class="tool-panel p-3 h-100" id="manualEntryPanel">
+                    <div class="section-title mb-1"><i class="fas fa-stopwatch me-2 text-success"></i>Manual Time Entry</div>
+                    <div class="small-muted mb-3">Manual entries start as pending so they get the same daily verification as GPS drafts.</div>
+                    <form id="sessionForm" class="row g-3" onsubmit="saveSessionForm(event)">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Job Site</label>
+                            <select id="sessionSite" class="form-select" required></select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Source</label>
+                            <select id="sessionSource" class="form-select">
+                                <option value="manual">Manual</option>
+                                <option value="gps">GPS Draft</option>
+                                <option value="import">Import</option>
+                                <option value="adjusted">Adjusted</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Start</label>
+                            <input id="sessionStart" type="datetime-local" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">End</label>
+                            <input id="sessionEnd" type="datetime-local" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Break</label>
+                            <div class="input-group">
+                                <input id="sessionBreak" type="number" class="form-control" value="0" min="0">
+                                <span class="input-group-text">min</span>
+                            </div>
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label fw-semibold">Worker</label>
+                            <input id="sessionWorker" class="form-control" placeholder="Optional">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Notes</label>
+                            <input id="sessionNotes" class="form-control" placeholder="e.g. Google timeline showed 8:05-4:12, left for lunch">
+                        </div>
+                        <div class="col-12 d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                            <div class="fw-bold">Preview: <span id="durationPreview">0h</span></div>
+                            <button class="btn btn-success" type="submit"><i class="fas fa-plus me-1"></i>Save For Review</button>
+                        </div>
+                    </form>
+                    <div class="coming-next p-3 mt-4">
+                        <div class="fw-bold mb-1"><i class="fas fa-mobile-screen me-2 text-primary"></i>Native GPS companion ready point</div>
+                        <div class="small-muted">The schema accepts GPS draft sessions now. The mobile app can later send background arrival and departure drafts into this same review queue.</div>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <section class="tool-panel p-3">
+            <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
+                <div>
+                    <div class="section-title"><i class="fas fa-table me-2 text-primary"></i>Recent Labour Sessions</div>
+                    <div class="small-muted">Approved, rejected, and draft labour entries from the last 90 days.</div>
+                </div>
+                <select id="historyFilter" class="form-select form-select-sm" style="max-width:180px;" onchange="renderHistory()">
+                    <option value="all">All sessions</option>
+                    <option value="approved">Approved only</option>
+                    <option value="pending_review">Pending only</option>
+                    <option value="rejected">Rejected only</option>
+                </select>
+            </div>
+            <div id="sessionHistory"></div>
+        </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-v2.js?v=1778194801"></script>
+    <script>
+        let laborSites = [];
+        let laborSessions = [];
+        let quoteRows = [];
+
+        function escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function asDate(value) {
+            const date = new Date(value);
+            return isNaN(date.getTime()) ? null : date;
+        }
+
+        function toLocalInputValue(date) {
+            const d = date instanceof Date ? date : new Date(date);
+            if (isNaN(d.getTime())) return '';
+            const offset = d.getTimezoneOffset();
+            return new Date(d.getTime() - offset * 60000).toISOString().slice(0, 16);
+        }
+
+        function fromLocalInputValue(value) {
+            const date = new Date(value);
+            return isNaN(date.getTime()) ? '' : date.toISOString();
+        }
+
+        function minutesBetween(startedAt, endedAt, breakMinutes) {
+            const start = asDate(startedAt);
+            const end = asDate(endedAt);
+            if (!start || !end || end < start) return 0;
+            const raw = Math.round((end.getTime() - start.getTime()) / 60000);
+            return Math.max(0, raw - (parseInt(breakMinutes || 0, 10) || 0));
+        }
+
+        function formatHours(minutes) {
+            minutes = Math.max(0, parseInt(minutes || 0, 10) || 0);
+            const hours = Math.floor(minutes / 60);
+            const rem = minutes % 60;
+            if (!hours) return rem + 'm';
+            return hours + 'h' + (rem ? ' ' + rem + 'm' : '');
+        }
+
+        function formatDateTime(value) {
+            const date = asDate(value);
+            if (!date) return '';
+            return date.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+        }
+
+        function startOfToday() {
+            const d = new Date();
+            d.setHours(0, 0, 0, 0);
+            return d;
+        }
+
+        function startOfWeek() {
+            const d = startOfToday();
+            const day = d.getDay() || 7;
+            d.setDate(d.getDate() - day + 1);
+            return d;
+        }
+
+        function sessionMinutes(session) {
+            return parseInt(session.duration_minutes || 0, 10) || minutesBetween(session.started_at, session.ended_at, session.break_minutes);
+        }
+
+        function statusPill(status) {
+            if (status === 'approved') return '<span class="status-pill status-approved"><i class="fas fa-check"></i>Approved</span>';
+            if (status === 'rejected') return '<span class="status-pill status-rejected"><i class="fas fa-xmark"></i>Rejected</span>';
+            return '<span class="status-pill status-pending"><i class="fas fa-clock"></i>Pending</span>';
+        }
+
+        function sourcePill(source) {
+            return '<span class="status-pill source-pill">' + escapeHtml(source || 'manual') + '</span>';
+        }
+
+        function quoteData(row) {
+            if (!row) return {};
+            if (row.data && typeof row.data === 'object') return row.data;
+            try { return JSON.parse(row.data || '{}'); } catch(e) { return {}; }
+        }
+
+        function quoteLabel(row) {
+            if (!row) return 'No linked quote';
+            const data = quoteData(row);
+            const number = row.quote_number || data.quoteNumber || '';
+            const client = row.client_name || data.clientName || '';
+            return [number, client].filter(Boolean).join(' - ') || row.id;
+        }
+
+        function getSiteName(session) {
+            const linked = session.labor_job_sites || laborSites.find(site => site.id === session.job_site_id) || {};
+            return linked.name || linked.client_name || 'Job Site';
+        }
+
+        function showDbAlert(message) {
+            const el = document.getElementById('dbAlert');
+            el.textContent = message;
+            el.classList.remove('d-none');
+        }
+
+        function clearDbAlert() {
+            const el = document.getElementById('dbAlert');
+            el.classList.add('d-none');
+            el.textContent = '';
+        }
+
+        function handleLoadError(error) {
+            if (!error) return false;
+            const msg = error.message || String(error);
+            if (/labor_job_sites|labor_time_sessions|schema cache|does not exist/i.test(msg)) {
+                showDbAlert('Labour tracking database is not ready yet. Run the 20260512190000_labor_tracking.sql migration, then refresh this page.');
+                return true;
+            }
+            showDbAlert(msg);
+            return true;
+        }
+
+        async function loadLaborData() {
+            clearDbAlert();
+            const sitesResult = await listLaborJobSites({ activeOnly: true });
+            if (handleLoadError(sitesResult.error)) return;
+            laborSites = sitesResult.data || [];
+
+            const since = new Date();
+            since.setDate(since.getDate() - 90);
+            const sessionsResult = await listLaborSessions({ since: since.toISOString(), limit: 300 });
+            if (handleLoadError(sessionsResult.error)) return;
+            laborSessions = sessionsResult.data || [];
+
+            const quotesResult = await listQuotesFromSupabase();
+            if (!quotesResult.error) quoteRows = quotesResult.data || [];
+
+            renderAll();
+        }
+
+        function renderAll() {
+            renderQuoteSelects();
+            renderSiteSelect();
+            renderMetrics();
+            renderSites();
+            renderPendingSessions();
+            renderHistory();
+            updateDurationPreview();
+        }
+
+        function renderQuoteSelects() {
+            const select = document.getElementById('siteQuote');
+            const current = select.value;
+            select.innerHTML = '<option value="">No linked quote</option>' + quoteRows.map(row => (
+                '<option value="' + escapeHtml(row.id) + '">' + escapeHtml(quoteLabel(row)) + '</option>'
+            )).join('');
+            select.value = current;
+        }
+
+        function renderSiteSelect() {
+            const select = document.getElementById('sessionSite');
+            const current = select.value;
+            if (!laborSites.length) {
+                select.innerHTML = '<option value="">Create a job site first</option>';
+                return;
+            }
+            select.innerHTML = laborSites.map(site => (
+                '<option value="' + escapeHtml(site.id) + '">' + escapeHtml(site.name) + '</option>'
+            )).join('');
+            if (laborSites.some(site => site.id === current)) select.value = current;
+        }
+
+        function renderMetrics() {
+            const pending = laborSessions.filter(s => s.status === 'pending_review').length;
+            const weekStart = startOfWeek();
+            const todayStart = startOfToday();
+            const approved = laborSessions.filter(s => s.status === 'approved');
+            const weekMinutes = approved.reduce((sum, session) => {
+                const start = asDate(session.started_at);
+                return start && start >= weekStart ? sum + sessionMinutes(session) : sum;
+            }, 0);
+            const todayMinutes = approved.reduce((sum, session) => {
+                const start = asDate(session.started_at);
+                return start && start >= todayStart ? sum + sessionMinutes(session) : sum;
+            }, 0);
+            document.getElementById('metricPending').textContent = pending;
+            document.getElementById('metricWeek').textContent = formatHours(weekMinutes);
+            document.getElementById('metricToday').textContent = formatHours(todayMinutes);
+            document.getElementById('metricSites').textContent = laborSites.length;
+        }
+
+        function renderSites() {
+            const el = document.getElementById('jobSitesList');
+            if (!laborSites.length) {
+                el.innerHTML = '<div class="empty-state p-3 text-center">No job sites yet.</div>';
+                return;
+            }
+            el.innerHTML = '<div class="table-responsive"><table class="table table-sm align-middle mb-0">' +
+                '<thead><tr><th>Site</th><th>Quote</th><th class="text-end">Actions</th></tr></thead><tbody>' +
+                laborSites.map(site => {
+                    const sessions = laborSessions.filter(s => s.job_site_id === site.id && s.status === 'approved');
+                    const minutes = sessions.reduce((sum, s) => sum + sessionMinutes(s), 0);
+                    return '<tr class="job-site-row">' +
+                        '<td><div class="fw-bold">' + escapeHtml(site.name) + '</div><div class="small-muted">' + escapeHtml(site.address || 'No address') + '</div><div class="small-muted">' + formatHours(minutes) + ' approved</div></td>' +
+                        '<td><div>' + escapeHtml(site.quote_number || '') + '</div><div class="small-muted">' + escapeHtml(site.client_name || '') + '</div></td>' +
+                        '<td class="text-end"><div class="btn-group btn-group-sm">' +
+                            '<button class="btn btn-outline-primary" onclick="editSite(\'' + escapeHtml(site.id) + '\')" title="Edit"><i class="fas fa-pen"></i></button>' +
+                            '<button class="btn btn-outline-danger" onclick="archiveSite(\'' + escapeHtml(site.id) + '\')" title="Archive"><i class="fas fa-box-archive"></i></button>' +
+                        '</div></td>' +
+                    '</tr>';
+                }).join('') +
+                '</tbody></table></div>';
+        }
+
+        function renderPendingSessions() {
+            const el = document.getElementById('pendingSessions');
+            const pending = laborSessions.filter(s => s.status === 'pending_review');
+            if (!pending.length) {
+                el.innerHTML = '<div class="empty-state p-3 text-center"><i class="fas fa-check-circle me-1 text-success"></i>No sessions waiting for review.</div>';
+                return;
+            }
+            el.innerHTML = '<div class="table-responsive"><table class="table table-sm mb-0">' +
+                '<thead><tr><th>Job</th><th>Time</th><th>Duration</th><th>Source</th><th class="text-end">Review</th></tr></thead><tbody>' +
+                pending.map(session => (
+                    '<tr>' +
+                        '<td><div class="fw-bold">' + escapeHtml(getSiteName(session)) + '</div><div class="small-muted">' + escapeHtml(session.notes || '') + '</div></td>' +
+                        '<td>' + escapeHtml(formatDateTime(session.started_at)) + '<div class="small-muted">to ' + escapeHtml(formatDateTime(session.ended_at)) + '</div></td>' +
+                        '<td class="fw-bold">' + formatHours(sessionMinutes(session)) + '</td>' +
+                        '<td>' + sourcePill(session.source) + '</td>' +
+                        '<td class="text-end"><div class="btn-group btn-group-sm">' +
+                            '<button class="btn btn-success" onclick="reviewSession(\'' + escapeHtml(session.id) + '\', \'approved\')"><i class="fas fa-check me-1"></i>Approve</button>' +
+                            '<button class="btn btn-outline-danger" onclick="reviewSession(\'' + escapeHtml(session.id) + '\', \'rejected\')"><i class="fas fa-xmark me-1"></i>Reject</button>' +
+                        '</div></td>' +
+                    '</tr>'
+                )).join('') +
+                '</tbody></table></div>';
+        }
+
+        function renderHistory() {
+            const filter = document.getElementById('historyFilter').value;
+            const rows = laborSessions.filter(s => filter === 'all' || s.status === filter);
+            const el = document.getElementById('sessionHistory');
+            if (!rows.length) {
+                el.innerHTML = '<div class="empty-state p-3 text-center">No labour sessions match this view.</div>';
+                return;
+            }
+            el.innerHTML = '<div class="table-responsive"><table class="table table-sm mb-0">' +
+                '<thead><tr><th>Status</th><th>Job</th><th>Time</th><th>Worker</th><th>Duration</th><th>Source</th></tr></thead><tbody>' +
+                rows.map(session => (
+                    '<tr>' +
+                        '<td>' + statusPill(session.status) + '</td>' +
+                        '<td><div class="fw-bold">' + escapeHtml(getSiteName(session)) + '</div><div class="small-muted">' + escapeHtml(session.review_notes || session.notes || '') + '</div></td>' +
+                        '<td>' + escapeHtml(formatDateTime(session.started_at)) + '<div class="small-muted">to ' + escapeHtml(formatDateTime(session.ended_at)) + '</div></td>' +
+                        '<td>' + escapeHtml(session.worker_name || '') + '</td>' +
+                        '<td class="fw-bold">' + formatHours(sessionMinutes(session)) + '</td>' +
+                        '<td>' + sourcePill(session.source) + '</td>' +
+                    '</tr>'
+                )).join('') +
+                '</tbody></table></div>';
+        }
+
+        function resetSiteForm() {
+            document.getElementById('siteId').value = '';
+            document.getElementById('siteName').value = '';
+            document.getElementById('siteAddress').value = '';
+            document.getElementById('siteQuote').value = '';
+            document.getElementById('siteRadius').value = '75';
+        }
+
+        function editSite(siteId) {
+            const site = laborSites.find(s => s.id === siteId);
+            if (!site) return;
+            document.getElementById('siteId').value = site.id;
+            document.getElementById('siteName').value = site.name || '';
+            document.getElementById('siteAddress').value = site.address || '';
+            document.getElementById('siteQuote').value = site.quote_id || '';
+            document.getElementById('siteRadius').value = site.geofence_radius_m || 75;
+            document.getElementById('siteName').focus();
+        }
+
+        async function saveSiteForm(event) {
+            event.preventDefault();
+            const quoteId = document.getElementById('siteQuote').value;
+            const quote = quoteRows.find(row => row.id === quoteId);
+            const result = await saveLaborJobSite({
+                id: document.getElementById('siteId').value || undefined,
+                name: document.getElementById('siteName').value.trim(),
+                address: document.getElementById('siteAddress').value.trim(),
+                quote_id: quoteId || null,
+                quote_number: quote ? (quote.quote_number || quoteData(quote).quoteNumber || '') : '',
+                client_name: quote ? (quote.client_name || quoteData(quote).clientName || '') : '',
+                geofence_radius_m: document.getElementById('siteRadius').value
+            });
+            if (result.error) return alert(result.error.message || result.error);
+            resetSiteForm();
+            await loadLaborData();
+        }
+
+        async function archiveSite(siteId) {
+            if (!confirm('Archive this job site? Existing labour sessions stay in history.')) return;
+            const result = await archiveLaborJobSite(siteId);
+            if (result.error) return alert(result.error.message || result.error);
+            await loadLaborData();
+        }
+
+        function quoteToSite(row) {
+            const data = quoteData(row);
+            const address = data.projectAddress || row.client_address || data.clientAddress || '';
+            const client = row.client_name || data.clientName || '';
+            const number = row.quote_number || data.quoteNumber || '';
+            const title = data.quoteTitle || '';
+            return {
+                quote_id: row.id,
+                quote_number: number,
+                client_name: client,
+                name: title || client || number || 'Imported Job Site',
+                address: address
+            };
+        }
+
+        async function importSitesFromQuotes() {
+            const importable = quoteRows.map(quoteToSite).filter(site => site.address || site.name);
+            if (!importable.length) return alert('No saved quotes with usable job site details were found.');
+            const existingKeys = new Set(laborSites.map(site => String(site.quote_id || site.address || site.name).toLowerCase()));
+            let created = 0;
+            for (const site of importable) {
+                const key = String(site.quote_id || site.address || site.name).toLowerCase();
+                if (existingKeys.has(key)) continue;
+                const result = await saveLaborJobSite(site);
+                if (!result.error) {
+                    existingKeys.add(key);
+                    created++;
+                }
+            }
+            await loadLaborData();
+            alert(created ? ('Imported ' + created + ' job site' + (created === 1 ? '.' : 's.')) : 'All quote job sites were already imported.');
+        }
+
+        function updateDurationPreview() {
+            const start = fromLocalInputValue(document.getElementById('sessionStart').value);
+            const end = fromLocalInputValue(document.getElementById('sessionEnd').value);
+            const breakMinutes = document.getElementById('sessionBreak').value;
+            document.getElementById('durationPreview').textContent = formatHours(minutesBetween(start, end, breakMinutes));
+        }
+
+        async function saveSessionForm(event) {
+            event.preventDefault();
+            const siteId = document.getElementById('sessionSite').value;
+            const site = laborSites.find(s => s.id === siteId);
+            if (!site) return alert('Create a job site before adding labour time.');
+            const startedAt = fromLocalInputValue(document.getElementById('sessionStart').value);
+            const endedAt = fromLocalInputValue(document.getElementById('sessionEnd').value);
+            const breakMinutes = parseInt(document.getElementById('sessionBreak').value || 0, 10) || 0;
+            const duration = minutesBetween(startedAt, endedAt, breakMinutes);
+            if (!duration) return alert('Check the start and end time. Duration must be greater than zero.');
+            const result = await saveLaborSession({
+                job_site_id: siteId,
+                quote_id: site.quote_id || null,
+                source: document.getElementById('sessionSource').value,
+                status: 'pending_review',
+                started_at: startedAt,
+                ended_at: endedAt,
+                duration_minutes: duration,
+                break_minutes: breakMinutes,
+                worker_name: document.getElementById('sessionWorker').value.trim(),
+                notes: document.getElementById('sessionNotes').value.trim()
+            });
+            if (result.error) return alert(result.error.message || result.error);
+            document.getElementById('sessionNotes').value = '';
+            await loadLaborData();
+            if (typeof qdCaptureEvent === 'function') qdCaptureEvent('labor_session_created', { source: document.getElementById('sessionSource').value });
+        }
+
+        async function reviewSession(sessionId, status) {
+            const label = status === 'approved' ? 'Approve' : 'Reject';
+            const note = prompt(label + ' note (optional)', '');
+            if (note === null) return;
+            const result = await updateLaborSessionStatus(sessionId, status, note || '');
+            if (result.error) return alert(result.error.message || result.error);
+            await loadLaborData();
+            if (status === 'approved' && typeof completeProTrialFeature === 'function') {
+                completeProTrialFeature('labor_tracker', 'Labour Tracker');
+            }
+            if (typeof qdCaptureEvent === 'function') qdCaptureEvent('labor_session_reviewed', { status });
+        }
+
+        function focusManualEntry() {
+            document.getElementById('manualEntryPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            setTimeout(() => document.getElementById('sessionSite').focus(), 250);
+        }
+
+        function setDefaultSessionTimes() {
+            const end = new Date();
+            end.setMinutes(Math.ceil(end.getMinutes() / 15) * 15, 0, 0);
+            const start = new Date(end.getTime() - 8 * 60 * 60000);
+            document.getElementById('sessionStart').value = toLocalInputValue(start);
+            document.getElementById('sessionEnd').value = toLocalInputValue(end);
+        }
+
+        document.addEventListener('DOMContentLoaded', async function() {
+            const user = await getCurrentUser();
+            if (!user) {
+                window.location.href = 'login.html';
+                return;
+            }
+            if (typeof requireProFeature === 'function') {
+                const allowed = await requireProFeature('labor_tracker', 'Labour Tracker');
+                if (!allowed) {
+                    window.location.href = 'dashboard.html';
+                    return;
+                }
+            }
+            setDefaultSessionTimes();
+            ['sessionStart', 'sessionEnd', 'sessionBreak'].forEach(id => {
+                document.getElementById(id).addEventListener('input', updateDurationPreview);
+            });
+            await loadLaborData();
+        });
+    </script>
+</body>
+</html>
