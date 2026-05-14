@@ -485,8 +485,10 @@
         // Logo or company name in top-left
         const logoArea = document.getElementById('contractor-logo-area');
         const displayName = document.getElementById('contractor-display-name');
-        if (logoRow.logo) {
-          logoArea.innerHTML = '<img src="' + escapeHtml(logoRow.logo) + '" alt="' + escapeHtml(companyName) + '">';
+        const savedBrowserLogo = localStorage.getItem('ald_company_logo') || localStorage.getItem('ald_logo') || '';
+        const logoSrc = logoRow.logo || logoRow.logoUrl || logoRow.url || savedBrowserLogo;
+        if (logoSrc) {
+          logoArea.innerHTML = '<img src="' + escapeHtml(logoSrc) + '" alt="' + escapeHtml(companyName) + '">';
           if (displayName) displayName.style.display = 'none';
         } else {
           logoArea.innerHTML = '';
