@@ -10,8 +10,8 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="QuoteDr">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
-    <title>QuoteDr - Quoting & Invoicing Software for Service Businesses</title>
-    <meta name="description" content="QuoteDr helps service businesses create professional quotes and invoices in minutes. Built for contractors, landscapers, cleaners, and any service pro who wants to win more jobs.">
+    <title>QuoteDr - AI Quoting Software for Contractors</title>
+    <meta name="description" content="QuoteDr turns voice notes, floor plans, IKEA kitchen plans, saved items, and templates into client-ready quotes, approvals, invoices, and payment workflows.">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="brand-theme.css?v=1777661601">
@@ -324,6 +324,87 @@
             color: #555;
             line-height: 1.6;
         }
+
+        .ai-tools-section {
+            padding: 5rem 0;
+            background: #ffffff;
+        }
+
+        .section-kicker {
+            color: var(--accent-orange);
+            font-size: 0.78rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            margin-bottom: 0.6rem;
+            text-align: center;
+            text-transform: uppercase;
+        }
+
+        .section-subtitle {
+            color: #5b6675;
+            font-size: 1.08rem;
+            line-height: 1.7;
+            margin: -1.8rem auto 2.75rem;
+            max-width: 760px;
+            text-align: center;
+        }
+
+        .ai-tool-card {
+            background: #ffffff;
+            border: 1px solid #dbe6f3;
+            border-radius: 8px;
+            box-shadow: 0 10px 28px rgba(15, 52, 96, 0.08);
+            height: 100%;
+            padding: 2rem;
+        }
+
+        .ai-tool-card.featured {
+            border: 2px solid var(--accent-orange);
+            box-shadow: 0 16px 38px rgba(232, 126, 42, 0.16);
+        }
+
+        .ai-tool-icon {
+            align-items: center;
+            background: #eef4fb;
+            border-radius: 8px;
+            color: var(--primary-blue);
+            display: inline-flex;
+            font-size: 1.6rem;
+            height: 54px;
+            justify-content: center;
+            margin-bottom: 1.1rem;
+            width: 54px;
+        }
+
+        .ai-tool-card.featured .ai-tool-icon {
+            background: #fff3e8;
+            color: var(--accent-orange);
+        }
+
+        .ai-tool-card h3 {
+            color: var(--dark-navy);
+            font-size: 1.32rem;
+            font-weight: 800;
+            margin-bottom: 0.8rem;
+        }
+
+        .ai-tool-card p {
+            color: #526070;
+            line-height: 1.65;
+            margin-bottom: 0;
+        }
+
+        .tool-proof-strip {
+            background: #0f3460;
+            border-radius: 8px;
+            color: rgba(255,255,255,0.82);
+            margin-top: 2rem;
+            padding: 1.4rem;
+        }
+
+        .tool-proof-strip strong {
+            color: #fff;
+        }
         
         /* Pricing Section */
         .pricing-section {
@@ -559,6 +640,7 @@
             <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
                 <ul class="navbar-nav align-items-xl-center gap-xl-2">
                     <li class="nav-item"><a class="nav-link" href="#how-it-works">How It Works</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#ai-tools">AI Tools</a></li>
                     <li class="nav-item"><a class="nav-link" href="#features">Features</a></li>
                     <li class="nav-item"><a class="nav-link" href="#pricing">Pricing</a></li>
                     <li class="nav-item"><a class="nav-link" href="blog/index.html">Blog</a></li>
@@ -579,14 +661,14 @@
         <div class="container">
             <div class="hero-content">
                 <img src="quotedr-logo.svg" alt="QuoteDr Logo" class="hero-logo">
-                <h1 class="hero-headline">Stop quoting. Start winning.</h1>
+                <h1 class="hero-headline">Turn voice notes, floor plans, and IKEA plans into quotes.</h1>
                 <div id="rotating-tagline" style="min-height:2rem; margin-bottom:1.2rem;">
     <p class="rotating-text" style="color:rgba(255,255,255,0.85); font-size:1.1rem; font-style:italic; margin:0; transition: opacity 0.5s ease;"></p>
 </div>
-                <p class="hero-subheadline">Professional quotes & invoices in minutes — not days. Your clients will be impressed. Your competition won't.</p>
+                <p class="hero-subheadline">QuoteDr uses AI to turn messy job info into clean rooms, line items, totals, client approvals, and invoices. Start from a conversation, a plan, an IKEA order, or your saved templates.</p>
                 <div class="mt-4 d-flex flex-wrap justify-content-center gap-3">
                     <a href="login.html?signup=1" class="btn btn-hero btn-primary-hero">Start Free</a>
-                    <a href="#how-it-works" class="btn btn-hero btn-secondary-hero">See How It Works</a>
+                    <a href="#ai-tools" class="btn btn-hero btn-secondary-hero">See the AI Tools</a>
                 </div>
             </div>
         </div>
@@ -596,8 +678,8 @@
     <section id="how-it-works" style="background:#0f3460; padding:80px 0;">
         <div class="container">
             <div class="text-center mb-5">
-                <h2 style="color:white; font-size:2.2rem; font-weight:700;">See It In Action</h2>
-                <p style="color:rgba(255,255,255,0.7); font-size:1.1rem;">Watch how easy it is to build a professional quote in minutes.</p>
+                <h2 style="color:white; font-size:2.2rem; font-weight:700;">From Rough Info to Client-Ready Quote</h2>
+                <p style="color:rgba(255,255,255,0.7); font-size:1.1rem;">Watch the core workflow, then let the AI tools handle the slow parts.</p>
             </div>
             <div class="row justify-content-center">
                 <div class="col-lg-8">
@@ -609,8 +691,8 @@
             <div class="row mt-5 text-center align-items-start">
                 <div class="col-md-4 mb-4">
                     <div style="color:#e87e2a; font-size:2rem; font-weight:800; margin-bottom:4px;">1.</div>
-                    <h5 style="color:white; font-weight:600;">Customize & Brand</h5>
-                    <p style="color:rgba(255,255,255,0.6); font-size:0.95rem; min-height:4.5rem;">Add your logo, choose a style, set your terms. Looks like you hired a designer.</p>
+                    <h5 style="color:white; font-weight:600;">Start With What You Have</h5>
+                    <p style="color:rgba(255,255,255,0.6); font-size:0.95rem; min-height:4.5rem;">Talk through the job, upload a floor plan, paste an IKEA order, or load one of your saved quote templates.</p>
                     <div class="video-placeholder mt-3" data-step="1">
                         <video class="step-video" autoplay loop muted playsinline preload="metadata" src="videos/tutorials/customize-brand.mp4">
                             Your browser does not support the video tag.
@@ -619,8 +701,8 @@
                 </div>
                 <div class="col-md-4 mb-4">
                     <div style="color:#e87e2a; font-size:2rem; font-weight:800; margin-bottom:4px;">2.</div>
-                    <h5 style="color:white; font-weight:600;">Add Your Rooms</h5>
-                    <p style="color:rgba(255,255,255,0.6); font-size:0.95rem; min-height:4.5rem;">Name each room or area, add line items, and let QuoteDr track your material costs and profit margins automatically.</p>
+                    <h5 style="color:white; font-weight:600;">QuoteDr Builds the Structure</h5>
+                    <p style="color:rgba(255,255,255,0.6); font-size:0.95rem; min-height:4.5rem;">Rooms, scope, quantities, saved prices, material costs, upgrades, and profit checks land in one organized quote.</p>
                     <div class="video-placeholder mt-3" data-step="2">
                         <video class="step-video" autoplay loop muted playsinline preload="metadata" src="videos/tutorials/quote-builder-overview.mp4">
                             Your browser does not support the video tag.
@@ -629,13 +711,52 @@
                 </div>
                 <div class="col-md-4 mb-4">
                     <div style="color:#e87e2a; font-size:2rem; font-weight:800; margin-bottom:4px;">3.</div>
-                    <h5 style="color:white; font-weight:600;">Send to Client</h5>
-                    <p style="color:rgba(255,255,255,0.6); font-size:0.95rem; min-height:4.5rem;">One click sends a professional interactive quote your client can view, choose finishes, and request upgrades — all from their phone.</p>
+                    <h5 style="color:white; font-weight:600;">Send, Approve, Invoice</h5>
+                    <p style="color:rgba(255,255,255,0.6); font-size:0.95rem; min-height:4.5rem;">Clients review the portal, choose upgrades, approve and sign, then pay by the method your business accepts.</p>
                     <div class="video-placeholder mt-3" data-step="3">
                         <video class="step-video" autoplay loop muted playsinline preload="metadata" src="videos/tutorials/send-client-quote.mp4">
                             Your browser does not support the video tag.
                         </video>
                     </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- AI Tools Section -->
+    <section class="ai-tools-section" id="ai-tools">
+        <div class="container">
+            <p class="section-kicker">The tools that sell the product</p>
+            <h2 class="section-title"><span>Skip the blank page.</span></h2>
+            <p class="section-subtitle">QuoteDr now has specialty quoting tools for the jobs that used to take the longest: explaining a scope from memory, measuring from plans, and itemizing cabinet packages.</p>
+            <div class="row g-4">
+                <div class="col-lg-4">
+                    <div class="ai-tool-card featured">
+                        <div class="ai-tool-icon"><i class="fas fa-microphone-lines"></i></div>
+                        <h3>AI Voice to Quote</h3>
+                        <p>Talk through the job like you would with another contractor. QuoteDr turns that conversation into rooms, scope, line items, quantities, and a polished starting quote.</p>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="ai-tool-card">
+                        <div class="ai-tool-icon"><i class="fas fa-drafting-compass"></i></div>
+                        <h3>Floor Plan Scanner</h3>
+                        <p>Upload a floor plan and move from takeoff to quote faster. Use plan details to create room structure, measurements, and quote-ready work items in minutes.</p>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="ai-tool-card">
+                        <div class="ai-tool-icon"><i class="fas fa-kitchen-set"></i></div>
+                        <h3>IKEA Kitchen Quoter</h3>
+                        <p>Upload an IKEA order PDF or paste the order list. QuoteDr itemizes the package, applies your saved install prices, and adds the kitchen to the quote in seconds.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="tool-proof-strip">
+                <div class="row g-3 text-center">
+                    <div class="col-md-4"><strong>Voice note in.</strong><br>Structured scope out.</div>
+                    <div class="col-md-4"><strong>Plan uploaded.</strong><br>Measurements become quote items.</div>
+                    <div class="col-md-4"><strong>IKEA list parsed.</strong><br>Cabinet install quote built fast.</div>
                 </div>
             </div>
         </div>
@@ -685,60 +806,72 @@
     <!-- Features Section -->
     <section class="features-section" id="features">
         <div class="container">
-            <h2 class="section-title"><span>Everything You Need. Nothing You Don't.</span></h2>
+            <h2 class="section-title"><span>The Full Quote-to-Cash Workflow</span></h2>
+            <p class="section-subtitle">The AI tools get the quote started. The rest of QuoteDr helps you finish, send, approve, invoice, and track the job.</p>
             <div class="row">
-                <div class="col-md-6 mb-4">
+                <div class="col-md-6 col-lg-4 mb-4">
                     <div class="feature-card">
-                        <div class="feature-icon">
-                            <i class="fas fa-hammer"></i>
-                        </div>
-                        <h3 class="feature-title">Fast Quote Builder</h3>
-                        <p class="feature-description">Add rooms, line items, and custom materials. Build a detailed quote in minutes, not hours.</p>
+                        <div class="feature-icon"><i class="fas fa-wand-magic-sparkles"></i></div>
+                        <h3 class="feature-title">AI Quote Builder</h3>
+                        <p class="feature-description">Use voice or typed notes to generate structured rooms, scope, line items, quantities, and client-ready wording.</p>
                     </div>
                 </div>
-                <div class="col-md-6 mb-4">
+                <div class="col-md-6 col-lg-4 mb-4">
                     <div class="feature-card">
-                        <div class="feature-icon">
-                            <i class="fas fa-file-pdf"></i>
-                        </div>
-                        <h3 class="feature-title">Professional Output</h3>
-                        <p class="feature-description">Send clients a clean, branded interactive quote they can review on any device.</p>
+                        <div class="feature-icon"><i class="fas fa-drafting-compass"></i></div>
+                        <h3 class="feature-title">Plan and Map Takeoffs</h3>
+                        <p class="feature-description">Scan floor plans or measure from satellite maps for rooms, roofs, fences, decks, driveways, landscaping, and more.</p>
                     </div>
                 </div>
-                <div class="col-md-6 mb-4">
+                <div class="col-md-6 col-lg-4 mb-4">
                     <div class="feature-card">
-                        <div class="feature-icon">
-                            <i class="fas fa-cloud"></i>
-                        </div>
-                        <h3 class="feature-title">Cloud Saved</h3>
-                        <p class="feature-description">Your quotes are saved to your account automatically. Access them anywhere, on any device.</p>
+                        <div class="feature-icon"><i class="fas fa-kitchen-set"></i></div>
+                        <h3 class="feature-title">IKEA Quick Quote</h3>
+                        <p class="feature-description">Parse an IKEA kitchen plan or order list, apply your install rates, and drop the itemized package into the quote.</p>
                     </div>
                 </div>
-                <div class="col-md-6 mb-4">
+                <div class="col-md-6 col-lg-4 mb-4">
                     <div class="feature-card">
-                        <div class="feature-icon">
-                            <i class="fas fa-chart-bar"></i>
-                        </div>
-                        <h3 class="feature-title">Quote Dashboard</h3>
-                        <p class="feature-description">Track all your quotes in one place. See what's drafted, sent, accepted, or declined.</p>
+                        <div class="feature-icon"><i class="fas fa-file-signature"></i></div>
+                        <h3 class="feature-title">Client Portal and E-Sign</h3>
+                        <p class="feature-description">Send an interactive quote clients can review, approve, sign, and use to choose optional upgrades from their phone.</p>
                     </div>
                 </div>
-                <div class="col-md-6 mb-4">
+                <div class="col-md-6 col-lg-4 mb-4">
                     <div class="feature-card">
-                        <div class="feature-icon">
-                            <i class="fas fa-bell"></i>
-                        </div>
-                        <h3 class="feature-title">Payment Reminders</h3>
-                        <p class="feature-description">Client reminder notifications built into the standard plan. Not locked behind a paywall.</p>
+                        <div class="feature-icon"><i class="fas fa-file-invoice-dollar"></i></div>
+                        <h3 class="feature-title">Invoices and Payments</h3>
+                        <p class="feature-description">Turn accepted quotes into invoices, show payment instructions, support manual payment methods, and connect Stripe when it is set up.</p>
                     </div>
                 </div>
-                <div class="col-md-6 mb-4">
-    <div class="feature-card">
-        <div class="feature-icon">⬆️</div>
-        <h4>Built-in Client Upsells</h4>
-        <p>Clients can add upgrades directly on their interactive quote — premium materials, extra rooms, add-ons. More revenue per job with zero extra effort from you.</p>
-    </div>
-</div>
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="fas fa-layer-group"></i></div>
+                        <h3 class="feature-title">Templates and Saved Items</h3>
+                        <p class="feature-description">Save your common items, prices, room layouts, terms, and quote templates so every new job starts faster.</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="fas fa-chart-line"></i></div>
+                        <h3 class="feature-title">Profit and Status Tracking</h3>
+                        <p class="feature-description">Track drafts, sent quotes, approvals, invoices, deposits, material costs, markup, and projected profit in one place.</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="fas fa-bell"></i></div>
+                        <h3 class="feature-title">Follow-Ups and Reminders</h3>
+                        <p class="feature-description">Keep client communication moving with quote follow-ups, invoice reminders, and status notifications built into the workflow.</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="fas fa-cloud"></i></div>
+                        <h3 class="feature-title">Cloud Saved and Branded</h3>
+                        <p class="feature-description">Your quotes, invoices, settings, logo, terms, payment details, and saved data stay connected to your business account.</p>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
@@ -759,7 +892,7 @@
                             <li><i class="fas fa-check"></i> Cloud storage & sync</li>
                             <li><i class="fas fa-check"></i> Quote dashboard</li>
                             <li><i class="fas fa-check"></i> PDF export</li>
-                            <li><i class="fas fa-check"></i> Client quote viewer</li>
+                            <li><i class="fas fa-check"></i> Client quote and invoice viewer</li>
                             <li><i class="fas fa-check"></i> Client upsell options</li>
                             <li><i class="fas fa-check"></i> Import/export your data</li>
                             <li><i class="fas fa-check"></i> Cancel anytime</li>
@@ -777,7 +910,9 @@
                         <p class="text-muted">or $550/year — save 2 months</p>
                         <ul class="pricing-features">
                             <li><i class="fas fa-check"></i> Everything in Standard</li>
-                            <li><i class="fas fa-check"></i> AI-powered quote builder</li>
+                            <li><i class="fas fa-check"></i> AI Voice to Quote</li>
+                            <li><i class="fas fa-check"></i> Floor Plan Scanner</li>
+                            <li><i class="fas fa-check"></i> IKEA Kitchen Quoter</li>
                             <li><i class="fas fa-check"></i> Email quotes to clients</li>
                             <li><i class="fas fa-check"></i> Client approval & e-signature</li>
                             <li><i class="fas fa-check"></i> Quote status tracking</li>
@@ -955,15 +1090,15 @@
         // Rotating taglines in hero section
         (function() {
             var taglines = [
-                "No waiting room. No co-pay. Just quotes that close.",
-                "The Quote Dr will see you now. 🩺",
-                "Diagnosing your problem: too much time on quotes. Prescription: this.",
-                "The doctor is in. Your spreadsheet is out.",
+                "Talk through a job. Get a structured quote.",
+                "Upload a floor plan. Start from the takeoff.",
+                "Paste an IKEA order. Build the kitchen quote in seconds.",
+                "The quote builder for contractors who are done copy-pasting.",
                 "Built by someone who's mudded more drywall than written code.",
                 "Your quote used to take 6 hours. Your coffee's still hot.",
-                "Clients used to ghost you. Now they're signing.",
+                "Client portal, approvals, invoices, and payments in one flow.",
                 "Excel called. It wants you back. Ignore it.",
-                "More time quoting = less time billing. Do the math.",
+                "More time quoting means less time billing. Do the math.",
                 "Your competition is still copy-pasting. You're already on site.",
                 "Quotes so professional, clients think you hired someone.",
                 "Less time at the laptop. More time on the tools."
