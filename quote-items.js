@@ -234,6 +234,7 @@
             toggleManageItemsTopBar(false);
             toggleManageItemsBottomBar(false);
             initManageItemsFooterSwipe();
+            bindManageItemsFooterButtons();
             syncManageItemsUndoButtons();
 (bootstrap.Modal.getInstance(document.getElementById('manageItemsModal')) || new bootstrap.Modal(document.getElementById('manageItemsModal'))).show();
         }
@@ -378,6 +379,26 @@
                 pullStartY = null;
             });
         }
+        function bindManageItemsFooterButtons() {
+            const saveBtn = document.getElementById('saveAllPricingFooterBtn');
+            const closeBtn = document.getElementById('closeManageItemsFooterBtn');
+            if (saveBtn && !saveBtn.dataset.boundManageFooter) {
+                saveBtn.dataset.boundManageFooter = '1';
+                saveBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    saveAllPricingRows();
+                });
+            }
+            if (closeBtn && !closeBtn.dataset.boundManageFooter) {
+                closeBtn.dataset.boundManageFooter = '1';
+                closeBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    closeManageItemsModal();
+                });
+            }
+        }
         function pushUndoState() {
             if (undoStack.length >= 20) undoStack.shift();
             undoStack.push(JSON.parse(JSON.stringify(customItems)));
@@ -429,10 +450,12 @@
             let upgrade = null;
             if (collapseRow) {
                 const upgName = collapseRow.querySelector('.upgrade-name')?.value.trim() || '';
+                const upgUnitType = collapseRow.querySelector('.upgrade-unit-type')?.value.trim() || '';
                 const upgRate = parseFloat(collapseRow.querySelector('.upgrade-rate')?.value) || 0;
                 const upgMaterialCost = parseFloat(collapseRow.querySelector('.upgrade-material-cost')?.value) || 0;
+                const upgSupplierUrl = collapseRow.querySelector('.upgrade-supplier-url')?.value.trim() || '';
                 const upgDesc = collapseRow.querySelector('.upgrade-desc')?.value.trim() || '';
-                if (upgName) upgrade = { name: upgName, rate: upgRate, materialCost: upgMaterialCost, description: upgDesc };
+                if (upgName) upgrade = { name: upgName, unitType: upgUnitType, rate: upgRate, materialCost: upgMaterialCost, supplierUrl: upgSupplierUrl, description: upgDesc };
             }
 
             // Ensure category exists in customItems
@@ -667,8 +690,10 @@
                     const nameE = item.name.replace(/"/g,'&quot;');
                     const upg = item.upgrade || {};
                     const upgName = (upg.name || '').replace(/"/g,'&quot;');
+                    const upgUnitType = (upg.unitType || upg.unit || '').replace(/"/g,'&quot;');
                     const upgRate = parseFloat(upg.rate || 0).toFixed(2);
                     const upgMaterialCost = parseFloat(upg.materialCost || 0).toFixed(2);
+                    const upgSupplierUrl = (upg.supplierUrl || '').replace(/"/g,'&quot;');
                     const upgDesc = (upg.description || '').replace(/"/g,'&quot;');
                     const hasUpgrade = !!upg.name;
                     const collapseId = 'upg_' + safeId;
@@ -716,20 +741,30 @@
                         <td colspan="6">
                             <div class="p-2">
                                 <small class="text-warning fw-bold"><i class="fas fa-arrow-up"></i> Upgrade Option</small>
-                                <div class="row g-2 mt-1">
+                                <div class="row g-2 mt-1 align-items-end">
                                     <div class="col-md-3">
                                         <label class="form-label" style="font-size:0.75em">Upgrade Name</label>
                                         <input type="text" class="form-control form-control-sm upgrade-name" value="${upgName}" placeholder="e.g., Tall Baseboard 5.5&quot;" oninput="markPricingDirty()">
                                     </div>
                                     <div class="col-md-2">
-                                        <label class="form-label" style="font-size:0.75em">Upgrade Rate ($)</label>
+                                        <label class="form-label" style="font-size:0.75em">Unit</label>
+                                        <input type="text" class="form-control form-control-sm upgrade-unit-type" value="${upgUnitType}" placeholder="LF, sq ft, each" oninput="markPricingDirty()">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label" style="font-size:0.75em">Rate ($)</label>
                                         <input type="number" class="form-control form-control-sm upgrade-rate" value="${upgRate}" step="0.01" min="0" oninput="markPricingDirty()">
                                     </div>
                                     <div class="col-md-2">
-                                        <label class="form-label" style="font-size:0.75em">Material Cost ($)</label>
+                                        <label class="form-label" style="font-size:0.75em">Mat. Cost ($)</label>
                                         <input type="number" class="form-control form-control-sm upgrade-material-cost" value="${upgMaterialCost}" step="0.01" min="0" oninput="markPricingDirty()">
                                     </div>
-                                    <div class="col-md-5">
+                                    <div class="col-md-3">
+                                        <label class="form-label" style="font-size:0.75em">Supplier URL</label>
+                                        <input type="url" class="form-control form-control-sm upgrade-supplier-url" value="${upgSupplierUrl}" placeholder="https://..." oninput="markPricingDirty()">
+                                    </div>
+                                </div>
+                                <div class="row g-2 mt-2">
+                                    <div class="col-12">
                                         <div class="d-flex justify-content-between align-items-center gap-2">
                                             <label class="form-label mb-0" style="font-size:0.75em">Description (shown to client)</label>
                                             <div class="d-flex align-items-center gap-1">
