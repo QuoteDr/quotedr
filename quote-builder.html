@@ -1686,9 +1686,15 @@ Example:
                         </div>
                     </div>
                     <div class="row g-2 mb-3">
-                        <div class="col-12">
-                            <label class="form-label"><strong>Description</strong> <span class="text-muted small">(optional - shown to clients on interactive quote)</span></label>
-                            <textarea id="newItemDescription" class="form-control" rows="2" placeholder="e.g., Complete drywall installation including hanging, mudding, taping, sanding and priming. Professional finish ready for paint." spellcheck="true"></textarea>
+                        <div class="col-12 description-refine-scope">
+                            <div class="d-flex justify-content-between align-items-center gap-2">
+                                <label class="form-label mb-0"><strong>Description</strong> <span class="text-muted small">(optional - shown to clients on interactive quote)</span></label>
+                                <div class="d-flex align-items-center gap-1">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary undo-refine-desc-btn" onclick="toggleRefinedDescription(this)" title="Undo AI refined description" style="display:none;font-size:0.75rem;padding:2px 7px;"><i class="fas fa-undo"></i></button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary refine-desc-btn" style="font-size:0.75rem;padding:2px 8px;">AI Refine</button>
+                                </div>
+                            </div>
+                            <textarea id="newItemDescription" class="form-control item-description-textarea mt-2" rows="2" placeholder="e.g., Complete drywall installation including hanging, mudding, taping, sanding and priming. Professional finish ready for paint." spellcheck="true"></textarea>
                         </div>
                     </div>
                     <div class="row g-2 mb-3 align-items-end">
@@ -7877,8 +7883,8 @@ Example:
                     if (delBtn) { deleteCustomItem(delBtn.dataset.cat, delBtn.dataset.name); return; }
                     var refineBtn = e.target.closest('.refine-desc-btn');
                     if (refineBtn) {
-                        var descRow = refineBtn.closest('tr');
-                        var textarea = descRow ? descRow.querySelector('.item-description-textarea') : null;
+                        var descScope = refineBtn.closest('tr') || refineBtn.closest('.description-refine-scope');
+                        var textarea = descScope ? descScope.querySelector('.item-description-textarea') : null;
                         refineDescription(textarea, refineBtn);
                         return;
                     }

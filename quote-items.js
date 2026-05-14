@@ -855,6 +855,13 @@
             document.getElementById('newItemMaterialCost').value = '';
             document.getElementById('newItemSupplierUrl').value = '';
             if (document.getElementById('newItemDescription')) document.getElementById('newItemDescription').value = '';
+            const newItemUndoBtn = document.getElementById('newItemDescription')?.closest('.description-refine-scope')?.querySelector('.undo-refine-desc-btn');
+            if (newItemUndoBtn) {
+                newItemUndoBtn.style.display = 'none';
+                delete newItemUndoBtn._previousDescription;
+                delete newItemUndoBtn._refinedDescription;
+                delete newItemUndoBtn._showingRefined;
+            }
 
             renderAllItemsList();
         }
@@ -920,8 +927,8 @@
 
         function toggleRefinedDescription(btnEl) {
             if (!btnEl || typeof btnEl._previousDescription !== 'string' || typeof btnEl._refinedDescription !== 'string') return;
-            const descRow = btnEl.closest('tr');
-            const textarea = descRow ? descRow.querySelector('.item-description-textarea') : null;
+            const descScope = btnEl.closest('tr') || btnEl.closest('.description-refine-scope');
+            const textarea = descScope ? descScope.querySelector('.item-description-textarea') : null;
             if (!textarea) return;
             if (btnEl._showingRefined) {
                 textarea.value = btnEl._previousDescription;
