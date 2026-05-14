@@ -3,6 +3,8 @@
 (function() {
     'use strict';
 
+        var CREATE_NEW_CATEGORY_VALUE = '__quote_dr_create_new_category__';
+
                 function _injectItemsIntoPricingDB(itemsObj) {
             for (var cat in itemsObj) {
                 if (!Array.isArray(itemsObj[cat])) continue; // skip corrupted entries
@@ -97,20 +99,47 @@
                 });
         }
 
+        function populateNewItemCategorySelect(selectedCat) {
+            const catSelect = document.getElementById('newItemCategory');
+            if (!catSelect) return;
+            const categories = Object.keys(pricingDatabase || {}).sort(function(a, b) {
+                return a.localeCompare(b);
+            });
+            catSelect.innerHTML = '';
+            categories.forEach(function(cat) {
+                const opt = document.createElement('option');
+                opt.value = cat;
+                opt.textContent = cat;
+                catSelect.appendChild(opt);
+            });
+            const createOpt = document.createElement('option');
+            createOpt.value = CREATE_NEW_CATEGORY_VALUE;
+            createOpt.textContent = '+ Create new category...';
+            catSelect.appendChild(createOpt);
+            if (selectedCat && categories.indexOf(selectedCat) >= 0) {
+                catSelect.value = selectedCat;
+            } else if (categories.length) {
+                catSelect.value = categories[0];
+            }
+            catSelect.dataset.previousCategory = catSelect.value !== CREATE_NEW_CATEGORY_VALUE ? catSelect.value : '';
+        }
+
         async function addNewCategory() {
             const newCat = (await qdPrompt('Enter new category name:', '', {
                 title: 'New Category'
             }) || '').trim();
-            if (!newCat || newCat.length === 0) return;
-            if (pricingDatabase[newCat]) { qdAlert('Category already exists!'); return; }
+            if (!newCat || newCat.length === 0) return null;
+            const existing = Object.keys(pricingDatabase || {}).find(function(cat) {
+                return cat.toLowerCase() === newCat.toLowerCase();
+            });
+            if (existing) {
+                qdAlert('Category already exists!');
+                populateNewItemCategorySelect(existing);
+                return existing;
+            }
             pricingDatabase[newCat] = [];
-            // Repopulate dropdown
-            const catSelect = document.getElementById('newItemCategory');
-            const opt = document.createElement('option');
-            opt.value = newCat;
-            opt.textContent = newCat;
-            opt.selected = true;
-            catSelect.appendChild(opt);
+            populateNewItemCategorySelect(newCat);
+            return newCat;
         }
 
         async function addNewUnitType() {
@@ -127,8 +156,16 @@
             document.getElementById('newItemUnit').value = newUnit;
         }
 
-        function handleCategoryChange() {
-            // Just a placeholder - can be used for future logic
+        async function handleCategoryChange() {
+            const catSelect = document.getElementById('newItemCategory');
+            if (!catSelect) return;
+            if (catSelect.value === CREATE_NEW_CATEGORY_VALUE) {
+                const previous = catSelect.dataset.previousCategory || '';
+                const created = await addNewCategory();
+                if (!created) populateNewItemCategorySelect(previous);
+                return;
+            }
+            catSelect.dataset.previousCategory = catSelect.value;
         }
 
         function handleItemPhotoUpload(input) {
@@ -184,13 +221,7 @@
             }
             const catSelect = document.getElementById('newItemCategory');
             if (!catSelect) { console.error('newItemCategory not found'); return; }
-            catSelect.innerHTML = '';
-            Object.keys(pricingDatabase).forEach(cat => {
-                const opt = document.createElement('option');
-                opt.value = cat;
-                opt.textContent = cat;
-                catSelect.appendChild(opt);
-            });
+            populateNewItemCategorySelect(catSelect.value);
             document.getElementById('newItemName').value = '';
             document.getElementById('newItemUnit').value = '';
             document.getElementById('newItemRate').value = '';
@@ -207,6 +238,29 @@
 (bootstrap.Modal.getInstance(document.getElementById('manageItemsModal')) || new bootstrap.Modal(document.getElementById('manageItemsModal'))).show();
         }
 
+        function hideManageItemsModal() {
+            const modalEl = document.getElementById('manageItemsModal');
+            if (!modalEl) return;
+            try {
+                if (window.bootstrap && bootstrap.Modal) {
+                    bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+                    return;
+                }
+            } catch(e) {
+                console.warn('Bootstrap could not close Manage Items modal:', e);
+            }
+            modalEl.classList.remove('show');
+            modalEl.style.display = 'none';
+            modalEl.setAttribute('aria-hidden', 'true');
+            modalEl.removeAttribute('aria-modal');
+            document.querySelectorAll('.modal-backdrop').forEach(function(backdrop) { backdrop.remove(); });
+            if (!document.querySelector('.modal.show')) {
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('overflow');
+                document.body.style.removeProperty('padding-right');
+            }
+        }
+
         async function closeManageItemsModal() {
             if (pricingDirty) {
                 const choice = await qdConfirm('You have unsaved pricing changes. Save all changes before closing?', {
@@ -221,8 +275,7 @@
                 }
             }
             clearPricingDirty();
-            const modal = bootstrap.Modal.getInstance(document.getElementById('manageItemsModal'));
-            if (modal) modal.hide();
+            hideManageItemsModal();
         }
 
         let pricingDirty = false; // tracks unsaved changes in Manage Items modal
@@ -671,8 +724,14 @@
                                         <input type="number" class="form-control form-control-sm upgrade-rate" value="${upgRate}" step="0.01" min="0" oninput="markPricingDirty()">
                                     </div>
                                     <div class="col-md-6">
-                                        <label class="form-label" style="font-size:0.75em">Description (shown to client)</label>
-                                        <input type="text" class="form-control form-control-sm upgrade-desc" value="${upgDesc}" placeholder="e.g., Premium 5.5&quot; tall baseboard - a luxurious finishing touch" oninput="markPricingDirty()">
+                                        <div class="d-flex justify-content-between align-items-center gap-2">
+                                            <label class="form-label mb-0" style="font-size:0.75em">Description (shown to client)</label>
+                                            <div class="d-flex align-items-center gap-1">
+                                                <button type="button" class="btn btn-sm btn-outline-secondary undo-refine-desc-btn" onclick="toggleRefinedDescription(this)" title="Undo AI refined description" style="display:none;font-size:0.75rem;padding:2px 7px;"><i class="fas fa-undo"></i></button>
+                                                <button type="button" class="btn btn-sm btn-outline-primary refine-desc-btn" style="font-size:0.75rem;padding:2px 8px;">AI Refine</button>
+                                            </div>
+                                        </div>
+                                        <input type="text" class="form-control form-control-sm upgrade-desc item-description-textarea mt-1" value="${upgDesc}" placeholder="e.g., Premium 5.5&quot; tall baseboard - a luxurious finishing touch" oninput="markPricingDirty()">
                                     </div>
                                 </div>
                                 <div class="mt-2">
@@ -724,6 +783,11 @@
             const materialCost = parseFloat(document.getElementById('newItemMaterialCost').value) || 0;
             const supplierUrl = document.getElementById('newItemSupplierUrl').value.trim();
             const itemDescription = document.getElementById('newItemDescription')?.value.trim() || '';
+
+            if (category === CREATE_NEW_CATEGORY_VALUE) {
+                qdAlert('Please create or choose a category first.');
+                return;
+            }
 
             if (!name || !unitType) {
                 qdAlert('Please fill in item name and unit type.');
