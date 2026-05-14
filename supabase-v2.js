@@ -680,6 +680,89 @@ async function updateLaborSessionStatus(sessionId, status, reviewNotes) {
     return { data, error };
 }
 
+async function listLaborDevices() {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    const { data, error } = await _supabase
+        .from('labor_devices')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false });
+    if (error) console.error('Labor devices list error:', error);
+    return { data, error };
+}
+
+async function saveLaborDevice(device) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    var now = new Date().toISOString();
+    var payload = {
+        user_id: user.id,
+        device_key: device.device_key || device.deviceKey,
+        platform: device.platform || 'android',
+        device_name: device.device_name || device.deviceName || '',
+        push_token: device.push_token || device.pushToken || null,
+        tracking_enabled: device.tracking_enabled === true || device.trackingEnabled === true,
+        last_sync_at: device.last_sync_at || device.lastSyncAt || null,
+        last_event_at: device.last_event_at || device.lastEventAt || null,
+        last_error: device.last_error || device.lastError || null,
+        app_version: device.app_version || device.appVersion || '',
+        updated_at: now
+    };
+    if (!payload.device_key) return { error: 'Device key is required' };
+    if (device.id) payload.id = device.id;
+    const { data, error } = await _supabase
+        .from('labor_devices')
+        .upsert(payload, { onConflict: 'user_id,device_key' })
+        .select();
+    if (error) console.error('Labor device save error:', error);
+    return { data, error };
+}
+
+async function listLaborLocationEvents(options) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    options = options || {};
+    var query = _supabase
+        .from('labor_location_events')
+        .select('*, labor_job_sites(name,address,client_name,quote_number), labor_devices(device_name,platform)')
+        .eq('user_id', user.id)
+        .order('occurred_at', { ascending: false });
+    if (options.since) query = query.gte('occurred_at', options.since);
+    if (options.jobSiteId) query = query.eq('job_site_id', options.jobSiteId);
+    if (options.eventType) query = query.eq('event_type', options.eventType);
+    if (options.limit) query = query.limit(options.limit);
+    const { data, error } = await query;
+    if (error) console.error('Labor location events list error:', error);
+    return { data, error };
+}
+
+async function saveLaborLocationEvent(event) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    var payload = {
+        user_id: user.id,
+        device_id: event.device_id || event.deviceId || null,
+        device_key: event.device_key || event.deviceKey || '',
+        job_site_id: event.job_site_id || event.jobSiteId || null,
+        quote_id: event.quote_id || event.quoteId || null,
+        event_type: event.event_type || event.eventType,
+        transition_source: event.transition_source || event.transitionSource || 'web_debug',
+        occurred_at: event.occurred_at || event.occurredAt || new Date().toISOString(),
+        latitude: event.latitude == null || event.latitude === '' ? null : qdLaborNumber(event.latitude, null),
+        longitude: event.longitude == null || event.longitude === '' ? null : qdLaborNumber(event.longitude, null),
+        accuracy_m: event.accuracy_m == null || event.accuracy_m === '' ? null : qdLaborNumber(event.accuracy_m, null),
+        raw_payload: event.raw_payload || event.rawPayload || {}
+    };
+    if (!payload.event_type) return { error: 'Event type is required' };
+    const { data, error } = await _supabase
+        .from('labor_location_events')
+        .upsert(payload, { onConflict: 'user_id,device_key,job_site_id,event_type,occurred_at' })
+        .select();
+    if (error) console.error('Labor location event save error:', error);
+    return { data, error };
+}
+
 // Aliases for consistent naming
 var listQuotesFromSupabase = listQuotes;
 var listInvoicesFromSupabase = listInvoices;

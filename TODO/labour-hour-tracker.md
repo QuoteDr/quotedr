@@ -8,6 +8,7 @@ Give contractors a reliable way to know how many labour hours were actually spen
 
 - Job sites can be created manually or imported from saved quotes.
 - Job sites can be pinned with Google Places autocomplete, a map marker, and a visible geofence radius.
+- Mobile devices can register for tracking and post raw geofence events for review.
 - Time sessions are saved as `pending_review` first.
 - The Daily Review screen lets the user approve or reject sessions before they count toward real labour totals.
 - Approved hours can be reviewed by job site, week, source, and quote link.
@@ -22,7 +23,7 @@ Google Maps history and mobile geofencing are usually accurate, but they can mis
 - Native iOS/Android app handles background geofencing.
 - QuoteDr sends active job site addresses and geofence radius to the device.
 - The phone records arrival/departure draft sessions.
-- Drafts sync to `labor_time_sessions` with `source = 'gps'` and `status = 'pending_review'`.
+- Draft events sync to `labor_location_events`, then become `labor_time_sessions` with `source = 'gps'` and `status = 'pending_review'`.
 - QuoteDr web remains the review and reporting center.
 
 ## Next Phases

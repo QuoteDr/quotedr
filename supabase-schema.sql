@@ -275,3 +275,59 @@ create index if not exists labor_job_sites_quote_idx on labor_job_sites(quote_id
 create index if not exists labor_time_sessions_user_started_idx on labor_time_sessions(user_id, started_at desc);
 create index if not exists labor_time_sessions_job_started_idx on labor_time_sessions(job_site_id, started_at desc);
 create index if not exists labor_time_sessions_review_idx on labor_time_sessions(user_id, status, started_at desc);
+
+create table if not exists labor_devices (
+    id uuid default uuid_generate_v4() primary key,
+    user_id uuid references auth.users(id) on delete cascade not null,
+    device_key text not null,
+    platform text default 'android' not null check (platform in ('android', 'ios', 'web')),
+    device_name text default '' not null,
+    push_token text,
+    tracking_enabled boolean default false not null,
+    last_sync_at timestamptz,
+    last_event_at timestamptz,
+    last_error text,
+    app_version text default '' not null,
+    created_at timestamptz default now() not null,
+    updated_at timestamptz default now() not null,
+    unique(user_id, device_key)
+);
+
+create table if not exists labor_location_events (
+    id uuid default uuid_generate_v4() primary key,
+    user_id uuid references auth.users(id) on delete cascade not null,
+    device_id uuid references labor_devices(id) on delete set null,
+    device_key text default '' not null,
+    job_site_id uuid references labor_job_sites(id) on delete set null,
+    quote_id uuid references quotes(id) on delete set null,
+    event_type text not null check (event_type in ('enter', 'exit', 'dwell', 'permission', 'sync', 'error')),
+    transition_source text default 'android_geofence' not null,
+    occurred_at timestamptz not null,
+    latitude numeric(10, 7),
+    longitude numeric(10, 7),
+    accuracy_m numeric(8, 2),
+    raw_payload jsonb default '{}'::jsonb not null,
+    processed_session_id uuid references labor_time_sessions(id) on delete set null,
+    processed_at timestamptz,
+    created_at timestamptz default now() not null
+);
+
+alter table labor_devices enable row level security;
+alter table labor_location_events enable row level security;
+
+create policy "Users can manage own labor devices"
+    on labor_devices for all
+    to authenticated
+    using (auth.uid() = user_id)
+    with check (auth.uid() = user_id);
+
+create policy "Users can manage own labor location events"
+    on labor_location_events for all
+    to authenticated
+    using (auth.uid() = user_id)
+    with check (auth.uid() = user_id);
+
+create index if not exists labor_devices_user_updated_idx on labor_devices(user_id, updated_at desc);
+create unique index if not exists labor_location_events_idempotency_idx on labor_location_events(user_id, device_key, job_site_id, event_type, occurred_at);
+create index if not exists labor_location_events_user_occurred_idx on labor_location_events(user_id, occurred_at desc);
+create index if not exists labor_location_events_site_occurred_idx on labor_location_events(job_site_id, occurred_at desc) where job_site_id is not null;

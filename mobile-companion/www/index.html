@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QuoteDr Labour Companion</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div class="brand">QuoteDr</div>
+      <h1>Labour GPS</h1>
+      <p>Register job-site geofences and sync arrivals/departures for daily review.</p>
+    </header>
+
+    <section id="authPanel" class="panel">
+      <h2>Sign In</h2>
+      <label>Email</label>
+      <input id="email" type="email" autocomplete="email" placeholder="you@example.com">
+      <label>Password</label>
+      <input id="password" type="password" autocomplete="current-password" placeholder="Password">
+      <button id="signInBtn">Sign In</button>
+      <div id="authMessage" class="message"></div>
+    </section>
+
+    <section id="trackingPanel" class="panel hidden">
+      <div class="row">
+        <div>
+          <h2>Tracking</h2>
+          <div id="deviceStatus" class="message">Device not registered yet.</div>
+        </div>
+        <button id="signOutBtn" class="secondary">Sign Out</button>
+      </div>
+
+      <div class="stats">
+        <div><strong id="siteCount">0</strong><span>pinned sites</span></div>
+        <div><strong id="eventCount">0</strong><span>queued events</span></div>
+      </div>
+
+      <button id="enableBtn">Enable Background Tracking</button>
+      <button id="syncBtn" class="secondary">Sync Job Sites</button>
+      <button id="testEventBtn" class="secondary">Send Test Event</button>
+      <div id="trackingMessage" class="message"></div>
+      <div id="sitesList" class="list"></div>
+    </section>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

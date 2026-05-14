@@ -91,6 +91,11 @@
             gap: 0.5rem;
             flex-wrap: wrap;
         }
+        .mobile-step {
+            border: 1px solid #d7e2ef;
+            border-radius: 8px;
+            background: #f8fbff;
+        }
         .pac-container {
             z-index: 99999 !important;
         }
@@ -140,6 +145,22 @@
                 <button class="btn btn-outline-secondary btn-sm" onclick="loadLaborData()"><i class="fas fa-sync-alt me-1"></i>Refresh</button>
             </div>
             <div id="pendingSessions"></div>
+        </section>
+
+        <section class="tool-panel p-3 mb-4">
+            <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-3">
+                <div>
+                    <div class="section-title"><i class="fas fa-mobile-screen-button me-2 text-primary"></i>Mobile GPS Tracking</div>
+                    <div class="small-muted">Android-first companion app will register these job-site geofences and send arrival/departure events for daily review.</div>
+                </div>
+                <button class="btn btn-outline-secondary btn-sm" onclick="loadLaborData()"><i class="fas fa-sync-alt me-1"></i>Refresh Status</button>
+            </div>
+            <div class="row g-3 mb-3">
+                <div class="col-md-4"><div class="mobile-step p-3 h-100"><div class="fw-bold">1. Pin job sites</div><div class="small-muted">Each active site needs latitude, longitude, and radius.</div><div class="metric-value fs-4 mt-1" id="metricPinnedSites">0</div></div></div>
+                <div class="col-md-4"><div class="mobile-step p-3 h-100"><div class="fw-bold">2. Connect device</div><div class="small-muted">Install the companion app and sign in with QuoteDr.</div><div class="metric-value fs-4 mt-1" id="metricDevices">0</div></div></div>
+                <div class="col-md-4"><div class="mobile-step p-3 h-100"><div class="fw-bold">3. Review events</div><div class="small-muted">GPS events become draft labour sessions after review.</div><div class="metric-value fs-4 mt-1" id="metricLocationEvents">0</div></div></div>
+            </div>
+            <div id="mobileTrackingStatus"></div>
         </section>
 
         <div class="row g-4 mb-4">
@@ -272,6 +293,8 @@
         let laborSites = [];
         let laborSessions = [];
         let quoteRows = [];
+        let laborDevices = [];
+        let laborLocationEvents = [];
         const LABOR_MAPS_API_URL = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyD7acqRI6KsoUDTEkyMx36eDNRuuPXdqIA&libraries=places';
         const LABOR_DEFAULT_CENTER = { lat: 43.6532, lng: -79.3832 };
         let laborMapsLoadingPromise = null;
@@ -611,6 +634,16 @@
             const quotesResult = await listQuotesFromSupabase();
             if (!quotesResult.error) quoteRows = quotesResult.data || [];
 
+            if (typeof listLaborDevices === 'function') {
+                const devicesResult = await listLaborDevices();
+                if (!devicesResult.error) laborDevices = devicesResult.data || [];
+            }
+
+            if (typeof listLaborLocationEvents === 'function') {
+                const eventsResult = await listLaborLocationEvents({ since: since.toISOString(), limit: 50 });
+                if (!eventsResult.error) laborLocationEvents = eventsResult.data || [];
+            }
+
             renderAll();
         }
 
@@ -618,6 +651,7 @@
             renderQuoteSelects();
             renderSiteSelect();
             renderMetrics();
+            renderMobileTrackingStatus();
             renderSites();
             renderPendingSessions();
             renderHistory();
@@ -665,6 +699,50 @@
             document.getElementById('metricSites').textContent = laborSites.length;
         }
 
+        function hasSitePin(site) {
+            return Number.isFinite(parseFloat(site.latitude)) && Number.isFinite(parseFloat(site.longitude));
+        }
+
+        function renderMobileTrackingStatus() {
+            const pinnedSites = laborSites.filter(hasSitePin).length;
+            const pinnedMetric = document.getElementById('metricPinnedSites');
+            const deviceMetric = document.getElementById('metricDevices');
+            const eventMetric = document.getElementById('metricLocationEvents');
+            if (pinnedMetric) pinnedMetric.textContent = pinnedSites + '/' + laborSites.length;
+            if (deviceMetric) deviceMetric.textContent = laborDevices.length;
+            if (eventMetric) eventMetric.textContent = laborLocationEvents.length;
+
+            const el = document.getElementById('mobileTrackingStatus');
+            if (!el) return;
+            const devicesHtml = laborDevices.length ? laborDevices.map(device => (
+                '<tr>' +
+                    '<td><div class="fw-bold">' + escapeHtml(device.device_name || device.device_key || 'Mobile device') + '</div><div class="small-muted">' + escapeHtml(device.platform || '') + ' ' + escapeHtml(device.app_version || '') + '</div></td>' +
+                    '<td>' + (device.tracking_enabled ? '<span class="status-pill status-approved">Tracking enabled</span>' : '<span class="status-pill status-pending">Setup needed</span>') + '</td>' +
+                    '<td>' + escapeHtml(device.last_sync_at ? formatDateTime(device.last_sync_at) : 'Never') + '</td>' +
+                    '<td>' + escapeHtml(device.last_event_at ? formatDateTime(device.last_event_at) : 'No events') + '</td>' +
+                '</tr>'
+            )).join('') : '<tr><td colspan="4" class="text-center text-muted">No mobile devices connected yet.</td></tr>';
+
+            const eventsHtml = laborLocationEvents.length ? laborLocationEvents.slice(0, 8).map(event => {
+                const site = event.labor_job_sites || {};
+                const device = event.labor_devices || {};
+                return '<tr>' +
+                    '<td>' + sourcePill(event.event_type) + '</td>' +
+                    '<td><div class="fw-bold">' + escapeHtml(site.name || 'Unknown site') + '</div><div class="small-muted">' + escapeHtml(device.device_name || event.device_key || '') + '</div></td>' +
+                    '<td>' + escapeHtml(formatDateTime(event.occurred_at)) + '</td>' +
+                    '<td>' + escapeHtml(event.accuracy_m ? (Math.round(event.accuracy_m) + 'm') : '') + '</td>' +
+                '</tr>';
+            }).join('') : '<tr><td colspan="4" class="text-center text-muted">No geofence events received yet.</td></tr>';
+
+            const unpinned = laborSites.length - pinnedSites;
+            el.innerHTML = '' +
+                (unpinned > 0 ? '<div class="alert alert-warning py-2"><i class="fas fa-location-dot me-1"></i>' + unpinned + ' active job site' + (unpinned === 1 ? ' needs' : 's need') + ' a map pin before mobile tracking can use it.</div>' : '') +
+                '<div class="row g-3">' +
+                    '<div class="col-lg-6"><div class="table-responsive"><table class="table table-sm mb-0"><thead><tr><th>Device</th><th>Status</th><th>Sync</th><th>Last Event</th></tr></thead><tbody>' + devicesHtml + '</tbody></table></div></div>' +
+                    '<div class="col-lg-6"><div class="table-responsive"><table class="table table-sm mb-0"><thead><tr><th>Event</th><th>Site</th><th>Time</th><th>Accuracy</th></tr></thead><tbody>' + eventsHtml + '</tbody></table></div></div>' +
+                '</div>';
+        }
+
         function renderSites() {
             const el = document.getElementById('jobSitesList');
             if (!laborSites.length) {
@@ -676,7 +754,7 @@
                 laborSites.map(site => {
                     const sessions = laborSessions.filter(s => s.job_site_id === site.id && s.status === 'approved');
                     const minutes = sessions.reduce((sum, s) => sum + sessionMinutes(s), 0);
-                    const hasPin = Number.isFinite(parseFloat(site.latitude)) && Number.isFinite(parseFloat(site.longitude));
+                    const hasPin = hasSitePin(site);
                     const pinText = hasPin ? ('Map pin saved - ' + (site.geofence_radius_m || 75) + 'm radius') : 'Needs map pin';
                     return '<tr class="job-site-row">' +
                         '<td><div class="fw-bold">' + escapeHtml(site.name) + '</div><div class="small-muted">' + escapeHtml(site.address || 'No address') + '</div><div class="small-muted">' + formatHours(minutes) + ' approved</div><div class="small-muted"><i class="fas fa-location-dot me-1 ' + (hasPin ? 'text-success' : 'text-warning') + '"></i>' + escapeHtml(pinText) + '</div></td>' +
