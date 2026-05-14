@@ -22,6 +22,8 @@
       --primary-dark: #1a2940;
       --secondary-light: #f8f9fa;
       --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+      --portal-header-text: #10233d;
+      --portal-header-muted: #4d5c70;
     }
     
     body {
@@ -30,15 +32,75 @@
     }
     
     .header-bg {
-      background-color: var(--primary-dark);
-      color: white;
-      padding: 1.5rem 0;
+      background-color: #ffffff;
+      color: var(--portal-header-text);
+      padding: 2.3rem 0;
+    }
+
+    .portal-header-shell {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 2rem;
+      flex-wrap: wrap;
+    }
+
+    .portal-brand-block {
+      display: flex;
+      align-items: center;
+      gap: 1.55rem;
+      min-width: min(100%, 700px);
     }
 
     #contractor-logo-area img {
-      max-height: 64px;
+      max-height: 96px;
       max-width: 180px;
       object-fit: contain;
+    }
+
+    #contractor-display-name {
+      font-size: 1.8rem;
+      font-weight: 800;
+      line-height: 1.1;
+      color: var(--portal-header-text);
+    }
+
+    .portal-business-info {
+      margin-top: 0.65rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem 1rem;
+      color: var(--portal-header-muted);
+      font-size: 0.86rem;
+    }
+
+    .portal-business-info span {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .portal-client-panel {
+      text-align: right;
+      min-width: 240px;
+    }
+
+    .portal-view-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      color: var(--portal-header-text);
+      font-weight: 800;
+      font-size: 0.78rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .portal-admin-tools {
+      display: none;
+      gap: 0.5rem;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      margin-top: 0.75rem;
     }
 
     .card {
@@ -199,6 +261,36 @@
     }
     
     @media (max-width: 768px) {
+      .header-bg {
+        padding: 1.5rem 0;
+      }
+
+      .portal-header-shell,
+      .portal-brand-block {
+        display: block;
+        text-align: center;
+      }
+
+      #contractor-logo-area img {
+        max-height: 118px;
+        max-width: min(84vw, 220px);
+        margin-bottom: 0.75rem;
+      }
+
+      .portal-business-info {
+        justify-content: center;
+        font-size: 0.82rem;
+      }
+
+      .portal-client-panel {
+        text-align: center;
+        margin-top: 1.25rem;
+      }
+
+      .portal-admin-tools {
+        justify-content: center;
+      }
+
       .portal-controls {
         width: 100%;
       }
@@ -243,16 +335,23 @@
   <!-- Header -->
   <header class="header-bg">
     <div class="container">
-      <div class="row align-items-center">
-        <div class="col-md-6">
-          <div id="contractor-logo-area">
+      <div class="portal-header-shell">
+        <div class="portal-brand-block">
+          <div id="contractor-logo-area"></div>
+          <div>
             <h2 id="contractor-display-name" class="mb-0">Loading...</h2>
+            <p class="mb-0" id="portal-tagline">Secure Client Portal</p>
+            <div id="business-info-header" class="portal-business-info"></div>
           </div>
-          <p class="mb-0" id="portal-tagline">Client Portal</p>
         </div>
-        <div class="col-md-6 text-md-end">
+        <div class="portal-client-panel">
+          <div id="portalViewBadge" class="portal-view-badge"><i class="fas fa-user-check"></i> Client View</div>
           <h3 id="client-name" class="mb-0">Client Name</h3>
           <p id="contractor-name" class="mb-0">Your Contractor</p>
+          <div id="portalAdminTools" class="portal-admin-tools">
+            <a href="dashboard.html" class="btn btn-outline-primary btn-sm"><i class="fas fa-gauge-high me-1"></i> Dashboard</a>
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="copyAdminPortalLink()"><i class="fas fa-link me-1"></i> Copy Admin Link</button>
+          </div>
         </div>
       </div>
     </div>
@@ -421,8 +520,17 @@
     }
 
     function updatePortalModeBadge(isAdmin) {
+      const badge = document.getElementById('portalViewBadge');
+      const tools = document.getElementById('portalAdminTools');
       const tagline = document.getElementById('portal-tagline');
-      if (tagline) tagline.textContent = 'Client Portal';
+      if (badge) {
+        badge.innerHTML = isAdmin
+          ? '<i class="fas fa-user-shield"></i> Admin Preview'
+          : '<i class="fas fa-user-check"></i> Client View';
+        badge.style.color = isAdmin ? '#f27a1a' : 'var(--portal-header-text)';
+      }
+      if (tools) tools.style.display = isAdmin ? 'flex' : 'none';
+      if (tagline) tagline.textContent = isAdmin ? 'Admin Portal Preview' : 'Secure Client Portal';
       document.body.classList.toggle('admin-mode', !!isAdmin);
     }
 
@@ -435,7 +543,14 @@
           .eq('user_id', contractorId)
           .in('key', ['business_profile', 'company_logo', 'portal_theme']);
 
-        const profile = rows?.find(r => r.key === 'business_profile')?.value || {};
+        const storedProfile = localStorage.getItem('ald_business_profile');
+        let localProfile = {};
+        try {
+          localProfile = storedProfile ? JSON.parse(storedProfile) : {};
+        } catch (_) {
+          localProfile = {};
+        }
+        const profile = rows?.find(r => r.key === 'business_profile')?.value || localProfile || {};
         const logoRow = rows?.find(r => r.key === 'company_logo')?.value || {};
         const theme = rows?.find(r => r.key === 'portal_theme')?.value || {};
 
@@ -445,19 +560,21 @@
 
         // Logo or company name in top-left
         const logoArea = document.getElementById('contractor-logo-area');
+        const displayName = document.getElementById('contractor-display-name');
         const savedBrowserLogo = localStorage.getItem('ald_company_logo') || localStorage.getItem('ald_logo') || '';
         const logoSrc = logoRow.logo || logoRow.logoUrl || logoRow.url || savedBrowserLogo;
         if (logoSrc) {
           logoArea.innerHTML = '<img src="' + escapeHtml(logoSrc) + '" alt="' + escapeHtml(companyName) + '">';
+          if (displayName) displayName.textContent = companyName;
         } else {
-          logoArea.innerHTML = '<h2 id="contractor-display-name" class="mb-0">' + escapeHtml(companyName) + '</h2>';
+          logoArea.innerHTML = '';
+          if (displayName) displayName.textContent = companyName;
         }
+        renderBusinessHeader(profile);
 
         // Apply portal theme
         if (theme.headerColor) {
           document.documentElement.style.setProperty('--primary-dark', theme.headerColor);
-          const header = document.querySelector('.header-bg');
-          if (header) header.style.backgroundColor = theme.headerColor;
         }
         if (theme.bgColor) document.body.style.backgroundColor = theme.bgColor;
 
@@ -466,6 +583,29 @@
         contractorNameEl.textContent = 'Your Contractor';
         document.getElementById('contractor-display-name').textContent = 'Your Contractor';
       }
+    }
+
+    function renderBusinessHeader(profile) {
+      const infoEl = document.getElementById('business-info-header');
+      if (!infoEl) return;
+
+      const cityLine = [profile.city, profile.province, profile.postal_code].filter(Boolean).join(' ');
+      const address = [profile.address, cityLine].filter(Boolean).join(', ');
+      const businessEmail = profile.email || profile.business_email || profile.company_email || '';
+      const phone = profile.phone || profile.business_phone || profile.company_phone || '';
+      const website = profile.website || profile.url || '';
+      const hst = profile.hst_number || profile.hst || '';
+      const items = [
+        address ? { icon: 'fa-location-dot', text: address } : null,
+        phone ? { icon: 'fa-phone', text: phone } : null,
+        businessEmail ? { icon: 'fa-envelope', text: businessEmail } : null,
+        website ? { icon: 'fa-globe', text: website } : null,
+        hst ? { icon: 'fa-receipt', text: 'HST: ' + hst } : null
+      ].filter(Boolean);
+
+      infoEl.innerHTML = items.map(function(item) {
+        return '<span><i class="fas ' + item.icon + '"></i>' + escapeHtml(item.text) + '</span>';
+      }).join('');
     }
 
     // Load quotes for this client from this contractor
