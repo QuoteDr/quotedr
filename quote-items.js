@@ -748,7 +748,7 @@
                                     </div>
                                     <div class="col-md-2">
                                         <label class="form-label" style="font-size:0.75em">Unit</label>
-                                        <input type="text" class="form-control form-control-sm upgrade-unit-type" value="${upgUnitType}" placeholder="LF, sq ft, each" oninput="markPricingDirty()">
+                                        <input type="text" class="form-control form-control-sm upgrade-unit-type" value="${upgUnitType}" list="unitTypeOptions" placeholder="LF, sq ft, each, Flatrate" oninput="markPricingDirty()">
                                     </div>
                                     <div class="col-md-2">
                                         <label class="form-label" style="font-size:0.75em">Rate ($)</label>

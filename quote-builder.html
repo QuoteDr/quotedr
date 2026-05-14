@@ -1584,7 +1584,7 @@ Example:
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label><strong>Unit Type:</strong></label>
-                            <input type="text" id="lineUnitType" class="form-control" placeholder="LF, sq ft, each, hourly">
+                            <input type="text" id="lineUnitType" class="form-control" list="unitTypeOptions" placeholder="LF, sq ft, each, Flatrate">
                         </div>
                     </div>
 
@@ -1675,6 +1675,7 @@ Example:
                                 <option value="m²">
                                 <option value="m">
                                 <option value="each">
+                                <option value="Flatrate">
                                 <option value="hourly">
                                 <option value="sheet">
                                 <option value="minimum">
@@ -1864,7 +1865,7 @@ Example:
             if (document.getElementById('mapGateWidthLabel')) document.getElementById('mapGateWidthLabel').textContent = heightUnit + ' gate';
             if (document.getElementById('mapOpeningsSqft')) document.getElementById('mapOpeningsSqft').title = 'Window/door/opening deduction in ' + areaUnit;
             if (document.getElementById('mapGateWidth')) document.getElementById('mapGateWidth').title = 'Fence gate width in ' + heightUnit;
-            if (document.getElementById('lineUnitType')) document.getElementById('lineUnitType').placeholder = isMetricMeasurement() ? 'm, m\u00b2, each, hourly' : 'LF, sq ft, each, hourly';
+            if (document.getElementById('lineUnitType')) document.getElementById('lineUnitType').placeholder = isMetricMeasurement() ? 'm, m\u00b2, each, Flatrate' : 'LF, sq ft, each, Flatrate';
             if (document.getElementById('newItemUnit')) document.getElementById('newItemUnit').placeholder = areaUnit;
         }
 
