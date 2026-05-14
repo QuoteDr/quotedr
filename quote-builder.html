@@ -3303,6 +3303,21 @@ Example:
 
             const roomIndex = rooms.findIndex(r => r.id === roomId);
             if (roomIndex !== -1) {
+                const savNewItemBtn = document.getElementById('saveNewItemBtn');
+                const shouldAskToSaveNewItem = editingItemIndex === null && savNewItemBtn && savNewItemBtn.style.display !== 'none';
+                if (shouldAskToSaveNewItem) {
+                    const saveChoice = await qdConfirm('Save "' + description + '" to your item database for next time?', {
+                        title: 'Save New Item',
+                        okText: 'Yes',
+                        secondaryText: 'No',
+                        secondaryValue: 'no',
+                        cancelText: 'Cancel',
+                        type: 'warning'
+                    });
+                    if (saveChoice === false) return;
+                    if (saveChoice === true) saveLineItemToDatabase();
+                }
+
                 _pushUndo(); // snapshot before save
                 // If editing existing item, update it; otherwise add new
                 if (editingItemIndex !== null && rooms[roomIndex].items[editingItemIndex]) {
@@ -3359,19 +3374,6 @@ Example:
 
                 renderRooms();
                 updateBuilderGuide();
-
-                // Prompt to save if this is a new item
-                const savNewItemBtn = document.getElementById('saveNewItemBtn');
-                if (savNewItemBtn && savNewItemBtn.style.display !== 'none') {
-                    const desc = document.getElementById('lineDescription').value.trim();
-                    if (desc && await qdConfirm('Save "' + desc + '" to your item database for next time?', {
-                        title: 'Save New Item',
-                        okText: 'Save Item',
-                        type: 'warning'
-                    })) {
-                        saveLineItemToDatabase();
-                    }
-                }
 
                 // Close modal
                 const modalEl = document.getElementById('addLineModal');

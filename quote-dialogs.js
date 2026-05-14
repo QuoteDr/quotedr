@@ -44,6 +44,7 @@
                     '</div>' +
                     '<div class="modal-footer">' +
                         '<button type="button" class="btn btn-outline-secondary" id="qdDialogCancel">Cancel</button>' +
+                        '<button type="button" class="btn btn-outline-primary" id="qdDialogSecondary" style="display:none;">No</button>' +
                         '<button type="button" class="btn btn-primary" id="qdDialogOk">OK</button>' +
                     '</div>' +
                 '</div>' +
@@ -79,6 +80,7 @@
             var input = document.getElementById('qdDialogInput');
             var ok = document.getElementById('qdDialogOk');
             var cancel = document.getElementById('qdDialogCancel');
+            var secondary = document.getElementById('qdDialogSecondary');
             var settled = false;
 
             setIcon(opts.type || (opts.prompt ? 'prompt' : 'info'));
@@ -88,6 +90,9 @@
             input.value = opts.defaultValue || '';
             cancel.style.display = opts.cancelText === null ? 'none' : '';
             cancel.textContent = opts.cancelText || 'Cancel';
+            secondary.style.display = opts.secondaryText ? '' : 'none';
+            secondary.textContent = opts.secondaryText || 'No';
+            secondary.className = 'btn ' + (opts.secondaryClass || 'btn-outline-primary');
             ok.textContent = opts.okText || 'OK';
             ok.className = 'btn ' + (opts.okClass || (opts.type === 'danger' ? 'btn-danger' : 'btn-primary'));
 
@@ -96,6 +101,7 @@
                 settled = true;
                 ok.onclick = null;
                 cancel.onclick = null;
+                secondary.onclick = null;
                 el.removeEventListener('hidden.bs.modal', onHidden);
                 resolve(value);
             }
@@ -110,6 +116,10 @@
             cancel.onclick = function() {
                 modal.hide();
                 cleanup(opts.prompt ? null : false);
+            };
+            secondary.onclick = function() {
+                modal.hide();
+                cleanup(opts.secondaryValue !== undefined ? opts.secondaryValue : 'secondary');
             };
             el.addEventListener('hidden.bs.modal', onHidden, { once: true });
             modal.show();
