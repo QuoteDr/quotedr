@@ -1624,8 +1624,8 @@ Example:
                         </div>
                     </div>
 
-                    <label><strong>Notes (Optional):</strong></label>
-                    <textarea id="lineNotes" class="form-control mb-3" rows="2" placeholder="Additional details..."></textarea>
+                    <label><strong>Description (Optional):</strong></label>
+                    <textarea id="lineNotes" class="form-control mb-3" rows="2" placeholder="Additional description shown under this line item..." spellcheck="true"></textarea>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -4625,7 +4625,7 @@ Example:
                             }
                             if (_hasDesc) html += ' <small class="text-muted" id="' + _descId + '_icon">&#9660;</small>';
                             if (item.itemDescription) html += '<div id="' + _descId + '" style="display:none;"><small class="text-muted fst-italic">' + item.itemDescription + '</small></div>';
-                            if (item.notes) html += '<div id="' + _descId + '_notes" style="display:' + (item.itemDescription ? 'none' : 'none') + ';"><small class="text-info"><i class="fas fa-info-circle"></i> ' + item.notes + '</small></div>';
+                            if (item.notes) html += '<div id="' + _descId + '_notes" style="display:none;"><small class="text-muted fst-italic">' + item.notes + '</small></div>';
                             html += '</td>';
                             html += '<td style="white-space:nowrap">' + formatQuoteQuantityDisplay(item.quantity, item.unitType || item.unit || '') + '</td>';
                             html += '<td style="white-space:nowrap">$' + displayRate.toFixed(2) + '</td>';
