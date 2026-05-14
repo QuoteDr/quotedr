@@ -26,7 +26,7 @@
     function getModal() {
         ensureStyles();
         var el = document.getElementById('qdDialogModal');
-        if (el) return el;
+        if (el) return ensureDialogButtons(el);
         el = document.createElement('div');
         el.className = 'modal fade qd-dialog-modal';
         el.id = 'qdDialogModal';
@@ -50,6 +50,23 @@
                 '</div>' +
             '</div>';
         document.body.appendChild(el);
+        ensureDialogButtons(el);
+        return el;
+    }
+
+    function ensureDialogButtons(el) {
+        var footer = el.querySelector('.modal-footer');
+        if (!footer) return el;
+        if (!el.querySelector('#qdDialogSecondary')) {
+            var secondary = document.createElement('button');
+            secondary.type = 'button';
+            secondary.className = 'btn btn-outline-primary';
+            secondary.id = 'qdDialogSecondary';
+            secondary.style.display = 'none';
+            secondary.textContent = 'No';
+            var ok = el.querySelector('#qdDialogOk');
+            footer.insertBefore(secondary, ok || null);
+        }
         return el;
     }
 
@@ -74,13 +91,13 @@
         return new Promise(function(resolve) {
             var el = getModal();
             var modal = bootstrap.Modal.getInstance(el) || new bootstrap.Modal(el);
-            var title = document.getElementById('qdDialogTitle');
-            var msg = document.getElementById('qdDialogMessage');
-            var inputWrap = document.getElementById('qdDialogInputWrap');
-            var input = document.getElementById('qdDialogInput');
-            var ok = document.getElementById('qdDialogOk');
-            var cancel = document.getElementById('qdDialogCancel');
-            var secondary = document.getElementById('qdDialogSecondary');
+            var title = el.querySelector('#qdDialogTitle');
+            var msg = el.querySelector('#qdDialogMessage');
+            var inputWrap = el.querySelector('#qdDialogInputWrap');
+            var input = el.querySelector('#qdDialogInput');
+            var ok = el.querySelector('#qdDialogOk');
+            var cancel = el.querySelector('#qdDialogCancel');
+            var secondary = el.querySelector('#qdDialogSecondary');
             var settled = false;
 
             setIcon(opts.type || (opts.prompt ? 'prompt' : 'info'));
