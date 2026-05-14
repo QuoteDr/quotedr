@@ -343,7 +343,7 @@
             let pullStartY = null;
 
             footer.addEventListener('pointerdown', function(e) {
-                if (e.pointerType === 'mouse' && e.button !== 0) return;
+                if (e.pointerType === 'mouse' || e.target.closest('button,input,select,textarea,a')) return;
                 footerStartY = e.clientY;
                 footer.setPointerCapture?.(e.pointerId);
             });
