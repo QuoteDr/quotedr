@@ -430,8 +430,9 @@
             if (collapseRow) {
                 const upgName = collapseRow.querySelector('.upgrade-name')?.value.trim() || '';
                 const upgRate = parseFloat(collapseRow.querySelector('.upgrade-rate')?.value) || 0;
+                const upgMaterialCost = parseFloat(collapseRow.querySelector('.upgrade-material-cost')?.value) || 0;
                 const upgDesc = collapseRow.querySelector('.upgrade-desc')?.value.trim() || '';
-                if (upgName) upgrade = { name: upgName, rate: upgRate, description: upgDesc };
+                if (upgName) upgrade = { name: upgName, rate: upgRate, materialCost: upgMaterialCost, description: upgDesc };
             }
 
             // Ensure category exists in customItems
@@ -667,6 +668,7 @@
                     const upg = item.upgrade || {};
                     const upgName = (upg.name || '').replace(/"/g,'&quot;');
                     const upgRate = parseFloat(upg.rate || 0).toFixed(2);
+                    const upgMaterialCost = parseFloat(upg.materialCost || 0).toFixed(2);
                     const upgDesc = (upg.description || '').replace(/"/g,'&quot;');
                     const hasUpgrade = !!upg.name;
                     const collapseId = 'upg_' + safeId;
@@ -715,7 +717,7 @@
                             <div class="p-2">
                                 <small class="text-warning fw-bold"><i class="fas fa-arrow-up"></i> Upgrade Option</small>
                                 <div class="row g-2 mt-1">
-                                    <div class="col-md-4">
+                                    <div class="col-md-3">
                                         <label class="form-label" style="font-size:0.75em">Upgrade Name</label>
                                         <input type="text" class="form-control form-control-sm upgrade-name" value="${upgName}" placeholder="e.g., Tall Baseboard 5.5&quot;" oninput="markPricingDirty()">
                                     </div>
@@ -723,7 +725,11 @@
                                         <label class="form-label" style="font-size:0.75em">Upgrade Rate ($)</label>
                                         <input type="number" class="form-control form-control-sm upgrade-rate" value="${upgRate}" step="0.01" min="0" oninput="markPricingDirty()">
                                     </div>
-                                    <div class="col-md-6">
+                                    <div class="col-md-2">
+                                        <label class="form-label" style="font-size:0.75em">Material Cost ($)</label>
+                                        <input type="number" class="form-control form-control-sm upgrade-material-cost" value="${upgMaterialCost}" step="0.01" min="0" oninput="markPricingDirty()">
+                                    </div>
+                                    <div class="col-md-5">
                                         <div class="d-flex justify-content-between align-items-center gap-2">
                                             <label class="form-label mb-0" style="font-size:0.75em">Description (shown to client)</label>
                                             <div class="d-flex align-items-center gap-1">

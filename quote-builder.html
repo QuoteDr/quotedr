@@ -3492,12 +3492,18 @@ Example:
             const item = room.items[itemIndex];
             if (!item.upgrade || !item.upgrade.name) return;
             item.upgraded = !item.upgraded;
-            // Swap rate and total to reflect upgrade
+            // Swap rate and material cost so profit/margin reflect the selected option.
             if (item.upgraded) {
                 item._baseRate = item.rate;
+                item._baseMaterialCost = parseFloat(item.materialCost) || 0;
                 item.rate = item.upgrade.rate;
+                var upgradeMaterialCost = item.upgrade.materialCost !== undefined ? item.upgrade.materialCost : item.upgrade.material_cost;
+                if (upgradeMaterialCost !== undefined) {
+                    item.materialCost = parseFloat(upgradeMaterialCost) || 0;
+                }
             } else {
                 item.rate = item._baseRate || item.rate;
+                if (item._baseMaterialCost !== undefined) item.materialCost = item._baseMaterialCost;
             }
             item.total = item.quantity * item.rate;
             renderRooms();
