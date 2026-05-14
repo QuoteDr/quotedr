@@ -72,10 +72,33 @@
             border: 1px solid #cfe0f5;
             border-radius: 8px;
         }
+        .site-map {
+            min-height: 280px;
+            border: 1px solid #cfe0f5;
+            border-radius: 8px;
+            background: #e8eef6;
+            overflow: hidden;
+        }
+        .location-status {
+            min-height: 1.25rem;
+            color: #58708a;
+            font-size: 0.86rem;
+        }
+        .map-action-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        .pac-container {
+            z-index: 99999 !important;
+        }
         @media (max-width: 768px) {
             .metric-value { font-size: 1.2rem; }
             .table-responsive { font-size: 0.88rem; }
             .navbar-brand { font-size: 1rem; }
+            .site-map { min-height: 240px; }
         }
     </style>
     <script src="analytics.js?v=1778059000"></script>
@@ -130,13 +153,16 @@
                     </div>
                     <form id="siteForm" class="row g-2 mb-3" onsubmit="saveSiteForm(event)">
                         <input type="hidden" id="siteId">
+                        <input type="hidden" id="siteLat">
+                        <input type="hidden" id="siteLng">
                         <div class="col-12">
                             <label class="form-label fw-semibold">Site Name</label>
                             <input id="siteName" class="form-control" placeholder="e.g. Adam Basement" required>
                         </div>
                         <div class="col-12">
                             <label class="form-label fw-semibold">Address</label>
-                            <input id="siteAddress" class="form-control" placeholder="123 Main St, Toronto">
+                            <input id="siteAddress" class="form-control" placeholder="123 Main St, Toronto" autocomplete="off">
+                            <div id="siteLocationStatus" class="location-status mt-1">Start typing and pick a Google suggestion to pin the job site.</div>
                         </div>
                         <div class="col-sm-6">
                             <label class="form-label fw-semibold">Quote</label>
@@ -148,6 +174,16 @@
                                 <input id="siteRadius" type="number" class="form-control" value="75" min="25" max="1000">
                                 <span class="input-group-text">m</span>
                             </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="map-action-row mb-2">
+                                <div class="small-muted">Drag the pin or change the radius to tune the future geofence.</div>
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-primary" type="button" onclick="geocodeSiteAddress()"><i class="fas fa-location-crosshairs me-1"></i>Find On Map</button>
+                                    <button class="btn btn-outline-secondary" type="button" onclick="clearSiteLocation()"><i class="fas fa-eraser me-1"></i>Clear Pin</button>
+                                </div>
+                            </div>
+                            <div id="siteMap" class="site-map"></div>
                         </div>
                         <div class="col-12 d-flex gap-2">
                             <button class="btn btn-primary" type="submit"><i class="fas fa-save me-1"></i>Save Site</button>
@@ -236,6 +272,13 @@
         let laborSites = [];
         let laborSessions = [];
         let quoteRows = [];
+        const LABOR_MAPS_API_URL = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyD7acqRI6KsoUDTEkyMx36eDNRuuPXdqIA&libraries=places';
+        const LABOR_DEFAULT_CENTER = { lat: 43.6532, lng: -79.3832 };
+        let laborMapsLoadingPromise = null;
+        let siteMap = null;
+        let siteMarker = null;
+        let siteRadiusCircle = null;
+        let siteAutocomplete = null;
 
         function escapeHtml(value) {
             return String(value == null ? '' : value)
@@ -329,6 +372,205 @@
         function getSiteName(session) {
             const linked = session.labor_job_sites || laborSites.find(site => site.id === session.job_site_id) || {};
             return linked.name || linked.client_name || 'Job Site';
+        }
+
+        function setLocationStatus(message, type) {
+            const el = document.getElementById('siteLocationStatus');
+            if (!el) return;
+            el.className = 'location-status mt-1';
+            if (type === 'success') el.classList.add('text-success');
+            if (type === 'warning') el.classList.add('text-warning');
+            if (type === 'danger') el.classList.add('text-danger');
+            el.textContent = message;
+        }
+
+        function readSiteRadius() {
+            return Math.max(25, Math.min(1000, parseInt(document.getElementById('siteRadius')?.value || 75, 10) || 75));
+        }
+
+        function readSiteLocation() {
+            const lat = parseFloat(document.getElementById('siteLat')?.value || '');
+            const lng = parseFloat(document.getElementById('siteLng')?.value || '');
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+            return { lat, lng };
+        }
+
+        function ensureLaborMapsApiLoaded() {
+            if (window.google && google.maps && google.maps.Map && google.maps.places) return Promise.resolve();
+            if (laborMapsLoadingPromise) return laborMapsLoadingPromise;
+            laborMapsLoadingPromise = new Promise(function(resolve, reject) {
+                const started = Date.now();
+                function ready() {
+                    if (window.google && google.maps && google.maps.Map && google.maps.places) {
+                        resolve();
+                        return true;
+                    }
+                    return false;
+                }
+                if (ready()) return;
+                const existing = Array.from(document.scripts).find(function(script) {
+                    return script.src && script.src.indexOf('maps.googleapis.com/maps/api/js') >= 0;
+                });
+                if (!existing) {
+                    const script = document.createElement('script');
+                    script.src = LABOR_MAPS_API_URL;
+                    script.async = true;
+                    script.defer = true;
+                    script.onerror = function() { reject(new Error('Google Maps could not be loaded.')); };
+                    document.head.appendChild(script);
+                }
+                const timer = setInterval(function() {
+                    if (ready()) clearInterval(timer);
+                    if (Date.now() - started > 12000) {
+                        clearInterval(timer);
+                        reject(new Error('Google Maps is still loading. Please try again in a moment.'));
+                    }
+                }, 150);
+            });
+            return laborMapsLoadingPromise;
+        }
+
+        async function initJobSiteMapTools() {
+            try {
+                await ensureLaborMapsApiLoaded();
+            } catch (err) {
+                setLocationStatus(err.message || 'Google Maps could not be loaded.', 'danger');
+                return;
+            }
+
+            const mapEl = document.getElementById('siteMap');
+            const addressInput = document.getElementById('siteAddress');
+            if (!mapEl || !addressInput) return;
+
+            if (!siteMap) {
+                siteMap = new google.maps.Map(mapEl, {
+                    center: LABOR_DEFAULT_CENTER,
+                    zoom: 12,
+                    mapTypeControl: true,
+                    streetViewControl: false,
+                    fullscreenControl: true
+                });
+                siteRadiusCircle = new google.maps.Circle({
+                    map: siteMap,
+                    radius: readSiteRadius(),
+                    strokeColor: '#1a56a0',
+                    strokeOpacity: 0.9,
+                    strokeWeight: 2,
+                    fillColor: '#1a56a0',
+                    fillOpacity: 0.14
+                });
+                siteMap.addListener('click', function(event) {
+                    if (!event.latLng) return;
+                    setSiteMapLocation(event.latLng, { pan: false, status: 'Pin moved from map click.' });
+                });
+            }
+
+            if (!siteAutocomplete) {
+                siteAutocomplete = new google.maps.places.Autocomplete(addressInput, {
+                    types: ['geocode'],
+                    fields: ['formatted_address', 'geometry', 'name'],
+                    componentRestrictions: { country: ['ca', 'us'] }
+                });
+                siteAutocomplete.addListener('place_changed', function() {
+                    const place = siteAutocomplete.getPlace();
+                    if (!place || !place.geometry || !place.geometry.location) {
+                        setLocationStatus('Pick a suggestion or use Find On Map.', 'warning');
+                        return;
+                    }
+                    addressInput.value = place.formatted_address || addressInput.value;
+                    setSiteMapLocation(place.geometry.location, {
+                        address: place.formatted_address,
+                        zoom: 17,
+                        status: 'Location pinned from Google Places.'
+                    });
+                });
+            }
+
+            const current = readSiteLocation();
+            if (current) setSiteMapLocation(current, { pan: true, status: 'Saved location loaded.' });
+            else updateSiteRadiusCircle();
+        }
+
+        function setSiteMapLocation(location, options) {
+            options = options || {};
+            const lat = typeof location.lat === 'function' ? location.lat() : location.lat;
+            const lng = typeof location.lng === 'function' ? location.lng() : location.lng;
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+            document.getElementById('siteLat').value = lat.toFixed(7);
+            document.getElementById('siteLng').value = lng.toFixed(7);
+            const pos = { lat, lng };
+            if (siteMap) {
+                if (!siteMarker) {
+                    siteMarker = new google.maps.Marker({
+                        map: siteMap,
+                        position: pos,
+                        draggable: true,
+                        title: 'Job site geofence center'
+                    });
+                    siteMarker.addListener('dragend', function(event) {
+                        if (!event.latLng) return;
+                        setSiteMapLocation(event.latLng, { pan: false, status: 'Pin moved. Save the site to keep this location.' });
+                    });
+                } else {
+                    siteMarker.setPosition(pos);
+                    siteMarker.setMap(siteMap);
+                }
+                siteMap.setCenter(pos);
+                siteMap.setZoom(options.zoom || Math.max(siteMap.getZoom() || 12, 16));
+            }
+            updateSiteRadiusCircle();
+            if (options.status !== false) setLocationStatus(options.status || 'Location pinned. Save the site to keep this geofence.', 'success');
+        }
+
+        function updateSiteRadiusCircle() {
+            const location = readSiteLocation();
+            const radius = readSiteRadius();
+            if (!siteRadiusCircle) return;
+            siteRadiusCircle.setRadius(radius);
+            if (location) {
+                siteRadiusCircle.setCenter(location);
+                siteRadiusCircle.setMap(siteMap);
+                if (siteMap && radius >= 25) {
+                    const bounds = siteRadiusCircle.getBounds();
+                    if (bounds) siteMap.fitBounds(bounds);
+                }
+            } else {
+                siteRadiusCircle.setMap(null);
+            }
+        }
+
+        function clearSiteLocation() {
+            document.getElementById('siteLat').value = '';
+            document.getElementById('siteLng').value = '';
+            if (siteMarker) siteMarker.setMap(null);
+            if (siteRadiusCircle) siteRadiusCircle.setMap(null);
+            setLocationStatus('No map pin saved. Pick an address suggestion or click the map.', 'warning');
+        }
+
+        async function geocodeSiteAddress(options) {
+            options = options || {};
+            const address = document.getElementById('siteAddress').value.trim();
+            if (!address) {
+                if (!options.silent) setLocationStatus('Type an address first.', 'warning');
+                return false;
+            }
+            await initJobSiteMapTools();
+            if (!window.google || !google.maps || !google.maps.Geocoder) return false;
+            return new Promise(function(resolve) {
+                new google.maps.Geocoder().geocode({ address: address }, function(results, status) {
+                    if (status === 'OK' && results && results[0] && results[0].geometry) {
+                        document.getElementById('siteAddress').value = results[0].formatted_address || address;
+                        setSiteMapLocation(results[0].geometry.location, {
+                            zoom: 17,
+                            status: 'Location pinned from typed address.'
+                        });
+                        resolve(true);
+                    } else {
+                        if (!options.silent) setLocationStatus('Address not found. Try a more specific address.', 'danger');
+                        resolve(false);
+                    }
+                });
+            });
         }
 
         function showDbAlert(message) {
@@ -434,8 +676,10 @@
                 laborSites.map(site => {
                     const sessions = laborSessions.filter(s => s.job_site_id === site.id && s.status === 'approved');
                     const minutes = sessions.reduce((sum, s) => sum + sessionMinutes(s), 0);
+                    const hasPin = Number.isFinite(parseFloat(site.latitude)) && Number.isFinite(parseFloat(site.longitude));
+                    const pinText = hasPin ? ('Map pin saved - ' + (site.geofence_radius_m || 75) + 'm radius') : 'Needs map pin';
                     return '<tr class="job-site-row">' +
-                        '<td><div class="fw-bold">' + escapeHtml(site.name) + '</div><div class="small-muted">' + escapeHtml(site.address || 'No address') + '</div><div class="small-muted">' + formatHours(minutes) + ' approved</div></td>' +
+                        '<td><div class="fw-bold">' + escapeHtml(site.name) + '</div><div class="small-muted">' + escapeHtml(site.address || 'No address') + '</div><div class="small-muted">' + formatHours(minutes) + ' approved</div><div class="small-muted"><i class="fas fa-location-dot me-1 ' + (hasPin ? 'text-success' : 'text-warning') + '"></i>' + escapeHtml(pinText) + '</div></td>' +
                         '<td><div>' + escapeHtml(site.quote_number || '') + '</div><div class="small-muted">' + escapeHtml(site.client_name || '') + '</div></td>' +
                         '<td class="text-end"><div class="btn-group btn-group-sm">' +
                             '<button class="btn btn-outline-primary" onclick="editSite(\'' + escapeHtml(site.id) + '\')" title="Edit"><i class="fas fa-pen"></i></button>' +
@@ -499,9 +743,10 @@
             document.getElementById('siteAddress').value = '';
             document.getElementById('siteQuote').value = '';
             document.getElementById('siteRadius').value = '75';
+            clearSiteLocation();
         }
 
-        function editSite(siteId) {
+        async function editSite(siteId) {
             const site = laborSites.find(s => s.id === siteId);
             if (!site) return;
             document.getElementById('siteId').value = site.id;
@@ -509,6 +754,12 @@
             document.getElementById('siteAddress').value = site.address || '';
             document.getElementById('siteQuote').value = site.quote_id || '';
             document.getElementById('siteRadius').value = site.geofence_radius_m || 75;
+            document.getElementById('siteLat').value = site.latitude == null ? '' : site.latitude;
+            document.getElementById('siteLng').value = site.longitude == null ? '' : site.longitude;
+            await initJobSiteMapTools();
+            const location = readSiteLocation();
+            if (location) setSiteMapLocation(location, { zoom: 17, status: 'Saved location loaded.' });
+            else clearSiteLocation();
             document.getElementById('siteName').focus();
         }
 
@@ -516,6 +767,10 @@
             event.preventDefault();
             const quoteId = document.getElementById('siteQuote').value;
             const quote = quoteRows.find(row => row.id === quoteId);
+            if (document.getElementById('siteAddress').value.trim() && !readSiteLocation()) {
+                await geocodeSiteAddress({ silent: true });
+            }
+            const siteLocation = readSiteLocation();
             const result = await saveLaborJobSite({
                 id: document.getElementById('siteId').value || undefined,
                 name: document.getElementById('siteName').value.trim(),
@@ -523,7 +778,9 @@
                 quote_id: quoteId || null,
                 quote_number: quote ? (quote.quote_number || quoteData(quote).quoteNumber || '') : '',
                 client_name: quote ? (quote.client_name || quoteData(quote).clientName || '') : '',
-                geofence_radius_m: document.getElementById('siteRadius').value
+                geofence_radius_m: document.getElementById('siteRadius').value,
+                latitude: siteLocation ? siteLocation.lat : null,
+                longitude: siteLocation ? siteLocation.lng : null
             });
             if (result.error) return alert(result.error.message || result.error);
             resetSiteForm();
@@ -648,7 +905,10 @@
             ['sessionStart', 'sessionEnd', 'sessionBreak'].forEach(id => {
                 document.getElementById(id).addEventListener('input', updateDurationPreview);
             });
+            document.getElementById('siteAddress').addEventListener('focus', initJobSiteMapTools);
+            document.getElementById('siteRadius').addEventListener('input', updateSiteRadiusCircle);
             await loadLaborData();
+            initJobSiteMapTools();
         });
     </script>
 </body>

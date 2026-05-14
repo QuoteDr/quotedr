@@ -7,6 +7,7 @@ Give contractors a reliable way to know how many labour hours were actually spen
 ## MVP Built In QuoteDr
 
 - Job sites can be created manually or imported from saved quotes.
+- Job sites can be pinned with Google Places autocomplete, a map marker, and a visible geofence radius.
 - Time sessions are saved as `pending_review` first.
 - The Daily Review screen lets the user approve or reject sessions before they count toward real labour totals.
 - Approved hours can be reviewed by job site, week, source, and quote link.
@@ -26,7 +27,7 @@ Google Maps history and mobile geofencing are usually accurate, but they can mis
 
 ## Next Phases
 
-- Geocode job site addresses to latitude/longitude.
+- Store latitude/longitude and geofence radius for each job site.
 - Add native mobile background geofence capture.
 - Add calendar-style weekly review.
 - Add labour cost rates and compare actual labour cost against quoted labour.
