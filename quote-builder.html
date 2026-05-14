@@ -4617,15 +4617,19 @@ Example:
                             const hasUpgrade = !!(item.upgrade && item.upgrade.name);
                             const isUpgraded = !!item.upgraded;
                             const isOptional = !!item.optional;
+                            const displayItemName = isUpgraded && hasUpgrade ? item.upgrade.name : item.description;
+                            const displayItemDescription = isUpgraded && hasUpgrade
+                                ? (item.upgrade.description || item.upgrade.itemDescription || item.upgrade.item_description || item.upgrade.notes || '')
+                                : (item.itemDescription || '');
                             var coStatus = window._quoteDocumentType === 'change_order' ? (item._coChangeStatus || 'added') : '';
                             var rowClass = coStatus ? ' class="co-item-' + coStatus + '"' : '';
                             const rowStyle = isOptional && !coStatus ? ' style="border-left:3px dashed #0dcaf0;"' : '';
                             html += '<tr' + rowClass + rowStyle + '>';
                             html += '<td style="width:30px">' + displayNum + (isOptional ? ' <span class="badge bg-info" style="font-size:0.6em;">opt</span>' : '') + '</td>';
-                            var _hasDesc = !!(item.itemDescription || item.notes);
+                            var _hasDesc = !!(displayItemDescription || item.notes);
                             var _descId = 'itemdesc_' + room.id + '_' + origIndex;
                             html += '<td style="cursor:' + (_hasDesc ? 'pointer' : 'default') + ';" ' + (_hasDesc ? 'onclick="toggleItemDesc(\''+_descId+'\')" title="Click to expand description"' : '') + '>';
-                            html += '<strong>' + item.description + '</strong>';
+                            html += '<strong>' + displayItemName + '</strong>';
                             if (coStatus) {
                                 var badgeClass = coStatus === 'added' ? 'bg-success' : (coStatus === 'removed' ? 'bg-danger' : (coStatus === 'changed' ? 'bg-warning text-dark' : 'bg-secondary'));
                                 html += ' <span class="badge ' + badgeClass + '">' + coStatus.replace(/^\w/, function(ch) { return ch.toUpperCase(); }) + '</span>';
@@ -4637,7 +4641,7 @@ Example:
                                 html += '<div class="co-change-note"><i class="fas fa-pen-to-square me-1"></i>' + qdTemplateEscapeHtml(item.changeOrderNote) + '</div>';
                             }
                             if (_hasDesc) html += ' <small class="text-muted" id="' + _descId + '_icon">&#9660;</small>';
-                            if (item.itemDescription) html += '<div id="' + _descId + '" style="display:none;"><small class="text-muted fst-italic">' + item.itemDescription + '</small></div>';
+                            if (displayItemDescription) html += '<div id="' + _descId + '" style="display:none;"><small class="text-muted fst-italic">' + displayItemDescription + '</small></div>';
                             if (item.notes) html += '<div id="' + _descId + '_notes" style="display:none;"><small class="text-muted fst-italic">' + item.notes + '</small></div>';
                             html += '</td>';
                             html += '<td style="white-space:nowrap">' + formatQuoteQuantityDisplay(item.quantity, item.unitType || item.unit || '') + '</td>';
