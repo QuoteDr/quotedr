@@ -457,6 +457,29 @@ if (location.search.includes('debug')) {
             });
         }
 
+        function getOriginalUpgradeForInvoiceItem(room, item, roomIndex) {
+            if (!invoiceData.client_upgraded || !Array.isArray(invoiceData.original_rooms)) return null;
+            var originalRoom = invoiceData.original_rooms[roomIndex] || invoiceData.original_rooms.find(function(r) {
+                return r && room && r.name === room.name;
+            });
+            if (!originalRoom || !Array.isArray(originalRoom.items)) return null;
+            var itemName = item.description || item.name || '';
+            return originalRoom.items.find(function(originalItem) {
+                return originalItem && originalItem.upgrade && originalItem.upgrade.name === itemName;
+            }) || null;
+        }
+
+        function getInvoiceUpgradeDescription(item, originalUpgradeItem) {
+            var upgrade = item && item.upgrade ? item.upgrade : (originalUpgradeItem && originalUpgradeItem.upgrade ? originalUpgradeItem.upgrade : null);
+            if (!upgrade) return '';
+            return upgrade.description || upgrade.itemDescription || upgrade.item_description || upgrade.notes || upgrade.longDescription || '';
+        }
+
+        function getInvoiceItemDescription(item, originalUpgradeItem, isUpgraded) {
+            if (isUpgraded) return getInvoiceUpgradeDescription(item, originalUpgradeItem);
+            return item.itemDescription || item.displayDescription || item.actualDescription || '';
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             // Load user's uploaded logo (localStorage first, then Supabase)
             var savedLogo = localStorage.getItem('ald_company_logo') || localStorage.getItem('ald_logo');
@@ -653,7 +676,7 @@ if (location.search.includes('debug')) {
             let subtotal = 0;
             let html = '';
 
-            invoiceData.rooms.forEach(room => {
+            invoiceData.rooms.forEach((room, roomIndex) => {
                 const headerBg = ROOM_COLORS[room.colorIndex ?? 0] || ROOM_COLORS[0];
                 const roomTotal = room.items.reduce((sum, item) => {
                     const rate = item.upgraded && item.upgrade ? item.upgrade.rate : item.rate;
@@ -696,13 +719,12 @@ if (location.search.includes('debug')) {
                     html += `<tr><td colspan="4" style="background:#f0f4ff; padding:4px 8px; font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:#495057;"><i class="fas fa-tag me-1" style="color:#6c757d;"></i>${canonicalCat(catName)}</td></tr>`;
 
                     catItems.forEach(item => {
-                    const isUpgraded = !!item.upgraded;
+                    const originalUpgradeItem = getOriginalUpgradeForInvoiceItem(room, item, roomIndex);
+                    const isUpgraded = !!item.upgraded || !!originalUpgradeItem;
                     const activeRate = isUpgraded && item.upgrade ? item.upgrade.rate : (item.rate || 0);
                     const itemTotal = (item.quantity || 0) * activeRate;
                     const displayName = isUpgraded && item.upgrade ? item.upgrade.name : (item.description || item.name || 'Item');
-                    const displayDesc = isUpgraded && item.upgrade?.description
-                        ? item.upgrade.description
-                        : (item.itemDescription || '');
+                    const displayDesc = getInvoiceItemDescription(item, originalUpgradeItem, isUpgraded);
                     const descHtml = settings.showDescriptions !== false
                         ? (renderCollapsibleDescription(displayDesc) + renderCollapsibleDescription(item.notes, '<i class="fas fa-info-circle"></i> '))
                         : '';
