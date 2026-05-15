@@ -864,6 +864,18 @@ if (location.search.includes('debug')) {
             } catch(e) { return null; }
         }
 
+        function loadLocalPaymentSettingsSnapshot() {
+            try {
+                return JSON.parse(localStorage.getItem('ald_payment_settings') || 'null');
+            } catch(e) {
+                return null;
+            }
+        }
+
+        function getInvoicePaymentSettingsFallback() {
+            return invoiceData.paymentSettings || invoiceData.payment_settings || loadLocalPaymentSettingsSnapshot();
+        }
+
         function withDefaultPaymentSettings(settings) {
             var profile = invoiceData.businessProfile || {};
             return Object.assign({
@@ -880,7 +892,7 @@ if (location.search.includes('debug')) {
 
         function renderInvoicePaymentOptions(settings, total, invoiceId) {
             if (getInvoiceSettings().showPaymentOptions === false || !total) return;
-            var s = withDefaultPaymentSettings(settings);
+            var s = withDefaultPaymentSettings(settings || getInvoicePaymentSettingsFallback());
             _invoicePaymentSettings = s;
             _invoiceTotalForPayment = total || 0;
             _invoiceIdForPayment = invoiceId || '';
@@ -922,12 +934,13 @@ if (location.search.includes('debug')) {
             if (getInvoiceSettings().showPaymentOptions === false) return;
             _invoiceTotalForPayment = total || 0;
             _invoiceIdForPayment = invoiceId;
-            if (!contractorUserId || !total) return;
+            if (!total) return;
             if (new URLSearchParams(window.location.search).get('payment') === 'success') {
                 showPaymentReturnNotice();
                 return;
             }
             _invoicePaymentSettings = await loadContractorPaymentSettings(contractorUserId);
+            if (!_invoicePaymentSettings) _invoicePaymentSettings = getInvoicePaymentSettingsFallback();
             renderInvoicePaymentOptions(_invoicePaymentSettings, total, invoiceId);
         }
 

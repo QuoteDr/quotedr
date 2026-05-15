@@ -4905,6 +4905,14 @@ Example:
             return window.location.href.split('?')[0].split('#')[0].replace(/quote-builder(\.html)?\/?$/, 'invoice-viewer');
         }
 
+        function getLocalPaymentSettingsSnapshot() {
+            try {
+                return JSON.parse(localStorage.getItem('ald_payment_settings') || 'null');
+            } catch(e) {
+                return null;
+            }
+        }
+
         function buildInvoiceData(invoiceId) {
             var taxPrefs = getBuilderTaxPrefs();
             return {
@@ -4920,6 +4928,7 @@ Example:
                 taxRate: taxPrefs.rate,
                 taxLabel: taxPrefs.label,
                 currency: taxPrefs.currency,
+                paymentSettings: getLocalPaymentSettingsSnapshot(),
                 invoiceSettings: getInvoiceSettings()
             };
         }
@@ -4932,6 +4941,14 @@ Example:
             }
             var invoiceId = 'invoice_' + Date.now();
             var invoiceData = buildInvoiceData(invoiceId);
+            if (typeof loadPaymentSettings === 'function') {
+                try {
+                    var latestPaymentSettings = await loadPaymentSettings();
+                    if (latestPaymentSettings) invoiceData.paymentSettings = latestPaymentSettings;
+                } catch(e) {
+                    console.warn('Could not load latest payment settings for invoice:', e);
+                }
+            }
             if (window._supabaseQuoteId && window.QuoteDrChangeOrders && typeof _supabase !== 'undefined') {
                 try {
                     var coRes = await _supabase.from('quotes').select('*').eq('parent_quote_id', window._supabaseQuoteId).order('change_order_number', { ascending: true });
