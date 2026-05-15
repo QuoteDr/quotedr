@@ -5910,6 +5910,21 @@ Example:
             return profile.owner_name || profile.ownerName || profile.name || '';
         }
 
+        async function getBusinessProfileForInvoiceSubject() {
+            var profile = (typeof window !== 'undefined' && window.invoiceBusinessProfile) ? window.invoiceBusinessProfile : {};
+            try {
+                var localProfile = JSON.parse(localStorage.getItem('ald_business_profile') || '{}');
+                if (localProfile && Object.keys(localProfile).length) profile = localProfile;
+            } catch(e) {}
+            if (typeof loadBusinessProfile === 'function') {
+                try {
+                    var cloudProfile = await loadBusinessProfile();
+                    if (cloudProfile) profile = cloudProfile;
+                } catch(e) {}
+            }
+            return profile || {};
+        }
+
         async function generateInvoiceLink() {
             try {
             var invoiceState = await prepareInvoiceForViewer({ markInvoiced: true });
@@ -5956,7 +5971,7 @@ Example:
             if (sendEmailEl) sendEmailEl.value = clientEmail || '';
             var subjectEl = document.getElementById('sendInvoiceSubject');
             if (subjectEl) {
-                var profileForSubject = invoiceBusinessProfile || {};
+                var profileForSubject = await getBusinessProfileForInvoiceSubject();
                 var companyForSubject = getProfileCompanyName(profileForSubject) || 'Your Contractor';
                 subjectEl.value = 'Invoice from ' + companyForSubject;
             }
