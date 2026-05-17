@@ -16,9 +16,9 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { clientName, clientEmail, contractorId, quoteId, pin } = await req.json();
+    const { clientName, clientEmail, contractorId, quoteId, portalId, pin } = await req.json();
 
-    if ((!clientName && !clientEmail && !quoteId) || !contractorId || !pin) {
+    if ((!clientName && !clientEmail && !quoteId && !portalId) || !contractorId || !pin) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -33,6 +33,7 @@ Deno.serve(async (req) => {
     const normalizedEmail = normalize(clientEmail);
     const normalizedName = normalize(clientName);
     const normalizedQuoteId = String(quoteId ?? '').trim();
+    const normalizedPortalId = String(portalId ?? '').trim();
     const enteredPin = String(pin ?? '').trim();
 
     // Fetch quotes for this contractor, then match the client server-side.
@@ -52,7 +53,10 @@ Deno.serve(async (req) => {
     const matchingQuotes = (quotes || []).filter((quote) => {
       const data = quote.data || {};
       const quoteEmail = normalize(data.clientEmail || data.email || data.client_email);
-      const quoteName = normalize(quote.client_name || data.clientName || data.client_name);
+      const quoteName = normalize(data.portal_client_name || quote.client_name || data.clientName || data.client_name);
+      if (normalizedPortalId) {
+        return data.portal_id === normalizedPortalId;
+      }
       return (
         (normalizedQuoteId && quote.id === normalizedQuoteId) ||
         (normalizedEmail && quoteEmail && quoteEmail === normalizedEmail) ||

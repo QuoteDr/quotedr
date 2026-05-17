@@ -161,6 +161,9 @@
                             <button class="btn btn-sm btn-primary" onclick="openNewQuoteModal()">
                                 <i class="fas fa-plus me-1"></i> New Quote
                             </button>
+                            <button class="btn btn-sm btn-outline-primary" onclick="openPortalManager()">
+                                <i class="fas fa-folder-open me-1"></i> Manage Portals
+                            </button>
                             <a class="btn btn-sm btn-outline-primary" href="home-depot-tracker.html" onclick="return openJobTracker(event)">
                                 <i class="fas fa-folder-tree me-1"></i> Job Tracker
                             </a>
@@ -248,7 +251,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-v2.js?v=1778194800"></script>
     <script>
-        // ─── DASHBOARD FUNCTIONS ─────────────────────────────────────────────────────
+        // DASHBOARD FUNCTIONS
 
         let allQuotes = []; // Store all quotes for client-side filtering
 
@@ -293,7 +296,7 @@
             try {
                 const { data, error } = await listQuotesFromSupabase();
                 if (error === 'Not authenticated') {
-                    // Retry after delay — session may not be ready yet
+                    // Retry after delay - session may not be ready yet
                     setTimeout(async function() {
                         const retry = await listQuotesFromSupabase();
                         if (!retry.error) {
@@ -365,7 +368,7 @@
                 el.innerHTML = `<div class="text-center py-5">
                     <i class="fas fa-file-invoice fa-4x mb-4" style="color:#1a56a0; opacity:0.3;"></i>
                     <h4 style="color:#444;">No quotes yet</h4>
-                    <p class="text-muted mb-4">Start building your first professional quote — it only takes a minute.</p>
+                    <p class="text-muted mb-4">Start building your first professional quote - it only takes a minute.</p>
                     <button onclick="openNewQuoteModal()" class="btn btn-lg" style="background:#e87e2a; color:#fff; font-weight:600;">
                         <i class="fas fa-plus me-2"></i>Build Your First Quote
                     </button>
@@ -414,7 +417,7 @@
                               <button class="btn btn-success btn-sm" onclick="saveTitle(${jsAttr(q.id)})"><i class="fas fa-check"></i></button>
                               <button class="btn btn-outline-secondary btn-sm" onclick="cancelEditTitle(${jsAttr(q.id)})"><i class="fas fa-times"></i></button>
                             </div>
-                            <div class="text-muted small">${quoteTitle ? escapeHtml(clientName) + ' · ' : ''}${quoteNumber ? '#' + escapeHtml(quoteNumber) + ' · ' : ''}${escapeHtml(formatDate((q.data && q.data.savedAt) || q.created_at))}</div>
+                            <div class="text-muted small">${quoteTitle ? escapeHtml(clientName) + ' - ' : ''}${quoteNumber ? '#' + escapeHtml(quoteNumber) + ' - ' : ''}${escapeHtml(formatDate((q.data && q.data.savedAt) || q.created_at))}</div>
                         </div>
                         <div class="text-end d-flex flex-column align-items-end gap-1">
                             <div class="fw-bold">$${parseFloat(q.total || 0).toFixed(2)}</div>
@@ -439,7 +442,7 @@
                     ${pendingCos ? `<div class="alert alert-info py-1 px-2 mt-2 mb-0 small"><i class="fas fa-file-circle-plus me-1"></i><strong>${pendingCos} pending change order${pendingCos === 1 ? '' : 's'}</strong></div>` : ''}
                     ${status === 'in_review' ? `<button class="btn btn-warning btn-sm w-100 mt-2" onclick="openNotesReview(${jsAttr(q.id)}, ${jsAttr(clientName)})"><i class="fas fa-comments me-1"></i> Review Client Notes</button>` : ''}
                     ${(!isChangeOrder && (status === 'accepted' || status === 'invoiced')) ? `<button class="btn btn-warning btn-sm w-100 mt-1" onclick="openQuoteForChangeOrder(${jsAttr(q.id)})"><i class="fas fa-file-circle-plus me-1"></i>Create Change Order</button>` : ''}
-                    <button class="btn btn-sm w-100 mt-1 ${portalVisible ? 'btn-success' : 'btn-outline-secondary'}" onclick="togglePortalVisibility(${jsAttr(q.id)}, ${!portalVisible})" title="${portalVisible ? 'Remove from client portal' : 'Publish to client portal'}"><i class="fas ${portalVisible ? 'fa-eye' : 'fa-eye-slash'} me-1"></i> ${portalVisible ? 'In Portal' : 'Add to Portal'}</button>
+                    <button class="btn btn-sm w-100 mt-1 ${portalVisible ? 'btn-success' : 'btn-outline-secondary'}" onclick="openPortalAssignment(${jsAttr(q.id)})" title="${portalVisible ? 'Manage portal assignment' : 'Choose a client portal'}"><i class="fas ${portalVisible ? 'fa-eye' : 'fa-eye-slash'} me-1"></i> ${portalVisible ? 'In Portal' : 'Add to Portal'}</button>
                     <button class="btn btn-outline-info btn-sm w-100 mt-1" onclick="shareClientPortal(${jsAttr(q.id)}, ${jsAttr(clientName)}, ${jsAttr(clientEmail)})" title="Share client portal"><i class="fas fa-external-link-alt me-1"></i> Client Portal</button>
                     ${(status === 'sent' || status === 'viewed') ? `<button class="btn btn-outline-primary btn-sm w-100 mt-1" onclick="sendFollowUpReminder(${jsAttr(q.id)}, ${jsAttr(clientName)}, ${jsAttr(clientEmail)})"><i class="fas fa-bell me-1"></i> Send Follow-up</button>` : ''}
                 </div>
@@ -514,7 +517,7 @@
                 if (upgrades.length > 0) {
                     html += '<div class="card mb-3 border-success"><div class="card-header py-2" style="background:#d1e7dd;"><strong><i class="fas fa-arrow-up me-2 text-success"></i>Client Selected Upgrades</strong></div><div class="card-body py-2">';
                     upgrades.forEach(function(u) {
-                        html += '<div class="d-flex justify-content-between align-items-center py-1 border-bottom"><div><strong>' + u.room + ':</strong> ' + u.from + ' → <span class="text-success fw-bold">' + u.to + '</span></div><div class="text-success fw-bold">+$' + parseFloat(u.diff || 0).toFixed(2) + '</div></div>';
+                        html += '<div class="d-flex justify-content-between align-items-center py-1 border-bottom"><div><strong>' + u.room + ':</strong> ' + u.from + ' &rarr; <span class="text-success fw-bold">' + u.to + '</span></div><div class="text-success fw-bold">+$' + parseFloat(u.diff || 0).toFixed(2) + '</div></div>';
                     });
                     var upgradeTotal = upgrades.reduce(function(s, u) { return s + parseFloat(u.diff || 0); }, 0);
                     html += '<div class="d-flex justify-content-between pt-2"><strong>Upgrade Total</strong><strong class="text-success">+$' + upgradeTotal.toFixed(2) + '</strong></div>';
@@ -524,7 +527,7 @@
                 if (choiceGroups.length > 0) {
                     html += '<div class="card mb-3 border-primary"><div class="card-header py-2" style="background:#cfe2ff;"><strong><i class="fas fa-layer-group me-2 text-primary"></i>Client Selected Options</strong></div><div class="card-body py-2">';
                     choiceGroups.forEach(function(choice) {
-                        html += '<div class="d-flex justify-content-between align-items-center py-1 border-bottom"><div><strong>' + choice.room + ':</strong> ' + choice.group + ' â†’ <span class="text-primary fw-bold">' + choice.option + '</span></div><div class="text-primary fw-bold">$' + parseFloat(choice.total || 0).toFixed(2) + '</div></div>';
+                        html += '<div class="d-flex justify-content-between align-items-center py-1 border-bottom"><div><strong>' + choice.room + ':</strong> ' + choice.group + ' &rarr; <span class="text-primary fw-bold">' + choice.option + '</span></div><div class="text-primary fw-bold">$' + parseFloat(choice.total || 0).toFixed(2) + '</div></div>';
                     });
                     html += '</div></div>';
                 }
@@ -544,7 +547,7 @@
                         var idx = entry[0], note = entry[1];
                         if (!note || !note.trim()) return;
                         var roomName = (rooms[parseInt(idx)] && rooms[parseInt(idx)].name) || ('Room ' + (parseInt(idx)+1));
-                        html += '<div class="card mb-3 border-warning"><div class="card-header py-2" style="background:#fff3cd;"><strong><i class="fas fa-comment me-2"></i>' + roomName + ' — Client Note</strong></div><div class="card-body py-3"><p class="mb-2" style="white-space:pre-wrap;">' + note.trim() + '</p><button class="btn btn-outline-secondary btn-sm" onclick="copyNoteText(this, ' + JSON.stringify(roomName + ': ' + note.trim()) + ')"><i class="fas fa-copy me-1"></i>Copy</button></div></div>';
+                        html += '<div class="card mb-3 border-warning"><div class="card-header py-2" style="background:#fff3cd;"><strong><i class="fas fa-comment me-2"></i>' + roomName + ' - Client Note</strong></div><div class="card-body py-3"><p class="mb-2" style="white-space:pre-wrap;">' + note.trim() + '</p><button class="btn btn-outline-secondary btn-sm" onclick="copyNoteText(this, ' + JSON.stringify(roomName + ': ' + note.trim()) + ')"><i class="fas fa-copy me-1"></i>Copy</button></div></div>';
                     });
                 }
 
@@ -617,6 +620,626 @@
             }
         }
 
+        function quoteClientEmail(q) {
+            var d = q && q.data || {};
+            return d.clientEmail || d.email || d.client_email || '';
+        }
+
+        function quoteClientName(q) {
+            var d = q && q.data || {};
+            return q.client_name || d.clientName || d.client_name || 'Unnamed Client';
+        }
+
+        function quotePortalKey(q) {
+            var d = q && q.data || {};
+            if (d.portal_id) return String(d.portal_id);
+            var email = normalizePortalDashboardValue(quoteClientEmail(q));
+            var name = normalizePortalDashboardValue(quoteClientName(q));
+            return 'legacy-' + (email || name || q.id);
+        }
+
+        function portalSlug(value) {
+            return normalizePortalDashboardValue(value).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 36) || 'portal';
+        }
+
+        function makePortalId(name) {
+            if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+            return 'portal-' + portalSlug(name) + '-' + Date.now().toString(36);
+        }
+
+        function portalDomId(portalId) {
+            return String(portalId || '').replace(/[^a-zA-Z0-9_-]/g, '_');
+        }
+
+        function buildPortalRegistry(quotes) {
+            var map = {};
+            (quotes || []).forEach(function(q) {
+                var d = q.data || {};
+                if (!d.portal_visible) return;
+                var key = quotePortalKey(q);
+                var clientName = d.portal_client_name || quoteClientName(q);
+                var clientEmail = d.portal_client_email || quoteClientEmail(q);
+                if (!map[key]) {
+                    map[key] = {
+                        id: key,
+                        legacy: !d.portal_id,
+                        name: d.portal_name || clientName || 'Client Portal',
+                        clientName: clientName,
+                        clientEmail: clientEmail,
+                        pin: d.portal_pin || '',
+                        quoteIds: [],
+                        quotes: []
+                    };
+                }
+                map[key].quoteIds.push(q.id);
+                map[key].quotes.push(q);
+                if (!map[key].pin && d.portal_pin) map[key].pin = d.portal_pin;
+            });
+            return Object.values(map).sort(function(a, b) {
+                return a.name.localeCompare(b.name) || a.clientName.localeCompare(b.clientName);
+            });
+        }
+
+        function portalDocumentCount(portal) {
+            return (portal && portal.quotes || []).filter(function(q) {
+                return !(q.data && q.data.portal_placeholder);
+            }).length;
+        }
+
+        function portalThemeForDashboard(portal) {
+            var quoteWithTheme = (portal && portal.quotes || []).find(function(q) {
+                return q.data && q.data.portal_theme && q.data.portal_theme.useDefault !== true;
+            });
+            return quoteWithTheme ? quoteWithTheme.data.portal_theme : {};
+        }
+
+        function cleanPortalColor(value, fallback) {
+            var color = String(value || '').trim();
+            return /^#[0-9a-fA-F]{6}$/.test(color) ? color : fallback;
+        }
+
+        function openPortalAssignment(quoteId) {
+            var quote = (allQuotes || []).find(function(q) { return q.id === quoteId; });
+            if (!quote) { qdAlert('Could not find that quote. Please refresh and try again.'); return; }
+            window._portalAssignQuoteId = quoteId;
+            var d = quote.data || {};
+            document.getElementById('portalAssignQuoteTitle').textContent = (d.quoteTitle || quote.client_name || quote.quote_number || 'Selected quote');
+            document.getElementById('portalAssignSelectedWrap').style.display = '';
+            document.getElementById('portalAssignCreateWrap').style.display = '';
+            document.getElementById('portalAssignCreateBtn').innerHTML = '<i class="fas fa-plus me-1"></i>Create Portal & Add';
+            document.getElementById('portalAssignRemoveBtn').style.display = '';
+            document.getElementById('portalAssignClientName').value = quoteClientName(quote);
+            document.getElementById('portalAssignClientEmail').value = quoteClientEmail(quote);
+            document.getElementById('portalAssignPortalName').value = d.portal_name || quoteClientName(quote);
+            renderPortalAssignmentList();
+            var modal = new bootstrap.Modal(document.getElementById('portalAssignModal'));
+            modal.show();
+        }
+
+        function openPortalManager() {
+            window._portalAssignQuoteId = '';
+            window._portalMergeMode = false;
+            window._portalMergeSelected = {};
+            document.getElementById('portalAssignQuoteTitle').textContent = 'Manage all client portals';
+            document.getElementById('portalAssignSelectedWrap').style.display = 'none';
+            document.getElementById('portalAssignCreateWrap').style.display = 'none';
+            document.getElementById('portalAssignClientName').value = '';
+            document.getElementById('portalAssignClientEmail').value = '';
+            document.getElementById('portalAssignPortalName').value = '';
+            document.getElementById('portalAssignCreateBtn').innerHTML = '<i class="fas fa-plus me-1"></i>Create Empty Portal';
+            document.getElementById('portalAssignRemoveBtn').style.display = 'none';
+            renderPortalAssignmentList();
+            var modal = new bootstrap.Modal(document.getElementById('portalAssignModal'));
+            modal.show();
+        }
+
+        function showNewPortalForm() {
+            window._portalAssignQuoteId = window._portalAssignQuoteId || '';
+            document.getElementById('portalAssignCreateWrap').style.display = '';
+            if (!window._portalAssignQuoteId) {
+                document.getElementById('portalAssignClientName').value = '';
+                document.getElementById('portalAssignClientEmail').value = '';
+                document.getElementById('portalAssignPortalName').value = '';
+                document.getElementById('portalAssignClientName').focus();
+            }
+        }
+
+        function renderPortalAssignmentList() {
+            var wrap = document.getElementById('portalAssignList');
+            if (!wrap) return;
+            var quoteId = window._portalAssignQuoteId || '';
+            var hasSelectedQuote = !!quoteId;
+            var portals = buildPortalRegistry(allQuotes);
+            renderPortalMergeActions(portals);
+            if (!portals.length) {
+                wrap.innerHTML = '<div class="text-muted small border rounded p-3">No portals exist yet. Click Add New Portal to create one.</div>';
+                return;
+            }
+            window._portalMergeSelected = window._portalMergeSelected || {};
+            var mergeMode = !!window._portalMergeMode;
+            wrap.innerHTML = portals.map(function(portal) {
+                var selected = portal.quoteIds.includes(quoteId);
+                var portalDom = escapeHtml(portalDomId(portal.id));
+                var docCount = portalDocumentCount(portal);
+                var theme = portalThemeForDashboard(portal);
+                var hasCustomTheme = !!(theme.headerColor || theme.bgColor || theme.textColor);
+                var contractor = (portal.quotes && portal.quotes[0] && portal.quotes[0].user_id) || (window.currentUser && window.currentUser.id) || '';
+                var portalForUrl = Object.assign({}, portal, { contractorId: contractor });
+                var portalOpenUrl = portalUrlForDashboard(portalForUrl, window._portalAssignQuoteId || '', { admin: true });
+                var portalClientUrl = portalUrlForDashboard(portalForUrl, window._portalAssignQuoteId || '');
+                var addButton = hasSelectedQuote
+                    ? '<button type="button" class="btn btn-primary btn-sm" onclick="assignQuoteToPortal(' + jsAttr(portal.id) + ')"><i class="fas fa-folder-plus me-1"></i>Add here</button>'
+                    : '';
+                var mergeBox = mergeMode
+                    ? '<div class="form-check me-2 mt-1"><input class="form-check-input" type="checkbox" id="portal-merge-' + portalDom + '" ' + (window._portalMergeSelected[portal.id] ? 'checked' : '') + ' onchange="togglePortalMergeSelection(' + jsAttr(portal.id) + ', this.checked)"><label class="visually-hidden" for="portal-merge-' + portalDom + '">Select portal to merge</label></div>'
+                    : '';
+                return '<div class="border rounded p-2 mb-2 ' + (selected ? 'border-success bg-light' : '') + '">' +
+                    '<div class="d-flex justify-content-between gap-2 flex-wrap align-items-start">' +
+                    '<div class="d-flex align-items-start">' + mergeBox +
+                    '<div><div class="fw-bold">' + escapeHtml(portal.name) + (selected ? ' <span class="badge bg-success">Selected</span>' : '') + '</div>' +
+                    '<div class="text-muted small">' + escapeHtml(portal.clientName || 'Client') + (portal.clientEmail ? ' - ' + escapeHtml(portal.clientEmail) : '') + ' - ' + docCount + ' document' + (docCount === 1 ? '' : 's') + '</div></div></div>' +
+                    '<div class="d-flex gap-1 flex-wrap">' +
+                    addButton +
+                    '<a class="btn btn-outline-info btn-sm" href="' + escapeHtml(portalOpenUrl) + '"><i class="fas fa-arrow-up-right-from-square me-1"></i>Open</a>' +
+                    '<button type="button" class="btn btn-outline-secondary btn-sm" onclick="togglePortalPinEditor(' + jsAttr(portal.id) + ')"><i class="fas fa-key me-1"></i>PIN</button>' +
+                    '</div></div>' +
+                    '<div class="input-group input-group-sm mt-2"><input class="form-control" id="portal-name-' + portalDom + '" value="' + escapeHtml(portal.name) + '" aria-label="Portal name"><button class="btn btn-outline-secondary" type="button" onclick="renamePortal(' + jsAttr(portal.id) + ')">Rename</button><button class="btn btn-outline-primary" type="button" onclick="togglePortalThemeEditor(' + jsAttr(portal.id) + ')"><i class="fas fa-paint-brush me-1"></i>' + (hasCustomTheme ? 'Theme Set' : 'Theme') + '</button><button class="btn btn-outline-danger" type="button" onclick="deletePortal(' + jsAttr(portal.id) + ')">Delete</button></div>' +
+                    (window._portalPinEditorId === portal.id ? renderPortalPinEditor(portal, portalClientUrl) : '') +
+                    (window._portalThemeEditorId === portal.id ? renderPortalThemeEditor(portal, portalDom, theme) : '') +
+                    '</div>';
+            }).join('');
+        }
+
+        function renderPortalPinEditor(portal, portalClientUrl) {
+            var pin = String(portal.pin || '').trim();
+            var pinText = pin || 'Not set';
+            return '<div class="border rounded p-3 mt-2 bg-light">' +
+                '<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2">' +
+                '<div><strong><i class="fas fa-key me-1"></i>Portal PIN</strong><div class="small text-muted">Clients use this PIN to unlock this portal.</div></div>' +
+                '<div class="px-3 py-2 rounded text-center" style="background:#fff;border:1px solid #d8e0ea;min-width:120px;font-size:1.5rem;font-weight:800;letter-spacing:0.35rem;color:#1a2940;">' + escapeHtml(pinText) + '</div>' +
+                '</div>' +
+                '<div class="input-group input-group-sm mb-2"><span class="input-group-text">Client link</span><input class="form-control" value="' + escapeHtml(portalClientUrl) + '" readonly><button class="btn btn-outline-secondary" type="button" onclick="copyPortalPinBundle(' + jsAttr(portal.id) + ')"><i class="fas fa-copy me-1"></i>Copy Link + PIN</button></div>' +
+                '<button type="button" class="btn btn-outline-warning btn-sm" onclick="changePortalPin(' + jsAttr(portal.id) + ')"><i class="fas fa-rotate me-1"></i>Generate New PIN</button>' +
+                '</div>';
+        }
+
+        function togglePortalPinEditor(portalId) {
+            window._portalPinEditorId = window._portalPinEditorId === portalId ? '' : portalId;
+            renderPortalAssignmentList();
+        }
+
+        async function copyPortalPinBundle(portalId) {
+            var portal = buildPortalRegistry(allQuotes).find(function(p) { return p.id === portalId; });
+            if (!portal) return;
+            var contractor = (portal.quotes && portal.quotes[0] && portal.quotes[0].user_id) || (window.currentUser && window.currentUser.id) || '';
+            var url = portalUrlForDashboard(Object.assign({}, portal, { contractorId: contractor }), window._portalAssignQuoteId || '');
+            var pin = portal.pin || 'Not set';
+            await navigator.clipboard.writeText('Client Portal: ' + url + '\nPIN: ' + pin).catch(function(){});
+            var btn = event.target.closest('button');
+            if (btn) {
+                var orig = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check me-1"></i>Copied';
+                setTimeout(function(){ btn.innerHTML = orig; }, 1500);
+            }
+        }
+
+        async function changePortalPin(portalId) {
+            var portal = buildPortalRegistry(allQuotes).find(function(p) { return p.id === portalId; });
+            if (!portal) return;
+            if (!(await qdConfirm('Generate a new PIN for "' + portal.name + '"? The old PIN will stop working for this portal.'))) return;
+            var newPin = Math.floor(1000 + Math.random() * 9000).toString();
+            try {
+                for (var i = 0; i < portal.quoteIds.length; i++) {
+                    var row = (allQuotes || []).find(function(q) { return q.id === portal.quoteIds[i]; });
+                    if (!row) continue;
+                    var data = Object.assign({}, row.data || {}, { portal_pin: newPin });
+                    var result = await _supabase.from('quotes').update({ data: data }).eq('id', row.id);
+                    if (result.error) throw result.error;
+                }
+                window._portalPinEditorId = portalId;
+                await refreshQuotes();
+                renderPortalAssignmentList();
+            } catch(err) {
+                qdAlert('Could not change portal PIN: ' + err.message);
+            }
+        }
+
+        function renderPortalThemeEditor(portal, portalDom, theme) {
+            var headerColor = cleanPortalColor(theme.headerColor, '#1a2940');
+            var bgColor = cleanPortalColor(theme.bgColor, '#f5f7fb');
+            var textColor = cleanPortalColor(theme.textColor, '#1a2940');
+            var customChecked = (theme.headerColor || theme.bgColor || theme.textColor) ? 'checked' : '';
+            return '<div class="border rounded p-3 mt-2 bg-light">' +
+                '<div class="d-flex justify-content-between align-items-center mb-2 gap-2 flex-wrap">' +
+                '<div><strong><i class="fas fa-paint-brush me-1"></i>Portal Theme</strong><div class="small text-muted">Leave custom theme off to use the default Client Portal Appearance from Settings.</div></div>' +
+                '<div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="portal-theme-custom-' + portalDom + '" ' + customChecked + ' onchange="togglePortalThemeCustom(' + jsAttr(portal.id) + ', this.checked)"><label class="form-check-label small" for="portal-theme-custom-' + portalDom + '">Custom theme</label></div>' +
+                '</div>' +
+                '<div class="row g-2 align-items-end">' +
+                '<div class="col-sm-4"><label class="form-label small mb-1" for="portal-theme-header-' + portalDom + '">Header</label><input type="color" class="form-control form-control-color" id="portal-theme-header-' + portalDom + '" value="' + headerColor + '" oninput="updatePortalThemePreview(' + jsAttr(portal.id) + ')"></div>' +
+                '<div class="col-sm-4"><label class="form-label small mb-1" for="portal-theme-bg-' + portalDom + '">Background</label><input type="color" class="form-control form-control-color" id="portal-theme-bg-' + portalDom + '" value="' + bgColor + '" oninput="updatePortalThemePreview(' + jsAttr(portal.id) + ')"></div>' +
+                '<div class="col-sm-4"><label class="form-label small mb-1" for="portal-theme-text-' + portalDom + '">Accent / Text</label><input type="color" class="form-control form-control-color" id="portal-theme-text-' + portalDom + '" value="' + textColor + '" oninput="updatePortalThemePreview(' + jsAttr(portal.id) + ')"></div>' +
+                '</div>' +
+                '<div id="portal-theme-preview-' + portalDom + '" class="mt-3 rounded overflow-hidden border" style="max-width:360px;"><div class="p-2" style="background:' + headerColor + ';color:' + textColor + ';font-weight:700;">Client Portal Header</div><div class="p-2" style="background:' + bgColor + ';color:' + textColor + ';">Quote card preview</div></div>' +
+                '<div class="d-flex gap-2 mt-3"><button type="button" class="btn btn-primary btn-sm" onclick="savePortalThemeOverride(' + jsAttr(portal.id) + ')"><i class="fas fa-save me-1"></i>Save Theme</button><button type="button" class="btn btn-outline-secondary btn-sm" onclick="resetPortalThemeOverride(' + jsAttr(portal.id) + ')">Use Default Theme</button></div>' +
+                '</div>';
+        }
+
+        function togglePortalThemeEditor(portalId) {
+            window._portalThemeEditorId = window._portalThemeEditorId === portalId ? '' : portalId;
+            renderPortalAssignmentList();
+        }
+
+        function togglePortalThemeCustom(portalId, enabled) {
+            var portalDom = portalDomId(portalId);
+            ['header', 'bg', 'text'].forEach(function(part) {
+                var input = document.getElementById('portal-theme-' + part + '-' + portalDom);
+                if (input) input.disabled = !enabled;
+            });
+        }
+
+        function updatePortalThemePreview(portalId) {
+            var portalDom = portalDomId(portalId);
+            var preview = document.getElementById('portal-theme-preview-' + portalDom);
+            if (!preview) return;
+            var header = document.getElementById('portal-theme-header-' + portalDom)?.value || '#1a2940';
+            var bg = document.getElementById('portal-theme-bg-' + portalDom)?.value || '#f5f7fb';
+            var text = document.getElementById('portal-theme-text-' + portalDom)?.value || '#1a2940';
+            var parts = preview.children;
+            if (parts[0]) { parts[0].style.background = header; parts[0].style.color = text; }
+            if (parts[1]) { parts[1].style.background = bg; parts[1].style.color = text; }
+        }
+
+        async function savePortalThemeOverride(portalId) {
+            var portal = buildPortalRegistry(allQuotes).find(function(p) { return p.id === portalId; });
+            if (!portal) return;
+            var portalDom = portalDomId(portalId);
+            var useCustom = document.getElementById('portal-theme-custom-' + portalDom)?.checked;
+            var theme = useCustom ? {
+                headerColor: cleanPortalColor(document.getElementById('portal-theme-header-' + portalDom)?.value, '#1a2940'),
+                bgColor: cleanPortalColor(document.getElementById('portal-theme-bg-' + portalDom)?.value, '#f5f7fb'),
+                textColor: cleanPortalColor(document.getElementById('portal-theme-text-' + portalDom)?.value, '#1a2940')
+            } : null;
+            try {
+                for (var i = 0; i < portal.quoteIds.length; i++) {
+                    var row = (allQuotes || []).find(function(q) { return q.id === portal.quoteIds[i]; });
+                    if (!row) continue;
+                    var data = Object.assign({}, row.data || {});
+                    if (theme) {
+                        data.portal_theme = theme;
+                    } else {
+                        delete data.portal_theme;
+                    }
+                    var result = await _supabase.from('quotes').update({ data: data }).eq('id', row.id);
+                    if (result.error) throw result.error;
+                }
+                await refreshQuotes();
+                window._portalThemeEditorId = portalId;
+                renderPortalAssignmentList();
+            } catch(err) {
+                qdAlert('Could not save portal theme: ' + err.message);
+            }
+        }
+
+        async function resetPortalThemeOverride(portalId) {
+            window._portalThemeEditorId = portalId;
+            var checkbox = document.getElementById('portal-theme-custom-' + portalDomId(portalId));
+            if (checkbox) checkbox.checked = false;
+            await savePortalThemeOverride(portalId);
+        }
+
+        function startPortalMergeMode() {
+            window._portalMergeMode = true;
+            window._portalMergeSelected = {};
+            renderPortalAssignmentList();
+        }
+
+        function cancelPortalMergeMode() {
+            window._portalMergeMode = false;
+            window._portalMergeSelected = {};
+            renderPortalAssignmentList();
+        }
+
+        function togglePortalMergeSelection(portalId, checked) {
+            window._portalMergeSelected = window._portalMergeSelected || {};
+            if (checked) {
+                window._portalMergeSelected[portalId] = true;
+            } else {
+                delete window._portalMergeSelected[portalId];
+            }
+            renderPortalAssignmentList();
+        }
+
+        function renderPortalMergeActions(portals) {
+            var wrap = document.getElementById('portalMergeActions');
+            if (!wrap) return;
+            if (!window._portalMergeMode) {
+                wrap.innerHTML = '';
+                return;
+            }
+            window._portalMergeSelected = window._portalMergeSelected || {};
+            var selectedIds = Object.keys(window._portalMergeSelected).filter(function(id) { return window._portalMergeSelected[id]; });
+            var selectedPortals = (portals || []).filter(function(portal) { return selectedIds.includes(String(portal.id)); });
+            var targetOptions = selectedPortals.map(function(portal) {
+                return '<option value="' + escapeHtml(portal.id) + '">' + escapeHtml(portal.name) + ' - ' + portalDocumentCount(portal) + ' document' + (portalDocumentCount(portal) === 1 ? '' : 's') + '</option>';
+            }).join('');
+            wrap.innerHTML = '<div class="alert alert-warning border d-flex flex-wrap align-items-end gap-2 mb-3">' +
+                '<div class="me-auto"><strong><i class="fas fa-code-merge me-1"></i>Merge mode</strong><div class="small">Select two or more portals, choose the portal to keep, then merge. This cannot be undone.</div></div>' +
+                '<div><label class="form-label small mb-1" for="portalMergeTarget">Merge into</label><select class="form-select form-select-sm" id="portalMergeTarget" ' + (selectedPortals.length < 2 ? 'disabled' : '') + '>' + (targetOptions || '<option>Select portals first</option>') + '</select></div>' +
+                '<button type="button" class="btn btn-warning btn-sm" onclick="mergeSelectedPortals()" ' + (selectedPortals.length < 2 ? 'disabled' : '') + '><i class="fas fa-code-merge me-1"></i>Merge Selected</button>' +
+                '<button type="button" class="btn btn-outline-secondary btn-sm" onclick="cancelPortalMergeMode()">Cancel</button>' +
+                '</div>';
+        }
+
+        async function mergeSelectedPortals() {
+            var selectedIds = Object.keys(window._portalMergeSelected || {}).filter(function(id) { return window._portalMergeSelected[id]; });
+            if (selectedIds.length < 2) {
+                qdAlert('Select at least two portals to merge.');
+                return;
+            }
+            var targetSelect = document.getElementById('portalMergeTarget');
+            var targetId = targetSelect ? targetSelect.value : '';
+            if (!targetId || !selectedIds.includes(targetId)) {
+                qdAlert('Choose which selected portal should be kept.');
+                return;
+            }
+            var portals = buildPortalRegistry(allQuotes);
+            var targetPortal = portals.find(function(portal) { return String(portal.id) === targetId; });
+            var selectedPortals = portals.filter(function(portal) { return selectedIds.includes(String(portal.id)); });
+            if (!targetPortal || selectedPortals.length < 2) return;
+            var docCount = selectedPortals.reduce(function(sum, portal) { return sum + portalDocumentCount(portal); }, 0);
+            var names = selectedPortals.map(function(portal) { return portal.name; }).join(', ');
+            var message = 'Merge ' + selectedPortals.length + ' portals into "' + targetPortal.name + '"? This will move ' + docCount + ' document' + (docCount === 1 ? '' : 's') + ' from: ' + names + '. This cannot be undone.';
+            if (!(await qdConfirm(message))) return;
+
+            var durablePortalId = targetPortal.legacy ? makePortalId(targetPortal.name) : targetPortal.id;
+            var targetPin = targetPortal.pin || Math.floor(1000 + Math.random() * 9000).toString();
+            var targetTheme = portalThemeForDashboard(targetPortal);
+            var hasTargetTheme = !!(targetTheme.headerColor || targetTheme.bgColor || targetTheme.textColor);
+            var rowsById = {};
+            selectedPortals.forEach(function(portal) {
+                portal.quotes.forEach(function(row) {
+                    rowsById[row.id] = { row: row, sourcePortalId: portal.id };
+                });
+            });
+
+            try {
+                for (var id in rowsById) {
+                    var item = rowsById[id];
+                    var row = item.row;
+                    var originalData = row.data || {};
+                    var isSourcePlaceholder = originalData.portal_placeholder && String(item.sourcePortalId) !== String(targetPortal.id);
+                    var data = Object.assign({}, originalData, {
+                        portal_visible: !isSourcePlaceholder,
+                        portal_id: durablePortalId,
+                        portal_name: targetPortal.name,
+                        portal_client_name: targetPortal.clientName || targetPortal.name,
+                        portal_client_email: targetPortal.clientEmail || '',
+                        portal_pin: targetPin
+                    });
+                    if (hasTargetTheme) {
+                        data.portal_theme = targetTheme;
+                    } else {
+                        delete data.portal_theme;
+                    }
+                    var result = await _supabase.from('quotes').update({ data: data }).eq('id', row.id);
+                    if (result.error) throw result.error;
+                }
+                window._portalMergeMode = false;
+                window._portalMergeSelected = {};
+                await refreshQuotes();
+                renderPortalAssignmentList();
+                qdAlert('Portals merged into "' + targetPortal.name + '".');
+            } catch(err) {
+                qdAlert('Could not merge portals: ' + err.message);
+            }
+        }
+
+        async function assignQuoteToPortal(portalId) {
+            var quoteId = window._portalAssignQuoteId || '';
+            var target = (allQuotes || []).find(function(q) { return q.id === quoteId; });
+            var portal = buildPortalRegistry(allQuotes).find(function(p) { return p.id === portalId; });
+            if (!target || !portal) return;
+            var durablePortalId = portal.legacy ? makePortalId(portal.name) : portal.id;
+            var pin = portal.pin || Math.floor(1000 + Math.random() * 9000).toString();
+            var portalTheme = portalThemeForDashboard(portal);
+            var hasPortalTheme = !!(portalTheme.headerColor || portalTheme.bgColor || portalTheme.textColor);
+            var idsToUpdate = portal.quoteIds.slice();
+            if (!idsToUpdate.includes(quoteId)) idsToUpdate.push(quoteId);
+            try {
+                for (var i = 0; i < idsToUpdate.length; i++) {
+                    var row = (allQuotes || []).find(function(q) { return q.id === idsToUpdate[i]; });
+                    if (!row) continue;
+                    var data = Object.assign({}, row.data || {}, {
+                        portal_visible: true,
+                        portal_id: durablePortalId,
+                        portal_name: portal.name,
+                        portal_client_name: portal.clientName || quoteClientName(target),
+                        portal_client_email: portal.clientEmail || quoteClientEmail(target),
+                        portal_pin: pin
+                    });
+                    if (hasPortalTheme) {
+                        data.portal_theme = portalTheme;
+                    } else {
+                        delete data.portal_theme;
+                    }
+                    var result = await _supabase.from('quotes').update({ data: data }).eq('id', row.id);
+                    if (result.error) throw result.error;
+                }
+                await refreshQuotes();
+                renderPortalAssignmentList();
+            } catch(err) {
+                qdAlert('Could not assign portal: ' + err.message);
+            }
+        }
+
+        async function createPortalForQuote() {
+            var quoteId = window._portalAssignQuoteId || '';
+            var target = (allQuotes || []).find(function(q) { return q.id === quoteId; });
+            var clientName = document.getElementById('portalAssignClientName').value.trim() || (target ? quoteClientName(target) : '');
+            var clientEmail = document.getElementById('portalAssignClientEmail').value.trim() || (target ? quoteClientEmail(target) : '');
+            var portalName = document.getElementById('portalAssignPortalName').value.trim() || clientName;
+            if (!portalName || !clientName) {
+                qdAlert('Enter a client and portal name first.');
+                return;
+            }
+            var portalId = makePortalId(portalName);
+            var pin = Math.floor(1000 + Math.random() * 9000).toString();
+            try {
+                if (target) {
+                    var data = Object.assign({}, target.data || {}, {
+                        portal_visible: true,
+                        portal_id: portalId,
+                        portal_name: portalName,
+                        portal_client_name: clientName,
+                        portal_client_email: clientEmail,
+                        portal_pin: pin
+                    });
+                    var result = await _supabase.from('quotes').update({ data: data }).eq('id', quoteId);
+                    if (result.error) throw result.error;
+                } else {
+                    var session = await _supabase.auth.getSession();
+                    var userId = session.data?.session?.user?.id;
+                    if (!userId) throw new Error('Not logged in');
+                    var placeholderData = {
+                        portal_visible: true,
+                        portal_placeholder: true,
+                        portal_id: portalId,
+                        portal_name: portalName,
+                        portal_client_name: clientName,
+                        portal_client_email: clientEmail,
+                        portal_pin: pin,
+                        clientName: clientName,
+                        clientEmail: clientEmail,
+                        quoteTitle: portalName + ' Portal',
+                        projectAddress: '',
+                        rooms: [],
+                        terms: []
+                    };
+                    var insertResult = await _supabase.from('quotes').insert({
+                        user_id: userId,
+                        client_name: clientName,
+                        quote_number: 'PORTAL-' + Date.now().toString(36).toUpperCase(),
+                        total: 0,
+                        status: 'draft',
+                        data: placeholderData
+                    });
+                    if (insertResult.error) throw insertResult.error;
+                }
+                await refreshQuotes();
+                document.getElementById('portalAssignCreateWrap').style.display = window._portalAssignQuoteId ? '' : 'none';
+                renderPortalAssignmentList();
+            } catch(err) {
+                qdAlert('Could not create portal: ' + err.message);
+            }
+        }
+
+        async function removeQuoteFromPortal() {
+            var quoteId = window._portalAssignQuoteId || '';
+            var target = (allQuotes || []).find(function(q) { return q.id === quoteId; });
+            if (!target) return;
+            var data = Object.assign({}, target.data || {}, { portal_visible: false });
+            try {
+                var result = await _supabase.from('quotes').update({ data: data }).eq('id', quoteId);
+                if (result.error) throw result.error;
+                await refreshQuotes();
+                renderPortalAssignmentList();
+            } catch(err) {
+                qdAlert('Could not remove from portal: ' + err.message);
+            }
+        }
+
+        async function renamePortal(portalId) {
+            var input = document.getElementById('portal-name-' + portalDomId(portalId));
+            var newName = input ? input.value.trim() : '';
+            if (!newName) return;
+            var portal = buildPortalRegistry(allQuotes).find(function(p) { return p.id === portalId; });
+            if (!portal) return;
+            try {
+                for (var i = 0; i < portal.quoteIds.length; i++) {
+                    var row = (allQuotes || []).find(function(q) { return q.id === portal.quoteIds[i]; });
+                    if (!row) continue;
+                    var data = Object.assign({}, row.data || {}, { portal_name: newName });
+                    var result = await _supabase.from('quotes').update({ data: data }).eq('id', row.id);
+                    if (result.error) throw result.error;
+                }
+                await refreshQuotes();
+                renderPortalAssignmentList();
+            } catch(err) {
+                qdAlert('Could not rename portal: ' + err.message);
+            }
+        }
+
+        async function deletePortal(portalId) {
+            var portal = buildPortalRegistry(allQuotes).find(function(p) { return p.id === portalId; });
+            if (!portal) return;
+            var docCount = portalDocumentCount(portal);
+            if (!(await qdConfirm('Remove this portal from ' + docCount + ' document' + (docCount === 1 ? '' : 's') + '?'))) return;
+            try {
+                for (var i = 0; i < portal.quoteIds.length; i++) {
+                    var row = (allQuotes || []).find(function(q) { return q.id === portal.quoteIds[i]; });
+                    if (!row) continue;
+                    var data = Object.assign({}, row.data || {}, { portal_visible: false });
+                    var result = await _supabase.from('quotes').update({ data: data }).eq('id', row.id);
+                    if (result.error) throw result.error;
+                }
+                await refreshQuotes();
+                renderPortalAssignmentList();
+            } catch(err) {
+                qdAlert('Could not delete portal: ' + err.message);
+            }
+        }
+
+        function portalUrlForDashboard(portal, quoteId, options) {
+            var params = [];
+            if (portal.clientEmail) params.push('email=' + encodeURIComponent(portal.clientEmail));
+            params.push('client=' + encodeURIComponent(portal.clientName || portal.name || 'Client'));
+            params.push('contractor=' + encodeURIComponent(portal.contractorId || ''));
+            if (portal.id && !String(portal.id).startsWith('legacy-')) params.push('portal=' + encodeURIComponent(portal.id));
+            if (quoteId) params.push('quote=' + encodeURIComponent(quoteId));
+            if (options && options.admin) params.push('admin=1');
+            return getClientPortalBaseUrl() + '?' + params.join('&');
+        }
+
+        function getClientPortalBaseUrl() {
+            if (['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+                return window.location.origin + '/client-portal.html';
+            }
+            return 'https://quotedr.io/client-portal.html';
+        }
+
+        function previewPortalFromDashboard(portalId) {
+            var portal = buildPortalRegistry(allQuotes).find(function(p) { return p.id === portalId; });
+            if (!portal) return;
+            var contractor = (portal.quotes && portal.quotes[0] && portal.quotes[0].user_id) || (window.currentUser && window.currentUser.id) || '';
+            var url = portalUrlForDashboard(Object.assign({}, portal, { contractorId: contractor }), window._portalAssignQuoteId || '', { admin: true });
+            window.location.href = url;
+        }
+
+        Object.assign(window, {
+            openPortalAssignment: openPortalAssignment,
+            openPortalManager: openPortalManager,
+            showNewPortalForm: showNewPortalForm,
+            renderPortalAssignmentList: renderPortalAssignmentList,
+            startPortalMergeMode: startPortalMergeMode,
+            cancelPortalMergeMode: cancelPortalMergeMode,
+            togglePortalMergeSelection: togglePortalMergeSelection,
+            mergeSelectedPortals: mergeSelectedPortals,
+            togglePortalPinEditor: togglePortalPinEditor,
+            copyPortalPinBundle: copyPortalPinBundle,
+            changePortalPin: changePortalPin,
+            togglePortalThemeEditor: togglePortalThemeEditor,
+            togglePortalThemeCustom: togglePortalThemeCustom,
+            updatePortalThemePreview: updatePortalThemePreview,
+            savePortalThemeOverride: savePortalThemeOverride,
+            resetPortalThemeOverride: resetPortalThemeOverride,
+            assignQuoteToPortal: assignQuoteToPortal,
+            createPortalForQuote: createPortalForQuote,
+            removeQuoteFromPortal: removeQuoteFromPortal,
+            renamePortal: renamePortal,
+            deletePortal: deletePortal,
+            previewPortalFromDashboard: previewPortalFromDashboard
+        });
+
         async function shareClientPortal(quoteId, clientName, savedEmail) {
             // Dismiss any stale Bootstrap backdrop before opening
             document.querySelectorAll('.modal-backdrop').forEach(function(el) { el.remove(); });
@@ -625,7 +1248,7 @@
             document.body.style.removeProperty('padding-right');
 
             var modalEl = document.getElementById('portalShareModal');
-            if (!modalEl) { qdAlert('Portal not found — please refresh.'); return; }
+            if (!modalEl) { qdAlert('Portal not found - please refresh.'); return; }
 
             // Pre-populate with loading state
             var nameEl = document.getElementById('portalClientName');
@@ -640,7 +1263,7 @@
             window._currentPortalQuoteId = quoteId || '';
             window._currentPortalClientEmail = savedEmail || '';
 
-            // Show modal — try multiple approaches
+            // Show modal - try multiple approaches
             try {
                 var existing = bootstrap.Modal.getInstance(modalEl);
                 if (existing) { existing.dispose(); }
@@ -651,7 +1274,7 @@
                 return;
             }
 
-            // Now load data async — modal is already visible
+            // Now load data async - modal is already visible
             try {
                 const session = await _supabase.auth.getSession();
                 const userId = session.data && session.data.session && session.data.session.user ? session.data.session.user.id : null;
@@ -670,9 +1293,12 @@
 
                 var selectedData = (selectedQuote && selectedQuote.data) || {};
                 var selectedEmail = savedEmail || selectedData.clientEmail || selectedData.email || selectedData.client_email || '';
-                var selectedName = clientName || (selectedQuote && selectedQuote.client_name) || selectedData.clientName || selectedData.client_name || '';
+                var selectedName = selectedData.portal_client_name || clientName || (selectedQuote && selectedQuote.client_name) || selectedData.clientName || selectedData.client_name || '';
+                var selectedPortalId = selectedData.portal_id || '';
+                var selectedPortalName = selectedData.portal_name || selectedName;
                 window._currentPortalClient = selectedName;
                 window._currentPortalClientEmail = selectedEmail;
+                window._currentPortalId = selectedPortalId;
 
                 // Look for existing PIN across related quotes for this client
                 var allResult = await _supabase.from('quotes').select('id, client_name, data').eq('user_id', userId);
@@ -682,8 +1308,9 @@
                 var quotes = allClientQuotes.filter(function(q) {
                     if (quoteId && q.id === quoteId) return true;
                     var d = q.data || {};
+                    if (selectedPortalId) return d.portal_id === selectedPortalId;
                     var qEmail = normalizePortalDashboardValue(d.clientEmail || d.email || d.client_email);
-                    var qName = normalizePortalDashboardValue(q.client_name || d.clientName || d.client_name);
+                    var qName = normalizePortalDashboardValue(d.portal_client_name || q.client_name || d.clientName || d.client_name);
                     if (clientKeyName) return qName === clientKeyName;
                     return clientKeyEmail && (qEmail === clientKeyEmail || qName === clientKeyEmail);
                 });
@@ -700,7 +1327,13 @@
                 if (!pin) {
                     pin = Math.floor(1000 + Math.random() * 9000).toString();
                     for (var j = 0; j < quotes.length; j++) {
-                        var newData = Object.assign({}, quotes[j].data || {}, { portal_pin: pin });
+                        var newData = Object.assign({}, quotes[j].data || {}, {
+                            portal_pin: pin,
+                            portal_id: selectedPortalId || (quotes[j].data && quotes[j].data.portal_id) || '',
+                            portal_name: selectedPortalName,
+                            portal_client_name: selectedName,
+                            portal_client_email: selectedEmail
+                        });
                         await _supabase.from('quotes').update({ data: newData }).eq('id', quotes[j].id);
                     }
                 }
@@ -718,8 +1351,9 @@
                 if (clientEmail) portalParams.push('email=' + encodeURIComponent(clientEmail));
                 portalParams.push('client=' + encodeURIComponent(selectedName || clientName || clientEmail || 'Client'));
                 portalParams.push('contractor=' + encodeURIComponent(userId));
+                if (selectedPortalId) portalParams.push('portal=' + encodeURIComponent(selectedPortalId));
                 if (quoteId) portalParams.push('quote=' + encodeURIComponent(quoteId));
-                var url = 'https://quotedr.io/client-portal.html?' + portalParams.join('&');
+                var url = getClientPortalBaseUrl() + '?' + portalParams.join('&');
                 var adminUrl = url + '&admin=1';
                 document.getElementById('portalUrlDisplay').value = url;
                 adminUrlEl = document.getElementById('portalAdminUrlDisplay');
@@ -728,9 +1362,9 @@
 
             } catch(err) {
                 console.error('shareClientPortal error:', err);
-                document.getElementById('portalUrlDisplay').value = 'Error loading — try again';
+                document.getElementById('portalUrlDisplay').value = 'Error loading - try again';
                 var adminUrlErrorEl = document.getElementById('portalAdminUrlDisplay');
-                if (adminUrlErrorEl) adminUrlErrorEl.value = 'Error loading — try again';
+                if (adminUrlErrorEl) adminUrlErrorEl.value = 'Error loading - try again';
                 document.getElementById('portalPinDisplay').textContent = '----';
             }
         }
@@ -766,6 +1400,7 @@
             var clientName = window._currentPortalClient;
             var quoteId = window._currentPortalQuoteId || '';
             var clientEmail = window._currentPortalClientEmail || '';
+            var portalId = window._currentPortalId || '';
             if (!clientName) return;
             var session = await _supabase.auth.getSession();
             var userId = session.data?.session?.user?.id;
@@ -777,8 +1412,9 @@
             var quotes = (allQuotes || []).filter(function(q) {
                 if (quoteId && q.id === quoteId) return true;
                 var d = q.data || {};
+                if (portalId) return d.portal_id === portalId;
                 var qEmail = normalizePortalDashboardValue(d.clientEmail || d.email || d.client_email);
-                var qName = normalizePortalDashboardValue(q.client_name || d.clientName || d.client_name);
+                var qName = normalizePortalDashboardValue(d.portal_client_name || q.client_name || d.clientName || d.client_name);
                 if (nameKey) return qName === nameKey;
                 return emailKey && (qEmail === emailKey || qName === emailKey);
             });
@@ -885,7 +1521,7 @@
 
         // Load user name
         document.addEventListener('DOMContentLoaded', async () => {
-            // Auth check — redirect to login if not signed in
+            // Auth check - redirect to login if not signed in
             const { data: { session } } = await _supabase.auth.getSession();
             if (!session) { window.location.href = 'login.html'; return; }
             window.currentUser = session.user;
@@ -894,7 +1530,7 @@
             var mob = document.getElementById('userNameMobile');
             if (mob) mob.textContent = userName;
 
-            // Load quotes — retry up to 3 times to handle auth session warmup
+            // Load quotes - retry up to 3 times to handle auth session warmup
             var attempts = 0;
             async function loadWithRetry() {
                 attempts++;
@@ -1072,7 +1708,7 @@
                                         cardsHtml += `
                                             <div class="kanban-card mb-2 p-2 bg-white rounded shadow-sm" style="cursor:pointer; border-left:3px solid ${col.color};" onclick="openQuote('${q.id}')">
                                                 <div class="fw-semibold small">${escapeHtml(displayTitle)}</div>
-                                                <div class="text-muted" style="font-size:0.75rem;">${quoteTitle ? escapeHtml(q.client_name || "") + " · " : ""}#${escapeHtml(q.quote_number || "")} · $${escapeHtml(q.total || 0)}</div>
+                                                <div class="text-muted" style="font-size:0.75rem;">${quoteTitle ? escapeHtml(q.client_name || "") + " - " : ""}#${escapeHtml(q.quote_number || "")} - $${escapeHtml(q.total || 0)}</div>
                                                 <div class="text-muted" style="font-size:0.7rem;">${timeAgo}</div>
                                             </div>
                                         `;
@@ -1156,7 +1792,7 @@
                                                                 cardsHtml += `
                                                                     <div class="kanban-card mb-2 p-2 bg-white rounded shadow-sm" style="cursor:pointer; border-left:3px solid ${col.color};" onclick="openQuote('${q.id}')">
                                                                         <div class="fw-semibold small">${escapeHtml(displayTitle)}</div>
-                                                                        <div class="text-muted" style="font-size:0.75rem;">${quoteTitle ? escapeHtml(q.client_name || "") + " · " : ""}#${escapeHtml(q.quote_number || "")} · $${escapeHtml(q.total || 0)}</div>
+                                                                        <div class="text-muted" style="font-size:0.75rem;">${quoteTitle ? escapeHtml(q.client_name || "") + " - " : ""}#${escapeHtml(q.quote_number || "")} - $${escapeHtml(q.total || 0)}</div>
                                                                         <div class="text-muted" style="font-size:0.7rem;">${timeAgo}</div>
                                                                     </div>
                                                                 `;
@@ -1547,10 +2183,13 @@ function renderBusinessInsights(quotes) {
                                           // Update form's subtotal display if needed
                                         }
                                         
-                                        document.getElementById('newCoForm').addEventListener('submit', function(e) {
-                                          e.preventDefault();
-                                          submitChangeOrder(currentQuoteId);
-                                        });
+                                        const newCoForm = document.getElementById('newCoForm');
+                                        if (newCoForm) {
+                                          newCoForm.addEventListener('submit', function(e) {
+                                            e.preventDefault();
+                                            submitChangeOrder(currentQuoteId);
+                                          });
+                                        }
                                         
                                         function submitChangeOrder(quoteId) {
                                           const description = document.getElementById('coDescription').value;
@@ -1892,7 +2531,7 @@ function renderBusinessInsights(quotes) {
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header" style="background:#fff3cd; border-bottom:2px solid #ffc107;">
-                <h5 class="modal-title"><i class="fas fa-comments me-2" style="color:#fd7e14;"></i>Client Notes — <span id="notesReviewClientName"></span></h5>
+                <h5 class="modal-title"><i class="fas fa-comments me-2" style="color:#fd7e14;"></i>Client Notes - <span id="notesReviewClientName"></span></h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body" id="notesReviewBody">
@@ -2026,6 +2665,52 @@ function renderBusinessInsights(quotes) {
 
 
 <!-- Portal Share Modal (must be at top level, outside any nested elements) -->
+<div class="modal fade" id="portalAssignModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#1a2940; color:white;">
+        <h5 class="modal-title"><i class="fas fa-folder-tree me-2"></i>Add to Client Portal</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-light border small mb-3" id="portalAssignSelectedWrap">
+          <div class="text-muted mb-1">Selected document</div>
+          <strong id="portalAssignQuoteTitle">Selected quote</strong>
+        </div>
+        <div class="row g-3">
+          <div class="col-lg-7">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="mb-0">Existing portals</h6>
+              <div class="d-flex gap-1">
+                <button type="button" class="btn btn-primary btn-sm" onclick="showNewPortalForm()"><i class="fas fa-plus me-1"></i>Add New Portal</button>
+                <button type="button" class="btn btn-outline-warning btn-sm" onclick="startPortalMergeMode()"><i class="fas fa-code-merge me-1"></i>Merge Portals</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="renderPortalAssignmentList()"><i class="fas fa-rotate me-1"></i>Refresh</button>
+              </div>
+            </div>
+            <div id="portalMergeActions"></div>
+            <div id="portalAssignList"></div>
+          </div>
+          <div class="col-lg-5" id="portalAssignCreateWrap">
+            <div class="border rounded p-3">
+              <h6>Create or start fresh</h6>
+              <label class="form-label small text-muted mb-1" for="portalAssignClientName">Client</label>
+              <input type="text" class="form-control form-control-sm mb-2" id="portalAssignClientName">
+              <label class="form-label small text-muted mb-1" for="portalAssignClientEmail">Client email</label>
+              <input type="email" class="form-control form-control-sm mb-2" id="portalAssignClientEmail">
+              <label class="form-label small text-muted mb-1" for="portalAssignPortalName">Portal name</label>
+              <input type="text" class="form-control form-control-sm mb-3" id="portalAssignPortalName" placeholder="e.g., Adam Dezic - Spring Project">
+              <div class="d-grid gap-2">
+                <button type="button" class="btn btn-primary btn-sm" id="portalAssignCreateBtn" onclick="createPortalForQuote()"><i class="fas fa-plus me-1"></i>Create Portal & Add</button>
+                <button type="button" class="btn btn-outline-danger btn-sm" id="portalAssignRemoveBtn" onclick="removeQuoteFromPortal()"><i class="fas fa-eye-slash me-1"></i>Remove This Document From Portal</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="portalShareModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
@@ -2079,7 +2764,7 @@ function renderBusinessInsights(quotes) {
           <input type="text" id="newQuoteAddress" class="form-control" placeholder="e.g. 123 Main St">
         </div>
         <div class="mb-3">
-          <label class="form-label fw-semibold">Quote Number <span class="text-muted fw-normal">(optional — auto-assigned if blank)</span></label>
+          <label class="form-label fw-semibold">Quote Number <span class="text-muted fw-normal">(optional - auto-assigned if blank)</span></label>
           <input type="text" id="newQuoteNumber" class="form-control" placeholder="e.g. Q-2026-042">
         </div>
         <div id="newQuoteError" class="text-danger small" style="min-height:1.2rem;"></div>
