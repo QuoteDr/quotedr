@@ -30,6 +30,18 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             transform: translateY(-2px);
         }
+        .quote-card.change-order-card {
+            background: #fff8e8;
+            border-color: #f5b66b;
+            box-shadow: inset 4px 0 0 #f97316;
+        }
+        .quote-card.change-order-card:hover {
+            box-shadow: inset 4px 0 0 #f97316, 0 2px 8px rgba(249,115,22,0.16);
+        }
+        .change-order-badge {
+            background: #f97316;
+            color: #fff;
+        }
         .status-draft { color: #6c757d; }
         .status-sent { color: #0d6efd; }
         .status-viewed { color: #0dcaf0; font-weight: 600; }
@@ -401,12 +413,12 @@
                 var depositPayment = payments.slice().reverse().find(function(payment) { return ['deposit', 'invoice_deposit'].includes(payment.type) && payment.paid_at; });
                 var depositAmount = depositPayment && depositPayment.amount_cents ? '$' + (depositPayment.amount_cents / 100).toFixed(2) : 'Deposit';
                 return `
-                <div class="quote-card">
+                <div class="quote-card ${isChangeOrder ? 'change-order-card' : ''}">
                     <div class="d-flex justify-content-between align-items-start">
                         <div onclick="openQuote(${jsAttr(q.id)})" style="flex:1; cursor:pointer;">
                             ${q.id === lastOpenedId ? '<span class="badge bg-primary me-1" style="font-size:0.65rem; vertical-align:middle;">Last Opened</span>' : ''}
                             <div class="d-flex align-items-center gap-1" id="title-row-${escapeHtml(q.id)}">
-                              <div class="fw-bold" id="title-display-${escapeHtml(q.id)}">${isChangeOrder ? '<span class="badge bg-info me-1">CO #' + escapeHtml(QuoteDrChangeOrders.number(q) || '') + '</span>' : ''}${escapeHtml(displayTitle)}</div>
+                              <div class="fw-bold" id="title-display-${escapeHtml(q.id)}">${isChangeOrder ? '<span class="badge change-order-badge me-1">CO #' + escapeHtml(QuoteDrChangeOrders.number(q) || '') + '</span>' : ''}${escapeHtml(displayTitle)}</div>
                               <button class="btn btn-link btn-sm p-0 text-muted" onclick="event.stopPropagation();startEditTitle(${jsAttr(q.id)})" title="Edit title" style="font-size:0.75rem;"><i class="fas fa-pencil-alt"></i></button>
                             </div>
                             <div id="title-edit-${escapeHtml(q.id)}" style="display:none; gap:0.25rem;" class="mt-1">
