@@ -8,10 +8,15 @@ body {
     background: #fff;
     border-bottom: 2px solid #eef4fb;
     box-shadow: 0 2px 10px rgba(15, 52, 96, 0.08);
+    min-height: 76px;
+    overflow: visible;
 }
 
 .marketing-nav .navbar-brand img {
-    height: 58px;
+    height: 112px;
+    margin: -34px 0 -30px;
+    position: relative;
+    z-index: 2;
     width: auto;
 }
 
@@ -68,6 +73,33 @@ body {
     text-transform: uppercase;
 }
 
+.hero-eyebrow-large {
+    font-size: clamp(1.05rem, 2vw, 1.55rem);
+    line-height: 1.1;
+    margin-bottom: 20px;
+}
+
+.workflow-kicker-title {
+    color: #0f3460;
+    display: inline-block;
+    font-size: clamp(2rem, 4vw, 3rem);
+    line-height: 1.08;
+    margin-bottom: 24px;
+    padding-bottom: 12px;
+    position: relative;
+}
+
+.workflow-kicker-title::after {
+    background: #e87e2a;
+    border-radius: 999px;
+    bottom: 0;
+    content: "";
+    height: 4px;
+    left: 6%;
+    position: absolute;
+    width: 88%;
+}
+
 .content-section {
     padding: 64px 0;
 }
@@ -122,24 +154,32 @@ body {
 }
 
 .marketing-footer {
-    background: #0f3460;
-    color: rgba(255, 255, 255, 0.72);
-    padding: 34px 0;
+    background: #fff;
+    border-top: 1px solid rgba(15, 52, 96, 0.12);
+    box-shadow: 0 -8px 24px rgba(15, 52, 96, 0.06);
+    color: #526070;
+    padding: 16px 0;
 }
 
 .marketing-footer img {
-    filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.55)) drop-shadow(0 0 26px rgba(255, 255, 255, 0.28));
-    height: 54px;
+    height: 112px;
+    margin: -34px 0 -30px;
+    width: auto;
 }
 
 .marketing-footer a {
-    color: #fff;
-    font-weight: 600;
+    color: #0f3460;
+    font-weight: 700;
     text-decoration: none;
 }
 
 .marketing-footer a:hover {
-    color: #f2a05f;
+    color: #e87e2a;
+}
+
+.marketing-footer span {
+    color: #526070;
+    font-weight: 600;
 }
 
 .article {
@@ -186,5 +226,21 @@ body {
         border-top: 1px solid #eef4fb;
         margin-top: 8px;
         padding: 8px 0 12px;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .marketing-nav {
+        min-height: 58px;
+    }
+
+    .marketing-nav .navbar-brand img {
+        height: 82px;
+        margin: -24px 0 -22px;
+    }
+
+    .marketing-footer img {
+        height: 86px;
+        margin: -24px 0 -22px;
     }
 }

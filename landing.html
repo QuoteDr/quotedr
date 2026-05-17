@@ -161,6 +161,12 @@
                 padding: 8px 16px !important;
             }
         }
+
+        @media (max-width: 767.98px) {
+            .ai-tool-detail-list {
+                grid-template-columns: 1fr;
+            }
+        }
         
         /* Hero Section */
         .hero-section {
@@ -189,10 +195,13 @@
         }
         
         .hero-subheadline {
-            font-size: 1.2rem;
-            color: #e0e0e0;
-            margin-bottom: 2rem;
-            line-height: 1.6;
+            color: #ffffff;
+            font-size: 1.45rem;
+            font-weight: 800;
+            line-height: 1.35;
+            margin: 0 auto 2.1rem;
+            max-width: 860px;
+            text-shadow: 0 2px 12px rgba(0,0,0,0.22);
         }
         
         .hero-logo {
@@ -295,6 +304,7 @@
         .feature-card {
             background-color: white;
             border-radius: 10px;
+            cursor: pointer;
             padding: 2rem;
             margin-bottom: 1.5rem;
             box-shadow: 0 5px 15px rgba(0,0,0,0.05);
@@ -302,9 +312,16 @@
             height: 100%;
         }
         
-        .feature-card:hover {
+        .feature-card:hover,
+        .feature-card:focus {
+            outline: none;
             transform: translateY(-5px);
             box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        .feature-card:focus {
+            border: 2px solid var(--primary-blue);
+            padding: calc(2rem - 2px);
         }
         
         .feature-icon {
@@ -323,6 +340,70 @@
         .feature-description {
             color: #555;
             line-height: 1.6;
+        }
+
+        .feature-more {
+            color: var(--accent-orange);
+            display: inline-flex;
+            font-size: 0.9rem;
+            font-weight: 800;
+            margin-top: 1rem;
+        }
+
+        .feature-modal-kicker {
+            color: var(--accent-orange);
+            font-size: 0.76rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .feature-modal-intro {
+            color: #526070;
+            font-size: 1rem;
+            line-height: 1.7;
+        }
+
+        .feature-modal-points {
+            display: grid;
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+
+        .feature-modal-points div {
+            background: #f8fbff;
+            border: 1px solid #e2ebf6;
+            border-radius: 8px;
+            padding: 1rem;
+        }
+
+        .feature-modal-points strong {
+            color: var(--dark-navy);
+            display: block;
+            margin-bottom: 0.35rem;
+        }
+
+        .trade-pill {
+            align-items: center;
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 999px;
+            color: #24364b;
+            display: inline-flex;
+            font-size: 0.9rem;
+            font-weight: 700;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease, transform 0.2s ease;
+        }
+
+        .trade-pill:hover,
+        .trade-pill:focus {
+            border-color: var(--primary-blue);
+            box-shadow: 0 8px 18px rgba(15, 52, 96, 0.12);
+            color: var(--dark-navy);
+            outline: none;
+            transform: translateY(-2px);
         }
 
         .ai-tools-section {
@@ -354,13 +435,21 @@
             border: 1px solid #dbe6f3;
             border-radius: 8px;
             box-shadow: 0 10px 28px rgba(15, 52, 96, 0.08);
+            color: inherit;
+            cursor: pointer;
+            display: block;
             height: 100%;
             padding: 2rem;
+            text-align: left;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+            width: 100%;
         }
 
-        .ai-tool-card.featured {
-            border: 2px solid var(--accent-orange);
-            box-shadow: 0 16px 38px rgba(232, 126, 42, 0.16);
+        .ai-tool-card:hover,
+        .ai-tool-card.active {
+            border-color: var(--primary-blue);
+            box-shadow: 0 16px 34px rgba(15, 52, 96, 0.14);
+            transform: translateY(-3px);
         }
 
         .ai-tool-icon {
@@ -376,11 +465,6 @@
             width: 54px;
         }
 
-        .ai-tool-card.featured .ai-tool-icon {
-            background: #fff3e8;
-            color: var(--accent-orange);
-        }
-
         .ai-tool-card h3 {
             color: var(--dark-navy);
             font-size: 1.32rem;
@@ -394,18 +478,61 @@
             margin-bottom: 0;
         }
 
-        .tool-proof-strip {
-            background: #0f3460;
-            border-radius: 8px;
-            color: rgba(255,255,255,0.82);
-            margin-top: 2rem;
-            padding: 1.4rem;
+        .ai-tool-learn {
+            color: var(--accent-orange);
+            display: inline-flex;
+            font-size: 0.9rem;
+            font-weight: 800;
+            margin-top: 1rem;
         }
 
-        .tool-proof-strip strong {
-            color: #fff;
+        .ai-tool-detail {
+            background: #ffffff;
+            border: 1px solid #dbe6f3;
+            border-left: 5px solid var(--accent-orange);
+            border-radius: 8px;
+            box-shadow: 0 16px 38px rgba(15, 52, 96, 0.12);
+            display: none;
+            margin-top: 1.5rem;
+            padding: 1.7rem;
         }
-        
+
+        .ai-tool-detail.active {
+            display: block;
+        }
+
+        .ai-tool-detail h3 {
+            color: var(--dark-navy);
+            font-weight: 850;
+            margin-bottom: 0.75rem;
+        }
+
+        .ai-tool-detail p {
+            color: #526070;
+            line-height: 1.7;
+        }
+
+        .ai-tool-detail-list {
+            display: grid;
+            gap: 0.75rem;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            margin-top: 1.1rem;
+        }
+
+        .ai-tool-detail-list div {
+            background: #f8fbff;
+            border: 1px solid #e2ebf6;
+            border-radius: 8px;
+            color: #526070;
+            padding: 1rem;
+        }
+
+        .ai-tool-detail-list strong {
+            color: var(--dark-navy);
+            display: block;
+            margin-bottom: 0.35rem;
+        }
+
         /* Pricing Section */
         .pricing-section {
             padding: 5rem 0;
@@ -492,44 +619,69 @@
         
         /* Footer */
         .footer {
-            background-color: var(--dark-navy);
-            color: white;
-            padding: 3rem 0;
+            background-color: #ffffff;
+            color: var(--dark-navy);
+            padding: 1.1rem 0;
+            border-top: 1px solid rgba(13, 58, 106, 0.12);
+            box-shadow: 0 -8px 24px rgba(13, 58, 106, 0.06);
         }
         
         .footer-logo {
-            height: 56px;
-            margin-bottom: 1rem;
-            filter: drop-shadow(0 0 12px rgba(255,255,255,0.55)) drop-shadow(0 0 26px rgba(255,255,255,0.28));
+            height: 112px;
+            margin: -34px 0 -30px;
+            max-width: 260px;
+            display: block;
+        }
+
+        .footer p {
+            color: #24364b;
+            margin-bottom: 0;
+            font-weight: 600;
         }
         
         .footer-links {
             list-style: none;
             padding: 0;
-            margin: 1rem 0;
+            margin: 0;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 0.35rem 1.4rem;
         }
         
         .footer-links li {
-            display: inline-block;
-            margin-right: 1.5rem;
+            display: inline-flex;
         }
         
         .footer-links a {
-            color: #ccc;
+            color: var(--dark-navy);
             text-decoration: none;
+            font-weight: 700;
             transition: color 0.3s;
         }
         
         .footer-links a:hover {
-            color: white;
+            color: var(--primary-orange);
         }
         
         .copyright {
-            text-align: center;
-            padding-top: 2rem;
-            border-top: 1px solid rgba(255,255,255,0.1);
-            margin-top: 2rem;
-            color: #aaa;
+            text-align: right;
+            padding-top: 0;
+            border-top: 0;
+            margin-top: 0;
+            color: #526070;
+            font-weight: 600;
+        }
+
+        @media (max-width: 991.98px) {
+            .footer-logo {
+                margin: -28px auto -24px;
+            }
+
+            .footer p,
+            .copyright {
+                text-align: center;
+            }
         }
         
         /* Scroll to top */
@@ -567,7 +719,8 @@
             }
             
             .hero-subheadline {
-                font-size: 1rem;
+                font-size: 1.08rem;
+                line-height: 1.4;
             }
             
             .btn-hero {
@@ -727,36 +880,59 @@
     <section class="ai-tools-section" id="ai-tools">
         <div class="container">
             <p class="section-kicker">The tools that sell the product</p>
-            <h2 class="section-title"><span>Skip the blank page.</span></h2>
-            <p class="section-subtitle">QuoteDr now has specialty quoting tools for the jobs that used to take the longest: explaining a scope from memory, measuring from plans, and itemizing cabinet packages.</p>
+            <h2 class="section-title"><span>Unlock superpowers with Pro.</span></h2>
+            <p class="section-subtitle">QuoteDr now has specialty quoting tools for the jobs that used to take the longest: explaining a scope from memory, measuring from plans, and itemizing cabinet packages. Each tool can save hours of quoting work the first time it is used.</p>
             <div class="row g-4">
                 <div class="col-lg-4">
-                    <div class="ai-tool-card featured">
+                    <div class="ai-tool-card" role="button" tabindex="0" aria-expanded="false" aria-controls="aiToolDetail_voice" data-ai-tool="voice">
                         <div class="ai-tool-icon"><i class="fas fa-microphone-lines"></i></div>
                         <h3>AI Voice to Quote</h3>
                         <p>Talk through the job like you would with another contractor. QuoteDr turns that conversation into rooms, scope, line items, quantities, and a polished starting quote.</p>
+                        <span class="ai-tool-learn">See how it works</span>
                     </div>
                 </div>
                 <div class="col-lg-4">
-                    <div class="ai-tool-card">
+                    <div class="ai-tool-card" role="button" tabindex="0" aria-expanded="false" aria-controls="aiToolDetail_floorplan" data-ai-tool="floorplan">
                         <div class="ai-tool-icon"><i class="fas fa-drafting-compass"></i></div>
                         <h3>Floor Plan Scanner</h3>
                         <p>Upload a floor plan and move from takeoff to quote faster. Use plan details to create room structure, measurements, and quote-ready work items in minutes.</p>
+                        <span class="ai-tool-learn">See how it works</span>
                     </div>
                 </div>
                 <div class="col-lg-4">
-                    <div class="ai-tool-card">
+                    <div class="ai-tool-card" role="button" tabindex="0" aria-expanded="false" aria-controls="aiToolDetail_ikea" data-ai-tool="ikea">
                         <div class="ai-tool-icon"><i class="fas fa-kitchen-set"></i></div>
                         <h3>IKEA Kitchen Quoter</h3>
                         <p>Upload an IKEA order PDF or paste the order list. QuoteDr itemizes the package, applies your saved install prices, and adds the kitchen to the quote in seconds.</p>
+                        <span class="ai-tool-learn">See how it works</span>
                     </div>
                 </div>
             </div>
-            <div class="tool-proof-strip">
-                <div class="row g-3 text-center">
-                    <div class="col-md-4"><strong>Voice note in.</strong><br>Structured scope out.</div>
-                    <div class="col-md-4"><strong>Plan uploaded.</strong><br>Measurements become quote items.</div>
-                    <div class="col-md-4"><strong>IKEA list parsed.</strong><br>Cabinet install quote built fast.</div>
+            <div class="ai-tool-detail" id="aiToolDetail_voice">
+                <h3>AI Voice to Quote learns how you sell the job.</h3>
+                <p>Instead of starting from a blank quote, the user can speak naturally: what the client wants, the rooms involved, materials, options, exclusions, and the rough order of work. QuoteDr turns that into a usable quote structure, then the contractor can edit anything before it goes to the client.</p>
+                <div class="ai-tool-detail-list">
+                    <div><strong>Custom wording</strong>It can be tuned around the user's language, saved items, services, and preferred quote style, so the output feels like their business instead of generic AI copy.</div>
+                    <div><strong>Gets faster over time</strong>Saved items, repeated rooms, templates, and edited descriptions give the user a stronger starting point each time they quote similar work.</div>
+                    <div><strong>Big time saver</strong>A messy job conversation can become rooms, scope, notes, and line items in minutes, then the contractor just reviews and adjusts.</div>
+                </div>
+            </div>
+            <div class="ai-tool-detail" id="aiToolDetail_floorplan">
+                <h3>Floor Plan Scanner turns takeoff work into quote structure.</h3>
+                <p>The user can upload a floor plan or sketch and move quickly into rooms, quantities, and quote-ready work areas. It is built to be lightweight and accurate: the user enters the measurement of an existing line on the scaled drawing, and the tool calibrates from there. No AI guessing. It is built for contractors who quote from drawings, sketches, plans, or layout files and want the estimate organized faster.</p>
+                <div class="ai-tool-detail-list">
+                    <div><strong>Less manual measuring</strong>Use plan details to speed up room creation, quantities, and measurements that would normally require a long takeoff session.</div>
+                    <div><strong>Room-by-room output</strong>The quote can stay organized by room or area, which makes it easier for the client to understand and easier for the contractor to check.</div>
+                    <div><strong>Easy to review</strong>The scanner gives the contractor a starting point, not a locked result. They can adjust quantities, rates, notes, and scope before sending.</div>
+                </div>
+            </div>
+            <div class="ai-tool-detail" id="aiToolDetail_ikea">
+                <h3>IKEA Kitchen Quoter handles the cabinet-list grind.</h3>
+                <p>IKEA kitchen quotes can take an entire evening because every cabinet, panel, filler, drawer, and accessory needs to be understood and priced. QuoteDr can read the order PDF or pasted list, itemize it, apply the user's install pricing, and add it to the quote fast. If the user is charging IKEA kitchens by linear footage alone, complex kitchens with lots of inner fittings can quietly burn their margin. This breaks every item down individually in seconds, so a simple kitchen can cost less than a complex kitchen with many parts. Professional, fair, and much easier to defend.</p>
+                <div class="ai-tool-detail-list">
+                    <div><strong>Upload or paste</strong>Drop in the IKEA order PDF or paste the order list, then let QuoteDr parse the package into quote-ready items.</div>
+                    <div><strong>Starter pricing included</strong>Industry-standard install pricing is built in so line items already have a starting price. The user can adjust those rates and save their own pricing so the quote reflects how they actually charge.</div>
+                    <div><strong>Seconds, not evenings</strong>What used to be repetitive cabinet counting and spreadsheet cleanup becomes a quick review-and-add workflow.</div>
                 </div>
             </div>
         </div>
@@ -767,16 +943,17 @@
         <div class="container text-center">
             <p class="text-muted small fw-bold mb-3" style="letter-spacing:1px; text-transform:uppercase;">Built for every service business</p>
             <div class="d-flex flex-wrap justify-content-center gap-3">
-                <span class="px-3 py-2 rounded-pill" style="background:white; border:1px solid #dee2e6; font-size:0.9rem;"><i class="fas fa-hammer me-2" style="color:#e87e2a;"></i>Contractors</span>
-                <span class="px-3 py-2 rounded-pill" style="background:white; border:1px solid #dee2e6; font-size:0.9rem;"><i class="fas fa-leaf me-2" style="color:#28a745;"></i>Landscapers</span>
-                <span class="px-3 py-2 rounded-pill" style="background:white; border:1px solid #dee2e6; font-size:0.9rem;"><i class="fas fa-broom me-2" style="color:#1a56a0;"></i>Cleaners</span>
-                <span class="px-3 py-2 rounded-pill" style="background:white; border:1px solid #dee2e6; font-size:0.9rem;"><i class="fas fa-faucet me-2" style="color:#0dcaf0;"></i>Plumbers</span>
-                <span class="px-3 py-2 rounded-pill" style="background:white; border:1px solid #dee2e6; font-size:0.9rem;"><i class="fas fa-plug me-2" style="color:#ffc107;"></i>Electricians</span>
-                <span class="px-3 py-2 rounded-pill" style="background:white; border:1px solid #dee2e6; font-size:0.9rem;"><i class="fas fa-paint-roller me-2" style="color:#6f42c1;"></i>Painters</span>
-                <span class="px-3 py-2 rounded-pill" style="background:white; border:1px solid #dee2e6; font-size:0.9rem;"><i class="fas fa-layer-group me-2" style="color:#fd7e14;"></i>Flooring Pros</span>
-                <span class="px-3 py-2 rounded-pill" style="background:white; border:1px solid #dee2e6; font-size:0.9rem;"><i class="fas fa-vector-square me-2" style="color:#20c997;"></i>Hardscapers</span>
-                <span class="px-3 py-2 rounded-pill" style="background:white; border:1px solid #dee2e6; font-size:0.9rem;"><i class="fas fa-snowflake me-2" style="color:#0dcaf0;"></i>HVAC Techs</span>
-                <span class="px-3 py-2 rounded-pill" style="background:white; border:1px solid #dee2e6; font-size:0.9rem;"><i class="fas fa-ellipsis-h me-2" style="color:#6c757d;"></i>& many more</span>
+                <button type="button" class="trade-pill" data-trade-detail="contractors"><i class="fas fa-hammer" style="color:#e87e2a;"></i>Contractors</button>
+                <button type="button" class="trade-pill" data-trade-detail="landscapers"><i class="fas fa-leaf" style="color:#28a745;"></i>Landscapers</button>
+                <button type="button" class="trade-pill" data-trade-detail="cleaners"><i class="fas fa-broom" style="color:#1a56a0;"></i>Cleaners</button>
+                <button type="button" class="trade-pill" data-trade-detail="plumbers"><i class="fas fa-faucet" style="color:#0dcaf0;"></i>Plumbers</button>
+                <button type="button" class="trade-pill" data-trade-detail="electricians"><i class="fas fa-plug" style="color:#ffc107;"></i>Electricians</button>
+                <button type="button" class="trade-pill" data-trade-detail="roofers"><i class="fas fa-house-chimney" style="color:#b45309;"></i>Roofers</button>
+                <button type="button" class="trade-pill" data-trade-detail="painters"><i class="fas fa-paint-roller" style="color:#6f42c1;"></i>Painters</button>
+                <button type="button" class="trade-pill" data-trade-detail="flooring"><i class="fas fa-layer-group" style="color:#fd7e14;"></i>Flooring Pros</button>
+                <button type="button" class="trade-pill" data-trade-detail="hardscapers"><i class="fas fa-vector-square" style="color:#20c997;"></i>Hardscapers</button>
+                <button type="button" class="trade-pill" data-trade-detail="hvac"><i class="fas fa-snowflake" style="color:#0dcaf0;"></i>HVAC Techs</button>
+                <button type="button" class="trade-pill" data-trade-detail="more"><i class="fas fa-ellipsis-h" style="color:#6c757d;"></i>& many more</button>
             </div>
         </div>
     </section>
@@ -788,7 +965,7 @@
             <div class="row justify-content-center">
                 <div class="col-lg-10">
                     <div class="story-content">
-                        <p>I'm Adam — A Service contractor in Burlington Ontario. For years, I quoted jobs out of Excel. Honestly? My spreadsheets looked great! I built up a great template over the years. Clients loved the detail. But a big quote could eat an entire day...or a few! Copy, paste, calculate, re-format, double-check, repeat. Staring at a screen when I could be on a job site.</p>
+                        <p>I'm Adam, a renovation and service contractor in Burlington Ontario. For years, I quoted jobs out of Excel. Honestly? My spreadsheets looked great! I built up a great template over the years. Clients loved the detail. But a big quote could eat an entire day...or a few! Copy, paste, calculate, re-format, double-check, repeat. Staring at a screen when I could be on a job site.</p>
                         
                         <p>I needed my time back. So I went looking for software. Sat through demos with the big names in the industry — slick products, sharp salespeople. But $300 a month? $800 a month as you grow? For features I'll never use? And basic stuff like client payment reminders locked behind a premium tier? No thanks.</p>
                         
@@ -810,66 +987,99 @@
             <p class="section-subtitle">The AI tools get the quote started. The rest of QuoteDr helps you finish, send, approve, invoice, and track the job.</p>
             <div class="row">
                 <div class="col-md-6 col-lg-4 mb-4">
-                    <div class="feature-card">
+                    <div class="feature-card" role="button" tabindex="0" data-feature-detail="aiQuote">
                         <div class="feature-icon"><i class="fas fa-wand-magic-sparkles"></i></div>
                         <h3 class="feature-title">AI Quote Builder</h3>
                         <p class="feature-description">Use voice or typed notes to generate structured rooms, scope, line items, quantities, and client-ready wording.</p>
+                        <span class="feature-more">Learn more</span>
                     </div>
                 </div>
                 <div class="col-md-6 col-lg-4 mb-4">
-                    <div class="feature-card">
+                    <div class="feature-card" role="button" tabindex="0" data-feature-detail="takeoffs">
                         <div class="feature-icon"><i class="fas fa-drafting-compass"></i></div>
                         <h3 class="feature-title">Plan and Map Takeoffs</h3>
                         <p class="feature-description">Scan floor plans or measure from satellite maps for rooms, roofs, fences, decks, driveways, landscaping, and more.</p>
+                        <span class="feature-more">Learn more</span>
                     </div>
                 </div>
                 <div class="col-md-6 col-lg-4 mb-4">
-                    <div class="feature-card">
+                    <div class="feature-card" role="button" tabindex="0" data-feature-detail="ikea">
                         <div class="feature-icon"><i class="fas fa-kitchen-set"></i></div>
                         <h3 class="feature-title">IKEA Quick Quote</h3>
                         <p class="feature-description">Parse an IKEA kitchen plan or order list, apply your install rates, and drop the itemized package into the quote.</p>
+                        <span class="feature-more">Learn more</span>
                     </div>
                 </div>
                 <div class="col-md-6 col-lg-4 mb-4">
-                    <div class="feature-card">
+                    <div class="feature-card" role="button" tabindex="0" data-feature-detail="portal">
+                        <div class="feature-icon"><i class="fas fa-mobile-screen-button"></i></div>
+                        <h3 class="feature-title">Client Portal</h3>
+                        <p class="feature-description">Give clients a clean portal to view quotes, invoices, change orders, payment details, and job documents from their phone.</p>
+                        <span class="feature-more">Learn more</span>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="feature-card" role="button" tabindex="0" data-feature-detail="esign">
                         <div class="feature-icon"><i class="fas fa-file-signature"></i></div>
-                        <h3 class="feature-title">Client Portal and E-Sign</h3>
-                        <p class="feature-description">Send an interactive quote clients can review, approve, sign, and use to choose optional upgrades from their phone.</p>
+                        <h3 class="feature-title">E-Sign Approvals</h3>
+                        <p class="feature-description">Let clients approve and sign quotes or changes clearly, so everyone knows what was agreed to before work moves forward.</p>
+                        <span class="feature-more">Learn more</span>
                     </div>
                 </div>
                 <div class="col-md-6 col-lg-4 mb-4">
-                    <div class="feature-card">
+                    <div class="feature-card" role="button" tabindex="0" data-feature-detail="changeOrders">
+                        <div class="feature-icon"><i class="fas fa-file-contract"></i></div>
+                        <h3 class="feature-title">Change Orders</h3>
+                        <p class="feature-description">Send clear change orders when the scope changes, protect both sides, and keep approvals attached to the job.</p>
+                        <span class="feature-more">Learn more</span>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="feature-card" role="button" tabindex="0" data-feature-detail="payments">
                         <div class="feature-icon"><i class="fas fa-file-invoice-dollar"></i></div>
                         <h3 class="feature-title">Invoices and Payments</h3>
                         <p class="feature-description">Turn accepted quotes into invoices, show payment instructions, support manual payment methods, and connect Stripe when it is set up.</p>
+                        <span class="feature-more">Learn more</span>
                     </div>
                 </div>
                 <div class="col-md-6 col-lg-4 mb-4">
-                    <div class="feature-card">
+                    <div class="feature-card" role="button" tabindex="0" data-feature-detail="upgrades">
+                        <div class="feature-icon"><i class="fas fa-arrow-up-right-dots"></i></div>
+                        <h3 class="feature-title">Client Upgrade Options</h3>
+                        <p class="feature-description">Present optional upgrades inside the quote so clients can choose better finishes or extra work without awkward sales pressure.</p>
+                        <span class="feature-more">Learn more</span>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="feature-card" role="button" tabindex="0" data-feature-detail="templates">
                         <div class="feature-icon"><i class="fas fa-layer-group"></i></div>
                         <h3 class="feature-title">Templates and Saved Items</h3>
                         <p class="feature-description">Save your common items, prices, room layouts, terms, and quote templates so every new job starts faster.</p>
+                        <span class="feature-more">Learn more</span>
                     </div>
                 </div>
                 <div class="col-md-6 col-lg-4 mb-4">
-                    <div class="feature-card">
+                    <div class="feature-card" role="button" tabindex="0" data-feature-detail="tracking">
                         <div class="feature-icon"><i class="fas fa-chart-line"></i></div>
                         <h3 class="feature-title">Profit and Status Tracking</h3>
                         <p class="feature-description">Track drafts, sent quotes, approvals, invoices, deposits, material costs, markup, and projected profit in one place.</p>
+                        <span class="feature-more">Learn more</span>
                     </div>
                 </div>
                 <div class="col-md-6 col-lg-4 mb-4">
-                    <div class="feature-card">
+                    <div class="feature-card" role="button" tabindex="0" data-feature-detail="followups">
                         <div class="feature-icon"><i class="fas fa-bell"></i></div>
                         <h3 class="feature-title">Follow-Ups and Reminders</h3>
                         <p class="feature-description">Keep client communication moving with quote follow-ups, invoice reminders, and status notifications built into the workflow.</p>
+                        <span class="feature-more">Learn more</span>
                     </div>
                 </div>
                 <div class="col-md-6 col-lg-4 mb-4">
-                    <div class="feature-card">
+                    <div class="feature-card" role="button" tabindex="0" data-feature-detail="cloud">
                         <div class="feature-icon"><i class="fas fa-cloud"></i></div>
                         <h3 class="feature-title">Cloud Saved and Branded</h3>
                         <p class="feature-description">Your quotes, invoices, settings, logo, terms, payment details, and saved data stay connected to your business account.</p>
+                        <span class="feature-more">Learn more</span>
                     </div>
                 </div>
             </div>
@@ -894,6 +1104,7 @@
                             <li><i class="fas fa-check"></i> PDF export</li>
                             <li><i class="fas fa-check"></i> Client quote and invoice viewer</li>
                             <li><i class="fas fa-check"></i> Client upsell options</li>
+                            <li><i class="fas fa-check"></i> Quote follow-ups and payment reminders</li>
                             <li><i class="fas fa-check"></i> Import/export your data</li>
                             <li><i class="fas fa-check"></i> Cancel anytime</li>
                         </ul>
@@ -916,7 +1127,6 @@
                             <li><i class="fas fa-check"></i> Email quotes to clients</li>
                             <li><i class="fas fa-check"></i> Client approval & e-signature</li>
                             <li><i class="fas fa-check"></i> Quote status tracking</li>
-                            <li><i class="fas fa-check"></i> Client notifications</li>
                             <li><i class="fas fa-check"></i> Priority support</li>
                             <li><i class="fas fa-check"></i> Early access to new features</li>
                         </ul>
@@ -931,7 +1141,7 @@
     <!-- Footer -->
     <footer class="footer">
         <div class="container">
-            <div class="row">
+            <div class="row align-items-center g-3">
                 <div class="col-lg-4 text-center text-lg-start">
                     <img src="quotedr-logo.svg" alt="QuoteDr Logo" class="footer-logo">
                     <p>Professional quoting & invoicing software built for service businesses of all kinds.</p>
@@ -948,11 +1158,55 @@
                     </ul>
                 </div>
                 <div class="col-lg-4 text-center text-lg-end">
-                    <p class="copyright">© 2026 QuoteDr. Built for service businesses.</p>
+                    <p class="copyright">&copy; 2026 QuoteDr. Built for service businesses.</p>
                 </div>
             </div>
         </div>
     </footer>
+
+    <div class="modal fade" id="featureDetailModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header" style="background:#0f3460; color:white;">
+                    <div>
+                        <div class="feature-modal-kicker" id="featureDetailKicker">QuoteDr feature</div>
+                        <h5 class="modal-title mb-0" id="featureDetailTitle">Feature details</h5>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="feature-modal-intro" id="featureDetailIntro"></p>
+                    <div class="feature-modal-points" id="featureDetailPoints"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                    <a href="login.html?signup=1" class="btn btn-primary" style="background:#e87e2a; border-color:#e87e2a;">Start Free</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="tradeDetailModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header" style="background:#0f3460; color:white;">
+                    <div>
+                        <div class="feature-modal-kicker" id="tradeDetailKicker">Built for your trade</div>
+                        <h5 class="modal-title mb-0" id="tradeDetailTitle">QuoteDr for service businesses</h5>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="feature-modal-intro" id="tradeDetailIntro"></p>
+                    <div class="feature-modal-points" id="tradeDetailPoints"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                    <a href="login.html?signup=1" class="btn btn-primary" style="background:#e87e2a; border-color:#e87e2a;">Start Free</a>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Scroll to top button -->
     <div class="scroll-to-top" id="scrollTopBtn">
@@ -1056,6 +1310,340 @@
                 });
             });
         });
+
+        // AI tool detail selector
+        (function() {
+            var cards = Array.from(document.querySelectorAll('[data-ai-tool]'));
+            var details = Array.from(document.querySelectorAll('.ai-tool-detail'));
+            if (!cards.length || !details.length) return;
+
+            function selectTool(tool) {
+                cards.forEach(function(card) {
+                    var isActive = card.getAttribute('data-ai-tool') === tool;
+                    card.classList.toggle('active', isActive);
+                    card.setAttribute('aria-expanded', isActive ? 'true' : 'false');
+                });
+                details.forEach(function(panel) {
+                    panel.classList.toggle('active', panel.id === 'aiToolDetail_' + tool);
+                });
+            }
+
+            cards.forEach(function(card) {
+                card.addEventListener('click', function() {
+                    selectTool(card.getAttribute('data-ai-tool'));
+                });
+                card.addEventListener('keydown', function(event) {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        selectTool(card.getAttribute('data-ai-tool'));
+                    }
+                });
+            });
+        })();
+
+        // Feature detail modal
+        (function() {
+            var featureDetails = {
+                aiQuote: {
+                    kicker: 'AI quoting workflow',
+                    title: 'AI Quote Builder',
+                    intro: 'The AI Quote Builder is for the moment when the contractor knows the job, but does not want to spend the next hour turning thoughts into quote structure. They can use voice or typed notes, then review and edit the output before anything goes to the client.',
+                    points: [
+                        ['Start messy', 'Describe the scope in plain language: rooms, materials, exclusions, timeline, options, and client concerns. QuoteDr turns that into a usable quote structure.'],
+                        ['Custom to the user', 'Saved items, edited wording, templates, and preferred terms help the quote sound more like the contractor and less like generic software.'],
+                        ['Still controlled', 'The AI gets the quote started. The user stays in charge of prices, quantities, language, margins, and what the client sees.']
+                    ]
+                },
+                takeoffs: {
+                    kicker: 'Measurements and takeoffs',
+                    title: 'Plan and Map Takeoffs',
+                    intro: 'This covers the measurement tools that help contractors quote from floor plans, sketches, and property layouts without rebuilding every number manually. It is designed to turn measuring work into organized quote inputs faster.',
+                    points: [
+                        ['Floor plan scanner', 'Upload a drawing or sketch, calibrate it from a known line measurement, then work from that scale. It is lightweight, accurate, and avoids AI guessing.'],
+                        ['Satellite measuring', 'Measure roofs, fences, decks, driveways, landscaping, and other exterior work from a map when the job type makes sense.'],
+                        ['Quote-ready output', 'Measurements can become rooms, work areas, quantities, and notes that are easier to review before sending a polished quote.']
+                    ]
+                },
+                ikea: {
+                    kicker: 'Kitchen quoting',
+                    title: 'IKEA Quick Quote',
+                    intro: 'IKEA cabinet installs can become a long night of counting cabinets, panels, drawers, fillers, and accessories. The IKEA Quick Quote tool is built to turn that order package into a quote-ready starting point fast.',
+                    points: [
+                        ['Upload or paste', 'Use an IKEA order PDF or pasted order list. QuoteDr parses the package into recognizable cabinet and install items.'],
+                        ['Use saved pricing', 'The user can save install rates for cabinet types and categories so the final quote reflects how their business charges.'],
+                        ['Huge time savings', 'What used to be repetitive list cleanup can become a quick parse, review, adjust, and add-to-quote workflow.']
+                    ]
+                },
+                portal: {
+                    kicker: 'Client experience',
+                    title: 'Client Portal',
+                    intro: 'The client portal turns the quote and invoice experience into a clean client-facing page instead of a static document buried in an email thread. Clients can review what they need, understand the next step, and access the job details from their phone.',
+                    points: [
+                        ['Everything in one place', 'Quotes, invoices, payment instructions, change orders, and job documents can live in a portal the client can actually understand.'],
+                        ['Phone friendly', 'Clients can review scope, totals, notes, and next steps without needing to pinch through a spreadsheet or dense PDF.'],
+                        ['Cleaner communication', 'The portal gives both sides one shared place to check what was sent, approved, changed, and paid.']
+                    ]
+                },
+                esign: {
+                    kicker: 'Approvals',
+                    title: 'E-Sign Approvals',
+                    intro: 'E-sign approvals help turn a quote from a conversation into a clear agreement. The goal is simple: make it easy for the client to approve, and easier for the contractor to prove what was approved.',
+                    points: [
+                        ['Clear acceptance', 'Clients can approve and sign the quote instead of replying with vague text messages or verbal go-aheads.'],
+                        ['Less confusion', 'The signed version creates a clearer paper trail around scope, price, terms, and timing before work starts.'],
+                        ['Built into the flow', 'Approval happens alongside the quote and portal experience, so the user does not need to stitch together extra tools.']
+                    ]
+                },
+                changeOrders: {
+                    kicker: 'Scope changes',
+                    title: 'Change Orders',
+                    intro: 'Change orders happen constantly in real contracting work. QuoteDr is being built to make them quick, clear, and attached to the same client portal so the contractor and client both know what changed before the work continues.',
+                    points: [
+                        ['Protect both sides', 'A clear change order records what changed, why it changed, and what it does to the price or scope before memories get fuzzy.'],
+                        ['Fast client approval', 'The contractor can send the change, the client can review it in the portal, and approval can be captured without another messy email thread.'],
+                        ['Fewer arguments later', 'When changes are documented as they happen, the final invoice is easier to understand and defend.']
+                    ]
+                },
+                upgrades: {
+                    kicker: 'Optional work',
+                    title: 'Client Upgrade Options',
+                    intro: 'Upgrade options help contractors present better choices without turning the quote into an awkward sales pitch. Clients can see what the extra work or better finish costs and decide from inside the quote.',
+                    points: [
+                        ['Easy upsells', 'Add optional upgrades, finishes, add-ons, or alternate scopes so clients can choose more without a long back-and-forth.'],
+                        ['Transparent choices', 'The client sees what is included, what is optional, and what the extra cost is before approving.'],
+                        ['Higher-value jobs', 'Good options can help clients say yes to the work they actually want, while keeping the base quote clear.']
+                    ]
+                },
+                payments: {
+                    kicker: 'Invoice flow',
+                    title: 'Invoices and Payments',
+                    intro: 'Once a quote becomes work, QuoteDr helps carry that same job into invoicing and payment instructions. The client sees the user business brand, not generic QuoteDr billing language.',
+                    points: [
+                        ['Quote to invoice', 'Accepted quotes can become invoices without rebuilding the job details from scratch.'],
+                        ['Flexible payment methods', 'The invoice can show manual payment options like e-transfer, cheque, or cash, and Stripe can appear when the user has it connected.'],
+                        ['Client-friendly view', 'The invoice viewer is meant for the customer to pay or follow payment instructions, not to request deposits from the contractor.']
+                    ]
+                },
+                templates: {
+                    kicker: 'Repeatable quoting',
+                    title: 'Templates and Saved Items',
+                    intro: 'Most contractors do not need to invent every quote from scratch. QuoteDr helps them build a reusable quoting system from the rooms, services, terms, and line items they already use.',
+                    points: [
+                        ['Saved services', 'Common line items, descriptions, units, material costs, and pricing can be saved once and reused.'],
+                        ['Quote templates', 'Repeat job types can start from a prepared structure instead of a blank page.'],
+                        ['More consistent quotes', 'Templates reduce forgotten scope, inconsistent wording, and the copy-paste mistakes that happen when quoting under pressure.']
+                    ]
+                },
+                tracking: {
+                    kicker: 'Job visibility',
+                    title: 'Profit and Status Tracking',
+                    intro: 'QuoteDr is not only about making the quote look good. It also helps the user understand where each job stands and whether the numbers make sense before and after sending.',
+                    points: [
+                        ['Status clarity', 'Track drafts, sent quotes, accepted work, declined work, invoices, deposits, and change-order style statuses from one workflow.'],
+                        ['Margin awareness', 'Material cost, markup, totals, and projected profit stay visible while the quote is being built.'],
+                        ['Less guessing', 'The goal is to help contractors see the job as a business decision, not just a total at the bottom of a page.']
+                    ]
+                },
+                followups: {
+                    kicker: 'Communication',
+                    title: 'Follow-Ups and Reminders',
+                    intro: 'A quote that sits unanswered is still admin work. Follow-ups and reminders help keep the job moving without the user manually chasing every client from memory.',
+                    points: [
+                        ['Quote follow-up', 'The workflow can remind or help the user follow up after a quote has been sent and the client has not acted.'],
+                        ['Invoice reminders', 'Payment reminders help reduce awkward manual chasing once money is owed.'],
+                        ['Better timing', 'The right follow-up at the right time can recover jobs that would otherwise go quiet.']
+                    ]
+                },
+                cloud: {
+                    kicker: 'Business setup',
+                    title: 'Cloud Saved and Branded',
+                    intro: 'QuoteDr keeps the user business identity and saved quoting setup connected to their account, so client-facing documents look like the contractor, not the software vendor.',
+                    points: [
+                        ['User branding', 'Logo, business details, terms, quote style, invoice settings, and payment instructions can represent the user company.'],
+                        ['Saved everywhere', 'Quotes, settings, saved items, templates, and client details stay connected so the user can work from more than one device.'],
+                        ['Less setup each time', 'The more the user saves, the less they have to rebuild on the next quote.']
+                    ]
+                }
+            };
+
+            var modalEl = document.getElementById('featureDetailModal');
+            var titleEl = document.getElementById('featureDetailTitle');
+            var kickerEl = document.getElementById('featureDetailKicker');
+            var introEl = document.getElementById('featureDetailIntro');
+            var pointsEl = document.getElementById('featureDetailPoints');
+            var cards = Array.from(document.querySelectorAll('[data-feature-detail]'));
+            if (!modalEl || !titleEl || !kickerEl || !introEl || !pointsEl || !cards.length) return;
+
+            function openFeatureDetail(key) {
+                var detail = featureDetails[key];
+                if (!detail) return;
+                kickerEl.textContent = detail.kicker;
+                titleEl.textContent = detail.title;
+                introEl.textContent = detail.intro;
+                pointsEl.innerHTML = detail.points.map(function(point) {
+                    return '<div><strong>' + point[0] + '</strong>' + point[1] + '</div>';
+                }).join('');
+                if (window.bootstrap) {
+                    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                }
+            }
+
+            cards.forEach(function(card) {
+                card.addEventListener('click', function() {
+                    openFeatureDetail(card.getAttribute('data-feature-detail'));
+                });
+                card.addEventListener('keydown', function(event) {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        openFeatureDetail(card.getAttribute('data-feature-detail'));
+                    }
+                });
+            });
+        })();
+
+        // Trade detail modal
+        (function() {
+            var tradeDetails = {
+                contractors: {
+                    kicker: 'Built for contractors',
+                    title: 'QuoteDr for Contractors',
+                    intro: 'Contractors usually get the biggest win because QuoteDr was built around real quoting pain: rooms, scope, options, change orders, approvals, invoices, and all the little details clients expect to see before they say yes.',
+                    points: [
+                        ['Voice to detailed scope', 'Talk through the job from memory and turn it into rooms, line items, notes, options, and a quote that feels like it came from your business.'],
+                        ['Plans and room calculations', 'Use the floor plan scanner, quick room structure, and reusable templates to get quantities organized without rebuilding the quote from scratch.'],
+                        ['Protect the job', 'Client portal, e-sign approvals, invoices, payment details, and change orders help keep the paper trail clear when the scope changes.']
+                    ]
+                },
+                landscapers: {
+                    kicker: 'Built for landscapers',
+                    title: 'QuoteDr for Landscapers',
+                    intro: 'Landscapers can use QuoteDr to move faster from property layout to a professional quote, especially when measuring yards, fences, patios, driveways, garden beds, and repeatable outdoor packages.',
+                    points: [
+                        ['Satellite measuring', 'Measure outdoor areas from map imagery when it makes sense, then turn those measurements into quote-ready quantities.'],
+                        ['Packages and options', 'Save common services like cleanup, sod, mulch, planting, stonework, edging, and maintenance packages for faster quoting.'],
+                        ['Clear client choices', 'Show base scope, optional upgrades, and change orders in a way clients can understand before the work starts.']
+                    ]
+                },
+                cleaners: {
+                    kicker: 'Built for cleaners',
+                    title: 'QuoteDr for Cleaners',
+                    intro: 'Cleaners can quote faster by using floor plans, saved service packages, recurring templates, and markups for travel, difficulty, or jobs that need extra care.',
+                    points: [
+                        ['Floor-plan pricing help', 'Use square footage, room counts, and floor plan details to build a more consistent cleaning quote.'],
+                        ['Recurring templates', 'Save move-out cleans, deep cleans, commercial visits, post-renovation cleanup, and recurring service packages.'],
+                        ['Markup when needed', 'Add travel, difficulty, access, or special-condition markups so hard jobs do not quietly eat your margin.']
+                    ]
+                },
+                plumbers: {
+                    kicker: 'Built for plumbers',
+                    title: 'QuoteDr for Plumbers',
+                    intro: 'Plumbers can use templates and takeoffs to quote bathrooms, fixture swaps, rough-ins, repairs, and material-heavy work with more detail and less copy-paste.',
+                    points: [
+                        ['Bathroom templates', 'Build reusable bathroom quote structures with fixture lines, rough-in notes, trim details, exclusions, and options.'],
+                        ['Material takeoffs', 'Organize fittings, fixtures, valves, pipe, access work, and other job details before sending the quote.'],
+                        ['Change orders matter', 'When walls open up or the client adds scope, send a clean change order so the extra work is approved and documented.']
+                    ]
+                },
+                electricians: {
+                    kicker: 'Built for electricians',
+                    title: 'QuoteDr for Electricians',
+                    intro: 'Electricians can use QuoteDr for room-based templates, plan review, device counts, panel work, upgrade options, and clean client approvals.',
+                    points: [
+                        ['Room and device templates', 'Save common line items for plugs, switches, pot lights, panels, breakers, dedicated circuits, and fixture installs.'],
+                        ['Plan-based quoting', 'Use plans to organize rooms, outlets, lighting, wire runs, and quote quantities faster.'],
+                        ['Options clients understand', 'Present upgrades like dimmers, extra outlets, smart switches, EV chargers, or service upgrades without burying the client in jargon.']
+                    ]
+                },
+                roofers: {
+                    kicker: 'Built for roofers',
+                    title: 'QuoteDr for Roofers',
+                    intro: 'Roofers can use QuoteDr to move from roof measurements and site notes into a clear, itemized quote with options, exclusions, approvals, and change orders documented before the job starts. See a loose shingle while driving by? Pull over, check the satellite measurement, build a quick quote, and go knock on the door.',
+                    points: [
+                        ['Satellite measuring', 'Use satellite measuring to estimate roof areas, sections, and takeoff details faster before building the quote.'],
+                        ['Roofing templates', 'Save common assemblies for shingles, underlayment, ice and water, vents, flashing, disposal, access, and warranty notes.'],
+                        ['Options and changes', 'Present good-better-best material options, document rotten decking or extra scope with change orders, and keep approvals attached to the job.']
+                    ]
+                },
+                painters: {
+                    kicker: 'Built for painters',
+                    title: 'QuoteDr for Painters',
+                    intro: 'Painters can move quickly from rooms and notes to polished scope, using calculators, floor plans, saved prep items, AI voice notes, and hidden or client-visible markup per room or per quote. Older homes, rundown rooms, lived-in houses, heavy prep, access issues, and difficult conditions can all be accounted for without making the quote messy.',
+                    points: [
+                        ['Quick room calculations', 'Estimate rooms, ceilings, trim, doors, prep, primer, coats, and paint-related quantities in a more organized way.'],
+                        ['Voice notes to quote', 'Walk through the job out loud and let QuoteDr turn that into scope, exclusions, options, and a professional starting quote.'],
+                        ['Smart markups', 'Add room-level or job-level markups for rough walls, furnished spaces, older houses, heavy prep, or awkward clients, and choose whether those markups stay hidden or visible.']
+                    ]
+                },
+                flooring: {
+                    kicker: 'Built for flooring pros',
+                    title: 'QuoteDr for Flooring Pros',
+                    intro: 'Flooring pros can use QuoteDr to organize room measurements, material quantities, waste factors, prep work, transitions, stairs, and optional upgrades.',
+                    points: [
+                        ['Room measurements', 'Use floor plans or room-by-room structures to organize square footage, transitions, stairs, and tricky areas.'],
+                        ['Material and waste', 'Track flooring, underlayment, trim, removal, prep, disposal, and waste so the quote is easier to defend.'],
+                        ['Upgrade options', 'Show better underlay, trim upgrades, leveling, repairs, or removal options as clear add-ons.']
+                    ]
+                },
+                hardscapers: {
+                    kicker: 'Built for hardscapers',
+                    title: 'QuoteDr for Hardscapers',
+                    intro: 'Hardscapers can use measuring tools and saved assemblies to quote patios, walkways, retaining walls, base prep, excavation, disposal, and change orders with less guesswork.',
+                    points: [
+                        ['Measure outdoor areas', 'Use satellite measuring and plan details for patios, walkways, retaining walls, driveways, and outdoor work areas.'],
+                        ['Material-heavy quoting', 'Organize base, stone, pavers, edging, excavation, fabric, drainage, disposal, and labor as reusable quote pieces.'],
+                        ['Scope changes documented', 'When grade, access, drainage, or client choices change, change orders keep the cost impact clear.']
+                    ]
+                },
+                hvac: {
+                    kicker: 'Built for HVAC techs',
+                    title: 'QuoteDr for HVAC Techs',
+                    intro: 'HVAC teams can use QuoteDr to build clean options, equipment comparisons, saved service packages, approvals, invoices, and follow-ups without rebuilding every quote manually.',
+                    points: [
+                        ['Good-better-best options', 'Present equipment choices, accessories, warranties, add-ons, or comfort upgrades in a way clients can compare.'],
+                        ['Saved templates', 'Reuse service calls, installs, ductwork, equipment swaps, maintenance packages, and common terms.'],
+                        ['Follow-through', 'Use follow-ups, approvals, invoices, and payment instructions to keep the job moving after the quote is sent.']
+                    ]
+                },
+                more: {
+                    kicker: 'Built for service businesses',
+                    title: 'QuoteDr for Many More Trades',
+                    intro: 'If your business repeats scope, pricing, client approvals, invoices, follow-ups, or change orders, QuoteDr can help you quote faster and look more professional while doing it.',
+                    points: [
+                        ['Repeatable work', 'Save the line items, packages, templates, rooms, terms, and notes you use over and over.'],
+                        ['Better client experience', 'Give clients clear quotes, optional upgrades, approvals, invoices, and payment instructions from one workflow.'],
+                        ['Less admin time', 'Spend less time formatting, chasing, and rebuilding quotes, and more time doing the work that actually pays.']
+                    ]
+                }
+            };
+
+            var modalEl = document.getElementById('tradeDetailModal');
+            var titleEl = document.getElementById('tradeDetailTitle');
+            var kickerEl = document.getElementById('tradeDetailKicker');
+            var introEl = document.getElementById('tradeDetailIntro');
+            var pointsEl = document.getElementById('tradeDetailPoints');
+            var pills = Array.from(document.querySelectorAll('[data-trade-detail]'));
+            if (!modalEl || !titleEl || !kickerEl || !introEl || !pointsEl || !pills.length) return;
+
+            function openTradeDetail(key) {
+                var detail = tradeDetails[key];
+                if (!detail) return;
+                kickerEl.textContent = detail.kicker;
+                titleEl.textContent = detail.title;
+                introEl.textContent = detail.intro;
+                pointsEl.innerHTML = detail.points.map(function(point) {
+                    return '<div><strong>' + point[0] + '</strong>' + point[1] + '</div>';
+                }).join('');
+                if (window.bootstrap) {
+                    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                }
+            }
+
+            pills.forEach(function(pill) {
+                pill.addEventListener('click', function() {
+                    openTradeDetail(pill.getAttribute('data-trade-detail'));
+                });
+            });
+        })();
 
         // Scroll to top button functionality
         const scrollTopBtn = document.getElementById('scrollTopBtn');
