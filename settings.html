@@ -1379,6 +1379,21 @@ Sarah Jones, 905-555-5678"></textarea>
 			if (p.tagline !== undefined) document.getElementById('bizTagline').value = p.tagline;
 		}
 
+		function getHiddenProfileFieldsFromForm() {
+			return ['businessName', 'ownerName', 'address', 'cityRow', 'phone', 'email', 'hst'].filter(function(field) {
+				var checkbox = document.getElementById('hide_' + field);
+				return checkbox && checkbox.checked;
+			});
+		}
+
+		function applyHiddenProfileFieldsToForm(fields) {
+			fields = Array.isArray(fields) ? fields : [];
+			['businessName', 'ownerName', 'address', 'cityRow', 'phone', 'email', 'hst'].forEach(function(field) {
+				var checkbox = document.getElementById('hide_' + field);
+				if (checkbox) checkbox.checked = fields.indexOf(field) !== -1;
+			});
+		}
+
 		document.addEventListener('DOMContentLoaded', async function() {
 			// Auth check — redirect to login if not signed in
 			const { data: { session } } = await _supabase.auth.getSession();
@@ -1415,9 +1430,14 @@ Sarah Jones, 905-555-5678"></textarea>
 			// Load saved profile — localStorage first, then Supabase overrides with cloud data
 			var savedProfile = JSON.parse(localStorage.getItem('ald_business_profile') || '{}');
 			applyProfileToForm(savedProfile);
+			var savedHiddenProfileFields = JSON.parse(localStorage.getItem('ald_hidden_profile_fields') || '[]');
+			applyHiddenProfileFieldsToForm(savedHiddenProfileFields);
 			if (typeof loadBusinessProfile === 'function') {
 				loadBusinessProfile().then(function(profile) {
-					if (profile && Object.keys(profile).length > 0) applyProfileToForm(profile);
+					if (profile && Object.keys(profile).length > 0) {
+						applyProfileToForm(profile);
+						if (Array.isArray(profile.hidden_profile_fields)) applyHiddenProfileFieldsToForm(profile.hidden_profile_fields);
+					}
 				});
 			}
 
@@ -1452,8 +1472,10 @@ Sarah Jones, 905-555-5678"></textarea>
 				phone: document.getElementById('bizPhone').value.trim(),
 				email: document.getElementById('bizEmail').value.trim(),
 				hst_number: document.getElementById('bizHst').value.trim(),
-				tagline: document.getElementById('bizTagline').value.trim()
+				tagline: document.getElementById('bizTagline').value.trim(),
+				hidden_profile_fields: getHiddenProfileFieldsFromForm()
 			};
+			localStorage.setItem('ald_hidden_profile_fields', JSON.stringify(profile.hidden_profile_fields));
 
 			var btn = document.querySelector('.btn-save');
 			btn.disabled = true;

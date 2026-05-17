@@ -77,6 +77,29 @@
             margin-left: 6px;
             font-weight: 600;
         }
+        .invoice-action-bar {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .invoice-action-left { justify-self: start; }
+        .invoice-action-center { justify-self: center; }
+        .invoice-action-right { justify-self: end; }
+        @media (max-width: 520px) {
+            .invoice-action-bar {
+                grid-template-columns: 1fr;
+                justify-items: stretch;
+            }
+            .invoice-action-left,
+            .invoice-action-center,
+            .invoice-action-right {
+                justify-self: stretch;
+            }
+            .invoice-action-bar .btn {
+                width: 100%;
+            }
+        }
 
         .totals-section {
             background: white;
@@ -194,12 +217,15 @@ if (location.search.includes('debug')) {
 <body>
     <div class="container py-4" style="max-width: 860px;">
 
-        <!-- Print / Save button -->
-        <div class="text-center mb-3 d-print-none d-flex justify-content-center gap-2 flex-wrap">
-            <button onclick="window.print()" class="btn btn-outline-secondary btn-sm">
+        <!-- Invoice actions -->
+        <div class="mb-3 d-print-none invoice-action-bar">
+            <a href="quote-builder.html" onclick="return goBackToBuilder(event)" class="btn btn-outline-secondary btn-sm invoice-action-left">
+                <i class="fas fa-arrow-left me-1"></i> Back to Builder
+            </a>
+            <button onclick="window.print()" class="btn btn-outline-secondary btn-sm invoice-action-center">
                 <i class="fas fa-print me-1"></i> Print / Save as PDF
             </button>
-            <button id="qbPushBtn" onclick="pushInvoiceToQB()" class="btn btn-outline-primary btn-sm" style="display:none;">
+            <button id="qbPushBtn" onclick="pushInvoiceToQB()" class="btn btn-outline-primary btn-sm invoice-action-right" style="display:none;">
                 <i class="fas fa-sync me-1"></i> Send to QuickBooks
             </button>
         </div>
@@ -432,6 +458,20 @@ if (location.search.includes('debug')) {
             btn.textContent = collapsed ? 'Show more' : 'Show less';
         }
 
+        function goBackToBuilder(event) {
+            var fallbackUrl = 'quote-builder.html';
+            try {
+                var referrer = document.referrer ? new URL(document.referrer) : null;
+                if (referrer && referrer.origin === window.location.origin && /\/quote-builder(?:\.html)?\/?$/.test(referrer.pathname)) {
+                    if (event) event.preventDefault();
+                    window.history.back();
+                    return false;
+                }
+            } catch(e) {}
+            if (event && event.currentTarget) event.currentTarget.href = fallbackUrl;
+            return true;
+        }
+
         const CATEGORY_ORDER = [
             'Demolition','Asbestos / Hazmat','Concrete & Masonry','Waterproofing',
             'Rough Framing','Windows & Exterior Doors','Rough Plumbing','Rough Electrical',
@@ -480,6 +520,83 @@ if (location.search.includes('debug')) {
             return item.itemDescription || item.displayDescription || item.actualDescription || '';
         }
 
+        function getHiddenProfileFields(profile) {
+            var hidden = [];
+            try {
+                hidden = JSON.parse(localStorage.getItem('ald_hidden_profile_fields') || '[]');
+            } catch(e) {
+                hidden = [];
+            }
+            if (!Array.isArray(hidden)) hidden = [];
+            var embeddedHidden = invoiceData.hiddenProfileFields || invoiceData.hidden_profile_fields;
+            if (Array.isArray(embeddedHidden)) {
+                embeddedHidden.forEach(function(field) {
+                    if (hidden.indexOf(field) === -1) hidden.push(field);
+                });
+            }
+            var profileHidden = profile && (profile.hidden_profile_fields || profile.hiddenProfileFields);
+            if (Array.isArray(profileHidden)) {
+                profileHidden.forEach(function(field) {
+                    if (hidden.indexOf(field) === -1) hidden.push(field);
+                });
+            }
+            return hidden;
+        }
+
+        function getProfileValue(profile, keys) {
+            profile = profile || {};
+            for (var i = 0; i < keys.length; i++) {
+                var value = profile[keys[i]];
+                if (value !== undefined && value !== null && String(value).trim() !== '') return String(value).trim();
+            }
+            return '';
+        }
+
+        function renderBusinessProfile(profile) {
+            profile = profile || {};
+            var hidden = getHiddenProfileFields(profile);
+            var name = getProfileValue(profile, ['business_name', 'businessName', 'companyName', 'company_name']);
+            var tagline = getProfileValue(profile, ['tagline', 'companyTagline', 'business_tagline']);
+            var owner = getProfileValue(profile, ['owner_name', 'ownerName', 'name']);
+            var address = getProfileValue(profile, ['address', 'streetAddress', 'street_address']);
+            var city = getProfileValue(profile, ['city']);
+            var province = getProfileValue(profile, ['province', 'state']);
+            var postal = getProfileValue(profile, ['postal_code', 'postalCode', 'postal']);
+            var phone = getProfileValue(profile, ['phone', 'business_phone']);
+            var email = getProfileValue(profile, ['email', 'business_email']);
+            var hst = getProfileValue(profile, ['hst_number', 'hstNumber', 'taxNumber', 'tax_number']);
+
+            var nameEl = document.getElementById('companyNameDisplay');
+            if (nameEl) {
+                nameEl.textContent = hidden.indexOf('businessName') === -1 ? name : '';
+                nameEl.style.display = nameEl.textContent ? '' : 'none';
+            }
+
+            var tagEl = document.getElementById('companyTaglineDisplay');
+            if (tagEl) {
+                tagEl.textContent = tagline;
+                tagEl.style.display = tagline ? '' : 'none';
+            }
+
+            var lines = [];
+            if (hidden.indexOf('ownerName') === -1 && owner) lines.push(owner);
+            if (hidden.indexOf('address') === -1 && address) lines.push(address);
+            if (hidden.indexOf('cityRow') === -1 && (city || province || postal)) {
+                lines.push([city, province].filter(Boolean).join(', ') + (postal ? ' ' + postal : ''));
+            }
+            if (hidden.indexOf('phone') === -1 && phone) lines.push('Phone: ' + phone);
+            if (hidden.indexOf('email') === -1 && email) lines.push('Email: ' + email);
+            if (hidden.indexOf('hst') === -1 && hst) lines.push('HST: ' + hst);
+
+            var bizEl = document.getElementById('businessInfoDisplay');
+            if (bizEl) {
+                bizEl.innerHTML = lines.map(function(line) {
+                    return '<div>' + escapeHtml(line) + '</div>';
+                }).join('');
+                bizEl.style.display = lines.length ? '' : 'none';
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             // Load user's uploaded logo (localStorage first, then Supabase)
             var savedLogo = localStorage.getItem('ald_company_logo') || localStorage.getItem('ald_logo');
@@ -495,25 +612,15 @@ if (location.search.includes('debug')) {
                     }
                 });
             }
-            // Load company name + tagline (localStorage first, then Supabase)
-            var bizProfile = JSON.parse(localStorage.getItem('ald_business_profile') || '{}');
+            // Load business profile (localStorage first, then Supabase)
+            var bizProfile = {};
+            try { bizProfile = JSON.parse(localStorage.getItem('ald_business_profile') || '{}'); } catch(e) {}
+            renderBusinessProfile(bizProfile);
             if (typeof loadBusinessProfile === 'function') {
                 loadBusinessProfile().then(function(p) {
-                    if (p && p.business_name) {
-                        var nameEl = document.getElementById('companyNameDisplay');
-                        if (nameEl) nameEl.textContent = p.business_name;
-                    }
-                    if (p && p.tagline) {
-                        var tagEl = document.getElementById('companyTaglineDisplay');
-                        if (tagEl) tagEl.textContent = p.tagline;
-                    }
+                    if (p && Object.keys(p).length) renderBusinessProfile(p);
                 });
             }
-            var nameEl = document.getElementById('companyNameDisplay');
-            var tagEl = document.getElementById('companyTaglineDisplay');
-            if (nameEl && bizProfile.business_name) nameEl.textContent = bizProfile.business_name;
-            if (tagEl && bizProfile.tagline) tagEl.textContent = bizProfile.tagline;
-            else if (tagEl && !bizProfile.tagline) tagEl.style.display = 'none';
             loadInvoice();
             showPaymentReturnNotice();
         });
@@ -636,35 +743,16 @@ if (location.search.includes('debug')) {
                 if (embeddedLogoEl) embeddedLogoEl.src = invoiceData.businessLogo;
             }
             if (invoiceData.businessProfile) {
-                const b = invoiceData.businessProfile;
-                const nameEl = document.getElementById('companyNameDisplay');
-                const tagEl = document.getElementById('companyTaglineDisplay');
-                if (nameEl) nameEl.textContent = b.business_name || b.companyName || b.businessName || '';
-                if (tagEl) {
-                    tagEl.textContent = b.tagline || '';
-                    tagEl.style.display = b.tagline ? '' : 'none';
+                renderBusinessProfile(invoiceData.businessProfile);
+            } else {
+                try {
+                    renderBusinessProfile(JSON.parse(localStorage.getItem('ald_business_profile') || '{}'));
+                } catch(e) {}
+                if (typeof loadBusinessProfile === 'function') {
+                    loadBusinessProfile().then(function(profile) {
+                        if (profile && Object.keys(profile).length) renderBusinessProfile(profile);
+                    });
                 }
-                const bizEl = document.getElementById('businessInfoDisplay');
-                if (bizEl) bizEl.innerHTML = [
-                    b.address,
-                    b.city ? b.city + (b.province ? ', ' + b.province : '') + (b.postal_code ? ' ' + b.postal_code : '') : '',
-                    b.phone ? 'Phone: ' + b.phone : '',
-                    b.email ? 'Email: ' + b.email : '',
-                    b.hst_number ? 'HST: ' + b.hst_number : ''
-                ].filter(Boolean).map(l => '<div>' + l + '</div>').join('');
-            } else if (typeof getBusinessProfile === 'function') {
-                getBusinessProfile().then(function(result) {
-                    var bizEl = document.getElementById('businessInfoDisplay');
-                    if (bizEl && result.data) {
-                        var b = result.data;
-                        var lines = [];
-                        if (b.address) lines.push(b.address);
-                        if (b.city) lines.push(b.city + (b.province ? ', ' + b.province : '') + (b.postal_code ? ' ' + b.postal_code : ''));
-                        if (b.phone) lines.push('Phone: ' + b.phone);
-                        if (b.hst_number) lines.push('HST: ' + b.hst_number);
-                        bizEl.innerHTML = lines.map(function(l) { return '<div>' + l + '</div>'; }).join('');
-                    }
-                });
             }
 
             if (!invoiceData.rooms || !invoiceData.rooms.length) {
@@ -856,6 +944,7 @@ if (location.search.includes('debug')) {
         var _invoicePaymentSettings = null;
         var _invoiceTotalForPayment = 0;
         var _invoiceIdForPayment = null;
+        var QUOTEDR_SUPABASE_ANON_KEY = typeof SUPABASE_ANON_KEY !== 'undefined' ? SUPABASE_ANON_KEY : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso';
 
         async function loadContractorPaymentSettings(contractorUserId) {
             try {
@@ -892,18 +981,41 @@ if (location.search.includes('debug')) {
             }, settings || {});
         }
 
+        function isSupabaseUuid(value) {
+            return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
+        }
+
+        function getInvoicePaymentTargetId(invoiceId) {
+            var params = new URLSearchParams(window.location.search);
+            var candidates = [
+                params.get('id'),
+                invoiceData.supabaseId,
+                invoiceData.supabase_id,
+                invoiceData.quoteSupabaseId,
+                invoiceData.quote_supabase_id,
+                invoiceId
+            ];
+            for (var i = 0; i < candidates.length; i++) {
+                if (isSupabaseUuid(candidates[i])) return candidates[i];
+            }
+            return '';
+        }
+
         function renderInvoicePaymentOptions(settings, total, invoiceId) {
             if (getInvoiceSettings().showPaymentOptions === false || !total) return;
             var s = withDefaultPaymentSettings(settings || getInvoicePaymentSettingsFallback());
+            var paymentTargetId = getInvoicePaymentTargetId(invoiceId);
             _invoicePaymentSettings = s;
             _invoiceTotalForPayment = total || 0;
-            _invoiceIdForPayment = invoiceId || '';
+            _invoiceIdForPayment = paymentTargetId;
 
             var buttonHtml = '';
-            if (s.stripe_enabled && s.accept_full_payment !== false && invoiceId) {
+            if (s.stripe_enabled && s.accept_full_payment !== false && paymentTargetId) {
                 buttonHtml += '<button class="btn btn-success btn-lg px-5 mb-3 w-100" onclick="handleClientInvoicePayment(' + Math.round(total * 100) + ', \"Pay Invoice in Full\", \"invoice_full\")">';
                 buttonHtml += '<i class="fas fa-credit-card me-2"></i>Pay Invoice - $' + total.toFixed(2) + '</button>';
                 buttonHtml += '<div class="text-muted small mb-3"><i class="fab fa-stripe me-1"></i>Secure card payment powered by Stripe</div>';
+            } else if (s.stripe_enabled && s.accept_full_payment !== false) {
+                buttonHtml += '<div class="alert alert-warning small mb-3">Card payment will be available from the shared invoice link after this invoice is saved.</div>';
             }
 
             var manualHtml = '';
@@ -947,12 +1059,20 @@ if (location.search.includes('debug')) {
         }
 
         async function handleClientInvoicePayment(amountCents, description, paymentType) {
+            if (!_invoiceIdForPayment) {
+                alert('This invoice needs to be saved before card payment is available. Please use the shared invoice link.');
+                return;
+            }
             var btns = document.querySelectorAll('#clientPaymentButtons button');
             btns.forEach(function(b) { b.disabled = true; });
             try {
                 var resp = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/stripe-deposit', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'apikey': QUOTEDR_SUPABASE_ANON_KEY,
+                        'Authorization': 'Bearer ' + QUOTEDR_SUPABASE_ANON_KEY
+                    },
                     body: JSON.stringify({
                         amount: amountCents,
                         currency: 'cad',
@@ -964,7 +1084,10 @@ if (location.search.includes('debug')) {
                         cancelUrl: window.location.href.split('#')[0]
                     })
                 });
-                var data = await resp.json();
+                var responseText = await resp.text();
+                var data = {};
+                try { data = responseText ? JSON.parse(responseText) : {}; } catch(parseErr) { data = { error: responseText }; }
+                if (!resp.ok) throw new Error(data.error || 'Payment failed');
                 if (data.url) { window.location.href = data.url; }
                 else { throw new Error(data.error || 'Payment failed'); }
             } catch(e) {
@@ -1045,13 +1168,5 @@ if (location.search.includes('debug')) {
         });
         // === End QuickBooks ===
     </script>
-</body>
-</html>
--e 
-<div class="no-print" style="position:fixed; bottom:24px; right:24px; z-index:9999;">
-    <button onclick="window.print()" class="btn btn-lg shadow" style="background:#1a56a0; color:#fff; font-weight:600; border-radius:50px; padding:12px 24px;">
-        <i class="fas fa-download me-2"></i>Download PDF
-    </button>
-</div>
 </body>
 </html>

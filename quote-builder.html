@@ -5547,8 +5547,27 @@ Example:
             }
         }
 
+        function getLocalBusinessProfileSnapshot() {
+            try {
+                return JSON.parse(localStorage.getItem('ald_business_profile') || '{}');
+            } catch(e) {
+                return {};
+            }
+        }
+
+        function getLocalHiddenProfileFieldsSnapshot() {
+            try {
+                var hidden = JSON.parse(localStorage.getItem('ald_hidden_profile_fields') || '[]');
+                return Array.isArray(hidden) ? hidden : [];
+            } catch(e) {
+                return [];
+            }
+        }
+
         function buildInvoiceData(invoiceId) {
             var taxPrefs = getBuilderTaxPrefs();
+            var businessProfile = getLocalBusinessProfileSnapshot();
+            businessProfile.hidden_profile_fields = getLocalHiddenProfileFieldsSnapshot();
             return {
                 id: invoiceId,
                 clientName: document.getElementById('clientName')?.value || 'Client',
@@ -5563,6 +5582,8 @@ Example:
                 taxLabel: taxPrefs.label,
                 currency: taxPrefs.currency,
                 paymentSettings: getLocalPaymentSettingsSnapshot(),
+                businessProfile: businessProfile,
+                hiddenProfileFields: businessProfile.hidden_profile_fields,
                 invoiceSettings: getInvoiceSettings()
             };
         }
@@ -5575,6 +5596,18 @@ Example:
             }
             var invoiceId = 'invoice_' + Date.now();
             var invoiceData = buildInvoiceData(invoiceId);
+            if (typeof loadBusinessProfile === 'function') {
+                try {
+                    var latestBusinessProfile = await loadBusinessProfile();
+                    if (latestBusinessProfile) {
+                        latestBusinessProfile.hidden_profile_fields = getLocalHiddenProfileFieldsSnapshot();
+                        invoiceData.businessProfile = latestBusinessProfile;
+                        invoiceData.hiddenProfileFields = latestBusinessProfile.hidden_profile_fields;
+                    }
+                } catch(e) {
+                    console.warn('Could not load latest business profile for invoice:', e);
+                }
+            }
             if (typeof loadPaymentSettings === 'function') {
                 try {
                     var latestPaymentSettings = await loadPaymentSettings();
