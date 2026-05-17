@@ -982,9 +982,11 @@ if (location.search.includes('debug')) {
                 <div class="row">
                     <!-- Quote Number -->
                     <div class="col-md-12 mb-3">
-                        <div class="d-flex align-items-center gap-3">
+                        <div class="d-flex align-items-center gap-3 flex-wrap">
                             <label class="mb-0"><strong>Quote #:</strong><button type="button" class="qd-inline-help-btn" title="Help with quote numbers" aria-label="Help with quote numbers" onclick="QuoteDrModalHelp.openInline('quoteNumber'); return false;"><i class="fas fa-question"></i></button></label>
-                            <input type="text" id="quoteNumber" class="form-control" style="max-width: 200px; font-weight: bold; font-size: 1.1rem;" placeholder="2026-001" id="quoteNumber" oninput="checkQuoteNumberDuplicate()">
+                            <input type="text" id="quoteNumber" class="form-control" style="max-width: 200px; font-weight: bold; font-size: 1.1rem;" placeholder="2026-001" oninput="checkQuoteNumberDuplicate()">
+                            <label class="mb-0"><strong>File Name:</strong></label>
+                            <input type="text" id="quoteTitle" class="form-control flex-grow-1" style="min-width: 220px; max-width: 360px; font-weight: 600;" spellcheck="true" placeholder="e.g., Michelle Bathroom" oninput="markUnsaved()">
                             <select id="quoteStatus" class="form-select form-select-sm d-inline-block" style="width:auto; font-size:0.8rem;" onchange="markUnsaved(); updateChangeOrderModeUI();">
                                 <option value="draft">Draft</option>
                                 <option value="sent">Sent</option>
@@ -1718,6 +1720,8 @@ Example:
                         <h6 class="fw-bold mb-0"><i class="fas fa-list-alt text-secondary"></i> All Items - edit fields, then hit Save All to save each row</h6>
                         <div class="d-flex align-items-center gap-2">
                             <span id="pricingUnsavedIndicator" class="badge bg-warning text-dark" style="display:none;">?? Unsaved changes</span>
+                            <button onclick="openChoiceGroupTemplateModal()" class="btn btn-sm btn-outline-primary"><i class="fas fa-layer-group"></i> Choice Group</button>
+                            <button onclick="suggestChoiceGroupTemplates()" class="btn btn-sm btn-outline-secondary"><i class="fas fa-wand-magic-sparkles"></i> Suggest Groups</button>
                             <button onclick="saveAllPricingRows()" class="btn btn-sm btn-success"><i class="fas fa-save"></i> Save All</button>
                         </div>
                     </div>
@@ -3525,6 +3529,171 @@ Example:
             calculateTotals();
         }
 
+        function choiceGroupId() {
+            return 'cg_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+        }
+
+        function normalizeChoiceGroupOption(item, fallbackId) {
+            item = item || {};
+            return {
+                id: item.id || fallbackId || choiceGroupId(),
+                name: item.name || item.description || item.serviceName || 'Option',
+                description: item.description || item.name || item.serviceName || '',
+                unitType: item.unitType || item.unit || '',
+                rate: parseFloat(item.rate) || 0,
+                materialCost: parseFloat(item.materialCost) || 0,
+                supplierUrl: item.supplierUrl || '',
+                photo: item.photo || '',
+                itemDescription: item.itemDescription || item.description || '',
+                quantityMode: item.quantityMode || 'inherit',
+                quantityOverride: item.quantityOverride || ''
+            };
+        }
+
+        function getChoiceGroupSelectedOptions(choiceGroup) {
+            if (!choiceGroup || !Array.isArray(choiceGroup.options)) return [];
+            var selected = Array.isArray(choiceGroup.selectedOptionIds) ? choiceGroup.selectedOptionIds.slice() : [];
+            if (choiceGroup.type === 'single') {
+                selected = [selected[0] || choiceGroup.defaultOptionId].filter(Boolean);
+            }
+            return choiceGroup.options.filter(function(option) {
+                return selected.indexOf(option.id) !== -1;
+            });
+        }
+
+        function applyChoiceGroupSelectionToItem(item) {
+            if (!item || !item.choiceGroup) return item;
+            var group = item.choiceGroup;
+            var selectedOptions = getChoiceGroupSelectedOptions(group);
+            var baseQty = parseFloat(item.quantity) || 0;
+            var selectedTotal = 0;
+            var selectedRate = 0;
+            selectedOptions.forEach(function(option) {
+                var qty = option.quantityMode === 'override' ? (parseFloat(option.quantityOverride) || 0) : baseQty;
+                var rate = parseFloat(option.rate) || 0;
+                selectedRate += rate;
+                selectedTotal += qty * rate;
+            });
+            item.total = selectedTotal;
+            if (group.type === 'single' && selectedOptions[0]) {
+                var option = selectedOptions[0];
+                item.description = option.name || group.name || item.description;
+                item.unitType = option.unitType || item.unitType || item.unit || '';
+                item.rate = parseFloat(option.rate) || 0;
+                item.materialCost = parseFloat(option.materialCost) || 0;
+                item.supplierUrl = option.supplierUrl || item.supplierUrl || '';
+                item.itemDescription = option.itemDescription || option.description || item.itemDescription || '';
+            } else {
+                item.description = group.name || item.description || 'Option Group';
+                item.rate = selectedRate;
+            }
+            item.choiceGroup.selectedOptionIds = selectedOptions.map(function(option) { return option.id; });
+            return item;
+        }
+
+        function refreshChoiceGroupTotals() {
+            (rooms || []).forEach(function(room) {
+                (room.items || []).forEach(function(item) {
+                    applyChoiceGroupSelectionToItem(item);
+                });
+            });
+        }
+
+        async function createChoiceGroupFromRoomItems(roomId) {
+            var room = rooms.find(function(r) { return r.id === roomId; });
+            if (!room) return;
+            var checked = Array.from(document.querySelectorAll('.choice-group-select[data-room-id="' + roomId + '"]:checked'));
+            var indexes = checked.map(function(cb) { return parseInt(cb.dataset.itemIndex, 10); }).filter(function(i) { return Number.isFinite(i) && room.items[i]; });
+            if (indexes.length < 2) {
+                qdAlert('Select at least two items in this room to create an option group.');
+                return;
+            }
+            var groupName = (await qdPrompt('Name this client choice group:', 'Options for ' + room.name, { title: 'Create Option Group' }) || '').trim();
+            if (!groupName) return;
+            var typeText = (await qdPrompt('Type "single" for Pick One or "multiple" for Pick Multiple:', 'single', { title: 'Choice Group Type' }) || 'single').trim().toLowerCase();
+            var type = typeText.indexOf('multi') === 0 ? 'multiple' : 'single';
+            var defaultNumber = 1;
+            if (type === 'single') {
+                var list = indexes.map(function(idx, n) { return (n + 1) + '. ' + (room.items[idx].description || room.items[idx].serviceName || 'Option'); }).join('\n');
+                defaultNumber = parseInt(await qdPrompt('Which option should be the default/base price?\n' + list, '1', { title: 'Default Option' }), 10) || 1;
+                defaultNumber = Math.max(1, Math.min(indexes.length, defaultNumber));
+            }
+            _pushUndo();
+            var sourceItems = indexes.map(function(idx) { return room.items[idx]; });
+            var options = sourceItems.map(function(item, optIndex) {
+                return normalizeChoiceGroupOption(item, choiceGroupId() + '_' + optIndex);
+            });
+            var defaultOption = options[Math.max(0, defaultNumber - 1)] || options[0];
+            var group = {
+                id: choiceGroupId(),
+                name: groupName,
+                type: type,
+                required: type === 'single',
+                defaultOptionId: defaultOption ? defaultOption.id : '',
+                selectedOptionIds: type === 'single' ? [defaultOption.id] : options.map(function(option) { return option.id; }),
+                options: options
+            };
+            var baseItem = Object.assign({}, sourceItems[Math.max(0, defaultNumber - 1)] || sourceItems[0]);
+            baseItem.choiceGroup = group;
+            baseItem.optional = false;
+            applyChoiceGroupSelectionToItem(baseItem);
+            indexes.sort(function(a, b) { return b - a; }).forEach(function(idx) { room.items.splice(idx, 1); });
+            room.items.splice(Math.min.apply(null, indexes), 0, baseItem);
+            renderRooms();
+            showToast('Option group created for ' + room.name, 'success');
+        }
+
+        function getChoiceGroupTemplates() {
+            try {
+                var stored = JSON.parse(localStorage.getItem('ald_custom_items') || '{}');
+                return Array.isArray(stored.__choiceGroupTemplates) ? stored.__choiceGroupTemplates : [];
+            } catch(e) {
+                return [];
+            }
+        }
+
+        async function addChoiceTemplateToRoom(roomId) {
+            var room = rooms.find(function(r) { return r.id === roomId; });
+            if (!room) return;
+            var templates = getChoiceGroupTemplates();
+            if (!templates.length) {
+                qdAlert('No saved choice groups yet. Open Manage Items and create a reusable Choice Group first.');
+                return;
+            }
+            var list = templates.map(function(t, idx) { return (idx + 1) + '. ' + t.name + ' (' + ((t.options || []).length) + ' options)'; }).join('\n');
+            var selected = parseInt(await qdPrompt('Which saved choice group should be added?\n' + list, '1', { title: 'Add Saved Choice Group' }), 10) || 1;
+            var template = templates[Math.max(0, Math.min(templates.length - 1, selected - 1))];
+            if (!template) return;
+            var group = JSON.parse(JSON.stringify(template));
+            group.id = choiceGroupId();
+            group.selectedOptionIds = group.type === 'single'
+                ? [group.defaultOptionId || (group.options[0] && group.options[0].id)].filter(Boolean)
+                : [];
+            var first = group.options && group.options[0] ? group.options[0] : {};
+            var item = {
+                description: group.name,
+                category: first.category || 'Options',
+                serviceName: group.name,
+                unitType: first.unitType || '',
+                quantity: 1,
+                rate: 0,
+                notes: '',
+                materialCost: 0,
+                supplierUrl: '',
+                upgrade: null,
+                upgraded: false,
+                optional: false,
+                itemDescription: '',
+                total: 0,
+                choiceGroup: group
+            };
+            applyChoiceGroupSelectionToItem(item);
+            _pushUndo();
+            room.items.push(item);
+            renderRooms();
+            showToast('Choice group added to ' + room.name, 'success');
+        }
+
         function deleteItem(roomId, itemIndex) {
             const room = rooms.find(r => r.id === roomId);
             if (room) {
@@ -3542,6 +3711,7 @@ Example:
         }
 
         function calculateTotals() {
+            refreshChoiceGroupTotals();
             let subtotal = 0;
             let coAddedSubtotal = 0;
             let coCreditSubtotal = 0;
@@ -4559,6 +4729,8 @@ Example:
                 html += '<i class="fas fa-trash"></i> Delete Room</button>';
                 html += '<button onclick="saveRoomAsTemplate(' + room.id + ')" class="btn btn-sm btn-info text-white ms-1" title="Save this room as a template">';
                 html += '<i class="fas fa-bookmark"></i></button>';
+                html += '<button onclick="createChoiceGroupFromRoomItems(' + room.id + ')" class="btn btn-sm btn-outline-light ms-1" title="Group checked items into client-selectable options"><i class="fas fa-layer-group me-1"></i>Option Group</button>';
+                html += '<button onclick="addChoiceTemplateToRoom(' + room.id + ')" class="btn btn-sm btn-outline-light ms-1" title="Add a saved reusable option group"><i class="fas fa-list-check me-1"></i>Saved Group</button>';
                 html += '<button onclick="undoLastAction()" class="btn btn-sm btn-warning ms-1" title="Undo last action (Ctrl+Z)" id="undoBtn">';
                 html += '<i class="fas fa-undo"></i> Undo</button>';
                 html += '</div>';
@@ -4566,8 +4738,11 @@ Example:
                 // Per-room notes/scope section
                 const roomNotes = room.scopeNotes || '';
                 html += '<div class="mt-2 mb-2">';
-                html += '<label><small><i class="fas fa-clipboard-list"></i> <strong>Scope / Notes</strong> <span class="text-muted">(visible to client)</span></small></label>';
-                html += '<textarea id="scopeNotes_' + room.id + '" class="form-control form-control-sm" rows="3" placeholder="Describe the scope of work for this room... e.g., Sometimes this comes up easy, usually not haha." onchange="updateRoomScopeNotes(' + room.id + ')">' + roomNotes + '</textarea>';
+                html += '<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-1">';
+                html += '<label class="mb-0"><small><i class="fas fa-clipboard-list"></i> <strong>Scope / Notes</strong> <span class="text-muted">(visible to client)</span></small></label>';
+                html += '<button type="button" class="btn btn-sm btn-outline-primary" id="aiScopeBtn_' + room.id + '" onclick="generateRoomScopeNotes(' + room.id + ', this)" title="Build a client-facing scope from this room&apos;s line items"><i class="fas fa-magic me-1"></i>AI Scope</button>';
+                html += '</div>';
+                html += '<textarea id="scopeNotes_' + room.id + '" class="form-control form-control-sm" rows="3" placeholder="Describe the scope of work for this room..." onchange="updateRoomScopeNotes(' + room.id + ')">' + qdTemplateEscapeHtml(roomNotes) + '</textarea>';
                 html += '</div>';
 
                 if (room.items.length > 0) {
@@ -4609,9 +4784,12 @@ Example:
                         html += '<span class="cat-drag-handle" title="Drag to reorder category">&#8801;</span>';
                         html += '<i class="fas ' + catIcon + ' me-1" style="color:#6c757d;"></i>' + catDisplay;
                         html += '</div>';
-                        html += '<div style="overflow-x:auto;"><table class="table table-sm mb-0" style="min-width:480px;"><colgroup><col style="width:32px"><col><col style="width:90px"><col style="width:80px"><col style="width:80px"><col style="width:180px"></colgroup><tbody>';
+                        html += '<div style="overflow-x:auto;"><table class="table table-sm mb-0" style="min-width:560px;"><colgroup><col style="width:32px"><col style="width:34px"><col><col style="width:90px"><col style="width:80px"><col style="width:80px"><col style="width:210px"></colgroup><tbody>';
 
                         entries.forEach(({ item, origIndex }) => {
+                            applyChoiceGroupSelectionToItem(item);
+                            const hasChoiceGroup = !!(item.choiceGroup && Array.isArray(item.choiceGroup.options));
+                            const selectedChoiceOptions = hasChoiceGroup ? getChoiceGroupSelectedOptions(item.choiceGroup) : [];
                             const displayRate = item.rate * markupFactor;
                             const displayTotal = item.total * markupFactor;
                             const hasUpgrade = !!(item.upgrade && item.upgrade.name);
@@ -4626,10 +4804,18 @@ Example:
                             const rowStyle = isOptional && !coStatus ? ' style="border-left:3px dashed #0dcaf0;"' : '';
                             html += '<tr' + rowClass + rowStyle + '>';
                             html += '<td style="width:30px">' + displayNum + (isOptional ? ' <span class="badge bg-info" style="font-size:0.6em;">opt</span>' : '') + '</td>';
+                            html += '<td><input type="checkbox" class="form-check-input choice-group-select" data-room-id="' + room.id + '" data-item-index="' + origIndex + '" title="Select for option group"></td>';
                             var _hasDesc = !!(displayItemDescription || item.notes);
                             var _descId = 'itemdesc_' + room.id + '_' + origIndex;
                             html += '<td style="cursor:' + (_hasDesc ? 'pointer' : 'default') + ';" ' + (_hasDesc ? 'onclick="toggleItemDesc(\''+_descId+'\')" title="Click to expand description"' : '') + '>';
                             html += '<strong>' + displayItemName + '</strong>';
+                            if (hasChoiceGroup) {
+                                html += ' <span class="badge bg-primary ms-1"><i class="fas fa-layer-group me-1"></i>' + (item.choiceGroup.type === 'multiple' ? 'Pick Multiple' : 'Pick One') + '</span>';
+                                html += '<div class="small text-muted mt-1">Client options: ' + item.choiceGroup.options.map(function(option) { return qdTemplateEscapeHtml(option.name); }).join(' / ') + '</div>';
+                                if (selectedChoiceOptions.length) {
+                                    html += '<div class="small text-success">Default selected: ' + selectedChoiceOptions.map(function(option) { return qdTemplateEscapeHtml(option.name); }).join(', ') + '</div>';
+                                }
+                            }
                             if (coStatus) {
                                 var badgeClass = coStatus === 'added' ? 'bg-success' : (coStatus === 'removed' ? 'bg-danger' : (coStatus === 'changed' ? 'bg-warning text-dark' : 'bg-secondary'));
                                 html += ' <span class="badge ' + badgeClass + '">' + coStatus.replace(/^\w/, function(ch) { return ch.toUpperCase(); }) + '</span>';
@@ -4656,10 +4842,10 @@ Example:
                                 html += '<td class="' + profitClass + '"><strong>' + profitIcon + ' $' + Math.abs(profit).toFixed(2) + '</strong><br><small>' + margin + '%</small></td>';
                             }
                             let upgradeBtn = '';
-                            if (hasUpgrade) {
+                            if (hasUpgrade && !hasChoiceGroup) {
                                 upgradeBtn = '<button onclick="toggleItemUpgrade(' + room.id + ', ' + origIndex + ')" class="btn btn-sm ' + (isUpgraded ? 'btn-warning' : 'btn-outline-warning') + '" title="' + (isUpgraded ? 'Upgraded: ' + item.upgrade.name : 'Upgrade: ' + item.upgrade.name) + '"><i class="fas fa-arrow-up"></i> ' + (isUpgraded ? 'Upgraded' : 'Upgrade') + '</button>';
                             }
-                            const optionalBtn = '<button onclick="toggleItemOptional(' + room.id + ', ' + origIndex + ')" class="btn btn-sm ' + (isOptional ? 'btn-info' : 'btn-outline-secondary') + '" title="' + (isOptional ? 'Client can remove this item' : 'Mark as removable by client') + '"><i class="fas fa-' + (isOptional ? 'toggle-on' : 'toggle-off') + '"></i> Optional</button>';
+                            const optionalBtn = hasChoiceGroup ? '' : '<button onclick="toggleItemOptional(' + room.id + ', ' + origIndex + ')" class="btn btn-sm ' + (isOptional ? 'btn-info' : 'btn-outline-secondary') + '" title="' + (isOptional ? 'Client can remove this item' : 'Mark as removable by client') + '"><i class="fas fa-' + (isOptional ? 'toggle-on' : 'toggle-off') + '"></i> Optional</button>';
                             var deleteTitle = (window._quoteDocumentType === 'change_order' && item._coOriginal) ? 'Mark as removed from this change order' : 'Delete';
                             html += '<td><div class="d-flex gap-1 flex-wrap">' + upgradeBtn + optionalBtn + '<button onclick="editLineItem(' + room.id + ', ' + origIndex + ')" class="btn btn-sm btn-outline-primary" title="Edit"><i class="fas fa-edit"></i></button><button onclick="deleteItem(' + room.id + ', ' + origIndex + ')" class="btn btn-sm btn-danger" title="' + deleteTitle + '"><i class="fas fa-trash"></i></button></div></td>';
                             html += '</tr>';
@@ -4715,6 +4901,146 @@ Example:
             markUnsaved();
             updateChangeOrderModeUI();
             initSortable();
+        }
+
+        function updateRoomScopeNotes(roomId) {
+            var room = rooms.find(function(r) { return r.id === roomId; });
+            var textarea = document.getElementById('scopeNotes_' + roomId);
+            if (!room || !textarea) return;
+            room.scopeNotes = textarea.value || '';
+            markUnsaved();
+        }
+
+        var MAX_ROOM_SCOPE_PROMPT_CHARS = 8500;
+
+        function compactRoomScopeText(value, maxLength) {
+            var text = String(value || '').replace(/\s+/g, ' ').trim();
+            if (!text || !maxLength || text.length <= maxLength) return text;
+            return text.slice(0, Math.max(0, maxLength - 1)).trim() + '…';
+        }
+
+        function buildRoomScopeAiPayload(room) {
+            var items = (room.items || []).filter(function(item) {
+                return item && !item._excludeFromQuote;
+            }).map(function(item) {
+                var upgraded = !!item.upgraded;
+                var upgrade = upgraded && item.upgrade ? item.upgrade : null;
+                var itemDescription = compactRoomScopeText(upgrade
+                    ? (upgrade.description || upgrade.itemDescription || upgrade.item_description || '')
+                    : String(item.itemDescription || ''), 180);
+                return {
+                    category: compactRoomScopeText(item.category || 'Miscellaneous', 60),
+                    description: compactRoomScopeText(upgrade ? (upgrade.name || item.description || '') : (item.description || item.serviceName || ''), 90),
+                    quantity: item.quantity || 0,
+                    unit: compactRoomScopeText(item.unitType || item.unit || '', 25),
+                    itemDescription: itemDescription,
+                    notes: compactRoomScopeText(item.notes || '', 120),
+                    optional: !!item.optional,
+                    upgraded: upgraded
+                };
+            });
+            return {
+                roomName: compactRoomScopeText(room.name || 'Room', 80),
+                items: items
+            };
+        }
+
+        function buildRoomScopePrompt(payload) {
+            var prompt = [
+                'Write a client-facing renovation scope of work for one room.',
+                'Return only concise bullet points.',
+                'Do not include pricing, rates, totals, supplier links, headings, or phrases like "based on your items".',
+                'Use the item names and short descriptions only as context. Do not rewrite or replace individual line item descriptions.',
+                'Keep it practical, clear, and easy for a homeowner to understand.',
+                '',
+                'Room data JSON:',
+                JSON.stringify(payload)
+            ].join('\n');
+            if (prompt.length <= MAX_ROOM_SCOPE_PROMPT_CHARS) return prompt;
+            var compactPayload = {
+                roomName: payload.roomName,
+                items: (payload.items || []).map(function(item) {
+                    return {
+                        category: item.category,
+                        description: item.description,
+                        quantity: item.quantity,
+                        unit: item.unit,
+                        itemDescription: compactRoomScopeText(item.itemDescription, 70),
+                        notes: '',
+                        optional: item.optional,
+                        upgraded: item.upgraded
+                    };
+                })
+            };
+            return [
+                'Write concise client-facing scope bullets for this room.',
+                'No pricing, headings, supplier links, or line item rewrites.',
+                'Room data JSON:',
+                JSON.stringify(compactPayload)
+            ].join('\n').slice(0, MAX_ROOM_SCOPE_PROMPT_CHARS);
+        }
+
+        function normalizeRoomScopeAiReply(reply) {
+            return String(reply || '')
+                .replace(/^["']|["']$/g, '')
+                .replace(/^#+\s*/gm, '')
+                .replace(/^(scope of work|scope|room scope)\s*:?\s*$/gim, '')
+                .trim();
+        }
+
+        async function generateRoomScopeNotes(roomId, btnEl) {
+            var room = rooms.find(function(r) { return r.id === roomId; });
+            if (!room) return;
+            var payload = buildRoomScopeAiPayload(room);
+            if (!payload.items.length) {
+                qdAlert('Add items to this room first so AI can build a scope.');
+                return;
+            }
+            if (typeof requireProFeature === 'function') {
+                var allowed = await requireProFeature('ai_refine', 'AI Scope');
+                if (!allowed) return;
+            }
+            var btn = btnEl || document.getElementById('aiScopeBtn_' + roomId);
+            var originalHtml = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Writing...';
+            }
+            try {
+                if (typeof getSupabaseFunctionAuthHeaders !== 'function') throw new Error('Please sign in again before using AI Scope.');
+                var prompt = buildRoomScopePrompt(payload);
+                var response = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/ai-assistant', {
+                    method: 'POST',
+                    headers: await getSupabaseFunctionAuthHeaders(),
+                    body: JSON.stringify({ feature: 'ai_assistant', messages: [{ role: 'user', content: prompt }] })
+                });
+                var data = await response.json();
+                if (!response.ok || data.error) throw new Error(data.error || 'AI Scope failed');
+                var generated = normalizeRoomScopeAiReply(data.reply || '');
+                if (!generated) throw new Error('AI did not return scope text. Please try again.');
+                var textarea = document.getElementById('scopeNotes_' + roomId);
+                var current = textarea ? textarea.value.trim() : (room.scopeNotes || '').trim();
+                var combined = current ? current + '\n\n' + generated : generated;
+                room.scopeNotes = combined;
+                if (textarea) textarea.value = combined;
+                markUnsaved();
+                if (typeof completeProTrialFeature === 'function') completeProTrialFeature('ai_refine', 'AI Scope');
+                if (typeof qdMaybeShowProUpgradePrompt === 'function') {
+                    qdMaybeShowProUpgradePrompt('ai_scope_success', {
+                        featureKey: 'ai_refine',
+                        featureLabel: 'AI Scope',
+                        message: 'AI helped draft this room scope. Keep it with Pro access.'
+                    });
+                }
+            } catch (error) {
+                console.error('AI Scope failed:', error);
+                qdAlert(error.message || 'AI Scope failed. Please try again.');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                }
+            }
         }
 
         function initSortable() {
@@ -5195,7 +5521,7 @@ Example:
             }
 
             // Load client info
-            if (document.getElementById('quoteTitle')) document.getElementById('quoteTitle').value = quote.quoteTitle || '';
+            if (document.getElementById('quoteTitle')) document.getElementById('quoteTitle').value = quote.quoteTitle || quote.clientName || quote.client_name || '';
             if (document.getElementById('clientName')) document.getElementById('clientName').value = quote.clientName || '';
             if (document.getElementById('quoteNumber')) document.getElementById('quoteNumber').value = quote.quoteNumber || '';
             if (document.getElementById('projectAddress')) document.getElementById('projectAddress').value = quote.projectAddress || '';
@@ -5230,7 +5556,7 @@ Example:
             const quote = JSON.parse(draftData);
 
             // Load client info
-            if (document.getElementById('quoteTitle')) document.getElementById('quoteTitle').value = quote.quoteTitle || '';
+            if (document.getElementById('quoteTitle')) document.getElementById('quoteTitle').value = quote.quoteTitle || quote.clientName || quote.client_name || '';
             if (document.getElementById('clientName')) document.getElementById('clientName').value = quote.clientName || '';
             if (document.getElementById('projectAddress')) document.getElementById('projectAddress').value = quote.projectAddress || '';
             if (document.getElementById('clientEmail')) document.getElementById('clientEmail').value = quote.email || '';
@@ -5262,6 +5588,7 @@ Example:
 
             const draftData = {
                 id: Date.now(),
+                quoteTitle: document.getElementById('quoteTitle')?.value || '',
                 clientName: document.getElementById('clientName')?.value || 'Client',
                 projectAddress: document.getElementById('projectAddress')?.value || 'Project Address',
                 email: document.getElementById('clientEmail')?.value || '',

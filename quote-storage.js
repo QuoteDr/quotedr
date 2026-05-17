@@ -72,7 +72,7 @@
         function applyQuoteData(data) {
             var wasInitDone = initDone;
             initDone = false; // suppress markUnsaved during load
-            if (document.getElementById('quoteTitle'))     document.getElementById('quoteTitle').value     = data.quoteTitle || '';
+            if (document.getElementById('quoteTitle'))     document.getElementById('quoteTitle').value     = data.quoteTitle || data.clientName || data.client_name || '';
             if (document.getElementById('clientName'))     document.getElementById('clientName').value     = data.clientName || data.client_name || '';
             if (document.getElementById('quoteNumber'))    document.getElementById('quoteNumber').value    = data.quoteNumber || data.quote_number || '';
             if (document.getElementById('quoteStatus'))    document.getElementById('quoteStatus').value    = data.status || 'draft';
@@ -158,7 +158,7 @@
             })) return;
             window._quoteFullyLoaded = true; // new quote - intentionally empty, allow save
             // Clear all fields
-            ['clientName','clientEmail','projectAddress','quoteNotes'].forEach(function(id) {
+            ['quoteTitle','clientName','clientEmail','projectAddress','quoteNotes'].forEach(function(id) {
                 var el = document.getElementById(id);
                 if (el) el.value = '';
             });
@@ -320,7 +320,8 @@ async function saveQuote() {
                 updateDraftWarning();
                 bootstrap.Modal.getInstance(document.getElementById('saveQuoteModal')).hide();
                 qdAfterManualQuoteSave();
-                // Update client name field if changed
+                // Update visible fields if the save dialog changed the title/name.
+                if (document.getElementById('quoteTitle')) document.getElementById('quoteTitle').value = _saveDialogData.quoteTitle || '';
                 if (document.getElementById('clientName')) document.getElementById('clientName').value = _saveDialogData.clientName;
             } catch(e) {
                 qdAlert('Save failed: ' + e.message);
@@ -331,6 +332,8 @@ async function saveQuote() {
 
         async function confirmOverwrite() {
             if (!_saveDialogData || !_selectedOverwriteId) return;
+            var nameInput = document.getElementById('saveQuoteNameInput');
+            if (nameInput) _saveDialogData.quoteTitle = nameInput.value.trim();
             var selectedEl = document.querySelector('.save-quote-item[style*="background"]');
             var quoteName = selectedEl ? selectedEl.querySelector('.fw-bold')?.textContent : 'this quote';
             if (!await qdConfirm('Overwrite "' + quoteName + '"? This cannot be undone.', {
@@ -351,6 +354,7 @@ async function saveQuote() {
                 updateDraftWarning();
                 bootstrap.Modal.getInstance(document.getElementById('saveQuoteModal')).hide();
                 qdAfterManualQuoteSave();
+                if (document.getElementById('quoteTitle')) document.getElementById('quoteTitle').value = _saveDialogData.quoteTitle || '';
             } catch(e) {
                 qdAlert('Save failed: ' + e.message);
             } finally {
@@ -362,7 +366,7 @@ async function saveQuote() {
             if (window.showSaveFilePicker) {
                 // Desktop: use File System API
                 try {
-                    var client = (_saveDialogData && _saveDialogData.clientName) || 'Quote';
+                    var client = (_saveDialogData && (_saveDialogData.quoteTitle || _saveDialogData.clientName)) || 'Quote';
                     var date = new Date().toISOString().slice(0, 10);
                     saveFileHandle = await window.showSaveFilePicker({
                         suggestedName: client + ' - ' + date + '.qdr',
@@ -578,7 +582,7 @@ async function saveQuote() {
             const blob = new Blob([JSON.stringify(collectQuoteData(), null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            const client = document.getElementById('clientName')?.value.trim() || 'Quote';
+            const client = document.getElementById('quoteTitle')?.value.trim() || document.getElementById('clientName')?.value.trim() || 'Quote';
             a.href = url;
             a.download = client + ' - ' + new Date().toISOString().slice(0, 10) + '.qdr';
             a.click();

@@ -1347,6 +1347,125 @@ if (location.search.includes('debug')) {
             if (btn) btn.textContent = expanding ? 'Show less' : 'Show more';
         }
 
+        function getViewerChoiceSelectedOptions(choiceGroup) {
+            if (!choiceGroup || !Array.isArray(choiceGroup.options)) return [];
+            var selected = Array.isArray(choiceGroup.selectedOptionIds) ? choiceGroup.selectedOptionIds.slice() : [];
+            if (choiceGroup.type === 'single') selected = [selected[0] || choiceGroup.defaultOptionId].filter(Boolean);
+            return choiceGroup.options.filter(function(option) { return selected.indexOf(option.id) !== -1; });
+        }
+
+        function applyViewerChoiceGroupToItem(item) {
+            if (!item || !item.choiceGroup) return item;
+            var group = item.choiceGroup;
+            var selected = getViewerChoiceSelectedOptions(group);
+            var qty = parseFloat(item.quantity) || 0;
+            var total = 0;
+            var rateSum = 0;
+            selected.forEach(function(option) {
+                var optionQty = option.quantityMode === 'override' ? (parseFloat(option.quantityOverride) || 0) : qty;
+                var rate = parseFloat(option.rate) || 0;
+                rateSum += rate;
+                total += optionQty * rate;
+            });
+            item.total = total;
+            item.rate = group.type === 'single' && selected[0] ? (parseFloat(selected[0].rate) || 0) : rateSum;
+            item.choiceGroup.selectedOptionIds = selected.map(function(option) { return option.id; });
+            return item;
+        }
+
+        function renderViewerChoiceGroup(roomIdx, itemIndex, item, isSignedDiff) {
+            var group = item.choiceGroup;
+            if (!group || !Array.isArray(group.options)) return '';
+            var selectedIds = getViewerChoiceSelectedOptions(group).map(function(option) { return option.id; });
+            var typeLabel = group.type === 'multiple' ? 'Choose any that apply' : 'Choose one option';
+            var html = '<div class="choice-group-card py-3 border-bottom" id="item_' + roomIdx + '_' + itemIndex + '" style="border-left:4px solid #0d6efd;padding-left:12px;">';
+            html += '<div class="d-flex justify-content-between gap-3 mb-2"><div><strong>' + escapeHtml(group.name || item.description || 'Options') + '</strong><div class="text-muted small"><i class="fas fa-layer-group me-1"></i>' + typeLabel + '</div></div>';
+            html += '<div class="text-end small text-muted">' + (group.required ? 'Required' : 'Optional') + '</div></div>';
+            html += '<div class="row g-2">';
+            group.options.forEach(function(option) {
+                var checked = selectedIds.indexOf(option.id) !== -1;
+                var optionQty = option.quantityMode === 'override' ? (parseFloat(option.quantityOverride) || 0) : (parseFloat(item.quantity) || 0);
+                var optionTotal = optionQty * (parseFloat(option.rate) || 0);
+                var optionArg = JSON.stringify(option.id || '').replace(/"/g, '&quot;');
+                html += '<div class="col-md-6"><button type="button" class="w-100 text-start btn ' + (checked ? 'btn-primary' : 'btn-outline-primary') + '" ' + (isSignedDiff ? 'disabled' : 'onclick="toggleViewerChoiceOption(' + roomIdx + ',' + itemIndex + ',' + optionArg + ')"') + '>';
+                html += '<div class="d-flex justify-content-between gap-2"><span><i class="fas ' + (checked ? 'fa-check-circle' : 'fa-circle') + ' me-1"></i>' + escapeHtml(option.name) + '</span><strong>$' + optionTotal.toFixed(2) + '</strong></div>';
+                if (option.itemDescription || option.description) html += '<div class="small opacity-75 mt-1">' + escapeHtml(option.itemDescription || option.description) + '</div>';
+                html += '<div class="small opacity-75 mt-1">' + optionQty + ' ' + escapeHtml(option.unitType || item.unitType || '') + ' @ $' + (parseFloat(option.rate) || 0).toFixed(2) + '</div>';
+                html += '</button></div>';
+            });
+            html += '</div></div>';
+            return html;
+        }
+
+        function toggleViewerChoiceOption(roomIdx, itemIndex, optionId) {
+            var item = quoteData.rooms[roomIdx]?.items[itemIndex];
+            if (!item || !item.choiceGroup) return;
+            var group = item.choiceGroup;
+            var selected = Array.isArray(group.selectedOptionIds) ? group.selectedOptionIds.slice() : [];
+            if (group.type === 'multiple') {
+                selected = selected.indexOf(optionId) === -1
+                    ? selected.concat([optionId])
+                    : selected.filter(function(id) { return id !== optionId; });
+            } else {
+                selected = [optionId];
+            }
+            group.selectedOptionIds = selected;
+            applyViewerChoiceGroupToItem(item);
+            renderQuote();
+            updateTotal();
+        }
+
+        function collectClientChoiceGroups() {
+            var choices = [];
+            (quoteData.rooms || []).forEach(function(room) {
+                (room.items || []).forEach(function(item) {
+                    if (!item.choiceGroup) return;
+                    var selected = getViewerChoiceSelectedOptions(item.choiceGroup);
+                    selected.forEach(function(option) {
+                        choices.push({
+                            room: room.name,
+                            group: item.choiceGroup.name,
+                            option: option.name,
+                            type: item.choiceGroup.type,
+                            total: (parseFloat(item.quantity) || 0) * (parseFloat(option.rate) || 0)
+                        });
+                    });
+                });
+            });
+            return choices;
+        }
+
+        function applyClientChoiceGroupsToRooms(sourceRooms) {
+            return (sourceRooms || []).map(function(room) {
+                var nextItems = [];
+                (room.items || []).forEach(function(item) {
+                    if (!item.choiceGroup) {
+                        if (!item._removed) nextItems.push(item);
+                        return;
+                    }
+                    if (item._removed) return;
+                    var group = item.choiceGroup;
+                    getViewerChoiceSelectedOptions(group).forEach(function(option) {
+                        var qty = option.quantityMode === 'override' ? (parseFloat(option.quantityOverride) || 0) : (parseFloat(item.quantity) || 0);
+                        nextItems.push(Object.assign({}, item, {
+                            description: option.name,
+                            serviceName: option.name,
+                            unitType: option.unitType || item.unitType || item.unit || '',
+                            rate: parseFloat(option.rate) || 0,
+                            materialCost: parseFloat(option.materialCost) || 0,
+                            supplierUrl: option.supplierUrl || '',
+                            itemDescription: option.itemDescription || option.description || '',
+                            quantity: qty,
+                            total: qty * (parseFloat(option.rate) || 0),
+                            choiceGroupSelection: { groupId: group.id, groupName: group.name, optionId: option.id, optionName: option.name, type: group.type },
+                            choiceGroup: group
+                        }));
+                    });
+                });
+                return Object.assign({}, room, { items: nextItems });
+            });
+        }
+
         function defaultCommitmentItems() {
             return [
                 { icon: 'fa-solid fa-shield-halved', image: '', label: '1-Year Warranty', text: 'Workmanship guaranteed for 12 months from project completion' },
@@ -1550,6 +1669,7 @@ if (location.search.includes('debug')) {
             ];
 
             quoteData.rooms.forEach((room, roomIdx) => {
+                (room.items || []).forEach(function(item) { applyViewerChoiceGroupToItem(item); });
                 const roomTotal = room.items.reduce((sum, item) => sum + (item.quantity * item.rate), 0);
                 const headerBg = roomHeaderBackground(room, ROOM_COLORS[room.colorIndex ?? 0] || ROOM_COLORS[0]);
 
@@ -1620,6 +1740,11 @@ if (location.search.includes('debug')) {
                     const origRoom = origRoomsForDiff[roomIdx] || {};
                     const origItem = isSignedDiff ? (origRoom.items || []).find(oi => oi.description === item.description) : null;
                     const wasUpgraded = isSignedDiff && origItem && origItem.rate !== item.rate;
+
+                    if (item.choiceGroup && !isRemoved) {
+                        html += renderViewerChoiceGroup(roomIdx, itemIndex, item, isSignedDiff);
+                        return;
+                    }
 
                     if (isRemoved) {
                         if (isSignedDiff) {
@@ -1792,6 +1917,7 @@ if (location.search.includes('debug')) {
             if (quoteData.rooms) {
                 quoteData.rooms.forEach(room => {
                     room.items.forEach(item => {
+                        applyViewerChoiceGroupToItem(item);
                         if (item._removed) return; // skip removed items
                         const activeRate = (item.upgraded && item.upgrade) ? item.upgrade.rate : (item._baseRate || item.rate);
                         const baseTotal = item.quantity * (item._baseRate || item.rate);
@@ -1811,8 +1937,11 @@ if (location.search.includes('debug')) {
 
             var upgradesEl = document.getElementById('upgradesTotalDisplay');
             if (upgradesEl) {
-                upgradesEl.style.display = upgradesTotal > 0 ? 'flex' : 'none';
-                upgradesEl.innerHTML = upgradesTotal > 0 ? `<span>Selected upgrades</span><strong>+$${upgradesTotal.toFixed(2)}</strong>` : '';
+                var selectedChoices = collectClientChoiceGroups();
+                upgradesEl.style.display = (upgradesTotal > 0 || selectedChoices.length) ? 'flex' : 'none';
+                upgradesEl.innerHTML = upgradesTotal > 0
+                    ? `<span>Selected upgrades${selectedChoices.length ? ' and options' : ''}</span><strong>+$${upgradesTotal.toFixed(2)}</strong>`
+                    : (selectedChoices.length ? `<span>Selected options</span><strong>${selectedChoices.length}</strong>` : '');
             }
 
             var depositSummary = document.getElementById('depositSummary');
@@ -1897,7 +2026,7 @@ if (location.search.includes('debug')) {
 
         function hasClientUpgrades() {
             return (quoteData.rooms || []).some(function(room) {
-                return (room.items || []).some(function(item) { return !!item.upgraded; });
+                return (room.items || []).some(function(item) { return !!item.upgraded || !!item.choiceGroup; });
             });
         }
 
@@ -2109,7 +2238,8 @@ if (location.search.includes('debug')) {
                 var originalRoomsSnapshot = JSON.parse(JSON.stringify(quoteData.rooms || []));
 
                 // Build updated rooms with client upgrades/removals applied permanently
-                var updatedRooms = (quoteData.rooms || []).map(function(room) {
+                var choiceAppliedRooms = applyClientChoiceGroupsToRooms(quoteData.rooms || []);
+                var updatedRooms = choiceAppliedRooms.map(function(room) {
                     return Object.assign({}, room, {
                         items: (room.items || []).filter(function(item) { return !item._removed; }).map(function(item) {
                             if (item.upgraded && item.upgrade) {
@@ -2131,6 +2261,8 @@ if (location.search.includes('debug')) {
                 var _hasRemovals = (quoteData.rooms || []).some(function(room) {
                     return (room.items || []).some(function(item) { return item._removed; });
                 });
+                var _clientChoiceGroups = collectClientChoiceGroups();
+                var _hasChoiceGroups = _clientChoiceGroups.length > 0;
 
                 var isChangeOrder = !!(window.QuoteDrChangeOrders && QuoteDrChangeOrders.isChangeOrder(quoteData));
                 const updateData = {
@@ -2144,19 +2276,20 @@ if (location.search.includes('debug')) {
                         signed_at: now.toISOString(),
                         approved_by: name,
                         approved_at: now.toISOString(),
-                        client_upgraded: _hasUpgrades || _hasRemovals,
-                        client_upgraded_at: (_hasUpgrades || _hasRemovals) ? now.toISOString() : undefined,
-                        original_rooms: (_hasUpgrades || _hasRemovals) ? originalRoomsSnapshot : undefined
+                        client_upgraded: _hasUpgrades || _hasRemovals || _hasChoiceGroups,
+                        client_upgraded_at: (_hasUpgrades || _hasRemovals || _hasChoiceGroups) ? now.toISOString() : undefined,
+                        original_rooms: (_hasUpgrades || _hasRemovals || _hasChoiceGroups) ? originalRoomsSnapshot : undefined,
+                        _clientChoiceGroups: _clientChoiceGroups
                     })
                 };
 
                 await _supabase.from('quotes').update(updateData).eq('id', quoteId);
                 quoteData = Object.assign({}, quoteData, updateData.data, { status: updateData.status });
                 if (typeof qdCaptureEvent === 'function') {
-                    qdCaptureEvent('quote_signed', {
-                        quote_id: quoteId,
-                        document_type: isChangeOrder ? 'change_order' : 'quote',
-                        had_client_changes: _hasUpgrades || _hasRemovals,
+                qdCaptureEvent('quote_signed', {
+                    quote_id: quoteId,
+                    document_type: isChangeOrder ? 'change_order' : 'quote',
+                        had_client_changes: _hasUpgrades || _hasRemovals || _hasChoiceGroups,
                         room_count: Array.isArray(updatedRooms) ? updatedRooms.length : 0
                     });
                 }
@@ -2181,6 +2314,7 @@ if (location.search.includes('debug')) {
             // Build upgrade summary for Supabase
             var _clientUpgrades = [];
             var _clientRemovals = [];
+            var _clientChoiceGroups = collectClientChoiceGroups();
             (quoteData.rooms || []).forEach(function(room) {
                 (room.items || []).forEach(function(item) {
                     if (item.upgraded && item.upgrade) {
@@ -2203,6 +2337,7 @@ if (location.search.includes('debug')) {
                                 _roomNotes: quoteData._roomNotes || {},
                                 _clientUpgrades: _clientUpgrades,
                                 _clientRemovals: _clientRemovals,
+                                _clientChoiceGroups: _clientChoiceGroups,
                                 _clientRooms: JSON.parse(JSON.stringify(quoteData.rooms || [])),
                                 _clientSubmittedAt: new Date().toISOString()
                             });

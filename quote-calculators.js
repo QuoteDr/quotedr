@@ -170,24 +170,34 @@
 
         function addEstimatorPricingItem(items, seen, category, item, sourceLabel) {
             var rate = parseFloat(item && item.rate) || 0;
-            if (rate <= 0) return;
             var name = item.name || item.description || 'Saved item';
             var unitType = item.unitType || item.unit || '';
             var key = String(category || '') + '::' + String(name || '') + '::' + String(unitType || '') + '::' + String(rate);
             if (seen[key]) return;
             seen[key] = true;
+            var searchText = [
+                name,
+                item.description || '',
+                item.serviceName || '',
+                item.itemDescription || '',
+                item.notes || '',
+                category || '',
+                unitType || ''
+            ].join(' ').toLowerCase();
             items.push({
                 id: (sourceLabel || category || 'Item') + '::' + category + '::' + name,
                 category: sourceLabel || category || 'Saved Items',
                 itemCategory: category || '',
                 name: name,
                 rate: rate,
-                unitType: unitType
+                unitType: unitType,
+                searchText: searchText
             });
         }
 
         function collectEstimatorItemsFromMap(items, seen, source, sourceLabel) {
             Object.keys(source || {}).sort().forEach(function(cat) {
+                if (cat === '__choiceGroupTemplates') return;
                 var catItems = Array.isArray(source[cat]) ? source[cat] : [];
                 catItems.forEach(function(item) {
                     addEstimatorPricingItem(items, seen, cat, item, sourceLabel || cat);
@@ -221,7 +231,7 @@
             var q = String(query || '').trim().toLowerCase();
             var filtered = _estimatorPricingItems.filter(function(item) {
                 if (!q) return true;
-                return (item.name + ' ' + item.category + ' ' + item.unitType).toLowerCase().indexOf(q) !== -1;
+                return (item.searchText || (item.name + ' ' + item.category + ' ' + item.unitType).toLowerCase()).indexOf(q) !== -1;
             });
             var html = '<option value="">Pick from my items...</option>';
             var lastCat = null;
@@ -240,17 +250,107 @@
             return html;
         }
 
-        function findEstimatorSavedItemId(saved) {
-            if (!saved) return '';
-            if (saved.itemId !== undefined && _estimatorPricingItems.some(function(item) { return String(item.id) === String(saved.itemId); })) return saved.itemId;
+        function estimatorPricingDatalistHtml() {
+            var seen = {};
+            return _estimatorPricingItems.map(function(item) {
+                var label = item.name + ' - ' + item.category + (item.unitType ? ' / ' + item.unitType : '');
+                if (seen[label]) return '';
+                seen[label] = true;
+                return '<option value="' + calcEscapeHtml(item.name) + '" label="' + calcEscapeHtml(label) + '"></option>';
+            }).join('');
+        }
+
+        function findEstimatorSavedItemIds(saved) {
+            if (!saved) return [];
+            if (Array.isArray(saved.items)) {
+                return saved.items
+                    .map(function(item) { return item.itemId || item.id || ''; })
+                    .filter(function(id) {
+                        return id && _estimatorPricingItems.some(function(item) { return String(item.id) === String(id); });
+                    });
+            }
+            if (saved.itemId !== undefined && _estimatorPricingItems.some(function(item) { return String(item.id) === String(saved.itemId); })) return [saved.itemId];
             if (saved.itemName) {
                 var match = _estimatorPricingItems.find(function(item) {
                     return item.name === saved.itemName && (!saved.category || item.category === saved.category);
                 });
-                if (match) return match.id;
+                if (match) return [match.id];
             }
-            return '';
+            return [];
         }
+
+        function findEstimatorSavedItemId(saved) {
+            var ids = findEstimatorSavedItemIds(saved);
+            return ids.length ? ids[0] : '';
+        }
+
+        function getEstimatorItemById(itemId) {
+            return _estimatorPricingItems.find(function(item) { return String(item.id) === String(itemId); }) || null;
+        }
+
+        function estimatorSelectedItemsHtml(key, selectedIds) {
+            selectedIds = selectedIds || [];
+            if (!selectedIds.length) {
+                return '<div class="text-muted small" id="epSelectedEmpty_' + key + '">No saved items linked yet.</div>';
+            }
+            return selectedIds.map(function(itemId) {
+                var item = getEstimatorItemById(itemId);
+                if (!item) return '';
+                return '<span class="badge rounded-pill text-bg-light border me-1 mb-1" data-ep-selected-item="' + calcEscapeHtml(item.id) + '" data-rate="' + item.rate + '" data-name="' + calcEscapeHtml(item.name) + '" data-category="' + calcEscapeHtml(item.category) + '" data-unit="' + calcEscapeHtml(item.unitType) + '">' +
+                    calcEscapeHtml(item.name) +
+                    ' <small class="text-muted">$' + item.rate.toFixed(2) + (item.unitType ? '/' + calcEscapeHtml(item.unitType) : '') + '</small>' +
+                    ' <button type="button" class="btn-close btn-close-sm ms-1" aria-label="Remove" data-estimator-remove-item="1" data-estimator-key="' + calcEscapeHtml(key) + '" data-estimator-item-id="' + calcEscapeHtml(item.id) + '" style="font-size:0.55rem;"></button>' +
+                '</span>';
+            }).join('');
+        }
+
+        function estimatorSelectedItemIds(key) {
+            var wrap = document.getElementById('epSelected_' + key);
+            if (!wrap) return [];
+            return Array.from(wrap.querySelectorAll('[data-ep-selected-item]')).map(function(el) {
+                return el.getAttribute('data-ep-selected-item');
+            }).filter(Boolean);
+        }
+
+        function updateEstimatorSelectedTotal(key) {
+            var ids = estimatorSelectedItemIds(key);
+            var total = ids.reduce(function(sum, itemId) {
+                var item = getEstimatorItemById(itemId);
+                return sum + (item ? parseFloat(item.rate) || 0 : 0);
+            }, 0);
+            var rateInput = document.getElementById('epRate_' + key);
+            if (rateInput) rateInput.value = ids.length ? total.toFixed(2) : '';
+        }
+
+        function removeEstimatorPricingItem(key, itemId) {
+            var selected = estimatorSelectedItemIds(key).filter(function(id) { return String(id) !== String(itemId); });
+            var wrap = document.getElementById('epSelected_' + key);
+            if (wrap) wrap.innerHTML = estimatorSelectedItemsHtml(key, selected);
+            updateEstimatorSelectedTotal(key);
+        }
+
+        function removeEstimatorPricingItemFromButton(button) {
+            if (!button || !button.dataset) return;
+            removeEstimatorPricingItem(button.dataset.estimatorKey, button.dataset.estimatorItemId);
+        }
+
+        function addEstimatorPricingItemSelection(key, itemId) {
+            if (!itemId) return false;
+            var selected = estimatorSelectedItemIds(key);
+            if (selected.indexOf(itemId) === -1) selected.push(itemId);
+            var wrap = document.getElementById('epSelected_' + key);
+            if (wrap) wrap.innerHTML = estimatorSelectedItemsHtml(key, selected);
+            updateEstimatorSelectedTotal(key);
+            return true;
+        }
+
+        document.addEventListener('click', function(event) {
+            var button = event.target && event.target.closest ? event.target.closest('[data-estimator-remove-item="1"]') : null;
+            if (!button) return;
+            event.preventDefault();
+            event.stopPropagation();
+            removeEstimatorPricingItemFromButton(button);
+        });
 
         // Re-open estimator after pricing modal closes
         document.addEventListener('hidden.bs.modal', function(e) {
@@ -264,15 +364,26 @@
             EST_FIELDS.forEach(function(f) {
                 var rateEl = document.getElementById('epRate_' + f.key);
                 var rate = rateEl ? parseFloat(rateEl.value) || 0 : 0;
-                var sel = document.getElementById('epItem_' + f.key);
-                var opt = sel && sel.selectedOptions ? sel.selectedOptions[0] : null;
+                var selectedItems = estimatorSelectedItemIds(f.key).map(function(itemId) {
+                    var item = getEstimatorItemById(itemId);
+                    if (!item) return null;
+                    return {
+                        itemId: item.id,
+                        itemName: item.name,
+                        category: item.category,
+                        itemCategory: item.itemCategory || '',
+                        unitType: item.unitType || '',
+                        rate: parseFloat(item.rate) || 0
+                    };
+                }).filter(Boolean);
                 pricing[f.key] = {
-                    rate: rate,
+                    rate: selectedItems.length ? selectedItems.reduce(function(sum, item) { return sum + (parseFloat(item.rate) || 0); }, 0) : rate,
                     unit: f.unit,
-                    itemId: sel && sel.value ? sel.value : '',
-                    itemName: opt && opt.dataset ? (opt.dataset.name || '') : '',
-                    category: opt && opt.dataset ? (opt.dataset.category || '') : '',
-                    unitType: opt && opt.dataset ? (opt.dataset.unit || '') : ''
+                    items: selectedItems,
+                    itemId: selectedItems[0] ? selectedItems[0].itemId : '',
+                    itemName: selectedItems[0] ? selectedItems[0].itemName : '',
+                    category: selectedItems[0] ? selectedItems[0].category : '',
+                    unitType: selectedItems[0] ? selectedItems[0].unitType : ''
                 };
             });
             localStorage.setItem('ald_estimator_pricing', JSON.stringify(pricing));
@@ -300,14 +411,21 @@
             var items = buildEstimatorPricingItems();
             var html = '';
             EST_FIELDS.forEach(function(f) {
-                var savedRate = (saved[f.key] && saved[f.key].rate) || '';
                 var displayUnit = (f.unit === 'sqft') ? calcAreaUnit() : (f.unit === 'LF' ? calcLengthUnit() : f.unit);
-                var selectedId = findEstimatorSavedItemId(saved[f.key]);
+                var selectedIds = findEstimatorSavedItemIds(saved[f.key]);
+                var selectedTotal = selectedIds.reduce(function(sum, itemId) {
+                    var item = getEstimatorItemById(itemId);
+                    return sum + (item ? parseFloat(item.rate) || 0 : 0);
+                }, 0);
+                var savedRate = selectedIds.length ? selectedTotal.toFixed(2) : ((saved[f.key] && saved[f.key].rate) || '');
+                var selectedId = selectedIds.length === 1 ? selectedIds[0] : '';
                 html += '<div class="row g-2 align-items-end mb-3">';
                 html += '<div class="col-lg-3"><label class="form-label fw-semibold mb-0">' + f.label + '</label><div class="text-muted small">per ' + displayUnit + '</div></div>';
                 html += '<div class="col-lg-4">';
                 html += '<label class="form-label small text-muted mb-1" for="epSearch_' + f.key + '">Find saved item</label>';
-                html += '<input type="search" class="form-control form-control-sm" id="epSearch_' + f.key + '" data-estimator-item-search="' + f.key + '" placeholder="Start typing..." oninput="filterEstimatorPricingItems(\'' + f.key + '\')" autocomplete="off">';
+                html += '<input type="search" class="form-control form-control-sm" id="epSearch_' + f.key + '" data-estimator-item-search="' + f.key + '" list="epSuggestions_' + f.key + '" placeholder="Start typing..." oninput="filterEstimatorPricingItems(\'' + f.key + '\')" onchange="commitEstimatorPricingSearchMatch(\'' + f.key + '\')" autocomplete="off">';
+                html += '<datalist id="epSuggestions_' + f.key + '">' + estimatorPricingDatalistHtml() + '</datalist>';
+                html += '<div class="mt-1" id="epSelected_' + f.key + '">' + estimatorSelectedItemsHtml(f.key, selectedIds) + '</div>';
                 html += '</div>';
                 html += '<div class="col-lg-3">';
                 html += '<label class="form-label small text-muted mb-1" for="epItem_' + f.key + '">Category items</label>';
@@ -333,10 +451,40 @@
             var sel = document.getElementById('epItem_' + key);
             if (!sel || !sel.value) return;
             var opt = sel.selectedOptions ? sel.selectedOptions[0] : null;
-            var rate = opt && opt.dataset ? opt.dataset.rate : '';
-            if (rate) document.getElementById('epRate_' + key).value = rate;
+            addEstimatorPricingItemSelection(key, sel.value);
             var search = document.getElementById('epSearch_' + key);
-            if (search && opt && opt.dataset) search.value = opt.dataset.name || '';
+            if (search) search.value = '';
+            sel.innerHTML = estimatorPricingOptionsHtml(key, '', '');
+            sel.value = '';
+        }
+
+        function findEstimatorSearchMatch(query) {
+            var q = String(query || '').trim().toLowerCase();
+            if (!q) return null;
+            var exact = _estimatorPricingItems.find(function(item) {
+                return String(item.name || '').trim().toLowerCase() === q;
+            });
+            if (exact) return exact;
+            return _estimatorPricingItems.find(function(item) {
+                var label = (item.name + ' - ' + item.category + (item.unitType ? ' / ' + item.unitType : '')).trim().toLowerCase();
+                return label === q;
+            }) || null;
+        }
+
+        function commitEstimatorPricingSearchMatch(key) {
+            var search = document.getElementById('epSearch_' + key);
+            var sel = document.getElementById('epItem_' + key);
+            var match = search ? findEstimatorSearchMatch(search.value) : null;
+            if (match) {
+                addEstimatorPricingItemSelection(key, match.id);
+                if (search) search.value = '';
+                if (sel) {
+                    sel.innerHTML = estimatorPricingOptionsHtml(key, '', '');
+                    sel.value = '';
+                }
+                return;
+            }
+            filterEstimatorPricingItems(key);
         }
 
         function filterEstimatorPricingItems(key) {
@@ -346,11 +494,36 @@
             var query = search ? search.value : '';
             var matches = _estimatorPricingItems.filter(function(item) {
                 if (!query) return true;
-                return (item.name + ' ' + item.category + ' ' + item.unitType).toLowerCase().indexOf(query.toLowerCase()) !== -1;
+                return (item.searchText || (item.name + ' ' + item.category + ' ' + item.unitType).toLowerCase()).indexOf(query.toLowerCase()) !== -1;
             });
-            var selectedId = matches.length === 1 ? matches[0].id : '';
+            var exactMatch = query ? matches.find(function(item) { return String(item.name || '').toLowerCase() === query.toLowerCase(); }) : null;
+            var selectedId = exactMatch ? exactMatch.id : '';
             sel.innerHTML = estimatorPricingOptionsHtml(key, query, selectedId);
-            if (matches.length === 1) estimatorPricingItemSelected(key);
+        }
+
+        function getEstimatorPricingSelections(pricing, key) {
+            var saved = pricing[key] || {};
+            if (Array.isArray(saved.items) && saved.items.length) {
+                return saved.items.map(function(item) {
+                    return {
+                        name: item.itemName || item.name || '',
+                        category: item.itemCategory || item.category || '',
+                        displayCategory: item.category || item.itemCategory || '',
+                        unitType: item.unitType || '',
+                        rate: parseFloat(item.rate) || 0
+                    };
+                });
+            }
+            if (saved.itemName || saved.itemId) {
+                return [{
+                    name: saved.itemName || '',
+                    category: saved.itemCategory || saved.category || '',
+                    displayCategory: saved.category || saved.itemCategory || '',
+                    unitType: saved.unitType || '',
+                    rate: parseFloat(saved.rate) || 0
+                }];
+            }
+            return [];
         }
 
         function epItemSelected(key) {
@@ -428,6 +601,22 @@
 
             function getRate(key) { return (pricing[key] && pricing[key].rate) ? pricing[key].rate : 0; }
             function noteList(parts) { return parts.filter(Boolean).join('; '); }
+            function estimateLineHtml(line) {
+                line.rate = parseFloat(line.rate) || 0;
+                var total = Math.round(line.qty * line.rate * 100) / 100;
+                subtotal += total;
+                var label = line.label || line.itemName;
+                var notes = line.notes || '';
+                var itemName = line.itemName || label;
+                html += '<tr data-cat="' + calcEscapeHtml(line.cat) + '" data-name="' + calcEscapeHtml(itemName) + '" data-unit="' + calcEscapeHtml(line.unit) + '" data-qty="' + line.qty + '" data-rate="' + line.rate + '" data-notes="' + calcEscapeHtml(notes) + '">';
+                html += '<td><input type="checkbox" class="form-check-input est-check" checked></td>';
+                html += '<td>' + calcEscapeHtml(label) + (notes ? '<div class="text-muted small">' + calcEscapeHtml(notes) + '</div>' : '') + '</td>';
+                html += '<td>' + calcFormatQuantity(line.qty, line.unit) + '</td>';
+                html += '<td class="text-muted">' + line.unit + '</td>';
+                html += '<td>' + (line.rate > 0 ? '$' + line.rate.toFixed(2) : '<span class="text-muted">-</span>') + '</td>';
+                html += '<td>' + (total > 0 ? '$' + total.toFixed(2) : '<span class="text-muted">-</span>') + '</td>';
+                html += '</tr>';
+            }
 
             document.getElementById('estResultRoomName').textContent = name;
             var rows = [
@@ -441,19 +630,35 @@
 
             var html = '';
             var subtotal = 0;
+            var resultCount = 0;
             rows.forEach(function(r) {
                 if (r.hide) return;
-                var rate = getRate(r.key);
-                var total = Math.round(r.qty * rate * 100) / 100;
-                subtotal += total;
-                html += '<tr data-cat="' + calcEscapeHtml(r.cat) + '" data-name="' + calcEscapeHtml(r.itemName) + '" data-unit="' + calcEscapeHtml(r.unit) + '" data-qty="' + r.qty + '" data-rate="' + rate + '" data-notes="' + calcEscapeHtml(r.notes || '') + '">';
-                html += '<td><input type="checkbox" class="form-check-input est-check" checked></td>';
-                html += '<td>' + r.label + (r.notes ? '<div class="text-muted small">' + calcEscapeHtml(r.notes) + '</div>' : '') + '</td>';
-                html += '<td>' + calcFormatQuantity(r.qty, r.unit) + '</td>';
-                html += '<td class="text-muted">' + r.unit + '</td>';
-                html += '<td>' + (rate > 0 ? '$' + rate.toFixed(2) : '<span class="text-muted">-</span>') + '</td>';
-                html += '<td>' + (total > 0 ? '$' + total.toFixed(2) : '<span class="text-muted">-</span>') + '</td>';
-                html += '</tr>';
+                var selections = getEstimatorPricingSelections(pricing, r.key);
+                if (selections.length) {
+                    selections.forEach(function(selection) {
+                        estimateLineHtml({
+                            label: selection.name || r.label,
+                            itemName: selection.name || r.itemName,
+                            cat: selection.category || r.cat,
+                            qty: r.qty,
+                            unit: r.unit,
+                            rate: parseFloat(selection.rate) || 0,
+                            notes: r.notes || ''
+                        });
+                        resultCount++;
+                    });
+                    return;
+                }
+                estimateLineHtml({
+                    label: r.label,
+                    itemName: r.itemName,
+                    cat: r.cat,
+                    qty: r.qty,
+                    unit: r.unit,
+                    rate: getRate(r.key),
+                    notes: r.notes || ''
+                });
+                resultCount++;
             });
             document.getElementById('estResultsBody').innerHTML = html;
             document.getElementById('estSubtotal').textContent = subtotal > 0 ? '$' + subtotal.toFixed(2) : '-';
@@ -461,7 +666,7 @@
             document.getElementById('estResultsSection').style.display = 'block';
             if (typeof qdCaptureEvent === 'function') {
                 qdCaptureEvent('quick_add_room_calculated', {
-                    item_count: rows.filter(function(r) { return !r.hide; }).length,
+                    item_count: resultCount,
                     total_bucket: typeof qdAnalyticsBucketMoney === 'function' ? qdAnalyticsBucketMoney(subtotal) : undefined,
                     has_pricing: hasPricing,
                     doors: doors,

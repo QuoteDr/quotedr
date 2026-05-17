@@ -725,6 +725,7 @@ if (location.search.includes('debug')) {
                     const itemTotal = (item.quantity || 0) * activeRate;
                     const displayName = isUpgraded && item.upgrade ? item.upgrade.name : (item.description || item.name || 'Item');
                     const displayDesc = getInvoiceItemDescription(item, originalUpgradeItem, isUpgraded);
+                    const choiceGroupSelection = item.choiceGroupSelection || null;
                     const descHtml = settings.showDescriptions !== false
                         ? (renderCollapsibleDescription(displayDesc) + renderCollapsibleDescription(item.notes, '<i class="fas fa-info-circle"></i> '))
                         : '';
@@ -735,6 +736,7 @@ if (location.search.includes('debug')) {
                                     <span class="item-name">${escapeHtml(displayName)}</span>
                                     ${item.photo ? `<div class="mt-1"><img src="${item.photo}" style="max-width:100px;max-height:70px;border-radius:4px;" alt=""></div>` : ''}
                                     ${isUpgraded ? '<span class="item-upgraded-badge">⬆ Upgraded</span>' : ''}
+                                    ${choiceGroupSelection ? '<span class="item-upgraded-badge" style="background:#0d6efd;">Selected Option: ' + escapeHtml(choiceGroupSelection.groupName || 'Choice Group') + '</span>' : ''}
                                     ${descHtml}
                                 </td>
                                 <td style="text-align:center; vertical-align:top; padding-top:10px;">${typeof qdFormatQuantity === 'function' ? qdFormatQuantity(item.quantity || 0, item.unitType || item.unit || '') : ((item.quantity || 0) + ' ' + (item.unitType || ''))}</td>

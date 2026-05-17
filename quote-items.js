@@ -7,6 +7,7 @@
 
                 function _injectItemsIntoPricingDB(itemsObj) {
             for (var cat in itemsObj) {
+                if (cat === '__choiceGroupTemplates') continue;
                 if (!Array.isArray(itemsObj[cat])) continue; // skip corrupted entries
                 if (!pricingDatabase[cat]) pricingDatabase[cat] = [];
                 itemsObj[cat].forEach(function(item) {
@@ -70,6 +71,7 @@
             _restoreCategoryStylesFromCloud().catch(function(){});
             _restoreHiddenCategoriesFromCloud().catch(function(){});
             for (const [category, items] of Object.entries(customItems)) {
+                if (category === '__choiceGroupTemplates') continue;
                 if (!Array.isArray(items)) continue; // skip corrupted entries
                 if (!pricingDatabase[category]) pricingDatabase[category] = [];
                 items.forEach(item => {
@@ -664,6 +666,14 @@
         function renderAllItemsList() {
             const container = document.getElementById('customItemsList');
             let html = '';
+            var choiceGroupTemplates = (customItems && Array.isArray(customItems.__choiceGroupTemplates)) ? customItems.__choiceGroupTemplates : [];
+            if (choiceGroupTemplates.length) {
+                html += '<div class="alert alert-primary py-2 mb-2"><div class="fw-bold mb-1"><i class="fas fa-layer-group me-1"></i>Reusable Choice Groups</div>';
+                choiceGroupTemplates.forEach(function(group) {
+                    html += '<div class="small d-flex justify-content-between border-top pt-1 mt-1"><span><strong>' + (group.name || 'Choice Group') + '</strong> <span class="text-muted">(' + (group.type === 'multiple' ? 'Pick Multiple' : 'Pick One') + ', ' + ((group.options || []).length) + ' options)</span></span><span>' + (group.options || []).map(function(option) { return option.name; }).join(' / ') + '</span></div>';
+                });
+                html += '</div>';
+            }
 
             Object.entries(pricingDatabase).forEach(([cat, items]) => {
                 if (!items.length) return;
@@ -866,6 +876,187 @@
             renderAllItemsList();
         }
 
+        function getChoiceGroupTemplateStore() {
+            if (!customItems || typeof customItems !== 'object') customItems = {};
+            if (!Array.isArray(customItems.__choiceGroupTemplates)) customItems.__choiceGroupTemplates = [];
+            return customItems.__choiceGroupTemplates;
+        }
+
+        function flattenChoiceGroupCandidateItems() {
+            var out = [];
+            Object.keys(pricingDatabase || {}).forEach(function(cat) {
+                var items = Array.isArray(pricingDatabase[cat]) ? pricingDatabase[cat] : [];
+                items.forEach(function(item) {
+                    if (!item || !item.name) return;
+                    out.push({
+                        category: cat,
+                        id: 'cgt_' + cat.replace(/[^a-z0-9]/gi, '_') + '_' + item.name.replace(/[^a-z0-9]/gi, '_'),
+                        name: item.name,
+                        description: item.name,
+                        unitType: item.unitType || item.unit || '',
+                        rate: parseFloat(item.rate) || 0,
+                        materialCost: parseFloat(item.materialCost) || 0,
+                        supplierUrl: item.supplierUrl || '',
+                        photo: item.photo || '',
+                        itemDescription: item.itemDescription || item.description || '',
+                        quantityMode: 'inherit',
+                        quantityOverride: ''
+                    });
+                });
+            });
+            return out;
+        }
+
+        function itemHtmlEscape(value) {
+            return String(value === undefined || value === null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        async function openChoiceGroupTemplateModal() {
+            var name = (await qdPrompt('Name this reusable choice group:', 'Deck Material Options', { title: 'Choice Group' }) || '').trim();
+            if (!name) return;
+            var typeText = (await qdPrompt('Type "single" for Pick One or "multiple" for Pick Multiple:', 'single', { title: 'Choice Group Type' }) || 'single').trim().toLowerCase();
+            var type = typeText.indexOf('multi') === 0 ? 'multiple' : 'single';
+            var query = (await qdPrompt('Search saved items to include. Example: deck, stone, flooring, paint', name.split(' ')[0] || '', { title: 'Find Options' }) || '').trim().toLowerCase();
+            var candidates = flattenChoiceGroupCandidateItems().filter(function(item) {
+                return !query || item.name.toLowerCase().indexOf(query) !== -1 || item.category.toLowerCase().indexOf(query) !== -1;
+            }).slice(0, 20);
+            if (candidates.length < 2) {
+                qdAlert('I found fewer than two matching saved items. Try a broader search word, then create the group again.');
+                return;
+            }
+            var list = candidates.map(function(item, idx) {
+                return (idx + 1) + '. ' + item.name + ' - $' + item.rate.toFixed(2) + '/' + (item.unitType || 'unit');
+            }).join('\n');
+            var pickedText = (await qdPrompt('Choose option numbers, comma separated:\n' + list, candidates.map(function(_, idx) { return idx + 1; }).join(','), { title: 'Confirm Options' }) || '').trim();
+            var picked = pickedText.split(',').map(function(part) { return parseInt(part.trim(), 10) - 1; })
+                .filter(function(idx, pos, arr) { return idx >= 0 && idx < candidates.length && arr.indexOf(idx) === pos; })
+                .map(function(idx) { return candidates[idx]; });
+            if (picked.length < 2) {
+                qdAlert('A choice group needs at least two options.');
+                return;
+            }
+            var defaultOption = picked[0];
+            if (type === 'single') {
+                var def = parseInt(await qdPrompt('Which option number is the default/base price?', '1', { title: 'Default Option' }), 10) || 1;
+                defaultOption = picked[Math.max(0, Math.min(picked.length - 1, def - 1))] || picked[0];
+            }
+            var template = {
+                id: 'cgt_' + Date.now().toString(36),
+                name: name,
+                type: type,
+                required: type === 'single',
+                defaultOptionId: defaultOption.id,
+                selectedOptionIds: type === 'single' ? [defaultOption.id] : [],
+                options: picked
+            };
+            pushUndoState();
+            getChoiceGroupTemplateStore().push(template);
+            saveCustomItems(true);
+            renderAllItemsList();
+            qdAlert('Saved "' + name + '" as a reusable client choice group.');
+        }
+
+        async function suggestChoiceGroupTemplates() {
+            var candidates = flattenChoiceGroupCandidateItems();
+            var buckets = {};
+            candidates.forEach(function(item) {
+                var words = item.name.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(function(word) {
+                    return word.length >= 4 && ['with','from','complete','standard','install','installation','service'].indexOf(word) === -1;
+                });
+                words.slice(0, 3).forEach(function(word) {
+                    if (!buckets[word]) buckets[word] = [];
+                    if (!buckets[word].some(function(existing) { return existing.name === item.name; })) buckets[word].push(item);
+                });
+            });
+            var suggestions = Object.keys(buckets).filter(function(key) { return buckets[key].length >= 2; })
+                .sort(function(a, b) { return buckets[b].length - buckets[a].length; })
+                .slice(0, 8);
+            if (!suggestions.length) {
+                qdAlert('No obvious groups found yet. Add a few related saved items first, then try suggestions again.');
+                return;
+            }
+            var key = await openChoiceGroupSuggestionPicker(suggestions, buckets);
+            if (!key) return;
+            var options = buckets[key].map(function(item, idx) {
+                return Object.assign({}, item, { id: item.id || ('cgt_opt_' + idx) });
+            });
+            getChoiceGroupTemplateStore().push({
+                id: 'cgt_' + Date.now().toString(36),
+                name: key.replace(/^\w/, function(ch) { return ch.toUpperCase(); }) + ' Options',
+                type: 'single',
+                required: true,
+                defaultOptionId: options[0].id,
+                selectedOptionIds: [options[0].id],
+                options: options
+            });
+            saveCustomItems(true);
+            renderAllItemsList();
+        }
+
+        function openChoiceGroupSuggestionPicker(suggestions, buckets) {
+            return new Promise(function(resolve) {
+                var existing = document.getElementById('choiceGroupSuggestionPickerModal');
+                if (existing) existing.remove();
+                var optionsHtml = suggestions.map(function(key) {
+                    var label = key.replace(/^\w/, function(ch) { return ch.toUpperCase(); }) + ' Options';
+                    return '<option value="' + itemHtmlEscape(key) + '">' + itemHtmlEscape(label) + ' (' + buckets[key].length + ' items)</option>';
+                }).join('');
+                var modalHtml = '' +
+                    '<div class="modal fade" id="choiceGroupSuggestionPickerModal" tabindex="-1" aria-hidden="true">' +
+                    '<div class="modal-dialog modal-lg modal-dialog-centered">' +
+                    '<div class="modal-content">' +
+                    '<div class="modal-header bg-primary text-white">' +
+                    '<h5 class="modal-title"><i class="fas fa-layer-group me-2"></i>Suggested Choice Groups</h5>' +
+                    '<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>' +
+                    '</div>' +
+                    '<div class="modal-body">' +
+                    '<label class="form-label fw-bold" for="choiceGroupSuggestionSelect">Pick a suggested group</label>' +
+                    '<select id="choiceGroupSuggestionSelect" class="form-select mb-3">' + optionsHtml + '</select>' +
+                    '<div class="small text-muted mb-2">Review the items below, then create the group if it looks right. Nothing is saved until you click Create Group.</div>' +
+                    '<div id="choiceGroupSuggestionPreview" class="list-group" style="max-height:320px;overflow:auto;"></div>' +
+                    '</div>' +
+                    '<div class="modal-footer">' +
+                    '<button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>' +
+                    '<button type="button" class="btn btn-primary" id="createSuggestedChoiceGroupBtn"><i class="fas fa-plus me-1"></i>Create Group</button>' +
+                    '</div>' +
+                    '</div></div></div>';
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+                var modalEl = document.getElementById('choiceGroupSuggestionPickerModal');
+                var selectEl = document.getElementById('choiceGroupSuggestionSelect');
+                var previewEl = document.getElementById('choiceGroupSuggestionPreview');
+                var chosen = null;
+                function renderPreview() {
+                    var key = selectEl.value;
+                    var items = buckets[key] || [];
+                    previewEl.innerHTML = items.map(function(item) {
+                        return '<div class="list-group-item">' +
+                            '<div class="d-flex justify-content-between gap-2">' +
+                            '<strong>' + itemHtmlEscape(item.name) + '</strong>' +
+                            '<span class="text-primary fw-bold">$' + (parseFloat(item.rate) || 0).toFixed(2) + '</span>' +
+                            '</div>' +
+                            '<div class="small text-muted">' + itemHtmlEscape(item.category || 'Saved Item') + ' · ' + itemHtmlEscape(item.unitType || 'unit') + '</div>' +
+                            '</div>';
+                    }).join('');
+                }
+                selectEl.addEventListener('change', renderPreview);
+                document.getElementById('createSuggestedChoiceGroupBtn').addEventListener('click', function() {
+                    chosen = selectEl.value;
+                    bootstrap.Modal.getInstance(modalEl).hide();
+                });
+                modalEl.addEventListener('hidden.bs.modal', function() {
+                    modalEl.remove();
+                    resolve(chosen);
+                }, { once: true });
+                renderPreview();
+                new bootstrap.Modal(modalEl).show();
+            });
+        }
+
         async function refineDescription(textareaEl, btnEl) {
             if (!textareaEl || !btnEl) return;
             const currentText = textareaEl.value || '';
@@ -994,6 +1185,8 @@
         window.renderAllItemsList = renderAllItemsList;
         window.saveItemFieldEdit = saveItemFieldEdit;
         window.addCustomItem = addCustomItem;
+        window.openChoiceGroupTemplateModal = openChoiceGroupTemplateModal;
+        window.suggestChoiceGroupTemplates = suggestChoiceGroupTemplates;
         window.refineDescription = refineDescription;
         window.toggleRefinedDescription = toggleRefinedDescription;
         window.deleteCustomItem = deleteCustomItem;

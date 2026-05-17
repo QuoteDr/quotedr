@@ -183,7 +183,7 @@
                                     <span class="input-group-text bg-white">
                                         <i class="fas fa-search text-muted"></i>
                                     </span>
-                                    <input type="text" id="searchInput" class="form-control" placeholder="Search by client name or quote number..." oninput="filterQuotes()">
+                                    <input type="text" id="searchInput" class="form-control" placeholder="Search by file name, client name, or quote number..." oninput="filterQuotes()">
                                 </div>
                             </div>
                             <div class="col-md-3">
@@ -204,10 +204,19 @@
                         
             <!-- View Toggle -->
             <div class="mb-3 d-flex justify-content-between align-items-center">
-                <div class="btn-group btn-group-sm" id="viewToggle">
-    <button class="btn btn-primary" id="listViewBtn" onclick="setView('list')"><i class="fas fa-list me-1"></i>List</button>
-    <button class="btn btn-outline-primary" id="kanbanViewBtn" onclick="setView('kanban')"><i class="fas fa-columns me-1"></i>Board</button>
-</div>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <div class="btn-group btn-group-sm" id="viewToggle">
+                        <button class="btn btn-primary" id="listViewBtn" onclick="setView('list')"><i class="fas fa-list me-1"></i>List</button>
+                        <button class="btn btn-outline-primary" id="kanbanViewBtn" onclick="setView('kanban')"><i class="fas fa-columns me-1"></i>Board</button>
+                    </div>
+                    <button class="btn btn-sm btn-outline-secondary" id="dashboardDefaultViewBtn" onclick="setDefaultDashboardView()" title="Open the dashboard in the current view by default">
+                        <i class="fas fa-star me-1"></i>Set Default
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" id="kanbanReorderBtn" onclick="toggleKanbanReorder()" title="Reorder board columns" style="display:none;">
+                        <i class="fas fa-arrows-alt-h me-1"></i>Reorder
+                    </button>
+                    <span id="dashboardDefaultViewLabel" class="text-muted small"></span>
+                </div>
             </div>
 
             <div id="quotesList">
@@ -291,6 +300,7 @@
                             allQuotes = autocleanDuplicates(retry.data || []);
                             renderQuotes(allQuotes);
                             updateStats(allQuotes);
+                            applyDashboardDefaultView();
                         } else {
                             document.getElementById('quotesList').innerHTML = '<div class="alert alert-warning">Please <a href="login.html">log in</a> to see your quotes.</div>';
                         }
@@ -301,6 +311,7 @@
                 allQuotes = autocleanDuplicates(data || []);
                 renderQuotes(allQuotes);
                 updateStats(allQuotes);
+                applyDashboardDefaultView();
             } catch (err) {
                 console.error('Error loading quotes:', err.message || err);
                 document.getElementById('quotesList').innerHTML = '<div class="alert alert-danger">Error loading quotes: ' + (err.message || err) + '</div>';
@@ -372,7 +383,7 @@
                 });
             }
             el.innerHTML = sorted.map(q => {
-                var quoteTitle = q.data && q.data.quoteTitle ? q.data.quoteTitle : '';
+                var quoteTitle = getQuoteTitle(q);
                 var clientName = q.client_name || 'Unnamed Client';
                 var displayTitle = quoteTitle || clientName;
                 var quoteNumber = q.quote_number || '';
@@ -397,7 +408,7 @@
                             </div>
                             <div id="title-edit-${escapeHtml(q.id)}" style="display:none; gap:0.25rem;" class="mt-1">
                               <input type="text" class="form-control form-control-sm" id="title-input-${escapeHtml(q.id)}"
-                                     value="${escapeHtml(quoteTitle)}"
+                                     value="${escapeHtml(displayTitle)}"
                                      placeholder="${escapeHtml(clientName || 'Add a title...')}"
                                      onkeydown="if(event.key==='Enter') saveTitle(${jsAttr(q.id)}); if(event.key==='Escape') cancelEditTitle(${jsAttr(q.id)})">
                               <button class="btn btn-success btn-sm" onclick="saveTitle(${jsAttr(q.id)})"><i class="fas fa-check"></i></button>
@@ -441,7 +452,9 @@
             const statusFilter = document.getElementById('statusFilter').value;
 
             const filtered = allQuotes.filter(quote => {
+                const quoteTitle = getQuoteTitle(quote).toLowerCase();
                 const matchesSearch = !searchTerm ||
+                    (quoteTitle && quoteTitle.includes(searchTerm)) ||
                     (quote.client_name && quote.client_name.toLowerCase().includes(searchTerm)) ||
                     (quote.quote_number && quote.quote_number.toLowerCase().includes(searchTerm));
                 const matchesStatus = statusFilter === 'all' || quote.status === statusFilter;
@@ -450,6 +463,14 @@
 
             renderQuotes(filtered);
             document.getElementById('filteredCount').textContent = filtered.length > 0 ? `${filtered.length} quote${filtered.length !== 1 ? 's' : ''} found` : '';
+        }
+
+        function getQuoteTitle(quote) {
+            return quote && quote.data && quote.data.quoteTitle ? String(quote.data.quoteTitle).trim() : '';
+        }
+
+        function getQuoteDisplayTitle(quote) {
+            return getQuoteTitle(quote) || (quote && quote.client_name) || 'Unnamed Client';
         }
 
         function openQuote(quoteId) {
@@ -476,9 +497,10 @@
                 var rooms = qd.rooms || [];
                 var upgrades = qd._clientUpgrades || [];
                 var removals = qd._clientRemovals || [];
+                var choiceGroups = qd._clientChoiceGroups || [];
                 var submittedAt = qd._clientSubmittedAt;
                 var hasNotes = Object.values(roomNotes).some(function(n) { return n && n.trim(); });
-                var hasChanges = upgrades.length > 0 || removals.length > 0;
+                var hasChanges = upgrades.length > 0 || removals.length > 0 || choiceGroups.length > 0;
 
                 if (!hasNotes && !hasChanges) {
                     document.getElementById('notesReviewBody').innerHTML = '<p class="text-muted text-center py-3">No notes or changes found for this quote.</p>';
@@ -496,6 +518,14 @@
                     });
                     var upgradeTotal = upgrades.reduce(function(s, u) { return s + parseFloat(u.diff || 0); }, 0);
                     html += '<div class="d-flex justify-content-between pt-2"><strong>Upgrade Total</strong><strong class="text-success">+$' + upgradeTotal.toFixed(2) + '</strong></div>';
+                    html += '</div></div>';
+                }
+
+                if (choiceGroups.length > 0) {
+                    html += '<div class="card mb-3 border-primary"><div class="card-header py-2" style="background:#cfe2ff;"><strong><i class="fas fa-layer-group me-2 text-primary"></i>Client Selected Options</strong></div><div class="card-body py-2">';
+                    choiceGroups.forEach(function(choice) {
+                        html += '<div class="d-flex justify-content-between align-items-center py-1 border-bottom"><div><strong>' + choice.room + ':</strong> ' + choice.group + ' â†’ <span class="text-primary fw-bold">' + choice.option + '</span></div><div class="text-primary fw-bold">$' + parseFloat(choice.total || 0).toFixed(2) + '</div></div>';
+                    });
                     html += '</div></div>';
                 }
 
@@ -565,8 +595,9 @@
                 var updatedData = Object.assign({}, quote.data || {}, { quoteTitle: newTitle });
                 var { error: saveErr } = await _supabase.from('quotes').update({ data: updatedData }).eq('id', quoteId);
                 if (saveErr) throw saveErr;
-                var displayEl = document.getElementById('title-display-' + quoteId);
-                if (displayEl) displayEl.textContent = newTitle || displayEl.textContent;
+                var row = (allQuotes || []).find(function(q) { return q.id === quoteId; });
+                if (row) row.data = updatedData;
+                renderQuotes(allQuotes);
                 cancelEditTitle(quoteId);
             } catch(err) {
                 qdAlert('Could not save title: ' + err.message);
@@ -874,6 +905,7 @@
                     allQuotes = autocleanDuplicates(result.data || []);
                     renderQuotes(allQuotes);
                     updateStats(allQuotes);
+                    applyDashboardDefaultView();
                 } else {
                     document.getElementById('quotesList').innerHTML = '<div class="alert alert-warning">Please <a href="login.html">log in</a> to see your quotes.</div>';
                 }
@@ -884,9 +916,27 @@
 <script src="ai-assistant.js?v=1778194800"></script>
     <script>
         window.currentQuotes = [];
+        var currentDashboardView = 'list';
+        var DASHBOARD_DEFAULT_VIEW_KEY = 'ald_dashboard_default_view';
+        var KANBAN_ORDER_KEY = 'ald_dashboard_kanban_order';
+        var kanbanReorderMode = false;
+        var draggedKanbanStatus = '';
+        var KANBAN_DEFAULT_COLUMNS = [
+            { status: 'draft', label: 'Draft', color: '#6c757d', icon: 'fa-pencil' },
+            { status: 'invoiced', label: 'Invoiced', color: '#fd7e14', icon: 'fa-file-invoice-dollar' },
+            { status: 'viewed', label: 'Viewed', color: '#6f42c1', icon: 'fa-eye' },
+            { status: 'accepted', label: 'Accepted', color: '#198754', icon: 'fa-check-circle' },
+            { status: 'sent', label: 'Sent', color: '#0d6efd', icon: 'fa-paper-plane' },
+            { status: 'in_review', label: 'In Review', color: '#ffc107', icon: 'fa-comments' },
+            { status: 'pending_approval', label: 'Pending CO', color: '#0dcaf0', icon: 'fa-file-signature' },
+            { status: 'approved', label: 'CO Approved', color: '#20c997', icon: 'fa-file-circle-check' },
+            { status: 'paid', label: 'Paid', color: '#006400', icon: 'fa-dollar-sign' }
+        ];
                         
                         function setView(mode) {
+                            currentDashboardView = mode === 'kanban' ? 'kanban' : 'list';
                             if (mode === 'list') {
+                                kanbanReorderMode = false;
                                 document.getElementById('quotesList').style.display = 'block';
                                 document.getElementById('kanbanBoard').style.display = 'none';
                                 document.getElementById('listViewBtn').classList.add('btn-primary');
@@ -902,21 +952,107 @@
                                 document.getElementById('kanbanViewBtn').classList.remove('btn-outline-primary');
                                 renderKanban(window.currentQuotes);
                             }
-                            localStorage.setItem('ald_dashboard_view', mode);
+                            updateKanbanReorderButton();
+                            updateDefaultDashboardViewLabel();
+                        }
+
+                        function getDefaultDashboardView() {
+                            return localStorage.getItem(DASHBOARD_DEFAULT_VIEW_KEY) || localStorage.getItem('ald_dashboard_view') || 'list';
+                        }
+
+                        function applyDashboardDefaultView() {
+                            setView(getDefaultDashboardView() === 'kanban' ? 'kanban' : 'list');
+                        }
+
+                        function setDefaultDashboardView() {
+                            localStorage.setItem(DASHBOARD_DEFAULT_VIEW_KEY, currentDashboardView);
+                            localStorage.setItem('ald_dashboard_view', currentDashboardView);
+                            updateDefaultDashboardViewLabel(true);
+                        }
+
+                        function updateDefaultDashboardViewLabel(justSaved) {
+                            var label = document.getElementById('dashboardDefaultViewLabel');
+                            var btn = document.getElementById('dashboardDefaultViewBtn');
+                            if (!label || !btn) return;
+                            var defaultView = getDefaultDashboardView() === 'kanban' ? 'Board' : 'List';
+                            var currentView = currentDashboardView === 'kanban' ? 'Board' : 'List';
+                            label.textContent = (justSaved ? 'Default saved: ' : 'Default: ') + defaultView;
+                            btn.innerHTML = '<i class="fas fa-star me-1"></i>' + (defaultView === currentView ? 'Default' : 'Set Default');
+                            btn.classList.toggle('btn-secondary', defaultView === currentView);
+                            btn.classList.toggle('btn-outline-secondary', defaultView !== currentView);
+                            if (kanbanReorderMode) updateKanbanReorderButton();
+                        }
+
+                        function getKanbanColumns() {
+                            var savedOrder = [];
+                            try { savedOrder = JSON.parse(localStorage.getItem(KANBAN_ORDER_KEY) || '[]'); } catch(e) {}
+                            var byStatus = {};
+                            KANBAN_DEFAULT_COLUMNS.forEach(function(col) { byStatus[col.status] = col; });
+                            var ordered = savedOrder.map(function(status) { return byStatus[status]; }).filter(Boolean);
+                            KANBAN_DEFAULT_COLUMNS.forEach(function(col) {
+                                if (!ordered.some(function(existing) { return existing.status === col.status; })) ordered.push(col);
+                            });
+                            return ordered;
+                        }
+
+                        function toggleKanbanReorder() {
+                            kanbanReorderMode = !kanbanReorderMode;
+                            if (currentDashboardView !== 'kanban') setView('kanban');
+                            renderKanban(window.currentQuotes);
+                            updateKanbanReorderButton();
+                        }
+
+                        function updateKanbanReorderButton() {
+                            var btn = document.getElementById('kanbanReorderBtn');
+                            var label = document.getElementById('dashboardDefaultViewLabel');
+                            if (!btn) return;
+                            btn.style.display = currentDashboardView === 'kanban' ? 'inline-block' : 'none';
+                            btn.classList.toggle('btn-warning', kanbanReorderMode);
+                            btn.classList.toggle('btn-outline-secondary', !kanbanReorderMode);
+                            btn.innerHTML = kanbanReorderMode
+                                ? '<i class="fas fa-check me-1"></i>Done'
+                                : '<i class="fas fa-arrows-alt-h me-1"></i>Reorder';
+                            if (label && kanbanReorderMode) label.textContent = 'Drag columns to reorder';
+                        }
+
+                        function onKanbanColumnDragStart(event, status) {
+                            if (!kanbanReorderMode) {
+                                event.preventDefault();
+                                return false;
+                            }
+                            draggedKanbanStatus = status;
+                            event.dataTransfer.effectAllowed = 'move';
+                            event.dataTransfer.setData('text/plain', status);
+                            event.currentTarget.style.opacity = '0.55';
+                        }
+
+                        function onKanbanColumnDragOver(event) {
+                            if (!kanbanReorderMode || !draggedKanbanStatus) return;
+                            event.preventDefault();
+                            event.dataTransfer.dropEffect = 'move';
+                        }
+
+                        function onKanbanColumnDrop(event, targetStatus) {
+                            if (!kanbanReorderMode || !draggedKanbanStatus || draggedKanbanStatus === targetStatus) return;
+                            event.preventDefault();
+                            var order = getKanbanColumns().map(function(col) { return col.status; });
+                            var from = order.indexOf(draggedKanbanStatus);
+                            var to = order.indexOf(targetStatus);
+                            if (from < 0 || to < 0) return;
+                            order.splice(from, 1);
+                            order.splice(to, 0, draggedKanbanStatus);
+                            localStorage.setItem(KANBAN_ORDER_KEY, JSON.stringify(order));
+                            draggedKanbanStatus = '';
+                            renderKanban(window.currentQuotes);
+                        }
+
+                        function onKanbanColumnDragEnd(event) {
+                            draggedKanbanStatus = '';
+                            event.currentTarget.style.opacity = '';
                         }
                         
                         function renderKanban(quotes) {
-                            const columns = [
-                                { status: 'draft', label: 'Draft', color: '#6c757d', icon: 'fa-pencil' },
-                                { status: 'sent', label: 'Sent', color: '#0d6efd', icon: 'fa-paper-plane' },
-                                { status: 'viewed', label: 'Viewed', color: '#6f42c1', icon: 'fa-eye' },
-                                { status: 'in_review', label: 'In Review', color: '#ffc107', icon: 'fa-comments' },
-                                { status: 'accepted', label: 'Accepted', color: '#198754', icon: 'fa-check-circle' },
-                                { status: 'pending_approval', label: 'Pending CO', color: '#0dcaf0', icon: 'fa-file-signature' },
-                                { status: 'approved', label: 'CO Approved', color: '#20c997', icon: 'fa-file-circle-check' },
-                                { status: 'invoiced', label: 'Invoiced', color: '#fd7e14', icon: 'fa-file-invoice-dollar' },
-                                { status: 'paid', label: 'Paid', color: '#006400', icon: 'fa-dollar-sign' }
-                            ];
+                            const columns = getKanbanColumns();
                         
                             const kanbanColumns = document.getElementById('kanbanColumns');
                             kanbanColumns.innerHTML = '';
@@ -931,10 +1067,12 @@
                                 } else {
                                     statusQuotes.forEach(q => {
                                         const timeAgo = getTimeAgo(q.updated_at);
+                                        const displayTitle = getQuoteDisplayTitle(q);
+                                        const quoteTitle = getQuoteTitle(q);
                                         cardsHtml += `
                                             <div class="kanban-card mb-2 p-2 bg-white rounded shadow-sm" style="cursor:pointer; border-left:3px solid ${col.color};" onclick="openQuote('${q.id}')">
-                                                <div class="fw-semibold small">${escapeHtml(q.client_name || "")}</div>
-                                                <div class="text-muted" style="font-size:0.75rem;">#${escapeHtml(q.quote_number || "")} · $${escapeHtml(q.total || 0)}</div>
+                                                <div class="fw-semibold small">${escapeHtml(displayTitle)}</div>
+                                                <div class="text-muted" style="font-size:0.75rem;">${quoteTitle ? escapeHtml(q.client_name || "") + " · " : ""}#${escapeHtml(q.quote_number || "")} · $${escapeHtml(q.total || 0)}</div>
                                                 <div class="text-muted" style="font-size:0.7rem;">${timeAgo}</div>
                                             </div>
                                         `;
@@ -942,8 +1080,9 @@
                                 }
                         
                                 const columnHtml = `
-                                    <div class="kanban-col" style="min-width:200px; max-width:220px;">
+                                    <div class="kanban-col" data-status="${escapeHtml(col.status)}" draggable="${kanbanReorderMode ? 'true' : 'false'}" ondragstart="onKanbanColumnDragStart(event, '${escapeHtml(col.status)}')" ondragover="onKanbanColumnDragOver(event)" ondrop="onKanbanColumnDrop(event, '${escapeHtml(col.status)}')" ondragend="onKanbanColumnDragEnd(event)" style="min-width:200px; max-width:220px; ${kanbanReorderMode ? 'cursor:grab;' : ''}">
                                         <div class="kanban-col-header" style="background:${col.color}; color:white; border-radius:8px 8px 0 0; padding:8px 12px;">
+                                            ${kanbanReorderMode ? '<i class="fas fa-grip-lines me-1"></i>' : ''}
                                             <i class="fas ${col.icon} me-1"></i>${col.label} ${countBadge}
                                         </div>
                                         <div class="kanban-col-body" style="background:#f8f9fa; border:1px solid #dee2e6; border-top:none; border-radius:0 0 8px 8px; padding:8px; min-height:200px;">
@@ -974,7 +1113,9 @@
                 window.currentQuotes = [];
                                                 
                                                 function setView(mode) {
+                                                    currentDashboardView = mode === 'kanban' ? 'kanban' : 'list';
                                                     if (mode === 'list') {
+                                                        kanbanReorderMode = false;
                                                         document.getElementById('quotesList').style.display = 'block';
                                                         document.getElementById('kanbanBoard').style.display = 'none';
                                                         document.getElementById('listViewBtn').classList.add('btn-primary');
@@ -990,19 +1131,12 @@
                                                         document.getElementById('kanbanViewBtn').classList.remove('btn-outline-primary');
                                                         renderKanban(window.currentQuotes);
                                                     }
-                                                    localStorage.setItem('ald_dashboard_view', mode);
+                                                    updateKanbanReorderButton();
+                                                    updateDefaultDashboardViewLabel();
                                                 }
                                                 
                                                 function renderKanban(quotes) {
-                                                    const columns = [
-                                                        { status: 'draft', label: 'Draft', color: '#6c757d', icon: 'fa-pencil' },
-                                                        { status: 'sent', label: 'Sent', color: '#0d6efd', icon: 'fa-paper-plane' },
-                                                        { status: 'viewed', label: 'Viewed', color: '#6f42c1', icon: 'fa-eye' },
-                                                        { status: 'in_review', label: 'In Review', color: '#ffc107', icon: 'fa-comments' },
-                                                        { status: 'accepted', label: 'Accepted', color: '#198754', icon: 'fa-check-circle' },
-                                                        { status: 'invoiced', label: 'Invoiced', color: '#fd7e14', icon: 'fa-file-invoice-dollar' },
-                                                        { status: 'paid', label: 'Paid', color: '#006400', icon: 'fa-dollar-sign' }
-                                                    ];
+                                                    const columns = getKanbanColumns();
                                                 
                                                     const kanbanColumns = document.getElementById('kanbanColumns');
                                                     kanbanColumns.innerHTML = '';
@@ -1017,10 +1151,12 @@
                                                         } else {
                                                             statusQuotes.forEach(q => {
                                                                 const timeAgo = getTimeAgo(q.updated_at);
+                                                                const displayTitle = getQuoteDisplayTitle(q);
+                                                                const quoteTitle = getQuoteTitle(q);
                                                                 cardsHtml += `
                                                                     <div class="kanban-card mb-2 p-2 bg-white rounded shadow-sm" style="cursor:pointer; border-left:3px solid ${col.color};" onclick="openQuote('${q.id}')">
-                                                                        <div class="fw-semibold small">${escapeHtml(q.client_name || "")}</div>
-                                                                        <div class="text-muted" style="font-size:0.75rem;">#${escapeHtml(q.quote_number || "")} · $${escapeHtml(q.total || 0)}</div>
+                                                                        <div class="fw-semibold small">${escapeHtml(displayTitle)}</div>
+                                                                        <div class="text-muted" style="font-size:0.75rem;">${quoteTitle ? escapeHtml(q.client_name || "") + " · " : ""}#${escapeHtml(q.quote_number || "")} · $${escapeHtml(q.total || 0)}</div>
                                                                         <div class="text-muted" style="font-size:0.7rem;">${timeAgo}</div>
                                                                     </div>
                                                                 `;
@@ -1028,8 +1164,9 @@
                                                         }
                                                 
                                                         const columnHtml = `
-                                                            <div class="kanban-col" style="min-width:200px; max-width:220px;">
+                                                            <div class="kanban-col" data-status="${escapeHtml(col.status)}" draggable="${kanbanReorderMode ? 'true' : 'false'}" ondragstart="onKanbanColumnDragStart(event, '${escapeHtml(col.status)}')" ondragover="onKanbanColumnDragOver(event)" ondrop="onKanbanColumnDrop(event, '${escapeHtml(col.status)}')" ondragend="onKanbanColumnDragEnd(event)" style="min-width:200px; max-width:220px; ${kanbanReorderMode ? 'cursor:grab;' : ''}">
                                                                 <div class="kanban-col-header" style="background:${col.color}; color:white; border-radius:8px 8px 0 0; padding:8px 12px;">
+                                                                    ${kanbanReorderMode ? '<i class="fas fa-grip-lines me-1"></i>' : ''}
                                                                     <i class="fas ${col.icon} me-1"></i>${col.label} ${countBadge}
                                                                 </div>
                                                                 <div class="kanban-col-body" style="background:#f8f9fa; border:1px solid #dee2e6; border-top:none; border-radius:0 0 8px 8px; padding:8px; min-height:200px;">
