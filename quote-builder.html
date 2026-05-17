@@ -697,6 +697,118 @@
         #builderGuideShowBtn {
             display: none;
         }
+        #manageItemsModal .manage-items-add-shell {
+            border: 1px solid #d8e2ee;
+            border-radius: 8px;
+            background: #f8fbff;
+            margin-bottom: 0.85rem;
+        }
+        #manageItemsModal .manage-items-add-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            padding: 0.7rem 0.85rem;
+            border: 0;
+            background: transparent;
+            color: #102033;
+            font-weight: 800;
+            text-align: left;
+        }
+        #manageItemsModal .manage-items-add-panel {
+            display: none;
+            padding: 0 0.85rem 0.85rem;
+        }
+        #manageItemsModal .manage-items-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.7rem;
+            border: 1px solid #d8e2ee;
+            border-radius: 8px;
+            background: #fff;
+            margin-bottom: 0.65rem;
+        }
+        #manageItemsModal .manage-items-filter-btn.active {
+            background: #1a56a0 !important;
+            border-color: #1a56a0 !important;
+            color: #fff !important;
+        }
+        #manageItemsModal .manage-items-category-header {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            margin-top: 0.85rem;
+            margin-bottom: 0.25rem;
+            padding: 0.38rem 0.55rem;
+            border-radius: 7px;
+        }
+        #manageItemsModal .manage-items-category-toggle {
+            width: 28px;
+            height: 28px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            background: rgba(255,255,255,0.75);
+            color: #1f2d3d;
+        }
+        #manageItemsModal .manage-items-category-count {
+            font-size: 0.72rem;
+            font-weight: 800;
+            color: #475569;
+            background: rgba(255,255,255,0.82);
+            border: 1px solid rgba(148,163,184,0.35);
+            border-radius: 999px;
+            padding: 0.08rem 0.45rem;
+        }
+        #manageItemsModal .manage-item-dirty {
+            background: #fff9e6 !important;
+            box-shadow: inset 4px 0 0 #ffc107;
+        }
+        #manageItemsModal .manage-dirty-dot {
+            display: none;
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: #ffc107;
+            margin-right: 0.35rem;
+        }
+        #manageItemsModal .manage-item-dirty .manage-dirty-dot {
+            display: inline-block;
+        }
+        #manageItemsModal .manage-item-actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 0.25rem;
+        }
+        #manageItemsModal .item-details-row {
+            background: #f8fbff;
+        }
+        #manageItemsModal .manage-margin-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            border-radius: 999px;
+            padding: 0.12rem 0.48rem;
+            font-size: 0.72rem;
+            font-weight: 750;
+            white-space: nowrap;
+        }
+        #manageItemsModal .manage-margin-good { background: #e8f5e9; color: #146c43; }
+        #manageItemsModal .manage-margin-warn { background: #fff3cd; color: #8a5a00; }
+        #manageItemsModal .manage-margin-bad { background: #f8d7da; color: #842029; }
+        #manageItemsModal .manage-empty-filter {
+            padding: 1.25rem;
+            text-align: center;
+            color: #64748b;
+            border: 1px dashed #cbd5e1;
+            border-radius: 8px;
+            background: #f8fafc;
+        }
     @media (max-width: 768px) {
             .container-fluid { padding-left: 8px !important; padding-right: 8px !important; }
             .btn-sm { font-size: 0.75rem; padding: 4px 7px; }
@@ -748,6 +860,69 @@
             /* Prevent any horizontal overflow */
             .container-fluid { max-width: 100%; }
             .d-flex { min-width: 0; }
+            #manageItemsModal .modal-dialog {
+                max-width: 100% !important;
+                width: 100% !important;
+                margin: 0 !important;
+            }
+            #manageItemsModal .modal-content {
+                border-radius: 0 !important;
+                min-height: 100vh;
+            }
+            #manageItemsModal .modal-body {
+                padding: 0.65rem;
+            }
+            #manageItemsModal .manage-items-toolbar {
+                align-items: stretch;
+            }
+            #manageItemsModal .manage-items-toolbar > * {
+                width: 100%;
+            }
+            #manageItemsModal .manage-items-toolbar .btn-group,
+            #manageItemsModal .manage-items-toolbar .d-flex {
+                width: 100%;
+            }
+            #manageItemsModal .manage-items-table,
+            #manageItemsModal .manage-items-table thead,
+            #manageItemsModal .manage-items-table tbody,
+            #manageItemsModal .manage-items-table tr,
+            #manageItemsModal .manage-items-table td {
+                display: block;
+                width: 100%;
+            }
+            #manageItemsModal .manage-items-table thead {
+                display: none;
+            }
+            #manageItemsModal .manage-items-row {
+                border: 1px solid #d8e2ee;
+                border-radius: 8px;
+                margin-bottom: 0.7rem;
+                background: #fff;
+                overflow: hidden;
+            }
+            #manageItemsModal .manage-items-row td {
+                border: 0 !important;
+                padding: 0.45rem 0.55rem !important;
+            }
+            #manageItemsModal .manage-items-row td[data-label]::before {
+                content: attr(data-label);
+                display: block;
+                margin-bottom: 0.2rem;
+                font-size: 0.7rem;
+                font-weight: 800;
+                color: #64748b;
+                text-transform: uppercase;
+            }
+            #manageItemsModal .manage-item-actions {
+                justify-content: flex-start;
+            }
+            #manageItemsModal .item-details-row td {
+                display: block;
+                padding: 0 !important;
+            }
+            #manageItemsModal #customItemsList {
+                padding-bottom: 72px;
+            }
         }
 
     @media (max-width: 768px) and (orientation: portrait) {
@@ -1652,7 +1827,12 @@ Example:
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <h6 class="fw-bold mb-3"><i class="fas fa-plus-circle text-primary"></i> Add New Item</h6>
+                    <div class="manage-items-add-shell">
+                        <button type="button" class="manage-items-add-toggle" id="toggleAddItemPanelBtn" onclick="toggleManageNewItemPanel()">
+                            <span><i class="fas fa-plus-circle text-primary me-1"></i> New Item</span>
+                            <i class="fas fa-chevron-down" id="toggleAddItemPanelIcon"></i>
+                        </button>
+                        <div class="manage-items-add-panel" id="manageNewItemPanel">
                     <div class="row g-2 mb-3 align-items-end">
                         <div class="col-md-3">
                             <label class="form-label"><strong>Category</strong></label>
@@ -1711,32 +1891,35 @@ Example:
                         </div>
                         <div class="col-md-2">
                             <button onclick="addCustomItem()" class="btn btn-primary w-100">
-                                <i class="fas fa-plus"></i> Add
+                                <i class="fas fa-plus"></i> Add Item
                             </button>
                         </div>
                     </div>
-                    <hr>
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h6 class="fw-bold mb-0"><i class="fas fa-list-alt text-secondary"></i> All Items - edit fields, then hit Save All to save each row</h6>
-                        <div class="d-flex align-items-center gap-2">
-                            <span id="pricingUnsavedIndicator" class="badge bg-warning text-dark" style="display:none;">?? Unsaved changes</span>
-                            <button onclick="openChoiceGroupTemplateModal()" class="btn btn-sm btn-outline-primary"><i class="fas fa-layer-group"></i> Choice Group</button>
-                            <button onclick="suggestChoiceGroupTemplates()" class="btn btn-sm btn-outline-secondary"><i class="fas fa-wand-magic-sparkles"></i> Suggest Groups</button>
-                            <button onclick="saveAllPricingRows()" class="btn btn-sm btn-success"><i class="fas fa-save"></i> Save All</button>
-                        </div>
+                    </div>
                     </div>
 
-                    <!-- Search + jump bar -->
-                    <div class="d-flex gap-2 mb-2 align-items-center" id="itemListTopAnchor">
+                    <div class="manage-items-toolbar" id="itemListTopAnchor">
                         <div class="flex-grow-1">
-                            <input type="text" id="itemSearchFilter" class="form-control form-control-sm" placeholder="?? Search items by name..." oninput="filterItemsList()">
+                            <label class="form-label fw-bold mb-1"><i class="fas fa-list-alt text-secondary"></i> All Items</label>
+                            <input type="text" id="itemSearchFilter" class="form-control form-control-sm" placeholder="Search name, category, description, supplier, or upgrade..." oninput="filterItemsList()">
                         </div>
-                        <button class="btn btn-sm btn-outline-secondary" onclick="whizzScroll('customItemsList', 'top')" title="Jump to top">
-                            <i class="fas fa-arrow-up"></i> Top
-                        </button>
-                        <button class="btn btn-sm btn-outline-secondary" onclick="whizzScroll('customItemsList', 'bottom')" title="Jump to bottom">
-                            <i class="fas fa-arrow-down"></i> Bottom
-                        </button>
+                        <div class="btn-group btn-group-sm flex-wrap" id="manageItemsFilterBar" role="group" aria-label="Item filters">
+                            <button type="button" class="btn btn-outline-primary manage-items-filter-btn active" data-item-filter="all" onclick="setManageItemsFilter('all')">All</button>
+                            <button type="button" class="btn btn-outline-primary manage-items-filter-btn" data-item-filter="unsaved" onclick="setManageItemsFilter('unsaved')">Unsaved</button>
+                            <button type="button" class="btn btn-outline-primary manage-items-filter-btn" data-item-filter="custom" onclick="setManageItemsFilter('custom')">Custom</button>
+                            <button type="button" class="btn btn-outline-primary manage-items-filter-btn" data-item-filter="has-upgrade" onclick="setManageItemsFilter('has-upgrade')">Upgrades</button>
+                            <button type="button" class="btn btn-outline-primary manage-items-filter-btn" data-item-filter="missing-material" onclick="setManageItemsFilter('missing-material')">Missing Cost</button>
+                            <button type="button" class="btn btn-outline-primary manage-items-filter-btn" data-item-filter="no-description" onclick="setManageItemsFilter('no-description')">No Desc</button>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <span id="pricingUnsavedIndicator" class="badge bg-warning text-dark" style="display:none;">Unsaved changes</span>
+                            <button onclick="openChoiceGroupTemplateModal()" class="btn btn-sm btn-outline-primary"><i class="fas fa-layer-group"></i> Choice Group</button>
+                            <button onclick="suggestChoiceGroupTemplates()" class="btn btn-sm btn-outline-secondary"><i class="fas fa-wand-magic-sparkles"></i> Suggest Groups</button>
+                            <button onclick="saveChangedPricingRows()" class="btn btn-sm btn-success"><i class="fas fa-save"></i> Save Changed</button>
+                            <button onclick="saveAllPricingRows()" class="btn btn-sm btn-outline-success"><i class="fas fa-database"></i> Save All</button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="whizzScroll('customItemsList', 'top')" title="Jump to top"><i class="fas fa-arrow-up"></i> Top</button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="whizzScroll('customItemsList', 'bottom')" title="Jump to bottom"><i class="fas fa-arrow-down"></i> Bottom</button>
+                        </div>
                     </div>
 
                     <div id="customItemsList" style="max-height:460px; overflow-y:auto; touch-action:pan-y;">
@@ -1750,7 +1933,8 @@ Example:
                         <button id="showManageItemsTopBarBtn" type="button" class="btn btn-sm btn-outline-primary text-nowrap" onclick="toggleManageItemsTopBar(false)" style="display:none;padding:2px 8px;line-height:1.2;" title="Show the top bar again"><i class="fas fa-window-maximize me-1"></i>Show</button>
                     </div>
                     <div class="d-flex gap-2 flex-nowrap align-items-center">
-                        <button id="saveAllPricingFooterBtn" type="button" class="btn btn-sm btn-success text-nowrap" style="padding:2px 8px;line-height:1.2;"><i class="fas fa-save"></i> Save All</button>
+                        <button id="saveChangedPricingFooterBtn" type="button" class="btn btn-sm btn-success text-nowrap" style="padding:2px 8px;line-height:1.2;"><i class="fas fa-save"></i> Save Changed</button>
+                        <button id="saveAllPricingFooterBtn" type="button" class="btn btn-sm btn-outline-success text-nowrap" style="padding:2px 8px;line-height:1.2;"><i class="fas fa-database"></i> Save All</button>
                         <button id="closeManageItemsFooterBtn" type="button" class="btn btn-sm btn-secondary text-nowrap" style="padding:2px 8px;line-height:1.2;">Close</button>
                     </div>
                 </div>
@@ -2355,12 +2539,15 @@ Example:
             { fa: 'fa-mountain',            label: 'Grading / Earthwork' },
             // Framing & Structure
             { fa: 'fa-hammer',              label: 'Framing / Carpentry' },
+            { fa: 'qd-wall-framing',        label: 'Wall Framing' },
             { fa: 'fa-ruler-combined',      label: 'Framing / Layout' },
             { fa: 'fa-drafting-compass',    label: 'Structural / Design' },
             { fa: 'fa-warehouse',           label: 'Structure / Shell' },
             { fa: 'fa-archway',             label: 'Archways / Openings' },
             { fa: 'fa-border-none',         label: 'Subfloor / Sheathing' },
             // Drywall & Insulation
+            { fa: 'qd-drywall-knife',       label: 'Drywall Knife (6 inch)' },
+            { fa: 'qd-drywall-knife-angle', label: 'Drywall Knife (12)' },
             { fa: 'fa-border-all',          label: 'Drywall / Grid' },
             { fa: 'fa-layer-group',         label: 'Drywall / Layers' },
             { fa: 'fa-snowflake',           label: 'Insulation / Spray Foam' },
@@ -2375,6 +2562,8 @@ Example:
             { fa: 'fa-grip-horizontal',     label: 'Hardwood / Laminate' },
             { fa: 'fa-th',                  label: 'Carpet / Pattern' },
             // Tile & Stone
+            { fa: 'qd-tile-trowel',         label: 'Tile Trowel' },
+            { fa: 'qd-stacked-tiles',       label: 'Stacked Tiles' },
             { fa: 'fa-th-large',            label: 'Large Format Tile' },
             { fa: 'fa-chess-board',         label: 'Mosaic / Pattern Tile' },
             // Plumbing
@@ -2431,6 +2620,7 @@ Example:
             { fa: 'fa-utensils',            label: 'Kitchen' },
             { fa: 'fa-bath',                label: 'Bathroom' },
             { fa: 'fa-blender',             label: 'Appliances' },
+            { fa: 'qd-cabinet-base',        label: 'Cabinetry / Vanity' },
             { fa: 'fa-couch',               label: 'Millwork / Cabinets' },
             { fa: 'fa-sink',                label: 'Countertops / Sink' },
         ];
@@ -2460,46 +2650,160 @@ Example:
             _catPickerOpen = null;
         }
 
+        function renderCategoryIconMarkup(iconClass, extraClass, style) {
+            var icon = iconClass || 'fa-tag';
+            var cls = extraClass || '';
+            var css = style || 'color:#495057;';
+            if (icon === 'qd-drywall-knife') {
+                return '<svg class="' + cls + '" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" style="' + css + 'vertical-align:-0.16em;" fill="currentColor">' +
+                    '<path d="M12 2.2c-1.55 0-2.75 1.22-2.58 2.75l1.05 9.45h3.06l1.05-9.45C14.75 3.42 13.55 2.2 12 2.2zm0 4.15a1.16 1.16 0 1 1 0-2.32 1.16 1.16 0 0 1 0 2.32z"></path>' +
+                    '<path d="M10.1 15.2h3.8v1.7h-3.8z"></path>' +
+                    '<path d="M8.6 17.8h6.8c.38 0 .72.24.84.6l2.1 6.3H5.66l2.1-6.3c.12-.36.46-.6.84-.6z"></path>' +
+                '</svg>';
+            }
+            if (icon === 'qd-drywall-knife-angle') {
+                return '<svg class="' + cls + '" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" style="' + css + 'vertical-align:-0.16em;" fill="currentColor">' +
+                    '<path d="M7.4 3.2c.9-.72 2.22-.56 2.92.36l4.12 5.38-2.88 2.2-4.12-5.38a2.04 2.04 0 0 1-.04-2.56z"></path>' +
+                    '<path d="M6.1 14.2 15.8 6.8c.85-.65 2.05-.49 2.7.35l.62.82-10.9 8.32-2.12-2.09z"></path>' +
+                    '<path d="M4.25 15.1 18.7 4.15c.55-.42 1.35-.31 1.77.24l.98 1.29c.42.55.31 1.35-.24 1.77L8.55 17.08l2.02 5.04a1.05 1.05 0 0 1-1.63 1.18L3.9 18.48a2.16 2.16 0 0 1 .35-3.38z"></path>' +
+                    '<path d="M5.8 14.9 17.9 5.65l.92 1.2L6.72 16.1z" fill="#fff"></path>' +
+                '</svg>';
+            }
+            if (icon === 'qd-tile-trowel') {
+                return '<svg class="' + cls + '" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" style="' + css + 'vertical-align:-0.16em;" fill="currentColor">' +
+                    '<path d="M3.2 4.2h15.4c1.22 0 2.2.98 2.2 2.2v9.7c0 .72-.58 1.3-1.3 1.3H5.9c-1.49 0-2.7-1.21-2.7-2.7V4.2z"></path>' +
+                    '<path d="M5.2 17.4h14.2v2.4H5.2z"></path>' +
+                    '<path d="M5.9 19.8h1.35v2.2H5.9zM8.55 19.8H9.9v2.2H8.55zM11.2 19.8h1.35v2.2H11.2zM13.85 19.8h1.35v2.2h-1.35zM16.5 19.8h1.35v2.2H16.5z"></path>' +
+                    '<path d="M8.4 8.1h7.8v2.2H8.4z" fill="#fff"></path>' +
+                    '<path d="M11.7 6.1h1.2v6.2h-1.2z" fill="#fff"></path>' +
+                '</svg>';
+            }
+            if (icon === 'qd-cabinet-base') {
+                return '<svg class="' + cls + '" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" style="' + css + 'vertical-align:-0.16em;" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+                    '<rect x="4" y="3.2" width="16" height="16" rx="0.8"></rect>' +
+                    '<path d="M4 7.4h16"></path>' +
+                    '<path d="M4 10.4h16"></path>' +
+                    '<path d="M12 10.4v8.8"></path>' +
+                    '<path d="M5.1 20.8h13.8"></path>' +
+                    '<path d="M5.1 22.3h13.8"></path>' +
+                    '<path d="M10.8 5.35h2.4"></path>' +
+                    '<path d="M9.6 13.3v2.8"></path>' +
+                    '<path d="M14.4 13.3v2.8"></path>' +
+                '</svg>';
+            }
+            if (icon === 'qd-wall-framing') {
+                return '<svg class="' + cls + '" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" style="' + css + 'vertical-align:-0.16em;" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" stroke-linejoin="miter">' +
+                    '<path d="M3.2 3.5h17.6"></path>' +
+                    '<path d="M3.2 20.5h17.6"></path>' +
+                    '<path d="M3.2 3.5v17"></path>' +
+                    '<path d="M6.2 3.5v17"></path>' +
+                    '<path d="M13 3.5v17"></path>' +
+                    '<path d="M17.8 3.5v17"></path>' +
+                    '<path d="M20.8 3.5v17"></path>' +
+                    '<path d="M6.2 7.2H13"></path>' +
+                    '<path d="M6.2 15.2H13"></path>' +
+                    '<path d="M8.8 15.2v5.3"></path>' +
+                    '<path d="M10.9 15.2v5.3"></path>' +
+                    '<path d="M17.8 7.2h3"></path>' +
+                    '<path d="M17.8 15.2h3"></path>' +
+                '</svg>';
+            }
+            if (icon === 'qd-stacked-tiles') {
+                return '<svg class="' + cls + '" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" style="' + css + 'vertical-align:-0.16em;" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round">' +
+                    '<path d="M12 3.1 20.2 8.3 12 13.5 3.8 8.3 12 3.1z"></path>' +
+                    '<path d="M6.2 11.2 12 14.9 17.8 11.2"></path>' +
+                    '<path d="M3 14.2 8.7 10.6 14.4 14.2 8.7 17.9 3 14.2z"></path>' +
+                    '<path d="M9.6 14.2 15.3 10.6 21 14.2 15.3 17.9 9.6 14.2z"></path>' +
+                    '<path d="M6.2 17.3 12 20.9 17.8 17.3"></path>' +
+                '</svg>';
+            }
+            return '<i class="fas ' + icon + (cls ? ' ' + cls : '') + '" style="' + css + '"></i>';
+        }
+
+        function catPickerEscape(value) {
+            return String(value || '').replace(/[&<>"']/g, function(ch) {
+                return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
+            });
+        }
+
         function _catPickerHTML(cat) {
             var cur = categoryStyles[cat] || {};
             var html = '<div class="icon-section-label" style="font-size:0.7rem;font-weight:700;text-transform:uppercase;color:#6c757d;letter-spacing:0.5px;margin:4px 0 6px;">Icon</div>';
+            html += '<input type="text" id="catIconSearch" data-cat-icon-search class="form-control form-control-sm" placeholder="Search icons..." onclick="event.stopPropagation()" onkeydown="event.stopPropagation()" oninput="filterCategoryIconPicker(this.value)" style="margin-bottom:8px;">';
             html += '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;">';
             CAT_ICONS.forEach(function(ico) {
-                var active = cur.icon === ico.fa ? 'background:#1a56a0;color:white;border-color:#1a56a0;' : '';
-                html += '<div title="' + ico.label + '" onclick="selectCatIcon(' + JSON.stringify(cat) + ',\'' + ico.fa + '\')" style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:6px;cursor:pointer;border:2px solid #dee2e6;' + active + '"><i class="fas ' + ico.fa + '"></i></div>';
+                var active = cur.icon === ico.fa;
+                var activeStyle = active ? 'background:#1a56a0;color:white;border-color:#1a56a0;box-shadow:0 0 0 3px rgba(26,86,160,0.22);' : '';
+                html += '<button type="button" title="' + catPickerEscape(ico.label) + '" data-cat-style-icon="' + catPickerEscape(ico.fa) + '" data-cat-icon-label="' + catPickerEscape(ico.label.toLowerCase()) + '" aria-label="' + catPickerEscape(ico.label) + '" aria-pressed="' + (active ? 'true' : 'false') + '" style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:6px;cursor:pointer;border:2px solid #dee2e6;background:#fff;' + activeStyle + '">' + renderCategoryIconMarkup(ico.fa, '', 'color:currentColor;') + '</button>';
             });
             html += '</div>';
             html += '<div class="icon-section-label" style="font-size:0.7rem;font-weight:700;text-transform:uppercase;color:#6c757d;letter-spacing:0.5px;margin:4px 0 6px;">Background Colour</div>';
             html += '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
             CAT_COLORS.forEach(function(c) {
-                var active = cur.color === c.color ? 'border:3px solid #1a56a0;transform:scale(1.15);' : 'border:2px solid #dee2e6;';
-                html += '<div title="' + c.label + '" onclick="selectCatColor(' + JSON.stringify(cat) + ',\'' + c.color + '\')" style="width:28px;height:28px;border-radius:50%;background:' + c.color + ';cursor:pointer;' + active + '"></div>';
+                var active = cur.color === c.color;
+                var activeStyle = active ? 'border:3px solid #1a56a0;transform:scale(1.15);box-shadow:0 0 0 3px rgba(26,86,160,0.22);' : 'border:2px solid #dee2e6;';
+                html += '<button type="button" title="' + catPickerEscape(c.label) + '" data-cat-style-color="' + catPickerEscape(c.color) + '" aria-label="' + catPickerEscape(c.label) + '" aria-pressed="' + (active ? 'true' : 'false') + '" style="width:28px;height:28px;border-radius:50%;background:' + c.color + ';cursor:pointer;padding:0;' + activeStyle + '"></button>';
             });
             html += '</div>';
             return html;
         }
 
-        function selectCatIcon(cat, iconClass) {
-            if (!categoryStyles[cat]) categoryStyles[cat] = {};
-            categoryStyles[cat].icon = iconClass;
-            markPricingDirty();
+        function saveCategoryStyle(cat) {
             localStorage.setItem('ald_category_styles', JSON.stringify(categoryStyles));
             _saveCategoryStylesToCloud().catch(function(){});
             renderAllItemsList();
             renderRooms();
-            // Re-open picker on new button position
-            closeCategoryPicker();
+        }
+
+        function filterCategoryIconPicker(query) {
+            var q = String(query || '').toLowerCase().trim();
+            document.querySelectorAll('[data-cat-style-icon]').forEach(function(btn) {
+                var label = (btn.getAttribute('data-cat-icon-label') || '').toLowerCase();
+                var icon = (btn.getAttribute('data-cat-style-icon') || '').toLowerCase();
+                btn.style.display = (!q || label.indexOf(q) >= 0 || icon.indexOf(q) >= 0) ? 'flex' : 'none';
+            });
+        }
+
+        function getCategoryPickerMount() {
+            return document.querySelector('#manageItemsModal .modal-content') || document.getElementById('manageItemsModal') || document.body;
+        }
+
+        function selectCatIcon(cat, iconClass) {
+            if (!categoryStyles[cat]) categoryStyles[cat] = {};
+            categoryStyles[cat].icon = iconClass;
+            saveCategoryStyle(cat);
+            refreshOpenCategoryPicker(cat);
         }
 
         function selectCatColor(cat, color) {
             if (!categoryStyles[cat]) categoryStyles[cat] = {};
             categoryStyles[cat].color = color;
-            markPricingDirty();
-            localStorage.setItem('ald_category_styles', JSON.stringify(categoryStyles));
-            _saveCategoryStylesToCloud().catch(function(){});
-            renderAllItemsList();
-            renderRooms();
-            closeCategoryPicker();
+            saveCategoryStyle(cat);
+            refreshOpenCategoryPicker(cat);
+        }
+
+        function bindCategoryPickerChoices(picker, cat) {
+            if (!picker) return;
+            if (picker.dataset.categoryPickerBound === '1') return;
+            picker.dataset.categoryPickerBound = '1';
+            picker.addEventListener('click', function(e) {
+                var iconBtn = e.target.closest('[data-cat-style-icon]');
+                var colorBtn = e.target.closest('[data-cat-style-color]');
+                if (!iconBtn && !colorBtn) return;
+                e.preventDefault();
+                e.stopPropagation();
+                if (iconBtn) selectCatIcon(cat, iconBtn.getAttribute('data-cat-style-icon'));
+                if (colorBtn) selectCatColor(cat, colorBtn.getAttribute('data-cat-style-color'));
+            });
+        }
+
+        function refreshOpenCategoryPicker(cat) {
+            var picker = document.getElementById('catPickerSheet') || document.getElementById('catPickerPopover');
+            if (!picker || _catPickerOpen !== cat) return;
+            var header = picker.querySelector('[data-cat-picker-header]');
+            picker.innerHTML = (header ? header.outerHTML : '') + _catPickerHTML(cat);
+            picker.dataset.categoryPickerBound = '';
+            bindCategoryPickerChoices(picker, cat);
         }
 
         function openCategoryStylePicker(cat, triggerEl) {
@@ -2513,23 +2817,27 @@ Example:
                 overlay.id = 'catPickerOverlay';
                 overlay.onclick = closeCategoryPicker;
                 overlay.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.45);';
-                document.body.appendChild(overlay);
+                var mount = getCategoryPickerMount();
+                mount.appendChild(overlay);
                 var sheet = document.createElement('div');
                 sheet.id = 'catPickerSheet';
                 sheet.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:9999;background:#fff;border-radius:20px 20px 0 0;padding:16px 16px 32px;max-height:75vh;overflow-y:auto;box-shadow:0 -4px 24px rgba(0,0,0,0.18);';
                 sheet.innerHTML = '<div style="width:40px;height:4px;background:#dee2e6;border-radius:2px;margin:0 auto 14px;"></div>' +
-                    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><strong>' + cat + ' Style</strong>' +
+                    '<div data-cat-picker-header style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><strong>' + cat + ' Style</strong>' +
                     '<button onclick="closeCategoryPicker()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#6c757d;">&times;</button></div>' +
                     _catPickerHTML(cat);
-                document.body.appendChild(sheet);
+                mount.appendChild(sheet);
+                bindCategoryPickerChoices(sheet, cat);
             } else {
                 var pk = document.createElement('div');
                 pk.id = 'catPickerPopover';
                 pk.style.cssText = 'position:fixed;z-index:9999;background:#fff;border:1px solid #dee2e6;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.18);padding:14px;width:300px;max-height:400px;overflow-y:auto;';
-                pk.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><strong style="font-size:0.9rem;">' + cat + ' Style</strong>' +
+                pk.innerHTML = '<div data-cat-picker-header style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><strong style="font-size:0.9rem;">' + cat + ' Style</strong>' +
                     '<button onclick="closeCategoryPicker()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#6c757d;">&times;</button></div>' +
                     _catPickerHTML(cat);
-                document.body.appendChild(pk);
+                var mount = getCategoryPickerMount();
+                mount.appendChild(pk);
+                bindCategoryPickerChoices(pk, cat);
                 var rect = triggerEl.getBoundingClientRect();
                 var pw = 300, ph = 400;
                 var top = rect.bottom + 8;
@@ -4782,7 +5090,7 @@ Example:
                         var catBg = catStyle.color || '#f0f4ff';
                         html += '<div class="cat-group-header" style="background:' + catBg + '; padding:4px 8px; font-size:0.78rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#495057; border-bottom:1px solid #dee2e6;">';
                         html += '<span class="cat-drag-handle" title="Drag to reorder category">&#8801;</span>';
-                        html += '<i class="fas ' + catIcon + ' me-1" style="color:#6c757d;"></i>' + catDisplay;
+                        html += renderCategoryIconMarkup(catIcon, 'me-1', 'color:#6c757d;') + catDisplay;
                         html += '</div>';
                         html += '<div style="overflow-x:auto;"><table class="table table-sm mb-0" style="min-width:560px;"><colgroup><col style="width:32px"><col style="width:34px"><col><col style="width:90px"><col style="width:80px"><col style="width:80px"><col style="width:210px"></colgroup><tbody>';
 
@@ -8247,9 +8555,20 @@ Example:
                     if (delBtn) { deleteCustomItem(delBtn.dataset.cat, delBtn.dataset.name); return; }
                     var refineBtn = e.target.closest('.refine-desc-btn');
                     if (refineBtn) {
-                        var descScope = refineBtn.closest('tr') || refineBtn.closest('.description-refine-scope');
+                        var descScope = refineBtn.closest('.description-refine-scope') || refineBtn.closest('tr');
                         var textarea = descScope ? descScope.querySelector('.item-description-textarea') : null;
                         refineDescription(textarea, refineBtn);
+                        return;
+                    }
+                    var detailsBtn = e.target.closest('.details-toggle-btn');
+                    if (detailsBtn) {
+                        var detailsTarget = document.getElementById(detailsBtn.dataset.target);
+                        if (detailsTarget) {
+                            var detailsOpen = detailsTarget.style.display !== 'none';
+                            detailsTarget.style.display = detailsOpen ? 'none' : 'table-row';
+                            detailsBtn.classList.toggle('btn-info', detailsOpen);
+                            detailsBtn.classList.toggle('btn-secondary', !detailsOpen);
+                        }
                         return;
                     }
                     var upgBtn = e.target.closest('.upgrade-toggle-btn');

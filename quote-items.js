@@ -4,6 +4,48 @@
     'use strict';
 
         var CREATE_NEW_CATEGORY_VALUE = '__quote_dr_create_new_category__';
+        var MANAGE_CATEGORY_STATE_KEY = 'ald_manage_items_category_state';
+        var manageItemsFilter = 'all';
+        var manageItemsCategoryState = {};
+        var dirtyPricingRows = new Set();
+        var pricingOtherDirty = false;
+
+        function manageItemsEscape(value) {
+            return String(value == null ? '' : value).replace(/[&<>"']/g, function(ch) {
+                return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
+            });
+        }
+
+        function manageItemsAttr(value) {
+            return manageItemsEscape(value).replace(/`/g, '&#96;');
+        }
+
+        function manageItemsRowKey(cat, name) {
+            return String(cat || '') + '||' + String(name || '');
+        }
+
+        function manageItemsSafeId(cat, name) {
+            return (String(cat || '') + '_' + String(name || '')).replace(/[^a-z0-9]/gi,'_');
+        }
+
+        function loadManageItemsCategoryState() {
+            try {
+                manageItemsCategoryState = JSON.parse(localStorage.getItem(MANAGE_CATEGORY_STATE_KEY) || '{}') || {};
+            } catch(e) {
+                manageItemsCategoryState = {};
+            }
+        }
+
+        function saveManageItemsCategoryState() {
+            localStorage.setItem(MANAGE_CATEGORY_STATE_KEY, JSON.stringify(manageItemsCategoryState || {}));
+        }
+
+        function getManageItemsCategoryOpen(cat) {
+            if (Object.prototype.hasOwnProperty.call(manageItemsCategoryState, cat)) {
+                return manageItemsCategoryState[cat] === true;
+            }
+            return false;
+        }
 
                 function _injectItemsIntoPricingDB(itemsObj) {
             for (var cat in itemsObj) {
@@ -223,15 +265,21 @@
             }
             const catSelect = document.getElementById('newItemCategory');
             if (!catSelect) { console.error('newItemCategory not found'); return; }
+            loadManageItemsCategoryState();
             populateNewItemCategorySelect(catSelect.value);
             document.getElementById('newItemName').value = '';
             document.getElementById('newItemUnit').value = '';
             document.getElementById('newItemRate').value = '';
             document.getElementById('newItemMaterialCost').value = '';
             document.getElementById('newItemSupplierUrl').value = '';
+            const addPanel = document.getElementById('manageNewItemPanel');
+            const addIcon = document.getElementById('toggleAddItemPanelIcon');
+            if (addPanel) addPanel.style.display = 'none';
+            if (addIcon) addIcon.className = 'fas fa-chevron-down';
             clearPricingDirty();
             const searchEl = document.getElementById('itemSearchFilter');
             if (searchEl) searchEl.value = '';
+            setManageItemsFilter('all', { skipFilter: true });
             renderAllItemsList();
             toggleManageItemsTopBar(false);
             toggleManageItemsBottomBar(false);
@@ -239,6 +287,20 @@
             bindManageItemsFooterButtons();
             syncManageItemsUndoButtons();
 (bootstrap.Modal.getInstance(document.getElementById('manageItemsModal')) || new bootstrap.Modal(document.getElementById('manageItemsModal'))).show();
+        }
+
+        function toggleManageNewItemPanel(forceOpen) {
+            const panel = document.getElementById('manageNewItemPanel');
+            const icon = document.getElementById('toggleAddItemPanelIcon');
+            if (!panel) return;
+            const open = forceOpen === true || (forceOpen !== false && panel.style.display === 'none');
+            panel.style.display = open ? 'block' : 'none';
+            if (icon) icon.className = open ? 'fas fa-chevron-up' : 'fas fa-chevron-down';
+            if (open) {
+                setTimeout(function() {
+                    document.getElementById('newItemName')?.focus();
+                }, 0);
+            }
         }
 
         function hideManageItemsModal() {
@@ -383,7 +445,16 @@
         }
         function bindManageItemsFooterButtons() {
             const saveBtn = document.getElementById('saveAllPricingFooterBtn');
+            const saveChangedBtn = document.getElementById('saveChangedPricingFooterBtn');
             const closeBtn = document.getElementById('closeManageItemsFooterBtn');
+            if (saveChangedBtn && !saveChangedBtn.dataset.boundManageFooter) {
+                saveChangedBtn.dataset.boundManageFooter = '1';
+                saveChangedBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    saveChangedPricingRows();
+                });
+            }
             if (saveBtn && !saveBtn.dataset.boundManageFooter) {
                 saveBtn.dataset.boundManageFooter = '1';
                 saveBtn.addEventListener('click', function(e) {
@@ -416,16 +487,78 @@
             }
         }
 
-        function markPricingDirty() {
-            pricingDirty = true;
+        function getManageRowByKey(rowKey) {
+            if (!rowKey) return null;
+            const container = document.getElementById('customItemsList');
+            if (!container) return null;
+            return Array.from(container.querySelectorAll('tr.manage-items-row')).find(function(row) {
+                return row.dataset.rowKey === rowKey;
+            }) || null;
+        }
+
+        function updatePricingDirtyIndicator() {
+            pricingDirty = pricingOtherDirty || dirtyPricingRows.size > 0;
             const indicator = document.getElementById('pricingUnsavedIndicator');
-            if (indicator) indicator.style.display = 'inline';
+            if (indicator) {
+                if (pricingDirty) {
+                    indicator.style.display = 'inline';
+                    indicator.textContent = dirtyPricingRows.size > 0
+                        ? dirtyPricingRows.size + ' unsaved row' + (dirtyPricingRows.size === 1 ? '' : 's')
+                        : 'Unsaved changes';
+                } else {
+                    indicator.style.display = 'none';
+                    indicator.textContent = 'Unsaved changes';
+                }
+            }
+            document.querySelectorAll('.manage-items-filter-btn').forEach(function(btn) {
+                btn.classList.toggle('active', btn.dataset.itemFilter === manageItemsFilter);
+            });
+        }
+
+        function setRowDirtyState(rowKey, isDirty) {
+            const row = getManageRowByKey(rowKey);
+            const details = row ? document.getElementById(row.dataset.detailsId || '') : null;
+            [row, details].forEach(function(el) {
+                if (el) el.classList.toggle('manage-item-dirty', !!isDirty);
+            });
+        }
+
+        function markPricingDirty(source) {
+            let rowKey = '';
+            if (source && source.closest) {
+                const row = source.closest('tr[data-row-key]');
+                if (row) rowKey = row.dataset.rowKey || '';
+            }
+            if (rowKey) {
+                dirtyPricingRows.add(rowKey);
+                setRowDirtyState(rowKey, true);
+            } else {
+                pricingOtherDirty = true;
+            }
+            updatePricingDirtyIndicator();
+            if (manageItemsFilter === 'unsaved') filterItemsList();
+        }
+
+        function markRowDirty(rowKey) {
+            if (!rowKey) return;
+            dirtyPricingRows.add(rowKey);
+            setRowDirtyState(rowKey, true);
+            updatePricingDirtyIndicator();
+            if (manageItemsFilter === 'unsaved') filterItemsList();
+        }
+
+        function clearRowDirty(rowKey) {
+            if (!rowKey) return;
+            dirtyPricingRows.delete(rowKey);
+            setRowDirtyState(rowKey, false);
+            updatePricingDirtyIndicator();
         }
 
         function clearPricingDirty() {
-            pricingDirty = false;
-            const indicator = document.getElementById('pricingUnsavedIndicator');
-            if (indicator) indicator.style.display = 'none';
+            dirtyPricingRows.forEach(function(rowKey) { setRowDirtyState(rowKey, false); });
+            dirtyPricingRows.clear();
+            pricingOtherDirty = false;
+            updatePricingDirtyIndicator();
         }
 
         function saveItemRow(cat, name) {
@@ -435,7 +568,8 @@
 
         function saveItemRowCore(cat, name, options) {
             options = options || {};
-            const safeId = (cat + '_' + name).replace(/[^a-z0-9]/gi,'_');
+            const rowKey = manageItemsRowKey(cat, name);
+            const safeId = manageItemsSafeId(cat, name);
             const row = document.getElementById('row_' + safeId);
             if (!row) return false;
 
@@ -446,11 +580,13 @@
             const rate        = parseFloat(inputs[1]?.value) || 0;
             const matCost     = parseFloat(inputs[2]?.value) || 0;
             const supplierUrl = inputs[3]?.value.trim() || '';
-            const descRow     = document.getElementById('desc_' + safeId);
-            const itemDescription = descRow?.querySelector('.item-description-textarea')?.value.trim() || '';
-            const collapseRow = document.getElementById('upg_' + safeId);
+            const detailsRow  = document.getElementById('details_' + safeId);
+            const itemDescription = detailsRow?.querySelector('.item-description-textarea')?.value.trim() || '';
+            const collapseRow = detailsRow;
             let upgrade = null;
+            let hasUpgradeEditor = false;
             if (collapseRow) {
+                hasUpgradeEditor = true;
                 const upgName = collapseRow.querySelector('.upgrade-name')?.value.trim() || '';
                 const upgUnitType = collapseRow.querySelector('.upgrade-unit-type')?.value.trim() || '';
                 const upgRate = parseFloat(collapseRow.querySelector('.upgrade-rate')?.value) || 0;
@@ -490,6 +626,8 @@
                 var oldUpgPhoto = pricingDatabase[cat]?.find(function(i){return i.name===name||i.name===newName;})?.upgrade?.photo;
                 if (!upgrade.photo && oldUpgPhoto) upgrade.photo = oldUpgPhoto;
                 ci.upgrade = upgrade;
+            } else if (hasUpgradeEditor) {
+                delete ci.upgrade;
             }
             // Preserve item photo from previous state
             if (!ci.photo) {
@@ -500,7 +638,10 @@
             // Mirror into pricingDatabase
             if (!pricingDatabase[cat]) pricingDatabase[cat] = [];
             const pi = pricingDatabase[cat].find(i => i.name === name);
-            if (pi) { Object.assign(pi, ci, { _custom: true }); }
+            if (pi) {
+                Object.assign(pi, ci, { _custom: true });
+                if (hasUpgradeEditor && upgrade === null) delete pi.upgrade;
+            }
 
             // Save to localStorage
             localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
@@ -511,7 +652,10 @@
                 row.style.background = '#d1e7dd';
                 setTimeout(() => { row.style.background = ''; }, 900);
             }
-            clearPricingDirty();
+            if (options.clearDirty !== false) {
+                clearRowDirty(rowKey);
+                if (dirtyPricingRows.size === 0 && !pricingOtherDirty) updatePricingDirtyIndicator();
+            }
 
             // Save to cloud and show result
             if (options.backup !== false) _doBackupItemsToCloud(customItems).then(function(r) {
@@ -634,33 +778,64 @@
             requestAnimationFrame(step);
         }
 
+        function setManageItemsFilter(filter, options) {
+            manageItemsFilter = filter || 'all';
+            document.querySelectorAll('.manage-items-filter-btn').forEach(function(btn) {
+                btn.classList.toggle('active', btn.dataset.itemFilter === manageItemsFilter);
+            });
+            if (!options || !options.skipFilter) filterItemsList();
+        }
+
+        function rowMatchesManageFilter(row, q) {
+            if (!row) return false;
+            const rowKey = row.dataset.rowKey || '';
+            const blob = (row.dataset.search || '').toLowerCase();
+            const matchesSearch = !q || blob.includes(q);
+            if (!matchesSearch) return false;
+            if (manageItemsFilter === 'unsaved') return dirtyPricingRows.has(rowKey);
+            if (manageItemsFilter === 'custom') return row.dataset.custom === '1';
+            if (manageItemsFilter === 'has-upgrade') return row.dataset.hasUpgrade === '1';
+            if (manageItemsFilter === 'missing-material') return row.dataset.missingMaterial === '1';
+            if (manageItemsFilter === 'no-description') return row.dataset.noDescription === '1';
+            return true;
+        }
+
         function filterItemsList() {
             const q = (document.getElementById('itemSearchFilter')?.value || '').toLowerCase().trim();
             const container = document.getElementById('customItemsList');
+            if (!container) return;
+            let visibleRows = 0;
 
-            container.querySelectorAll('table').forEach(table => {
+            container.querySelectorAll('.manage-items-category').forEach(function(section) {
                 let anyVisible = false;
-                table.querySelectorAll('tbody tr').forEach(row => {
-                    // Skip hidden desc/upgrade collapse rows - never touch them
-                    const isCollapse = row.id && (row.id.startsWith('desc_') || row.id.startsWith('upg_'));
-                    if (isCollapse) return;
-
-                    if (!q) {
-                        row.style.display = '';
-                        anyVisible = true;
-                        return;
-                    }
-                    // Name is now in an input field, not a <strong>
-                    const nameInput = row.querySelector('input.item-name-input');
-                    const name = (nameInput?.value || '').toLowerCase();
-                    const show = name.includes(q);
+                const body = section.querySelector('.manage-items-category-body');
+                const hasActiveSearchOrFilter = !!q || manageItemsFilter !== 'all';
+                section.querySelectorAll('tr.manage-items-row').forEach(function(row) {
+                    const show = rowMatchesManageFilter(row, q);
+                    const details = document.getElementById(row.dataset.detailsId || '');
                     row.style.display = show ? '' : 'none';
-                    if (show) anyVisible = true;
+                    if (details && !show) details.style.display = 'none';
+                    if (show) {
+                        anyVisible = true;
+                        visibleRows++;
+                    }
                 });
-                table.style.display = (!q || anyVisible) ? '' : 'none';
-                const prev = table.previousElementSibling;
-                if (prev && prev.tagName === 'H6') prev.style.display = (!q || anyVisible) ? '' : 'none';
+                section.style.display = anyVisible ? '' : 'none';
+                if (body && anyVisible) {
+                    body.style.display = (hasActiveSearchOrFilter || getManageItemsCategoryOpen(section.dataset.category)) ? '' : 'none';
+                }
             });
+
+            let empty = document.getElementById('manageItemsEmptyFilter');
+            if (!empty) {
+                empty = document.createElement('div');
+                empty.id = 'manageItemsEmptyFilter';
+                empty.className = 'manage-empty-filter';
+                empty.textContent = 'No items match this search or filter.';
+                container.appendChild(empty);
+            }
+            empty.style.display = visibleRows === 0 ? '' : 'none';
+            updatePricingDirtyIndicator();
         }
 
         function renderAllItemsList() {
@@ -681,8 +856,11 @@
                 const cIcon = catSty.icon || 'fa-tag';
                 const cColor = catSty.color || '#f0f4ff';
                 const catEsc = cat.replace(/'/g, "\\'");
+                const catIconMarkup = typeof renderCategoryIconMarkup === 'function'
+                    ? renderCategoryIconMarkup(cIcon, '', 'color:#495057;')
+                    : `<i class="fas ${cIcon}" style="color:#495057;"></i>`;
                 html += `<div class="d-flex align-items-center gap-2 mt-3 mb-1 px-2 py-1 rounded" style="background:${cColor};">
-                  <i class="fas ${cIcon}" style="color:#495057;"></i>
+                  ${catIconMarkup}
                   <h6 class="fw-bold mb-0 text-primary" style="flex:1;">${cat}</h6>
                   <button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem; padding:1px 8px;" onclick="openCategoryStylePicker('${catEsc}', this)" title="Customize icon &amp; colour">
                     <i class="fas fa-palette me-1"></i>Style
@@ -800,6 +978,221 @@
             container.innerHTML = html || '<p class="text-muted">No items found.</p>';
 
             // Event listeners handled via delegation on #customItemsList (see DOMContentLoaded)
+        }
+
+        function renderManageMarginPill(rateValue, materialValue) {
+            const rate = parseFloat(rateValue || 0) || 0;
+            const material = parseFloat(materialValue || 0) || 0;
+            if (rate <= 0) return '<span class="manage-margin-pill manage-margin-warn"><i class="fas fa-exclamation-circle"></i> No rate</span>';
+            if (material <= 0) return '<span class="manage-margin-pill manage-margin-warn"><i class="fas fa-box-open"></i> Cost missing</span>';
+            const profit = rate - material;
+            const pct = Math.round((profit / rate) * 100);
+            if (profit < 0) return '<span class="manage-margin-pill manage-margin-bad"><i class="fas fa-triangle-exclamation"></i> Cost above rate</span>';
+            return '<span class="manage-margin-pill manage-margin-good"><i class="fas fa-chart-line"></i> ' + pct + '% margin</span>';
+        }
+
+        function renderAllItemsList() {
+            const container = document.getElementById('customItemsList');
+            let html = '';
+
+            Object.entries(pricingDatabase).forEach(([cat, items]) => {
+                if (!items.length) return;
+                const catSty = categoryStyles[cat] || {};
+                const cIcon = catSty.icon || 'fa-tag';
+                const cColor = catSty.color || '#f0f4ff';
+                const catJs = manageItemsAttr(JSON.stringify(cat));
+                const catSafeId = manageItemsSafeId(cat, 'category');
+                const isOpen = getManageItemsCategoryOpen(cat);
+                const catIconMarkup = typeof renderCategoryIconMarkup === 'function'
+                    ? renderCategoryIconMarkup(cIcon, '', 'color:#495057;')
+                    : `<i class="fas ${manageItemsAttr(cIcon)}" style="color:#495057;"></i>`;
+
+                html += `<section class="manage-items-category" data-category="${manageItemsAttr(cat)}">
+                    <div class="manage-items-category-header" style="background:${manageItemsAttr(cColor)};">
+                        <button type="button" class="manage-items-category-toggle" onclick="toggleManageItemsCategory(${catJs})" title="Collapse or expand ${manageItemsAttr(cat)}">
+                            <i class="fas ${isOpen ? 'fa-chevron-down' : 'fa-chevron-right'}"></i>
+                        </button>
+                        ${catIconMarkup}
+                        <h6 class="fw-bold mb-0 text-primary" style="flex:1;">${manageItemsEscape(cat)}</h6>
+                        <span class="manage-items-category-count">${items.length}</span>
+                        <button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem; padding:1px 8px;" onclick="openCategoryStylePicker(${catJs}, this)" title="Customize icon and colour">
+                            <i class="fas fa-palette me-1"></i>Style
+                        </button>
+                    </div>
+                    <div class="manage-items-category-body" id="cat_body_${catSafeId}" style="${isOpen ? '' : 'display:none;'}">
+                    <table class="table table-sm table-bordered mb-2 manage-items-table"><thead class="table-light"><tr><th>Name</th><th style="width:90px">Unit</th><th style="width:100px">Rate ($)</th><th style="width:115px">Mat. Cost ($)</th><th>Supplier URL <button type="button" class="qd-inline-help-btn" title="Help with supplier URLs" aria-label="Help with supplier URLs" onclick="if(window.QuoteDrModalHelp){QuoteDrModalHelp.openInline(&quot;supplierUrl&quot;);} return false;"><i class="fas fa-question"></i></button></th><th style="width:138px"></th></tr></thead><tbody>`;
+
+                items.forEach(item => {
+                    if (!item || !item.name) return;
+                    const safeId = manageItemsSafeId(cat, item.name);
+                    const rowKey = manageItemsRowKey(cat, item.name);
+                    const isCustom = !!item._custom;
+                    const rate = parseFloat(item.rate || 0).toFixed(2);
+                    const matCost = parseFloat(item.materialCost || 0).toFixed(2);
+                    const supplier = manageItemsAttr(item.supplierUrl || '');
+                    const catE = manageItemsAttr(cat);
+                    const nameE = manageItemsAttr(item.name);
+                    const upg = item.upgrade || {};
+                    const upgName = manageItemsAttr(upg.name || '');
+                    const upgUnitType = manageItemsAttr(upg.unitType || upg.unit || '');
+                    const upgRate = parseFloat(upg.rate || 0).toFixed(2);
+                    const upgMaterialCost = parseFloat(upg.materialCost || 0).toFixed(2);
+                    const upgSupplierUrl = manageItemsAttr(upg.supplierUrl || '');
+                    const hasUpgrade = !!upg.name;
+                    const noDescription = !(item.itemDescription || '').trim();
+                    const missingMaterial = parseFloat(item.materialCost || 0) <= 0;
+                    const detailsId = 'details_' + safeId;
+                    const isDirty = dirtyPricingRows.has(rowKey);
+                    const searchBlob = [
+                        cat, item.name, item.unitType, item.supplierUrl, item.itemDescription,
+                        upg.name, upg.unitType || upg.unit, upg.supplierUrl, upg.description
+                    ].filter(Boolean).join(' ').toLowerCase();
+                    const rowMeta = `data-row-key="${manageItemsAttr(rowKey)}" data-details-id="${detailsId}" data-search="${manageItemsAttr(searchBlob)}" data-custom="${isCustom ? '1' : '0'}" data-has-upgrade="${hasUpgrade ? '1' : '0'}" data-missing-material="${missingMaterial ? '1' : '0'}" data-no-description="${noDescription ? '1' : '0'}"`;
+
+                    html += `<tr id="row_${safeId}" class="manage-items-row ${isDirty ? 'manage-item-dirty' : ''}" ${rowMeta}>
+                        <td data-label="Name">
+                            <div class="d-flex align-items-center">
+                                <span class="manage-dirty-dot" title="Unsaved row"></span>
+                                <input type="text" class="form-control form-control-sm item-name-input" value="${manageItemsAttr(item.name)}" placeholder="Item name" oninput="markPricingDirty(this)">
+                            </div>
+                            <div class="mt-1">${renderManageMarginPill(rate, matCost)}</div>
+                        </td>
+                        <td data-label="Unit"><input type="text" class="form-control form-control-sm item-input" value="${manageItemsAttr(item.unitType || '')}" oninput="markPricingDirty(this)"></td>
+                        <td data-label="Rate"><input type="number" class="form-control form-control-sm item-input" value="${rate}" step="0.01" min="0" oninput="markPricingDirty(this)"></td>
+                        <td data-label="Mat. Cost"><input type="number" class="form-control form-control-sm item-input" value="${matCost}" step="0.01" min="0" oninput="markPricingDirty(this)"></td>
+                        <td data-label="Supplier">
+                            <div class="input-group input-group-sm">
+                                <input type="url" class="form-control item-input" value="${supplier}" placeholder="https://..." oninput="markPricingDirty(this)">
+                                <button type="button" class="btn btn-outline-secondary" title="Help with supplier URLs" aria-label="Help with supplier URLs" onclick="if(window.QuoteDrModalHelp){QuoteDrModalHelp.openInline('supplierUrl');} return false;"><i class="fas fa-question"></i></button>
+                            </div>
+                        </td>
+                        <td data-label="Actions">
+                            <div class="manage-item-actions">
+                                <button class="btn btn-sm btn-info details-toggle-btn" data-target="${detailsId}" title="Show item details"><i class="fas fa-sliders-h"></i> Details</button>
+                                <button class="btn btn-sm btn-success item-save-btn" data-cat="${catE}" data-name="${nameE}" title="Save this row"><i class="fas fa-save"></i></button>
+                                ${isCustom ? `<button class="btn btn-sm btn-danger item-delete-btn" data-cat="${catE}" data-name="${nameE}" title="Delete"><i class="fas fa-trash"></i></button>` : ''}
+                            </div>
+                        </td>
+                    </tr>
+                    <tr id="${detailsId}" class="item-details-row ${isDirty ? 'manage-item-dirty' : ''}" data-row-key="${manageItemsAttr(rowKey)}" style="display:none;">
+                        <td colspan="6">
+                            <div class="p-3">
+                                <div class="row g-3">
+                                    <div class="col-lg-6 description-refine-scope">
+                                        <div class="d-flex justify-content-between align-items-center gap-2">
+                                            <small class="text-info fw-bold"><i class="fas fa-align-left"></i> Description shown to clients</small>
+                                            <div class="d-flex align-items-center gap-1">
+                                                <button type="button" class="btn btn-sm btn-outline-secondary undo-refine-desc-btn" onclick="toggleRefinedDescription(this)" title="Undo AI refined description" style="display:none;font-size:0.75rem;padding:2px 7px;"><i class="fas fa-undo"></i></button>
+                                                <button type="button" class="btn btn-sm btn-outline-primary refine-desc-btn" style="font-size:0.75rem;padding:2px 8px;">AI Refine</button>
+                                            </div>
+                                        </div>
+                                        <textarea class="form-control form-control-sm item-description-textarea mt-2" rows="4" placeholder="e.g., Complete drywall installation including hanging, mudding, taping, sanding and priming." spellcheck="true" oninput="markPricingDirty(this)">${manageItemsEscape(item.itemDescription || '')}</textarea>
+                                        <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
+                                            <button class="btn btn-sm btn-outline-secondary item-photo-btn" data-cat="${catE}" data-name="${nameE}" data-field="photo" title="Add item photo"><i class="fas fa-camera me-1"></i>Item Photo</button>
+                                            ${item.photo ? `<img src="${manageItemsAttr(item.photo)}" class="rounded" style="max-width:80px;max-height:52px;cursor:pointer;" onclick="openPhotoLightbox(this.src)" title="Click to enlarge">` : ''}
+                                        </div>
+                                    </div>
+                                    <div class="col-lg-6">
+                                        <small class="text-warning fw-bold"><i class="fas fa-arrow-up"></i> Upgrade Option</small>
+                                        <div class="row g-2 mt-1 align-items-end">
+                                            <div class="col-md-5">
+                                                <label class="form-label" style="font-size:0.75em">Upgrade Name</label>
+                                                <input type="text" class="form-control form-control-sm upgrade-name" value="${upgName}" placeholder="e.g., Tall Baseboard 5.5&quot;" oninput="markPricingDirty(this)">
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label" style="font-size:0.75em">Unit</label>
+                                                <input type="text" class="form-control form-control-sm upgrade-unit-type" value="${upgUnitType}" list="unitTypeOptions" placeholder="LF" oninput="markPricingDirty(this)">
+                                            </div>
+                                            <div class="col-md-2">
+                                                <label class="form-label" style="font-size:0.75em">Rate</label>
+                                                <input type="number" class="form-control form-control-sm upgrade-rate" value="${upgRate}" step="0.01" min="0" oninput="markPricingDirty(this)">
+                                            </div>
+                                            <div class="col-md-2">
+                                                <label class="form-label" style="font-size:0.75em">Cost</label>
+                                                <input type="number" class="form-control form-control-sm upgrade-material-cost" value="${upgMaterialCost}" step="0.01" min="0" oninput="markPricingDirty(this)">
+                                            </div>
+                                            <div class="col-12">
+                                                <label class="form-label" style="font-size:0.75em">Supplier URL</label>
+                                                <input type="url" class="form-control form-control-sm upgrade-supplier-url" value="${upgSupplierUrl}" placeholder="https://..." oninput="markPricingDirty(this)">
+                                            </div>
+                                            <div class="col-12 description-refine-scope">
+                                                <div class="d-flex justify-content-between align-items-center gap-2">
+                                                    <label class="form-label mb-0" style="font-size:0.75em">Upgrade Description</label>
+                                                    <div class="d-flex align-items-center gap-1">
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary undo-refine-desc-btn" onclick="toggleRefinedDescription(this)" title="Undo AI refined description" style="display:none;font-size:0.75rem;padding:2px 7px;"><i class="fas fa-undo"></i></button>
+                                                        <button type="button" class="btn btn-sm btn-outline-primary refine-desc-btn" style="font-size:0.75rem;padding:2px 8px;">AI Refine</button>
+                                                    </div>
+                                                </div>
+                                                <input type="text" class="form-control form-control-sm upgrade-desc item-description-textarea mt-1" value="${manageItemsAttr(upg.description || '')}" placeholder="e.g., Premium finishing upgrade" oninput="markPricingDirty(this)">
+                                            </div>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
+                                            <span>${renderManageMarginPill(upgRate, upgMaterialCost)}</span>
+                                            <button class="btn btn-sm btn-outline-secondary item-photo-btn" data-cat="${catE}" data-name="${nameE}" data-field="upgradePhoto" title="Add upgrade photo"><i class="fas fa-camera me-1"></i>Upgrade Photo</button>
+                                            ${upg.photo ? `<img src="${manageItemsAttr(upg.photo)}" class="rounded" style="max-width:80px;max-height:52px;cursor:pointer;" onclick="openPhotoLightbox(this.src)" title="Click to enlarge">` : ''}
+                                        </div>
+                                        <small class="text-muted d-block mt-2">Leave upgrade name blank to remove the upgrade when this row is saved.</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>`;
+                });
+                html += '</tbody></table></div></section>';
+            });
+
+            container.innerHTML = html || '<p class="text-muted">No items found.</p>';
+            filterItemsList();
+        }
+
+        function toggleManageItemsCategory(cat) {
+            const current = getManageItemsCategoryOpen(cat);
+            manageItemsCategoryState[cat] = !current;
+            saveManageItemsCategoryState();
+            const section = Array.from(document.querySelectorAll('.manage-items-category')).find(function(el) {
+                return el.dataset.category === cat;
+            });
+            if (!section) return;
+            const body = section.querySelector('.manage-items-category-body');
+            const icon = section.querySelector('.manage-items-category-toggle i');
+            if (body) body.style.display = manageItemsCategoryState[cat] === false ? 'none' : '';
+            if (icon) icon.className = manageItemsCategoryState[cat] === false ? 'fas fa-chevron-right' : 'fas fa-chevron-down';
+        }
+
+        function showManageItemsToast(message, ok) {
+            var toast = document.createElement('div');
+            toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:' + (ok ? '#198754' : '#dc3545') + ';color:white;padding:12px 20px;border-radius:8px;z-index:9999;font-size:0.95rem;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(function(){ toast.remove(); }, 3200);
+        }
+
+        function saveChangedPricingRows() {
+            const changedKeys = Array.from(dirtyPricingRows);
+            if (changedKeys.length === 0 && !pricingOtherDirty) {
+                showManageItemsToast('No changed rows to save.', true);
+                return;
+            }
+            pushUndoState();
+            changedKeys.forEach(function(rowKey) {
+                const row = getManageRowByKey(rowKey);
+                const saveBtn = row ? row.querySelector('.item-save-btn') : null;
+                if (saveBtn?.dataset.cat && saveBtn?.dataset.name) {
+                    saveItemRowCore(saveBtn.dataset.cat, saveBtn.dataset.name, { backup: false, flash: false });
+                }
+            });
+            pricingOtherDirty = false;
+            localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
+            _doBackupItemsToCloud(customItems).then(function(result) {
+                const ok = result && !result.error;
+                clearPricingDirty();
+                showManageItemsToast(ok ? 'Changed rows saved to cloud.' : 'Saved locally - cloud sync failed.', ok);
+                filterItemsList();
+            }).catch(function() {
+                clearPricingDirty();
+                showManageItemsToast('Saved locally - cloud sync failed.', false);
+                filterItemsList();
+            });
         }
 
         function saveItemFieldEdit(category, name, field, value) {
@@ -1118,7 +1511,7 @@
 
         function toggleRefinedDescription(btnEl) {
             if (!btnEl || typeof btnEl._previousDescription !== 'string' || typeof btnEl._refinedDescription !== 'string') return;
-            const descScope = btnEl.closest('tr') || btnEl.closest('.description-refine-scope');
+            const descScope = btnEl.closest('.description-refine-scope') || btnEl.closest('tr');
             const textarea = descScope ? descScope.querySelector('.item-description-textarea') : null;
             if (!textarea) return;
             if (btnEl._showingRefined) {
@@ -1172,15 +1565,20 @@
         window.syncManageItemsUndoButtons = syncManageItemsUndoButtons;
         window.toggleManageItemsTopBar = toggleManageItemsTopBar;
         window.toggleManageItemsBottomBar = toggleManageItemsBottomBar;
+        window.toggleManageNewItemPanel = toggleManageNewItemPanel;
+        window.toggleManageItemsCategory = toggleManageItemsCategory;
         window.initManageItemsFooterSwipe = initManageItemsFooterSwipe;
         window.markPricingDirty = markPricingDirty;
+        window.markRowDirty = markRowDirty;
         window.clearPricingDirty = clearPricingDirty;
         window.saveItemRow = saveItemRow;
         window.saveItemRowCore = saveItemRowCore;
         window._doRestoreItemsFromCloud = _doRestoreItemsFromCloud;
         window._doBackupItemsToCloud = _doBackupItemsToCloud;
         window.saveAllPricingRows = saveAllPricingRows;
+        window.saveChangedPricingRows = saveChangedPricingRows;
         window.whizzScroll = whizzScroll;
+        window.setManageItemsFilter = setManageItemsFilter;
         window.filterItemsList = filterItemsList;
         window.renderAllItemsList = renderAllItemsList;
         window.saveItemFieldEdit = saveItemFieldEdit;
