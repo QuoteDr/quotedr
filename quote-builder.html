@@ -1095,7 +1095,7 @@ if (location.search.includes('debug')) {
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openMeasureModal()"><i class="fas fa-satellite me-2 text-primary"></i>Satellite Measure</a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openIkeaQuoteModal()"><i class="fas fa-utensils me-2 text-warning"></i>IKEA Quick Quote</a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openProFeature('floor_plan_scanner','Floor Plan Scanner', openFloorPlanModal)"><i class="fas fa-drafting-compass me-2 text-info"></i>Floor Plan Scanner</a></li>
-                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="openMaterialEstimator()"><i class="fas fa-ruler-combined me-2 text-info"></i>Material Estimator</a></li>
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="openMaterialEstimator()"><i class="fas fa-ruler-combined me-2 text-info"></i>Quick Room Quoter</a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openHardwoodCalc()"><i class="fas fa-rug me-2 text-warning"></i>Hardwood/LVP Calculator</a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openPaintCalc()"><i class="fas fa-paint-brush me-2 text-danger"></i>Paint Calculator</a></li>
@@ -1323,7 +1323,7 @@ if (location.search.includes('debug')) {
                     <a href="javascript:void(0)" onclick="addRoom()" class="btn btn-sm btn-add-room">
                         <i class="fas fa-plus"></i> Add Room
                     </a>
-                    <a href="javascript:void(0)" onclick="openMaterialEstimator()" class="btn btn-sm btn-quick-room" title="Estimate materials from room dimensions">
+                    <a href="javascript:void(0)" onclick="openMaterialEstimator()" class="btn btn-sm btn-quick-room" title="Build a quick room quote from room dimensions">
                         <i class="fas fa-ruler-combined"></i> Quick Add Room
                     </a>
                     <a href="javascript:void(0)" onclick="saveTemplate()" class="btn btn-sm btn-save-template" title="Save all current rooms as a quote template">
@@ -1620,12 +1620,12 @@ Example:
         </div>
     </div>
 
-    <!-- Material Estimator Modal -->
+    <!-- Quick Room Quoter Modal -->
     <div class="modal fade" id="materialEstimatorModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title"><i class="fas fa-ruler-combined me-2 text-info"></i>Material Estimator</h5>
+                    <h5 class="modal-title"><i class="fas fa-ruler-combined me-2 text-info"></i>Quick Room Quoter</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -5015,7 +5015,7 @@ Example:
     <script src="floor-plan-scanner.js?v=toolbar-zoom-1"></script>
     <script>
 
-        // Material estimator moved to quote-calculators.js
+        // Quick Room Quoter moved to quote-calculators.js
 
         // -- Google Maps Measurement -----------------------------------------
         var _map = null, _mapShapes = [], _mapInited = false, _mapsLoadingPromise = null, _mapSelectedShapeIndex = -1;
@@ -10750,7 +10750,7 @@ Example:
 </div>
 
 <script src="quote-calculators.js?v=1778198200"></script>
-<script src="help-content.js?v=1778055200"></script>
+<script src="help-content.js?v=1778198300"></script>
 <script src="modal-help.js?v=1778055200"></script>
 <script>
         function _toggleAiBtn() {

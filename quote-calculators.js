@@ -1,4 +1,4 @@
-// Quote Dr material estimator and calculator helpers.
+// Quote Dr quick room quoter and calculator helpers.
 // Extracted from quote-builder.html so the quote builder shell stays easier to maintain.
 
         function calcIsMetric() {
@@ -117,7 +117,7 @@
             if (windowsText) windowsText.textContent = 'Each window adds ' + calcWindowCasingLength().toFixed(calcIsMetric() ? 2 : 0) + ' ' + calcLengthUnit() + ' of casing trim';
         }
 
-        // -- Material Estimator ---------------------------------------------
+        // -- Quick Room Quoter ----------------------------------------------
 
         var EST_FIELDS = [
             { key: 'flooring',     label: 'Flooring',       unit: 'sqft', defaultRate: 0 },

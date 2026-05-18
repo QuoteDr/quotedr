@@ -205,13 +205,13 @@
             helpUrl: 'help.html#specialty-tools'
         },
         materialEstimatorModal: {
-            title: 'Material Estimator',
-            summary: 'Estimate common room materials from basic dimensions and add them to your quote.',
+            title: 'Quick Room Quoter',
+            summary: 'Build a quick room quote from dimensions, openings, waste settings, and your saved pricing.',
             steps: [
                 'Enter the room name, width, length, ceiling height, doors, and windows.',
-                'Calculate the estimated material quantities.',
+                'Calculate the recommended line items and quantities.',
                 'Review the results and choose the target room.',
-                'Add the estimate to the quote.'
+                'Add the quick quote as a new room or append it to an existing room.'
             ],
             tips: [
                 'Set pricing once so future estimates come in with rates already filled.',
@@ -221,7 +221,7 @@
         },
         estimatorPricingModal: {
             title: 'Set Up Estimator Pricing',
-            summary: 'Connect estimator outputs to your saved items or manual rates.',
+            summary: 'Connect Quick Room Quoter outputs to one or more saved items or manual rates.',
             steps: [
                 'For each material type, choose a saved item or enter a rate.',
                 'Save pricing when every common material is mapped.',
