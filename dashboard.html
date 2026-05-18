@@ -1388,6 +1388,13 @@
             if (btn) { var orig = btn.innerHTML; btn.innerHTML = '<i class="fas fa-check"></i>'; setTimeout(function(){ btn.innerHTML = orig; }, 1500); }
         }
 
+        function openPortalClientUrl() {
+            var url = document.getElementById('portalUrlDisplay').value;
+            if (url && url !== 'Loading...' && !url.startsWith('Error')) {
+                window.location.href = url;
+            }
+        }
+
         function copyPortalAdminUrl() {
             var url = document.getElementById('portalAdminUrlDisplay').value;
             navigator.clipboard.writeText(url).catch(function(){});
@@ -1397,7 +1404,9 @@
 
         function openPortalAdminUrl() {
             var url = document.getElementById('portalAdminUrlDisplay').value;
-            if (url) window.open(url, '_blank');
+            if (url && url !== 'Loading...' && !url.startsWith('Error')) {
+                window.location.href = url;
+            }
         }
 
         function copyPortalBoth() {
@@ -2731,18 +2740,24 @@ function renderBusinessInsights(quotes) {
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body text-center">
-        <p class="text-muted mb-1">Share this link with <strong id="portalClientName"></strong>:</p>
-        <div class="input-group mb-3">
-          <input type="text" class="form-control form-control-sm" id="portalUrlDisplay" readonly>
-          <button class="btn btn-outline-secondary btn-sm" onclick="copyPortalUrl()"><i class="fas fa-copy"></i></button>
+        <p class="text-muted mb-3">Share portal access with <strong id="portalClientName"></strong>.</p>
+        <div class="text-start mb-3">
+          <label class="form-label fw-bold small mb-1" style="color:#1a2940;">CLIENT VIEWER LINK</label>
+          <div class="input-group">
+            <input type="text" class="form-control form-control-sm" id="portalUrlDisplay" readonly aria-label="Client viewer link">
+            <button class="btn btn-outline-secondary btn-sm" onclick="copyPortalUrl()" title="Copy client viewer link" aria-label="Copy client viewer link"><i class="fas fa-copy"></i></button>
+            <button class="btn btn-outline-primary btn-sm" onclick="openPortalClientUrl()" title="View client portal" aria-label="View client portal"><i class="fas fa-arrow-up-right-from-square me-1"></i>View</button>
+          </div>
+          <div class="form-text">Client-facing link that requires the PIN below.</div>
         </div>
         <div class="text-start mb-3">
-          <label class="form-label text-muted small mb-1">Admin preview link (for you only):</label>
+          <label class="form-label fw-bold small mb-1" style="color:#1a2940;">ADMIN PREVIEW LINK</label>
           <div class="input-group">
-            <input type="text" class="form-control form-control-sm" id="portalAdminUrlDisplay" readonly>
-            <button class="btn btn-outline-secondary btn-sm" onclick="copyPortalAdminUrl()"><i class="fas fa-copy"></i></button>
-            <button class="btn btn-outline-primary btn-sm" onclick="openPortalAdminUrl()"><i class="fas fa-arrow-up-right-from-square"></i></button>
+            <input type="text" class="form-control form-control-sm" id="portalAdminUrlDisplay" readonly aria-label="Admin preview link">
+            <button class="btn btn-outline-secondary btn-sm" onclick="copyPortalAdminUrl()" title="Copy admin preview link" aria-label="Copy admin preview link"><i class="fas fa-copy"></i></button>
+            <button class="btn btn-outline-primary btn-sm" onclick="openPortalAdminUrl()" title="Open admin preview" aria-label="Open admin preview"><i class="fas fa-arrow-up-right-from-square me-1"></i>Preview</button>
           </div>
+          <div class="form-text">For you only. Opens the portal in admin preview mode.</div>
         </div>
         <div class="mb-3">
           <div class="text-muted small mb-1">Client PIN (they need this to log in):</div>
