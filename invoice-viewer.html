@@ -106,8 +106,8 @@
             gap: 0.5rem;
         }
         .invoice-action-left { justify-self: start; }
-        .invoice-action-center { justify-self: center; }
-        .invoice-action-right { justify-self: end; }
+        .invoice-action-center { grid-column: 2; justify-self: center; }
+        .invoice-action-right { grid-column: 3; justify-self: end; }
         @media (max-width: 520px) {
             .invoice-action-bar {
                 grid-template-columns: 1fr;
@@ -116,6 +116,7 @@
             .invoice-action-left,
             .invoice-action-center,
             .invoice-action-right {
+                grid-column: auto;
                 justify-self: stretch;
             }
             .invoice-action-bar .btn {
@@ -241,9 +242,6 @@ if (location.search.includes('debug')) {
 
         <!-- Invoice actions -->
         <div class="mb-3 d-print-none invoice-action-bar">
-            <a href="quote-builder.html" onclick="return goBackToBuilder(event)" class="btn btn-outline-secondary btn-sm invoice-action-left">
-                <i class="fas fa-arrow-left me-1"></i> Back to Builder
-            </a>
             <button onclick="window.print()" class="btn btn-outline-secondary btn-sm invoice-action-center">
                 <i class="fas fa-print me-1"></i> Print / Save as PDF
             </button>
@@ -518,20 +516,6 @@ if (location.search.includes('debug')) {
             }
         }
 
-        function goBackToBuilder(event) {
-            var fallbackUrl = 'quote-builder.html';
-            try {
-                var referrer = document.referrer ? new URL(document.referrer) : null;
-                if (referrer && referrer.origin === window.location.origin && /\/quote-builder(?:\.html)?\/?$/.test(referrer.pathname)) {
-                    if (event) event.preventDefault();
-                    window.history.back();
-                    return false;
-                }
-            } catch(e) {}
-            if (event && event.currentTarget) event.currentTarget.href = fallbackUrl;
-            return true;
-        }
-
         const CATEGORY_ORDER = [
             'Demolition','Asbestos / Hazmat','Concrete & Masonry','Waterproofing',
             'Rough Framing','Windows & Exterior Doors','Rough Plumbing','Rough Electrical',
@@ -687,12 +671,21 @@ if (location.search.includes('debug')) {
 
         function showPaymentReturnNotice() {
             var params = new URLSearchParams(window.location.search);
-            if (params.get('payment') !== 'success') return;
+            if (params.get('payment') !== 'success') return false;
+            showInvoicePaidNotice();
+            return true;
+        }
+
+        function showInvoicePaidNotice(paymentInfo) {
             var section = document.getElementById('clientPaymentSection');
             if (!section) return;
             section.style.display = 'block';
             var buttons = document.getElementById('clientPaymentButtons');
-            if (buttons) buttons.innerHTML = '<div class="alert alert-success mb-0"><i class="fas fa-check-circle me-1"></i>Payment received. Thank you.</div>';
+            var amountText = '';
+            if (paymentInfo && paymentInfo.amountCents) {
+                amountText = ' ' + formatMoney(Number(paymentInfo.amountCents || 0) / 100, invoiceData.currency || 'CAD') + ' received.';
+            }
+            if (buttons) buttons.innerHTML = '<div class="alert alert-success mb-0"><i class="fas fa-check-circle me-1"></i>Payment received.' + amountText + ' Thank you.</div>';
         }
 
         function tryLocalStorageFallback() {
@@ -1063,6 +1056,34 @@ if (location.search.includes('debug')) {
             return '';
         }
 
+        async function reconcileInvoicePaymentStatus(invoiceId) {
+            if (!isSupabaseUuid(invoiceId)) return false;
+            try {
+                var resp = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/stripe-deposit', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'apikey': QUOTEDR_SUPABASE_ANON_KEY,
+                        'Authorization': 'Bearer ' + QUOTEDR_SUPABASE_ANON_KEY
+                    },
+                    body: JSON.stringify({
+                        action: 'reconcile_quote_payments',
+                        quoteId: invoiceId
+                    })
+                });
+                var responseText = await resp.text();
+                var data = {};
+                try { data = responseText ? JSON.parse(responseText) : {}; } catch(parseErr) { data = {}; }
+                if (resp.ok && data.paid) {
+                    showInvoicePaidNotice(data);
+                    return true;
+                }
+            } catch(e) {
+                console.warn('Could not verify invoice payment status:', e);
+            }
+            return false;
+        }
+
         function renderInvoicePaymentOptions(settings, total, invoiceId) {
             if (getInvoiceSettings().showPaymentOptions === false || !total) return;
             var s = withDefaultPaymentSettings(settings || getInvoicePaymentSettingsFallback());
@@ -1104,6 +1125,7 @@ if (location.search.includes('debug')) {
             if (buttonsEl) buttonsEl.innerHTML = buttonHtml;
             if (manualEl) manualEl.innerHTML = manualHtml ? '<div class="payment-method-list">' + manualHtml + '</div>' : '<p class="text-muted small mb-0">Please contact us to arrange payment.</p>';
             if (section && (buttonHtml || manualHtml)) section.style.display = 'block';
+            if (paymentTargetId) reconcileInvoicePaymentStatus(paymentTargetId);
         }
 
         async function initInvoicePaymentSection(contractorUserId, total, invoiceId) {
@@ -1111,10 +1133,9 @@ if (location.search.includes('debug')) {
             _invoiceTotalForPayment = total || 0;
             _invoiceIdForPayment = invoiceId;
             if (!total) return;
-            if (new URLSearchParams(window.location.search).get('payment') === 'success') {
-                showPaymentReturnNotice();
-                return;
-            }
+            var returnedFromStripe = showPaymentReturnNotice();
+            if (await reconcileInvoicePaymentStatus(invoiceId)) return;
+            if (returnedFromStripe) return;
             _invoicePaymentSettings = await loadContractorPaymentSettings(contractorUserId);
             if (!_invoicePaymentSettings) _invoicePaymentSettings = getInvoicePaymentSettingsFallback();
             renderInvoicePaymentOptions(_invoicePaymentSettings, total, invoiceId);
