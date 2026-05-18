@@ -28,3 +28,5 @@ assert(source.includes('toggleEstimatorPricingBrowse'), 'category item browsing 
 assert(source.includes('Browse all items'), 'pricing setup should expose browsing as a small optional button');
 assert(source.includes('style="display:none;" id="epBrowseWrap_'), 'category dropdown should be hidden until the user asks to browse');
 assert(!source.includes('<label class="form-label small text-muted mb-1" for="epItem_'), 'category dropdown should no longer be a full-time visible column');
+assert(source.includes('estimator-pricing-row'), 'pricing setup rows should have a visual grouping class');
+assert(source.includes('estimator-pricing-field'), 'pricing setup row labels should align within each grouped row');

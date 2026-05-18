@@ -515,9 +515,10 @@
                 }, 0);
                 var savedRate = selectedIds.length ? selectedTotal.toFixed(2) : ((saved[f.key] && saved[f.key].rate) || '');
                 var selectedId = selectedIds.length === 1 ? selectedIds[0] : '';
-                html += '<div class="row g-2 align-items-end mb-3">';
-                html += '<div class="col-lg-3"><label class="form-label fw-semibold mb-0">' + f.label + '</label><div class="text-muted small">per ' + displayUnit + '</div></div>';
-                html += '<div class="col-lg-7 position-relative" data-estimator-pricing-search-wrap="1">';
+                html += '<div class="row g-3 align-items-stretch estimator-pricing-row">';
+                html += '<div class="col-lg-3 estimator-pricing-field"><label class="form-label fw-semibold mb-0">' + f.label + '</label><div class="text-muted small">per ' + displayUnit + '</div></div>';
+                html += '<div class="col-lg-9"><div class="row g-2 align-items-start estimator-pricing-controls">';
+                html += '<div class="col-lg-9 position-relative" data-estimator-pricing-search-wrap="1">';
                 html += '<label class="form-label small text-muted mb-1" for="epSearch_' + f.key + '">Find saved item</label>';
                 html += '<input type="search" class="form-control form-control-sm" id="epSearch_' + f.key + '" data-estimator-item-search="' + f.key + '" placeholder="Start typing..." oninput="filterEstimatorPricingItems(\'' + f.key + '\')" onfocus="filterEstimatorPricingItems(\'' + f.key + '\')" onkeydown="return handleEstimatorPricingSearchKey(event, \'' + f.key + '\')" onchange="commitEstimatorPricingSearchMatch(\'' + f.key + '\')" autocomplete="off">';
                 html += '<div class="list-group position-absolute w-100 shadow-sm" id="epResults_' + f.key + '" data-estimator-pricing-results="1" style="display:none;z-index:1085;max-height:240px;overflow:auto;"></div>';
@@ -527,7 +528,8 @@
                 html += '<select class="form-select form-select-sm" id="epItem_' + f.key + '" aria-label="Browse saved items for ' + calcEscapeHtml(f.label) + '" onchange="estimatorPricingItemSelected(\'' + f.key + '\')">' + estimatorPricingOptionsHtml(f.key, '', selectedId) + '</select>';
                 html += '</div>';
                 html += '</div>';
-                html += '<div class="col-lg-2"><label class="form-label small text-muted mb-1" for="epRate_' + f.key + '">Rate</label><div class="input-group input-group-sm"><span class="input-group-text">$</span><input type="number" class="form-control" id="epRate_' + f.key + '" value="' + savedRate + '" placeholder="0.00" step="0.01" min="0"></div></div>';
+                html += '<div class="col-lg-3"><label class="form-label small text-muted mb-1" for="epRate_' + f.key + '">Rate</label><div class="input-group input-group-sm"><span class="input-group-text">$</span><input type="number" class="form-control" id="epRate_' + f.key + '" value="' + savedRate + '" placeholder="0.00" step="0.01" min="0"></div></div>';
+                html += '</div></div>';
                 html += '</div>';
             });
             if (items.length === 0) {
