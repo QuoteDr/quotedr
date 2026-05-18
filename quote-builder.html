@@ -6654,8 +6654,9 @@ Example:
             var modal = new bootstrap.Modal(modalEl);
             modal.show();
 
-            // Save to Supabase in background (after modal is visible)
-            saveInvoiceForViewer(invoiceState, savingNote, document.getElementById('openInvoiceBtn'));
+            // Save to Supabase in background (after modal is visible), but keep the
+            // promise so emailed invoices use the shareable/payment-capable URL.
+            window._currentInvoiceSavePromise = saveInvoiceForViewer(invoiceState, savingNote, document.getElementById('openInvoiceBtn'));
             if (typeof qdCaptureEvent === 'function') {
                 qdCaptureEvent('invoice_sent', {
                     total_bucket: typeof qdAnalyticsBucketMoney === 'function' ? qdAnalyticsBucketMoney(invoiceData.grandTotal || 0) : undefined,
@@ -6681,6 +6682,26 @@ Example:
             }
             var invoiceUrl = window._currentInvoiceUrl || '';
             var invoiceData = window._currentInvoiceData || {};
+            if (window._currentInvoiceSavePromise && !/[?&]id=/.test(invoiceUrl)) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving invoice link...';
+                resultEl.innerHTML = '<span class="text-muted"><i class="fas fa-spinner fa-spin me-1"></i>Saving invoice for client payment...</span>';
+                var savedState = await window._currentInvoiceSavePromise;
+                if (savedState && savedState.invoiceUrl) {
+                    invoiceUrl = savedState.invoiceUrl;
+                    invoiceData = savedState.invoiceData || invoiceData;
+                    window._currentInvoiceUrl = invoiceUrl;
+                    window._currentInvoiceData = invoiceData;
+                    var openBtn = document.getElementById('openInvoiceBtn');
+                    if (openBtn) openBtn.href = invoiceUrl;
+                }
+            }
+            if (!/[?&]id=/.test(invoiceUrl)) {
+                resultEl.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>Could not create the shareable invoice link yet. Please wait a moment and try again.</span>';
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-paper-plane me-1"></i>Send Invoice by Email';
+                return;
+            }
             var profile = {};
             try { profile = JSON.parse(localStorage.getItem('ald_business_profile') || '{}'); } catch(e) {}
             if (typeof loadBusinessProfile === 'function') {

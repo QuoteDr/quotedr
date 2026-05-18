@@ -686,27 +686,19 @@
                 return;
             }
             markQuoteNumberUsed(document.getElementById('quoteNumber')?.value);
-            var previewWindow = window.open('about:blank', '_blank');
-            if (previewWindow) {
-                previewWindow.document.write('<!doctype html><title>Preparing Quote Preview</title><body style="font-family:Arial,sans-serif;padding:32px;color:#1f3349;"><h3>Preparing quote preview...</h3><p>This tab will open the client view automatically.</p></body>');
-            }
             var saveStatus = document.getElementById('saveStatus');
             if (saveStatus) saveStatus.innerHTML = '<span style="color:#1a56a0;"><i class="fas fa-spinner fa-spin"></i> Preparing preview...</span>';
             try {
                 await initStyleModal();
                 var viewerUrl = await createInteractiveQuoteLink();
-                if (saveStatus) saveStatus.innerHTML = '<span style="color:green;"><i class="fas fa-check"></i> Preview ready!</span>';
+                if (typeof saveSessionQuote === 'function') saveSessionQuote();
+                if (saveStatus) saveStatus.innerHTML = '<span style="color:green;"><i class="fas fa-check"></i> Opening preview...</span>';
                 if (typeof qdToast === 'function') {
                     qdToast({ title: 'Preview Ready', message: 'Opening the client quote view.', type: 'success' });
                 }
-                if (previewWindow && !previewWindow.closed) {
-                    previewWindow.location.href = viewerUrl;
-                } else {
-                    window.open(viewerUrl, '_blank');
-                }
+                window.location.href = viewerUrl;
             } catch(err) {
                 console.error('Failed to preview quote:', err);
-                if (previewWindow && !previewWindow.closed) previewWindow.close();
                 alert('Failed to prepare quote preview: ' + (err.message || err));
                 if (saveStatus) saveStatus.innerHTML = '<span style="color:red;"><i class="fas fa-times"></i> Preview failed</span>';
             }

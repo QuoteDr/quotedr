@@ -35,6 +35,28 @@
 
         .room-card { margin-bottom: 1.5rem; }
         .room-card .card-header { color: white; }
+        .invoice-room-anchor { scroll-margin-top: 18px; }
+        .invoice-room-locator {
+            margin: -0.4rem 0 1.5rem;
+            padding: 1rem;
+            border: 1px solid #dbe4ef;
+            border-radius: 8px;
+            background: #fff;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+        }
+        .invoice-room-locator-label {
+            color: #64748b;
+            font-size: 0.76rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            margin-bottom: 0.45rem;
+            letter-spacing: 0.02em;
+        }
+        .invoice-room-locator select {
+            border-radius: 8px;
+            min-height: 42px;
+            font-weight: 650;
+        }
 
         .item-row {
             padding: 10px 0;
@@ -274,6 +296,13 @@ if (location.search.includes('debug')) {
             </div>
         </div>
 
+        <div class="invoice-room-locator d-print-none" id="invoiceRoomLocatorWrap" style="display:none;">
+            <div class="invoice-room-locator-label"><i class="fas fa-location-dot me-1"></i>Find Room</div>
+            <select class="form-select" id="invoiceRoomLocatorSelect" onchange="jumpToInvoiceRoom(this.value)">
+                <option value="">Choose a room...</option>
+            </select>
+        </div>
+
         <!-- Rooms + Line Items -->
         <div id="invoiceContainer"></div>
 
@@ -456,6 +485,37 @@ if (location.search.includes('debug')) {
             if (!wrap) return;
             var collapsed = wrap.classList.toggle('is-collapsed');
             btn.textContent = collapsed ? 'Show more' : 'Show less';
+        }
+
+        function invoiceRoomAnchorId(roomIndex) {
+            return 'invoiceRoom_' + roomIndex;
+        }
+
+        function updateInvoiceRoomLocator() {
+            var wrap = document.getElementById('invoiceRoomLocatorWrap');
+            var select = document.getElementById('invoiceRoomLocatorSelect');
+            if (!wrap || !select) return;
+            var rooms = Array.isArray(invoiceData && invoiceData.rooms) ? invoiceData.rooms : [];
+            if (!rooms.length) {
+                wrap.style.display = 'none';
+                select.innerHTML = '<option value="">Choose a room...</option>';
+                return;
+            }
+            select.innerHTML = '<option value="">Choose a room...</option>' + rooms.map(function(room, idx) {
+                var name = escapeHtml(room && room.name ? room.name : 'Room ' + (idx + 1));
+                return '<option value="' + invoiceRoomAnchorId(idx) + '">' + name + '</option>';
+            }).join('');
+            wrap.style.display = '';
+        }
+
+        function jumpToInvoiceRoom(anchorId) {
+            if (!anchorId) return;
+            var target = document.getElementById(anchorId);
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                var select = document.getElementById('invoiceRoomLocatorSelect');
+                if (select) select.value = '';
+            }
         }
 
         function goBackToBuilder(event) {
@@ -758,6 +818,7 @@ if (location.search.includes('debug')) {
             if (!invoiceData.rooms || !invoiceData.rooms.length) {
                 console.error('Invoice data has no rooms:', JSON.stringify(invoiceData).substring(0, 500));
                 document.getElementById('invoiceContainer').innerHTML = '<div class="alert alert-warning">No invoice data found. Please regenerate the invoice from the quote builder.</div>';
+                updateInvoiceRoomLocator();
                 return;
             }
 
@@ -773,9 +834,9 @@ if (location.search.includes('debug')) {
                 subtotal += roomTotal;
 
                 html += `
-                <div class="card room-card">
+                <div class="card room-card invoice-room-anchor" id="${invoiceRoomAnchorId(roomIndex)}">
                     <div class="card-header" style="background:${headerBg};">
-                        <strong><i class="fas fa-door-open"></i> ${room.name}</strong>
+                        <strong><i class="fas fa-door-open"></i> ${escapeHtml(room.name || ('Room ' + (roomIndex + 1)))}</strong>
                     </div>
                     <div class="card-body p-0">
                         <table class="table table-sm mb-0" style="table-layout:fixed;">
@@ -848,6 +909,7 @@ if (location.search.includes('debug')) {
             });
 
             document.getElementById('invoiceContainer').innerHTML = html;
+            updateInvoiceRoomLocator();
 
             // Totals
             var _iqp = {}; try { _iqp = JSON.parse(localStorage.getItem('ald_quote_prefs')||'{}'); } catch(e) {}
