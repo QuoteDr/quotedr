@@ -123,13 +123,20 @@
             { key: 'flooring',     label: 'Flooring',       unit: 'sqft', defaultRate: 0 },
             { key: 'ceilingPaint', label: 'Ceiling Paint',  unit: 'sqft', defaultRate: 0 },
             { key: 'wallPaint',    label: 'Wall Paint',     unit: 'sqft', defaultRate: 0 },
+            { key: 'drywall',      label: 'Drywall',        unit: 'sqft', defaultRate: 0 },
             { key: 'baseboard',    label: 'Baseboard',      unit: 'LF',   defaultRate: 0 },
+            { key: 'crownMolding', label: 'Crown Molding',  unit: 'LF',   defaultRate: 0 },
             { key: 'doorCasing',   label: 'Door Casing',    unit: 'LF',   defaultRate: 0 },
             { key: 'windowCasing', label: 'Window Casing',  unit: 'LF',   defaultRate: 0 },
         ];
 
         function loadEstimatorPricing() {
             return JSON.parse(localStorage.getItem('ald_estimator_pricing') || '{}');
+        }
+
+        function isEstimatorFieldEnabled(pricing, key) {
+            var saved = pricing && pricing[key] ? pricing[key] : null;
+            return !saved || saved.enabled !== false;
         }
 
         var _estimatorPricingItems = [];
@@ -474,6 +481,7 @@
             var pricing = {};
             EST_FIELDS.forEach(function(f) {
                 var rateEl = document.getElementById('epRate_' + f.key);
+                var useEl = document.getElementById('epUse_' + f.key);
                 var rate = rateEl ? parseFloat(rateEl.value) || 0 : 0;
                 var selectedItems = estimatorSelectedItemIds(f.key).map(function(itemId) {
                     var item = getEstimatorItemById(itemId);
@@ -489,6 +497,7 @@
                     };
                 }).filter(Boolean);
                 pricing[f.key] = {
+                    enabled: !useEl || useEl.checked,
                     rate: selectedItems.length ? selectedItems.reduce(function(sum, item) { return sum + (parseFloat(item.rate) || 0); }, 0) : rate,
                     unit: f.unit,
                     items: selectedItems,
@@ -530,9 +539,10 @@
                     return sum + (item ? parseFloat(item.rate) || 0 : 0);
                 }, 0);
                 var savedRate = selectedIds.length ? selectedTotal.toFixed(2) : ((saved[f.key] && saved[f.key].rate) || '');
+                var fieldEnabled = isEstimatorFieldEnabled(saved, f.key);
                 var selectedId = selectedIds.length === 1 ? selectedIds[0] : '';
                 html += '<div class="row g-3 align-items-stretch estimator-pricing-row">';
-                html += '<div class="col-lg-3 estimator-pricing-field"><label class="form-label fw-semibold mb-0">' + f.label + '</label><div class="text-muted small">per ' + displayUnit + '</div></div>';
+                html += '<div class="col-lg-3 estimator-pricing-field"><div class="d-flex flex-wrap align-items-center gap-2"><label class="form-label fw-semibold mb-0">' + f.label + '</label><div class="form-check form-check-inline m-0 small"><input class="form-check-input" type="checkbox" id="epUse_' + f.key + '"' + (fieldEnabled ? ' checked' : '') + '><label class="form-check-label fw-semibold" for="epUse_' + f.key + '">Use</label></div></div><div class="text-muted small">per ' + displayUnit + '</div></div>';
                 html += '<div class="col-lg-9"><div class="row g-2 align-items-start estimator-pricing-controls">';
                 html += '<div class="col-lg-9 position-relative" data-estimator-pricing-search-wrap="1">';
                 html += '<label class="form-label small text-muted mb-1" for="epSearch_' + f.key + '">Find saved item</label>';
@@ -709,6 +719,7 @@
             var openingDeduction = deductOpenings ? Math.round((doors * calcDoorAreaDeduction() + windows * calcWindowAreaDeduction()) * 10) / 10 : 0;
             var wallNetSqft = Math.max(0, wallGrossSqft - openingDeduction);
             var wallSqft = Math.round(wallNetSqft * (1 + paintWaste / 100) * 10) / 10;
+            var drywallSqft = Math.round(Math.max(0, wallGrossSqft + baseFloorSqft - openingDeduction) * 10) / 10;
             var perimeter = Math.round((2 * w + 2 * l) * 10) / 10;
             var doorCasing = doors * calcDoorCasingLength();
             var windowCasing = windows * calcWindowCasingLength();
@@ -742,7 +753,9 @@
                 { key: 'flooring',     label: 'Flooring',       qty: floorSqft,    unit: calcAreaUnit(),   cat: 'Flooring',        itemName: 'Flooring - ' + name, notes: noteList([floorWaste > 0 ? floorWaste + '% waste added' : '']) },
                 { key: 'ceilingPaint', label: 'Ceiling Paint',  qty: baseFloorSqft, unit: calcAreaUnit(),  cat: 'Painting',        itemName: 'Ceiling Paint - ' + name, hide: !includeCeilingPaint },
                 { key: 'wallPaint',    label: 'Wall Paint',     qty: wallSqft,     unit: calcAreaUnit(),   cat: 'Painting',        itemName: 'Wall Paint - ' + name, notes: noteList([openingDeduction > 0 ? openingDeduction + ' ' + calcAreaUnit() + ' openings deducted' : '', paintWaste > 0 ? paintWaste + '% paint waste added' : '']) },
+                { key: 'drywall',      label: 'Drywall',        qty: drywallSqft,  unit: calcAreaUnit(),   cat: 'Drywall',         itemName: 'Drywall - ' + name, notes: noteList(['walls and ceiling calculated', openingDeduction > 0 ? openingDeduction + ' ' + calcAreaUnit() + ' openings deducted' : '']) },
                 { key: 'baseboard',    label: 'Baseboard',      qty: perimeter,    unit: calcLengthUnit(), cat: 'Trim & Millwork', itemName: 'Baseboard - ' + name },
+                { key: 'crownMolding', label: 'Crown Molding',  qty: perimeter,    unit: calcLengthUnit(), cat: 'Trim & Millwork', itemName: 'Crown Molding - ' + name },
                 { key: 'doorCasing',   label: 'Door Casing',    qty: doorCasing,   unit: calcLengthUnit(), cat: 'Trim & Millwork', itemName: 'Door Casing - ' + name, hide: doors === 0 },
                 { key: 'windowCasing', label: 'Window Casing',  qty: windowCasing, unit: calcLengthUnit(), cat: 'Trim & Millwork', itemName: 'Window Casing - ' + name, hide: windows === 0 },
             ];
@@ -751,6 +764,7 @@
             var subtotal = 0;
             var resultCount = 0;
             rows.forEach(function(r) {
+                if (!isEstimatorFieldEnabled(pricing, r.key)) return;
                 if (r.hide) return;
                 var selections = getEstimatorPricingSelections(pricing, r.key);
                 if (selections.length) {

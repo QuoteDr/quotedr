@@ -206,7 +206,7 @@
         },
         materialEstimatorModal: {
             title: 'Quick Room Quoter',
-            summary: 'Build a quick room quote from dimensions, openings, waste settings, and your saved pricing.',
+            summary: 'Build a quick room quote from dimensions, openings, waste settings, and the enabled outputs from your saved pricing setup.',
             steps: [
                 'Enter the room name, width, length, ceiling height, doors, and windows.',
                 'Calculate the recommended line items and quantities.',
@@ -221,14 +221,16 @@
         },
         estimatorPricingModal: {
             title: 'Set Up Estimator Pricing',
-            summary: 'Connect Quick Room Quoter outputs to one or more saved items or manual rates.',
+            summary: 'Choose which Quick Room Quoter outputs are used, then connect each active output to one or more saved items or manual rates.',
             steps: [
-                'For each material type, choose a saved item or enter a rate.',
+                'Leave Use checked for outputs you want in quick room quotes, or uncheck outputs you want skipped for now.',
+                'For each active output, choose one or more saved items or enter a rate.',
                 'Save pricing when every common material is mapped.',
                 'Return to the estimator and calculate again.'
             ],
             tips: [
                 'Saved item links keep estimator pricing consistent with your main price database.',
+                'Disabled outputs keep their pricing, so you can turn them back on later without rebuilding the setup.',
                 'Use manual rates only when you do not need a reusable database item.'
             ],
             helpUrl: 'help.html#pricing-database'
