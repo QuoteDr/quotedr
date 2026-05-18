@@ -11,14 +11,15 @@ const addItemBlock = source.slice(source.indexOf('function addEstimatorPricingIt
 
 assert(!addItemBlock.includes('if (rate <= 0) return;'), 'estimator pricing setup should include saved items even when their rate is 0');
 assert(addItemBlock.includes('searchText'), 'estimator pricing items should carry richer searchable text');
-assert(source.includes('estimatorPricingDatalistHtml'), 'pricing setup should provide datalist suggestions for search inputs');
-assert(source.includes('list="epSuggestions_'), 'search inputs should attach to datalist suggestions');
+assert(!source.includes('estimatorPricingDatalistHtml'), 'pricing setup should not use native datalist suggestions now that it renders its own dropdown');
+assert(!source.includes('list="epSuggestions_'), 'search inputs should not attach native datalist suggestions');
+assert(!source.includes('<datalist id="epSuggestions_'), 'pricing setup should not render native datalist elements');
 assert(source.includes('findEstimatorSavedItemIds'), 'estimator pricing should support multiple saved item ids');
 assert(source.includes('estimatorSelectedItemsHtml'), 'estimator pricing should render selected item chips');
 assert(source.includes('removeEstimatorPricingItem'), 'estimator pricing should allow removing selected items');
 assert(source.includes('getEstimatorPricingSelections'), 'estimator calculations should expand multiple selected items');
 assert(source.includes('commitEstimatorPricingSearchMatch'), 'search suggestion selection should immediately add the matching saved item');
-assert(source.includes('onchange="commitEstimatorPricingSearchMatch'), 'saved-item search onchange should commit exact datalist selections');
+assert(source.includes('onchange="commitEstimatorPricingSearchMatch'), 'saved-item search onchange should still commit exact typed selections');
 assert(source.includes('estimatorPricingSearchResultsHtml'), 'typing in pricing setup should render visible clickable search results');
 assert(source.includes('pickEstimatorPricingSearchResult'), 'pricing setup search results should be clickable and link saved items');
 assert(source.includes('onfocus="filterEstimatorPricingItems'), 'pricing setup search should refresh visible results when focused');

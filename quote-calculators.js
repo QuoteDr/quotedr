@@ -250,16 +250,6 @@
             return html;
         }
 
-        function estimatorPricingDatalistHtml() {
-            var seen = {};
-            return _estimatorPricingItems.map(function(item) {
-                var label = item.name + ' - ' + item.category + (item.unitType ? ' / ' + item.unitType : '');
-                if (seen[label]) return '';
-                seen[label] = true;
-                return '<option value="' + calcEscapeHtml(item.name) + '" label="' + calcEscapeHtml(label) + '"></option>';
-            }).join('');
-        }
-
         function getEstimatorPricingSearchMatches(query, limit) {
             var q = String(query || '').trim().toLowerCase();
             if (!q) return [];
@@ -529,8 +519,7 @@
                 html += '<div class="col-lg-3"><label class="form-label fw-semibold mb-0">' + f.label + '</label><div class="text-muted small">per ' + displayUnit + '</div></div>';
                 html += '<div class="col-lg-7 position-relative" data-estimator-pricing-search-wrap="1">';
                 html += '<label class="form-label small text-muted mb-1" for="epSearch_' + f.key + '">Find saved item</label>';
-                html += '<input type="search" class="form-control form-control-sm" id="epSearch_' + f.key + '" data-estimator-item-search="' + f.key + '" list="epSuggestions_' + f.key + '" placeholder="Start typing..." oninput="filterEstimatorPricingItems(\'' + f.key + '\')" onfocus="filterEstimatorPricingItems(\'' + f.key + '\')" onkeydown="return handleEstimatorPricingSearchKey(event, \'' + f.key + '\')" onchange="commitEstimatorPricingSearchMatch(\'' + f.key + '\')" autocomplete="off">';
-                html += '<datalist id="epSuggestions_' + f.key + '">' + estimatorPricingDatalistHtml() + '</datalist>';
+                html += '<input type="search" class="form-control form-control-sm" id="epSearch_' + f.key + '" data-estimator-item-search="' + f.key + '" placeholder="Start typing..." oninput="filterEstimatorPricingItems(\'' + f.key + '\')" onfocus="filterEstimatorPricingItems(\'' + f.key + '\')" onkeydown="return handleEstimatorPricingSearchKey(event, \'' + f.key + '\')" onchange="commitEstimatorPricingSearchMatch(\'' + f.key + '\')" autocomplete="off">';
                 html += '<div class="list-group position-absolute w-100 shadow-sm" id="epResults_' + f.key + '" data-estimator-pricing-results="1" style="display:none;z-index:1085;max-height:240px;overflow:auto;"></div>';
                 html += '<div class="mt-1" id="epSelected_' + f.key + '">' + estimatorSelectedItemsHtml(f.key, selectedIds) + '</div>';
                 html += '<button type="button" class="btn btn-link btn-sm px-0 mt-1 text-decoration-none" id="epBrowseBtn_' + f.key + '" onclick="toggleEstimatorPricingBrowse(\'' + f.key + '\')"><i class="fas fa-list me-1"></i>Browse all items</button>';
