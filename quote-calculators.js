@@ -180,6 +180,7 @@
                 item.description || '',
                 item.serviceName || '',
                 item.itemDescription || '',
+                item.item_description || '',
                 item.notes || '',
                 category || '',
                 unitType || ''
@@ -189,6 +190,7 @@
                 category: sourceLabel || category || 'Saved Items',
                 itemCategory: category || '',
                 name: name,
+                itemDescription: item.itemDescription || item.description || item.item_description || '',
                 rate: rate,
                 unitType: unitType,
                 searchText: searchText
@@ -482,6 +484,7 @@
                         category: item.category,
                         itemCategory: item.itemCategory || '',
                         unitType: item.unitType || '',
+                        itemDescription: item.itemDescription || '',
                         rate: parseFloat(item.rate) || 0
                     };
                 }).filter(Boolean);
@@ -623,6 +626,7 @@
                         category: item.itemCategory || item.category || '',
                         displayCategory: item.category || item.itemCategory || '',
                         unitType: item.unitType || '',
+                        itemDescription: item.itemDescription || '',
                         rate: parseFloat(item.rate) || 0
                     };
                 });
@@ -633,6 +637,7 @@
                     category: saved.itemCategory || saved.category || '',
                     displayCategory: saved.category || saved.itemCategory || '',
                     unitType: saved.unitType || '',
+                    itemDescription: saved.itemDescription || '',
                     rate: parseFloat(saved.rate) || 0
                 }];
             }
@@ -669,7 +674,7 @@
                 var opt = document.createElement('option');
                 opt.value = r.id; opt.textContent = r.name; sel.appendChild(opt);
             });
-            if (rooms.length > 0) sel.value = rooms[rooms.length - 1].id;
+            sel.value = '__new__';
             // Show pricing banner if no pricing set up yet
             var hasPricing = Object.keys(loadEstimatorPricing()).length > 0;
             document.getElementById('estPricingBanner').style.display = hasPricing ? 'none' : 'block';
@@ -721,7 +726,8 @@
                 var label = line.label || line.itemName;
                 var notes = line.notes || '';
                 var itemName = line.itemName || label;
-                html += '<tr data-cat="' + calcEscapeHtml(line.cat) + '" data-name="' + calcEscapeHtml(itemName) + '" data-unit="' + calcEscapeHtml(line.unit) + '" data-qty="' + line.qty + '" data-rate="' + line.rate + '" data-notes="' + calcEscapeHtml(notes) + '">';
+                var itemDescription = line.itemDescription || '';
+                html += '<tr data-cat="' + calcEscapeHtml(line.cat) + '" data-name="' + calcEscapeHtml(itemName) + '" data-item-description="' + calcEscapeHtml(itemDescription) + '" data-unit="' + calcEscapeHtml(line.unit) + '" data-qty="' + line.qty + '" data-rate="' + line.rate + '" data-notes="' + calcEscapeHtml(notes) + '">';
                 html += '<td><input type="checkbox" class="form-check-input est-check" checked></td>';
                 html += '<td>' + calcEscapeHtml(label) + (notes ? '<div class="text-muted small">' + calcEscapeHtml(notes) + '</div>' : '') + '</td>';
                 html += '<td>' + calcFormatQuantity(line.qty, line.unit) + '</td>';
@@ -756,6 +762,7 @@
                             qty: r.qty,
                             unit: r.unit,
                             rate: parseFloat(selection.rate) || 0,
+                            itemDescription: selection.itemDescription || '',
                             notes: r.notes || ''
                         });
                         resultCount++;
@@ -769,6 +776,7 @@
                     qty: r.qty,
                     unit: r.unit,
                     rate: getRate(r.key),
+                    itemDescription: '',
                     notes: r.notes || ''
                 });
                 resultCount++;
@@ -810,10 +818,12 @@
                 if (!row.querySelector('.est-check').checked) return;
                 var rate = parseFloat(row.dataset.rate) || 0;
                 var qty = parseFloat(row.dataset.qty) || 0;
+                var itemName = row.dataset.name || '';
                 var item = {
                     category: row.dataset.cat,
-                    name: row.dataset.name,
-                    description: '',
+                    name: itemName,
+                    description: itemName,
+                    itemDescription: row.dataset.itemDescription || '',
                     quantity: qty,
                     unit: row.dataset.unit,
                     unitType: row.dataset.unit,

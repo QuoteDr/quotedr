@@ -83,10 +83,10 @@ document.getElementById('ceil8').checked = true;
 context.calculateEstimate();
 
 const html = elements.estResultsBody.innerHTML;
-if (!html.includes('data-name="Flooring - Test Room" data-unit="sqft" data-qty="110"')) {
+if (!html.includes('data-name="Flooring - Test Room"') || !html.includes('data-unit="sqft"') || !html.includes('data-qty="110"')) {
   throw new Error('flooring row should include 10% waste');
 }
-if (!html.includes('data-name="Wall Paint - Test Room" data-unit="sqft" data-qty="285"')) {
+if (!html.includes('data-name="Wall Paint - Test Room"') || !html.includes('data-unit="sqft"') || !html.includes('data-qty="285"')) {
   throw new Error('wall paint row should deduct one door and one window opening');
 }
 if (!html.includes('10% waste added')) {
