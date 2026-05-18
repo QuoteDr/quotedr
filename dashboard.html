@@ -47,7 +47,7 @@
         .status-viewed { color: #0dcaf0; font-weight: 600; }
         .status-in_review { color: #fd7e14; font-weight: 600; }
         .status-accepted { color: #198754; }
-        .status-invoiced { color: #ffc107; }
+        .status-invoiced { color: #fd7e14; font-weight: 600; }
         .status-declined { color: #dc3545; }
         .quote-card .status-select {
             padding: 0.25rem 0.5rem;
@@ -2460,11 +2460,94 @@ function renderBusinessInsights(quotes) {
                                         });
 
         // === NEW QUOTE MODAL ===
+        function getDashboardSavedClients() {
+            var raw = {};
+            try { raw = JSON.parse(localStorage.getItem('ald_clients') || '{}'); } catch(e) { raw = {}; }
+            if (Array.isArray(raw)) {
+                return raw
+                    .filter(function(c) { return c && c.name; })
+                    .map(function(c) { return Object.assign({}, c, { name: c.name }); })
+                    .sort(function(a, b) { return String(a.name || '').localeCompare(String(b.name || '')); });
+            }
+            return Object.keys(raw || {})
+                .map(function(name) {
+                    var c = raw[name] || {};
+                    return Object.assign({}, c, { name: c.name || name });
+                })
+                .filter(function(c) { return c.name; })
+                .sort(function(a, b) { return String(a.name || '').localeCompare(String(b.name || '')); });
+        }
+
+        async function refreshDashboardSavedClientsFromCloud() {
+            if (typeof listClientsFromSupabase !== 'function') return;
+            try {
+                var result = await listClientsFromSupabase();
+                if (!result || result.error || !Array.isArray(result.data) || !result.data.length) return;
+                var existing = {};
+                try { existing = JSON.parse(localStorage.getItem('ald_clients') || '{}'); } catch(e) { existing = {}; }
+                if (Array.isArray(existing)) {
+                    var converted = {};
+                    existing.forEach(function(c) { if (c && c.name) converted[c.name] = c; });
+                    existing = converted;
+                }
+                result.data.forEach(function(client) {
+                    if (!client || !client.name) return;
+                    existing[client.name] = Object.assign({}, existing[client.name] || {}, {
+                        name: client.name,
+                        phone: client.phone || (existing[client.name] && existing[client.name].phone) || '',
+                        email: client.email || (existing[client.name] && existing[client.name].email) || '',
+                        address: client.address || (existing[client.name] && existing[client.name].address) || '',
+                        city: client.city || (existing[client.name] && existing[client.name].city) || '',
+                        notes: client.notes || (existing[client.name] && existing[client.name].notes) || ''
+                    });
+                });
+                localStorage.setItem('ald_clients', JSON.stringify(existing));
+                populateNewQuoteClientSuggestions();
+            } catch(e) {
+                console.warn('Dashboard client refresh error:', e);
+            }
+        }
+
+        function populateNewQuoteClientSuggestions() {
+            var datalist = document.getElementById('newQuoteClientSuggestions');
+            if (!datalist) return;
+            datalist.innerHTML = '';
+            getDashboardSavedClients().forEach(function(client) {
+                var option = document.createElement('option');
+                option.value = client.name || '';
+                var details = [client.address, client.phone, client.email].filter(Boolean).join(' - ');
+                if (details) option.label = details;
+                datalist.appendChild(option);
+            });
+        }
+
+        function findNewQuoteClientByName(name) {
+            var needle = String(name || '').trim().toLowerCase();
+            if (!needle) return null;
+            return getDashboardSavedClients().find(function(client) {
+                return String(client.name || '').trim().toLowerCase() === needle;
+            }) || null;
+        }
+
+        function applyNewQuoteClientSelection() {
+            var nameInput = document.getElementById('newQuoteClientName');
+            var addressInput = document.getElementById('newQuoteAddress');
+            if (!nameInput || !addressInput) return;
+            var client = findNewQuoteClientByName(nameInput.value);
+            window._newQuoteSelectedClient = client || null;
+            if (!client) return;
+            nameInput.value = client.name || nameInput.value;
+            if (client.address) addressInput.value = client.address;
+        }
+
         function openNewQuoteModal() {
             document.getElementById('newQuoteClientName').value = '';
             document.getElementById('newQuoteAddress').value = '';
             document.getElementById('newQuoteNumber').value = '';
             document.getElementById('newQuoteError').textContent = '';
+            window._newQuoteSelectedClient = null;
+            populateNewQuoteClientSuggestions();
+            refreshDashboardSavedClientsFromCloud();
             var btn = document.getElementById('newQuoteCreateBtn');
             btn.disabled = false;
             btn.innerHTML = '<i class="fas fa-arrow-right me-1"></i>Create & Open Builder';
@@ -2478,6 +2561,10 @@ function renderBusinessInsights(quotes) {
             var quoteNum = document.getElementById('newQuoteNumber').value.trim();
             var errEl = document.getElementById('newQuoteError');
             var btn = document.getElementById('newQuoteCreateBtn');
+            var savedClient = findNewQuoteClientByName(clientName) || window._newQuoteSelectedClient || null;
+            var clientEmail = savedClient && savedClient.email ? savedClient.email : '';
+            var clientPhone = savedClient && savedClient.phone ? savedClient.phone : '';
+            if (!address && savedClient && savedClient.address) address = savedClient.address;
 
             if (!clientName) {
                 errEl.textContent = 'Client name is required.';
@@ -2513,12 +2600,14 @@ function renderBusinessInsights(quotes) {
             try {
                 var result = await saveQuoteToSupabase({
                     clientName: clientName,
+                    clientEmail: clientEmail,
+                    clientPhone: clientPhone,
                     projectAddress: address,
                     quoteNumber: quoteNum,
                     rooms: [],
                     grandTotal: 0,
                     status: 'draft',
-                    data: { clientName: clientName, projectAddress: address, quoteNumber: quoteNum, rooms: [] }
+                    data: { clientName: clientName, clientEmail: clientEmail, clientPhone: clientPhone, projectAddress: address, quoteNumber: quoteNum, rooms: [] }
                 });
 
                 if (result.error) throw new Error(result.error.message || 'Save failed');
@@ -2545,6 +2634,11 @@ function renderBusinessInsights(quotes) {
                     if (e.key === 'Enter') createAndOpenQuote();
                 });
             });
+            var newQuoteClientName = document.getElementById('newQuoteClientName');
+            if (newQuoteClientName) {
+                newQuoteClientName.addEventListener('input', applyNewQuoteClientSelection);
+                newQuoteClientName.addEventListener('change', applyNewQuoteClientSelection);
+            }
         });
     </script>
 
@@ -2784,7 +2878,8 @@ function renderBusinessInsights(quotes) {
         <p class="text-muted small mb-3">Give this quote a name so it saves to the cloud right away. You can always change these in the builder.</p>
         <div class="mb-3">
           <label class="form-label fw-semibold">Client Name <span class="text-danger">*</span></label>
-          <input type="text" id="newQuoteClientName" class="form-control" placeholder="e.g. John Smith" autofocus>
+          <input type="text" id="newQuoteClientName" class="form-control" placeholder="e.g. John Smith" list="newQuoteClientSuggestions" autocomplete="off" autofocus>
+          <datalist id="newQuoteClientSuggestions"></datalist>
         </div>
         <div class="mb-3">
           <label class="form-label fw-semibold">Project Address <span class="text-muted fw-normal">(optional)</span></label>

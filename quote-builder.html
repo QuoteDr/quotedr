@@ -23,6 +23,9 @@
             margin-top: 1.5rem;
             border-radius: 8px;
         }
+        .room-header.room-text-dark {
+            color: #111827;
+        }
         .room-header h3 { margin: 0; font-weight: bold; }
         .room-icon-btn { opacity: 0.85; transition: opacity 0.15s, transform 0.15s; }
         .room-icon-btn:hover { opacity: 1; transform: scale(1.2); }
@@ -336,6 +339,25 @@
         }
         .room-color-tools label,
         .room-color-tools .room-intensity-value { color: rgba(255,255,255,0.9); }
+        .room-header.room-text-dark .room-color-tools {
+            background: rgba(255,255,255,0.22);
+            border-color: rgba(17,24,39,0.16);
+        }
+        .room-header.room-text-dark .room-color-tools label,
+        .room-header.room-text-dark .room-color-tools .room-intensity-value {
+            color: rgba(17,24,39,0.9);
+        }
+        .room-header.room-text-dark .btn-outline-light {
+            color: #111827;
+            border-color: rgba(17,24,39,0.46);
+            background: rgba(255,255,255,0.26);
+        }
+        .room-header.room-text-dark .btn-outline-light:hover,
+        .room-header.room-text-dark .btn-outline-light:focus {
+            color: #111827;
+            border-color: rgba(17,24,39,0.72);
+            background: rgba(255,255,255,0.48);
+        }
         .room-color-tools .form-range { height: 1rem; }
         .room-custom-colour-preview {
             width: 52px;
@@ -349,6 +371,9 @@
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
             gap: 8px;
+        }
+        .room-saved-colour-grid.overwrite-mode {
+            grid-template-columns: repeat(auto-fill, minmax(94px, 1fr));
         }
         .room-saved-colour {
             display: flex;
@@ -366,6 +391,29 @@
             border-radius: 50%;
             border: 1px solid rgba(0,0,0,0.18);
             flex-shrink: 0;
+        }
+        .room-saved-colour-grid.overwrite-mode .room-saved-colour {
+            gap: 6px;
+            padding: 5px;
+        }
+        .room-saved-colour-grid.overwrite-mode .room-saved-colour .btn-light {
+            display: flex;
+            justify-content: center;
+            min-width: 0;
+            padding-left: 0.45rem;
+            padding-right: 0.45rem;
+        }
+        .room-saved-colour-grid.overwrite-mode .room-saved-colour-dot {
+            margin-right: 0 !important;
+        }
+        .room-overwrite-icon-btn {
+            width: 34px;
+            height: 34px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 auto;
+            padding: 0;
         }
 
         /* Sticky total bar */
@@ -3386,7 +3434,9 @@ Example:
         const SWATCH_COLORS = ['#2d2d2d','#1e3a5f','#1a5c38','#6b1a2a','#4a5568','#0652DD','#00796b','#6a1b9a','#b87333','#546e7a','#c0747a','#1a1a2e'];
         const ROOM_COLOR_PRESETS_KEY = 'quotedr_room_color_presets';
         const ROOM_DEFAULT_COLOR_KEY = 'quotedr_default_room_color';
+        const ROOM_COLOR_PRESET_LIMIT = 8;
         let activeRoomColorModalId = null;
+        let pendingRoomColorPresetOverwrite = null;
 
         function normalizeHexColor(value) {
             var hex = String(value || '').trim();
@@ -3405,11 +3455,23 @@ Example:
             };
         }
 
-        function shadeHexColor(hex, amount) {
+        function mixRoomColorWithWhite(hex, strength) {
             var rgb = hexToRgb(hex);
-            function clamp(v) { return Math.max(0, Math.min(255, Math.round(v))); }
-            function toHex(v) { return clamp(v).toString(16).padStart(2, '0'); }
-            return '#' + toHex(rgb.r + amount) + toHex(rgb.g + amount) + toHex(rgb.b + amount);
+            strength = Math.max(0, Math.min(1, parseFloat(strength) || 0));
+            function mix(channel) {
+                return Math.max(0, Math.min(255, Math.round(255 + (channel - 255) * strength)));
+            }
+            return { r: mix(rgb.r), g: mix(rgb.g), b: mix(rgb.b) };
+        }
+
+        function deepenRoomColor(hex, amount) {
+            var rgb = hexToRgb(hex);
+            var depth = Math.max(0, Math.min(1, parseFloat(amount) || 0));
+            var factor = 1 - (depth * 0.32);
+            function deepen(channel) {
+                return Math.max(0, Math.min(255, Math.round(channel * factor)));
+            }
+            return { r: deepen(rgb.r), g: deepen(rgb.g), b: deepen(rgb.b) };
         }
 
         function getRoomHeaderIntensity(room) {
@@ -3421,25 +3483,37 @@ Example:
         function roomHeaderBackground(room) {
             var colorIdx = (room && room.colorIndex !== undefined) ? room.colorIndex : 0;
             var base = room && room.customColor ? normalizeHexColor(room.customColor) : (SWATCH_COLORS[colorIdx] || SWATCH_COLORS[0]);
-            var dark = shadeHexColor(base, -55);
-            var opacity = getRoomHeaderIntensity(room) / 100;
-            return 'linear-gradient(135deg, rgba(' + hexToRgb(base).r + ',' + hexToRgb(base).g + ',' + hexToRgb(base).b + ',' + opacity + ') 0%, rgba(' + hexToRgb(dark).r + ',' + hexToRgb(dark).g + ',' + hexToRgb(dark).b + ',' + opacity + ') 100%), linear-gradient(135deg,#2d2d2d 0%,#111111 100%)';
+            var intensity = getRoomHeaderIntensity(room);
+            var slider = (intensity - 20) / 80;
+            var soft = mixRoomColorWithWhite(base, 0.55 + slider * 0.35);
+            var strong = slider > 0.65 ? deepenRoomColor(base, (slider - 0.65) / 0.35) : mixRoomColorWithWhite(base, 0.70 + slider * 0.30);
+            return 'linear-gradient(135deg, rgb(' + strong.r + ',' + strong.g + ',' + strong.b + ') 0%, rgb(' + soft.r + ',' + soft.g + ',' + soft.b + ') 100%)';
         }
 
         function getRoomColorPresets() {
             try {
                 var saved = JSON.parse(localStorage.getItem(ROOM_COLOR_PRESETS_KEY) || '[]');
-                return Array.isArray(saved) ? saved.filter(function(c) { return /^#[0-9a-f]{6}$/i.test(c); }).slice(0, 8) : [];
+                return Array.isArray(saved) ? saved.filter(function(c) { return /^#[0-9a-f]{6}$/i.test(c); }).slice(0, ROOM_COLOR_PRESET_LIMIT) : [];
             } catch(e) {
                 return [];
             }
         }
 
-        function saveRoomColorPreset(hex) {
+        function saveRoomColorPreset(hex, overwriteHex) {
             hex = normalizeHexColor(hex);
-            var presets = getRoomColorPresets().filter(function(c) { return c.toLowerCase() !== hex; });
+            overwriteHex = overwriteHex ? normalizeHexColor(overwriteHex) : '';
+            var presets = getRoomColorPresets();
+            var alreadySaved = presets.some(function(c) { return c.toLowerCase() === hex; });
+            if (!alreadySaved && !overwriteHex && presets.length >= ROOM_COLOR_PRESET_LIMIT) {
+                return { saved: false, needsOverwrite: true, color: hex };
+            }
+            presets = presets.filter(function(c) {
+                var lower = c.toLowerCase();
+                return lower !== hex && (!overwriteHex || lower !== overwriteHex);
+            });
             presets.unshift(hex);
-            localStorage.setItem(ROOM_COLOR_PRESETS_KEY, JSON.stringify(presets.slice(0, 8)));
+            localStorage.setItem(ROOM_COLOR_PRESETS_KEY, JSON.stringify(presets.slice(0, ROOM_COLOR_PRESET_LIMIT)));
+            return { saved: true, needsOverwrite: false, color: hex };
         }
 
         function getDefaultRoomColor() {
@@ -3480,27 +3554,63 @@ Example:
             markUnsaved();
         }
 
+        function applyRoomColorDefaultChoice(color) {
+            var defaultToggle = document.getElementById('roomDefaultColorToggle');
+            if (defaultToggle && defaultToggle.checked) saveDefaultRoomColor(color);
+            if (defaultToggle && !defaultToggle.checked && defaultToggle.dataset.wasChecked === 'true') localStorage.removeItem(ROOM_DEFAULT_COLOR_KEY);
+        }
+
+        function finishRoomColorModalApply(color) {
+            setRoomCustomColor(activeRoomColorModalId, color, { skipPresetSave: true });
+            applyRoomColorDefaultChoice(color);
+            pendingRoomColorPresetOverwrite = null;
+            var modalEl = document.getElementById('roomColorModal');
+            var modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+        }
+
+        function overwriteRoomColorPreset(overwriteHex) {
+            if (!pendingRoomColorPresetOverwrite || !pendingRoomColorPresetOverwrite.color) return;
+            var color = pendingRoomColorPresetOverwrite.color;
+            var result = saveRoomColorPreset(color, overwriteHex);
+            if (!result.saved) return;
+            finishRoomColorModalApply(color);
+        }
+
         function renderRoomColorPresetManager() {
             var wrap = document.getElementById('roomSavedColours');
             if (!wrap) return;
             var presets = getRoomColorPresets();
+            var pending = pendingRoomColorPresetOverwrite;
+            var pendingHtml = '';
+            if (pending && pending.color) {
+                pendingHtml = '<div class="alert alert-warning py-2 mb-2 small">' +
+                    '<div class="fw-bold"><i class="fas fa-exclamation-triangle me-1"></i>Max custom colour saves reached</div>' +
+                    '<div>Choose a colour below to overwrite with <span class="fw-bold">' + pending.color.toUpperCase() + '</span>.</div>' +
+                    '</div>';
+            }
             if (!presets.length) {
                 wrap.innerHTML = '<div class="text-muted small border rounded p-3 bg-light">No saved custom colours yet. Pick one above and click Done to save it here.</div>';
                 return;
             }
-            wrap.innerHTML = '<div class="room-saved-colour-grid">' + presets.map(function(color) {
+            wrap.innerHTML = pendingHtml + '<div class="room-saved-colour-grid' + (pending && pending.color ? ' overwrite-mode' : '') + '">' + presets.map(function(color) {
+                var chooseAction = pending && pending.color ? 'overwriteRoomColorPreset(\'' + color + '\')' : 'chooseRoomColourFromPreset(\'' + color + '\')';
+                var deleteOrOverwrite = pending && pending.color
+                    ? '<button type="button" class="btn btn-sm btn-warning room-overwrite-icon-btn" onclick="overwriteRoomColorPreset(\'' + color + '\')" title="Overwrite this saved colour" aria-label="Overwrite this saved colour"><i class="fas fa-rotate"></i></button>'
+                    : '<button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteRoomColorPreset(\'' + color + '\')" title="Delete saved colour"><i class="fas fa-trash"></i></button>';
                 return '<div class="room-saved-colour">' +
-                    '<button type="button" class="btn btn-sm btn-light border flex-grow-1 text-start" onclick="chooseRoomColourFromPreset(\'' + color + '\')">' +
+                    '<button type="button" class="btn btn-sm btn-light border flex-grow-1 text-start" onclick="' + chooseAction + '">' +
                     '<span class="room-saved-colour-dot me-2 d-inline-block align-middle" style="background:' + color + ';"></span>' +
-                    '<span class="align-middle">' + color.toUpperCase() + '</span>' +
+                    '<span class="align-middle">' + (pending && pending.color ? '' : color.toUpperCase()) + '</span>' +
                     '</button>' +
-                    '<button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteRoomColorPreset(\'' + color + '\')" title="Delete saved colour"><i class="fas fa-trash"></i></button>' +
+                    deleteOrOverwrite +
                     '</div>';
             }).join('') + '</div>';
         }
 
         function openRoomColorModal(roomId) {
             activeRoomColorModalId = roomId;
+            pendingRoomColorPresetOverwrite = null;
             var room = rooms.find(function(r) { return r.id === roomId; });
             if (!room) return;
             var colorIdx = (room.colorIndex !== undefined) ? room.colorIndex : 0;
@@ -3528,25 +3638,27 @@ Example:
         }
 
         function chooseRoomColourFromPreset(color) {
+            pendingRoomColorPresetOverwrite = null;
             var input = document.getElementById('roomCustomColorModalInput');
             if (input) input.value = normalizeHexColor(color);
             updateRoomColorModalPreview(color);
             var defaultToggle = document.getElementById('roomDefaultColorToggle');
             var defaultColor = getDefaultRoomColor();
             if (defaultToggle) defaultToggle.checked = !!(defaultColor && defaultColor.customColor === normalizeHexColor(color));
+            renderRoomColorPresetManager();
         }
 
         function applyRoomColorModal() {
             if (!activeRoomColorModalId) return;
             var input = document.getElementById('roomCustomColorModalInput');
             var color = normalizeHexColor(input ? input.value : '#2d2d2d');
-            var defaultToggle = document.getElementById('roomDefaultColorToggle');
-            if (defaultToggle && defaultToggle.checked) saveDefaultRoomColor(color);
-            if (defaultToggle && !defaultToggle.checked && defaultToggle.dataset.wasChecked === 'true') localStorage.removeItem(ROOM_DEFAULT_COLOR_KEY);
-            setRoomCustomColor(activeRoomColorModalId, color);
-            var modalEl = document.getElementById('roomColorModal');
-            var modal = bootstrap.Modal.getInstance(modalEl);
-            if (modal) modal.hide();
+            var result = saveRoomColorPreset(color);
+            if (result.needsOverwrite) {
+                pendingRoomColorPresetOverwrite = { color: color };
+                renderRoomColorPresetManager();
+                return;
+            }
+            finishRoomColorModalApply(color);
         }
 
         function refreshRoomHeader(roomId) {
@@ -3565,18 +3677,19 @@ Example:
             room.customColor = '';
             refreshRoomHeader(roomId);
             const header = document.querySelector('.room-card[data-room-id="' + roomId + '"] .room-header');
-            if (header) header.querySelectorAll('.color-swatch[data-preset-index]').forEach((s) => {
-                s.classList.toggle('active', parseInt(s.dataset.presetIndex, 10) === colorIndex);
+            if (header) header.querySelectorAll('.color-swatch').forEach((s) => {
+                s.classList.toggle('active', s.hasAttribute('data-preset-index') && parseInt(s.dataset.presetIndex, 10) === colorIndex);
             });
             markUnsaved();
         }
 
-        function setRoomCustomColor(roomId, color) {
+        function setRoomCustomColor(roomId, color, options) {
             const room = rooms.find(r => r.id === roomId);
             if (!room) return;
+            options = options || {};
             room.customColor = normalizeHexColor(color);
             room.colorIndex = -1;
-            saveRoomColorPreset(room.customColor);
+            if (!options.skipPresetSave) saveRoomColorPreset(room.customColor);
             renderRooms();
             markUnsaved();
         }
@@ -3586,6 +3699,14 @@ Example:
             if (!room) return;
             room.colorIntensity = Math.max(20, Math.min(100, parseInt(value, 10) || 100));
             refreshRoomHeader(roomId);
+            markUnsaved();
+        }
+
+        function toggleRoomHeaderText(roomId) {
+            const room = rooms.find(r => r.id === roomId);
+            if (!room) return;
+            room.invertHeaderText = !room.invertHeaderText;
+            renderRooms();
             markUnsaved();
         }
 
@@ -5680,7 +5801,7 @@ Example:
                 const colorIdx = (room.colorIndex !== undefined) ? room.colorIndex : 0;
                 const headerBg = roomHeaderBackground(room);
                 html += '<div class="room-card" data-room-id="' + room.id + '">';
-                html += '<div class="room-header" style="background:' + headerBg + '">';
+                html += '<div class="room-header' + (room.invertHeaderText ? ' room-text-dark' : '') + '" style="background:' + headerBg + '">';
                 html += '<div class="d-flex justify-content-between align-items-start">';
                 html += '<div>';
                 var roomIcon = room.icon || 'fa-door-open';
@@ -5702,6 +5823,7 @@ Example:
                 html += '<div class="d-flex justify-content-between align-items-center gap-2"><label for="roomColorIntensity_' + room.id + '" class="small fw-semibold mb-0">Header colour intensity</label><span id="roomColorIntensityValue_' + room.id + '" class="room-intensity-value small fw-semibold">' + getRoomHeaderIntensity(room) + '%</span></div>';
                 html += '<input type="range" id="roomColorIntensity_' + room.id + '" class="form-range" min="20" max="100" step="5" value="' + getRoomHeaderIntensity(room) + '" oninput="updateRoomColorIntensity(' + room.id + ', this.value)">';
                 html += '<button type="button" class="btn btn-sm btn-outline-light mt-2" onclick="openRoomColorModal(' + room.id + ')"><i class="fas fa-palette me-1"></i>Edit colours</button>';
+                html += '<button type="button" class="btn btn-sm btn-outline-light mt-2 ms-1" onclick="toggleRoomHeaderText(' + room.id + ')" title="Switch this room header between white and black text"><i class="fas fa-adjust me-1"></i>Invert</button>';
                 html += '</div>';
 
                 // Timeline input field (shown when showTimelines is true)
