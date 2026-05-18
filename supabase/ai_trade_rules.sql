@@ -7,6 +7,9 @@ create table if not exists ai_trade_rules (
 
     trigger_phrase text not null,
     phrase_key text not null,
+    rule_type text not null default 'line_item',
+    clarification_question text,
+    clarification_options jsonb not null default '[]'::jsonb,
 
     mapped_item_category text not null,
     mapped_item_name text not null,

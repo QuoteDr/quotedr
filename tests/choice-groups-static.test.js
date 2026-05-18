@@ -14,6 +14,9 @@ const items = read('quote-items.js');
 const viewer = read('interactive-quote-viewer.html');
 const dashboard = read('dashboard.html');
 const invoice = read('invoice-viewer.html');
+const supabase = read('supabase-v2.js');
+const tradeRulesSchema = read('supabase/ai_trade_rules.sql');
+const tradeRuleQuestionMigration = read('supabase/migrations/20260518110000_ai_trade_rule_questions.sql');
 
 assert(builder.includes('createChoiceGroupFromRoomItems'), 'builder should create quote-level choice groups from room items');
 assert(builder.includes('applyChoiceGroupSelectionToItem'), 'builder should apply choice group selections to totals');
@@ -32,6 +35,19 @@ assert(builder.includes('openAiVoiceAutoGroupChoiceModal'), 'AI Voice should ask
 assert(builder.includes('Grouped items found. Use saved groups?'), 'AI Voice grouping prompt should explain that grouped items were found');
 assert(builder.includes('openAiVoiceAutoGroupReviewModal'), 'AI Voice should offer a review modal for grouped items');
 assert(builder.includes('data-ai-auto-group-include'), 'AI Voice grouping review should let users ungroup selected rows');
+assert(builder.includes('ai-voice-review-quantity'), 'AI Voice review should let users correct parsed quantities before adding items');
+assert(builder.includes('aiVoiceReviewUnit'), 'AI Voice review should let users correct parsed units before adding items');
+assert(builder.includes('_applyAiVoiceReviewQuantityEdit'), 'AI Voice review should apply corrected quantity and unit values before quote creation');
+assert(builder.includes('aiVoiceTradeRuleType'), 'AI Trade Rules should expose a rule type selector');
+assert(builder.includes('aiVoiceTradeQuestion'), 'AI Trade Rules should collect a clarification question');
+assert(builder.includes('aiVoiceQuestionOptionDraftList'), 'AI Trade Rules should show drafted clarification answer options');
+assert(builder.includes('addAiVoiceQuestionOptionDraftItem'), 'AI Trade Rules should add answer options before saving a question rule');
+assert(builder.includes('showAiVoiceClarificationModal'), 'AI Voice should ask unanswered trade-rule questions before review');
+assert(builder.includes('aiVoiceClarificationModal'), 'AI Voice should include a clarification modal');
+assert(builder.includes('_findClarificationAnswer'), 'AI Voice should auto-select clarification answers from transcript aliases');
+assert(builder.includes('_applyAiTradeRuleOptionToResult'), 'AI Voice should turn chosen clarification answers into quote items');
+assert(builder.includes('clarification_options'), 'AI Trade Rules should read and write clarification options');
+assert(builder.includes('rule_type'), 'AI Trade Rules should preserve direct line item rules and question rules');
 assert(builder.includes('openTurnOffChoiceGroupingPicker'), 'turning off a grouped line should ask which item remains');
 assert(builder.includes('Which item do you want to remain?'), 'turn off grouping picker should use the requested wording');
 assert(builder.includes('toggleRoomAutoGrouping'), 'rooms should expose a grouping toggle');
@@ -41,6 +57,7 @@ assert(builder.includes('openQuoteChoiceGroupOptionPicker'), 'Pick One grouped q
 assert(builder.includes('changeQuoteChoiceGroupDefault'), 'quote builder should let users change the selected Pick One option');
 assert(builder.includes('data-quote-choice-option'), 'quote Pick One picker should render clickable option rows');
 assert(builder.includes('Choose Pick One Option'), 'quote Pick One picker should explain that the user is choosing the visible/base option');
+assert(builder.includes("var manageItemsRoot = document.getElementById('manageItemsModal')"), 'Manage Items delegated actions should include the top New Item form');
 const manualAddBlock = builder.slice(builder.indexOf('async function confirmAddLine'), builder.indexOf('function choiceGroupId'));
 assert(manualAddBlock.includes('await autoGroupQuoteItem(newItem, rooms[roomIndex])'), 'manual Add Line should route new items through room-aware auto grouping');
 const aiApplyBlock = builder.slice(builder.indexOf('async function applyAIQuote'), builder.indexOf('initDone = true'));
@@ -85,3 +102,15 @@ assert(viewer.includes('applyClientChoiceGroupsToRooms'), 'client viewer should 
 
 assert(dashboard.includes('_clientChoiceGroups'), 'dashboard review should show client selected choice groups');
 assert(invoice.includes('choiceGroupSelection'), 'invoice should preserve/display accepted choice-group selections');
+
+assert(supabase.includes('sanitizeAiTradeRuleClarificationOptions'), 'Supabase helper should sanitize question rule answer options');
+assert(supabase.includes('rule_type'), 'Supabase helper should save the AI trade rule type');
+assert(supabase.includes('clarification_question'), 'Supabase helper should save clarification question text');
+assert(supabase.includes('clarification_options'), 'Supabase helper should save clarification answer options');
+
+assert(tradeRulesSchema.includes('rule_type text not null default'), 'AI trade rules schema should include rule_type');
+assert(tradeRulesSchema.includes('clarification_question text'), 'AI trade rules schema should include clarification_question');
+assert(tradeRulesSchema.includes("clarification_options jsonb not null default '[]'::jsonb"), 'AI trade rules schema should include clarification_options');
+assert(tradeRuleQuestionMigration.includes('add column if not exists rule_type'), 'migration should add rule_type');
+assert(tradeRuleQuestionMigration.includes('add column if not exists clarification_question'), 'migration should add clarification_question');
+assert(tradeRuleQuestionMigration.includes('add column if not exists clarification_options'), 'migration should add clarification_options');

@@ -8057,8 +8057,13 @@ Example:
         var _voiceReviewRows = [];
         var _voiceReviewItems = [];
         var _voiceMeasurementResult = null;
+        var _voiceClarificationResult = null;
+        var _voiceClarificationTranscript = '';
+        var _voiceClarificationPending = [];
+        var _voiceClarificationResolve = null;
         var _aiVoiceTemplateDraftItems = [];
         var _aiVoiceTemplateCache = [];
+        var _aiVoiceQuestionOptionDraftItems = [];
 
         async function startVoiceQuote() {
             if (typeof requireFeature === 'function') {
@@ -8416,11 +8421,54 @@ Example:
             return tokens.every(function(token) { return text.indexOf(token) >= 0; });
         }
 
+        function _aiVoiceTradeRuleType(rule) {
+            return rule && rule.rule_type === 'question' ? 'question' : 'line_item';
+        }
+
+        function _normalizeClarificationOptions(rule) {
+            var raw = rule && rule.clarification_options;
+            if (typeof raw === 'string') {
+                try { raw = JSON.parse(raw); } catch(e) { raw = []; }
+            }
+            if (!Array.isArray(raw)) raw = [];
+            return raw.map(function(option, index) {
+                option = option || {};
+                return {
+                    id: option.id || ('answer' + index),
+                    label: String(option.label || '').trim(),
+                    aliases: Array.isArray(option.aliases)
+                        ? option.aliases.map(function(alias) { return String(alias || '').trim(); }).filter(Boolean)
+                        : String(option.aliases || '').split(',').map(function(alias) { return alias.trim(); }).filter(Boolean),
+                    mapped_item_category: option.mapped_item_category || option.category || 'Miscellaneous',
+                    mapped_item_name: option.mapped_item_name || option.name || '',
+                    mapped_unit: option.mapped_unit || option.unitType || option.unit || 'ls',
+                    mapped_price: parseFloat(option.mapped_price !== undefined ? option.mapped_price : option.rate) || 0,
+                    quantity_mode: option.quantity_mode === 'fixed' ? 'fixed' : 'per_count',
+                    quantity_value: parseFloat(option.quantity_value || 1) || 1,
+                    count_unit_label: option.count_unit_label || '',
+                    default_count: parseFloat(option.default_count || 1) || 1,
+                    user_note: option.user_note || ''
+                };
+            }).filter(function(option) {
+                return option.label && option.mapped_item_name;
+            });
+        }
+
+        function _voiceRuleMappedSearchText(rule) {
+            var text = (rule && rule.mapped_item_name || '') + ' ' + (rule && rule.mapped_item_category || '');
+            if (_aiVoiceTradeRuleType(rule) === 'question') {
+                text += ' ' + _normalizeClarificationOptions(rule).map(function(option) {
+                    return [option.label, option.aliases.join(' '), option.mapped_item_name, option.mapped_item_category, option.count_unit_label].join(' ');
+                }).join(' ');
+            }
+            return text;
+        }
+
         function _voiceRuleMatchesParsedItem(rule, item) {
             if (!rule || !item || item.aiTradeRuleId) return false;
             var triggerTokens = _voiceRuleTextKey(rule.trigger_phrase).split(' ').filter(Boolean);
             var countLabel = _voiceRuleTextKey(rule.count_unit_label || '').split(' ').filter(Boolean);
-            var mappedTokens = _voiceRuleTextKey((rule.mapped_item_name || '') + ' ' + (rule.mapped_item_category || '')).split(' ').filter(Boolean);
+            var mappedTokens = _voiceRuleTextKey(_voiceRuleMappedSearchText(rule)).split(' ').filter(Boolean);
             var itemText = _voiceRuleTextKey((item.spokenPhrase || '') + ' ' + (item.description || '') + ' ' + (item.category || ''));
             if (!itemText || !triggerTokens.length) return false;
             var triggerHits = triggerTokens.filter(function(token) { return itemText.indexOf(token) >= 0; }).length;
@@ -8470,6 +8518,137 @@ Example:
             return parseFloat(rule.default_count || 1) || 1;
         }
 
+        function _findClarificationAnswer(rule, transcript) {
+            var text = _voiceRuleTextKey(transcript);
+            if (!text) return null;
+            return _normalizeClarificationOptions(rule).find(function(option) {
+                var candidates = [option.label].concat(option.aliases || []);
+                return candidates.some(function(candidate) {
+                    var key = _voiceRuleTextKey(candidate);
+                    if (!key) return false;
+                    var tokens = key.split(' ').filter(Boolean);
+                    return tokens.length && tokens.every(function(token) { return text.indexOf(token) >= 0; });
+                });
+            }) || null;
+        }
+
+        function _buildAiTradeRuleVoiceItem(rule, transcript, answerLabel) {
+            var savedItem = _findVoiceSavedItemForMapped(rule);
+            var count = _extractVoiceRuleCount(rule, transcript);
+            var eachQty = parseFloat(rule.quantity_value || 1) || 1;
+            var quantity = rule.quantity_mode === 'fixed' ? eachQty : _voiceRoundQuantity(eachQty * count);
+            var rate = parseFloat(rule.mapped_price || 0) || 0;
+            var unit = rule.mapped_unit || 'ls';
+            var description = rule.mapped_item_name || rule.trigger_phrase || 'AI trade rule item';
+            var calculationLabel = answerLabel ? 'AI trade rule answer "' + answerLabel + '": ' : 'AI trade rule: ';
+            return {
+                category: rule.mapped_item_category || 'Miscellaneous',
+                description: description,
+                serviceName: description,
+                quantity: quantity,
+                unit: unit,
+                unitType: unit,
+                rate: rate,
+                total: _voiceRoundQuantity(quantity * rate),
+                spokenPhrase: rule.trigger_phrase || description,
+                calculation: rule.quantity_mode === 'fixed'
+                    ? calculationLabel + 'fixed ' + quantity + ' ' + unit
+                    : calculationLabel + eachQty + ' ' + unit + ' x ' + count + ' ' + (rule.count_unit_label || 'count') + ' = ' + quantity + ' ' + unit,
+                itemDescription: (savedItem && savedItem.itemDescription) || '',
+                notes: rule.user_note || '',
+                aiTradeRuleId: rule.id,
+                aiTradeRuleAnswer: answerLabel || ''
+            };
+        }
+
+        function _ensureAiTradeRuleTargetRoom(result) {
+            if (!result.rooms.length) result.rooms.push({ name: 'AI Trade Rules', items: [] });
+            var targetRoom = result.rooms[0];
+            if (!Array.isArray(targetRoom.items)) targetRoom.items = [];
+            return targetRoom;
+        }
+
+        function _applyAiTradeRuleOptionToResult(result, rule, option, transcript) {
+            if (!result || !rule || !option) return result;
+            var optionRule = Object.assign({}, rule, {
+                mapped_item_category: option.mapped_item_category,
+                mapped_item_name: option.mapped_item_name,
+                mapped_unit: option.mapped_unit,
+                mapped_price: option.mapped_price,
+                quantity_mode: option.quantity_mode,
+                quantity_value: option.quantity_value,
+                count_unit_label: option.count_unit_label,
+                default_count: option.default_count,
+                user_note: option.user_note || rule.user_note || ''
+            });
+            _ensureAiTradeRuleTargetRoom(result).items.push(_buildAiTradeRuleVoiceItem(optionRule, transcript, option.label));
+            if (typeof incrementAiTradeRuleUsage === 'function') incrementAiTradeRuleUsage(rule.id).catch(function(){});
+            return result;
+        }
+
+        function showAiVoiceClarificationModal(result, transcript, pendingQuestions) {
+            return new Promise(function(resolve) {
+                var modalEl = document.getElementById('aiVoiceClarificationModal');
+                var list = document.getElementById('aiVoiceClarificationList');
+                if (!modalEl || !list || !pendingQuestions || !pendingQuestions.length) {
+                    resolve(result);
+                    return;
+                }
+                _voiceClarificationResult = result;
+                _voiceClarificationTranscript = transcript || '';
+                _voiceClarificationPending = pendingQuestions;
+                _voiceClarificationResolve = resolve;
+                list.innerHTML = '';
+                pendingQuestions.forEach(function(entry, entryIndex) {
+                    var rule = entry.rule;
+                    var options = entry.options || [];
+                    var card = document.createElement('div');
+                    card.className = 'border rounded p-3 mb-3';
+                    card.innerHTML = ''
+                        + '<div class="small text-muted mb-1">You said "' + _escapeHtml(rule.trigger_phrase || '') + '"</div>'
+                        + '<div class="fw-semibold mb-2">' + _escapeHtml(rule.clarification_question || 'Which option should QuoteDr use?') + '</div>'
+                        + '<div class="d-grid gap-2">'
+                        + options.map(function(option, optionIndex) {
+                            var id = 'aiVoiceClarification' + entryIndex + '_' + optionIndex;
+                            return '<label class="border rounded p-2 d-flex gap-2 align-items-start" for="' + id + '">'
+                                + '<input class="form-check-input mt-1" type="radio" name="aiVoiceClarification' + entryIndex + '" id="' + id + '" value="' + optionIndex + '">'
+                                + '<span><span class="fw-semibold">' + _escapeHtml(option.label) + '</span>'
+                                + '<span class="d-block small text-muted">' + _escapeHtml(option.mapped_item_name) + ' - ' + _escapeHtml(option.quantity_value + ' ' + option.mapped_unit + (option.quantity_mode === 'fixed' ? ' fixed' : ' per ' + (option.count_unit_label || 'count'))) + '</span>'
+                                + (option.aliases && option.aliases.length ? '<span class="d-block small text-muted">Also listens for: ' + _escapeHtml(option.aliases.join(', ')) + '</span>' : '')
+                                + '</span></label>';
+                        }).join('')
+                        + '</div>';
+                    list.appendChild(card);
+                });
+                new bootstrap.Modal(modalEl).show();
+            });
+        }
+
+        function confirmAiVoiceClarifications() {
+            if (!_voiceClarificationResult || !_voiceClarificationPending.length) return;
+            for (var i = 0; i < _voiceClarificationPending.length; i++) {
+                var checked = document.querySelector('input[name="aiVoiceClarification' + i + '"]:checked');
+                if (!checked) {
+                    qdAlert('Please answer each AI trade rule question before continuing.');
+                    return;
+                }
+            }
+            _voiceClarificationPending.forEach(function(entry, index) {
+                var checked = document.querySelector('input[name="aiVoiceClarification' + index + '"]:checked');
+                var option = entry.options[parseInt(checked.value, 10)];
+                _applyAiTradeRuleOptionToResult(_voiceClarificationResult, entry.rule, option, _voiceClarificationTranscript);
+            });
+            var result = _voiceClarificationResult;
+            var resolve = _voiceClarificationResolve;
+            var modal = bootstrap.Modal.getInstance(document.getElementById('aiVoiceClarificationModal'));
+            if (modal) modal.hide();
+            _voiceClarificationResult = null;
+            _voiceClarificationTranscript = '';
+            _voiceClarificationPending = [];
+            _voiceClarificationResolve = null;
+            if (resolve) resolve(result);
+        }
+
         async function _applyAiTradeRulesToVoiceResult(result, transcript) {
             if (!result || !Array.isArray(result.rooms) || typeof getUserAiTradeRules !== 'function') return result;
             var rules = [];
@@ -8477,36 +8656,24 @@ Example:
             var activeRules = (rules || []).filter(function(rule) { return rule && rule.active !== false && _voiceRuleMatchesTranscript(rule, transcript); });
             if (!activeRules.length) return result;
             _suppressAiItemsCoveredByTradeRules(result, activeRules);
-            if (!result.rooms.length) result.rooms.push({ name: 'AI Trade Rules', items: [] });
-            var targetRoom = result.rooms[0];
-            if (!Array.isArray(targetRoom.items)) targetRoom.items = [];
+            var targetRoom = _ensureAiTradeRuleTargetRoom(result);
+            var pendingQuestions = [];
             activeRules.forEach(function(rule) {
-                var savedItem = _findVoiceSavedItemForMapped(rule);
-                var count = _extractVoiceRuleCount(rule, transcript);
-                var eachQty = parseFloat(rule.quantity_value || 1) || 1;
-                var quantity = rule.quantity_mode === 'fixed' ? eachQty : _voiceRoundQuantity(eachQty * count);
-                var rate = parseFloat(rule.mapped_price || 0) || 0;
-                var unit = rule.mapped_unit || 'ls';
-                var description = rule.mapped_item_name || rule.trigger_phrase || 'AI trade rule item';
-                targetRoom.items.push({
-                    category: rule.mapped_item_category || 'Miscellaneous',
-                    description: description,
-                    serviceName: description,
-                    quantity: quantity,
-                    unit: unit,
-                    unitType: unit,
-                    rate: rate,
-                    total: _voiceRoundQuantity(quantity * rate),
-                    spokenPhrase: rule.trigger_phrase || description,
-                    calculation: rule.quantity_mode === 'fixed'
-                        ? 'AI trade rule: fixed ' + quantity + ' ' + unit
-                        : 'AI trade rule: ' + eachQty + ' ' + unit + ' x ' + count + ' ' + (rule.count_unit_label || 'count') + ' = ' + quantity + ' ' + unit,
-                    itemDescription: (savedItem && savedItem.itemDescription) || '',
-                    notes: rule.user_note || '',
-                    aiTradeRuleId: rule.id
-                });
+                if (_aiVoiceTradeRuleType(rule) === 'question') {
+                    var options = _normalizeClarificationOptions(rule);
+                    if (!options.length) return;
+                    var matched = _findClarificationAnswer(rule, transcript);
+                    if (matched) {
+                        _applyAiTradeRuleOptionToResult(result, rule, matched, transcript);
+                    } else {
+                        pendingQuestions.push({ rule: rule, options: options });
+                    }
+                    return;
+                }
+                targetRoom.items.push(_buildAiTradeRuleVoiceItem(rule, transcript, ''));
                 if (typeof incrementAiTradeRuleUsage === 'function') incrementAiTradeRuleUsage(rule.id).catch(function(){});
             });
+            if (pendingQuestions.length) return await showAiVoiceClarificationModal(result, transcript, pendingQuestions);
             return result;
         }
 
@@ -8628,6 +8795,117 @@ Example:
             };
         }
 
+        function toggleAiVoiceTradeRuleType() {
+            var type = document.getElementById('aiVoiceTradeRuleType')?.value || 'line_item';
+            var lineFields = document.getElementById('aiVoiceLineItemRuleFields');
+            var questionFields = document.getElementById('aiVoiceQuestionRuleFields');
+            if (lineFields) lineFields.classList.toggle('d-none', type !== 'line_item');
+            if (questionFields) questionFields.classList.toggle('d-none', type !== 'question');
+            var saveLabel = document.getElementById('aiVoiceTradeRuleSaveLabel');
+            if (saveLabel) saveLabel.textContent = type === 'question' ? 'Add Question Rule' : 'Add Rule';
+        }
+
+        function _readAiVoiceQuestionOptionDraft() {
+            var selected = _resolveVoiceReviewSelection(document.getElementById('aiVoiceQuestionOptionItem')?.value || '');
+            var label = (document.getElementById('aiVoiceQuestionOptionLabel')?.value || '').trim();
+            if (!label) { qdAlert('Enter an answer label, like Vacant or Occupied.'); return null; }
+            if (!selected) { qdAlert('Choose the saved item this answer should add.'); return null; }
+            return {
+                id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+                label: label,
+                aliases: (document.getElementById('aiVoiceQuestionOptionAliases')?.value || '').split(',').map(function(alias) { return alias.trim(); }).filter(Boolean),
+                mapped_item_category: selected.category,
+                mapped_item_name: selected.name,
+                mapped_unit: selected.unitType,
+                mapped_price: selected.rate,
+                quantity_mode: document.getElementById('aiVoiceQuestionOptionMode')?.value || 'per_count',
+                quantity_value: parseFloat(document.getElementById('aiVoiceQuestionOptionQuantity')?.value || 1) || 1,
+                count_unit_label: (document.getElementById('aiVoiceQuestionOptionCountLabel')?.value || '').trim(),
+                default_count: parseFloat(document.getElementById('aiVoiceQuestionOptionDefaultCount')?.value || 1) || 1,
+                user_note: (document.getElementById('aiVoiceQuestionOptionNote')?.value || '').trim()
+            };
+        }
+
+        function _renderAiVoiceQuestionOptionDraft() {
+            var list = document.getElementById('aiVoiceQuestionOptionDraftList');
+            if (!list) return;
+            if (!_aiVoiceQuestionOptionDraftItems.length) {
+                list.innerHTML = '<div class="text-muted small">No answer options added yet.</div>';
+                return;
+            }
+            list.innerHTML = _aiVoiceQuestionOptionDraftItems.map(function(option, index) {
+                var formula = option.quantity_mode === 'fixed'
+                    ? option.quantity_value + ' ' + option.mapped_unit + ' fixed'
+                    : option.quantity_value + ' ' + option.mapped_unit + ' per ' + (option.count_unit_label || 'count');
+                return '<div class="border rounded p-2 mb-2 bg-white">'
+                    + '<div class="d-flex justify-content-between gap-2">'
+                    + '<div><strong>' + _escapeHtml(option.label) + '</strong><div class="small text-muted">' + _escapeHtml(option.mapped_item_name + ' - ' + formula) + '</div>'
+                    + (option.aliases && option.aliases.length ? '<div class="small text-muted">Aliases: ' + _escapeHtml(option.aliases.join(', ')) + '</div>' : '')
+                    + '</div>'
+                    + '<button type="button" class="btn btn-outline-danger btn-sm" onclick="removeAiVoiceQuestionOptionDraftItem(' + index + ')"><i class="fas fa-trash"></i></button>'
+                    + '</div></div>';
+            }).join('');
+        }
+
+        function addAiVoiceQuestionOptionDraftItem() {
+            var option = _readAiVoiceQuestionOptionDraft();
+            if (!option) return;
+            _aiVoiceQuestionOptionDraftItems.push(option);
+            ['aiVoiceQuestionOptionLabel','aiVoiceQuestionOptionAliases','aiVoiceQuestionOptionItem','aiVoiceQuestionOptionNote'].forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            _renderAiVoiceQuestionOptionDraft();
+        }
+
+        function removeAiVoiceQuestionOptionDraftItem(index) {
+            _aiVoiceQuestionOptionDraftItems.splice(index, 1);
+            _renderAiVoiceQuestionOptionDraft();
+        }
+
+        function _formatAiVoiceTradeRuleCard(rule) {
+            var card = document.createElement('div');
+            card.className = 'border rounded p-3 mb-3';
+            if (_aiVoiceTradeRuleType(rule) === 'question') {
+                var options = _normalizeClarificationOptions(rule);
+                card.innerHTML = ''
+                    + '<div class="d-flex flex-wrap justify-content-between gap-2 mb-2">'
+                    + '<div><span class="badge bg-info text-dark me-2">Ask a question</span><strong>' + _escapeHtml(rule.trigger_phrase || '') + '</strong>'
+                    + '<div class="text-muted small">' + _escapeHtml(rule.clarification_question || '') + '</div></div>'
+                    + '<span class="badge bg-primary align-self-start">' + (parseInt(rule.usage_count, 10) || 0) + ' uses</span>'
+                    + '</div>'
+                    + options.map(function(option) {
+                        var formula = option.quantity_mode === 'fixed'
+                            ? option.quantity_value + ' ' + option.mapped_unit + ' fixed'
+                            : option.quantity_value + ' ' + option.mapped_unit + ' per ' + (option.count_unit_label || 'count');
+                        return '<div class="small border rounded p-2 mb-2 bg-light"><strong>' + _escapeHtml(option.label) + '</strong>: '
+                            + _escapeHtml(option.mapped_item_name + ' - ' + formula)
+                            + (option.aliases.length ? '<div class="text-muted">Aliases: ' + _escapeHtml(option.aliases.join(', ')) + '</div>' : '')
+                            + '</div>';
+                    }).join('')
+                    + '<div class="text-end"><button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteAiVoiceTradeRule(\'' + rule.id + '\')"><i class="fas fa-trash me-1"></i>Delete</button></div>';
+                return card;
+            }
+            var itemDisplay = _voiceItemDisplay({
+                category: rule.mapped_item_category || 'Miscellaneous',
+                name: rule.mapped_item_name || '',
+                unitType: rule.mapped_unit || 'ls',
+                rate: parseFloat(rule.mapped_price || 0) || 0
+            });
+            var formula = rule.quantity_mode === 'fixed'
+                ? (parseFloat(rule.quantity_value || 0) + ' ' + (rule.mapped_unit || 'ls') + ' fixed')
+                : (parseFloat(rule.quantity_value || 0) + ' ' + (rule.mapped_unit || 'ls') + ' per ' + (rule.count_unit_label || 'count'));
+            card.innerHTML = ''
+                + '<div class="d-flex flex-wrap justify-content-between gap-2 mb-1">'
+                + '<div><span class="badge bg-secondary me-2">Add saved item</span><strong>' + _escapeHtml(rule.trigger_phrase || '') + '</strong><div class="text-muted small">' + _escapeHtml(formula) + '</div></div>'
+                + '<span class="badge bg-primary align-self-start">' + (parseInt(rule.usage_count, 10) || 0) + ' uses</span>'
+                + '</div>'
+                + '<div class="small mb-2">' + _escapeHtml(itemDisplay) + '</div>'
+                + (rule.user_note ? '<div class="small text-muted mb-2">' + _escapeHtml(rule.user_note) + '</div>' : '')
+                + '<div class="text-end"><button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteAiVoiceTradeRule(\'' + rule.id + '\')"><i class="fas fa-trash me-1"></i>Delete</button></div>';
+            return card;
+        }
+
         async function openAiVoiceMemorySettings() {
             await loadAiVoiceMemorySettings();
             new bootstrap.Modal(document.getElementById('aiVoiceMemoryModal')).show();
@@ -8721,6 +8999,8 @@ Example:
             var options = document.getElementById('aiVoiceTradeRuleItemOptions');
             if (!list || !options) return;
             list.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm me-2"></span>Loading trade rules...</div>';
+            toggleAiVoiceTradeRuleType();
+            _renderAiVoiceQuestionOptionDraft();
             _voiceReviewItems = _flattenVoicePricingItems();
             options.innerHTML = '';
             _voiceReviewItems.forEach(function(item) {
@@ -8739,48 +9019,45 @@ Example:
             }
             list.innerHTML = '';
             rules.forEach(function(rule) {
-                var itemDisplay = _voiceItemDisplay({
-                    category: rule.mapped_item_category || 'Miscellaneous',
-                    name: rule.mapped_item_name || '',
-                    unitType: rule.mapped_unit || 'ls',
-                    rate: parseFloat(rule.mapped_price || 0) || 0
-                });
-                var formula = rule.quantity_mode === 'fixed'
-                    ? (parseFloat(rule.quantity_value || 0) + ' ' + (rule.mapped_unit || 'ls') + ' fixed')
-                    : (parseFloat(rule.quantity_value || 0) + ' ' + (rule.mapped_unit || 'ls') + ' per ' + (rule.count_unit_label || 'count'));
-                var card = document.createElement('div');
-                card.className = 'border rounded p-3 mb-3';
-                card.innerHTML = ''
-                    + '<div class="d-flex flex-wrap justify-content-between gap-2 mb-1">'
-                    + '<div><strong>' + _escapeHtml(rule.trigger_phrase || '') + '</strong><div class="text-muted small">' + _escapeHtml(formula) + '</div></div>'
-                    + '<span class="badge bg-primary align-self-start">' + (parseInt(rule.usage_count, 10) || 0) + ' uses</span>'
-                    + '</div>'
-                    + '<div class="small mb-2">' + _escapeHtml(itemDisplay) + '</div>'
-                    + (rule.user_note ? '<div class="small text-muted mb-2">' + _escapeHtml(rule.user_note) + '</div>' : '')
-                    + '<div class="text-end"><button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteAiVoiceTradeRule(\'' + rule.id + '\')"><i class="fas fa-trash me-1"></i>Delete</button></div>';
-                list.appendChild(card);
+                list.appendChild(_formatAiVoiceTradeRuleCard(rule));
             });
         }
 
         async function saveAiVoiceTradeRule() {
+            var type = document.getElementById('aiVoiceTradeRuleType')?.value || 'line_item';
             var phrase = (document.getElementById('aiVoiceTradePhrase')?.value || '').trim();
-            var selected = _resolveVoiceReviewSelection(document.getElementById('aiVoiceTradeItem')?.value || '');
             if (!phrase) { qdAlert('Enter the phrase the user will say.'); return; }
-            if (!selected) { qdAlert('Choose a saved item for this trade rule.'); return; }
             if (typeof saveAiTradeRule !== 'function') { qdAlert('AI trade rule helper is not loaded yet.'); return; }
-            var payload = {
-                trigger_phrase: phrase,
-                mapped_item_category: selected.category,
-                mapped_item_name: selected.name,
-                mapped_unit: selected.unitType,
-                mapped_price: selected.rate,
-                quantity_mode: document.getElementById('aiVoiceTradeMode')?.value || 'per_count',
-                quantity_value: parseFloat(document.getElementById('aiVoiceTradeQuantity')?.value || 1) || 1,
-                count_unit_label: (document.getElementById('aiVoiceTradeCountLabel')?.value || '').trim(),
-                default_count: parseFloat(document.getElementById('aiVoiceTradeDefaultCount')?.value || 1) || 1,
-                user_note: (document.getElementById('aiVoiceTradeNote')?.value || '').trim(),
-                active: true
-            };
+            var payload;
+            if (type === 'question') {
+                var question = (document.getElementById('aiVoiceTradeQuestion')?.value || '').trim();
+                if (!question) { qdAlert('Enter the question QuoteDr should ask.'); return; }
+                if (_aiVoiceQuestionOptionDraftItems.length < 2) { qdAlert('Add at least two answer options for this question.'); return; }
+                payload = {
+                    rule_type: 'question',
+                    trigger_phrase: phrase,
+                    clarification_question: question,
+                    clarification_options: _aiVoiceQuestionOptionDraftItems.slice(),
+                    active: true
+                };
+            } else {
+                var selected = _resolveVoiceReviewSelection(document.getElementById('aiVoiceTradeItem')?.value || '');
+                if (!selected) { qdAlert('Choose a saved item for this trade rule.'); return; }
+                payload = {
+                    rule_type: 'line_item',
+                    trigger_phrase: phrase,
+                    mapped_item_category: selected.category,
+                    mapped_item_name: selected.name,
+                    mapped_unit: selected.unitType,
+                    mapped_price: selected.rate,
+                    quantity_mode: document.getElementById('aiVoiceTradeMode')?.value || 'per_count',
+                    quantity_value: parseFloat(document.getElementById('aiVoiceTradeQuantity')?.value || 1) || 1,
+                    count_unit_label: (document.getElementById('aiVoiceTradeCountLabel')?.value || '').trim(),
+                    default_count: parseFloat(document.getElementById('aiVoiceTradeDefaultCount')?.value || 1) || 1,
+                    user_note: (document.getElementById('aiVoiceTradeNote')?.value || '').trim(),
+                    active: true
+                };
+            }
             var result = await saveAiTradeRule(payload);
             if (result && result.error) {
                 qdAlert('Could not save trade rule: ' + (result.error.message || result.error));
@@ -8789,6 +9066,9 @@ Example:
             document.getElementById('aiVoiceTradePhrase').value = '';
             document.getElementById('aiVoiceTradeItem').value = '';
             document.getElementById('aiVoiceTradeNote').value = '';
+            document.getElementById('aiVoiceTradeQuestion').value = '';
+            _aiVoiceQuestionOptionDraftItems = [];
+            _renderAiVoiceQuestionOptionDraft();
             await loadAiVoiceTradeRulesSettings();
         }
 
@@ -9162,6 +9442,19 @@ Example:
                     + '<div class="small text-muted">What AI heard</div><div class="fw-semibold mb-2">"' + _escapeHtml(row.phrase || item.description || 'Item') + '"</div>'
                     + '<div class="small text-muted">AI parsed</div>'
                     + '<div class="mb-2">' + _escapeHtml(item.description || 'Item') + ' - ' + _escapeHtml(formatQuoteQuantityDisplay(item.quantity || 1, item.unit || item.unitType || 'ls')) + ' @ $' + (parseFloat(item.rate || 0) || 0).toFixed(2) + calculation + '</div>'
+                    + '<div class="row g-2 mb-2">'
+                    + '<div class="col-6 col-md-4">'
+                    + '<label class="form-label small fw-semibold" for="aiVoiceReviewQuantity' + index + '">Quantity</label>'
+                    + '<input type="number" min="0" step="0.01" class="form-control form-control-sm ai-voice-review-quantity" id="aiVoiceReviewQuantity' + index + '" data-row-index="' + index + '" value="' + _escapeHtml(_voiceRoundQuantity(item.quantity || 1)) + '">'
+                    + '</div>'
+                    + '<div class="col-6 col-md-4">'
+                    + '<label class="form-label small fw-semibold" for="aiVoiceReviewUnit' + index + '">Unit</label>'
+                    + '<input class="form-control form-control-sm ai-voice-review-unit" id="aiVoiceReviewUnit' + index + '" data-row-index="' + index + '" list="unitTypeOptions" value="' + _escapeHtml(item.unit || item.unitType || 'ls') + '" placeholder="sq ft, LF, each">'
+                    + '</div>'
+                    + '<div class="col-12 col-md-4 d-flex align-items-end">'
+                    + '<div class="small text-muted">Fix wrong sq ft or LF before adding.</div>'
+                    + '</div>'
+                    + '</div>'
                     + '<label class="form-label small fw-semibold" for="aiVoiceReviewMatch' + index + '">Match to saved item</label>'
                     + '<input class="form-control ai-voice-review-match" id="aiVoiceReviewMatch' + index + '" list="aiVoiceItemOptions" data-row-index="' + index + '" value="' + _escapeHtml(selectedText || '') + '" placeholder="' + (row.requiresChoice ? 'Choose which saved item this means...' : 'Start typing a saved item name...') + '">'
                     + suggestions
@@ -9181,6 +9474,22 @@ Example:
                     if (input) input.value = this.getAttribute('data-value') || '';
                 });
             });
+        }
+
+        function _applyAiVoiceReviewQuantityEdit(row, index) {
+            if (!row || !row.item) return;
+            var qtyEl = document.getElementById('aiVoiceReviewQuantity' + index);
+            var unitEl = document.getElementById('aiVoiceReviewUnit' + index);
+            var quantity = qtyEl ? parseFloat(qtyEl.value) : NaN;
+            if (isFinite(quantity) && quantity >= 0) {
+                row.item.quantity = _voiceRoundQuantity(quantity);
+            }
+            var unit = unitEl ? unitEl.value.trim() : '';
+            if (unit) {
+                row.item.unit = unit;
+                row.item.unitType = unit;
+            }
+            row.item.total = _voiceRoundQuantity((parseFloat(row.item.quantity) || 0) * (parseFloat(row.item.rate || row.item.price || 0) || 0));
         }
 
         async function showAiVoiceReview(result) {
@@ -9302,11 +9611,13 @@ Example:
                 var selected = confirmedExistingMapping ? null : _resolveVoiceReviewSelection(typedValue);
                 if (confirmedExistingMapping) {
                     _applyVoiceMappedItem(row.item, row.mapping);
+                    _applyAiVoiceReviewQuantityEdit(row, index);
                     if (typeof incrementLearnedMappingUsage === 'function') {
                         saveTasks.push(incrementLearnedMappingUsage(row.mapping.id).catch(function(){}));
                     }
                 } else if (selected) {
                     _applyVoiceMappedItem(row.item, selected);
+                    _applyAiVoiceReviewQuantityEdit(row, index);
                     if (remember && remember.checked && typeof saveLearnedMapping === 'function') {
                         saveTasks.push(saveLearnedMapping(row.phrase || row.item.description, selected, note ? note.value.trim() : '').then(function(result) {
                             var uses = parseInt(result && result.data && result.data.usage_count, 10) || 0;
@@ -9316,6 +9627,8 @@ Example:
                             console.warn('Could not save AI learned mapping:', e);
                         }));
                     }
+                } else {
+                    _applyAiVoiceReviewQuantityEdit(row, index);
                 }
             });
             document.querySelectorAll('.ai-voice-scope-note').forEach(function(input) {
@@ -9455,10 +9768,10 @@ Example:
         // These run independently of auth - always fire on page load
         document.addEventListener('DOMContentLoaded', function() {
             loadInvoiceSettingsDefaultsFromCloud();
-            // Event delegation for Manage Items modal buttons (handles dynamically rendered rows)
-            var ciList = document.getElementById('customItemsList');
-            if (ciList) {
-                ciList.addEventListener('click', function(e) {
+            // Event delegation for Manage Items modal buttons (handles dynamically rendered form + rows)
+            var manageItemsRoot = document.getElementById('manageItemsModal') || document.getElementById('customItemsList');
+            if (manageItemsRoot) {
+                manageItemsRoot.addEventListener('click', function(e) {
                     var saveBtn = e.target.closest('.item-save-btn');
                     if (saveBtn) { saveItemRow(saveBtn.dataset.cat, saveBtn.dataset.name); return; }
                     var delBtn = e.target.closest('.item-delete-btn');
@@ -10281,11 +10594,20 @@ Example:
                     </div>
                     <datalist id="aiVoiceTradeRuleItemOptions"></datalist>
                     <div class="border rounded p-3 mb-3 bg-light">
-                        <div class="row g-2">
-                            <div class="col-md-4">
-                                <label class="form-label small fw-semibold" for="aiVoiceTradePhrase">When I say</label>
-                                <input id="aiVoiceTradePhrase" class="form-control form-control-sm" placeholder="case a door">
+                        <div class="row g-2 mb-2">
+                            <div class="col-md-3">
+                                <label class="form-label small fw-semibold" for="aiVoiceTradeRuleType">Rule type</label>
+                                <select id="aiVoiceTradeRuleType" class="form-select form-select-sm" onchange="toggleAiVoiceTradeRuleType()">
+                                    <option value="line_item">Add saved item</option>
+                                    <option value="question">Ask a question</option>
+                                </select>
                             </div>
+                            <div class="col-md-9">
+                                <label class="form-label small fw-semibold" for="aiVoiceTradePhrase">When I say</label>
+                                <input id="aiVoiceTradePhrase" class="form-control form-control-sm" placeholder="case a door, paint the walls, install baseboards">
+                            </div>
+                        </div>
+                        <div id="aiVoiceLineItemRuleFields" class="row g-2">
                             <div class="col-md-4">
                                 <label class="form-label small fw-semibold" for="aiVoiceTradeItem">Add saved item</label>
                                 <input id="aiVoiceTradeItem" class="form-control form-control-sm" list="aiVoiceTradeRuleItemOptions" placeholder="Start typing item...">
@@ -10314,8 +10636,56 @@ Example:
                                 <input id="aiVoiceTradeNote" class="form-control form-control-sm" placeholder="Optional note">
                             </div>
                         </div>
+                        <div id="aiVoiceQuestionRuleFields" class="d-none mt-3">
+                            <label class="form-label small fw-semibold" for="aiVoiceTradeQuestion">Question QuoteDr should ask</label>
+                            <input id="aiVoiceTradeQuestion" class="form-control form-control-sm mb-3" placeholder="Is this a vacant home or occupied?">
+                            <div class="border rounded p-3 bg-white mb-3">
+                                <div class="fw-semibold small mb-2">Answer option</div>
+                                <div class="row g-2">
+                                    <div class="col-md-3">
+                                        <label class="form-label small fw-semibold" for="aiVoiceQuestionOptionLabel">Answer</label>
+                                        <input id="aiVoiceQuestionOptionLabel" class="form-control form-control-sm" placeholder="Vacant">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small fw-semibold" for="aiVoiceQuestionOptionAliases">Aliases</label>
+                                        <input id="aiVoiceQuestionOptionAliases" class="form-control form-control-sm" placeholder="empty, new build">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-semibold" for="aiVoiceQuestionOptionItem">Add saved item</label>
+                                        <input id="aiVoiceQuestionOptionItem" class="form-control form-control-sm" list="aiVoiceTradeRuleItemOptions" placeholder="Start typing item...">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label small fw-semibold" for="aiVoiceQuestionOptionQuantity">Quantity</label>
+                                        <input id="aiVoiceQuestionOptionQuantity" type="number" step="0.01" class="form-control form-control-sm" value="1">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label small fw-semibold" for="aiVoiceQuestionOptionCountLabel">Per</label>
+                                        <input id="aiVoiceQuestionOptionCountLabel" class="form-control form-control-sm" placeholder="room, door, sqft">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small fw-semibold" for="aiVoiceQuestionOptionMode">Formula</label>
+                                        <select id="aiVoiceQuestionOptionMode" class="form-select form-select-sm">
+                                            <option value="per_count">Quantity per count</option>
+                                            <option value="fixed">Fixed quantity</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label small fw-semibold" for="aiVoiceQuestionOptionDefaultCount">Default count</label>
+                                        <input id="aiVoiceQuestionOptionDefaultCount" type="number" step="0.01" class="form-control form-control-sm" value="1">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small fw-semibold" for="aiVoiceQuestionOptionNote">Note</label>
+                                        <input id="aiVoiceQuestionOptionNote" class="form-control form-control-sm" placeholder="Optional">
+                                    </div>
+                                </div>
+                                <div class="text-end mt-2">
+                                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="addAiVoiceQuestionOptionDraftItem()"><i class="fas fa-plus me-1"></i>Add Answer</button>
+                                </div>
+                            </div>
+                            <div id="aiVoiceQuestionOptionDraftList" class="mb-2"></div>
+                        </div>
                         <div class="text-end mt-3">
-                            <button type="button" class="btn btn-primary btn-sm" onclick="saveAiVoiceTradeRule()"><i class="fas fa-plus me-1"></i>Add Rule</button>
+                            <button type="button" class="btn btn-primary btn-sm" onclick="saveAiVoiceTradeRule()"><i class="fas fa-plus me-1"></i><span id="aiVoiceTradeRuleSaveLabel">Add Rule</span></button>
                         </div>
                     </div>
                     <div id="aiVoiceTradeRulesList"></div>
@@ -10323,6 +10693,26 @@ Example:
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" onclick="loadAiVoiceTradeRulesSettings()"><i class="fas fa-sync-alt me-1"></i>Refresh</button>
                     <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Voice Clarification Modal -->
+    <div class="modal fade" id="aiVoiceClarificationModal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header" style="background:#1a56a0; color:white;">
+                    <h5 class="modal-title"><i class="fas fa-question-circle me-2"></i>AI Trade Rule Questions</h5>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-light border small">
+                        QuoteDr needs one more choice before the review step so it can add the right saved item.
+                    </div>
+                    <div id="aiVoiceClarificationList"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" onclick="confirmAiVoiceClarifications()"><i class="fas fa-check me-1"></i>Continue Review</button>
                 </div>
             </div>
         </div>

@@ -1148,23 +1148,55 @@ async function getUserAiTradeRules() {
     return data || [];
 }
 
+function sanitizeAiTradeRuleClarificationOptions(options) {
+    if (!Array.isArray(options)) return [];
+    return options
+        .map(function(option) {
+            if (!option) return null;
+            const quantityMode = option.quantity_mode === 'fixed' ? 'fixed' : 'per_count';
+            return {
+                id: option.id || (Date.now().toString(36) + Math.random().toString(36).slice(2, 8)),
+                label: String(option.label || '').trim(),
+                aliases: Array.isArray(option.aliases)
+                    ? option.aliases.map(function(alias) { return String(alias || '').trim(); }).filter(Boolean)
+                    : String(option.aliases || '').split(',').map(function(alias) { return alias.trim(); }).filter(Boolean),
+                mapped_item_category: option.mapped_item_category || option.category || 'Miscellaneous',
+                mapped_item_name: option.mapped_item_name || option.name || '',
+                mapped_unit: option.mapped_unit || option.unitType || option.unit || 'ls',
+                mapped_price: parseFloat(option.mapped_price !== undefined ? option.mapped_price : option.rate) || 0,
+                quantity_mode: quantityMode,
+                quantity_value: parseFloat(option.quantity_value || 1) || 1,
+                count_unit_label: option.count_unit_label || '',
+                default_count: parseFloat(option.default_count || 1) || 1,
+                user_note: option.user_note || ''
+            };
+        })
+        .filter(function(option) { return option && option.label && option.mapped_item_name; });
+}
+
 async function saveAiTradeRule(rule) {
     const user = await getCurrentUser();
     if (!user) return { data: null, error: 'Not authenticated' };
     const phraseKey = normalizeAiPhraseKey(rule && rule.trigger_phrase);
     if (!phraseKey) return { data: null, error: 'Missing trigger phrase' };
+    const ruleType = rule && rule.rule_type === 'question' ? 'question' : 'line_item';
+    const clarificationOptions = sanitizeAiTradeRuleClarificationOptions(rule && rule.clarification_options);
+    const fallbackOption = clarificationOptions[0] || {};
     const payload = {
         user_id: user.id,
         trigger_phrase: String(rule.trigger_phrase || '').trim(),
         phrase_key: phraseKey,
-        mapped_item_category: rule.mapped_item_category || rule.category || 'Miscellaneous',
-        mapped_item_name: rule.mapped_item_name || rule.name || '',
-        mapped_unit: rule.mapped_unit || rule.unitType || rule.unit || 'ls',
-        mapped_price: parseFloat(rule.mapped_price !== undefined ? rule.mapped_price : rule.rate) || 0,
-        quantity_mode: rule.quantity_mode || 'per_count',
-        quantity_value: parseFloat(rule.quantity_value || 1) || 1,
-        count_unit_label: rule.count_unit_label || '',
-        default_count: parseFloat(rule.default_count || 1) || 1,
+        rule_type: ruleType,
+        clarification_question: ruleType === 'question' ? String(rule.clarification_question || '').trim() : null,
+        clarification_options: ruleType === 'question' ? clarificationOptions : [],
+        mapped_item_category: rule.mapped_item_category || rule.category || fallbackOption.mapped_item_category || 'Miscellaneous',
+        mapped_item_name: rule.mapped_item_name || rule.name || fallbackOption.mapped_item_name || '',
+        mapped_unit: rule.mapped_unit || rule.unitType || rule.unit || fallbackOption.mapped_unit || 'ls',
+        mapped_price: parseFloat(rule.mapped_price !== undefined ? rule.mapped_price : (rule.rate !== undefined ? rule.rate : fallbackOption.mapped_price)) || 0,
+        quantity_mode: rule.quantity_mode || fallbackOption.quantity_mode || 'per_count',
+        quantity_value: parseFloat(rule.quantity_value || fallbackOption.quantity_value || 1) || 1,
+        count_unit_label: rule.count_unit_label || fallbackOption.count_unit_label || '',
+        default_count: parseFloat(rule.default_count || fallbackOption.default_count || 1) || 1,
         user_note: rule.user_note || '',
         active: rule.active !== false,
         updated_at: new Date().toISOString()
