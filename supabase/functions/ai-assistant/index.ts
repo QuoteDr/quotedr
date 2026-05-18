@@ -5,6 +5,10 @@ import {
   jsonResponse,
   startAiUsage,
 } from "../_shared/ai-guard.ts";
+import {
+  buildQuoteDrAssistantSystemPrompt,
+  type QuoteDrAssistantContext,
+} from "../_shared/quotedr-knowledge.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,14 +22,14 @@ Deno.serve(async (req) => {
 
   let usageGuard: any = null;
   try {
-    const { messages, feature } = await req.json();
+    const { messages, feature, context } = await req.json();
 
     if (!messages || !Array.isArray(messages)) {
       return jsonResponse({ error: 'No messages provided' }, 400, corsHeaders);
     }
 
     const aiFeature = feature === 'ai_refine' ? 'ai_refine' : 'ai_assistant';
-    const inputChars = JSON.stringify(messages).length;
+    const inputChars = JSON.stringify({ messages, context }).length;
     usageGuard = await startAiUsage(req, { feature: aiFeature, endpoint: 'ai-assistant', inputChars });
     assertWithinAiInputLimit(usageGuard.policy, messages, usageGuard.policy.label);
 
@@ -35,21 +39,10 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'OpenAI key not configured' }, 500, corsHeaders);
     }
 
-    const systemPrompt = `You are QuoteDr Assistant, a helpful AI built into QuoteDr.io — a quoting and invoicing app for renovation contractors. You help contractors with:
-- How to use QuoteDr features (adding rooms, line items, sending quotes, saving, dashboard, settings)
-- Renovation business advice (pricing strategies, client communication, job scoping)
-- Quick answers about the app workflow
-- Suggesting what to include in quotes for specific renovation types
-
-QuoteDr App Flow:
-- Quote Builder: Add rooms/areas, add line items per room with category/description/qty/rate, set deposit %, add terms
-- Send Quote: Saves to cloud, generates shareable link for client
-- Dashboard: View all saved quotes, open/edit them
-- Settings: Import materials price list, manage clients, business profile
-- AI Quote: Tap mic, describe job verbally, AI generates the quote structure
-- Invoice: Convert quote to invoice
-
-Keep answers concise and practical. Use bullet points for steps. If asked how to do something in the app, give clear step-by-step instructions. You are friendly, helpful, and speak like a knowledgeable contractor buddy.`;
+    // Grounded-only product guide: QuoteDr workflow answers come from the shared knowledge module.
+    const assistantSystemPrompt = aiFeature === 'ai_refine'
+      ? `You help QuoteDr users rewrite client-facing descriptions. Keep the user's meaning, make it clear and professional, and return only the refined wording.`
+      : buildQuoteDrAssistantSystemPrompt(context as QuoteDrAssistantContext | undefined);
 
     const model = 'gpt-4o-mini';
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -61,7 +54,7 @@ Keep answers concise and practical. Use bullet points for steps. If asked how to
       body: JSON.stringify({
         model,
         messages: [
-          { role: 'system', content: systemPrompt },
+          { role: 'system', content: assistantSystemPrompt },
           ...messages,
         ],
         temperature: 0.7,
@@ -79,7 +72,7 @@ Keep answers concise and practical. Use bullet points for steps. If asked how to
     await usageGuard.recordSuccess({
       model,
       usage: data.usage || {},
-      metadata: { label: usageGuard.policy.label, messageCount: messages.length },
+      metadata: { label: usageGuard.policy.label, messageCount: messages.length, hasContext: !!context },
     });
 
     return jsonResponse({ reply }, 200, corsHeaders);

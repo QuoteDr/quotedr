@@ -10,10 +10,10 @@ var isOpen = false;
 var SUGGESTIONS = [
   'How do I add a room?',
   'How do I send a quote to a client?',
-  'How do I add my pricing list?',
-  'How do I save a quote?',
-  'How do I create an invoice?',
-  'Tips for pricing a job?'
+  'How do I create a saved group?',
+  'How can clients pick one material?',
+  'How do I use AI Voice memory?',
+  'How do payments work?'
 ];
 
 function init() {
@@ -332,6 +332,115 @@ window._qdAiAsk = function(text) {
   window._qdAiSend();
 };
 
+function getQuoteDrAssistantContext() {
+  var activeModal = document.querySelector('.modal.show');
+  var activeModalTitle = '';
+  if (activeModal) {
+    var titleEl = activeModal.querySelector('.modal-title, h1, h2, h3, h4, h5');
+    activeModalTitle = titleEl ? titleEl.textContent.trim() : '';
+  }
+  var activeTool = '';
+  try {
+    var selectedToolbar = document.querySelector('.btn.active, .nav-link.active, [aria-selected="true"]');
+    activeTool = selectedToolbar ? selectedToolbar.textContent.trim().replace(/\s+/g, ' ').slice(0, 80) : '';
+  } catch(e) {}
+  return {
+    pagePath: window.location.pathname || '',
+    pageTitle: document.title || '',
+    activeModalId: activeModal ? activeModal.id || '' : '',
+    activeModalTitle: activeModalTitle,
+    activeTool: activeTool
+  };
+}
+
+function normalizeQuoteDrAssistantQuestion(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function quoteDrMissingFeatureReply() {
+  return 'From what I can see, QuoteDr does not have that yet. Go to Settings > Feedback and submit the idea so we can consider building it.';
+}
+
+function getQuoteDrLocalAssistantReply(text) {
+  var q = normalizeQuoteDrAssistantQuestion(text);
+  if (!q) return '';
+
+  if ((q.includes('saved group') || q.includes('choice group') || q.includes('option group')) && (q.includes('create') || q.includes('make') || q.includes('saved'))) {
+    return '**How to create a saved Choice Group:**\n' +
+      '1. Open the quote builder and click **Manage Items**.\n' +
+      '2. Use **Manage Items > Choice Group**: click Choice Group, then click New.\n' +
+      '3. Search and select the saved items you want in the group.\n' +
+      '4. Choose **Pick One** if the client should choose one option, or **Pick Multiple** if they can choose several.\n' +
+      '5. For **Pick One**, choose the default/base option.\n' +
+      '6. Leave **Always use grouping when any of these items are added to a quote** on if you want QuoteDr to auto-group them later.\n' +
+      '7. Save the group.\n\n' +
+      'You can add it to a room with **Saved Group**, or add one of its saved items and let auto-grouping place the group on the quote.';
+  }
+
+  if ((q.includes('client') || q.includes('customer')) && (q.includes('pick') || q.includes('choose') || q.includes('select')) && (q.includes('material') || q.includes('option') || q.includes('few'))) {
+    return '**To let a client pick one of a few materials:**\n' +
+      '1. Open **Manage Items**.\n' +
+      '2. Click **Choice Group**, then **New**.\n' +
+      '3. Select the saved material items, such as vinyl, laminate, and hardwood.\n' +
+      '4. Choose **Pick One**.\n' +
+      '5. Choose the default/base option and save the group.\n' +
+      '6. Add the group to a room with **Saved Group**, or add one matching item and let auto-grouping use the saved group.\n\n' +
+      'In the quote builder, click the **Pick One** badge if you want to switch which option is selected or shown first. Use **Turn Off Grouping** if this quote should keep only one normal line item.';
+  }
+
+  if (q.includes('turn off grouping') || q.includes('disable grouping') || q.includes('ungroup')) {
+    return '**To turn off grouping:**\n' +
+      '1. On the grouped quote row, click **Turn Off Grouping**.\n' +
+      '2. Choose which option should remain on the quote.\n' +
+      '3. QuoteDr converts that grouped row into a normal line item for this quote only.\n\n' +
+      'To stop automatic grouping for a room and future new rooms, click **Disable Grouping** in the room toolbar.';
+  }
+
+  if (q.includes('ai voice') && (q.includes('memory') || q.includes('learn'))) {
+    return '**AI Voice Memory:**\n' +
+      '1. Open the AI Voice tool.\n' +
+      '2. Record the job and generate the review step.\n' +
+      '3. In **AI Voice Review**, match what QuoteDr heard to the correct saved item.\n' +
+      '4. Keep **Remember this** checked when you want QuoteDr to learn that phrase for next time.\n' +
+      '5. Use **AI Memory** from the voice modal to edit or delete learned mappings later.\n\n' +
+      'For repeat rules like “case a door means 35 LF of trim,” use **AI Trade Rules**. For packages like “standard bedroom package,” use **Voice Templates**.';
+  }
+
+  if (q.includes('payment') || q.includes('stripe') || q.includes('deposit')) {
+    return '**How payments work in QuoteDr:**\n' +
+      '1. Go to **Settings > Payments**.\n' +
+      '2. Enable Stripe Payments when you are ready to accept card payments.\n' +
+      '3. Set the default deposit percent.\n' +
+      '4. Turn on the **deposit payment button on quote links** if clients should pay deposits from quotes.\n' +
+      '5. Turn on the **pay-in-full button on invoice links** if clients should pay full invoice balances.\n\n' +
+      'You can also keep manual payment instructions for e-transfer, cash, cheque, or other offline methods.';
+  }
+
+  if (q.includes('add') && q.includes('room')) {
+    return '**To add a room or area:**\n' +
+      '1. In the quote builder, click **Add Room**.\n' +
+      '2. Enter the room or area name, like Bedroom, Kitchen, Exterior, or Basement.\n' +
+      '3. Add line items inside that room so the quote stays organized for the client.';
+  }
+
+  if (q.includes('send') && q.includes('quote')) {
+    return '**To send a quote:**\n' +
+      '1. Review the client information, rooms, line items, totals, and terms.\n' +
+      '2. Click **Quote** or open **Send Quote Settings**.\n' +
+      '3. Choose style, pricing detail, approval type, expiry, deposit display, and message.\n' +
+      '4. Generate the client link, preview it, then copy or email it to the client.';
+  }
+
+  if ((q.includes('schedule') && (q.includes('crew') || q.includes('job'))) || q.includes('dispatch') || q.includes('calendar crew')) {
+    return quoteDrMissingFeatureReply();
+  }
+
+  return '';
+}
+
 window._qdAiSend = async function() {
   var input = document.getElementById('qdAiInput');
   var text = input.value.trim();
@@ -359,6 +468,20 @@ window._qdAiSend = async function() {
   msgEl.scrollTop = msgEl.scrollHeight;
 
   try {
+    var localReply = getQuoteDrLocalAssistantReply(text);
+    if (localReply) {
+      messages.push({
+        role: 'assistant',
+        content: localReply
+      });
+      var localLoadingEl = document.getElementById(loadingId);
+      if (localLoadingEl) {
+        localLoadingEl.remove();
+      }
+      _addMsg(localReply, 'ai');
+      return;
+    }
+
     if (typeof getSupabaseFunctionAuthHeaders !== 'function') {
       throw new Error('Please sign in before using the AI assistant.');
     }
@@ -366,7 +489,8 @@ window._qdAiSend = async function() {
       method: 'POST',
       headers: await getSupabaseFunctionAuthHeaders(),
       body: JSON.stringify({
-        messages: messages.slice(-6) // last 6 messages for context
+        messages: messages.slice(-6), // last 6 messages for context
+        context: getQuoteDrAssistantContext()
       })
     });
     var data = await res.json();

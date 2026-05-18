@@ -178,7 +178,7 @@
                 </h2>
                 <div id="manualPricing" class="accordion-collapse collapse" data-bs-parent="#manualsAccordion">
                     <div class="accordion-body">
-                        Manage Line Items is your saved price list. Keep item names searchable, set the rate you charge, and optionally track material cost and supplier links for margin review.
+                        Manage Line Items is your saved price list. Keep item names searchable, set the rate you charge, and optionally track material cost and supplier links for margin review. Use Manage Items &gt; Choice Group to create saved client option groups from your saved items. Pick One is for one selected material or option; Pick Multiple is for add-ons where the client can choose several. Auto-grouping can automatically use a saved group when one of its items is added to a quote.
                     </div>
                 </div>
             </div>
@@ -238,7 +238,7 @@
                 </h2>
                 <div id="manualAI" class="accordion-collapse collapse" data-bs-parent="#manualsAccordion">
                     <div class="accordion-body">
-                        AI Quote Builder works best when you describe the job clearly and your saved pricing list is current. Always review AI-created rooms, quantities, and prices before sending to a client.
+                        AI Quote Builder works best when you describe the job clearly and your saved pricing list is current. Always use AI Voice Review to check parsed items, uncertain matches, duplicates, learned mappings, saved groups, and room scope notes before sending to a client. AI Memory remembers phrase corrections, AI Trade Rules apply contractor shorthand, and Voice Templates apply repeatable packages.
                     </div>
                 </div>
             </div>
@@ -262,7 +262,7 @@
                 </h2>
                 <div id="manualInvoices" class="accordion-collapse collapse" data-bs-parent="#manualsAccordion">
                     <div class="accordion-body">
-                        Generate invoices from completed quote information, then review the total before sending. Use deposit tools and Stripe checkout only after payment settings are ready.
+                        Generate invoices from completed quote information, then review the total before sending. In Settings &gt; Payments, Stripe can show a deposit payment button on quote links and a pay-in-full button on invoice links. Use deposit tools and Stripe checkout only after payment settings are ready.
                     </div>
                 </div>
             </div>
@@ -335,6 +335,30 @@
                 <div id="collapse5" class="accordion-collapse collapse" data-bs-parent="#faqBuildingQuotes">
                     <div class="accordion-body">
                         Yes! Go to Settings → My Materials. Add your custom items with your own rates. When you use AI voice quotes, it will automatically pull from your price list.
+                    </div>
+                </div>
+            </div>
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="headingChoiceGroups">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseChoiceGroups">
+                        How do I create a saved choice group?
+                    </button>
+                </h2>
+                <div id="collapseChoiceGroups" class="accordion-collapse collapse" data-bs-parent="#faqBuildingQuotes">
+                    <div class="accordion-body">
+                        Open the quote builder, click Manage Items, click Choice Group, then click New. Search and select saved items from your database, choose Pick One or Pick Multiple, choose the default/base option for Pick One, leave auto-grouping on if you want QuoteDr to use the group automatically, then save the group.
+                    </div>
+                </div>
+            </div>
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="headingClientChoices">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseClientChoices">
+                        How can I let a client pick one of a few materials?
+                    </button>
+                </h2>
+                <div id="collapseClientChoices" class="accordion-collapse collapse" data-bs-parent="#faqBuildingQuotes">
+                    <div class="accordion-body">
+                        Create a saved Choice Group in Manage Items with Pick One. Add the group to a room with Saved Group, or add one of the saved items and let auto-grouping place the group on the quote. In the quote builder, click the Pick One badge if you want to choose which option appears first or is selected by default for the client. Use Turn Off Grouping if this quote should keep only one normal line item.
                     </div>
                 </div>
             </div>
@@ -497,6 +521,18 @@
                 <div id="collapse17" class="accordion-collapse collapse" data-bs-parent="#faqBilling">
                     <div class="accordion-body">
                         Email support@quotedr.io or use the AI Assistant chat button (bottom right of any page). We typically respond within 1 business day.
+                    </div>
+                </div>
+            </div>
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading18">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse18">
+                        What if QuoteDr does not have a feature I need?
+                    </button>
+                </h2>
+                <div id="collapse18" class="accordion-collapse collapse" data-bs-parent="#faqBilling">
+                    <div class="accordion-body">
+                        From what I can see, QuoteDr does not have that yet. Go to Settings &gt; Feedback and submit the idea so we can consider building it. Include the page you were on, what you were trying to do, and how the feature would help your workflow.
                     </div>
                 </div>
             </div>

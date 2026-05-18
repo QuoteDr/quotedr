@@ -1309,34 +1309,340 @@
                 .replace(/'/g, '&#39;');
         }
 
-        async function openChoiceGroupTemplateModal() {
+        function choiceGroupItemSearchText(item) {
+            return [
+                item.name,
+                item.category,
+                item.unitType,
+                item.supplierUrl,
+                item.itemDescription,
+                item.description
+            ].join(' ').toLowerCase();
+        }
+
+        function openChoiceGroupItemPicker(candidates, initialQuery, initialSelectedIds, initialAutoGroup) {
+            return new Promise(function(resolve) {
+                var existing = document.getElementById('choiceGroupItemPickerModal');
+                if (existing) existing.remove();
+
+                var modalHtml = '' +
+                    '<div class="modal fade" id="choiceGroupItemPickerModal" tabindex="-1" aria-hidden="true">' +
+                    '<div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">' +
+                    '<div class="modal-content">' +
+                    '<div class="modal-header bg-primary text-white">' +
+                    '<h5 class="modal-title"><i class="fas fa-layer-group me-2"></i>Choose Saved Items</h5>' +
+                    '<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>' +
+                    '</div>' +
+                    '<div class="modal-body">' +
+                    '<label class="form-label fw-bold" for="choiceGroupItemSearch">Search saved items</label>' +
+                    '<input type="text" id="choiceGroupItemSearch" class="form-control mb-2" placeholder="Search by item, category, description, supplier, or unit...">' +
+                    '<div class="d-flex justify-content-between align-items-center gap-2 mb-2 flex-wrap">' +
+                    '<div class="small text-muted">Click saved items below to include them in this choice group.</div>' +
+                    '<span id="choiceGroupSelectedCount" class="badge bg-secondary">0 selected</span>' +
+                    '</div>' +
+                    '<div class="form-check form-switch border rounded bg-light px-5 py-2 mb-2">' +
+                    '<input class="form-check-input" type="checkbox" id="choiceGroupAutoGroupCheckbox" checked>' +
+                    '<label class="form-check-label fw-semibold" for="choiceGroupAutoGroupCheckbox">Always use grouping when any of these items are added to a quote</label>' +
+                    '<div class="small text-muted">When this is on, QuoteDr automatically shows the full option group if one of these saved items lands on a quote.</div>' +
+                    '</div>' +
+                    '<div id="choiceGroupItemPickerList" style="max-height:55vh;overflow:auto;"></div>' +
+                    '</div>' +
+                    '<div class="modal-footer">' +
+                    '<button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>' +
+                    '<button type="button" class="btn btn-primary" id="choiceGroupUseSelectedBtn" disabled><i class="fas fa-check me-1"></i>Use Selected Items</button>' +
+                    '</div>' +
+                    '</div></div></div>';
+
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+                var modalEl = document.getElementById('choiceGroupItemPickerModal');
+                var searchEl = document.getElementById('choiceGroupItemSearch');
+                var listEl = document.getElementById('choiceGroupItemPickerList');
+                var countEl = document.getElementById('choiceGroupSelectedCount');
+                var useBtn = document.getElementById('choiceGroupUseSelectedBtn');
+                var autoGroupEl = document.getElementById('choiceGroupAutoGroupCheckbox');
+                var selected = new Set();
+                var initialIds = Array.isArray(initialSelectedIds) ? initialSelectedIds : [];
+                if (autoGroupEl) autoGroupEl.checked = initialAutoGroup !== false;
+                candidates.forEach(function(item, index) {
+                    if (initialIds.indexOf(item.id) >= 0) selected.add(index);
+                });
+                var accepted = false;
+
+                function getFilteredItems() {
+                    var q = (searchEl.value || '').trim().toLowerCase();
+                    return candidates.filter(function(item) {
+                        return !q || choiceGroupItemSearchText(item).indexOf(q) !== -1;
+                    });
+                }
+
+                function renderPicker() {
+                    var filtered = getFilteredItems();
+                    var grouped = {};
+                    filtered.forEach(function(item) {
+                        var cat = item.category || 'Saved Items';
+                        if (!grouped[cat]) grouped[cat] = [];
+                        grouped[cat].push(item);
+                    });
+
+                    var html = '';
+                    Object.keys(grouped).sort(function(a, b) { return a.localeCompare(b); }).forEach(function(cat) {
+                        html += '<section class="border rounded mb-2 overflow-hidden">' +
+                            '<div class="d-flex align-items-center justify-content-between gap-2 px-3 py-2" style="background:#eef4ff;">' +
+                            '<strong><i class="fas fa-tag me-1 text-primary"></i>' + itemHtmlEscape(cat) + '</strong>' +
+                            '<span class="badge bg-light text-dark border">' + grouped[cat].length + '</span>' +
+                            '</div>' +
+                            '<div class="list-group list-group-flush">';
+                        grouped[cat].forEach(function(item) {
+                            var index = candidates.indexOf(item);
+                            var checked = selected.has(index);
+                            html += '<div class="list-group-item list-group-item-action d-flex align-items-start gap-2" data-choice-group-item="' + index + '" style="cursor:pointer;">' +
+                                '<input class="form-check-input mt-1 flex-shrink-0" type="checkbox" data-choice-group-check="' + index + '"' + (checked ? ' checked' : '') + '>' +
+                                '<span class="flex-grow-1">' +
+                                '<span class="d-flex justify-content-between gap-2">' +
+                                '<strong>' + itemHtmlEscape(item.name) + '</strong>' +
+                                '<span class="text-primary fw-bold text-nowrap">$' + (parseFloat(item.rate) || 0).toFixed(2) + '</span>' +
+                                '</span>' +
+                                '<span class="small text-muted d-block">' + itemHtmlEscape(item.unitType || 'unit') + (item.itemDescription ? ' - ' + itemHtmlEscape(item.itemDescription) : '') + '</span>' +
+                                '</span>' +
+                                '</div>';
+                        });
+                        html += '</div></section>';
+                    });
+                    if (!html) {
+                        html = '<div class="alert alert-warning mb-0">No saved items match that search. Try a broader word or clear the search.</div>';
+                    }
+                    listEl.innerHTML = html;
+                    countEl.textContent = selected.size + ' selected';
+                    countEl.className = 'badge ' + (selected.size >= 2 ? 'bg-success' : 'bg-secondary');
+                    useBtn.disabled = selected.size < 2;
+                }
+
+                searchEl.value = initialQuery || '';
+                searchEl.addEventListener('input', renderPicker);
+                listEl.addEventListener('change', function(e) {
+                    var box = e.target.closest('[data-choice-group-check]');
+                    if (!box) return;
+                    var index = parseInt(box.getAttribute('data-choice-group-check'), 10);
+                    if (box.checked) selected.add(index);
+                    else selected.delete(index);
+                    renderPicker();
+                });
+                listEl.addEventListener('click', function(e) {
+                    if (e.target.matches('input[type="checkbox"]')) return;
+                    var row = e.target.closest('[data-choice-group-item]');
+                    if (!row) return;
+                    var index = parseInt(row.getAttribute('data-choice-group-item'), 10);
+                    if (selected.has(index)) selected.delete(index);
+                    else selected.add(index);
+                    renderPicker();
+                });
+                useBtn.addEventListener('click', function() {
+                    if (selected.size < 2) return;
+                    accepted = true;
+                    bootstrap.Modal.getInstance(modalEl).hide();
+                });
+                modalEl.addEventListener('shown.bs.modal', function() {
+                    searchEl.focus();
+                    searchEl.select();
+                }, { once: true });
+                modalEl.addEventListener('hidden.bs.modal', function() {
+                    var picked = accepted ? Array.from(selected).sort(function(a, b) { return a - b; }).map(function(index) {
+                        return candidates[index];
+                    }).filter(Boolean) : null;
+                    if (picked) picked.autoGroup = !autoGroupEl || autoGroupEl.checked;
+                    modalEl.remove();
+                    resolve(picked);
+                }, { once: true });
+                renderPicker();
+                new bootstrap.Modal(modalEl).show();
+            });
+        }
+
+        function openChoiceGroupDefaultOptionPicker(options, initialDefaultOptionId) {
+            return new Promise(function(resolve) {
+                var existing = document.getElementById('choiceGroupDefaultOptionModal');
+                if (existing) existing.remove();
+
+                var initialIndex = Math.max(0, options.findIndex(function(item) { return item.id === initialDefaultOptionId; }));
+                var rowsHtml = options.map(function(item, idx) {
+                    var checked = idx === initialIndex;
+                    return '<div class="list-group-item list-group-item-action d-flex align-items-start gap-2' + (checked ? ' active' : '') + '" data-choice-group-default-option="' + idx + '" style="cursor:pointer;">' +
+                        '<input class="form-check-input mt-1 flex-shrink-0" type="radio" name="choiceGroupDefaultOption" data-choice-group-default-radio="' + idx + '"' + (checked ? ' checked' : '') + '>' +
+                        '<span class="flex-grow-1">' +
+                        '<span class="d-flex justify-content-between gap-2">' +
+                        '<strong>' + itemHtmlEscape(item.name) + '</strong>' +
+                        '<span class="fw-bold text-nowrap">$' + (parseFloat(item.rate) || 0).toFixed(2) + '</span>' +
+                        '</span>' +
+                        '<span class="small ' + (checked ? 'text-white-50' : 'text-muted') + ' d-block">' + itemHtmlEscape(item.category || 'Saved Item') + ' - ' + itemHtmlEscape(item.unitType || 'unit') + '</span>' +
+                        (item.itemDescription ? '<span class="small ' + (checked ? 'text-white-50' : 'text-muted') + ' d-block">' + itemHtmlEscape(item.itemDescription) + '</span>' : '') +
+                        '</span>' +
+                        '</div>';
+                }).join('');
+
+                var modalHtml = '' +
+                    '<div class="modal fade" id="choiceGroupDefaultOptionModal" tabindex="-1" aria-hidden="true">' +
+                    '<div class="modal-dialog modal-lg modal-dialog-centered">' +
+                    '<div class="modal-content">' +
+                    '<div class="modal-header bg-primary text-white">' +
+                    '<h5 class="modal-title"><i class="fas fa-check-circle me-2"></i>Default Option</h5>' +
+                    '<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>' +
+                    '</div>' +
+                    '<div class="modal-body">' +
+                    '<p class="mb-3">Choose the base option clients will see selected first.</p>' +
+                    '<div id="choiceGroupDefaultOptionList" class="list-group">' + rowsHtml + '</div>' +
+                    '</div>' +
+                    '<div class="modal-footer">' +
+                    '<button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>' +
+                    '<button type="button" class="btn btn-primary" id="choiceGroupUseDefaultBtn"><i class="fas fa-check me-1"></i>Use This Default</button>' +
+                    '</div>' +
+                    '</div></div></div>';
+
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+                var modalEl = document.getElementById('choiceGroupDefaultOptionModal');
+                var listEl = document.getElementById('choiceGroupDefaultOptionList');
+                var accepted = false;
+                var selectedIndex = initialIndex;
+
+                function renderSelected() {
+                    listEl.querySelectorAll('[data-choice-group-default-option]').forEach(function(row) {
+                        var index = parseInt(row.getAttribute('data-choice-group-default-option'), 10);
+                        var active = index === selectedIndex;
+                        row.classList.toggle('active', active);
+                        var radio = row.querySelector('[data-choice-group-default-radio]');
+                        if (radio) radio.checked = active;
+                        row.querySelectorAll('.small').forEach(function(el) {
+                            el.classList.toggle('text-muted', !active);
+                            el.classList.toggle('text-white-50', active);
+                        });
+                    });
+                }
+
+                listEl.addEventListener('click', function(e) {
+                    var row = e.target.closest('[data-choice-group-default-option]');
+                    if (!row) return;
+                    selectedIndex = parseInt(row.getAttribute('data-choice-group-default-option'), 10) || 0;
+                    renderSelected();
+                });
+                document.getElementById('choiceGroupUseDefaultBtn').addEventListener('click', function() {
+                    accepted = true;
+                    bootstrap.Modal.getInstance(modalEl).hide();
+                });
+                modalEl.addEventListener('hidden.bs.modal', function() {
+                    var selected = accepted ? options[selectedIndex] : null;
+                    modalEl.remove();
+                    resolve(selected || null);
+                }, { once: true });
+
+                renderSelected();
+                new bootstrap.Modal(modalEl).show();
+            });
+        }
+
+        function openChoiceGroupTypePicker(initialType) {
+            return new Promise(function(resolve) {
+                var existing = document.getElementById('choiceGroupTypePickerModal');
+                if (existing) existing.remove();
+
+                var selectedType = initialType === 'multiple' ? 'multiple' : 'single';
+                var accepted = false;
+                var modalHtml = '' +
+                    '<div class="modal fade" id="choiceGroupTypePickerModal" tabindex="-1" aria-hidden="true">' +
+                    '<div class="modal-dialog modal-lg modal-dialog-centered">' +
+                    '<div class="modal-content">' +
+                    '<div class="modal-header bg-primary text-white">' +
+                    '<h5 class="modal-title"><i class="fas fa-layer-group me-2"></i>Choice Group Type</h5>' +
+                    '<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>' +
+                    '</div>' +
+                    '<div class="modal-body">' +
+                    '<p class="mb-3 fw-semibold">Can the client pick more than one of these items at the same time?</p>' +
+                    '<div id="choiceGroupTypeList" class="row g-3">' +
+                    '<div class="col-md-6">' +
+                    '<button type="button" class="choice-group-type-card btn w-100 text-start border rounded p-3 h-100" data-choice-group-type-option="single">' +
+                    '<div class="d-flex align-items-start gap-2">' +
+                    '<span class="choice-group-type-check mt-1"><i class="far fa-circle"></i></span>' +
+                    '<span><span class="d-block fw-bold">Pick One</span>' +
+                    '<span class="d-block small text-muted">Use this when choices replace each other and only one can be selected.</span>' +
+                    '<span class="d-block small mt-2"><strong>Example:</strong> vinyl plank or hardwood flooring.</span>' +
+                    '</span></div>' +
+                    '</button>' +
+                    '</div>' +
+                    '<div class="col-md-6">' +
+                    '<button type="button" class="choice-group-type-card btn w-100 text-start border rounded p-3 h-100" data-choice-group-type-option="multiple">' +
+                    '<div class="d-flex align-items-start gap-2">' +
+                    '<span class="choice-group-type-check mt-1"><i class="far fa-circle"></i></span>' +
+                    '<span><span class="d-block fw-bold">Pick Multiple</span>' +
+                    '<span class="d-block small text-muted">Use this when several add-ons can be selected together.</span>' +
+                    '<span class="d-block small mt-2"><strong>Example:</strong> baseboards, shoe moulding, and crown moulding.</span>' +
+                    '</span></div>' +
+                    '</button>' +
+                    '</div>' +
+                    '</div>' +
+                    '</div>' +
+                    '<div class="modal-footer">' +
+                    '<button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>' +
+                    '<button type="button" class="btn btn-primary" id="choiceGroupUseTypeBtn"><i class="fas fa-check me-1"></i>Continue</button>' +
+                    '</div>' +
+                    '</div></div></div>';
+
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+                var modalEl = document.getElementById('choiceGroupTypePickerModal');
+                var listEl = document.getElementById('choiceGroupTypeList');
+
+                function renderSelectedType() {
+                    listEl.querySelectorAll('[data-choice-group-type-option]').forEach(function(card) {
+                        var active = card.getAttribute('data-choice-group-type-option') === selectedType;
+                        card.classList.toggle('btn-primary', active);
+                        card.classList.toggle('btn-outline-primary', !active);
+                        card.classList.toggle('text-white', active);
+                        card.querySelectorAll('.small').forEach(function(el) {
+                            el.classList.toggle('text-muted', !active);
+                            el.classList.toggle('text-white-50', active);
+                        });
+                        var icon = card.querySelector('.choice-group-type-check i');
+                        if (icon) icon.className = active ? 'fas fa-check-circle' : 'far fa-circle';
+                    });
+                }
+
+                listEl.addEventListener('click', function(e) {
+                    var card = e.target.closest('[data-choice-group-type-option]');
+                    if (!card) return;
+                    selectedType = card.getAttribute('data-choice-group-type-option') === 'multiple' ? 'multiple' : 'single';
+                    renderSelectedType();
+                });
+                document.getElementById('choiceGroupUseTypeBtn').addEventListener('click', function() {
+                    accepted = true;
+                    bootstrap.Modal.getInstance(modalEl).hide();
+                });
+                modalEl.addEventListener('hidden.bs.modal', function() {
+                    modalEl.remove();
+                    resolve(accepted ? selectedType : null);
+                }, { once: true });
+
+                renderSelectedType();
+                new bootstrap.Modal(modalEl).show();
+            });
+        }
+
+        async function createChoiceGroupTemplateFlow() {
             var name = (await qdPrompt('Name this reusable choice group:', 'Deck Material Options', { title: 'Choice Group' }) || '').trim();
             if (!name) return;
-            var typeText = (await qdPrompt('Type "single" for Pick One or "multiple" for Pick Multiple:', 'single', { title: 'Choice Group Type' }) || 'single').trim().toLowerCase();
-            var type = typeText.indexOf('multi') === 0 ? 'multiple' : 'single';
-            var query = (await qdPrompt('Search saved items to include. Example: deck, stone, flooring, paint', name.split(' ')[0] || '', { title: 'Find Options' }) || '').trim().toLowerCase();
-            var candidates = flattenChoiceGroupCandidateItems().filter(function(item) {
-                return !query || item.name.toLowerCase().indexOf(query) !== -1 || item.category.toLowerCase().indexOf(query) !== -1;
-            }).slice(0, 20);
+            var type = await openChoiceGroupTypePicker('single');
+            if (!type) return;
+            var candidates = flattenChoiceGroupCandidateItems();
             if (candidates.length < 2) {
-                qdAlert('I found fewer than two matching saved items. Try a broader search word, then create the group again.');
+                qdAlert('You need at least two saved items before creating a reusable choice group.');
                 return;
             }
-            var list = candidates.map(function(item, idx) {
-                return (idx + 1) + '. ' + item.name + ' - $' + item.rate.toFixed(2) + '/' + (item.unitType || 'unit');
-            }).join('\n');
-            var pickedText = (await qdPrompt('Choose option numbers, comma separated:\n' + list, candidates.map(function(_, idx) { return idx + 1; }).join(','), { title: 'Confirm Options' }) || '').trim();
-            var picked = pickedText.split(',').map(function(part) { return parseInt(part.trim(), 10) - 1; })
-                .filter(function(idx, pos, arr) { return idx >= 0 && idx < candidates.length && arr.indexOf(idx) === pos; })
-                .map(function(idx) { return candidates[idx]; });
+            var picked = await openChoiceGroupItemPicker(candidates, name.split(' ')[0] || '', [], true);
+            if (!picked) return;
             if (picked.length < 2) {
                 qdAlert('A choice group needs at least two options.');
                 return;
             }
             var defaultOption = picked[0];
             if (type === 'single') {
-                var def = parseInt(await qdPrompt('Which option number is the default/base price?', '1', { title: 'Default Option' }), 10) || 1;
-                defaultOption = picked[Math.max(0, Math.min(picked.length - 1, def - 1))] || picked[0];
+                defaultOption = await openChoiceGroupDefaultOptionPicker(picked);
+                if (!defaultOption) return;
             }
             var template = {
                 id: 'cgt_' + Date.now().toString(36),
@@ -1345,6 +1651,7 @@
                 required: type === 'single',
                 defaultOptionId: defaultOption.id,
                 selectedOptionIds: type === 'single' ? [defaultOption.id] : [],
+                autoGroup: picked.autoGroup !== false,
                 options: picked
             };
             pushUndoState();
@@ -1352,6 +1659,153 @@
             saveCustomItems(true);
             renderAllItemsList();
             qdAlert('Saved "' + name + '" as a reusable client choice group.');
+        }
+
+        async function renameChoiceGroupTemplate(index) {
+            var store = getChoiceGroupTemplateStore();
+            var group = store[index];
+            if (!group) return;
+            var name = (await qdPrompt('Rename this choice group:', group.name || 'Choice Group', { title: 'Rename Choice Group' }) || '').trim();
+            if (!name) return;
+            pushUndoState();
+            group.name = name;
+            saveCustomItems(true);
+            renderAllItemsList();
+        }
+
+        async function deleteChoiceGroupTemplate(index) {
+            var store = getChoiceGroupTemplateStore();
+            var group = store[index];
+            if (!group) return;
+            if (!await qdConfirm('Delete "' + (group.name || 'Choice Group') + '"?', {
+                title: 'Delete Choice Group',
+                okText: 'Delete',
+                okClass: 'btn-danger',
+                type: 'danger'
+            })) {
+                return;
+            }
+            pushUndoState();
+            store.splice(index, 1);
+            saveCustomItems(true);
+            renderAllItemsList();
+        }
+
+        async function editChoiceGroupTemplate(index) {
+            var store = getChoiceGroupTemplateStore();
+            var group = store[index];
+            if (!group) return;
+            var type = await openChoiceGroupTypePicker(group.type === 'multiple' ? 'multiple' : 'single');
+            if (!type) return;
+            var candidates = flattenChoiceGroupCandidateItems();
+            if (candidates.length < 2) {
+                qdAlert('You need at least two saved items before editing a reusable choice group.');
+                return;
+            }
+            var currentIds = Array.isArray(group.options) ? group.options.map(function(option) { return option.id; }) : [];
+            var picked = await openChoiceGroupItemPicker(candidates, (group.name || '').split(' ')[0] || '', currentIds, group.autoGroup !== false);
+            if (!picked) return;
+            if (picked.length < 2) {
+                qdAlert('A choice group needs at least two options.');
+                return;
+            }
+            var defaultOption = picked[0];
+            if (type === 'single') {
+                defaultOption = await openChoiceGroupDefaultOptionPicker(picked, group.defaultOptionId);
+                if (!defaultOption) return;
+            }
+            pushUndoState();
+            store[index] = {
+                id: group.id || ('cgt_' + Date.now().toString(36)),
+                name: group.name || 'Choice Group',
+                type: type,
+                required: type === 'single',
+                defaultOptionId: defaultOption.id,
+                selectedOptionIds: type === 'single' ? [defaultOption.id] : [],
+                autoGroup: picked.autoGroup !== false,
+                options: picked
+            };
+            saveCustomItems(true);
+            renderAllItemsList();
+        }
+
+        function renderChoiceGroupTemplateManagerList(container) {
+            var store = getChoiceGroupTemplateStore();
+            if (!store.length) {
+                container.innerHTML = '<div class="alert alert-info mb-0">No reusable choice groups yet. Click <strong>New Choice Group</strong> to create one from your saved items.</div>';
+                return;
+            }
+            container.innerHTML = store.map(function(group, index) {
+                var options = Array.isArray(group.options) ? group.options : [];
+                var optionNames = options.map(function(option) { return option.name; }).filter(Boolean).join(' / ');
+                return '<div class="border rounded p-3 mb-2 bg-white" data-choice-group-template="' + index + '">' +
+                    '<div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">' +
+                    '<div class="flex-grow-1">' +
+                    '<div class="fw-bold"><i class="fas fa-layer-group me-1 text-primary"></i>' + itemHtmlEscape(group.name || 'Choice Group') + '</div>' +
+                    '<div class="small text-muted">' + itemHtmlEscape(group.type === 'multiple' ? 'Pick Multiple' : 'Pick One') + ' - ' + options.length + ' options</div>' +
+                    '<div class="small mt-1">' + itemHtmlEscape(optionNames || 'No options') + '</div>' +
+                    '</div>' +
+                    '<div class="d-flex gap-1 flex-wrap">' +
+                    '<button type="button" class="btn btn-sm btn-outline-primary" data-choice-group-template-action="edit" data-choice-group-template-index="' + index + '"><i class="fas fa-pen me-1"></i>Edit</button>' +
+                    '<button type="button" class="btn btn-sm btn-outline-secondary" data-choice-group-template-action="rename" data-choice-group-template-index="' + index + '"><i class="fas fa-i-cursor me-1"></i>Rename</button>' +
+                    '<button type="button" class="btn btn-sm btn-outline-danger" data-choice-group-template-action="delete" data-choice-group-template-index="' + index + '"><i class="fas fa-trash me-1"></i>Delete</button>' +
+                    '</div>' +
+                    '</div>' +
+                    '</div>';
+            }).join('');
+        }
+
+        function runChoiceGroupManagerAction(modalEl, action) {
+            modalEl.addEventListener('hidden.bs.modal', async function() {
+                modalEl.remove();
+                await action();
+                openChoiceGroupTemplateModal();
+            }, { once: true });
+            bootstrap.Modal.getInstance(modalEl).hide();
+        }
+
+        function openChoiceGroupTemplateModal() {
+            var existing = document.getElementById('choiceGroupTemplateManagerModal');
+            if (existing) existing.remove();
+            var modalHtml = '' +
+                '<div class="modal fade" id="choiceGroupTemplateManagerModal" tabindex="-1" aria-hidden="true">' +
+                '<div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">' +
+                '<div class="modal-content">' +
+                '<div class="modal-header bg-primary text-white">' +
+                '<h5 class="modal-title"><i class="fas fa-layer-group me-2"></i>Choice Groups</h5>' +
+                '<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>' +
+                '</div>' +
+                '<div class="modal-body">' +
+                '<div class="d-flex justify-content-between align-items-center gap-2 mb-3 flex-wrap">' +
+                '<div class="text-muted">Manage reusable client option groups for your saved line items.</div>' +
+                '<button type="button" class="btn btn-primary" id="newChoiceGroupTemplateBtn"><i class="fas fa-plus me-1"></i>New Choice Group</button>' +
+                '</div>' +
+                '<div id="choiceGroupTemplateManagerList"></div>' +
+                '</div>' +
+                '<div class="modal-footer">' +
+                '<button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>' +
+                '</div>' +
+                '</div></div></div>';
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            var modalEl = document.getElementById('choiceGroupTemplateManagerModal');
+            var listEl = document.getElementById('choiceGroupTemplateManagerList');
+            renderChoiceGroupTemplateManagerList(listEl);
+            document.getElementById('newChoiceGroupTemplateBtn').addEventListener('click', function() {
+                runChoiceGroupManagerAction(modalEl, createChoiceGroupTemplateFlow);
+            });
+            listEl.addEventListener('click', function(e) {
+                var btn = e.target.closest('[data-choice-group-template-action]');
+                if (!btn) return;
+                var action = btn.getAttribute('data-choice-group-template-action');
+                var index = parseInt(btn.getAttribute('data-choice-group-template-index'), 10);
+                if (action === 'edit') runChoiceGroupManagerAction(modalEl, function() { return editChoiceGroupTemplate(index); });
+                if (action === 'rename') runChoiceGroupManagerAction(modalEl, function() { return renameChoiceGroupTemplate(index); });
+                if (action === 'delete') runChoiceGroupManagerAction(modalEl, function() { return deleteChoiceGroupTemplate(index); });
+            });
+            modalEl.addEventListener('hidden.bs.modal', function() {
+                if (document.body.contains(modalEl)) modalEl.remove();
+            }, { once: true });
+            new bootstrap.Modal(modalEl).show();
         }
 
         async function suggestChoiceGroupTemplates() {
@@ -1385,6 +1839,7 @@
                 required: true,
                 defaultOptionId: options[0].id,
                 selectedOptionIds: [options[0].id],
+                autoGroup: true,
                 options: options
             });
             saveCustomItems(true);
@@ -1432,7 +1887,7 @@
                             '<strong>' + itemHtmlEscape(item.name) + '</strong>' +
                             '<span class="text-primary fw-bold">$' + (parseFloat(item.rate) || 0).toFixed(2) + '</span>' +
                             '</div>' +
-                            '<div class="small text-muted">' + itemHtmlEscape(item.category || 'Saved Item') + ' · ' + itemHtmlEscape(item.unitType || 'unit') + '</div>' +
+                            '<div class="small text-muted">' + itemHtmlEscape(item.category || 'Saved Item') + ' - ' + itemHtmlEscape(item.unitType || 'unit') + '</div>' +
                             '</div>';
                     }).join('');
                 }
@@ -1584,6 +2039,8 @@
         window.saveItemFieldEdit = saveItemFieldEdit;
         window.addCustomItem = addCustomItem;
         window.openChoiceGroupTemplateModal = openChoiceGroupTemplateModal;
+        window.openChoiceGroupDefaultOptionPicker = openChoiceGroupDefaultOptionPicker;
+        window.openChoiceGroupTypePicker = openChoiceGroupTypePicker;
         window.suggestChoiceGroupTemplates = suggestChoiceGroupTemplates;
         window.refineDescription = refineDescription;
         window.toggleRefinedDescription = toggleRefinedDescription;

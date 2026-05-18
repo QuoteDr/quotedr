@@ -2076,6 +2076,7 @@ Example:
 
         let rooms = [];
         let roomCounter = 0;
+        let quoteAutoGroupingDefaultEnabled = true;
 
         function ensureUniqueRoomIds() {
             if (!Array.isArray(rooms)) return;
@@ -2560,6 +2561,7 @@ Example:
             { fa: 'fa-layer-group',         label: 'Flooring' },
             { fa: 'fa-vector-square',       label: 'Tile / Stone' },
             { fa: 'fa-grip-horizontal',     label: 'Hardwood / Laminate' },
+            { fa: 'qd-flooring-pattern',    label: 'Flooring Pattern' },
             { fa: 'fa-th',                  label: 'Carpet / Pattern' },
             // Tile & Stone
             { fa: 'qd-tile-trowel',         label: 'Tile Trowel' },
@@ -2689,6 +2691,29 @@ Example:
                     '<path d="M10.8 5.35h2.4"></path>' +
                     '<path d="M9.6 13.3v2.8"></path>' +
                     '<path d="M14.4 13.3v2.8"></path>' +
+                '</svg>';
+            }
+            if (icon === 'qd-flooring-pattern') {
+                return '<svg class="' + cls + '" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" style="' + css + 'vertical-align:-0.16em;" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="square" stroke-linejoin="miter">' +
+                    '<rect x="3.2" y="3.2" width="17.6" height="17.6"></rect>' +
+                    '<path d="M12 3.2v17.6"></path>' +
+                    '<path d="M3.2 12h17.6"></path>' +
+                    '<path d="M4 4.6 10.6 11.2"></path>' +
+                    '<path d="M7.4 3.2 12 7.8"></path>' +
+                    '<path d="M3.2 8.1 7.1 12"></path>' +
+                    '<path d="M12 5.9h8.8"></path>' +
+                    '<path d="M12 8.8h8.8"></path>' +
+                    '<path d="M12 11.7h8.8"></path>' +
+                    '<path d="M14.6 3.2v2.7"></path>' +
+                    '<path d="M18.4 5.9v2.9"></path>' +
+                    '<path d="M16.2 8.8v2.9"></path>' +
+                    '<path d="M3.2 18.6 9.8 12"></path>' +
+                    '<path d="M6.6 20.8 12 15.4"></path>' +
+                    '<path d="M3.2 14.9 8.9 20.6"></path>' +
+                    '<path d="M7.3 12 12 16.7"></path>' +
+                    '<path d="M14.8 12v8.8"></path>' +
+                    '<path d="M17.4 12v8.8"></path>' +
+                    '<path d="M20 12v8.8"></path>' +
                 '</svg>';
             }
             if (icon === 'qd-wall-framing') {
@@ -2889,6 +2914,24 @@ Example:
             roomModal.show();
         }
 
+        function getDefaultRoomAutoGroupingEnabled() {
+            return quoteAutoGroupingDefaultEnabled !== false;
+        }
+
+        function isRoomAutoGroupingEnabled(room) {
+            return !room || room.autoGroupingEnabled !== false;
+        }
+
+        function toggleRoomAutoGrouping(roomId) {
+            var room = rooms.find(function(r) { return r.id === roomId; });
+            if (!room) return;
+            _pushUndo();
+            room.autoGroupingEnabled = room.autoGroupingEnabled === false;
+            quoteAutoGroupingDefaultEnabled = room.autoGroupingEnabled !== false;
+            renderRooms();
+            showToast(room.autoGroupingEnabled === false ? 'Grouping disabled for this room and future rooms.' : 'Grouping enabled for this room and future rooms.', 'info');
+        }
+
         function confirmAddRoom() {
             const name = document.getElementById('newRoomName').value.trim();
             if (!name) return;
@@ -2901,7 +2944,8 @@ Example:
                 items: [],
                 colorIndex: defaultColour.colorIndex,
                 customColor: defaultColour.customColor,
-                colorIntensity: defaultColour.colorIntensity
+                colorIntensity: defaultColour.colorIntensity,
+                autoGroupingEnabled: getDefaultRoomAutoGroupingEnabled()
             });
 
             renderRooms();
@@ -3659,7 +3703,7 @@ Example:
                     const dbItem = pricingDatabase[category]?.find(i => i.name === svcName);
                     const sLinkBtn = document.getElementById('supplierLinkBtn');
                     const supplierUrl = (sLinkBtn && sLinkBtn.style.display !== 'none' && sLinkBtn.href !== '#') ? sLinkBtn.href : '';
-                    rooms[roomIndex].items.push({
+                    const newItem = {
                         description,
                         category,
                         serviceName: svcName,
@@ -3674,9 +3718,13 @@ Example:
                         optional: false,
                         itemDescription: dbItem?.itemDescription || '',
                         total: quantity * rate
+                    };
+                    const itemsToAdd = await autoGroupQuoteItem(newItem, rooms[roomIndex]);
+                    itemsToAdd.forEach(function(itemToAdd) {
+                        rooms[roomIndex].items.push(itemToAdd);
                     });
                     if (window._quoteDocumentType === 'change_order') {
-                        coRefreshItemDelta(rooms[roomIndex].items[rooms[roomIndex].items.length - 1]);
+                        itemsToAdd.forEach(function(itemToAdd) { coRefreshItemDelta(itemToAdd); });
                     }
                 }
 
@@ -3899,6 +3947,120 @@ Example:
             return item;
         }
 
+        function moveChoiceGroupOptionToFront(group, optionId) {
+            if (!group || !Array.isArray(group.options) || !optionId) return group;
+            var selectedIndex = group.options.findIndex(function(option) { return option && option.id === optionId; });
+            if (selectedIndex > 0) {
+                var selected = group.options.splice(selectedIndex, 1)[0];
+                group.options.unshift(selected);
+            }
+            return group;
+        }
+
+        function openQuoteChoiceGroupOptionPicker(groupedItem) {
+            return new Promise(function(resolve) {
+                var group = groupedItem && groupedItem.choiceGroup;
+                var options = group && Array.isArray(group.options) ? group.options : [];
+                if (!group || group.type !== 'single' || !options.length) {
+                    resolve(null);
+                    return;
+                }
+                var existing = document.getElementById('quoteChoiceGroupOptionModal');
+                if (existing) existing.remove();
+                var selectedOptions = getChoiceGroupSelectedOptions(group);
+                var selectedId = selectedOptions[0] ? selectedOptions[0].id : (group.defaultOptionId || options[0].id);
+                var selectedIndex = Math.max(0, options.findIndex(function(option) { return option.id === selectedId; }));
+                var accepted = false;
+                var rowsHtml = options.map(function(option, index) {
+                    var qty = option.quantityMode === 'override' ? (parseFloat(option.quantityOverride) || 0) : (parseFloat(groupedItem.quantity) || 0);
+                    var total = qty * (parseFloat(option.rate) || 0);
+                    return '<button type="button" class="list-group-item list-group-item-action text-start" data-quote-choice-option="' + index + '">' +
+                        '<div class="d-flex justify-content-between align-items-start gap-2">' +
+                        '<span class="flex-grow-1">' +
+                        '<span class="d-block fw-bold">' + qdTemplateEscapeHtml(option.name || option.description || 'Option') + '</span>' +
+                        '<span class="d-block small text-muted">' + qdTemplateEscapeHtml(qty + ' ' + (option.unitType || groupedItem.unitType || groupedItem.unit || '')) + ' @ $' + (parseFloat(option.rate) || 0).toFixed(2) + '</span>' +
+                        (option.itemDescription || option.description ? '<span class="d-block small mt-1">' + qdTemplateEscapeHtml(option.itemDescription || option.description) + '</span>' : '') +
+                        '</span>' +
+                        '<span class="text-end">' +
+                        '<strong>$' + total.toFixed(2) + '</strong>' +
+                        '<span class="d-block quote-choice-option-check text-primary mt-1"><i class="far fa-circle"></i></span>' +
+                        '</span>' +
+                        '</div>' +
+                        '</button>';
+                }).join('');
+                var modalHtml = '' +
+                    '<div class="modal fade" id="quoteChoiceGroupOptionModal" tabindex="-1" aria-hidden="true">' +
+                    '<div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">' +
+                    '<div class="modal-content">' +
+                    '<div class="modal-header bg-primary text-white">' +
+                    '<h5 class="modal-title"><i class="fas fa-layer-group me-2"></i>Choose Pick One Option</h5>' +
+                    '<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>' +
+                    '</div>' +
+                    '<div class="modal-body">' +
+                    '<p class="mb-3">Choose which Pick One option should be the base visible line item. The selected option will move to the top of this quote group for the client.</p>' +
+                    '<div id="quoteChoiceGroupOptionList" class="list-group">' + rowsHtml + '</div>' +
+                    '</div>' +
+                    '<div class="modal-footer">' +
+                    '<button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>' +
+                    '<button type="button" class="btn btn-primary" id="quoteChoiceGroupOptionUseBtn"><i class="fas fa-check me-1"></i>Use This Option</button>' +
+                    '</div>' +
+                    '</div></div></div>';
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+                var modalEl = document.getElementById('quoteChoiceGroupOptionModal');
+                var listEl = document.getElementById('quoteChoiceGroupOptionList');
+
+                function renderSelectedQuoteChoiceOption() {
+                    listEl.querySelectorAll('[data-quote-choice-option]').forEach(function(row) {
+                        var index = parseInt(row.getAttribute('data-quote-choice-option'), 10);
+                        var active = index === selectedIndex;
+                        row.classList.toggle('active', active);
+                        row.querySelectorAll('.small').forEach(function(el) {
+                            el.classList.toggle('text-muted', !active);
+                            el.classList.toggle('text-white-50', active);
+                        });
+                        var icon = row.querySelector('.quote-choice-option-check i');
+                        if (icon) icon.className = active ? 'fas fa-check-circle' : 'far fa-circle';
+                    });
+                }
+
+                listEl.addEventListener('click', function(e) {
+                    var row = e.target.closest('[data-quote-choice-option]');
+                    if (!row) return;
+                    selectedIndex = parseInt(row.getAttribute('data-quote-choice-option'), 10) || 0;
+                    renderSelectedQuoteChoiceOption();
+                });
+                document.getElementById('quoteChoiceGroupOptionUseBtn').addEventListener('click', function() {
+                    accepted = true;
+                    bootstrap.Modal.getInstance(modalEl).hide();
+                });
+                modalEl.addEventListener('hidden.bs.modal', function() {
+                    var selected = accepted ? options[selectedIndex] : null;
+                    modalEl.remove();
+                    resolve(selected || null);
+                }, { once: true });
+                renderSelectedQuoteChoiceOption();
+                new bootstrap.Modal(modalEl).show();
+            });
+        }
+
+        async function changeQuoteChoiceGroupDefault(roomId, itemIndex) {
+            var room = rooms.find(function(r) { return r.id === roomId; });
+            if (!room || !room.items || !room.items[itemIndex]) return;
+            var item = room.items[itemIndex];
+            if (!item.choiceGroup || item.choiceGroup.type !== 'single') return;
+            var selectedOption = await openQuoteChoiceGroupOptionPicker(item);
+            if (!selectedOption) return;
+            _pushUndo();
+            item.choiceGroup.defaultOptionId = selectedOption.id;
+            item.choiceGroup.selectedOptionIds = [selectedOption.id];
+            moveChoiceGroupOptionToFront(item.choiceGroup, selectedOption.id);
+            applyChoiceGroupSelectionToItem(item);
+            renderRooms();
+            calculateTotals();
+            markUnsaved();
+            showToast('Pick One option updated for this quote.', 'success');
+        }
+
         function refreshChoiceGroupTotals() {
             (rooms || []).forEach(function(room) {
                 (room.items || []).forEach(function(item) {
@@ -3918,20 +4080,31 @@ Example:
             }
             var groupName = (await qdPrompt('Name this client choice group:', 'Options for ' + room.name, { title: 'Create Option Group' }) || '').trim();
             if (!groupName) return;
-            var typeText = (await qdPrompt('Type "single" for Pick One or "multiple" for Pick Multiple:', 'single', { title: 'Choice Group Type' }) || 'single').trim().toLowerCase();
-            var type = typeText.indexOf('multi') === 0 ? 'multiple' : 'single';
-            var defaultNumber = 1;
-            if (type === 'single') {
-                var list = indexes.map(function(idx, n) { return (n + 1) + '. ' + (room.items[idx].description || room.items[idx].serviceName || 'Option'); }).join('\n');
-                defaultNumber = parseInt(await qdPrompt('Which option should be the default/base price?\n' + list, '1', { title: 'Default Option' }), 10) || 1;
-                defaultNumber = Math.max(1, Math.min(indexes.length, defaultNumber));
+            var type = 'single';
+            if (typeof openChoiceGroupTypePicker === 'function') {
+                type = await openChoiceGroupTypePicker('single');
+                if (!type) return;
+            } else {
+                var allowMultiple = await qdConfirm('Can the client pick more than one of these items at the same time?', {
+                    title: 'Choice Group Type',
+                    okText: 'Pick Multiple',
+                    cancelText: 'Pick One'
+                });
+                type = allowMultiple ? 'multiple' : 'single';
             }
-            _pushUndo();
             var sourceItems = indexes.map(function(idx) { return room.items[idx]; });
             var options = sourceItems.map(function(item, optIndex) {
                 return normalizeChoiceGroupOption(item, choiceGroupId() + '_' + optIndex);
             });
-            var defaultOption = options[Math.max(0, defaultNumber - 1)] || options[0];
+            var defaultOption = options[0];
+            if (type === 'single' && typeof openChoiceGroupDefaultOptionPicker === 'function') {
+                defaultOption = await openChoiceGroupDefaultOptionPicker(options, options[0] && options[0].id);
+                if (!defaultOption) return;
+            }
+            var defaultIndex = Math.max(0, options.findIndex(function(option) {
+                return defaultOption && option.id === defaultOption.id;
+            }));
+            _pushUndo();
             var group = {
                 id: choiceGroupId(),
                 name: groupName,
@@ -3941,7 +4114,7 @@ Example:
                 selectedOptionIds: type === 'single' ? [defaultOption.id] : options.map(function(option) { return option.id; }),
                 options: options
             };
-            var baseItem = Object.assign({}, sourceItems[Math.max(0, defaultNumber - 1)] || sourceItems[0]);
+            var baseItem = Object.assign({}, sourceItems[defaultIndex] || sourceItems[0]);
             baseItem.choiceGroup = group;
             baseItem.optional = false;
             applyChoiceGroupSelectionToItem(baseItem);
@@ -3960,6 +4133,524 @@ Example:
             }
         }
 
+        function choiceGroupMatchKey(category, name) {
+            return [category, name].map(function(value) {
+                return String(value || '')
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, ' ')
+                    .trim()
+                    .replace(/\s+/g, ' ');
+            }).join('|');
+        }
+
+        function getQuoteItemChoiceGroupKeys(item) {
+            var category = item && item.category;
+            var names = [item && item.serviceName, item && item.description, item && item.name]
+                .filter(function(value, index, arr) {
+                    return value && arr.indexOf(value) === index;
+                });
+            return names.map(function(name) {
+                return choiceGroupMatchKey(category, name);
+            });
+        }
+
+        function findAutoChoiceGroupMatches(item) {
+            if (!item || item.choiceGroup) return [];
+            var itemKeys = getQuoteItemChoiceGroupKeys(item);
+            if (!itemKeys.length) return [];
+            var matches = [];
+            getChoiceGroupTemplates().forEach(function(template, templateIndex) {
+                if (!template || !(template.autoGroup !== false) || !Array.isArray(template.options)) return;
+                template.options.forEach(function(option, optionIndex) {
+                    var optionKey = choiceGroupMatchKey(option.category, option.name || option.description);
+                    if (itemKeys.indexOf(optionKey) === -1) return;
+                    matches.push({
+                        template: template,
+                        templateIndex: templateIndex,
+                        option: option,
+                        optionIndex: optionIndex
+                    });
+                });
+            });
+            return matches;
+        }
+
+        function openAutoChoiceGroupPicker(matches) {
+            return new Promise(function(resolve) {
+                var existing = document.getElementById('autoChoiceGroupPickerModal');
+                if (existing) existing.remove();
+                var selectedIndex = 0;
+                var accepted = false;
+                var rowsHtml = matches.map(function(match, index) {
+                    var template = match.template || {};
+                    var options = Array.isArray(template.options) ? template.options : [];
+                    return '<button type="button" class="list-group-item list-group-item-action text-start" data-auto-choice-group-option="' + index + '">' +
+                        '<div class="d-flex justify-content-between align-items-start gap-2">' +
+                        '<span class="flex-grow-1">' +
+                        '<span class="d-block fw-bold">' + qdTemplateEscapeHtml(template.name || 'Choice Group') + '</span>' +
+                        '<span class="d-block small text-muted">' + qdTemplateEscapeHtml(template.type === 'multiple' ? 'Pick Multiple' : 'Pick One') + ' - ' + options.length + ' options</span>' +
+                        '<span class="d-block small mt-1">Matched: ' + qdTemplateEscapeHtml((match.option && match.option.name) || 'Saved item') + '</span>' +
+                        '</span>' +
+                        '<span class="auto-choice-group-check text-primary"><i class="far fa-circle"></i></span>' +
+                        '</div>' +
+                        '</button>';
+                }).join('');
+                var modalHtml = '' +
+                    '<div class="modal fade" id="autoChoiceGroupPickerModal" tabindex="-1" aria-hidden="true">' +
+                    '<div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">' +
+                    '<div class="modal-content">' +
+                    '<div class="modal-header bg-primary text-white">' +
+                    '<h5 class="modal-title"><i class="fas fa-layer-group me-2"></i>Use Choice Group?</h5>' +
+                    '<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>' +
+                    '</div>' +
+                    '<div class="modal-body">' +
+                    '<p class="mb-3">This item belongs to more than one saved choice group. Pick which group should appear on the quote.</p>' +
+                    '<div id="autoChoiceGroupList" class="list-group">' + rowsHtml + '</div>' +
+                    '</div>' +
+                    '<div class="modal-footer">' +
+                    '<button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Keep Normal Item</button>' +
+                    '<button type="button" class="btn btn-primary" id="autoChoiceGroupUseBtn"><i class="fas fa-check me-1"></i>Use Group</button>' +
+                    '</div>' +
+                    '</div></div></div>';
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+                var modalEl = document.getElementById('autoChoiceGroupPickerModal');
+                var listEl = document.getElementById('autoChoiceGroupList');
+
+                function renderSelectedAutoGroup() {
+                    listEl.querySelectorAll('[data-auto-choice-group-option]').forEach(function(row) {
+                        var index = parseInt(row.getAttribute('data-auto-choice-group-option'), 10);
+                        var active = index === selectedIndex;
+                        row.classList.toggle('active', active);
+                        row.querySelectorAll('.small').forEach(function(el) {
+                            el.classList.toggle('text-muted', !active);
+                            el.classList.toggle('text-white-50', active);
+                        });
+                        var icon = row.querySelector('.auto-choice-group-check i');
+                        if (icon) icon.className = active ? 'fas fa-check-circle' : 'far fa-circle';
+                    });
+                }
+
+                listEl.addEventListener('click', function(e) {
+                    var row = e.target.closest('[data-auto-choice-group-option]');
+                    if (!row) return;
+                    selectedIndex = parseInt(row.getAttribute('data-auto-choice-group-option'), 10) || 0;
+                    renderSelectedAutoGroup();
+                });
+                document.getElementById('autoChoiceGroupUseBtn').addEventListener('click', function() {
+                    accepted = true;
+                    bootstrap.Modal.getInstance(modalEl).hide();
+                });
+                modalEl.addEventListener('hidden.bs.modal', function() {
+                    var selected = accepted ? matches[selectedIndex] : null;
+                    modalEl.remove();
+                    resolve(selected || null);
+                }, { once: true });
+
+                renderSelectedAutoGroup();
+                new bootstrap.Modal(modalEl).show();
+            });
+        }
+
+        function buildAutoChoiceGroupLine(item, match) {
+            var template = JSON.parse(JSON.stringify(match.template || {}));
+            var matchedOption = template.options && template.options[match.optionIndex] ? template.options[match.optionIndex] : match.option;
+            var selectedId = matchedOption && matchedOption.id;
+            template.id = choiceGroupId();
+            template.selectedOptionIds = selectedId ? [selectedId] : [];
+            if (template.type === 'single') template.defaultOptionId = selectedId || template.defaultOptionId || '';
+            var first = matchedOption || (template.options && template.options[0]) || {};
+            var groupedItem = {
+                description: template.name || item.description || first.name || 'Option Group',
+                category: first.category || item.category || 'Options',
+                serviceName: template.name || item.serviceName || item.description || 'Option Group',
+                unit: item.unit || item.unitType || first.unitType || 'ls',
+                unitType: item.unitType || item.unit || first.unitType || 'ls',
+                quantity: parseFloat(item.quantity) || 1,
+                rate: 0,
+                notes: item.notes || '',
+                materialCost: 0,
+                supplierUrl: '',
+                upgrade: null,
+                upgraded: false,
+                optional: false,
+                itemDescription: item.itemDescription || '',
+                total: 0,
+                choiceGroup: template
+            };
+            return applyChoiceGroupSelectionToItem(groupedItem);
+        }
+
+        async function autoGroupQuoteItem(item, room) {
+            if (room && !isRoomAutoGroupingEnabled(room)) return [item];
+            if (!item || item.choiceGroup) return [item];
+            var matches = findAutoChoiceGroupMatches(item);
+            if (!matches.length) return [item];
+            var match = matches.length === 1 ? matches[0] : await openAutoChoiceGroupPicker(matches);
+            if (!match) return [item];
+            return [buildAutoChoiceGroupLine(item, match)];
+        }
+
+        function normalizeAiVoiceLineItem(item) {
+            var quantity = parseFloat(item && item.quantity) || 1;
+            var rate = parseFloat(item && item.rate) || 0;
+            var total = item && item.total !== undefined ? parseFloat(item.total) || 0 : quantity * rate;
+            return {
+                category: item && item.category || 'Miscellaneous',
+                description: item && item.description || '',
+                serviceName: item && (item.serviceName || item.description || item.name) || '',
+                quantity: quantity,
+                unit: item && (item.unit || item.unitType) || 'ls',
+                unitType: item && (item.unitType || item.unit) || 'ls',
+                rate: rate,
+                materialCost: parseFloat(item && item.materialCost) || 0,
+                total: total,
+                itemDescription: item && item.itemDescription || '',
+                notes: item && item.notes || '',
+                optional: false,
+                upgrade: false
+            };
+        }
+
+        function normalizeAiVoiceQuoteRooms(result) {
+            var sourceRooms = result && Array.isArray(result.rooms) ? result.rooms : [];
+            return sourceRooms.map(function(aiRoom, roomIndex) {
+                return {
+                    name: aiRoom && aiRoom.name || 'Room ' + (roomIndex + 1),
+                    scopeNotes: aiRoom && aiRoom.scopeNotes || '',
+                    items: Array.isArray(aiRoom && aiRoom.items) ? aiRoom.items.map(normalizeAiVoiceLineItem) : []
+                };
+            });
+        }
+
+        function getAiVoiceAutoGroupPlans(preparedRooms) {
+            if (!getDefaultRoomAutoGroupingEnabled()) return [];
+            var plans = [];
+            (preparedRooms || []).forEach(function(room, roomIndex) {
+                (room.items || []).forEach(function(item, itemIndex) {
+                    if (!item || item.choiceGroup) return;
+                    var matches = findAutoChoiceGroupMatches(item);
+                    if (!matches.length) return;
+                    plans.push({
+                        roomIndex: roomIndex,
+                        itemIndex: itemIndex,
+                        item: item,
+                        matches: matches,
+                        selectedMatchIndex: 0,
+                        useGrouping: true
+                    });
+                });
+            });
+            return plans;
+        }
+
+        async function openAiVoiceAutoGroupChoiceModal(plans) {
+            if (!plans || !plans.length) return false;
+            return await qdConfirm('Grouped items found. Use saved groups?', {
+                title: 'AI Voice Grouping',
+                okText: 'Yes',
+                cancelText: 'No',
+                secondaryText: 'Review',
+                secondaryValue: 'review',
+                type: 'info'
+            });
+        }
+
+        function openAiVoiceAutoGroupReviewModal(plans) {
+            return new Promise(function(resolve) {
+                var existing = document.getElementById('aiVoiceAutoGroupReviewModal');
+                if (existing) existing.remove();
+                var workingPlans = (plans || []).map(function(plan) {
+                    var clone = Object.assign({}, plan);
+                    clone.useGrouping = plan.useGrouping !== false;
+                    clone.selectedMatchIndex = parseInt(plan.selectedMatchIndex, 10) || 0;
+                    return clone;
+                });
+                var rowsHtml = workingPlans.map(function(plan, planIndex) {
+                    var item = plan.item || {};
+                    var matches = plan.matches || [];
+                    var selected = matches[plan.selectedMatchIndex] || matches[0] || {};
+                    var matchOptionsHtml = matches.map(function(match, matchIndex) {
+                        var template = match.template || {};
+                        var option = match.option || {};
+                        var label = (template.name || 'Choice Group') + ' - ' + (option.name || option.description || 'Option');
+                        return '<option value="' + matchIndex + '"' + (matchIndex === plan.selectedMatchIndex ? ' selected' : '') + '>' + qdTemplateEscapeHtml(label) + '</option>';
+                    }).join('');
+                    return '<div class="border rounded p-2 mb-2 bg-light" data-ai-auto-group-row="' + planIndex + '">' +
+                        '<div class="d-flex align-items-start gap-2">' +
+                        '<input type="checkbox" class="form-check-input mt-1" data-ai-auto-group-include="' + planIndex + '" checked>' +
+                        '<div class="flex-grow-1">' +
+                        '<div class="fw-bold">' + qdTemplateEscapeHtml(item.serviceName || item.description || 'AI item') + '</div>' +
+                        '<div class="small text-muted">' + qdTemplateEscapeHtml(item.category || 'Miscellaneous') + ' - ' + qdTemplateEscapeHtml(item.quantity + ' ' + (item.unitType || item.unit || '')) + '</div>' +
+                        '<label class="form-label small fw-semibold mt-2 mb-1">Saved group to use</label>' +
+                        '<select class="form-select form-select-sm" data-ai-auto-group-match="' + planIndex + '">' + matchOptionsHtml + '</select>' +
+                        '<div class="small text-muted mt-1">Uncheck this row to keep it as a normal line item.</div>' +
+                        '</div>' +
+                        '</div>' +
+                        '</div>';
+                }).join('');
+                var modalHtml = '' +
+                    '<div class="modal fade" id="aiVoiceAutoGroupReviewModal" tabindex="-1" aria-hidden="true">' +
+                    '<div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">' +
+                    '<div class="modal-content">' +
+                    '<div class="modal-header bg-primary text-white">' +
+                    '<h5 class="modal-title"><i class="fas fa-layer-group me-2"></i>Review Saved Groups</h5>' +
+                    '<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>' +
+                    '</div>' +
+                    '<div class="modal-body">' +
+                    '<p class="mb-3">Uncheck anything you want to keep as a normal line item before it hits the quote.</p>' +
+                    '<div id="aiVoiceAutoGroupReviewList">' + rowsHtml + '</div>' +
+                    '</div>' +
+                    '<div class="modal-footer">' +
+                    '<button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>' +
+                    '<button type="button" class="btn btn-primary" id="aiVoiceAutoGroupApplyBtn"><i class="fas fa-check me-1"></i>Apply Choices</button>' +
+                    '</div>' +
+                    '</div></div></div>';
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+                var modalEl = document.getElementById('aiVoiceAutoGroupReviewModal');
+                var accepted = false;
+
+                document.getElementById('aiVoiceAutoGroupApplyBtn').addEventListener('click', function() {
+                    accepted = true;
+                    workingPlans.forEach(function(plan, planIndex) {
+                        var includeEl = modalEl.querySelector('[data-ai-auto-group-include="' + planIndex + '"]');
+                        var matchEl = modalEl.querySelector('[data-ai-auto-group-match="' + planIndex + '"]');
+                        plan.useGrouping = !!(includeEl && includeEl.checked);
+                        plan.selectedMatchIndex = matchEl ? (parseInt(matchEl.value, 10) || 0) : 0;
+                    });
+                    bootstrap.Modal.getInstance(modalEl).hide();
+                });
+
+                modalEl.addEventListener('hidden.bs.modal', function() {
+                    if (!accepted) {
+                        workingPlans.forEach(function(plan) { plan.useGrouping = false; });
+                    }
+                    modalEl.remove();
+                    resolve(workingPlans);
+                }, { once: true });
+                new bootstrap.Modal(modalEl).show();
+            });
+        }
+
+        async function prepareAiVoiceAutoGroupingDecision(preparedRooms) {
+            var plans = getAiVoiceAutoGroupPlans(preparedRooms);
+            if (!plans.length) return { mode: 'none', plans: [] };
+            var choice = await openAiVoiceAutoGroupChoiceModal(plans);
+            if (choice === true) return { mode: 'yes', plans: plans };
+            if (choice === 'review') return { mode: 'review', plans: await openAiVoiceAutoGroupReviewModal(plans) };
+            plans.forEach(function(plan) { plan.useGrouping = false; });
+            return { mode: 'no', plans: plans };
+        }
+
+        function findAiVoiceAutoGroupPlan(decision, roomIndex, itemIndex) {
+            var plans = decision && Array.isArray(decision.plans) ? decision.plans : [];
+            return plans.find(function(plan) {
+                return plan.roomIndex === roomIndex && plan.itemIndex === itemIndex;
+            }) || null;
+        }
+
+        async function resolveAiVoiceAutoGroupedItems(item, decision, roomIndex, itemIndex) {
+            var plan = findAiVoiceAutoGroupPlan(decision, roomIndex, itemIndex);
+            if (!plan || plan.useGrouping === false) return [item];
+            var matches = plan.matches || [];
+            var match = matches[parseInt(plan.selectedMatchIndex, 10) || 0] || matches[0];
+            if (!match && matches.length > 1) match = await openAutoChoiceGroupPicker(matches);
+            if (!match) return [item];
+            return [buildAutoChoiceGroupLine(item, match)];
+        }
+
+        function choiceGroupOptionToLineItem(option, groupedItem) {
+            var quantity = parseFloat(groupedItem.quantity) || 1;
+            var rate = parseFloat(option.rate) || 0;
+            return {
+                category: option.category || groupedItem.category || 'Miscellaneous',
+                description: option.description || option.name || groupedItem.description || '',
+                serviceName: option.name || option.description || groupedItem.serviceName || '',
+                quantity: quantity,
+                unit: option.unitType || groupedItem.unit || groupedItem.unitType || 'ls',
+                unitType: option.unitType || groupedItem.unitType || groupedItem.unit || 'ls',
+                rate: rate,
+                materialCost: parseFloat(option.materialCost) || 0,
+                supplierUrl: option.supplierUrl || '',
+                itemDescription: option.itemDescription || option.description || '',
+                notes: groupedItem.notes || '',
+                optional: false,
+                upgrade: null,
+                upgraded: false,
+                total: quantity * rate
+            };
+        }
+
+        function openTurnOffChoiceGroupingPicker(groupedItem) {
+            return new Promise(function(resolve) {
+                var options = groupedItem && groupedItem.choiceGroup && Array.isArray(groupedItem.choiceGroup.options) ? groupedItem.choiceGroup.options : [];
+                if (!options.length) {
+                    resolve(null);
+                    return;
+                }
+                var existing = document.getElementById('turnOffChoiceGroupingModal');
+                if (existing) existing.remove();
+                var selectedOptions = getChoiceGroupSelectedOptions(groupedItem.choiceGroup);
+                var selectedId = selectedOptions[0] ? selectedOptions[0].id : options[0].id;
+                var selectedIndex = Math.max(0, options.findIndex(function(option) { return option.id === selectedId; }));
+                var accepted = false;
+                var rowsHtml = options.map(function(option, index) {
+                    return '<button type="button" class="list-group-item list-group-item-action text-start" data-turn-off-grouping-option="' + index + '">' +
+                        '<div class="d-flex justify-content-between align-items-start gap-2">' +
+                        '<span class="flex-grow-1">' +
+                        '<span class="d-block fw-bold">' + qdTemplateEscapeHtml(option.name || option.description || 'Option') + '</span>' +
+                        '<span class="d-block small text-muted">' + qdTemplateEscapeHtml(option.category || groupedItem.category || 'Saved Item') + ' - $' + (parseFloat(option.rate) || 0).toFixed(2) + '</span>' +
+                        '</span>' +
+                        '<span class="turn-off-grouping-check text-primary"><i class="far fa-circle"></i></span>' +
+                        '</div>' +
+                        '</button>';
+                }).join('');
+                var modalHtml = '' +
+                    '<div class="modal fade" id="turnOffChoiceGroupingModal" tabindex="-1" aria-hidden="true">' +
+                    '<div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">' +
+                    '<div class="modal-content">' +
+                    '<div class="modal-header bg-primary text-white">' +
+                    '<h5 class="modal-title"><i class="fas fa-layer-group me-2"></i>Turn Off Grouping</h5>' +
+                    '<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>' +
+                    '</div>' +
+                    '<div class="modal-body">' +
+                    '<p class="mb-3 fw-semibold">Which item do you want to remain?</p>' +
+                    '<div id="turnOffChoiceGroupingList" class="list-group">' + rowsHtml + '</div>' +
+                    '</div>' +
+                    '<div class="modal-footer">' +
+                    '<button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>' +
+                    '<button type="button" class="btn btn-primary" id="turnOffChoiceGroupingUseBtn"><i class="fas fa-check me-1"></i>Keep This Item</button>' +
+                    '</div>' +
+                    '</div></div></div>';
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+                var modalEl = document.getElementById('turnOffChoiceGroupingModal');
+                var listEl = document.getElementById('turnOffChoiceGroupingList');
+
+                function renderSelectedTurnOffOption() {
+                    listEl.querySelectorAll('[data-turn-off-grouping-option]').forEach(function(row) {
+                        var index = parseInt(row.getAttribute('data-turn-off-grouping-option'), 10);
+                        var active = index === selectedIndex;
+                        row.classList.toggle('active', active);
+                        row.querySelectorAll('.small').forEach(function(el) {
+                            el.classList.toggle('text-muted', !active);
+                            el.classList.toggle('text-white-50', active);
+                        });
+                        var icon = row.querySelector('.turn-off-grouping-check i');
+                        if (icon) icon.className = active ? 'fas fa-check-circle' : 'far fa-circle';
+                    });
+                }
+
+                listEl.addEventListener('click', function(e) {
+                    var row = e.target.closest('[data-turn-off-grouping-option]');
+                    if (!row) return;
+                    selectedIndex = parseInt(row.getAttribute('data-turn-off-grouping-option'), 10) || 0;
+                    renderSelectedTurnOffOption();
+                });
+                document.getElementById('turnOffChoiceGroupingUseBtn').addEventListener('click', function() {
+                    accepted = true;
+                    bootstrap.Modal.getInstance(modalEl).hide();
+                });
+                modalEl.addEventListener('hidden.bs.modal', function() {
+                    var selected = accepted ? options[selectedIndex] : null;
+                    modalEl.remove();
+                    resolve(selected || null);
+                }, { once: true });
+                renderSelectedTurnOffOption();
+                new bootstrap.Modal(modalEl).show();
+            });
+        }
+
+        async function turnOffChoiceGrouping(roomId, itemIndex) {
+            var room = rooms.find(function(r) { return r.id === roomId; });
+            if (!room || !room.items || !room.items[itemIndex] || !room.items[itemIndex].choiceGroup) return;
+            var groupedItem = room.items[itemIndex];
+            var selectedOption = await openTurnOffChoiceGroupingPicker(groupedItem);
+            if (!selectedOption) return;
+            _pushUndo();
+            room.items.splice(itemIndex, 1, choiceGroupOptionToLineItem(selectedOption, groupedItem));
+            renderRooms();
+            calculateTotals();
+            markUnsaved();
+            showToast('Grouping turned off for this line item.', 'info');
+        }
+
+        function openSavedChoiceGroupPicker(templates) {
+            return new Promise(function(resolve) {
+                var existing = document.getElementById('savedChoiceGroupPickerModal');
+                if (existing) existing.remove();
+                var selectedIndex = 0;
+                var accepted = false;
+                var rowsHtml = templates.map(function(template, index) {
+                    var options = Array.isArray(template.options) ? template.options : [];
+                    var optionNames = options.map(function(option) {
+                        return option && option.name ? option.name : '';
+                    }).filter(Boolean).join(' / ');
+                    return '<button type="button" class="list-group-item list-group-item-action text-start" data-saved-choice-group-option="' + index + '">' +
+                        '<div class="d-flex justify-content-between align-items-start gap-2">' +
+                        '<span class="flex-grow-1">' +
+                        '<span class="d-block fw-bold">' + qdTemplateEscapeHtml(template.name || 'Choice Group') + '</span>' +
+                        '<span class="d-block small text-muted">' + qdTemplateEscapeHtml(template.type === 'multiple' ? 'Pick Multiple' : 'Pick One') + ' - ' + options.length + ' options</span>' +
+                        (optionNames ? '<span class="d-block small mt-1">' + qdTemplateEscapeHtml(optionNames) + '</span>' : '') +
+                        '</span>' +
+                        '<span class="saved-choice-group-check text-primary"><i class="far fa-circle"></i></span>' +
+                        '</div>' +
+                        '</button>';
+                }).join('');
+                var modalHtml = '' +
+                    '<div class="modal fade" id="savedChoiceGroupPickerModal" tabindex="-1" aria-hidden="true">' +
+                    '<div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">' +
+                    '<div class="modal-content">' +
+                    '<div class="modal-header bg-primary text-white">' +
+                    '<h5 class="modal-title"><i class="fas fa-list-check me-2"></i>Add Saved Choice Group</h5>' +
+                    '<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>' +
+                    '</div>' +
+                    '<div class="modal-body">' +
+                    '<p class="mb-3">Choose the saved option group you want to add to this room.</p>' +
+                    '<div id="savedChoiceGroupList" class="list-group">' + rowsHtml + '</div>' +
+                    '</div>' +
+                    '<div class="modal-footer">' +
+                    '<button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>' +
+                    '<button type="button" class="btn btn-primary" id="savedChoiceGroupUseBtn"><i class="fas fa-check me-1"></i>Add Group</button>' +
+                    '</div>' +
+                    '</div></div></div>';
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+                var modalEl = document.getElementById('savedChoiceGroupPickerModal');
+                var listEl = document.getElementById('savedChoiceGroupList');
+
+                function renderSelectedSavedGroup() {
+                    listEl.querySelectorAll('[data-saved-choice-group-option]').forEach(function(row) {
+                        var index = parseInt(row.getAttribute('data-saved-choice-group-option'), 10);
+                        var active = index === selectedIndex;
+                        row.classList.toggle('active', active);
+                        row.querySelectorAll('.small').forEach(function(el) {
+                            el.classList.toggle('text-muted', !active);
+                            el.classList.toggle('text-white-50', active);
+                        });
+                        var icon = row.querySelector('.saved-choice-group-check i');
+                        if (icon) icon.className = active ? 'fas fa-check-circle' : 'far fa-circle';
+                    });
+                }
+
+                listEl.addEventListener('click', function(e) {
+                    var row = e.target.closest('[data-saved-choice-group-option]');
+                    if (!row) return;
+                    selectedIndex = parseInt(row.getAttribute('data-saved-choice-group-option'), 10) || 0;
+                    renderSelectedSavedGroup();
+                });
+                document.getElementById('savedChoiceGroupUseBtn').addEventListener('click', function() {
+                    accepted = true;
+                    bootstrap.Modal.getInstance(modalEl).hide();
+                });
+                modalEl.addEventListener('hidden.bs.modal', function() {
+                    var selected = accepted ? templates[selectedIndex] : null;
+                    modalEl.remove();
+                    resolve(selected || null);
+                }, { once: true });
+
+                renderSelectedSavedGroup();
+                new bootstrap.Modal(modalEl).show();
+            });
+        }
+
         async function addChoiceTemplateToRoom(roomId) {
             var room = rooms.find(function(r) { return r.id === roomId; });
             if (!room) return;
@@ -3968,9 +4659,7 @@ Example:
                 qdAlert('No saved choice groups yet. Open Manage Items and create a reusable Choice Group first.');
                 return;
             }
-            var list = templates.map(function(t, idx) { return (idx + 1) + '. ' + t.name + ' (' + ((t.options || []).length) + ' options)'; }).join('\n');
-            var selected = parseInt(await qdPrompt('Which saved choice group should be added?\n' + list, '1', { title: 'Add Saved Choice Group' }), 10) || 1;
-            var template = templates[Math.max(0, Math.min(templates.length - 1, selected - 1))];
+            var template = await openSavedChoiceGroupPicker(templates);
             if (!template) return;
             var group = JSON.parse(JSON.stringify(template));
             group.id = choiceGroupId();
@@ -4767,7 +5456,7 @@ Example:
                 if (!roomName) return;
                 roomCounter++;
                 var defaultColour = roomDefaultColorFields((roomCounter - 1) % ROOM_COLORS.length);
-                room = { id: roomCounter, name: roomName.trim(), items: [], notes: '', photos: [], colorIndex: defaultColour.colorIndex, customColor: defaultColour.customColor, colorIntensity: defaultColour.colorIntensity };
+                room = { id: roomCounter, name: roomName.trim(), items: [], notes: '', photos: [], colorIndex: defaultColour.colorIndex, customColor: defaultColour.customColor, colorIntensity: defaultColour.colorIntensity, autoGroupingEnabled: getDefaultRoomAutoGroupingEnabled() };
                 rooms.push(room);
             } else {
                 var roomId = parseInt(roomValue);
@@ -5039,6 +5728,8 @@ Example:
                 html += '<i class="fas fa-bookmark"></i></button>';
                 html += '<button onclick="createChoiceGroupFromRoomItems(' + room.id + ')" class="btn btn-sm btn-outline-light ms-1" title="Group checked items into client-selectable options"><i class="fas fa-layer-group me-1"></i>Option Group</button>';
                 html += '<button onclick="addChoiceTemplateToRoom(' + room.id + ')" class="btn btn-sm btn-outline-light ms-1" title="Add a saved reusable option group"><i class="fas fa-list-check me-1"></i>Saved Group</button>';
+                var groupingEnabled = isRoomAutoGroupingEnabled(room);
+                html += '<button onclick="toggleRoomAutoGrouping(' + room.id + ')" class="btn btn-sm ' + (groupingEnabled ? 'btn-outline-light' : 'btn-secondary') + ' ms-1" title="' + (groupingEnabled ? 'Disable automatic saved grouping for this room and future rooms' : 'Enable automatic saved grouping for this room and future rooms') + '"><i class="fas fa-' + (groupingEnabled ? 'ban' : 'layer-group') + ' me-1"></i>' + (groupingEnabled ? 'Disable Grouping' : 'Enable Grouping') + '</button>';
                 html += '<button onclick="undoLastAction()" class="btn btn-sm btn-warning ms-1" title="Undo last action (Ctrl+Z)" id="undoBtn">';
                 html += '<i class="fas fa-undo"></i> Undo</button>';
                 html += '</div>';
@@ -5118,7 +5809,12 @@ Example:
                             html += '<td style="cursor:' + (_hasDesc ? 'pointer' : 'default') + ';" ' + (_hasDesc ? 'onclick="toggleItemDesc(\''+_descId+'\')" title="Click to expand description"' : '') + '>';
                             html += '<strong>' + displayItemName + '</strong>';
                             if (hasChoiceGroup) {
-                                html += ' <span class="badge bg-primary ms-1"><i class="fas fa-layer-group me-1"></i>' + (item.choiceGroup.type === 'multiple' ? 'Pick Multiple' : 'Pick One') + '</span>';
+                                if (item.choiceGroup.type === 'single') {
+                                    html += ' <button type="button" class="badge bg-primary border-0 ms-1" onclick="event.stopPropagation(); changeQuoteChoiceGroupDefault(' + room.id + ', ' + origIndex + ')" title="Choose which Pick One option is the base visible item"><i class="fas fa-layer-group me-1"></i>Pick One</button>';
+                                } else {
+                                    html += ' <span class="badge bg-primary ms-1"><i class="fas fa-layer-group me-1"></i>Pick Multiple</span>';
+                                }
+                                html += ' <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1 ms-1" onclick="event.stopPropagation(); turnOffChoiceGrouping(' + room.id + ', ' + origIndex + ')" title="Convert this grouped line back into normal line item(s)">Turn Off Grouping</button>';
                                 html += '<div class="small text-muted mt-1">Client options: ' + item.choiceGroup.options.map(function(option) { return qdTemplateEscapeHtml(option.name); }).join(' / ') + '</div>';
                                 if (selectedChoiceOptions.length) {
                                     html += '<div class="small text-success">Default selected: ' + selectedChoiceOptions.map(function(option) { return qdTemplateEscapeHtml(option.name); }).join(', ') + '</div>';
@@ -8559,6 +9255,8 @@ Example:
                 qdAlert('AI could not parse the quote. Please try again with more detail.');
                 return;
             }
+            var preparedAiRooms = normalizeAiVoiceQuoteRooms(result);
+            var aiAutoGroupDecision = await prepareAiVoiceAutoGroupingDecision(preparedAiRooms);
             var action = 'replace';
             if (rooms.length > 0) {
                 if (await qdConfirm('Add AI rooms to your existing quote? Choose Cancel to replace everything.', {
@@ -8569,19 +9267,21 @@ Example:
                 })) { action = 'add'; }
             }
             if (action === 'replace') { rooms = []; roomCounter = 0; }
-            result.rooms.forEach(function(aiRoom) {
+            for (let aiRoomIndex = 0; aiRoomIndex < preparedAiRooms.length; aiRoomIndex++) {
+                const aiRoom = preparedAiRooms[aiRoomIndex];
                 roomCounter++;
-                var newRoom = { id: roomCounter, name: aiRoom.name || 'Room ' + roomCounter, colorIndex: (roomCounter - 1) % ROOM_COLORS.length, scopeNotes: aiRoom.scopeNotes || '', items: [] };
+                var newRoom = { id: roomCounter, name: aiRoom.name || 'Room ' + roomCounter, colorIndex: (roomCounter - 1) % ROOM_COLORS.length, scopeNotes: aiRoom.scopeNotes || '', items: [], autoGroupingEnabled: getDefaultRoomAutoGroupingEnabled() };
                 if (aiRoom.items && Array.isArray(aiRoom.items)) {
-                    aiRoom.items.forEach(function(item) {
-                        var quantity = parseFloat(item.quantity) || 1;
-                        var rate = parseFloat(item.rate) || 0;
-                        var total = item.total !== undefined ? parseFloat(item.total) || 0 : quantity * rate;
-                        newRoom.items.push({ category: item.category || 'Miscellaneous', description: item.description || '', serviceName: item.serviceName || item.description || '', quantity: quantity, unit: item.unit || item.unitType || 'ls', unitType: item.unitType || item.unit || 'ls', rate: rate, materialCost: 0, total: total, itemDescription: item.itemDescription || '', notes: item.notes || '', optional: false, upgrade: false });
-                    });
+                    for (let aiItemIndex = 0; aiItemIndex < aiRoom.items.length; aiItemIndex++) {
+                        var aiLineItem = aiRoom.items[aiItemIndex];
+                        var aiItemsToAdd = await resolveAiVoiceAutoGroupedItems(aiLineItem, aiAutoGroupDecision, aiRoomIndex, aiItemIndex);
+                        aiItemsToAdd.forEach(function(itemToAdd) {
+                            newRoom.items.push(itemToAdd);
+                        });
+                    }
                 }
                 rooms.push(newRoom);
-            });
+            }
             renderRooms();
             calculateTotals();
             markUnsaved();

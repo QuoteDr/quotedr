@@ -35,14 +35,17 @@
             title: 'Manage Line Items',
             summary: 'This is your pricing database: the saved items QuoteDr uses for quick entry and AI-assisted quoting.',
             steps: [
-                'Add a category, item name, unit type, and rate.',
-                'Optionally add a client-facing description, material cost, and supplier URL.',
-                'Edit existing rows directly, then save the row or use Save All Changes.',
-                'Use search and category tools to keep long price lists manageable.'
+                'Use New Item to add a category, item name, unit type, rate, description, material cost, and supplier URL.',
+                'Edit existing rows directly, open Details for descriptions/photos/upgrades, then use Save Changed or Save All.',
+                'Use Manage Items > Choice Group to create saved groups from your saved item database.',
+                'Use Pick One when the client should choose one material or option. Use Pick Multiple when they can select several.',
+                'Keep auto-grouping on when you want QuoteDr to use the saved group automatically whenever one of its items is added.'
             ],
             tips: [
                 'Keep item names short and searchable, like Tile install or Baseboard paint.',
-                'Material cost is for your margin tracking; rate is what you charge.'
+                'Material cost is for your margin tracking; rate is what you charge.',
+                'Turn Off Grouping only affects the current quote row; it does not change the saved group template.',
+                'Click the Pick One badge in the quote to choose which option appears first for the client.'
             ],
             helpUrl: 'help.html#pricing-database'
         },
@@ -135,14 +138,19 @@
             title: 'AI Quote Builder',
             summary: 'Speak the job scope and QuoteDr turns it into rooms and line items.',
             steps: [
-                'Tap the microphone and describe the project clearly.',
+                'Tap the microphone and describe the project clearly. Use Pause/Resume if you need to stop mid-recording.',
                 'Include rooms, major tasks, quantities, and any important materials.',
                 'Stop recording, review the transcript, then generate the quote.',
-                'Review the AI-created items before sending anything to a client.'
+                'Use AI Voice Review to include or remove parsed items, match phrases to saved items, and fix uncertain rows.',
+                'Use AI Memory, AI Trade Rules, and Voice Templates to teach QuoteDr your wording and repeatable packages.',
+                'If saved Choice Groups are found, choose Yes, No, or Review before grouped items are added.'
             ],
             tips: [
                 'Example: Bathroom renovation, remove tile, install new vanity, paint walls.',
-                'AI works best when your saved pricing items are up to date.'
+                'AI works best when your saved pricing items are up to date.',
+                'AI Memory learns phrase-to-item corrections per user.',
+                'AI Trade Rules are best for contractor shorthand, such as casing doors or applying trim quantities.',
+                'Voice Templates are best for packages like a standard bedroom package.'
             ],
             helpUrl: 'help.html#ai-features'
         },
@@ -363,11 +371,13 @@
             steps: [
                 'Enter the deposit amount or choose a percentage shortcut.',
                 'Check the invoice total shown below the amount.',
-                'Open Stripe Checkout and send or complete the payment flow.'
+                'Open Stripe Checkout and send or complete the payment flow.',
+                'Use Settings > Payments to control the deposit payment button on quote links and the pay-in-full button on invoice links.'
             ],
             tips: [
                 'Use the 25%, 50%, and Full buttons to avoid manual math.',
-                'Confirm Stripe is connected before sending payment links to clients.'
+                'Confirm Stripe is connected before sending payment links to clients.',
+                'Deposit payment button on quote links is for deposits; pay-in-full button on invoice links is for full balances.'
             ],
             helpUrl: 'help.html#invoices-payments'
         },
@@ -509,7 +519,8 @@
             steps: [
                 'Enable payments when you are ready to accept card payments.',
                 'Set the default deposit percentage.',
-                'Choose whether quotes show deposit buttons and invoices show pay-in-full buttons.'
+                'Choose whether clients see a deposit payment button on quote links.',
+                'Choose whether clients see a pay-in-full button on invoice links.'
             ],
             tips: [
                 'Check payment settings before sending payment links to clients.',
