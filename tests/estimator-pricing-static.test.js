@@ -19,3 +19,7 @@ assert(source.includes('removeEstimatorPricingItem'), 'estimator pricing should 
 assert(source.includes('getEstimatorPricingSelections'), 'estimator calculations should expand multiple selected items');
 assert(source.includes('commitEstimatorPricingSearchMatch'), 'search suggestion selection should immediately add the matching saved item');
 assert(source.includes('onchange="commitEstimatorPricingSearchMatch'), 'saved-item search onchange should commit exact datalist selections');
+assert(source.includes('estimatorPricingSearchResultsHtml'), 'typing in pricing setup should render visible clickable search results');
+assert(source.includes('pickEstimatorPricingSearchResult'), 'pricing setup search results should be clickable and link saved items');
+assert(source.includes('onfocus="filterEstimatorPricingItems'), 'pricing setup search should refresh visible results when focused');
+assert(source.includes('handleEstimatorPricingSearchKey(event'), 'pricing setup search should support keyboard selection');

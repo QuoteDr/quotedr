@@ -260,6 +260,47 @@
             }).join('');
         }
 
+        function getEstimatorPricingSearchMatches(query, limit) {
+            var q = String(query || '').trim().toLowerCase();
+            if (!q) return [];
+            return _estimatorPricingItems.filter(function(item) {
+                var haystack = item.searchText || (item.name + ' ' + item.category + ' ' + item.unitType + ' ' + item.rate).toLowerCase();
+                return haystack.indexOf(q) !== -1;
+            }).slice(0, limit || 8);
+        }
+
+        function estimatorPricingSearchResultsHtml(key, query) {
+            var q = String(query || '').trim();
+            if (!q) return '';
+            var matches = getEstimatorPricingSearchMatches(q, 8);
+            if (!matches.length) {
+                return '<div class="list-group-item small text-muted">No saved items match "' + calcEscapeHtml(q) + '". Try another word, or choose from the category dropdown.</div>';
+            }
+            return matches.map(function(item) {
+                return '<button type="button" class="list-group-item list-group-item-action py-2" data-estimator-search-pick="1" data-estimator-key="' + calcEscapeHtml(key) + '" data-estimator-item-id="' + calcEscapeHtml(item.id) + '">' +
+                    '<div class="d-flex justify-content-between gap-2">' +
+                        '<span class="fw-semibold text-truncate">' + calcEscapeHtml(item.name) + '</span>' +
+                        '<span class="text-success fw-semibold flex-shrink-0">$' + item.rate.toFixed(2) + '</span>' +
+                    '</div>' +
+                    '<div class="small text-muted text-truncate">' + calcEscapeHtml(item.category) + (item.unitType ? ' / ' + calcEscapeHtml(item.unitType) : '') + '</div>' +
+                '</button>';
+            }).join('');
+        }
+
+        function renderEstimatorPricingSearchResults(key) {
+            var search = document.getElementById('epSearch_' + key);
+            var results = document.getElementById('epResults_' + key);
+            if (!results) return;
+            var html = estimatorPricingSearchResultsHtml(key, search ? search.value : '');
+            results.innerHTML = html;
+            results.style.display = html ? 'block' : 'none';
+        }
+
+        function hideEstimatorPricingSearchResults(key) {
+            var results = document.getElementById('epResults_' + key);
+            if (results) results.style.display = 'none';
+        }
+
         function findEstimatorSavedItemIds(saved) {
             if (!saved) return [];
             if (Array.isArray(saved.items)) {
@@ -344,12 +385,55 @@
             return true;
         }
 
+        function pickEstimatorPricingSearchResult(key, itemId) {
+            if (!addEstimatorPricingItemSelection(key, itemId)) return;
+            var search = document.getElementById('epSearch_' + key);
+            var sel = document.getElementById('epItem_' + key);
+            if (search) search.value = '';
+            if (sel) {
+                sel.innerHTML = estimatorPricingOptionsHtml(key, '', '');
+                sel.value = '';
+            }
+            hideEstimatorPricingSearchResults(key);
+        }
+
+        function handleEstimatorPricingSearchKey(event, key) {
+            if (!event) return true;
+            if (event.key === 'Escape') {
+                hideEstimatorPricingSearchResults(key);
+                return true;
+            }
+            if (event.key !== 'Enter') return true;
+            var search = document.getElementById('epSearch_' + key);
+            var query = search ? search.value : '';
+            var match = findEstimatorSearchMatch(query) || getEstimatorPricingSearchMatches(query, 1)[0];
+            if (!match) return true;
+            event.preventDefault();
+            pickEstimatorPricingSearchResult(key, match.id);
+            return false;
+        }
+
         document.addEventListener('click', function(event) {
             var button = event.target && event.target.closest ? event.target.closest('[data-estimator-remove-item="1"]') : null;
             if (!button) return;
             event.preventDefault();
             event.stopPropagation();
             removeEstimatorPricingItemFromButton(button);
+        });
+
+        document.addEventListener('click', function(event) {
+            var button = event.target && event.target.closest ? event.target.closest('[data-estimator-search-pick="1"]') : null;
+            if (!button) return;
+            event.preventDefault();
+            event.stopPropagation();
+            pickEstimatorPricingSearchResult(button.dataset.estimatorKey, button.dataset.estimatorItemId);
+        });
+
+        document.addEventListener('click', function(event) {
+            if (event.target && event.target.closest && event.target.closest('[data-estimator-pricing-search-wrap]')) return;
+            document.querySelectorAll('[data-estimator-pricing-results]').forEach(function(results) {
+                results.style.display = 'none';
+            });
         });
 
         // Re-open estimator after pricing modal closes
@@ -421,10 +505,11 @@
                 var selectedId = selectedIds.length === 1 ? selectedIds[0] : '';
                 html += '<div class="row g-2 align-items-end mb-3">';
                 html += '<div class="col-lg-3"><label class="form-label fw-semibold mb-0">' + f.label + '</label><div class="text-muted small">per ' + displayUnit + '</div></div>';
-                html += '<div class="col-lg-4">';
+                html += '<div class="col-lg-4 position-relative" data-estimator-pricing-search-wrap="1">';
                 html += '<label class="form-label small text-muted mb-1" for="epSearch_' + f.key + '">Find saved item</label>';
-                html += '<input type="search" class="form-control form-control-sm" id="epSearch_' + f.key + '" data-estimator-item-search="' + f.key + '" list="epSuggestions_' + f.key + '" placeholder="Start typing..." oninput="filterEstimatorPricingItems(\'' + f.key + '\')" onchange="commitEstimatorPricingSearchMatch(\'' + f.key + '\')" autocomplete="off">';
+                html += '<input type="search" class="form-control form-control-sm" id="epSearch_' + f.key + '" data-estimator-item-search="' + f.key + '" list="epSuggestions_' + f.key + '" placeholder="Start typing..." oninput="filterEstimatorPricingItems(\'' + f.key + '\')" onfocus="filterEstimatorPricingItems(\'' + f.key + '\')" onkeydown="return handleEstimatorPricingSearchKey(event, \'' + f.key + '\')" onchange="commitEstimatorPricingSearchMatch(\'' + f.key + '\')" autocomplete="off">';
                 html += '<datalist id="epSuggestions_' + f.key + '">' + estimatorPricingDatalistHtml() + '</datalist>';
+                html += '<div class="list-group position-absolute w-100 shadow-sm" id="epResults_' + f.key + '" data-estimator-pricing-results="1" style="display:none;z-index:1085;max-height:240px;overflow:auto;"></div>';
                 html += '<div class="mt-1" id="epSelected_' + f.key + '">' + estimatorSelectedItemsHtml(f.key, selectedIds) + '</div>';
                 html += '</div>';
                 html += '<div class="col-lg-3">';
@@ -482,6 +567,7 @@
                     sel.innerHTML = estimatorPricingOptionsHtml(key, '', '');
                     sel.value = '';
                 }
+                hideEstimatorPricingSearchResults(key);
                 return;
             }
             filterEstimatorPricingItems(key);
@@ -499,6 +585,7 @@
             var exactMatch = query ? matches.find(function(item) { return String(item.name || '').toLowerCase() === query.toLowerCase(); }) : null;
             var selectedId = exactMatch ? exactMatch.id : '';
             sel.innerHTML = estimatorPricingOptionsHtml(key, query, selectedId);
+            renderEstimatorPricingSearchResults(key);
         }
 
         function getEstimatorPricingSelections(pricing, key) {
