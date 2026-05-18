@@ -301,6 +301,24 @@
             if (results) results.style.display = 'none';
         }
 
+        function toggleEstimatorPricingBrowse(key) {
+            var wrap = document.getElementById('epBrowseWrap_' + key);
+            var button = document.getElementById('epBrowseBtn_' + key);
+            var select = document.getElementById('epItem_' + key);
+            if (!wrap) return;
+            var shouldShow = wrap.style.display === 'none' || !wrap.style.display;
+            wrap.style.display = shouldShow ? 'block' : 'none';
+            if (button) {
+                button.innerHTML = shouldShow
+                    ? '<i class="fas fa-chevron-up me-1"></i>Hide browse'
+                    : '<i class="fas fa-list me-1"></i>Browse all items';
+            }
+            if (shouldShow && select) {
+                select.innerHTML = estimatorPricingOptionsHtml(key, '', '');
+                setTimeout(function() { select.focus(); }, 0);
+            }
+        }
+
         function findEstimatorSavedItemIds(saved) {
             if (!saved) return [];
             if (Array.isArray(saved.items)) {
@@ -395,6 +413,10 @@
                 sel.value = '';
             }
             hideEstimatorPricingSearchResults(key);
+            var browseWrap = document.getElementById('epBrowseWrap_' + key);
+            var browseBtn = document.getElementById('epBrowseBtn_' + key);
+            if (browseWrap) browseWrap.style.display = 'none';
+            if (browseBtn) browseBtn.innerHTML = '<i class="fas fa-list me-1"></i>Browse all items';
         }
 
         function handleEstimatorPricingSearchKey(event, key) {
@@ -505,16 +527,16 @@
                 var selectedId = selectedIds.length === 1 ? selectedIds[0] : '';
                 html += '<div class="row g-2 align-items-end mb-3">';
                 html += '<div class="col-lg-3"><label class="form-label fw-semibold mb-0">' + f.label + '</label><div class="text-muted small">per ' + displayUnit + '</div></div>';
-                html += '<div class="col-lg-4 position-relative" data-estimator-pricing-search-wrap="1">';
+                html += '<div class="col-lg-7 position-relative" data-estimator-pricing-search-wrap="1">';
                 html += '<label class="form-label small text-muted mb-1" for="epSearch_' + f.key + '">Find saved item</label>';
                 html += '<input type="search" class="form-control form-control-sm" id="epSearch_' + f.key + '" data-estimator-item-search="' + f.key + '" list="epSuggestions_' + f.key + '" placeholder="Start typing..." oninput="filterEstimatorPricingItems(\'' + f.key + '\')" onfocus="filterEstimatorPricingItems(\'' + f.key + '\')" onkeydown="return handleEstimatorPricingSearchKey(event, \'' + f.key + '\')" onchange="commitEstimatorPricingSearchMatch(\'' + f.key + '\')" autocomplete="off">';
                 html += '<datalist id="epSuggestions_' + f.key + '">' + estimatorPricingDatalistHtml() + '</datalist>';
                 html += '<div class="list-group position-absolute w-100 shadow-sm" id="epResults_' + f.key + '" data-estimator-pricing-results="1" style="display:none;z-index:1085;max-height:240px;overflow:auto;"></div>';
                 html += '<div class="mt-1" id="epSelected_' + f.key + '">' + estimatorSelectedItemsHtml(f.key, selectedIds) + '</div>';
+                html += '<button type="button" class="btn btn-link btn-sm px-0 mt-1 text-decoration-none" id="epBrowseBtn_' + f.key + '" onclick="toggleEstimatorPricingBrowse(\'' + f.key + '\')"><i class="fas fa-list me-1"></i>Browse all items</button>';
+                html += '<div class="mt-1" style="display:none;" id="epBrowseWrap_' + f.key + '">';
+                html += '<select class="form-select form-select-sm" id="epItem_' + f.key + '" aria-label="Browse saved items for ' + calcEscapeHtml(f.label) + '" onchange="estimatorPricingItemSelected(\'' + f.key + '\')">' + estimatorPricingOptionsHtml(f.key, '', selectedId) + '</select>';
                 html += '</div>';
-                html += '<div class="col-lg-3">';
-                html += '<label class="form-label small text-muted mb-1" for="epItem_' + f.key + '">Category items</label>';
-                html += '<select class="form-select form-select-sm" id="epItem_' + f.key + '" onchange="estimatorPricingItemSelected(\'' + f.key + '\')">' + estimatorPricingOptionsHtml(f.key, '', selectedId) + '</select>';
                 html += '</div>';
                 html += '<div class="col-lg-2"><label class="form-label small text-muted mb-1" for="epRate_' + f.key + '">Rate</label><div class="input-group input-group-sm"><span class="input-group-text">$</span><input type="number" class="form-control" id="epRate_' + f.key + '" value="' + savedRate + '" placeholder="0.00" step="0.01" min="0"></div></div>';
                 html += '</div>';

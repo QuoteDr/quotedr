@@ -23,3 +23,7 @@ assert(source.includes('estimatorPricingSearchResultsHtml'), 'typing in pricing 
 assert(source.includes('pickEstimatorPricingSearchResult'), 'pricing setup search results should be clickable and link saved items');
 assert(source.includes('onfocus="filterEstimatorPricingItems'), 'pricing setup search should refresh visible results when focused');
 assert(source.includes('handleEstimatorPricingSearchKey(event'), 'pricing setup search should support keyboard selection');
+assert(source.includes('toggleEstimatorPricingBrowse'), 'category item browsing should be available as an optional secondary control');
+assert(source.includes('Browse all items'), 'pricing setup should expose browsing as a small optional button');
+assert(source.includes('style="display:none;" id="epBrowseWrap_'), 'category dropdown should be hidden until the user asks to browse');
+assert(!source.includes('<label class="form-label small text-muted mb-1" for="epItem_'), 'category dropdown should no longer be a full-time visible column');
