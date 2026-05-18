@@ -126,6 +126,7 @@
             { key: 'drywall',      label: 'Drywall',        unit: 'sqft', defaultRate: 0 },
             { key: 'baseboard',    label: 'Baseboard',      unit: 'LF',   defaultRate: 0 },
             { key: 'crownMolding', label: 'Crown Molding',  unit: 'LF',   defaultRate: 0 },
+            { key: 'framing',      label: 'Framing',        unit: 'LF',   defaultRate: 0 },
             { key: 'doorCasing',   label: 'Door Casing',    unit: 'LF',   defaultRate: 0 },
             { key: 'windowCasing', label: 'Window Casing',  unit: 'LF',   defaultRate: 0 },
         ];
@@ -765,6 +766,7 @@
                 { key: 'drywall',      label: 'Drywall',        qty: drywallSqft,  unit: calcAreaUnit(),   cat: 'Drywall',         itemName: 'Drywall - ' + name, notes: noteList([includeCeilingDrywall ? 'walls and ceiling calculated' : 'walls only calculated', openingDeduction > 0 ? openingDeduction + ' ' + calcAreaUnit() + ' openings deducted' : '']) },
                 { key: 'baseboard',    label: 'Baseboard',      qty: perimeter,    unit: calcLengthUnit(), cat: 'Trim & Millwork', itemName: 'Baseboard - ' + name },
                 { key: 'crownMolding', label: 'Crown Molding',  qty: perimeter,    unit: calcLengthUnit(), cat: 'Trim & Millwork', itemName: 'Crown Molding - ' + name },
+                { key: 'framing',      label: 'Framing',        qty: perimeter,    unit: calcLengthUnit(), cat: 'Framing',         itemName: 'Framing - ' + name },
                 { key: 'doorCasing',   label: 'Door Casing',    qty: doorCasing,   unit: calcLengthUnit(), cat: 'Trim & Millwork', itemName: 'Door Casing - ' + name, hide: doors === 0 },
                 { key: 'windowCasing', label: 'Window Casing',  qty: windowCasing, unit: calcLengthUnit(), cat: 'Trim & Millwork', itemName: 'Window Casing - ' + name, hide: windows === 0 },
             ];
