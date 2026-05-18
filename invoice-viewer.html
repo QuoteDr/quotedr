@@ -1073,7 +1073,7 @@ if (location.search.includes('debug')) {
 
             var buttonHtml = '';
             if (s.stripe_enabled && s.accept_full_payment !== false && paymentTargetId) {
-                buttonHtml += '<button class="btn btn-success btn-lg px-5 mb-3 w-100" onclick="handleClientInvoicePayment(' + Math.round(total * 100) + ', \"Pay Invoice in Full\", \"invoice_full\")">';
+                buttonHtml += '<button type="button" class="btn btn-success btn-lg px-5 mb-3 w-100" onclick="handleClientInvoicePayment(' + Math.round(total * 100) + ', \'Pay Invoice in Full\', \'invoice_full\')">';
                 buttonHtml += '<i class="fas fa-credit-card me-2"></i>Pay Invoice - $' + total.toFixed(2) + '</button>';
                 buttonHtml += '<div class="text-muted small mb-3"><i class="fab fa-stripe me-1"></i>Secure card payment powered by Stripe</div>';
             } else if (s.stripe_enabled && s.accept_full_payment !== false) {
@@ -1126,7 +1126,11 @@ if (location.search.includes('debug')) {
                 return;
             }
             var btns = document.querySelectorAll('#clientPaymentButtons button');
-            btns.forEach(function(b) { b.disabled = true; });
+            btns.forEach(function(b) {
+                b.disabled = true;
+                b.dataset.originalHtml = b.innerHTML;
+                b.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Opening Stripe...';
+            });
             try {
                 var resp = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/stripe-deposit', {
                     method: 'POST',
@@ -1154,7 +1158,10 @@ if (location.search.includes('debug')) {
                 else { throw new Error(data.error || 'Payment failed'); }
             } catch(e) {
                 alert('Payment error: ' + e.message);
-                btns.forEach(function(b) { b.disabled = false; });
+                btns.forEach(function(b) {
+                    b.disabled = false;
+                    if (b.dataset.originalHtml) b.innerHTML = b.dataset.originalHtml;
+                });
             }
         }
 
