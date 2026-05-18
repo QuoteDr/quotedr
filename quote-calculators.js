@@ -675,6 +675,12 @@
             if (document.getElementById('estWallPaintWaste')) document.getElementById('estWallPaintWaste').value = '0';
             if (document.getElementById('estPaintDeductOpenings')) document.getElementById('estPaintDeductOpenings').checked = true;
             if (document.getElementById('estCeilingPaint')) document.getElementById('estCeilingPaint').checked = true;
+            var pricing = loadEstimatorPricing();
+            var showCeilingDrywall = isEstimatorFieldEnabled(pricing, 'drywall');
+            var ceilingDrywallWrap = document.getElementById('estCeilingDrywallWrap');
+            var ceilingDrywallInput = document.getElementById('estCeilingDrywall');
+            if (ceilingDrywallWrap) ceilingDrywallWrap.style.display = showCeilingDrywall ? '' : 'none';
+            if (ceilingDrywallInput) ceilingDrywallInput.checked = showCeilingDrywall;
             document.getElementById('ceil8').checked = true;
             document.getElementById('estCeilingCustom').style.display = 'none';
             // Populate room dropdown
@@ -686,7 +692,7 @@
             });
             sel.value = '__new__';
             // Show pricing banner if no pricing set up yet
-            var hasPricing = Object.keys(loadEstimatorPricing()).length > 0;
+            var hasPricing = Object.keys(pricing).length > 0;
             document.getElementById('estPricingBanner').style.display = hasPricing ? 'none' : 'block';
             new bootstrap.Modal(document.getElementById('materialEstimatorModal')).show();
         }
@@ -711,15 +717,18 @@
             var paintWaste = calcPercentInput('estWallPaintWaste', 0);
             var deductOpeningsEl = document.getElementById('estPaintDeductOpenings');
             var includeCeilingEl = document.getElementById('estCeilingPaint');
+            var includeCeilingDrywallEl = document.getElementById('estCeilingDrywall');
             var deductOpenings = !deductOpeningsEl || deductOpeningsEl.checked;
             var includeCeilingPaint = !includeCeilingEl || includeCeilingEl.checked;
+            var includeCeilingDrywall = !includeCeilingDrywallEl || includeCeilingDrywallEl.checked;
             var baseFloorSqft = Math.round(w * l * 10) / 10;
             var floorSqft = Math.round(baseFloorSqft * (1 + floorWaste / 100) * 10) / 10;
             var wallGrossSqft = Math.round((2 * w + 2 * l) * ceilH * 10) / 10;
             var openingDeduction = deductOpenings ? Math.round((doors * calcDoorAreaDeduction() + windows * calcWindowAreaDeduction()) * 10) / 10 : 0;
             var wallNetSqft = Math.max(0, wallGrossSqft - openingDeduction);
             var wallSqft = Math.round(wallNetSqft * (1 + paintWaste / 100) * 10) / 10;
-            var drywallSqft = Math.round(Math.max(0, wallGrossSqft + baseFloorSqft - openingDeduction) * 10) / 10;
+            var drywallBaseSqft = wallGrossSqft + (includeCeilingDrywall ? baseFloorSqft : 0);
+            var drywallSqft = Math.round(Math.max(0, drywallBaseSqft - openingDeduction) * 10) / 10;
             var perimeter = Math.round((2 * w + 2 * l) * 10) / 10;
             var doorCasing = doors * calcDoorCasingLength();
             var windowCasing = windows * calcWindowCasingLength();
@@ -753,7 +762,7 @@
                 { key: 'flooring',     label: 'Flooring',       qty: floorSqft,    unit: calcAreaUnit(),   cat: 'Flooring',        itemName: 'Flooring - ' + name, notes: noteList([floorWaste > 0 ? floorWaste + '% waste added' : '']) },
                 { key: 'ceilingPaint', label: 'Ceiling Paint',  qty: baseFloorSqft, unit: calcAreaUnit(),  cat: 'Painting',        itemName: 'Ceiling Paint - ' + name, hide: !includeCeilingPaint },
                 { key: 'wallPaint',    label: 'Wall Paint',     qty: wallSqft,     unit: calcAreaUnit(),   cat: 'Painting',        itemName: 'Wall Paint - ' + name, notes: noteList([openingDeduction > 0 ? openingDeduction + ' ' + calcAreaUnit() + ' openings deducted' : '', paintWaste > 0 ? paintWaste + '% paint waste added' : '']) },
-                { key: 'drywall',      label: 'Drywall',        qty: drywallSqft,  unit: calcAreaUnit(),   cat: 'Drywall',         itemName: 'Drywall - ' + name, notes: noteList(['walls and ceiling calculated', openingDeduction > 0 ? openingDeduction + ' ' + calcAreaUnit() + ' openings deducted' : '']) },
+                { key: 'drywall',      label: 'Drywall',        qty: drywallSqft,  unit: calcAreaUnit(),   cat: 'Drywall',         itemName: 'Drywall - ' + name, notes: noteList([includeCeilingDrywall ? 'walls and ceiling calculated' : 'walls only calculated', openingDeduction > 0 ? openingDeduction + ' ' + calcAreaUnit() + ' openings deducted' : '']) },
                 { key: 'baseboard',    label: 'Baseboard',      qty: perimeter,    unit: calcLengthUnit(), cat: 'Trim & Millwork', itemName: 'Baseboard - ' + name },
                 { key: 'crownMolding', label: 'Crown Molding',  qty: perimeter,    unit: calcLengthUnit(), cat: 'Trim & Millwork', itemName: 'Crown Molding - ' + name },
                 { key: 'doorCasing',   label: 'Door Casing',    qty: doorCasing,   unit: calcLengthUnit(), cat: 'Trim & Millwork', itemName: 'Door Casing - ' + name, hide: doors === 0 },

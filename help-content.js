@@ -209,6 +209,7 @@
             summary: 'Build a quick room quote from dimensions, openings, waste settings, and the enabled outputs from your saved pricing setup.',
             steps: [
                 'Enter the room name, width, length, ceiling height, doors, and windows.',
+                'Use the adjustment checkboxes to include or skip ceiling paint and ceiling drywall when those outputs apply.',
                 'Calculate the recommended line items and quantities.',
                 'Review the results and choose the target room.',
                 'Add the quick quote as a new room or append it to an existing room.'
