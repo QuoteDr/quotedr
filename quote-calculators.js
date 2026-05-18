@@ -425,6 +425,11 @@
             return false;
         }
 
+        function pickEstimatorPricingSearchButton(button) {
+            if (!button || !button.dataset) return;
+            pickEstimatorPricingSearchResult(button.dataset.estimatorKey, button.dataset.estimatorItemId);
+        }
+
         document.addEventListener('click', function(event) {
             var button = event.target && event.target.closest ? event.target.closest('[data-estimator-remove-item="1"]') : null;
             if (!button) return;
@@ -438,7 +443,15 @@
             if (!button) return;
             event.preventDefault();
             event.stopPropagation();
-            pickEstimatorPricingSearchResult(button.dataset.estimatorKey, button.dataset.estimatorItemId);
+            pickEstimatorPricingSearchButton(button);
+        });
+
+        document.addEventListener('pointerdown', function(event) {
+            var button = event.target && event.target.closest ? event.target.closest('[data-estimator-search-pick="1"]') : null;
+            if (!button) return;
+            event.preventDefault();
+            event.stopPropagation();
+            pickEstimatorPricingSearchButton(button);
         });
 
         document.addEventListener('click', function(event) {

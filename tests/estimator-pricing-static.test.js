@@ -30,3 +30,5 @@ assert(source.includes('style="display:none;" id="epBrowseWrap_'), 'category dro
 assert(!source.includes('<label class="form-label small text-muted mb-1" for="epItem_'), 'category dropdown should no longer be a full-time visible column');
 assert(source.includes('estimator-pricing-row'), 'pricing setup rows should have a visual grouping class');
 assert(source.includes('estimator-pricing-field'), 'pricing setup row labels should align within each grouped row');
+assert(source.includes("document.addEventListener('pointerdown'"), 'search result items should select on pointerdown before input change redraws the list');
+assert(source.includes('pickEstimatorPricingSearchButton'), 'search result pointer and click handlers should share one picker helper');
