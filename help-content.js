@@ -292,6 +292,54 @@
             ],
             helpUrl: 'help.html#building-quotes'
         },
+        shareTemplateModal: {
+            title: 'Share Template to Community',
+            summary: 'Publish one of your saved templates so other contractors can import the room structure into their own QuoteDr account.',
+            steps: [
+                'Give the template a clear name and description so other users know what kind of job it fits.',
+                'Choose the trade, region, and job type to make the template easier to find.',
+                'Decide whether to include pricing. If pricing is off, QuoteDr strips rates, material costs, totals, and markup to $0 before publishing.',
+                'Choose whether to show your contributor name or post anonymously.',
+                'Click Publish Template only after reviewing what will be shared.'
+            ],
+            tips: [
+                'Most users should share structure without pricing unless they intentionally want to share market rates.',
+                'Keep descriptions practical: scope included, assumptions, and what the template is best used for.'
+            ],
+            helpUrl: 'help.html#building-quotes'
+        },
+        communityTemplatesModal: {
+            title: 'Community Templates',
+            summary: 'Browse templates shared by other QuoteDr users and import useful job structures into your own template library.',
+            steps: [
+                'Use search, trade, and region filters to narrow the marketplace.',
+                'Check whether a template includes pricing or imports with rates set to $0.',
+                'Click Add to My Templates to copy it into your private template library.',
+                'After importing, open Manage Templates or add the template to a quote and review every room, item, quantity, and rate.',
+                'Use thumbs up, thumbs down, or report to help keep the marketplace useful.'
+            ],
+            tips: [
+                'Community templates are starting points, not finished quotes. Always adjust pricing for your market and scope.',
+                'If the marketplace is unavailable, the database migration may not be deployed yet.'
+            ],
+            helpUrl: 'help.html#building-quotes'
+        },
+        roomColorModal: {
+            title: 'Room Header Colours',
+            summary: 'Customize the colour used on room headers so quote sections are easier to scan and match your preferred style.',
+            steps: [
+                'Pick a custom colour with the colour picker or choose one of your saved preset colours.',
+                'Use Header colour intensity on the room card to make the colour stronger or more subtle.',
+                'Save useful colours as presets so they are available on future rooms.',
+                'Choose a default colour when you want new rooms to start with the same look.',
+                'Use Done when the room colour setup looks right.'
+            ],
+            tips: [
+                'Subtle header colours usually look more professional on client-facing quotes.',
+                'Use consistent colours for repeat room types if it helps you scan larger quotes faster.'
+            ],
+            helpUrl: 'help.html#building-quotes'
+        },
         notesReviewModal: {
             title: 'Client Notes Review',
             summary: 'Review client-requested changes or comments before updating a quote.',
@@ -350,6 +398,21 @@
             ],
             helpUrl: 'help.html#clients-data'
         },
+        portalAssignModal: {
+            title: 'Add to Client Portal',
+            summary: 'Attach quotes, invoices, and project documents to a client portal so the client has one organized place to review them.',
+            steps: [
+                'Choose the client portal or project folder the document belongs to.',
+                'Review the quote or invoice being attached before saving.',
+                'Save the portal assignment so the document appears in the client portal.',
+                'Use Client Portal Access when you are ready to share the portal link and PIN.'
+            ],
+            tips: [
+                'Use portal grouping when one client has multiple quotes, invoices, or change orders for the same job.',
+                'Portal assignments are internal until you share portal access with the client.'
+            ],
+            helpUrl: 'help.html#clients-data'
+        },
         newQuoteModal: {
             title: 'Start a New Quote',
             summary: 'Create a cloud-saved quote shell before opening the builder.',
@@ -381,6 +444,129 @@
             ],
             helpUrl: 'help.html#invoices-payments'
         },
+        invoiceSettingsModal: {
+            title: 'Invoice Settings',
+            summary: 'Control how generated invoices look before previewing, downloading, or sending them to a client.',
+            steps: [
+                'Set the invoice label if you want wording other than Invoice.',
+                'Add an invoice note for a short client-facing message.',
+                'Write payment terms that explain when and how payment is due.',
+                'Choose whether the invoice should show line descriptions, room totals, terms, and payment options.',
+                'Save Defaults to reuse these settings, or Apply to use them for the current invoice.'
+            ],
+            tips: [
+                'Invoices should usually be cleaner than quotes. Show only the detail the client needs to pay confidently.',
+                'Payment options only appear when the payment integration is enabled and available for that invoice.'
+            ],
+            helpUrl: 'help.html#invoices-payments'
+        },
+        aiVoiceTemplatesModal: {
+            title: 'Voice Templates',
+            summary: 'Teach AI Voice reusable phrases that add a prepared group of saved quote items.',
+            steps: [
+                'Enter a template name and the exact trigger phrase you want to say while recording.',
+                'Choose a saved item and quantity rule for each line in the template.',
+                'Use quantity basis to decide whether the item is fixed, based on floor area, room perimeter, or wall area.',
+                'Add each line to the draft, then save the template.',
+                'Use the saved phrase during AI Quote Builder and review the generated items before adding them.'
+            ],
+            tips: [
+                'Voice templates are best for repeat packages like standard bedroom paint or bathroom demo prep.',
+                'Keep trigger phrases short and natural so they are easy to remember on site.'
+            ],
+            helpUrl: 'help.html#ai-features'
+        },
+        aiVoiceMemoryModal: {
+            title: 'AI Memory',
+            summary: 'Review and edit what QuoteDr has learned from your AI Voice corrections.',
+            steps: [
+                'Open this list to see phrases that were mapped to saved items during previous AI Voice reviews.',
+                'Edit the saved item mapping when a phrase should point somewhere else.',
+                'Remove entries that are wrong or no longer useful.',
+                'Refresh the list after making changes from another device or session.'
+            ],
+            tips: [
+                'AI Memory is private to your account and helps future voice quotes match your wording.',
+                'Correcting items during review is the best way to teach QuoteDr your preferred language.'
+            ],
+            helpUrl: 'help.html#ai-features'
+        },
+        aiVoiceTradeRulesModal: {
+            title: 'AI Trade Rules',
+            summary: 'Create contractor math rules so AI Voice can turn phrases into accurate quantities.',
+            steps: [
+                'Enter the phrase you normally say, such as case a door or baseboard a room.',
+                'Choose the saved item that should be added when that phrase is heard.',
+                'Set the quantity and whether it is fixed or multiplied by a count.',
+                'Add a note if the rule needs context.',
+                'Save the rule and test it in AI Quote Builder.'
+            ],
+            tips: [
+                'Trade rules are useful for repeat math that AI would otherwise have to guess.',
+                'Use clear count labels like door, window, opening, or room so the rule reads naturally.'
+            ],
+            helpUrl: 'help.html#ai-features'
+        },
+        aiVoiceMeasurementModal: {
+            title: 'Missing AI Voice Measurement',
+            summary: 'QuoteDr needs one or more measurements before it can calculate certain AI-generated items accurately.',
+            steps: [
+                'Read which measurement is missing and why it is needed.',
+                'Enter the requested dimension, count, or area.',
+                'Continue Review so QuoteDr can recalculate the affected line items.',
+                'Review the final quantities before adding them to the quote.'
+            ],
+            tips: [
+                'This protects you from AI guessing important quantities like wall area, ceiling height, or linear footage.',
+                'Use approximate measurements only when you are comfortable with an estimate.'
+            ],
+            helpUrl: 'help.html#ai-features'
+        },
+        aiVoiceReviewModal: {
+            title: 'Review AI Voice Items',
+            summary: 'Check and correct AI-generated rooms, scope notes, items, quantities, rates, and saved-item matches before they land on the quote.',
+            steps: [
+                'Review each suggested room and line item from top to bottom.',
+                'Fix item names, quantities, units, rates, and room placement as needed.',
+                'Map unclear AI phrases to saved items when you want QuoteDr to remember the correction.',
+                'Review generated scope notes for client-facing wording.',
+                'Click Add Verified Items when the suggestions are ready for the quote.'
+            ],
+            tips: [
+                'Do not send AI-generated items to a client without reviewing them first.',
+                'Corrections made here improve future AI Voice results through AI Memory.'
+            ],
+            helpUrl: 'help.html#ai-features'
+        },
+        featureDetailModal: {
+            title: 'Feature Details',
+            summary: 'This landing-page panel explains one QuoteDr feature in more detail for visitors comparing the app.',
+            steps: [
+                'Read the short overview at the top of the panel.',
+                'Review the feature points to understand what the tool is meant to solve.',
+                'Close the panel to keep browsing the landing page.',
+                'Use Sign In or pricing links when you are ready to try the feature inside the app.'
+            ],
+            tips: [
+                'These panels are marketing explanations, not editable quote settings.',
+                'Inside the signed-in app, Help buttons give workflow guidance for the actual tool.'
+            ],
+            helpUrl: 'help.html#getting-started'
+        },
+        tradeDetailModal: {
+            title: 'Trade Details',
+            summary: 'This landing-page panel explains how QuoteDr can fit a specific trade or service business.',
+            steps: [
+                'Read the trade-specific overview.',
+                'Review the listed ways QuoteDr supports that workflow.',
+                'Close the panel to compare other trades or continue through the landing page.'
+            ],
+            tips: [
+                'Trade panels are examples. The quote builder can be customized with your own rooms, items, terms, and templates.',
+                'Use templates and saved items inside the app to make QuoteDr fit your exact business.'
+            ],
+            helpUrl: 'help.html#getting-started'
+        },
         signatureLightbox: {
             title: 'Signature Preview',
             summary: 'Preview the client signature attached to an accepted quote.',
@@ -411,7 +597,8 @@
     };
 
     const ALIASES = {
-        'signature-lightbox': 'signatureLightbox'
+        'signature-lightbox': 'signatureLightbox',
+        templateManagerModal: 'manageTemplatesModal'
     };
 
     const INLINE_TOPICS = {
@@ -565,12 +752,24 @@
         paintCalcModal: 'material-calculators',
         drywallCalcModal: 'material-calculators',
         manageTemplatesModal: 'quote-builder-overview',
+        shareTemplateModal: 'quote-builder-overview',
+        communityTemplatesModal: 'quote-builder-overview',
+        roomColorModal: 'quote-builder-overview',
         notesReviewModal: 'send-client-quote',
         warrantyModal: 'send-client-quote',
         changeOrderModal: 'send-client-quote',
+        portalAssignModal: 'send-client-quote',
         portalShareModal: 'send-client-quote',
         newQuoteModal: 'quote-builder-overview',
         depositModal: 'invoice-payments',
+        invoiceSettingsModal: 'invoice-payments',
+        aiVoiceTemplatesModal: 'ai-voice-quote',
+        aiVoiceMemoryModal: 'ai-voice-quote',
+        aiVoiceTradeRulesModal: 'ai-voice-quote',
+        aiVoiceMeasurementModal: 'ai-voice-quote',
+        aiVoiceReviewModal: 'ai-voice-quote',
+        featureDetailModal: 'quote-builder-overview',
+        tradeDetailModal: 'quote-builder-overview',
         signatureLightbox: 'send-client-quote',
         installHelpModal: 'quickbooks-settings'
     };

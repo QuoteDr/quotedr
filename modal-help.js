@@ -106,23 +106,7 @@
     function getTopic(modalId, modal) {
         const registered = modalId && window.QuoteDrHelpContent ? window.QuoteDrHelpContent.getTopic(modalId) : null;
         if (registered) return registered;
-
-        const title = modal ? (modal.querySelector('.modal-title')?.textContent || '').trim() : '';
-        return {
-            title: title || 'This Tool',
-            summary: 'This window helps you complete the current QuoteDr task. Follow the fields from top to bottom, review anything that affects the client, then use the main action button when you are ready.',
-            steps: [
-                'Read the title and field labels to confirm what this tool is for.',
-                'Fill in the required details first.',
-                'Review totals, links, client-visible text, or warnings before continuing.',
-                'Use Cancel or Close if you are unsure and want to return without changes.'
-            ],
-            tips: [
-                'Most QuoteDr windows save or apply changes only after you click the primary action button.',
-                'For detailed help, open the Help Center or ask the AI Assistant.'
-            ],
-            helpUrl: 'help.html'
-        };
+        return null;
     }
 
     function getInlineTopic(topicId) {
@@ -248,8 +232,9 @@
         if (!modal || modal.getAttribute(DECORATED_ATTR) === '1') return;
         if (modal.id === HELP_MODAL_ID) return;
 
-        if (!modal.id) modal.id = 'qdHelpModal_' + Math.random().toString(36).slice(2, 10);
+        if (!modal.id) return;
         const topic = getTopic(modal.id, modal);
+        if (!topic) return;
 
         const header = modal.querySelector('.modal-header');
         const closeBtn = header ? header.querySelector('[data-bs-dismiss="modal"], .btn-close') : null;
