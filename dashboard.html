@@ -60,6 +60,46 @@
             font-size: 0.7rem;
             padding: 0.25rem 0.5rem;
         }
+        .portal-client-typeahead {
+            position: relative;
+        }
+        .portal-client-dropdown {
+            display: none;
+            position: absolute;
+            top: calc(100% - 0.5rem);
+            left: 0;
+            right: 0;
+            z-index: 1065;
+            max-height: 240px;
+            overflow-y: auto;
+            background: #fff;
+            border: 1px solid #d7e0ea;
+            border-radius: 6px;
+            box-shadow: 0 10px 24px rgba(15, 52, 96, 0.16);
+        }
+        .portal-client-suggestion {
+            padding: 0.65rem 0.75rem;
+            cursor: pointer;
+            border-bottom: 1px solid #eef2f6;
+        }
+        .portal-client-suggestion:hover,
+        .portal-client-suggestion:focus {
+            background: #eef4fb;
+        }
+        .portal-client-suggestion:last-child {
+            border-bottom: 0;
+        }
+        .portal-client-suggestion strong {
+            display: block;
+            color: #0f3460;
+            line-height: 1.2;
+        }
+        .portal-client-suggestion small {
+            display: block;
+            margin-top: 0.2rem;
+            color: #6c757d;
+            line-height: 1.25;
+        }
         @media (max-width: 768px) {
             .quote-card {
                 padding: 0.75rem;
@@ -723,6 +763,9 @@
             document.getElementById('portalAssignClientName').value = quoteClientName(quote);
             document.getElementById('portalAssignClientEmail').value = quoteClientEmail(quote);
             document.getElementById('portalAssignPortalName').value = d.portal_name || quoteClientName(quote);
+            window._portalAssignSelectedClient = null;
+            populatePortalAssignClientSuggestions();
+            refreshDashboardSavedClientsFromCloud();
             renderPortalAssignmentList();
             var modal = new bootstrap.Modal(document.getElementById('portalAssignModal'));
             modal.show();
@@ -740,6 +783,9 @@
             document.getElementById('portalAssignPortalName').value = '';
             document.getElementById('portalAssignCreateBtn').innerHTML = '<i class="fas fa-plus me-1"></i>Create Empty Portal';
             document.getElementById('portalAssignRemoveBtn').style.display = 'none';
+            window._portalAssignSelectedClient = null;
+            populatePortalAssignClientSuggestions();
+            refreshDashboardSavedClientsFromCloud();
             renderPortalAssignmentList();
             var modal = new bootstrap.Modal(document.getElementById('portalAssignModal'));
             modal.show();
@@ -752,6 +798,9 @@
                 document.getElementById('portalAssignClientName').value = '';
                 document.getElementById('portalAssignClientEmail').value = '';
                 document.getElementById('portalAssignPortalName').value = '';
+                window._portalAssignSelectedClient = null;
+                populatePortalAssignClientSuggestions();
+                refreshDashboardSavedClientsFromCloud();
                 document.getElementById('portalAssignClientName').focus();
             }
         }
@@ -2503,6 +2552,7 @@ function renderBusinessInsights(quotes) {
                 });
                 localStorage.setItem('ald_clients', JSON.stringify(existing));
                 populateNewQuoteClientSuggestions();
+                populatePortalAssignClientSuggestions();
             } catch(e) {
                 console.warn('Dashboard client refresh error:', e);
             }
@@ -2521,12 +2571,88 @@ function renderBusinessInsights(quotes) {
             });
         }
 
+        function populatePortalAssignClientSuggestions() {
+            hidePortalAssignClientSuggestions('name');
+            hidePortalAssignClientSuggestions('email');
+        }
+
         function findNewQuoteClientByName(name) {
             var needle = String(name || '').trim().toLowerCase();
             if (!needle) return null;
             return getDashboardSavedClients().find(function(client) {
                 return String(client.name || '').trim().toLowerCase() === needle;
             }) || null;
+        }
+
+        function findDashboardClientByEmail(email) {
+            var needle = String(email || '').trim().toLowerCase();
+            if (!needle) return null;
+            return getDashboardSavedClients().find(function(client) {
+                return String(client.email || '').trim().toLowerCase() === needle;
+            }) || null;
+        }
+
+        function searchPortalAssignClients(query, source) {
+            var needle = String(query || '').trim().toLowerCase();
+            if (needle.length < 2) return [];
+            return getDashboardSavedClients().map(function(client) {
+                var fields = [
+                    client.name || '',
+                    client.email || '',
+                    client.phone || '',
+                    client.address || ''
+                ];
+                var primary = source === 'email' ? String(client.email || '') : String(client.name || '');
+                var haystack = fields.join(' ').toLowerCase();
+                if (!haystack.includes(needle)) return null;
+                var primaryLower = primary.toLowerCase();
+                var score = primaryLower === needle ? 100 : (primaryLower.startsWith(needle) ? 90 : (primaryLower.includes(needle) ? 75 : 55));
+                return Object.assign({}, client, { _score: score });
+            }).filter(Boolean).sort(function(a, b) {
+                return b._score - a._score || String(a.name || '').localeCompare(String(b.name || ''));
+            }).slice(0, 8);
+        }
+
+        function portalAssignDropdownFor(source) {
+            return document.getElementById(source === 'email' ? 'portalAssignClientEmailDropdown' : 'portalAssignClientNameDropdown');
+        }
+
+        function hidePortalAssignClientSuggestions(source) {
+            var dropdown = portalAssignDropdownFor(source);
+            if (!dropdown) return;
+            setTimeout(function() {
+                dropdown.style.display = 'none';
+            }, 160);
+        }
+
+        function showPortalAssignClientSuggestions(source) {
+            var input = document.getElementById(source === 'email' ? 'portalAssignClientEmail' : 'portalAssignClientName');
+            var dropdown = portalAssignDropdownFor(source);
+            if (!input || !dropdown) return;
+            var results = searchPortalAssignClients(input.value, source);
+            dropdown.innerHTML = '';
+            if (!results.length) {
+                dropdown.style.display = 'none';
+                return;
+            }
+            results.forEach(function(client) {
+                var item = document.createElement('button');
+                item.type = 'button';
+                item.className = 'portal-client-suggestion text-start w-100 border-0';
+                var title = document.createElement('strong');
+                title.textContent = client.name || client.email || 'Saved client';
+                var details = document.createElement('small');
+                details.textContent = [client.address, client.phone, client.email].filter(Boolean).join(' - ');
+                item.appendChild(title);
+                if (details.textContent) item.appendChild(details);
+                item.addEventListener('mousedown', function(event) {
+                    event.preventDefault();
+                    applyPortalAssignClientSelection(source, client);
+                    dropdown.style.display = 'none';
+                });
+                dropdown.appendChild(item);
+            });
+            dropdown.style.display = 'block';
         }
 
         function applyNewQuoteClientSelection() {
@@ -2538,6 +2664,28 @@ function renderBusinessInsights(quotes) {
             if (!client) return;
             nameInput.value = client.name || nameInput.value;
             if (client.address) addressInput.value = client.address;
+        }
+
+        function applyPortalAssignClientSelection(source, selectedClient) {
+            var nameInput = document.getElementById('portalAssignClientName');
+            var emailInput = document.getElementById('portalAssignClientEmail');
+            var portalNameInput = document.getElementById('portalAssignPortalName');
+            if (!nameInput || !emailInput) return;
+            var client = selectedClient || (source === 'email'
+                ? findDashboardClientByEmail(emailInput.value)
+                : findNewQuoteClientByName(nameInput.value));
+            if (!client) return;
+            var previousClient = window._portalAssignSelectedClient || null;
+            var previousName = previousClient && previousClient.name ? previousClient.name : '';
+            nameInput.value = client.name || nameInput.value;
+            emailInput.value = client.email || emailInput.value;
+            if (portalNameInput && client.name) {
+                var portalName = portalNameInput.value.trim();
+                if (!portalName || (previousName && portalName === previousName)) {
+                    portalNameInput.value = client.name;
+                }
+            }
+            window._portalAssignSelectedClient = client;
         }
 
         function openNewQuoteModal() {
@@ -2638,6 +2786,18 @@ function renderBusinessInsights(quotes) {
             if (newQuoteClientName) {
                 newQuoteClientName.addEventListener('input', applyNewQuoteClientSelection);
                 newQuoteClientName.addEventListener('change', applyNewQuoteClientSelection);
+            }
+            var portalAssignClientName = document.getElementById('portalAssignClientName');
+            if (portalAssignClientName) {
+                portalAssignClientName.addEventListener('input', function() { showPortalAssignClientSuggestions('name'); });
+                portalAssignClientName.addEventListener('change', function() { applyPortalAssignClientSelection('name'); });
+                portalAssignClientName.addEventListener('blur', function() { hidePortalAssignClientSuggestions('name'); });
+            }
+            var portalAssignClientEmail = document.getElementById('portalAssignClientEmail');
+            if (portalAssignClientEmail) {
+                portalAssignClientEmail.addEventListener('input', function() { showPortalAssignClientSuggestions('email'); });
+                portalAssignClientEmail.addEventListener('change', function() { applyPortalAssignClientSelection('email'); });
+                portalAssignClientEmail.addEventListener('blur', function() { hidePortalAssignClientSuggestions('email'); });
             }
         });
     </script>
@@ -2808,10 +2968,16 @@ function renderBusinessInsights(quotes) {
           <div class="col-lg-5" id="portalAssignCreateWrap">
             <div class="border rounded p-3">
               <h6>Create or start fresh</h6>
-              <label class="form-label small text-muted mb-1" for="portalAssignClientName">Client</label>
-              <input type="text" class="form-control form-control-sm mb-2" id="portalAssignClientName">
-              <label class="form-label small text-muted mb-1" for="portalAssignClientEmail">Client email</label>
-              <input type="email" class="form-control form-control-sm mb-2" id="portalAssignClientEmail">
+              <div class="portal-client-typeahead">
+                <label class="form-label small text-muted mb-1" for="portalAssignClientName">Client</label>
+                <input type="text" class="form-control form-control-sm mb-2" id="portalAssignClientName" autocomplete="off">
+                <div id="portalAssignClientNameDropdown" class="portal-client-dropdown"></div>
+              </div>
+              <div class="portal-client-typeahead">
+                <label class="form-label small text-muted mb-1" for="portalAssignClientEmail">Client email</label>
+                <input type="email" class="form-control form-control-sm mb-2" id="portalAssignClientEmail" autocomplete="off">
+                <div id="portalAssignClientEmailDropdown" class="portal-client-dropdown"></div>
+              </div>
               <label class="form-label small text-muted mb-1" for="portalAssignPortalName">Portal name</label>
               <input type="text" class="form-control form-control-sm mb-3" id="portalAssignPortalName" placeholder="e.g., Adam Dezic - Spring Project">
               <div class="d-grid gap-2">

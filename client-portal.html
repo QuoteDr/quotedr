@@ -749,7 +749,7 @@
         if (show === 'quotes') return !isChangeOrder && !isInvoice;
         if (show === 'invoices') return isInvoice;
         if (show === 'change_orders') return isChangeOrder;
-        if (show === 'needs_action') return needsAction;
+        if (show === 'needs_action') return needsAction && !documentIsCompleted(quote);
         if (show === 'open') return ['draft', 'sent', 'viewed', 'in_review', 'pending_approval'].includes(status);
         if (show === 'accepted') return ['accepted', 'approved', 'invoiced'].includes(status);
         if (show === 'completed') return documentIsCompleted(quote);
@@ -797,7 +797,7 @@
 
     function renderGroupedPortalDocuments(parents, children, co) {
       const groups = [
-        { key: 'needs', icon: 'fa-circle-exclamation', title: 'Needs Action', items: parents.filter(documentNeedsAction) },
+        { key: 'needs', icon: 'fa-circle-exclamation', title: 'Needs Action', items: parents.filter(function(q) { return documentNeedsAction(q) && !documentIsCompleted(q); }) },
         { key: 'open', icon: 'fa-folder-open', title: 'Open', items: parents.filter(function(q) { return !documentNeedsAction(q) && !documentIsCompleted(q); }) },
         { key: 'completed', icon: 'fa-circle-check', title: 'Completed', items: parents.filter(documentIsCompleted) }
       ];
@@ -967,6 +967,7 @@
     }
 
     function documentNeedsAction(quote) {
+      if (documentIsCompleted(quote)) return false;
       const status = quoteStatus(quote);
       const paymentStatus = String(quote.data?.paymentStatus || '').toLowerCase();
       return ['sent', 'viewed', 'in_review', 'pending_approval'].includes(status) ||
