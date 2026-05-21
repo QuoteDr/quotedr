@@ -35,6 +35,12 @@ assert(builder.includes('openAiVoiceAutoGroupChoiceModal'), 'AI Voice should ask
 assert(builder.includes('Grouped items found. Use saved groups?'), 'AI Voice grouping prompt should explain that grouped items were found');
 assert(builder.includes('openAiVoiceAutoGroupReviewModal'), 'AI Voice should offer a review modal for grouped items');
 assert(builder.includes('data-ai-auto-group-include'), 'AI Voice grouping review should let users ungroup selected rows');
+assert(builder.includes('openAiVoiceDestinationModal'), 'AI Voice should ask where reviewed items should be added');
+assert(builder.includes('aiVoiceDestinationModal'), 'AI Voice destination picker should be a real modal');
+assert(builder.includes('confirmAiVoiceDestination'), 'AI Voice destination picker should have an explicit confirm action');
+assert(builder.includes('Choose where to add these AI Voice items'), 'AI Voice destination picker should explain the add/create choices');
+assert(!builder.includes("var action = 'replace'"), 'AI Voice should not default to replacing quote rooms');
+assert(!builder.includes('Choose Cancel to replace everything'), 'AI Voice should not offer overwrite/replace as the cancel action');
 assert(builder.includes('ai-voice-review-quantity'), 'AI Voice review should let users correct parsed quantities before adding items');
 assert(builder.includes('aiVoiceReviewUnit'), 'AI Voice review should let users correct parsed units before adding items');
 assert(builder.includes('_applyAiVoiceReviewQuantityEdit'), 'AI Voice review should apply corrected quantity and unit values before quote creation');
@@ -42,6 +48,11 @@ assert(builder.includes('aiVoiceTradeRuleType'), 'AI Trade Rules should expose a
 assert(builder.includes('aiVoiceTradeQuestion'), 'AI Trade Rules should collect a clarification question');
 assert(builder.includes('aiVoiceQuestionOptionDraftList'), 'AI Trade Rules should show drafted clarification answer options');
 assert(builder.includes('addAiVoiceQuestionOptionDraftItem'), 'AI Trade Rules should add answer options before saving a question rule');
+assert(builder.includes('editAiVoiceTradeRule'), 'AI Trade Rules should let users edit saved trade rules');
+assert(builder.includes('cancelAiVoiceTradeRuleEdit'), 'AI Trade Rules should let users cancel editing and return to new-rule mode');
+assert(builder.includes('_aiVoiceEditingTradeRuleId'), 'AI Trade Rules should track which saved rule is being edited');
+assert(builder.includes('aiVoiceTradeRuleCancelEdit'), 'AI Trade Rules should expose a Cancel Edit button');
+assert(builder.includes('Update Rule'), 'AI Trade Rules edit mode should change the save button to Update Rule');
 assert(builder.includes('showAiVoiceClarificationModal'), 'AI Voice should ask unanswered trade-rule questions before review');
 assert(builder.includes('aiVoiceClarificationModal'), 'AI Voice should include a clarification modal');
 assert(builder.includes('_findClarificationAnswer'), 'AI Voice should auto-select clarification answers from transcript aliases');

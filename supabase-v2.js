@@ -1201,7 +1201,15 @@ async function saveAiTradeRule(rule) {
         active: rule.active !== false,
         updated_at: new Date().toISOString()
     };
-    if (rule.id) payload.id = rule.id;
+    if (rule.id) {
+        return await _supabase
+            .from('ai_trade_rules')
+            .update(payload)
+            .eq('id', rule.id)
+            .eq('user_id', user.id)
+            .select()
+            .single();
+    }
     return await _supabase
         .from('ai_trade_rules')
         .upsert(payload, { onConflict: 'user_id,phrase_key' })
