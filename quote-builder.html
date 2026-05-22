@@ -886,6 +886,35 @@
             border-radius: 8px;
             background: #f8fafc;
         }
+        .quote-items-table {
+            width: 100%;
+            min-width: 980px;
+            table-layout: fixed;
+        }
+        .quote-items-table td {
+            vertical-align: top;
+        }
+        .quote-item-desc-cell {
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+        .quote-item-description,
+        .quote-item-job-note {
+            margin-top: 0.2rem;
+        }
+        .quote-item-job-note small {
+            color: #495057;
+        }
+        .quote-item-qty-cell,
+        .quote-item-rate-cell,
+        .quote-item-total-cell,
+        .quote-item-profit-cell {
+            text-align: right;
+            white-space: nowrap;
+        }
+        .quote-item-actions-cell .quote-item-actions {
+            justify-content: flex-end;
+        }
     @media (max-width: 768px) {
             .container-fluid { padding-left: 8px !important; padding-right: 8px !important; }
             .btn-sm { font-size: 0.75rem; padding: 4px 7px; }
@@ -1883,8 +1912,8 @@ Example:
                         </div>
                     </div>
 
-                    <label><strong>Description (Optional):</strong></label>
-                    <textarea id="lineNotes" class="form-control mb-3" rows="2" placeholder="Additional description shown under this line item..." spellcheck="true"></textarea>
+                    <label><strong>Job-specific Note (Optional):</strong></label>
+                    <textarea id="lineNotes" class="form-control mb-3" rows="2" placeholder="Explain what is unique about this job, location, site condition, or why this line item is included..." spellcheck="true"></textarea>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -3805,6 +3834,16 @@ Example:
             // Show modal
             const modal = new bootstrap.Modal(document.getElementById('addLineModal'));
             modal.show();
+        }
+
+        function editLineItemNote(roomId, itemIndex) {
+            editLineItem(roomId, itemIndex);
+            setTimeout(function() {
+                const notesField = document.getElementById('lineNotes');
+                if (!notesField) return;
+                document.getElementById('lineNotes').focus();
+                notesField.select();
+            }, 200);
         }
 
         async function confirmAddLine() {
@@ -5749,12 +5788,10 @@ Example:
 
         // Toggle item description in quote builder rows
         function toggleItemDesc(id) {
-            var descEl = document.getElementById(id) || document.getElementById(id + '_notes');
-            var notesEl = document.getElementById(id + '_notes');
+            var descBlocks = [document.getElementById(id), document.getElementById(id + '_notes')].filter(Boolean);
             var iconEl = document.getElementById(id + '_icon');
-            var isOpen = descEl && descEl.style.display !== 'none';
-            if (descEl) descEl.style.display = isOpen ? 'none' : 'block';
-            if (notesEl) notesEl.style.display = isOpen ? 'none' : 'block';
+            var isOpen = descBlocks.some(function(block) { return block.style.display !== 'none'; });
+            descBlocks.forEach(function(block) { block.style.display = isOpen ? 'none' : 'block'; });
             if (iconEl) iconEl.innerHTML = isOpen ? '&#9660;' : '&#9650;';
         }
 
@@ -6029,7 +6066,8 @@ Example:
                         html += '<span class="cat-drag-handle" title="Drag to reorder category">&#8801;</span>';
                         html += renderCategoryIconMarkup(catIcon, 'me-1', 'color:#6c757d;') + catDisplay;
                         html += '</div>';
-                        html += '<div style="overflow-x:auto;"><table class="table table-sm mb-0" style="min-width:560px;"><colgroup><col style="width:32px"><col style="width:34px"><col><col style="width:90px"><col style="width:80px"><col style="width:80px"><col style="width:210px"></colgroup><tbody>';
+                        var quoteItemTableColgroup = '<col style="width:32px"><col style="width:34px"><col><col style="width:96px"><col style="width:86px"><col style="width:100px">' + (hasMaterialCosts ? '<col style="width:116px">' : '') + '<col style="width:220px">';
+                        html += '<div style="overflow-x:auto;"><table class="table table-sm mb-0 quote-items-table"><colgroup>' + quoteItemTableColgroup + '</colgroup><tbody>';
 
                         entries.forEach(({ item, origIndex }) => {
                             applyChoiceGroupSelectionToItem(item);
@@ -6048,11 +6086,11 @@ Example:
                             var rowClass = coStatus ? ' class="co-item-' + coStatus + '"' : '';
                             const rowStyle = isOptional && !coStatus ? ' style="border-left:3px dashed #0dcaf0;"' : '';
                             html += '<tr' + rowClass + rowStyle + '>';
-                            html += '<td style="width:30px">' + displayNum + (isOptional ? ' <span class="badge bg-info" style="font-size:0.6em;">opt</span>' : '') + '</td>';
+                            html += '<td>' + displayNum + (isOptional ? ' <span class="badge bg-info" style="font-size:0.6em;">opt</span>' : '') + '</td>';
                             html += '<td><input type="checkbox" class="form-check-input choice-group-select" data-room-id="' + room.id + '" data-item-index="' + origIndex + '" title="Select for option group"></td>';
                             var _hasDesc = !!(displayItemDescription || item.notes);
                             var _descId = 'itemdesc_' + room.id + '_' + origIndex;
-                            html += '<td style="cursor:' + (_hasDesc ? 'pointer' : 'default') + ';" ' + (_hasDesc ? 'onclick="toggleItemDesc(\''+_descId+'\')" title="Click to expand description"' : '') + '>';
+                            html += '<td class="quote-item-desc-cell" style="cursor:' + (_hasDesc ? 'pointer' : 'default') + ';" ' + (_hasDesc ? 'onclick="toggleItemDesc(\''+_descId+'\')" title="Click to expand description"' : '') + '>';
                             html += '<strong>' + displayItemName + '</strong>';
                             if (hasChoiceGroup) {
                                 if (item.choiceGroup.type === 'single') {
@@ -6077,27 +6115,28 @@ Example:
                                 html += '<div class="co-change-note"><i class="fas fa-pen-to-square me-1"></i>' + qdTemplateEscapeHtml(item.changeOrderNote) + '</div>';
                             }
                             if (_hasDesc) html += ' <small class="text-muted" id="' + _descId + '_icon">&#9660;</small>';
-                            if (displayItemDescription) html += '<div id="' + _descId + '" style="display:none;"><small class="text-muted fst-italic">' + displayItemDescription + '</small></div>';
-                            if (item.notes) html += '<div id="' + _descId + '_notes" style="display:none;"><small class="text-muted fst-italic">' + item.notes + '</small></div>';
+                            if (displayItemDescription) html += '<div id="' + _descId + '" class="quote-item-description" style="display:none;"><small class="text-muted fst-italic">' + qdTemplateEscapeHtml(displayItemDescription) + '</small></div>';
+                            if (item.notes) html += '<div id="' + _descId + '_notes" class="quote-item-job-note" style="display:none;"><small><i class="fas fa-sticky-note me-1"></i><strong>Job note:</strong> ' + qdTemplateEscapeHtml(item.notes || '') + '</small></div>';
                             html += '</td>';
-                            html += '<td style="white-space:nowrap">' + formatQuoteQuantityDisplay(item.quantity, item.unitType || item.unit || '') + '</td>';
-                            html += '<td style="white-space:nowrap">$' + displayRate.toFixed(2) + '</td>';
-                            html += '<td style="white-space:nowrap"><strong>$' + displayTotal.toFixed(2) + '</strong></td>';
+                            html += '<td class="quote-item-qty-cell">' + formatQuoteQuantityDisplay(item.quantity, item.unitType || item.unit || '') + '</td>';
+                            html += '<td class="quote-item-rate-cell">$' + displayRate.toFixed(2) + '</td>';
+                            html += '<td class="quote-item-total-cell"><strong>$' + displayTotal.toFixed(2) + '</strong></td>';
                             if (hasMaterialCosts) {
                                 const matCost = (item.materialCost || 0) * item.quantity;
                                 const profit = displayTotal - matCost;
                                 const margin = displayTotal > 0 ? (profit / displayTotal * 100).toFixed(0) : 0;
                                 const profitClass = profit >= 0 ? 'profit-positive' : 'profit-negative';
                                 const profitIcon = profit >= 0 ? '?' : '?';
-                                html += '<td class="' + profitClass + '"><strong>' + profitIcon + ' $' + Math.abs(profit).toFixed(2) + '</strong><br><small>' + margin + '%</small></td>';
+                                html += '<td class="quote-item-profit-cell ' + profitClass + '"><strong>' + profitIcon + ' $' + Math.abs(profit).toFixed(2) + '</strong><br><small>' + margin + '%</small></td>';
                             }
                             let upgradeBtn = '';
                             if (hasUpgrade && !hasChoiceGroup) {
                                 upgradeBtn = '<button onclick="toggleItemUpgrade(' + room.id + ', ' + origIndex + ')" class="btn btn-sm ' + (isUpgraded ? 'btn-warning' : 'btn-outline-warning') + '" title="' + (isUpgraded ? 'Upgraded: ' + item.upgrade.name : 'Upgrade: ' + item.upgrade.name) + '"><i class="fas fa-arrow-up"></i> ' + (isUpgraded ? 'Upgraded' : 'Upgrade') + '</button>';
                             }
                             const optionalBtn = hasChoiceGroup ? '' : '<button onclick="toggleItemOptional(' + room.id + ', ' + origIndex + ')" class="btn btn-sm ' + (isOptional ? 'btn-info' : 'btn-outline-secondary') + '" title="' + (isOptional ? 'Client can remove this item' : 'Mark as removable by client') + '"><i class="fas fa-' + (isOptional ? 'toggle-on' : 'toggle-off') + '"></i> Optional</button>';
+                            const noteBtn = '<button onclick="editLineItemNote(' + room.id + ', ' + origIndex + ')" class="btn btn-sm ' + (item.notes ? 'btn-info' : 'btn-outline-secondary') + '" title="' + (item.notes ? 'Edit job note' : 'Add job note') + '"><i class="fas fa-sticky-note"></i></button>';
                             var deleteTitle = (window._quoteDocumentType === 'change_order' && item._coOriginal) ? 'Mark as removed from this change order' : 'Delete';
-                            html += '<td><div class="d-flex gap-1 flex-wrap">' + upgradeBtn + optionalBtn + '<button onclick="editLineItem(' + room.id + ', ' + origIndex + ')" class="btn btn-sm btn-outline-primary" title="Edit"><i class="fas fa-edit"></i></button><button onclick="deleteItem(' + room.id + ', ' + origIndex + ')" class="btn btn-sm btn-danger" title="' + deleteTitle + '"><i class="fas fa-trash"></i></button></div></td>';
+                            html += '<td class="quote-item-actions-cell"><div class="d-flex gap-1 flex-wrap quote-item-actions" style="justify-content:flex-end">' + upgradeBtn + optionalBtn + noteBtn + '<button onclick="editLineItem(' + room.id + ', ' + origIndex + ')" class="btn btn-sm btn-outline-primary" title="Edit"><i class="fas fa-edit"></i></button><button onclick="deleteItem(' + room.id + ', ' + origIndex + ')" class="btn btn-sm btn-danger" title="' + deleteTitle + '"><i class="fas fa-trash"></i></button></div></td>';
                             html += '</tr>';
                             displayNum++;
                         });
