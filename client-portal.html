@@ -461,7 +461,9 @@
     const clientEmail = urlParams.get('email');
     const clientName = urlParams.get('client'); // backward compat
     const contractorId = urlParams.get('contractor');
-    const portalQuoteId = urlParams.get('quote');
+    const portalQuoteId = urlParams.get('quote') || urlParams.get('id');
+    const portalToken = urlParams.get('token') || '';
+    const portalAnchorId = urlParams.get('portal_anchor') || portalQuoteId || '';
     const portalId = urlParams.get('portal');
     const requestedAdminView = ['1', 'true', 'admin'].includes(String(urlParams.get('admin') || urlParams.get('view') || '').toLowerCase());
     let portalIsAdminView = false;
@@ -501,6 +503,21 @@
       await loadQuotes();
 
       if (portalIsAdminView) hidePinGate();
+    }
+
+    async function secureClientDocumentRequest(body) {
+      const resp = await fetch(supabaseUrl + '/functions/v1/client-document', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseKey,
+          'Authorization': 'Bearer ' + supabaseKey
+        },
+        body: JSON.stringify(body || {})
+      });
+      const data = await resp.json().catch(function() { return {}; });
+      if (!resp.ok || data.error) throw new Error(data.error || 'Secure portal request failed');
+      return data;
     }
 
     async function detectPortalMode() {
@@ -662,6 +679,34 @@
     // Load quotes for this client from this contractor
     async function loadQuotes() {
       try {
+        if (portalToken && portalAnchorId) {
+          const portalResult = await secureClientDocumentRequest({
+            action: 'portal',
+            documentId: portalAnchorId,
+            token: portalToken
+          });
+          const quotes = portalResult.documents || [];
+          if (quotes.length > 0) {
+            portalResolvedClientName = quotes[0].client_name || quotes[0].data?.clientName || quotes[0].data?.client_name || '';
+            clientNameEl.textContent = titleCase(portalResolvedClientName || clientEmail || 'Client');
+          }
+          if (!quotes.length) {
+            noQuotesEl.classList.remove('d-none');
+            return;
+          }
+          portalQuotesCache = quotes;
+          applyPortalTheme(Object.assign({}, portalDefaultTheme, portalThemeOverrideFromQuotes(quotes)));
+          processQuotes(getFilteredSortedQuotes(quotes));
+          updateSummaryCards(quotes);
+          return;
+        }
+
+        if (!portalIsAdminView) {
+          noQuotesEl.classList.remove('d-none');
+          quotesContainer.innerHTML = '<div class="card quote-card"><div class="card-body text-center text-muted py-4"><i class="fas fa-lock me-2"></i>This portal link is missing its secure access token. Please ask your contractor to resend it.</div></div>';
+          return;
+        }
+
         const requestedClientNameKey = normalizePortalValue(clientName);
         const requestedClientEmailKey = normalizePortalValue(clientEmail);
         let query = _sbClient
@@ -858,9 +903,10 @@
       const statusIcon = getStatusIcon(status);
       const docType = getDocumentType(quote);
       const needsAction = documentNeedsAction(quote);
+      const secureParams = portalToken ? '&token=' + encodeURIComponent(portalToken) + '&portal_anchor=' + encodeURIComponent(portalAnchorId || quote.id) : '';
       const primaryHref = isInvoiceDocument(quote)
-        ? 'invoice-viewer.html?id=' + encodeURIComponent(quote.id)
-        : 'interactive-quote-viewer.html?id=' + encodeURIComponent(quote.id);
+        ? 'invoice-viewer.html?id=' + encodeURIComponent(quote.id) + secureParams
+        : 'interactive-quote-viewer.html?id=' + encodeURIComponent(quote.id) + secureParams;
       
       // Format date
       const date = new Date(quote.created_at).toLocaleDateString('en-US', {
@@ -945,7 +991,7 @@
         '<div><div class="d-flex gap-2 flex-wrap align-items-center mb-2"><span class="doc-type-badge doc-type-change-order"><i class="fas fa-file-circle-plus"></i>Change Order</span><span class="status-badge ' + statusClassName(status) + '">' + escapeHtml(getClientStatusText(row)) + '</span></div>' +
         '<strong>Change Order #' + escapeHtml((co && co.number(row)) || '') + '</strong><div class="text-muted small">' + escapeHtml(row.data?.changeReason || 'Scope change') + '</div>' +
         '<div class="client-status-line ' + (documentNeedsAction(row) ? 'needs-action' : '') + '">' + escapeHtml(getClientActionLine(row)) + '</div></div>' +
-        '<div class="text-end"><div class="fw-bold">' + sign + '$' + Math.abs(amount).toFixed(2) + '</div><a href="interactive-quote-viewer.html?id=' + encodeURIComponent(row.id) + '" class="btn btn-outline-primary btn-sm mt-2"><i class="fas fa-pen-nib me-1"></i>Review Change Order</a></div>' +
+        '<div class="text-end"><div class="fw-bold">' + sign + '$' + Math.abs(amount).toFixed(2) + '</div><a href="interactive-quote-viewer.html?id=' + encodeURIComponent(row.id) + (portalToken ? '&token=' + encodeURIComponent(portalToken) + '&portal_anchor=' + encodeURIComponent(portalAnchorId || row.id) : '') + '" class="btn btn-outline-primary btn-sm mt-2"><i class="fas fa-pen-nib me-1"></i>Review Change Order</a></div>' +
         '</div></div></div>';
     }
 

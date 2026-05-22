@@ -54,7 +54,10 @@
                 grandTotal: grandTotal,
                 total: grandTotal,
                 supabaseId: supabaseId,
-                currency: (function(){ try { return JSON.parse(localStorage.getItem('ald_quote_prefs')||'{}').currency||'CAD'; } catch(e){return 'CAD';} })()
+                currency: (function(){ try { return JSON.parse(localStorage.getItem('ald_quote_prefs')||'{}').currency||'CAD'; } catch(e){return 'CAD';} })(),
+                paymentSettings: (typeof getLocalPaymentSettingsSnapshot === 'function') ? getLocalPaymentSettingsSnapshot() : null,
+                businessProfile: (typeof getLocalBusinessProfileSnapshot === 'function') ? getLocalBusinessProfileSnapshot() : {},
+                hiddenProfileFields: (typeof getLocalHiddenProfileFieldsSnapshot === 'function') ? getLocalHiddenProfileFieldsSnapshot() : []
             };
         }
 

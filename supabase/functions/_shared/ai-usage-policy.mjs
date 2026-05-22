@@ -41,6 +41,14 @@ export const AI_USAGE_LIMITS = Object.freeze({
     maxInputChars: 30000,
     maxOutputTokens: 8000,
   }),
+  quote_import: Object.freeze({
+    feature: 'quote_import',
+    label: 'Legacy quote import',
+    hourlyLimit: 80,
+    dailyLimit: 150,
+    maxInputChars: 250000,
+    maxOutputTokens: 16000,
+  }),
   floor_plan: Object.freeze({
     feature: 'floor_plan',
     label: 'AI floor plan scan',

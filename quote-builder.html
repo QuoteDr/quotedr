@@ -1077,6 +1077,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-v2.js?v=1778194800"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <!-- Eruda mobile console (only loads with ?debug in URL) -->
 <script>
 if (location.search.includes('debug')) {
@@ -1110,6 +1111,7 @@ if (location.search.includes('debug')) {
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="newQuote()"><i class="fas fa-plus me-2 text-warning"></i>New Quote</a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="saveQuote()"><i class="fas fa-save me-2 text-warning"></i>Save <span class="text-muted small">(Ctrl+S)</span></a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="loadQuoteFromFile()"><i class="fas fa-folder-open me-2 text-secondary"></i>Open</a></li>
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="exportToPDF()"><i class="fas fa-file-pdf me-2 text-danger"></i>Export as PDF</a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="previewInvoice()"><i class="fas fa-file-invoice me-2 text-success"></i>Preview Invoice PDF</a></li>
                         </ul>
                     </div>
@@ -1121,6 +1123,7 @@ if (location.search.includes('debug')) {
                         </button>
                         <ul class="dropdown-menu">
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="startVoiceQuote()"><i class="fas fa-microphone me-2" style="color:#7c3aed"></i>AI Quote</a></li>
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="openQuoteImportModal()"><i class="fas fa-file-import me-2 text-success"></i>Import Old Quote</a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openMeasureModal()"><i class="fas fa-satellite me-2 text-primary"></i>Satellite Measure</a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openIkeaQuoteModal()"><i class="fas fa-utensils me-2 text-warning"></i>IKEA Quick Quote</a></li>
@@ -1645,6 +1648,75 @@ Example:
                         <button class="btn btn-success mt-2" onclick="saveIkeaPricing()"><i class="fas fa-save me-1"></i>Save My Prices</button>
                         <span class="saved-badge ms-2" id="ikeaPricingSaved" style="display:none;"><i class="fas fa-check-circle me-1"></i>Saved!</span>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Legacy Quote Import Modal -->
+    <div class="modal fade" id="quoteImportModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header" style="background:#103b66;color:white;">
+                    <h5 class="modal-title"><i class="fas fa-file-import me-2 text-success"></i>Import Old Quote</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-lg-5">
+                            <div class="border rounded p-3 h-100">
+                                <label class="form-label fw-semibold">Upload old quote file</label>
+                                <input type="file" id="quoteImportFile" class="form-control" accept=".pdf,.xlsx,.xls,.csv,.txt,text/plain,application/pdf">
+                                <div class="form-text">Text-based PDFs, Excel files, CSV, TXT, or pasted quote text. Scanned/image-only PDFs are not included in this first version.</div>
+
+                                <div class="d-flex align-items-center gap-2 my-3">
+                                    <hr class="flex-grow-1">
+                                    <span class="text-muted small">or paste text</span>
+                                    <hr class="flex-grow-1">
+                                </div>
+
+                                <label class="form-label fw-semibold">Copied quote text</label>
+                                <textarea id="quoteImportPaste" class="form-control font-monospace" rows="12" placeholder="Paste an old quote, invoice, Excel export, CSV rows, or copied PDF text here..."></textarea>
+
+                                <div class="mt-3 d-flex gap-2 flex-wrap">
+                                    <button type="button" class="btn btn-success" onclick="runQuoteImport()"><i class="fas fa-wand-magic-sparkles me-1"></i>Parse Quote</button>
+                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                                </div>
+                                <div id="quoteImportStatus" class="mt-3"></div>
+                                <div id="quoteImportDebugOutput" class="mt-3" style="display:none;"></div>
+                            </div>
+                        </div>
+                        <div class="col-lg-7">
+                            <div class="border rounded p-3 mb-3">
+                                <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2">
+                                    <div>
+                                        <div class="fw-semibold">Review before applying</div>
+                                        <div class="small text-muted">QuoteDr preserves rooms, item names, descriptions, quantities, rates, and totals for review first.</div>
+                                    </div>
+                                    <div class="btn-group" role="group" aria-label="Import apply mode">
+                                        <input type="radio" class="btn-check" name="quoteImportApplyMode" id="quoteImportModeReplace" value="replace" autocomplete="off" checked>
+                                        <label class="btn btn-outline-primary btn-sm" for="quoteImportModeReplace">Replace current quote</label>
+                                        <input type="radio" class="btn-check" name="quoteImportApplyMode" id="quoteImportModeAppend" value="append" autocomplete="off">
+                                        <label class="btn btn-outline-primary btn-sm" for="quoteImportModeAppend">Append rooms</label>
+                                    </div>
+                                </div>
+                                <div id="quoteImportPreview" class="small">
+                                    <div class="alert alert-light border mb-0">Upload or paste an old quote, then click Parse Quote to preview the converted rooms and line items.</div>
+                                </div>
+                            </div>
+
+                            <div class="border rounded p-3">
+                                <div id="quoteImportCandidates">
+                                    <div class="alert alert-light border small mb-0">Reusable saved-item candidates will appear here after parsing. Nothing is auto-saved.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary me-auto" id="quoteImportExportDebugBtn" onclick="exportQuoteImportDebug()" disabled><i class="fas fa-bug me-1"></i>Export Debug</button>
+                    <button type="button" class="btn btn-outline-primary" id="quoteImportSaveCandidatesBtn" onclick="saveQuoteImportCandidates()" disabled><i class="fas fa-bookmark me-1"></i>Save Selected Items</button>
+                    <button type="button" class="btn btn-success" id="quoteImportApplyBtn" onclick="applyImportedQuote()" disabled><i class="fas fa-check me-1"></i>Apply to Quote</button>
                 </div>
             </div>
         </div>
@@ -6630,15 +6702,22 @@ Example:
             }
             return saveInvoiceForSharing(invoiceState.invoiceData).then(function(result) {
                 if (result && result.data && result.data.id) {
-                    invoiceState.invoiceUrl = invoiceState.invoiceBaseUrl + '?id=' + result.data.id + '&invoice=' + invoiceState.invoiceId;
                     invoiceState.invoiceData.supabaseId = result.data.id;
-                    localStorage.setItem(invoiceState.invoiceId, JSON.stringify(invoiceState.invoiceData));
-                    window._currentInvoiceUrl = invoiceState.invoiceUrl;
-                    window._currentInvoiceData = invoiceState.invoiceData;
-                    if (openBtn) openBtn.href = invoiceState.invoiceUrl;
+                    return createSecureClientShareLink(result.data.id, invoiceState.invoiceBaseUrl, { mode: 'document' }).then(function(share) {
+                        if (!share || !share.url || share.url.indexOf('token=') < 0) throw new Error('Could not create secure invoice link.');
+                        invoiceState.invoiceUrl = share.url + '&invoice=' + encodeURIComponent(invoiceState.invoiceId);
+                        localStorage.setItem(invoiceState.invoiceId, JSON.stringify(invoiceState.invoiceData));
+                        window._currentInvoiceUrl = invoiceState.invoiceUrl;
+                        window._currentInvoiceData = invoiceState.invoiceData;
+                        if (openBtn) openBtn.href = invoiceState.invoiceUrl;
+                        return invoiceState;
+                    });
                 }
                 if (savingNote) savingNote.style.display = 'none';
                 return invoiceState;
+            }).then(function(state) {
+                if (savingNote) savingNote.style.display = 'none';
+                return state;
             }).catch(function(e) {
                 console.warn('Could not save invoice to Supabase:', e);
                 if (savingNote) savingNote.style.display = 'none';
@@ -8147,6 +8226,7 @@ Example:
         // Manage Items behavior lives in quote-items.js.
     </script>
     <script src="quote-items.js?v=1778194800"></script>
+    <script src="quote-import.js?v=1778200000"></script>
     <script>
         // Load templates from localStorage on startup
         let templates = JSON.parse(localStorage.getItem('ald_quote_templates') || '{}');

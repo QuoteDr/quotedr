@@ -50,6 +50,84 @@ async function getSupabaseFunctionAuthHeaders() {
     };
 }
 
+const CLIENT_DOCUMENT_FUNCTION_URL = SUPABASE_URL + '/functions/v1/client-document';
+
+function getSupabaseAnonFunctionHeaders() {
+    return {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+    };
+}
+
+async function callClientDocumentFunction(body, requireUser) {
+    const headers = requireUser ? await getSupabaseFunctionAuthHeaders() : getSupabaseAnonFunctionHeaders();
+    const response = await fetch(CLIENT_DOCUMENT_FUNCTION_URL, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(body || {})
+    });
+    const data = await response.json().catch(function() { return {}; });
+    if (!response.ok || data.error) throw new Error(data.error || 'Secure client document request failed');
+    return data;
+}
+
+async function createSecureClientShareLink(documentId, baseUrl, options) {
+    options = options || {};
+    if (!documentId) throw new Error('Missing document id for secure client link');
+    return callClientDocumentFunction({
+        action: 'create_link',
+        documentId: documentId,
+        baseUrl: baseUrl || '',
+        mode: options.mode || 'document'
+    }, true);
+}
+
+async function loadSecureClientDocument(documentId, token, portalAnchorId) {
+    if (!documentId || !token) return { error: 'Missing secure client link token' };
+    try {
+        const data = await callClientDocumentFunction({
+            action: 'view',
+            documentId: documentId,
+            token: token,
+            portalAnchorId: portalAnchorId || ''
+        }, false);
+        return { data: data.document };
+    } catch (error) {
+        return { error: error };
+    }
+}
+
+async function updateSecureClientDocument(documentId, token, updateAction, payload, portalAnchorId) {
+    if (!documentId || !token) return { error: 'Missing secure client link token' };
+    try {
+        const data = await callClientDocumentFunction(Object.assign({
+            action: 'update',
+            updateAction: updateAction,
+            documentId: documentId,
+            token: token,
+            portalAnchorId: portalAnchorId || ''
+        }, payload || {}), false);
+        return { data: data.document, unchanged: data.unchanged };
+    } catch (error) {
+        return { error: error };
+    }
+}
+
+async function loadSecureClientPortal(documentId, token) {
+    if (!documentId || !token) return { error: 'Missing secure client portal token' };
+    try {
+        const data = await callClientDocumentFunction({
+            action: 'portal',
+            documentId: documentId,
+            token: token
+        }, false);
+        return { data: data.documents || [], anchor: data.anchor || null };
+    } catch (error) {
+        return { error: error };
+    }
+}
+
 // Sign in with email and password
 async function signInWithEmail(email, password) {
     const { data, error } = await _supabase.auth.signInWithPassword({
@@ -380,6 +458,10 @@ async function saveQuote(quoteData) {
             terms: quoteData.terms || [],
             style: quoteData.style || {},
             notes: quoteData.notes || '',
+            currency: quoteData.currency || 'CAD',
+            paymentSettings: quoteData.paymentSettings || null,
+            businessProfile: quoteData.businessProfile || null,
+            hiddenProfileFields: quoteData.hiddenProfileFields || [],
             paymentStatus: quoteData.paymentStatus || '',
             payments: quoteData.payments || [],
             savedAt: quoteData.savedAt || now
@@ -1305,6 +1387,7 @@ const QUOTEDR_PLAN_FEATURES = {
         'ai_voice_quote',
         'ai_assistant',
         'smart_import',
+        'quote_import',
         'ai_refine',
         'ikea_quoter',
         'job_tracker',
@@ -1323,6 +1406,7 @@ const QUOTEDR_PRO_FEATURE_LABELS = {
     job_tracker: 'Job Tracker',
     labor_tracker: 'Labour Tracker',
     ai_refine: 'AI Refine',
+    quote_import: 'Legacy Quote Import',
     quickbooks: 'QuickBooks sync',
     bank_card_sync: 'Bank/card sync'
 };

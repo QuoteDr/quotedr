@@ -1,0 +1,13 @@
+const assert = require('node:assert');
+const fs = require('node:fs');
+
+const source = fs.readFileSync('interactive-quote-viewer.html', 'utf8');
+
+assert(source.includes('function viewerItemBaseTotal'), 'interactive viewer should centralize base line total calculation');
+assert(source.includes('viewerItemActiveTotal(item)'), 'interactive viewer should use saved line totals for live total calculation');
+assert(source.includes('room.items.reduce((sum, item) => item._removed ? sum : sum + viewerItemActiveTotal(item), 0)'), 'room totals should use saved item totals and skip removed items');
+assert(source.includes('function viewerVisibleNotes'), 'interactive viewer should centralize note visibility so duplicate descriptions can be suppressed');
+assert(source.includes('viewerVisibleNotes(item, displayDesc)'), 'item rendering should hide notes that duplicate the displayed description');
+assert(!source.includes('let subtotal = 0;\n            let upgradesTotal = 0;\n            if (quoteData.rooms) {\n                quoteData.rooms.forEach(room => {\n                    room.items.forEach(item => {\n                        applyViewerChoiceGroupToItem(item);\n                        if (item._removed) return; // skip removed items\n                        const activeRate = (item.upgraded && item.upgrade) ? item.upgrade.rate : (item._baseRate || item.rate);\n                        const baseTotal = item.quantity * (item._baseRate || item.rate);\n                        const activeTotal = item.quantity * activeRate;'), 'viewer updateTotal should not recalculate imported legacy quote totals from quantity times rate');
+
+console.log('interactive quote viewer total static test passed');

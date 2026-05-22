@@ -677,7 +677,14 @@
             localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
 
             const _base = window.location.href.split('?')[0].split('#')[0].replace(/quote-builder(\.html)?\/?$/, '');
-            return _base + 'interactive-quote-viewer?id=' + supabaseId;
+            if (typeof createSecureClientShareLink !== 'function') {
+                throw new Error('Secure client links are not available. Please refresh and try again.');
+            }
+            const share = await createSecureClientShareLink(supabaseId, _base + 'interactive-quote-viewer', { mode: 'document' });
+            if (!share || !share.url || share.url.indexOf('token=') < 0) {
+                throw new Error('Could not create the secure client link.');
+            }
+            return share.url;
         }
 
         async function previewInteractiveQuote() {

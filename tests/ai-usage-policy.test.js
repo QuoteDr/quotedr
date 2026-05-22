@@ -25,6 +25,11 @@ function assert(condition, message) {
   assert(smartImport.maxInputChars === 30000, 'smart import should accept large messy pasted files');
   assert(smartImport.maxOutputTokens === 8000, 'smart import should have room to return complete import JSON');
 
+  const quoteImport = policy.getAiFeaturePolicy('quote_import');
+  assert(quoteImport.dailyLimit === 150, 'quote import should have a soft daily fair-use cap');
+  assert(quoteImport.maxInputChars >= 250000, 'quote import should accept full legacy spreadsheet exports before chunking');
+  assert(quoteImport.maxOutputTokens >= 8000, 'quote import should have room to return complete quote JSON');
+
   const unknown = policy.getAiFeaturePolicy('unknown_feature');
   assert(unknown.feature === 'default', 'unknown AI features should fall back to a safe default policy');
   assert(unknown.dailyLimit < voice.dailyLimit, 'default policy should be more conservative than voice quote');

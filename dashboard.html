@@ -1415,6 +1415,10 @@
                 if (selectedPortalId) portalParams.push('portal=' + encodeURIComponent(selectedPortalId));
                 if (quoteId) portalParams.push('quote=' + encodeURIComponent(quoteId));
                 var url = getClientPortalBaseUrl() + '?' + portalParams.join('&');
+                if (quoteId && typeof createSecureClientShareLink === 'function') {
+                    var share = await createSecureClientShareLink(quoteId, url, { mode: 'portal' });
+                    if (share && share.url) url = share.url;
+                }
                 var adminUrl = url + '&admin=1';
                 document.getElementById('portalUrlDisplay').value = url;
                 adminUrlEl = document.getElementById('portalAdminUrlDisplay');
@@ -1510,10 +1514,13 @@
                 title: 'Send Follow-Up'
             });
             if (!clientEmail || !clientEmail.includes('@')) { if (clientEmail !== null) qdAlert('Invalid email'); return; }
-            var viewerUrl = window.location.origin + '/interactive-quote-viewer.html?id=' + quoteId;
             var btn = event.target.closest('button');
             if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Sending...'; }
             try {
+                var viewerBaseUrl = window.location.origin + '/interactive-quote-viewer.html';
+                var share = await createSecureClientShareLink(quoteId, viewerBaseUrl, { mode: 'document' });
+                var viewerUrl = share && share.url ? share.url : '';
+                if (!viewerUrl) throw new Error('Could not create secure quote link.');
                 var res = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/send-quote-email', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso' },

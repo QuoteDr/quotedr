@@ -1132,16 +1132,13 @@ if (location.search.includes('debug')) {
         async function loadQuoteFromURL() {
             const params = new URLSearchParams(window.location.search);
             const quoteId = params.get('id');
+            const shareToken = params.get('token') || '';
+            const portalAnchorId = params.get('portal_anchor') || '';
 
-            // Mark as viewed in Supabase if still draft or sent
-            if (quoteId) {
-                markQuoteViewed(quoteId);
-            }
-
-            // New flow: load from Supabase by ?id= param
+            // Secure flow: public client links must include ?id=...&token=...
             const supabaseId = quoteId;
-            if (supabaseId && typeof loadQuoteForViewing === 'function') {
-                const result = await loadQuoteForViewing(supabaseId);
+            if (supabaseId && shareToken && typeof loadSecureClientDocument === 'function') {
+                const result = await loadSecureClientDocument(supabaseId, shareToken, portalAnchorId);
                 if (result && result.data && result.data.data) {
                     quoteData = result.data.data;
                     quoteData.id = result.data.id;
@@ -1158,6 +1155,7 @@ if (location.search.includes('debug')) {
                     // Init payment section after quote loads
                     var contractorId = result.data.user_id;
                     var quoteTotal = quoteData.grandTotal || quoteData.total || 0;
+                    await markQuoteViewed(supabaseId);
                     await reconcileQuotePaymentState(supabaseId);
                     if (contractorId && quoteTotal && quoteData.style?.depositMode !== 'hide') initPaymentSection(contractorId, quoteTotal);
                     return;
@@ -1165,6 +1163,25 @@ if (location.search.includes('debug')) {
                     qdAlert('Quote not found or could not be loaded. The link may be invalid.');
                     return;
                 }
+            } else if (supabaseId) {
+                if (typeof loadQuoteFromSupabase === 'function') {
+                    try {
+                        const ownerResult = await loadQuoteFromSupabase(supabaseId);
+                        if (ownerResult && ownerResult.data && ownerResult.data.data) {
+                            quoteData = ownerResult.data.data;
+                            quoteData.id = ownerResult.data.id;
+                            quoteData.status = ownerResult.data.status || quoteData.status || '';
+                            quoteData.type = ownerResult.data.type || quoteData.type || quoteData.documentType || 'quote';
+                            quoteData.parentQuoteId = ownerResult.data.parent_quote_id || quoteData.parentQuoteId || '';
+                            quoteData.changeOrderNumber = ownerResult.data.change_order_number || quoteData.changeOrderNumber || null;
+                            window._quoteRow = ownerResult.data;
+                            showExpiryNotice();
+                            return;
+                        }
+                    } catch(e) {}
+                }
+                qdAlert('This quote link is missing its secure access token. Please ask the contractor to resend the quote link.');
+                return;
         }
 
         async function reconcileQuotePaymentState(quoteId) {
@@ -1285,6 +1302,17 @@ if (location.search.includes('debug')) {
                 '</div>';
         }
 
+        function viewerDescriptionKey(value) {
+            return String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+        }
+
+        function viewerVisibleNotes(item, displayDesc) {
+            var notes = String(item && item.notes || '').trim();
+            if (!notes) return '';
+            if (viewerDescriptionKey(notes) === viewerDescriptionKey(displayDesc || (item && item.itemDescription) || '')) return '';
+            return notes;
+        }
+
         function roomAnchorId(roomIdx) {
             return 'quoteRoom_' + roomIdx;
         }
@@ -1371,6 +1399,46 @@ if (location.search.includes('debug')) {
             item.rate = group.type === 'single' && selected[0] ? (parseFloat(selected[0].rate) || 0) : rateSum;
             item.choiceGroup.selectedOptionIds = selected.map(function(option) { return option.id; });
             return item;
+        }
+
+        function viewerNumber(value) {
+            var parsed = parseFloat(value);
+            return isFinite(parsed) ? parsed : 0;
+        }
+
+        function viewerHasExplicitTotal(item) {
+            return !!item && item.total !== undefined && item.total !== null && item.total !== '' && isFinite(parseFloat(item.total));
+        }
+
+        function viewerItemQuantity(item) {
+            return viewerNumber(item && item.quantity);
+        }
+
+        function viewerItemBaseRate(item) {
+            if (!item) return 0;
+            return viewerNumber(item._baseRate !== undefined && item._baseRate !== null ? item._baseRate : item.rate);
+        }
+
+        function viewerItemBaseTotal(item) {
+            if (!item) return 0;
+            if (item._baseTotal !== undefined && item._baseTotal !== null && item._baseTotal !== '') return viewerNumber(item._baseTotal);
+            if (viewerHasExplicitTotal(item)) return viewerNumber(item.total);
+            return viewerItemQuantity(item) * viewerItemBaseRate(item);
+        }
+
+        function viewerItemActiveRate(item) {
+            if (!item) return 0;
+            if (item.upgraded && item.upgrade) return viewerNumber(item.upgrade.rate);
+            return viewerNumber(item.rate);
+        }
+
+        function viewerItemActiveTotal(item) {
+            if (!item) return 0;
+            if (item.upgraded && item.upgrade) {
+                if (item.upgrade.total !== undefined && item.upgrade.total !== null && item.upgrade.total !== '') return viewerNumber(item.upgrade.total);
+                return viewerItemQuantity(item) * viewerNumber(item.upgrade.rate);
+            }
+            return viewerItemBaseTotal(item);
         }
 
         function renderViewerChoiceGroup(roomIdx, itemIndex, item, isSignedDiff) {
@@ -1670,7 +1738,7 @@ if (location.search.includes('debug')) {
 
             quoteData.rooms.forEach((room, roomIdx) => {
                 (room.items || []).forEach(function(item) { applyViewerChoiceGroupToItem(item); });
-                const roomTotal = room.items.reduce((sum, item) => sum + (item.quantity * item.rate), 0);
+                const roomTotal = room.items.reduce((sum, item) => item._removed ? sum : sum + viewerItemActiveTotal(item), 0);
                 const headerBg = roomHeaderBackground(room, ROOM_COLORS[room.colorIndex ?? 0] || ROOM_COLORS[0]);
 
                 html += `
@@ -1710,7 +1778,7 @@ if (location.search.includes('debug')) {
                     html += `<div class="text-uppercase fw-bold mt-3 mb-1" style="font-size:0.72rem; letter-spacing:0.8px; color:#6c757d; border-bottom:1px solid #dee2e6; padding-bottom:3px;"><i class="fas fa-tag me-1"></i>${catDisplay}</div>`;
 
                     if (pricingMode === 'category') {
-                        const catSubtotal = catEntries.reduce((sum, entry) => sum + ((entry.item.quantity || 0) * (entry.item.rate || 0)), 0);
+                        const catSubtotal = catEntries.reduce((sum, entry) => entry.item._removed ? sum : sum + viewerItemActiveTotal(entry.item), 0);
                         html += `<div class="d-flex justify-content-between py-2 border-bottom"><span>${catEntries.length} item${catEntries.length === 1 ? '' : 's'}</span><strong>$${catSubtotal.toFixed(2)}</strong></div>`;
                         return;
                     }
@@ -1724,15 +1792,16 @@ if (location.search.includes('debug')) {
                     if (!item.hasOwnProperty('itemDescription')) item.itemDescription = '';
 
                     const isUpgraded = !!item.upgraded;
-                    const activeRate = isUpgraded && item.upgrade ? item.upgrade.rate : item.rate;
-                    const itemTotal = item.quantity * activeRate;
+                    const activeRate = viewerItemActiveRate(item);
+                    const itemTotal = viewerItemActiveTotal(item);
                     const hasUpgrade = showUpgrades && !!(item.upgrade && item.upgrade.name);
-                    const upgradeDiff = hasUpgrade ? ((item.upgrade.rate - item.rate) * item.quantity) : 0;
+                    const upgradeDiff = hasUpgrade ? ((viewerItemQuantity(item) * viewerNumber(item.upgrade.rate)) - viewerItemBaseTotal(item)) : 0;
                     item._itemDescription = item.itemDescription || '';
 
                     const displayDesc = isUpgraded && item.upgrade?.description
                         ? item.upgrade.description
                         : (item.itemDescription || '');
+                    const visibleNotes = viewerVisibleNotes(item, displayDesc);
                     const isOptional = !!item.optional;
                     const isRemoved = !!item._removed;
 
@@ -1753,7 +1822,7 @@ if (location.search.includes('debug')) {
                             <div class="py-2 border-bottom" id="item_${roomIdx}_${itemIndex}" style="opacity:0.6; background:#fff5f5;">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <span><s class="text-muted">${item.description || item.name || 'Item'}</s> <span class="badge bg-danger ms-1">Removed by client</span></span>
-                                    <span class="text-muted small">-$${(item.quantity * item.rate).toFixed(2)}</span>
+                                    <span class="text-muted small">-$${viewerItemBaseTotal(item).toFixed(2)}</span>
                                 </div>
                             </div>`;
                         } else {
@@ -1782,9 +1851,9 @@ if (location.search.includes('debug')) {
                                 </div>
                             </div>
                             ${renderExpandableDescription(displayDesc, `itemdesc_${roomIdx}_${itemIndex}`)}
-                            ${item.notes ? `<div class="text-muted mb-1"><small><i class="fas fa-info-circle"></i> ${item.notes}</small></div>` : ''}
+                            ${visibleNotes ? `<div class="text-muted mb-1"><small><i class="fas fa-info-circle"></i> ${visibleNotes}</small></div>` : ''}
                             ${isSignedDiff ? `
-                                ${wasUpgraded && origItem ? `<div class="mt-1"><span class="badge bg-success me-1"><i class="fas fa-arrow-up me-1"></i>Upgraded by client</span><span class="text-muted small">was: ${origItem.description} @ $${origItem.rate.toFixed(2)} = $${(origItem.rate * item.quantity).toFixed(2)}</span></div>` : ''}
+                                ${wasUpgraded && origItem ? `<div class="mt-1"><span class="badge bg-success me-1"><i class="fas fa-arrow-up me-1"></i>Upgraded by client</span><span class="text-muted small">was: ${origItem.description} @ $${viewerNumber(origItem.rate).toFixed(2)} = $${viewerItemBaseTotal(origItem).toFixed(2)}</span></div>` : ''}
                             ` : `
                             <div class="d-flex gap-2 mt-1 flex-wrap">
                                 ${hasUpgrade ? `
@@ -1896,14 +1965,15 @@ if (location.search.includes('debug')) {
         function toggleViewerUpgrade(roomIdx, itemIdx) {
             const item = quoteData.rooms[roomIdx]?.items[itemIdx];
             if (!item || !item.upgrade) return;
+            if (item._baseRate === undefined || item._baseRate === null) item._baseRate = item.rate;
+            if (item._baseTotal === undefined || item._baseTotal === null) item._baseTotal = viewerItemBaseTotal(item);
             item.upgraded = !item.upgraded;
             if (item.upgraded) {
-                item._baseRate = item.rate;
                 item.rate = item.upgrade.rate;
             } else {
                 item.rate = item._baseRate || item.rate;
             }
-            item.total = item.quantity * item.rate;
+            item.total = viewerItemActiveTotal(item);
             renderQuote();
             updateTotal();
         }
@@ -1919,9 +1989,8 @@ if (location.search.includes('debug')) {
                     room.items.forEach(item => {
                         applyViewerChoiceGroupToItem(item);
                         if (item._removed) return; // skip removed items
-                        const activeRate = (item.upgraded && item.upgrade) ? item.upgrade.rate : (item._baseRate || item.rate);
-                        const baseTotal = item.quantity * (item._baseRate || item.rate);
-                        const activeTotal = item.quantity * activeRate;
+                        const baseTotal = viewerItemBaseTotal(item);
+                        const activeTotal = viewerItemActiveTotal(item);
                         subtotal += activeTotal;
                         if (item.upgraded) upgradesTotal += (activeTotal - baseTotal);
                     });
@@ -2138,16 +2207,11 @@ if (location.search.includes('debug')) {
 
         async function markQuoteViewed(quoteId) {
             try {
-                const sb = window._supabaseClient || (typeof supabase !== 'undefined' ? supabase : null);
-                if (!sb || !quoteId) return;
-                // Only update if still draft or sent (don't overwrite accepted/declined)
-                await sb.from('quotes').update({ 
-                    status: 'viewed', 
-                    viewed_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', quoteId)
-                .or('status.in.(draft,sent),status.is.null');
+                const params = new URLSearchParams(window.location.search);
+                const token = params.get('token') || '';
+                const portalAnchorId = params.get('portal_anchor') || '';
+                if (!quoteId || !token || typeof updateSecureClientDocument !== 'function') return;
+                await updateSecureClientDocument(quoteId, token, 'mark_viewed', {}, portalAnchorId);
             } catch(e) { console.warn('Could not mark quote viewed:', e); }
         }
 
@@ -2210,6 +2274,8 @@ if (location.search.includes('debug')) {
 
             const urlParams = new URLSearchParams(window.location.search);
             const quoteId = urlParams.get('id');
+            const shareToken = urlParams.get('token') || '';
+            const portalAnchorId = urlParams.get('portal_anchor') || '';
     
             let signatureUrl = null;
             if (quoteId) {
@@ -2225,15 +2291,7 @@ if (location.search.includes('debug')) {
             document.getElementById('approvalBanner').classList.add('visible');
 
             if (quoteId) {
-                const { data: existingQuote, error } = await _supabase
-                    .from('quotes')
-                    .select('data')
-                    .eq('id', quoteId)
-                    .single();
-            
-                if (error) console.warn('Failed to fetch existing quote data:', error);
-        
-                const existingData = existingQuote?.data || {};
+                const existingData = quoteData || {};
                 // Snapshot original rooms BEFORE overwriting
                 var originalRoomsSnapshot = JSON.parse(JSON.stringify(quoteData.rooms || []));
 
@@ -2246,10 +2304,11 @@ if (location.search.includes('debug')) {
                                 return Object.assign({}, item, {
                                     description: item.upgrade.name,
                                     rate: item.upgrade.rate,
-                                    total: item.upgrade.rate * item.quantity,
+                                    total: viewerItemActiveTotal(item),
                                     upgraded: false,
                                     upgrade: null,
-                                    _baseRate: null
+                                    _baseRate: null,
+                                    _baseTotal: null
                                 });
                             }
                             return item;
@@ -2272,6 +2331,7 @@ if (location.search.includes('debug')) {
                         status: isChangeOrder ? 'approved' : 'accepted',
                         rooms: updatedRooms,
                         signature_url: signatureUrl,
+                        signature_data_url: signatureUrl ? undefined : sigDataUrl,
                         signed_by: name,
                         signed_at: now.toISOString(),
                         approved_by: name,
@@ -2283,7 +2343,14 @@ if (location.search.includes('debug')) {
                     })
                 };
 
-                await _supabase.from('quotes').update(updateData).eq('id', quoteId);
+                if (!shareToken || typeof updateSecureClientDocument !== 'function') {
+                    throw new Error('This quote link is missing its secure access token. Please ask the contractor to resend it.');
+                }
+                var secureUpdate = await updateSecureClientDocument(quoteId, shareToken, 'client_update', {
+                    topLevel: { status: updateData.status, client_name: updateData.client_name, accepted_at: now.toISOString(), accepted_by: name },
+                    dataPatch: updateData.data
+                }, portalAnchorId);
+                if (secureUpdate && secureUpdate.error) throw secureUpdate.error;
                 quoteData = Object.assign({}, quoteData, updateData.data, { status: updateData.status });
                 if (typeof qdCaptureEvent === 'function') {
                 qdCaptureEvent('quote_signed', {
@@ -2318,7 +2385,7 @@ if (location.search.includes('debug')) {
             (quoteData.rooms || []).forEach(function(room) {
                 (room.items || []).forEach(function(item) {
                     if (item.upgraded && item.upgrade) {
-                        _clientUpgrades.push({ room: room.name, from: item.description, to: item.upgrade.name, diff: (item.upgrade.rate - (item._baseRate || item.rate)) * item.quantity });
+                        _clientUpgrades.push({ room: room.name, from: item.description, to: item.upgrade.name, diff: viewerItemActiveTotal(item) - viewerItemBaseTotal(item) });
                     }
                     if (item._removed) {
                         _clientRemovals.push({ room: room.name, item: item.description });
@@ -2329,21 +2396,20 @@ if (location.search.includes('debug')) {
             // Save notes + upgrades + updated rooms to Supabase
             var _sqid = new URLSearchParams(window.location.search).get('id');
             if (_sqid) {
-                var sb2 = window._supabaseClient || (typeof supabase !== 'undefined' ? supabase : null);
-                if (sb2) {
-                    sb2.from('quotes').select('data').eq('id', _sqid).single().then(function(res) {
-                        if (res.data && res.data.data) {
-                            var merged = Object.assign({}, res.data.data, {
-                                _roomNotes: quoteData._roomNotes || {},
-                                _clientUpgrades: _clientUpgrades,
-                                _clientRemovals: _clientRemovals,
-                                _clientChoiceGroups: _clientChoiceGroups,
-                                _clientRooms: JSON.parse(JSON.stringify(quoteData.rooms || [])),
-                                _clientSubmittedAt: new Date().toISOString()
-                            });
-                            sb2.from('quotes').update({ data: merged, updated_at: new Date().toISOString() }).eq('id', _sqid).then(function() {});
+                var params = new URLSearchParams(window.location.search);
+                var shareToken = params.get('token') || '';
+                var portalAnchorId = params.get('portal_anchor') || '';
+                if (shareToken && typeof updateSecureClientDocument === 'function') {
+                    updateSecureClientDocument(_sqid, shareToken, 'client_update', {
+                        dataPatch: {
+                            _roomNotes: quoteData._roomNotes || {},
+                            _clientUpgrades: _clientUpgrades,
+                            _clientRemovals: _clientRemovals,
+                            _clientChoiceGroups: _clientChoiceGroups,
+                            _clientRooms: JSON.parse(JSON.stringify(quoteData.rooms || [])),
+                            _clientSubmittedAt: new Date().toISOString()
                         }
-                    });
+                    }, portalAnchorId).then(function() {});
                 }
             }
         }
@@ -2359,16 +2425,19 @@ if (location.search.includes('debug')) {
             var quoteId = new URLSearchParams(window.location.search).get('id');
             if (!quoteId) return;
             try {
-                var existing = await _supabase.from('quotes').select('data').eq('id', quoteId).single();
-                var merged = Object.assign({}, existing.data?.data || quoteData, {
+                var params = new URLSearchParams(window.location.search);
+                var shareToken = params.get('token') || '';
+                var portalAnchorId = params.get('portal_anchor') || '';
+                if (!shareToken || typeof updateSecureClientDocument !== 'function') throw new Error('Missing secure quote token');
+                var merged = Object.assign({}, quoteData, {
                     status: 'declined',
                     declined_at: new Date().toISOString()
                 });
-                await _supabase.from('quotes').update({
-                    status: 'declined',
-                    data: merged,
-                    updated_at: new Date().toISOString()
-                }).eq('id', quoteId);
+                var result = await updateSecureClientDocument(quoteId, shareToken, 'decline_change_order', {
+                    dataPatch: merged
+                }, portalAnchorId);
+                if (result && result.error) throw result.error;
+                quoteData = merged;
                 document.getElementById('approveSection').innerHTML = '<div class="alert alert-danger mb-0"><i class="fas fa-times-circle me-1"></i>Change order declined. Your contractor can revise it or create a new one.</div>';
                 var stickyActions = document.getElementById('stickyClientActions');
                 if (stickyActions) stickyActions.style.display = 'none';
@@ -2400,6 +2469,7 @@ if (location.search.includes('debug')) {
 
         async function loadContractorPaymentSettings(contractorUserId) {
             try {
+                if (quoteData && quoteData.paymentSettings) return quoteData.paymentSettings;
                 var sb = window._supabaseClient;
                 if (!sb || !contractorUserId) return null;
                 var result = await sb.from('user_data').select('value').eq('user_id', contractorUserId).eq('key', 'payment_settings').maybeSingle();

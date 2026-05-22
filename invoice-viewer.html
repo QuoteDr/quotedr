@@ -720,11 +720,36 @@ if (location.search.includes('debug')) {
         function loadInvoice() {
             const params = new URLSearchParams(window.location.search);
             const supabaseId = params.get('id');
+            const shareToken = params.get('token') || '';
+            const portalAnchorId = params.get('portal_anchor') || '';
             const localKey = params.get('invoice');
 
             if (supabaseId) {
-                // Try Supabase first, fall back to localStorage if it fails
-                loadQuoteForViewing(supabaseId).then(function(result) {
+                if (!shareToken || typeof loadSecureClientDocument !== 'function') {
+                    if (typeof loadQuoteFromSupabase === 'function') {
+                        loadQuoteFromSupabase(supabaseId).then(function(ownerResult) {
+                            if (ownerResult && ownerResult.data && ownerResult.data.data) {
+                                var row = ownerResult.data;
+                                invoiceData = row.data || row;
+                                if (!invoiceData.clientName && row.client_name) invoiceData.clientName = row.client_name;
+                                if (!invoiceData.rooms && row.rooms) invoiceData.rooms = row.rooms;
+                                if (!invoiceData.grandTotal && row.grand_total) invoiceData.grandTotal = row.grand_total;
+                                if (!invoiceData.terms && row.terms) invoiceData.terms = row.terms;
+                                renderInvoice();
+                                renderTerms();
+                                return;
+                            }
+                            document.getElementById('invoiceContainer').innerHTML = '<div class="alert alert-warning">This invoice link is missing its secure access token. Please ask the contractor to resend the invoice link.</div>';
+                        }).catch(function() {
+                            document.getElementById('invoiceContainer').innerHTML = '<div class="alert alert-warning">This invoice link is missing its secure access token. Please ask the contractor to resend the invoice link.</div>';
+                        });
+                    } else {
+                        document.getElementById('invoiceContainer').innerHTML = '<div class="alert alert-warning">This invoice link is missing its secure access token. Please ask the contractor to resend the invoice link.</div>';
+                    }
+                    return;
+                }
+                // Public invoice links load through the secure token function.
+                loadSecureClientDocument(supabaseId, shareToken, portalAnchorId).then(function(result) {
                     if (result.error || !result.data) {
                         console.warn('Supabase invoice load failed, trying localStorage...');
                         if (!tryLocalStorageFallback()) {
@@ -1003,6 +1028,7 @@ if (location.search.includes('debug')) {
 
         async function loadContractorPaymentSettings(contractorUserId) {
             try {
+                if (invoiceData && (invoiceData.paymentSettings || invoiceData.payment_settings)) return invoiceData.paymentSettings || invoiceData.payment_settings;
                 var sb = window._supabase;
                 if (!sb || !contractorUserId) return null;
                 var result = await sb.from('user_data').select('value').eq('user_id', contractorUserId).eq('key', 'payment_settings').maybeSingle();
