@@ -13,7 +13,7 @@ Deno.serve(async (req) => {
   try {
     const {
       to, clientName, contractorName, companyName, quoteNumber, total, quoteUrl, message, isInvoice,
-      emailSubject, emailIntro, emailButtonText, emailReplyTo, emailFooter
+      emailSubject, emailIntro, emailButtonText, portalUrl, emailReplyTo, emailFooter
     } = await req.json();
 
     if (!to || !quoteUrl) {
@@ -55,6 +55,10 @@ Deno.serve(async (req) => {
     const btnText = emailButtonText || (isInvoice ? "View Invoice" : "View Quote");
     const replyTo = emailReplyTo || undefined;
     const footerExtra = emailFooter ? `<br>${withBreaks(emailFooter)}` : "";
+    const documentLabel = isInvoice ? "invoice" : "quote";
+    const portalParagraph = portalUrl
+      ? `<p style="color:#555; font-size:0.92rem; line-height:1.6; margin:0 0 24px;">You can also view this ${documentLabel} in your client portal.<br><a href="${escapeHtml(portalUrl)}" style="color:#1a56a0; font-weight:700;">Open Client Portal</a></p>`
+      : "";
 
     const html = `
 <!DOCTYPE html>
@@ -87,6 +91,8 @@ Deno.serve(async (req) => {
               ${totalStr ? `<div><span style="color:#999; font-size:0.85rem;">Total</span><br><strong style="color:#0f3460; font-size:1.2rem;">${escapeHtml(totalStr)}</strong></div>` : ""}
             </td></tr>
           </table>` : ""}
+
+          ${portalParagraph}
 
           <p style="color:#999; font-size:0.8rem; margin:0;">
             If the button doesn't work, copy and paste this link into your browser:<br>

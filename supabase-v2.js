@@ -542,7 +542,16 @@ async function saveInvoiceForSharing(invoiceData) {
     const now = new Date().toISOString();
     const payload = {
         user_id: user ? user.id : null,
-        data: { ...invoiceData, _type: 'invoice' },
+        data: {
+            ...invoiceData,
+            _type: 'invoice',
+            type: invoiceData.type || 'invoice',
+            documentType: 'invoice',
+            portal_visible: invoiceData.portal_visible === true,
+            portal_client_name: invoiceData.portal_client_name || invoiceData.clientName || '',
+            portal_client_email: invoiceData.portal_client_email || invoiceData.email || invoiceData.clientEmail || '',
+            portal_added_at: invoiceData.portal_added_at || null
+        },
         client_name: invoiceData.clientName || '',
         quote_number: (invoiceData.quoteNumber || '') + '-INV',
         total: invoiceData.grandTotal || 0,

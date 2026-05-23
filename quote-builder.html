@@ -6786,6 +6786,10 @@ Example:
             return window.location.href.split('?')[0].split('#')[0].replace(/quote-builder(\.html)?\/?$/, 'invoice-viewer');
         }
 
+        function getClientPortalBaseUrl() {
+            return window.location.href.split('?')[0].split('#')[0].replace(/quote-builder(\.html)?\/?$/, 'client-portal');
+        }
+
         function getLocalPaymentSettingsSnapshot() {
             try {
                 return JSON.parse(localStorage.getItem('ald_payment_settings') || 'null');
@@ -6917,6 +6921,441 @@ Example:
                 if (savingNote) savingNote.style.display = 'none';
                 return invoiceState;
             });
+        }
+
+        async function ensureInvoiceShareableUrl(statusEl) {
+            var invoiceUrl = window._currentInvoiceUrl || '';
+            if (window._currentInvoiceSavePromise && !/[?&]id=/.test(invoiceUrl)) {
+                if (statusEl) statusEl.innerHTML = '<span class="text-muted"><i class="fas fa-spinner fa-spin me-1"></i>Saving secure invoice link...</span>';
+                var savedState = await window._currentInvoiceSavePromise;
+                if (savedState && savedState.invoiceUrl) {
+                    invoiceUrl = savedState.invoiceUrl;
+                    window._currentInvoiceUrl = invoiceUrl;
+                    window._currentInvoiceData = savedState.invoiceData || window._currentInvoiceData || {};
+                    var openBtn = document.getElementById('openInvoiceBtn');
+                    if (openBtn) openBtn.href = invoiceUrl;
+                }
+            }
+            if (!/[?&]id=/.test(invoiceUrl)) {
+                throw new Error('Could not create the shareable invoice link yet. Please wait a moment and try again.');
+            }
+            return invoiceUrl;
+        }
+
+        function normalizeInvoicePortalValue(value) {
+            return String(value || '').toLowerCase().trim().replace(/\s+/g, ' ');
+        }
+
+        function makeInvoicePortalId(name) {
+            if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+            return 'portal-' + normalizeInvoicePortalValue(name).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 36) + '-' + Date.now().toString(36);
+        }
+
+        function getCurrentInvoiceClientName(invoiceData) {
+            invoiceData = invoiceData || window._currentInvoiceData || {};
+            return invoiceData.clientName || invoiceData.client_name || document.getElementById('clientName')?.value || 'Client';
+        }
+
+        function getCurrentInvoiceClientEmail(invoiceData) {
+            invoiceData = invoiceData || window._currentInvoiceData || {};
+            return invoiceData.clientEmail || invoiceData.email || invoiceData.client_email || document.getElementById('clientEmail')?.value || '';
+        }
+
+        function invoicePortalRowClientName(row) {
+            var d = row && row.data || {};
+            return d.portal_client_name || row.client_name || d.clientName || d.client_name || 'Client';
+        }
+
+        function invoicePortalRowClientEmail(row) {
+            var d = row && row.data || {};
+            return d.portal_client_email || d.clientEmail || d.email || d.client_email || '';
+        }
+
+        function invoicePortalRowKey(row) {
+            var d = row && row.data || {};
+            if (d.portal_id) return String(d.portal_id);
+            var email = normalizeInvoicePortalValue(invoicePortalRowClientEmail(row));
+            var name = normalizeInvoicePortalValue(invoicePortalRowClientName(row));
+            return 'legacy-' + (email || name || (row && row.id) || 'portal');
+        }
+
+        function buildInvoicePortalRegistry(rows) {
+            var map = {};
+            (rows || []).forEach(function(row) {
+                var d = row && row.data || {};
+                if (d.portal_visible !== true) return;
+                var key = invoicePortalRowKey(row);
+                var clientName = d.portal_client_name || invoicePortalRowClientName(row);
+                var clientEmail = d.portal_client_email || invoicePortalRowClientEmail(row);
+                if (!map[key]) {
+                    map[key] = {
+                        id: key,
+                        legacy: !d.portal_id,
+                        name: d.portal_name || clientName || 'Client Portal',
+                        clientName: clientName,
+                        clientEmail: clientEmail,
+                        pin: d.portal_pin || '',
+                        quoteIds: [],
+                        rows: []
+                    };
+                }
+                map[key].quoteIds.push(row.id);
+                map[key].rows.push(row);
+                if (!map[key].pin && d.portal_pin) map[key].pin = d.portal_pin;
+            });
+            return Object.values(map).sort(function(a, b) {
+                return (a.name || '').localeCompare(b.name || '') || (a.clientName || '').localeCompare(b.clientName || '');
+            });
+        }
+
+        function invoiceMatchesPortal(portal, invoiceData) {
+            var invoiceEmail = normalizeInvoicePortalValue(getCurrentInvoiceClientEmail(invoiceData));
+            var invoiceName = normalizeInvoicePortalValue(getCurrentInvoiceClientName(invoiceData));
+            var portalEmail = normalizeInvoicePortalValue(portal && portal.clientEmail);
+            var portalName = normalizeInvoicePortalValue((portal && portal.clientName) || (portal && portal.name));
+            return !!((invoiceEmail && portalEmail && invoiceEmail === portalEmail) || (invoiceName && portalName && invoiceName === portalName));
+        }
+
+        function markInvoiceForPortal(invoiceData, portal) {
+            invoiceData = invoiceData || {};
+            portal = portal || {};
+            var portalId = portal.id && !String(portal.id).startsWith('legacy-') ? portal.id : (invoiceData.portal_id || makeInvoicePortalId(portal.name || getCurrentInvoiceClientName(invoiceData)));
+            var portalName = portal.name || invoiceData.portal_name || getCurrentInvoiceClientName(invoiceData);
+            var clientName = portal.clientName || invoiceData.portal_client_name || getCurrentInvoiceClientName(invoiceData);
+            var clientEmail = portal.clientEmail || invoiceData.portal_client_email || getCurrentInvoiceClientEmail(invoiceData);
+            invoiceData.type = 'invoice';
+            invoiceData.documentType = 'invoice';
+            invoiceData.portal_visible = true;
+            invoiceData.portal_id = portalId;
+            invoiceData.portal_name = portalName;
+            invoiceData.portal_client_name = clientName;
+            invoiceData.portal_client_email = clientEmail;
+            invoiceData.portal_pin = portal.pin || invoiceData.portal_pin || Math.floor(1000 + Math.random() * 9000).toString();
+            invoiceData.portal_added_at = invoiceData.portal_added_at || new Date().toISOString();
+            return invoiceData;
+        }
+
+        function updateInvoicePortalButton(inPortal) {
+            var btn = document.getElementById('addInvoiceToPortalBtn');
+            if (!btn) return;
+            btn.className = inPortal ? 'btn btn-success btn-sm w-100' : 'btn btn-outline-primary btn-sm w-100';
+            btn.innerHTML = inPortal
+                ? '<i class="fas fa-check-circle me-1"></i>In Portal'
+                : '<i class="fas fa-folder-plus me-1"></i>Add to Portal';
+        }
+
+        function setInvoiceUrlFromSecureShare(invoiceData, share) {
+            if (!invoiceData || !share || !share.id || !share.token) return window._currentInvoiceUrl || '';
+            var params = new URLSearchParams({ id: share.id, token: share.token });
+            if (share.portalAnchorId) params.set('portal_anchor', share.portalAnchorId);
+            if (invoiceData.id) params.set('invoice', invoiceData.id);
+            var invoiceUrl = getInvoiceBaseUrl() + '?' + params.toString();
+            window._currentInvoiceUrl = invoiceUrl;
+            var openBtn = document.getElementById('openInvoiceBtn');
+            if (openBtn) openBtn.href = invoiceUrl;
+            return invoiceUrl;
+        }
+
+        function ensureInvoicePortalAssignmentModal() {
+            if (document.getElementById('invoicePortalAssignModal')) return;
+            document.body.insertAdjacentHTML('beforeend', `
+                <div class="modal fade" id="invoicePortalAssignModal" tabindex="-1">
+                    <div class="modal-dialog modal-dialog-centered modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header" style="background:#1a2940; color:white;">
+                                <h5 class="modal-title"><i class="fas fa-folder-tree me-2"></i>Add to Client Portal</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="alert alert-light border small mb-3">
+                                    <div class="text-muted mb-1">Selected invoice</div>
+                                    <strong id="invoicePortalAssignTitle">Invoice</strong>
+                                </div>
+                                <div class="row g-3">
+                                    <div class="col-lg-7">
+                                        <div class="d-flex justify-content-between align-items-center mb-2 gap-2">
+                                            <h6 class="mb-0">Existing portals</h6>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="openInvoicePortalAssignment({ keepModalOpen: true })"><i class="fas fa-rotate me-1"></i>Refresh</button>
+                                        </div>
+                                        <div id="invoicePortalAssignList"></div>
+                                    </div>
+                                    <div class="col-lg-5">
+                                        <div class="border rounded p-3">
+                                            <h6>Create or start fresh</h6>
+                                            <label class="form-label small text-muted mb-1" for="invoicePortalAssignClientName">Client</label>
+                                            <input type="text" class="form-control form-control-sm mb-2" id="invoicePortalAssignClientName" autocomplete="off">
+                                            <label class="form-label small text-muted mb-1" for="invoicePortalAssignClientEmail">Client email</label>
+                                            <input type="email" class="form-control form-control-sm mb-2" id="invoicePortalAssignClientEmail" autocomplete="off">
+                                            <label class="form-label small text-muted mb-1" for="invoicePortalAssignPortalName">Portal name</label>
+                                            <input type="text" class="form-control form-control-sm mb-3" id="invoicePortalAssignPortalName" placeholder="e.g., Adam Dezic - Spring Project">
+                                            <button type="button" class="btn btn-primary btn-sm w-100" id="invoicePortalAssignCreateBtn" onclick="createPortalForCurrentInvoice()"><i class="fas fa-plus me-1"></i>Create Portal & Add</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="invoicePortalAssignResult" class="small mt-3"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>`);
+        }
+
+        async function loadInvoicePortalCandidates() {
+            window._invoicePortalRows = [];
+            window._invoicePortalRegistry = [];
+            if (typeof listQuotes !== 'function') return [];
+            var result = await listQuotes();
+            if (result && result.error) throw new Error(result.error.message || result.error || 'Could not load client portals.');
+            window._invoicePortalRows = result && result.data || [];
+            window._invoicePortalRegistry = buildInvoicePortalRegistry(window._invoicePortalRows);
+            return window._invoicePortalRegistry;
+        }
+
+        function renderInvoicePortalAssignmentList() {
+            var wrap = document.getElementById('invoicePortalAssignList');
+            if (!wrap) return;
+            var invoiceData = window._currentInvoiceData || {};
+            var portals = window._invoicePortalRegistry || [];
+            if (!portals.length) {
+                wrap.innerHTML = '<div class="text-muted small border rounded p-3">No portals exist yet. Create one on the right, then this invoice will be added there.</div>';
+                return;
+            }
+            wrap.innerHTML = portals.map(function(portal) {
+                var recommended = invoiceMatchesPortal(portal, invoiceData);
+                var selected = invoiceData.portal_visible && invoiceData.portal_id && portal.id === invoiceData.portal_id;
+                var docCount = (portal.rows || []).filter(function(row) { return !(row.data && row.data.portal_placeholder); }).length;
+                return '<div class="border rounded p-2 mb-2 ' + (recommended ? 'border-primary bg-light' : '') + '" data-invoice-portal-recommended="' + (recommended ? 'true' : 'false') + '">' +
+                    '<div class="d-flex justify-content-between gap-2 flex-wrap align-items-start">' +
+                    '<div><div class="fw-bold">' + _escapeHtml(portal.name || 'Client Portal') +
+                    (recommended ? ' <span class="badge bg-primary">Recommended</span>' : '') +
+                    (selected ? ' <span class="badge bg-success">Selected</span>' : '') + '</div>' +
+                    '<div class="text-muted small">' + _escapeHtml(portal.clientName || 'Client') + (portal.clientEmail ? ' - ' + _escapeHtml(portal.clientEmail) : '') + ' - ' + docCount + ' document' + (docCount === 1 ? '' : 's') + '</div></div>' +
+                    '<button type="button" class="btn btn-primary btn-sm" onclick="assignCurrentInvoiceToPortal(' + JSON.stringify(portal.id).replace(/"/g, '&quot;') + ')"><i class="fas fa-folder-plus me-1"></i>Add here</button>' +
+                    '</div></div>';
+            }).join('');
+        }
+
+        async function openInvoicePortalAssignment(options) {
+            options = options || {};
+            ensureInvoicePortalAssignmentModal();
+            var invoiceData = window._currentInvoiceData || {};
+            var resultEl = document.getElementById('sendInvoiceEmailResult');
+            if (options.resumeInvoiceEmailAfterPortal) window._resumeInvoiceEmailAfterPortal = true;
+            if (resultEl && !options.keepModalOpen) resultEl.innerHTML = '<span class="text-muted"><i class="fas fa-spinner fa-spin me-1"></i>Loading client portals...</span>';
+            try {
+                await ensureInvoiceShareableUrl(resultEl);
+                var savedState = window._currentInvoiceSavePromise ? await window._currentInvoiceSavePromise : null;
+                if (savedState && savedState.invoiceData) invoiceData = savedState.invoiceData;
+                window._currentInvoiceData = invoiceData;
+                document.getElementById('invoicePortalAssignTitle').textContent = (invoiceData.quoteNumber || 'Invoice') + ' - ' + getCurrentInvoiceClientName(invoiceData);
+                document.getElementById('invoicePortalAssignClientName').value = getCurrentInvoiceClientName(invoiceData);
+                document.getElementById('invoicePortalAssignClientEmail').value = getCurrentInvoiceClientEmail(invoiceData);
+                document.getElementById('invoicePortalAssignPortalName').value = invoiceData.portal_name || getCurrentInvoiceClientName(invoiceData);
+                document.getElementById('invoicePortalAssignResult').innerHTML = '';
+                await loadInvoicePortalCandidates();
+                renderInvoicePortalAssignmentList();
+                var modalEl = document.getElementById('invoicePortalAssignModal');
+                var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                modal.show();
+                if (resultEl && !options.keepModalOpen) resultEl.innerHTML = '<span class="text-muted"><i class="fas fa-folder-open me-1"></i>Choose the client portal for this invoice.</span>';
+            } catch(e) {
+                if (resultEl) resultEl.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>' + e.message + '</span>';
+                throw e;
+            }
+        }
+
+        async function copyTextToClipboard(text) {
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(text);
+                    return true;
+                }
+            } catch(e) {}
+            var ta = document.createElement('textarea');
+            ta.value = text;
+            ta.setAttribute('readonly', '');
+            ta.style.position = 'fixed';
+            ta.style.left = '-9999px';
+            document.body.appendChild(ta);
+            ta.focus();
+            ta.select();
+            var copied = false;
+            try { copied = document.execCommand('copy'); } catch(e) { copied = false; }
+            document.body.removeChild(ta);
+            if (!copied) throw new Error('Could not copy automatically. Use Open Invoice and copy the browser address instead.');
+            return true;
+        }
+
+        async function updateLegacyInvoicePortalRows(portal, durablePortalId, pin) {
+            if (!portal || !portal.legacy || !portal.quoteIds || !portal.quoteIds.length || typeof _supabase === 'undefined') return;
+            var rows = window._invoicePortalRows || [];
+            for (var i = 0; i < portal.quoteIds.length; i++) {
+                var row = rows.find(function(q) { return q.id === portal.quoteIds[i]; });
+                if (!row) continue;
+                var data = Object.assign({}, row.data || {}, {
+                    portal_visible: true,
+                    portal_id: durablePortalId,
+                    portal_name: portal.name,
+                    portal_client_name: portal.clientName || invoicePortalRowClientName(row),
+                    portal_client_email: portal.clientEmail || invoicePortalRowClientEmail(row),
+                    portal_pin: pin
+                });
+                var updated = await _supabase.from('quotes').update({ data: data }).eq('id', row.id);
+                if (updated.error) throw updated.error;
+            }
+        }
+
+        async function ensureInvoicePortalUrl(statusEl, portal) {
+            await ensureInvoiceShareableUrl(statusEl);
+            var invoiceData = window._currentInvoiceData || {};
+            if (!portal && invoiceData.portal_visible) {
+                portal = {
+                    id: invoiceData.portal_id,
+                    name: invoiceData.portal_name || getCurrentInvoiceClientName(invoiceData),
+                    clientName: invoiceData.portal_client_name || getCurrentInvoiceClientName(invoiceData),
+                    clientEmail: invoiceData.portal_client_email || getCurrentInvoiceClientEmail(invoiceData),
+                    pin: invoiceData.portal_pin || ''
+                };
+            }
+            if (!portal || !portal.id) throw new Error('Choose which client portal this invoice belongs in.');
+            invoiceData = markInvoiceForPortal(invoiceData, portal);
+            if (!invoiceData.supabaseId && window._currentInvoiceSavePromise) {
+                var savedState = await window._currentInvoiceSavePromise;
+                if (savedState && savedState.invoiceData) invoiceData = markInvoiceForPortal(savedState.invoiceData, portal);
+            }
+            if (!invoiceData.supabaseId) throw new Error('Invoice must be saved before adding it to the client portal.');
+            if (statusEl) statusEl.innerHTML = '<span class="text-muted"><i class="fas fa-spinner fa-spin me-1"></i>Adding invoice to client portal...</span>';
+            await updateLegacyInvoicePortalRows(portal, invoiceData.portal_id, invoiceData.portal_pin);
+            var saved = await saveInvoiceForSharing(invoiceData);
+            if (saved && saved.error) throw saved.error;
+            if (saved && saved.data && saved.data.id) invoiceData.supabaseId = saved.data.id;
+            window._currentInvoiceData = invoiceData;
+            var share = await createSecureClientShareLink(invoiceData.supabaseId, getClientPortalBaseUrl(), { mode: 'portal' });
+            if (!share || !share.url || share.url.indexOf('token=') < 0) throw new Error('Could not create the client portal link.');
+            setInvoiceUrlFromSecureShare(invoiceData, share);
+            window._currentInvoicePortalUrl = share.url;
+            if (invoiceData.id) localStorage.setItem(invoiceData.id, JSON.stringify(invoiceData));
+            updateInvoicePortalButton(true);
+            return share.url;
+        }
+
+        async function finishInvoicePortalAssignment(portal) {
+            var resultEl = document.getElementById('invoicePortalAssignResult') || document.getElementById('sendInvoiceEmailResult');
+            var portalUrl = await ensureInvoicePortalUrl(resultEl, portal);
+            var modalEl = document.getElementById('invoicePortalAssignModal');
+            var modal = modalEl ? bootstrap.Modal.getInstance(modalEl) : null;
+            if (modal) modal.hide();
+            var emailResultEl = document.getElementById('sendInvoiceEmailResult');
+            if (emailResultEl) emailResultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>Invoice added to the client portal.</span>';
+            if (window._resumeInvoiceEmailAfterPortal) {
+                resumeInvoiceEmailAfterPortal();
+            }
+            return portalUrl;
+        }
+
+        async function assignCurrentInvoiceToPortal(portalId) {
+            var btns = document.querySelectorAll('#invoicePortalAssignModal button');
+            var resultEl = document.getElementById('invoicePortalAssignResult');
+            try {
+                btns.forEach(function(btn) { btn.disabled = true; });
+                if (resultEl) resultEl.innerHTML = '<span class="text-muted"><i class="fas fa-spinner fa-spin me-1"></i>Adding invoice to portal...</span>';
+                var portal = (window._invoicePortalRegistry || []).find(function(p) { return p.id === portalId; });
+                if (!portal) throw new Error('Choose a portal and try again.');
+                await finishInvoicePortalAssignment(portal);
+            } catch(e) {
+                if (resultEl) resultEl.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>' + e.message + '</span>';
+            } finally {
+                btns.forEach(function(btn) { btn.disabled = false; });
+            }
+        }
+
+        async function createPortalForCurrentInvoice() {
+            var resultEl = document.getElementById('invoicePortalAssignResult');
+            var btn = document.getElementById('invoicePortalAssignCreateBtn');
+            var clientName = document.getElementById('invoicePortalAssignClientName')?.value.trim() || getCurrentInvoiceClientName();
+            var clientEmail = document.getElementById('invoicePortalAssignClientEmail')?.value.trim() || getCurrentInvoiceClientEmail();
+            var portalName = document.getElementById('invoicePortalAssignPortalName')?.value.trim() || clientName;
+            if (!clientName || !portalName) {
+                if (resultEl) resultEl.innerHTML = '<span class="text-danger">Enter a client and portal name first.</span>';
+                return;
+            }
+            var portal = {
+                id: makeInvoicePortalId(portalName),
+                legacy: false,
+                name: portalName,
+                clientName: clientName,
+                clientEmail: clientEmail,
+                pin: Math.floor(1000 + Math.random() * 9000).toString(),
+                quoteIds: [],
+                rows: []
+            };
+            try {
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Creating...';
+                }
+                await finishInvoicePortalAssignment(portal);
+            } catch(e) {
+                if (resultEl) resultEl.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>' + e.message + '</span>';
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-plus me-1"></i>Create Portal & Add';
+                }
+            }
+        }
+
+        function resumeInvoiceEmailAfterPortal() {
+            if (!window._resumeInvoiceEmailAfterPortal) return;
+            window._resumeInvoiceEmailAfterPortal = false;
+            setTimeout(function() {
+                sendInvoiceByEmail();
+            }, 50);
+        }
+
+        async function copyInvoiceLink() {
+            var resultEl = document.getElementById('sendInvoiceEmailResult');
+            var btn = document.getElementById('copyInvoiceLinkBtn');
+            var invoiceUrl = '';
+            try {
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Copying...';
+                }
+                invoiceUrl = await ensureInvoiceShareableUrl(resultEl);
+                await copyTextToClipboard(invoiceUrl);
+                if (resultEl) resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>Invoice link copied.</span>';
+            } catch(e) {
+                if (resultEl && invoiceUrl) {
+                    resultEl.innerHTML = '<div class="text-warning mb-1"><i class="fas fa-exclamation-triangle me-1"></i>' + e.message + '</div>' +
+                        '<input class="form-control form-control-sm" readonly value="' + _escapeHtml(invoiceUrl) + '" onclick="this.select()">';
+                } else if (resultEl) {
+                    resultEl.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>' + e.message + '</span>';
+                }
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-link me-1"></i>Copy Invoice Link';
+                }
+            }
+        }
+
+        async function publishCurrentInvoiceToPortal() {
+            var resultEl = document.getElementById('sendInvoiceEmailResult');
+            var btn = document.getElementById('addInvoiceToPortalBtn');
+            try {
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Loading...';
+                }
+                await openInvoicePortalAssignment();
+            } catch(e) {
+                if (resultEl) resultEl.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>' + e.message + '</span>';
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    updateInvoicePortalButton(!!(window._currentInvoiceData && window._currentInvoiceData.portal_visible));
+                }
+            }
         }
 
         async function previewInvoice() {
@@ -7875,6 +8314,22 @@ Example:
                                     <button class="btn btn-primary btn-sm w-100" onclick="sendInvoiceByEmail()" id="sendInvoiceEmailBtn">
                                         <i class="fas fa-paper-plane me-1"></i>Send Invoice by Email
                                     </button>
+                                    <div class="form-check mt-2">
+                                        <input class="form-check-input" type="checkbox" id="invoiceAddToPortalEmail" checked>
+                                        <label class="form-check-label small" for="invoiceAddToPortalEmail">Add to client portal and include portal link in email</label>
+                                    </div>
+                                    <div class="row g-2 mt-2">
+                                        <div class="col-sm-6">
+                                            <button type="button" class="btn btn-outline-secondary btn-sm w-100" onclick="copyInvoiceLink()" id="copyInvoiceLinkBtn">
+                                                <i class="fas fa-link me-1"></i>Copy Invoice Link
+                                            </button>
+                                        </div>
+                                        <div class="col-sm-6">
+                                            <button type="button" class="btn btn-outline-primary btn-sm w-100" onclick="publishCurrentInvoiceToPortal()" id="addInvoiceToPortalBtn">
+                                                <i class="fas fa-folder-plus me-1"></i>Add to Portal
+                                            </button>
+                                        </div>
+                                    </div>
                                     <div id="sendInvoiceEmailResult" class="mt-2 small"></div>
                                 </div>
                                 <a id="openInvoiceBtn" href="#" target="_blank" class="btn btn-outline-success w-100">
@@ -7888,6 +8343,8 @@ Example:
             document.getElementById('openInvoiceBtn').href = invoiceUrl;
             window._currentInvoiceUrl = invoiceUrl;
             window._currentInvoiceData = invoiceData;
+            window._currentInvoicePortalUrl = '';
+            updateInvoicePortalButton(!!invoiceData.portal_visible);
             var clientEmail = document.getElementById('clientEmail')?.value.trim();
             var sendEmailEl = document.getElementById('sendInvoiceEmail');
             if (sendEmailEl) sendEmailEl.value = clientEmail || '';
@@ -7936,25 +8393,46 @@ Example:
             }
             var invoiceUrl = window._currentInvoiceUrl || '';
             var invoiceData = window._currentInvoiceData || {};
-            if (window._currentInvoiceSavePromise && !/[?&]id=/.test(invoiceUrl)) {
+            var portalUrl = '';
+            if (!/[?&]id=/.test(invoiceUrl)) {
                 btn.disabled = true;
                 btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving invoice link...';
                 resultEl.innerHTML = '<span class="text-muted"><i class="fas fa-spinner fa-spin me-1"></i>Saving invoice for client payment...</span>';
-                var savedState = await window._currentInvoiceSavePromise;
-                if (savedState && savedState.invoiceUrl) {
-                    invoiceUrl = savedState.invoiceUrl;
-                    invoiceData = savedState.invoiceData || invoiceData;
+                try {
+                    invoiceUrl = await ensureInvoiceShareableUrl(resultEl);
+                    invoiceData = window._currentInvoiceData || invoiceData;
                     window._currentInvoiceUrl = invoiceUrl;
-                    window._currentInvoiceData = invoiceData;
-                    var openBtn = document.getElementById('openInvoiceBtn');
-                    if (openBtn) openBtn.href = invoiceUrl;
+                } catch(e) {
+                    resultEl.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>' + e.message + '</span>';
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-paper-plane me-1"></i>Send Invoice by Email';
+                    return;
                 }
             }
-            if (!/[?&]id=/.test(invoiceUrl)) {
-                resultEl.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>Could not create the shareable invoice link yet. Please wait a moment and try again.</span>';
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-paper-plane me-1"></i>Send Invoice by Email';
-                return;
+            if (document.getElementById('invoiceAddToPortalEmail')?.checked !== false) {
+                if (!window._currentInvoicePortalUrl && !(invoiceData.portal_visible && invoiceData.portal_id)) {
+                    window._resumeInvoiceEmailAfterPortal = true;
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-paper-plane me-1"></i>Send Invoice by Email';
+                    resultEl.innerHTML = '<span class="text-muted"><i class="fas fa-folder-open me-1"></i>Choose a client portal, then this email will send with the portal link.</span>';
+                    try {
+                        await openInvoicePortalAssignment({ resumeInvoiceEmailAfterPortal: true });
+                    } catch(e) {}
+                    return;
+                }
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Preparing portal link...';
+                try {
+                    portalUrl = window._currentInvoicePortalUrl || await ensureInvoicePortalUrl(resultEl);
+                    invoiceData = window._currentInvoiceData || invoiceData;
+                    invoiceUrl = window._currentInvoiceUrl || invoiceUrl;
+                } catch(e) {
+                    resultEl.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>' + e.message + '</span>';
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-paper-plane me-1"></i>Send Invoice by Email';
+                    await openInvoicePortalAssignment({ resumeInvoiceEmailAfterPortal: true });
+                    return;
+                }
             }
             var profile = {};
             try { profile = JSON.parse(localStorage.getItem('ald_business_profile') || '{}'); } catch(e) {}
@@ -7992,13 +8470,14 @@ Example:
                         emailSubject: subject,
                         emailIntro: '',
                         emailButtonText: 'View Invoice',
+                        portalUrl: portalUrl,
                         emailReplyTo: replyTo,
                         emailFooter: profile.emailFooter || ''
                     })
                 });
                 var data = await res.json();
                 if (data.error) throw new Error(data.error);
-                resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>Invoice sent to ' + email + '!</span>';
+                resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>Invoice sent to ' + email + '!' + (portalUrl ? ' Portal link included.' : '') + '</span>';
                 if (typeof qdCaptureEvent === 'function') {
                     qdCaptureEvent('invoice_sent', {
                         method: 'email',
@@ -8016,6 +8495,278 @@ Example:
 
         // Quote Style Modal behavior lives in quote-style.js.
 
+        function getCurrentQuoteDataForPortal() {
+            var data = Object.assign({}, window._currentQuoteData || {});
+            if (!data.clientName && typeof collectQuoteData === 'function') {
+                data = Object.assign({}, collectQuoteData(), data);
+            }
+            if (!data.supabaseId && window._supabaseQuoteId) data.supabaseId = window._supabaseQuoteId;
+            data.clientName = data.clientName || document.getElementById('clientName')?.value || 'Client';
+            data.clientEmail = data.clientEmail || data.email || document.getElementById('clientEmail')?.value || '';
+            data.email = data.email || data.clientEmail || '';
+            data.quoteNumber = data.quoteNumber || document.getElementById('quoteNumber')?.value || '';
+            return data;
+        }
+
+        function markQuoteForPortal(quoteData, portal) {
+            quoteData = quoteData || {};
+            portal = portal || {};
+            var portalId = portal.id && !String(portal.id).startsWith('legacy-') ? portal.id : (quoteData.portal_id || makeInvoicePortalId(portal.name || quoteData.clientName));
+            quoteData.type = quoteData.type || quoteData.documentType || 'quote';
+            quoteData.documentType = quoteData.documentType || quoteData.type || 'quote';
+            quoteData.portal_visible = true;
+            quoteData.portal_id = portalId;
+            quoteData.portal_name = portal.name || quoteData.portal_name || quoteData.clientName || 'Client Portal';
+            quoteData.portal_client_name = portal.clientName || quoteData.portal_client_name || quoteData.clientName || '';
+            quoteData.portal_client_email = portal.clientEmail || quoteData.portal_client_email || quoteData.clientEmail || quoteData.email || '';
+            quoteData.portal_pin = portal.pin || quoteData.portal_pin || Math.floor(1000 + Math.random() * 9000).toString();
+            quoteData.portal_added_at = quoteData.portal_added_at || new Date().toISOString();
+            return quoteData;
+        }
+
+        function updateQuotePortalButton(inPortal) {
+            var btn = document.getElementById('addQuoteToPortalBtn');
+            if (!btn) return;
+            btn.className = inPortal ? 'btn btn-success btn-sm w-100' : 'btn btn-outline-primary btn-sm w-100';
+            btn.innerHTML = inPortal
+                ? '<i class="fas fa-check-circle me-1"></i>In Portal'
+                : '<i class="fas fa-folder-plus me-1"></i>Add to Portal';
+        }
+
+        function setQuoteUrlFromSecureShare(quoteData, share) {
+            if (!quoteData || !share || !share.id || !share.token) return window._currentQuoteUrl || document.getElementById('interactiveLinkInput')?.value || '';
+            var _base = window.location.href.split('?')[0].split('#')[0].replace(/quote-builder(\.html)?\/?$/, '');
+            var params = new URLSearchParams({ id: share.id, token: share.token });
+            if (share.portalAnchorId) params.set('portal_anchor', share.portalAnchorId);
+            var quoteUrl = _base + 'interactive-quote-viewer?' + params.toString();
+            window._currentQuoteUrl = quoteUrl;
+            var linkInput = document.getElementById('interactiveLinkInput');
+            if (linkInput) linkInput.value = quoteUrl;
+            var openBtn = document.getElementById('openViewerBtn');
+            if (openBtn) openBtn.href = quoteUrl;
+            return quoteUrl;
+        }
+
+        function ensureQuotePortalAssignmentModal() {
+            if (document.getElementById('quotePortalAssignModal')) return;
+            document.body.insertAdjacentHTML('beforeend', `
+                <div class="modal fade" id="quotePortalAssignModal" tabindex="-1">
+                    <div class="modal-dialog modal-dialog-centered modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header" style="background:#1a2940; color:white;">
+                                <h5 class="modal-title"><i class="fas fa-folder-tree me-2"></i>Add Quote to Client Portal</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="alert alert-light border small mb-3">
+                                    <div class="text-muted mb-1">Selected quote</div>
+                                    <strong id="quotePortalAssignTitle">Quote</strong>
+                                </div>
+                                <div class="row g-3">
+                                    <div class="col-lg-7">
+                                        <div class="d-flex justify-content-between align-items-center mb-2 gap-2">
+                                            <h6 class="mb-0">Existing portals</h6>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="openQuotePortalAssignment({ keepModalOpen: true })"><i class="fas fa-rotate me-1"></i>Refresh</button>
+                                        </div>
+                                        <div id="quotePortalAssignList"></div>
+                                    </div>
+                                    <div class="col-lg-5">
+                                        <div class="border rounded p-3">
+                                            <h6>Create or start fresh</h6>
+                                            <label class="form-label small text-muted mb-1" for="quotePortalAssignClientName">Client</label>
+                                            <input type="text" class="form-control form-control-sm mb-2" id="quotePortalAssignClientName" autocomplete="off">
+                                            <label class="form-label small text-muted mb-1" for="quotePortalAssignClientEmail">Client email</label>
+                                            <input type="email" class="form-control form-control-sm mb-2" id="quotePortalAssignClientEmail" autocomplete="off">
+                                            <label class="form-label small text-muted mb-1" for="quotePortalAssignPortalName">Portal name</label>
+                                            <input type="text" class="form-control form-control-sm mb-3" id="quotePortalAssignPortalName" placeholder="e.g., Adam Dezic - Spring Project">
+                                            <button type="button" class="btn btn-primary btn-sm w-100" id="quotePortalAssignCreateBtn" onclick="createPortalForCurrentQuote()"><i class="fas fa-plus me-1"></i>Create Portal & Add</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="quotePortalAssignResult" class="small mt-3"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>`);
+        }
+
+        function renderQuotePortalAssignmentList() {
+            var wrap = document.getElementById('quotePortalAssignList');
+            if (!wrap) return;
+            var quoteData = getCurrentQuoteDataForPortal();
+            var portals = window._quotePortalRegistry || [];
+            if (!portals.length) {
+                wrap.innerHTML = '<div class="text-muted small border rounded p-3">No portals exist yet. Create one on the right, then this quote will be added there.</div>';
+                return;
+            }
+            wrap.innerHTML = portals.map(function(portal) {
+                var recommended = invoiceMatchesPortal(portal, quoteData);
+                var selected = quoteData.portal_visible && quoteData.portal_id && portal.id === quoteData.portal_id;
+                var docCount = (portal.rows || []).filter(function(row) { return !(row.data && row.data.portal_placeholder); }).length;
+                return '<div class="border rounded p-2 mb-2 ' + (recommended ? 'border-primary bg-light' : '') + '" data-quote-portal-recommended="' + (recommended ? 'true' : 'false') + '">' +
+                    '<div class="d-flex justify-content-between gap-2 flex-wrap align-items-start">' +
+                    '<div><div class="fw-bold">' + _escapeHtml(portal.name || 'Client Portal') +
+                    (recommended ? ' <span class="badge bg-primary">Recommended</span>' : '') +
+                    (selected ? ' <span class="badge bg-success">Selected</span>' : '') + '</div>' +
+                    '<div class="text-muted small">' + _escapeHtml(portal.clientName || 'Client') + (portal.clientEmail ? ' - ' + _escapeHtml(portal.clientEmail) : '') + ' - ' + docCount + ' document' + (docCount === 1 ? '' : 's') + '</div></div>' +
+                    '<button type="button" class="btn btn-primary btn-sm" onclick="assignCurrentQuoteToPortal(' + JSON.stringify(portal.id).replace(/"/g, '&quot;') + ')"><i class="fas fa-folder-plus me-1"></i>Add here</button>' +
+                    '</div></div>';
+            }).join('');
+        }
+
+        async function openQuotePortalAssignment(options) {
+            options = options || {};
+            ensureQuotePortalAssignmentModal();
+            var resultEl = document.getElementById('sendQuoteEmailResult');
+            if (options.resumeQuoteEmailAfterPortal) window._resumeQuoteEmailAfterPortal = true;
+            if (resultEl && !options.keepModalOpen) resultEl.innerHTML = '<span class="text-muted"><i class="fas fa-spinner fa-spin me-1"></i>Loading client portals...</span>';
+            try {
+                var quoteData = getCurrentQuoteDataForPortal();
+                if (!quoteData.supabaseId) throw new Error('Save or generate the quote link before adding it to a portal.');
+                window._currentQuoteData = quoteData;
+                document.getElementById('quotePortalAssignTitle').textContent = (quoteData.quoteNumber || 'Quote') + ' - ' + (quoteData.clientName || 'Client');
+                document.getElementById('quotePortalAssignClientName').value = quoteData.clientName || '';
+                document.getElementById('quotePortalAssignClientEmail').value = quoteData.clientEmail || quoteData.email || '';
+                document.getElementById('quotePortalAssignPortalName').value = quoteData.portal_name || quoteData.clientName || '';
+                document.getElementById('quotePortalAssignResult').innerHTML = '';
+                await loadInvoicePortalCandidates();
+                window._quotePortalRegistry = window._invoicePortalRegistry || [];
+                renderQuotePortalAssignmentList();
+                var modalEl = document.getElementById('quotePortalAssignModal');
+                var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                modal.show();
+                if (resultEl && !options.keepModalOpen) resultEl.innerHTML = '<span class="text-muted"><i class="fas fa-folder-open me-1"></i>Choose the client portal for this quote.</span>';
+            } catch(e) {
+                if (resultEl) resultEl.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>' + e.message + '</span>';
+                throw e;
+            }
+        }
+
+        async function ensureQuotePortalUrl(statusEl, portal) {
+            var quoteData = getCurrentQuoteDataForPortal();
+            if (!portal && quoteData.portal_visible) {
+                portal = {
+                    id: quoteData.portal_id,
+                    name: quoteData.portal_name || quoteData.clientName,
+                    clientName: quoteData.portal_client_name || quoteData.clientName,
+                    clientEmail: quoteData.portal_client_email || quoteData.clientEmail || quoteData.email,
+                    pin: quoteData.portal_pin || ''
+                };
+            }
+            if (!portal || !portal.id) throw new Error('Choose which client portal this quote belongs in.');
+            quoteData = markQuoteForPortal(quoteData, portal);
+            if (!quoteData.supabaseId) throw new Error('Save or generate the quote link before adding it to a portal.');
+            if (statusEl) statusEl.innerHTML = '<span class="text-muted"><i class="fas fa-spinner fa-spin me-1"></i>Adding quote to client portal...</span>';
+            await updateLegacyInvoicePortalRows(portal, quoteData.portal_id, quoteData.portal_pin);
+            var saved = await saveQuoteForSharing(quoteData);
+            if (saved && saved.error) throw saved.error;
+            if (saved && saved.data && saved.data.id) {
+                quoteData.supabaseId = saved.data.id;
+                window._supabaseQuoteId = saved.data.id;
+            }
+            window._currentQuoteData = quoteData;
+            var share = await createSecureClientShareLink(quoteData.supabaseId, getClientPortalBaseUrl(), { mode: 'portal' });
+            if (!share || !share.url || share.url.indexOf('token=') < 0) throw new Error('Could not create the client portal link.');
+            setQuoteUrlFromSecureShare(quoteData, share);
+            window._currentQuotePortalUrl = share.url;
+            updateQuotePortalButton(true);
+            return share.url;
+        }
+
+        async function finishQuotePortalAssignment(portal) {
+            var resultEl = document.getElementById('quotePortalAssignResult') || document.getElementById('sendQuoteEmailResult');
+            var portalUrl = await ensureQuotePortalUrl(resultEl, portal);
+            var modalEl = document.getElementById('quotePortalAssignModal');
+            var modal = modalEl ? bootstrap.Modal.getInstance(modalEl) : null;
+            if (modal) modal.hide();
+            var emailResultEl = document.getElementById('sendQuoteEmailResult');
+            if (emailResultEl) emailResultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>Quote added to the client portal.</span>';
+            if (window._resumeQuoteEmailAfterPortal) {
+                resumeQuoteEmailAfterPortal();
+            }
+            return portalUrl;
+        }
+
+        async function assignCurrentQuoteToPortal(portalId) {
+            var btns = document.querySelectorAll('#quotePortalAssignModal button');
+            var resultEl = document.getElementById('quotePortalAssignResult');
+            try {
+                btns.forEach(function(btn) { btn.disabled = true; });
+                if (resultEl) resultEl.innerHTML = '<span class="text-muted"><i class="fas fa-spinner fa-spin me-1"></i>Adding quote to portal...</span>';
+                var portal = (window._quotePortalRegistry || []).find(function(p) { return p.id === portalId; });
+                if (!portal) throw new Error('Choose a portal and try again.');
+                await finishQuotePortalAssignment(portal);
+            } catch(e) {
+                if (resultEl) resultEl.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>' + e.message + '</span>';
+            } finally {
+                btns.forEach(function(btn) { btn.disabled = false; });
+            }
+        }
+
+        async function createPortalForCurrentQuote() {
+            var resultEl = document.getElementById('quotePortalAssignResult');
+            var btn = document.getElementById('quotePortalAssignCreateBtn');
+            var quoteData = getCurrentQuoteDataForPortal();
+            var clientName = document.getElementById('quotePortalAssignClientName')?.value.trim() || quoteData.clientName || 'Client';
+            var clientEmail = document.getElementById('quotePortalAssignClientEmail')?.value.trim() || quoteData.clientEmail || quoteData.email || '';
+            var portalName = document.getElementById('quotePortalAssignPortalName')?.value.trim() || clientName;
+            if (!clientName || !portalName) {
+                if (resultEl) resultEl.innerHTML = '<span class="text-danger">Enter a client and portal name first.</span>';
+                return;
+            }
+            var portal = {
+                id: makeInvoicePortalId(portalName),
+                legacy: false,
+                name: portalName,
+                clientName: clientName,
+                clientEmail: clientEmail,
+                pin: Math.floor(1000 + Math.random() * 9000).toString(),
+                quoteIds: [],
+                rows: []
+            };
+            try {
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Creating...';
+                }
+                await finishQuotePortalAssignment(portal);
+            } catch(e) {
+                if (resultEl) resultEl.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>' + e.message + '</span>';
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-plus me-1"></i>Create Portal & Add';
+                }
+            }
+        }
+
+        function resumeQuoteEmailAfterPortal() {
+            if (!window._resumeQuoteEmailAfterPortal) return;
+            window._resumeQuoteEmailAfterPortal = false;
+            setTimeout(function() {
+                sendQuoteByEmail();
+            }, 50);
+        }
+
+        async function publishCurrentQuoteToPortal() {
+            var resultEl = document.getElementById('sendQuoteEmailResult');
+            var btn = document.getElementById('addQuoteToPortalBtn');
+            try {
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Loading...';
+                }
+                await openQuotePortalAssignment();
+            } catch(e) {
+                if (resultEl) resultEl.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>' + e.message + '</span>';
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    updateQuotePortalButton(!!(window._currentQuoteData && window._currentQuoteData.portal_visible));
+                }
+            }
+        }
+
         async function sendQuoteByEmail() {
             var emailEl = document.getElementById('sendQuoteEmail');
             var msgEl = document.getElementById('sendQuoteMessage');
@@ -8030,7 +8781,31 @@ Example:
             if (!quoteUrl) { resultEl.innerHTML = '<span class="text-danger">No quote link found.</span>'; return; }
 
             // Gather quote info
-            var qData = collectQuoteData();
+            var qData = getCurrentQuoteDataForPortal();
+            var portalUrl = '';
+            if (document.getElementById('quoteAddToPortalEmail')?.checked !== false) {
+                if (!window._currentQuotePortalUrl && !(qData.portal_visible && qData.portal_id)) {
+                    window._resumeQuoteEmailAfterPortal = true;
+                    resultEl.innerHTML = '<span class="text-muted"><i class="fas fa-folder-open me-1"></i>Choose a client portal, then this email will send with the portal link.</span>';
+                    try {
+                        await openQuotePortalAssignment({ resumeQuoteEmailAfterPortal: true });
+                    } catch(e) {}
+                    return;
+                }
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Preparing portal link...';
+                try {
+                    portalUrl = window._currentQuotePortalUrl || await ensureQuotePortalUrl(resultEl);
+                    qData = window._currentQuoteData || qData;
+                    quoteUrl = window._currentQuoteUrl || document.getElementById('interactiveLinkInput')?.value || quoteUrl;
+                } catch(e) {
+                    resultEl.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>' + e.message + '</span>';
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-paper-plane me-1"></i>Send Quote by Email';
+                    await openQuotePortalAssignment({ resumeQuoteEmailAfterPortal: true });
+                    return;
+                }
+            }
             var profile = {};
             try { profile = JSON.parse(localStorage.getItem('ald_business_profile') || '{}'); } catch(e) {}
 
@@ -8057,13 +8832,14 @@ Example:
                         emailSubject: profile.emailSubject || '',
                         emailIntro: profile.emailIntro || '',
                         emailButtonText: profile.emailButtonText || '',
+                        portalUrl: portalUrl,
                         emailReplyTo: profile.emailReplyTo || '',
                         emailFooter: profile.emailFooter || ''
                     })
                 });
                 var data = await res.json();
                 if (data.error) throw new Error(data.error);
-                resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>Quote sent to ' + email + '!</span>';
+                resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>Quote sent to ' + email + '!' + (portalUrl ? ' Portal link included.' : '') + '</span>';
                 if (typeof qdCaptureEvent === 'function') {
                     qdCaptureEvent('quote_sent', {
                         method: 'email',

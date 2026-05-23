@@ -618,6 +618,22 @@
                                             <button class="btn btn-primary btn-sm w-100" onclick="sendQuoteByEmail()" id="sendQuoteEmailBtn">
                                                 <i class="fas fa-paper-plane me-1"></i>Send Quote by Email
                                             </button>
+                                            <div class="form-check mt-2">
+                                                <input class="form-check-input" type="checkbox" id="quoteAddToPortalEmail" checked>
+                                                <label class="form-check-label small" for="quoteAddToPortalEmail">Add to client portal and include portal link in email</label>
+                                            </div>
+                                            <div class="row g-2 mt-2">
+                                                <div class="col-sm-6">
+                                                    <button type="button" class="btn btn-outline-secondary btn-sm w-100" onclick="copyInteractiveLink()" id="copyQuoteLinkBtn">
+                                                        <i class="fas fa-link me-1"></i>Copy Quote Link
+                                                    </button>
+                                                </div>
+                                                <div class="col-sm-6">
+                                                    <button type="button" class="btn btn-outline-primary btn-sm w-100" onclick="publishCurrentQuoteToPortal()" id="addQuoteToPortalBtn">
+                                                        <i class="fas fa-folder-plus me-1"></i>Add to Portal
+                                                    </button>
+                                                </div>
+                                            </div>
                                             <div id="sendQuoteEmailResult" class="mt-2 small"></div>
                                         </div>
                                         <a id="openViewerBtn" href="#" class="btn btn-outline-success w-100" onclick="saveSessionQuote(); window.location.href=this.href; return false;">
@@ -631,6 +647,9 @@
                 }
                 document.getElementById('interactiveLinkInput').value = viewerUrl;
                 document.getElementById('openViewerBtn').href = viewerUrl;
+                window._currentQuoteUrl = viewerUrl;
+                window._currentQuotePortalUrl = '';
+                if (typeof updateQuotePortalButton === 'function') updateQuotePortalButton(!!(window._currentQuoteData && window._currentQuoteData.portal_visible));
                 // Pre-fill client email if available
                 var clientEmail = document.getElementById('clientEmail')?.value.trim();
                 var sendEmailEl = document.getElementById('sendQuoteEmail');
@@ -674,6 +693,8 @@
 
             const supabaseId = result.data.id;
             window._supabaseQuoteId = supabaseId;
+            quoteData.supabaseId = supabaseId;
+            window._currentQuoteData = quoteData;
             localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
 
             const _base = window.location.href.split('?')[0].split('#')[0].replace(/quote-builder(\.html)?\/?$/, '');
@@ -684,6 +705,7 @@
             if (!share || !share.url || share.url.indexOf('token=') < 0) {
                 throw new Error('Could not create the secure client link.');
             }
+            window._currentQuoteUrl = share.url;
             return share.url;
         }
 
