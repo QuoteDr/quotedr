@@ -308,6 +308,11 @@
             background: #0f3460;
             color: #fff;
         }
+        .ai-voice-review-room-header {
+            background: #eaf3ff;
+            border: 1px solid #cfe1f8;
+            color: #0f3460;
+        }
         #estimatorPricingModal .estimator-pricing-row {
             border: 1px solid #e4ebf5;
             border-radius: 10px;
@@ -1471,10 +1476,38 @@ if (location.search.includes('debug')) {
                         <button class="btn btn-outline-secondary btn-sm w-100" type="button" data-bs-toggle="collapse" data-bs-target="#profitReport" aria-expanded="false">
                             <i class="fas fa-chart-line me-1"></i> View Profit Report
                         </button>
+                        <button class="btn btn-outline-secondary btn-sm w-100 mt-2" type="button" onclick="openTimelineReport()">
+                            <i class="fas fa-clock me-1"></i> View Timeline
+                        </button>
                         <div class="collapse mt-2" id="profitReport">
                             <div id="profitReportContent" class="small"></div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Measure from Map Modal -->
+    <div class="modal fade" id="timelineReportModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="fas fa-clock me-2"></i>Timeline Report</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-flex align-items-end gap-2 flex-wrap mb-3">
+                        <div>
+                            <label class="form-label small fw-semibold mb-1" for="timelineHoursPerDay">Working hours per day</label>
+                            <input type="number" min="1" step="0.5" value="8" id="timelineHoursPerDay" class="form-control form-control-sm" style="width:120px;" oninput="updateTimelineReport()">
+                        </div>
+                        <div class="small text-muted">Estimated from saved item labor time and quote quantities.</div>
+                    </div>
+                    <div id="timelineReportContent"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
@@ -2006,7 +2039,7 @@ Example:
                 <div class="modal-header" id="manageItemsTopBar">
                     <h5 class="modal-title"><i class="fas fa-database"></i> Manage Line Items</h5>
                     <button id="undoManageItemsBtn" class="btn btn-sm btn-outline-secondary ms-auto me-2" onclick="undoManageItems()" disabled title="Undo last change"><i class="fas fa-undo me-1"></i>Undo</button>
-                    <button id="hideManageItemsTopBarBtn" type="button" class="btn btn-sm btn-outline-secondary me-2" onclick="toggleManageItemsTopBar(true)" title="Hide the top bar for more editing space"><i class="fas fa-compress-alt me-1"></i>Hide</button>
+                    <button id="hideManageItemsTopBarBtn" type="button" class="btn btn-sm btn-outline-secondary me-2" onclick="toggleManageItemsTopBar(true)" title="Hide the header and item controls for more editing space"><i class="fas fa-compress-alt me-1"></i>Hide</button>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -2076,6 +2109,31 @@ Example:
                             <button onclick="addCustomItem()" class="btn btn-primary w-100">
                                 <i class="fas fa-plus"></i> Add Item
                             </button>
+                        </div>
+                    </div>
+                    <div class="border rounded p-2 mb-3 bg-light">
+                        <div class="small fw-bold text-primary mb-2"><i class="fas fa-clock me-1"></i>Labor Time <span class="text-muted fw-normal">(optional - used for Timeline Report)</span></div>
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-4">
+                                <label class="form-label small mb-1">Time Mode</label>
+                                <select id="newItemLaborMode" class="form-select form-select-sm">
+                                    <option value="">Not set</option>
+                                    <option value="units_per_hour">Units per hour</option>
+                                    <option value="fixed_hours">Fixed hours per item</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small mb-1">Units/hr</label>
+                                <input type="number" id="newItemUnitsPerHour" class="form-control form-control-sm" step="0.01" min="0" placeholder="120">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small mb-1">Hours/item</label>
+                                <input type="number" id="newItemFixedHours" class="form-control form-control-sm" step="0.01" min="0" placeholder="2">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small mb-1">Crew</label>
+                                <input type="number" id="newItemCrewSize" class="form-control form-control-sm" step="1" min="1" value="1">
+                            </div>
                         </div>
                     </div>
                     </div>
@@ -2219,6 +2277,38 @@ Example:
         function formatQuoteQuantityDisplay(quantity, unit) {
             if (typeof qdFormatQuantity === 'function') return qdFormatQuantity(quantity, unit);
             return (parseFloat(quantity) || 0).toLocaleString() + (unit ? ' ' + unit : '');
+        }
+
+        function normalizeLaborTime(laborTime) {
+            var source = laborTime || {};
+            var mode = source.mode === 'fixed_hours' ? 'fixed_hours' : (source.mode === 'units_per_hour' ? 'units_per_hour' : '');
+            return {
+                mode: mode,
+                unitsPerHour: parseFloat(source.unitsPerHour || source.units_per_hour || 0) || 0,
+                fixedHours: parseFloat(source.fixedHours || source.fixed_hours || 0) || 0,
+                crewSize: Math.max(1, parseFloat(source.crewSize || source.crew_size || 1) || 1)
+            };
+        }
+
+        function estimateItemLaborHours(item) {
+            if (!item || item._removed) return 0;
+            var labor = normalizeLaborTime(item.laborTime);
+            var quantity = parseFloat(item.quantity) || 0;
+            var crewSize = Math.max(1, parseFloat(labor.crewSize) || 1);
+            if (labor.mode === 'units_per_hour' && labor.unitsPerHour > 0) {
+                return quantity / labor.unitsPerHour / crewSize;
+            }
+            if (labor.mode === 'fixed_hours' && labor.fixedHours > 0) {
+                return quantity * labor.fixedHours / crewSize;
+            }
+            return 0;
+        }
+
+        function formatLaborHours(hours) {
+            var value = parseFloat(hours) || 0;
+            if (value <= 0) return '0 hrs';
+            if (value < 1) return Math.round(value * 60) + ' min';
+            return (Math.round(value * 10) / 10).toLocaleString() + ' hrs';
         }
 
         function updateMeasurementUnitLabels() {
@@ -3961,6 +4051,7 @@ Example:
                     item.notes = notes;
                     item.materialCost = materialCost;
                     item.supplierUrl = document.getElementById('supplierLinkBtn')?.href !== '#' ? document.getElementById('supplierLinkBtn')?.href : '';
+                    item.laborTime = normalizeLaborTime(item.laborTime);
                     item.total = quantity * rate;
                     coRefreshItemDelta(item);
                 } else {
@@ -3983,6 +4074,7 @@ Example:
                         upgraded: false,
                         optional: false,
                         itemDescription: dbItem?.itemDescription || '',
+                        laborTime: normalizeLaborTime(dbItem?.laborTime),
                         total: quantity * rate
                     };
                     const itemsToAdd = await autoGroupQuoteItem(newItem, rooms[roomIndex]);
@@ -4136,6 +4228,7 @@ Example:
                 item.rate = item.upgrade.rate;
                 if (item.upgrade.unitType || item.upgrade.unit) item.unitType = item.upgrade.unitType || item.upgrade.unit;
                 if (item.upgrade.supplierUrl) item.supplierUrl = item.upgrade.supplierUrl;
+                if (item.upgrade.laborTime) item.laborTime = normalizeLaborTime(item.upgrade.laborTime);
                 var upgradeMaterialCost = item.upgrade.materialCost !== undefined ? item.upgrade.materialCost : item.upgrade.material_cost;
                 if (upgradeMaterialCost !== undefined) {
                     item.materialCost = parseFloat(upgradeMaterialCost) || 0;
@@ -4146,6 +4239,7 @@ Example:
                 if (item._baseUnitType !== undefined) item.unitType = item._baseUnitType;
                 if (item._baseSupplierUrl !== undefined) item.supplierUrl = item._baseSupplierUrl;
             }
+            item.laborTime = normalizeLaborTime(item.upgraded && item.upgrade && item.upgrade.laborTime ? item.upgrade.laborTime : item.laborTime);
             item.total = item.quantity * item.rate;
             renderRooms();
             calculateTotals();
@@ -4167,6 +4261,7 @@ Example:
                 supplierUrl: item.supplierUrl || '',
                 photo: item.photo || '',
                 itemDescription: item.itemDescription || item.description || '',
+                laborTime: normalizeLaborTime(item.laborTime),
                 quantityMode: item.quantityMode || 'inherit',
                 quantityOverride: item.quantityOverride || ''
             };
@@ -4205,9 +4300,11 @@ Example:
                 item.materialCost = parseFloat(option.materialCost) || 0;
                 item.supplierUrl = option.supplierUrl || item.supplierUrl || '';
                 item.itemDescription = option.itemDescription || option.description || item.itemDescription || '';
+                item.laborTime = normalizeLaborTime(option.laborTime || item.laborTime);
             } else {
                 item.description = group.name || item.description || 'Option Group';
                 item.rate = selectedRate;
+                item.laborTime = normalizeLaborTime(item.laborTime);
             }
             item.choiceGroup.selectedOptionIds = selectedOptions.map(function(option) { return option.id; });
             return item;
@@ -4540,6 +4637,7 @@ Example:
                 upgraded: false,
                 optional: false,
                 itemDescription: item.itemDescription || '',
+                laborTime: normalizeLaborTime(item.laborTime || first.laborTime),
                 total: 0,
                 choiceGroup: template
             };
@@ -4572,6 +4670,7 @@ Example:
                 total: total,
                 itemDescription: item && item.itemDescription || '',
                 notes: item && item.notes || '',
+                laborTime: normalizeLaborTime(item && item.laborTime),
                 optional: false,
                 upgrade: false
             };
@@ -4731,12 +4830,36 @@ Example:
             }).join('');
         }
 
+        function _aiVoiceParsedRoomsListHtml(preparedRooms) {
+            return (preparedRooms || []).map(function(room, index) {
+                var name = (room && room.name) || ('Room ' + (index + 1));
+                var count = Array.isArray(room && room.items) ? room.items.length : 0;
+                return ''
+                    + '<div class="border rounded p-2 mb-2 bg-light" data-ai-parsed-room-card="' + index + '">'
+                    + '<label class="form-label small fw-semibold mb-1" for="aiVoiceParsedRoomName' + index + '">Parsed room ' + (index + 1) + '</label>'
+                    + '<input id="aiVoiceParsedRoomName' + index + '" class="form-control form-control-sm" data-ai-parsed-room-name="' + index + '" value="' + qdTemplateEscapeHtml(name) + '">'
+                    + '<div class="small text-muted mt-1">' + count + ' item' + (count === 1 ? '' : 's') + ' from this room break</div>'
+                    + '</div>';
+            }).join('');
+        }
+
         function openAiVoiceDestinationModal(preparedRooms) {
             return new Promise(function(resolve) {
                 var existing = document.getElementById('aiVoiceDestinationModal');
                 if (existing) existing.remove();
                 var hasRooms = Array.isArray(rooms) && rooms.length > 0;
+                var parsedRoomCount = Array.isArray(preparedRooms) ? preparedRooms.length : 0;
+                var hasParsedRooms = parsedRoomCount > 1;
                 var suggestedName = (preparedRooms && preparedRooms[0] && preparedRooms[0].name) || 'AI Voice Room';
+                var defaultMode = hasParsedRooms ? 'parsed' : (hasRooms ? 'existing' : 'new');
+                var parsedRoomsHtml = hasParsedRooms
+                    ? '<div class="form-check border rounded p-3 mb-2">'
+                        + '<input class="form-check-input" type="radio" name="aiVoiceDestinationMode" id="aiVoiceDestinationParsed" value="parsed"' + (defaultMode === 'parsed' ? ' checked' : '') + '>'
+                        + '<label class="form-check-label fw-semibold" for="aiVoiceDestinationParsed">Create the parsed rooms</label>'
+                        + '<div class="small text-muted mt-1 mb-2">QuoteDr heard ' + parsedRoomCount + ' room breaks. Rename any room before adding.</div>'
+                        + '<div id="aiVoiceParsedRoomsList">' + _aiVoiceParsedRoomsListHtml(preparedRooms) + '</div>'
+                    + '</div>'
+                    : '';
                 var modalHtml = ''
                     + '<div class="modal fade" id="aiVoiceDestinationModal" tabindex="-1" aria-hidden="true">'
                     + '<div class="modal-dialog modal-dialog-centered">'
@@ -4747,14 +4870,15 @@ Example:
                     + '</div>'
                     + '<div class="modal-body">'
                     + '<div class="alert alert-light border small mb-3">Nothing will be changed until you choose a destination. Closing this window cancels the AI Voice result.</div>'
+                    + parsedRoomsHtml
                     + '<div class="form-check border rounded p-3 mb-2' + (hasRooms ? '' : ' opacity-50') + '">'
-                    + '<input class="form-check-input" type="radio" name="aiVoiceDestinationMode" id="aiVoiceDestinationExisting" value="existing"' + (hasRooms ? ' checked' : ' disabled') + '>'
-                    + '<label class="form-check-label fw-semibold" for="aiVoiceDestinationExisting">Add to room</label>'
+                    + '<input class="form-check-input" type="radio" name="aiVoiceDestinationMode" id="aiVoiceDestinationExisting" value="existing"' + (defaultMode === 'existing' && hasRooms ? ' checked' : '') + (hasRooms ? '' : ' disabled') + '>'
+                    + '<label class="form-check-label fw-semibold" for="aiVoiceDestinationExisting">Add everything to one room</label>'
                     + '<select id="aiVoiceDestinationRoom" class="form-select form-select-sm mt-2" ' + (hasRooms ? '' : 'disabled') + '>' + _aiVoiceDestinationRoomOptions() + '</select>'
                     + '</div>'
                     + '<div class="form-check border rounded p-3">'
-                    + '<input class="form-check-input" type="radio" name="aiVoiceDestinationMode" id="aiVoiceDestinationNew" value="new"' + (hasRooms ? '' : ' checked') + '>'
-                    + '<label class="form-check-label fw-semibold" for="aiVoiceDestinationNew">Create new room</label>'
+                    + '<input class="form-check-input" type="radio" name="aiVoiceDestinationMode" id="aiVoiceDestinationNew" value="new"' + (defaultMode === 'new' ? ' checked' : '') + '>'
+                    + '<label class="form-check-label fw-semibold" for="aiVoiceDestinationNew">Create one new room</label>'
                     + '<input id="aiVoiceDestinationNewName" class="form-control form-control-sm mt-2" placeholder="Room name..." value="' + qdTemplateEscapeHtml(suggestedName) + '">'
                     + '</div>'
                     + '</div>'
@@ -4797,6 +4921,15 @@ Example:
                     return;
                 }
                 destination = { mode: 'new', roomName: roomName };
+            } else if (mode === 'parsed') {
+                var roomNames = Array.from(document.querySelectorAll('[data-ai-parsed-room-name]')).map(function(input) {
+                    return (input.value || '').trim();
+                });
+                if (!roomNames.length || roomNames.some(function(name) { return !name; })) {
+                    qdAlert('Name each parsed room before adding the AI Voice items.');
+                    return;
+                }
+                destination = { mode: 'parsed', roomNames: roomNames };
             }
             if (!destination) return;
             modalEl._aiVoiceDestinationAccepted = true;
@@ -4828,6 +4961,7 @@ Example:
                 materialCost: parseFloat(option.materialCost) || 0,
                 supplierUrl: option.supplierUrl || '',
                 itemDescription: option.itemDescription || option.description || '',
+                laborTime: normalizeLaborTime(option.laborTime || groupedItem.laborTime),
                 notes: groupedItem.notes || '',
                 optional: false,
                 upgrade: null,
@@ -5994,6 +6128,66 @@ Example:
             if (totalMaterialCost === 0) html += '<p class="text-muted mt-2 mb-0" style="font-size:0.8rem;"><i class="fas fa-info-circle me-1"></i>Add material costs to line items for accurate profit tracking.</p>';
             html += '</div>';
             content.innerHTML = html;
+        }
+
+        function buildTimelineReportHtml() {
+            var hoursPerDayEl = document.getElementById('timelineHoursPerDay');
+            var hoursPerDay = Math.max(1, parseFloat(hoursPerDayEl && hoursPerDayEl.value) || 8);
+            var totalHours = 0;
+            var missingCount = 0;
+            var roomHtml = '';
+            rooms.forEach(function(room) {
+                var roomHours = 0;
+                var itemHtml = '';
+                (room.items || []).forEach(function(item) {
+                    if (item._removed) return;
+                    var hours = estimateItemLaborHours(item);
+                    if (hours > 0) {
+                        roomHours += hours;
+                        itemHtml += '<div class="d-flex justify-content-between border-bottom py-1 gap-3">'
+                            + '<span>' + qdTemplateEscapeHtml(item.description || item.serviceName || 'Line item') + '<small class="text-muted d-block">' + qdTemplateEscapeHtml(formatQuoteQuantityDisplay(item.quantity || 0, item.unitType || item.unit || '')) + '</small></span>'
+                            + '<strong class="text-nowrap">' + formatLaborHours(hours) + '</strong>'
+                            + '</div>';
+                    } else {
+                        missingCount++;
+                    }
+                });
+                totalHours += roomHours;
+                if (roomHours > 0) {
+                    roomHtml += '<div class="border rounded p-3 mb-3 bg-light">'
+                        + '<div class="d-flex justify-content-between align-items-center mb-2">'
+                        + '<strong>' + qdTemplateEscapeHtml(room.name || 'Room') + '</strong>'
+                        + '<span class="badge bg-primary">' + formatLaborHours(roomHours) + '</span>'
+                        + '</div>'
+                        + itemHtml
+                        + '</div>';
+                }
+            });
+            var days = totalHours / hoursPerDay;
+            var html = '<div class="card border-0 bg-light p-3 mb-3">'
+                + '<div class="fw-bold mb-2"><i class="fas fa-business-time me-1"></i>Job Timeline Summary</div>'
+                + '<div class="d-flex justify-content-between"><span class="text-muted">Estimated labor</span><strong>' + formatLaborHours(totalHours) + '</strong></div>'
+                + '<div class="d-flex justify-content-between"><span class="text-muted">Estimated working days</span><strong>' + (Math.round(days * 10) / 10).toLocaleString() + ' days</strong></div>'
+                + '</div>';
+            if (roomHtml) html += roomHtml;
+            if (totalHours <= 0) {
+                html += '<div class="alert alert-light border mb-0">No timeline data yet. Add Labor Time to saved line items in Manage Items, then add those items to the quote.</div>';
+            } else if (missingCount > 0) {
+                html += '<div class="alert alert-warning small mb-0"><i class="fas fa-info-circle me-1"></i>' + missingCount + ' quote item' + (missingCount === 1 ? '' : 's') + ' do not have labor time yet, so this estimate may be low.</div>';
+            }
+            return html;
+        }
+
+        function updateTimelineReport() {
+            var content = document.getElementById('timelineReportContent');
+            if (!content) return;
+            content.innerHTML = buildTimelineReportHtml();
+        }
+
+        function openTimelineReport() {
+            updateTimelineReport();
+            var modalEl = document.getElementById('timelineReportModal');
+            if (modalEl && window.bootstrap) new bootstrap.Modal(modalEl).show();
         }
 
         function calculateMaterialTotal() {
@@ -8478,6 +8672,7 @@ Example:
                     unitType: item.unitType || item.unit || 'ls',
                     rate: parseFloat(item.rate || item.price || 0) || 0,
                     itemDescription: item.itemDescription || '',
+                    laborTime: normalizeLaborTime(item.laborTime),
                     notes: item.notes || ''
                 });
             }
@@ -8571,6 +8766,25 @@ Example:
             return _voicePhraseKey(category + ' ' + name + ' ' + qty + ' ' + unit);
         }
 
+        function _voiceReviewRoomHeader(row) {
+            var roomName = row && row.roomName ? row.roomName : ('Room ' + ((row && row.roomIndex !== undefined ? row.roomIndex : 0) + 1));
+            var roomRows = _voiceReviewRows.filter(function(candidate) { return candidate.roomIndex === row.roomIndex; });
+            var itemCount = roomRows.length;
+            return ''
+                + '<div class="ai-voice-review-room-header d-flex justify-content-between align-items-center rounded px-3 py-2 mb-2 mt-3">'
+                + '<div class="fw-bold"><i class="fas fa-door-open me-2"></i>' + _escapeHtml(roomName) + '</div>'
+                + '<span class="badge bg-light text-dark border">' + itemCount + ' item' + (itemCount === 1 ? '' : 's') + '</span>'
+                + '</div>';
+        }
+
+        function _voiceReviewDisplayRate(row) {
+            var itemRate = parseFloat(row && row.item && row.item.rate);
+            if (isFinite(itemRate) && itemRate > 0) return itemRate;
+            var matched = row ? (row.mapping || row.selected || row.exact || null) : null;
+            var matchedRate = parseFloat(matched && (matched.mapped_price !== undefined ? matched.mapped_price : matched.rate));
+            return isFinite(matchedRate) && matchedRate > 0 ? matchedRate : (isFinite(itemRate) ? itemRate : 0);
+        }
+
         function _applyVoiceMappedItem(item, mapped) {
             var rate = parseFloat(mapped.mapped_price !== undefined ? mapped.mapped_price : mapped.rate) || 0;
             var unit = mapped.mapped_unit || mapped.unitType || mapped.unit || 'ls';
@@ -8584,7 +8798,37 @@ Example:
             item.rate = rate;
             item.total = (parseFloat(item.quantity) || 1) * rate;
             item.itemDescription = mapped.itemDescription || (savedItem && savedItem.itemDescription) || item.itemDescription || '';
+            item.laborTime = normalizeLaborTime(mapped.laborTime || (savedItem && savedItem.laborTime));
             if (mapped.user_note && !item.notes) item.notes = mapped.user_note;
+            return item;
+        }
+
+        function _voiceIsGenericFallbackUnit(unit) {
+            var normalized = String(unit || '').trim().toLowerCase();
+            return !normalized || normalized === 'ls' || normalized === 'l/s' || normalized === 'lump sum';
+        }
+
+        function _repairAiTradeRuleReviewItem(item, matchedItem) {
+            if (!item || !item.aiTradeRuleId || !matchedItem) return item;
+            var matchedRate = parseFloat(matchedItem.mapped_price !== undefined ? matchedItem.mapped_price : matchedItem.rate);
+            var currentRate = parseFloat(item.rate);
+            if ((!isFinite(currentRate) || currentRate <= 0) && isFinite(matchedRate) && matchedRate > 0) {
+                item.rate = matchedRate;
+            }
+            var matchedUnit = matchedItem.mapped_unit || matchedItem.unitType || matchedItem.unit || '';
+            if (matchedUnit && _voiceIsGenericFallbackUnit(item.unit || item.unitType)) {
+                item.unit = matchedUnit;
+                item.unitType = matchedUnit;
+            }
+            var matchedCategory = matchedItem.mapped_item_category || matchedItem.category || '';
+            if (matchedCategory && (!item.category || String(item.category).toLowerCase() === 'miscellaneous')) {
+                item.category = matchedCategory;
+            }
+            var savedItem = _findVoiceSavedItemForMapped(matchedItem);
+            var savedDescription = matchedItem.itemDescription || (savedItem && savedItem.itemDescription) || '';
+            if (savedDescription && !item.itemDescription) item.itemDescription = savedDescription;
+            item.laborTime = normalizeLaborTime(matchedItem.laborTime || (savedItem && savedItem.laborTime) || item.laborTime);
+            item.total = _voiceRoundQuantity((parseFloat(item.quantity) || 1) * (parseFloat(item.rate) || 0));
             return item;
         }
 
@@ -8704,9 +8948,61 @@ Example:
             var numbers = {
                 one: 1, two: 2, three: 3, four: 4, five: 5,
                 six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
-                eleven: 11, twelve: 12
+                eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15,
+                sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20
             };
             return numbers[String(value || '').toLowerCase()] || null;
+        }
+
+        function _voiceNumberFromToken(value) {
+            var parsed = parseFloat(value);
+            if (isFinite(parsed)) return parsed;
+            return _voiceWordNumber(value);
+        }
+
+        function _voiceMeasurementFamily(unit) {
+            var normalized = String(unit || '').trim().toLowerCase();
+            if (normalized.indexOf('sq') >= 0 || normalized === 'sf' || normalized.indexOf('square') >= 0) return 'area';
+            if (normalized === 'lf' || normalized.indexOf('linear') >= 0 || normalized.indexOf('lineal') >= 0) return 'linear';
+            return '';
+        }
+
+        function _extractVoiceExplicitMeasurement(item) {
+            if (!item || item.aiTradeRuleId) return null;
+            var family = _voiceMeasurementFamily(item.unit || item.unitType);
+            if (!family) return null;
+            var numberPattern = '(\\d+(?:\\.\\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)';
+            var unitPattern = family === 'area'
+                ? '(?:sq\\.?\\s*ft\\.?|sqft|sf|square\\s*(?:feet|foot|ft))'
+                : '(?:lf|l\\.f\\.|linear\\s*(?:feet|foot|ft)|lineal\\s*(?:feet|foot|ft))';
+            var preferred = new RegExp('=\\s*' + numberPattern + '\\s*' + unitPattern + '\\b', 'i');
+            var ordinary = new RegExp('\\b' + numberPattern + '\\s*' + unitPattern + '\\b', 'i');
+            var texts = [item.spokenPhrase || '', item.calculation || ''];
+            for (var t = 0; t < texts.length; t++) {
+                var text = String(texts[t] || '');
+                var match = text.match(preferred) || text.match(ordinary);
+                if (!match) continue;
+                var quantity = _voiceNumberFromToken(match[1]);
+                if (isFinite(quantity) && quantity >= 0) {
+                    return { quantity: _voiceRoundQuantity(quantity), unit: family === 'area' ? 'sq ft' : 'LF' };
+                }
+            }
+            return null;
+        }
+
+        function _reconcileVoiceExplicitMeasurementQuantity(item) {
+            var explicit = _extractVoiceExplicitMeasurement(item);
+            if (!explicit) return item;
+            var current = parseFloat(item.quantity);
+            if (!isFinite(current) || Math.abs(current - explicit.quantity) > 0.001) {
+                item.quantity = explicit.quantity;
+                if (_voiceIsGenericFallbackUnit(item.unit || item.unitType)) {
+                    item.unit = explicit.unit;
+                    item.unitType = explicit.unit;
+                }
+                item.total = _voiceRoundQuantity(explicit.quantity * (parseFloat(item.rate || item.price || 0) || 0));
+            }
+            return item;
         }
 
         function _extractVoiceRuleCount(rule, transcript) {
@@ -8766,6 +9062,7 @@ Example:
                     ? calculationLabel + 'fixed ' + quantity + ' ' + unit
                     : calculationLabel + eachQty + ' ' + unit + ' x ' + count + ' ' + (rule.count_unit_label || 'count') + ' = ' + quantity + ' ' + unit,
                 itemDescription: (savedItem && savedItem.itemDescription) || '',
+                laborTime: normalizeLaborTime((savedItem && savedItem.laborTime) || rule.laborTime),
                 notes: rule.user_note || '',
                 aiTradeRuleId: rule.id,
                 aiTradeRuleAnswer: answerLabel || ''
@@ -8917,12 +9214,23 @@ Example:
             room.items.forEach(function(item) {
                 if (!_isWallPaintVoiceItem(item)) return;
                 item.quantity = wallArea;
-                item.unit = item.unit || 'sqft';
-                item.unitType = item.unitType || item.unit || 'sqft';
+                if (_voiceIsGenericFallbackUnit(item.unit || item.unitType)) {
+                    item.unit = 'sq ft';
+                    item.unitType = 'sq ft';
+                } else {
+                    item.unit = item.unit || 'sq ft';
+                    item.unitType = item.unitType || item.unit || 'sq ft';
+                }
                 item.calculation = 'Wall paint sqft = perimeter x height = (' + length + '+' + width + ')x2x' + parsedHeight + ' = ' + wallArea + ' sqft';
                 item.needsMeasurement = undefined;
                 item.total = _voiceRoundQuantity((parseFloat(item.rate) || 0) * wallArea);
             });
+        }
+
+        function _voiceHeightInputToFeet(value, unit) {
+            var parsed = parseFloat(value);
+            if (!isFinite(parsed) || parsed <= 0) return NaN;
+            return unit === 'in' ? _voiceRoundQuantity(parsed / 12) : parsed;
         }
 
         function showAiVoiceMeasurementModal(result) {
@@ -8946,8 +9254,19 @@ Example:
                     card.innerHTML = ''
                         + '<div class="fw-semibold mb-1">' + _escapeHtml(entry.room.name || ('Room ' + (entry.roomIndex + 1))) + '</div>'
                         + '<div class="small text-muted mb-2">I heard ' + _escapeHtml(dims.length) + ' ft x ' + _escapeHtml(dims.width) + ' ft and need the ceiling height to calculate wall paint.</div>'
-                        + '<label class="form-label small fw-semibold" for="aiVoiceHeightInput' + index + '">Ceiling height (ft)</label>'
-                        + '<input type="number" min="1" step="0.25" class="form-control ai-voice-height-input" id="aiVoiceHeightInput' + index + '" data-room-index="' + entry.roomIndex + '" value="' + _escapeHtml(dims.height || 8) + '">';
+                        + '<div class="row g-2 align-items-end">'
+                        + '<div class="col-7">'
+                        + '<label class="form-label small fw-semibold" for="aiVoiceHeightInput' + index + '">Ceiling height</label>'
+                        + '<input type="number" min="1" step="0.25" class="form-control ai-voice-height-input" id="aiVoiceHeightInput' + index + '" data-room-index="' + entry.roomIndex + '" value="' + _escapeHtml(dims.height || 8) + '">'
+                        + '</div>'
+                        + '<div class="col-5">'
+                        + '<label class="form-label small fw-semibold" for="aiVoiceHeightUnit' + index + '">Ceiling height unit</label>'
+                        + '<select class="form-select ai-voice-height-unit" id="aiVoiceHeightUnit' + index + '" data-room-index="' + entry.roomIndex + '">'
+                        + '<option value="ft" selected>Feet</option>'
+                        + '<option value="in">Inches</option>'
+                        + '</select>'
+                        + '</div>'
+                        + '</div>';
                     list.appendChild(card);
                 });
                 var modalEl = document.getElementById('aiVoiceMeasurementModal');
@@ -8964,7 +9283,8 @@ Example:
             var result = _voiceMeasurementResult;
             document.querySelectorAll('.ai-voice-height-input').forEach(function(input) {
                 var roomIndex = parseInt(input.getAttribute('data-room-index'), 10);
-                var height = parseFloat(input.value);
+                var unitEl = document.querySelector('.ai-voice-height-unit[data-room-index="' + roomIndex + '"]');
+                var height = _voiceHeightInputToFeet(input.value, unitEl ? unitEl.value : 'ft');
                 if (!result || !result.rooms || !result.rooms[roomIndex] || !isFinite(height) || height <= 0) return;
                 _recalculateVoiceRoomWallPaint(result.rooms[roomIndex], height);
             });
@@ -9618,6 +9938,7 @@ Example:
             });
             (result.rooms || []).forEach(function(aiRoom, roomIndex) {
                 (aiRoom.items || []).forEach(function(item, itemIndex) {
+                    _reconcileVoiceExplicitMeasurementQuantity(item);
                     var phrase = item.spokenPhrase || item.description || '';
                     var phraseKey = _voicePhraseKey(phrase);
                     var mapping = mappingByPhrase[phraseKey] || null;
@@ -9626,8 +9947,10 @@ Example:
                     var requiresChoice = familyItems.length > 1;
                     var similar = mapping ? [] : (requiresChoice ? familyItems : _findSimilarVoiceItems(phrase || item.description || ''));
                     var selected = mapping || exact || (requiresChoice ? null : similar[0]) || null;
+                    if (item && item.aiTradeRuleId) _repairAiTradeRuleReviewItem(item, selected);
                     var row = {
                         roomIndex: roomIndex,
+                        roomName: aiRoom && aiRoom.name ? aiRoom.name : ('Room ' + (roomIndex + 1)),
                         itemIndex: itemIndex,
                         item: item,
                         phrase: phrase,
@@ -9647,24 +9970,26 @@ Example:
                     rows.push(row);
                 });
             });
-            var seenKeys = {};
+            var seenKeysByRoom = {};
             rows.forEach(function(row, index) {
                 if (row.item && row.item.aiTradeRuleId) return;
                 var duplicateKey = _voiceReviewDuplicateKey(row);
                 if (!duplicateKey) return;
-                if (seenKeys[duplicateKey] !== undefined) {
-                    row.duplicateOf = seenKeys[duplicateKey];
+                var roomKey = String(row.roomIndex);
+                seenKeysByRoom[roomKey] = seenKeysByRoom[roomKey] || {};
+                if (seenKeysByRoom[roomKey][duplicateKey] !== undefined) {
+                    row.duplicateOf = seenKeysByRoom[roomKey][duplicateKey];
                     var conf = _voiceReviewConfidence(row);
                     row.confidence = conf.label;
                     row.confidenceScore = conf.score;
                     row.confidenceReason = conf.reason;
                     row.sortRank = conf.rank;
                 } else {
-                    seenKeys[duplicateKey] = index;
+                    seenKeysByRoom[roomKey][duplicateKey] = index;
                 }
             });
             rows.sort(function(a, b) {
-                return a.sortRank - b.sortRank || a.originalIndex - b.originalIndex;
+                return a.roomIndex - b.roomIndex || a.sortRank - b.sortRank || a.originalIndex - b.originalIndex;
             });
             return rows;
         }
@@ -9692,13 +10017,14 @@ Example:
                 var item = row.item;
                 var selectedText = row.mapping ? _voiceMappingDisplay(row.mapping) : _voiceItemDisplay(row.selected);
                 var calculation = item.calculation ? '<div class="small text-muted mt-1">' + _escapeHtml(item.calculation) + '</div>' : '';
+                var displayRate = _voiceReviewDisplayRate(row);
                 var badgeClass = row.duplicateOf !== undefined ? 'bg-secondary' : (row.sortRank >= 2 ? 'bg-success' : (row.mapping ? 'bg-info text-dark' : 'bg-warning text-dark'));
                 var includeChecked = row.duplicateOf !== undefined ? '' : 'checked';
                 var helper = '';
                 if (row.requiresChoice) {
                     helper = '<div class="alert alert-warning py-2 px-3 small mt-2 mb-0">You have multiple saved items for this kind of work. Choose the right one, or check Remember this phrase so QuoteDr stops asking for this wording.</div>';
                 } else if (row.duplicateOf !== undefined) {
-                    helper = '<div class="alert alert-secondary py-2 px-3 small mt-2 mb-0">Possible duplicate of another reviewed item. It is unchecked by default, but you can add it if this is separate work.</div>';
+                    helper = '<div class="alert alert-secondary py-2 px-3 small mt-2 mb-0">Possible duplicate inside this same parsed room. It is unchecked by default, but you can add it if this is separate work.</div>';
                 } else if (row.confidenceReason) {
                     helper = '<div class="small text-muted mt-1">' + _escapeHtml(row.confidenceReason) + '</div>';
                 }
@@ -9709,6 +10035,10 @@ Example:
                             return '<button type="button" class="btn btn-outline-secondary btn-sm ai-voice-suggestion" data-row-index="' + index + '" data-value="' + _escapeHtml(_voiceItemDisplay(match)) + '">' + _escapeHtml(match.name || match.description || 'Item') + '</button>';
                         }).join('')
                         + '</div>';
+                }
+                var previousRow = index > 0 ? _voiceReviewRows[index - 1] : null;
+                if (!previousRow || previousRow.roomIndex !== row.roomIndex) {
+                    list.insertAdjacentHTML('beforeend', _voiceReviewRoomHeader(row));
                 }
                 var card = document.createElement('div');
                 card.className = 'border rounded p-3 mb-3 ai-voice-review-card' + (row.duplicateOf !== undefined ? ' bg-light' : '');
@@ -9722,7 +10052,7 @@ Example:
                     + '</div>'
                     + '<div class="small text-muted">What AI heard</div><div class="fw-semibold mb-2">"' + _escapeHtml(row.phrase || item.description || 'Item') + '"</div>'
                     + '<div class="small text-muted">AI parsed</div>'
-                    + '<div class="mb-2">' + _escapeHtml(item.description || 'Item') + ' - ' + _escapeHtml(formatQuoteQuantityDisplay(item.quantity || 1, item.unit || item.unitType || 'ls')) + ' @ $' + (parseFloat(item.rate || 0) || 0).toFixed(2) + calculation + '</div>'
+                    + '<div class="mb-2">' + _escapeHtml(item.description || 'Item') + ' - ' + _escapeHtml(formatQuoteQuantityDisplay(item.quantity || 1, item.unit || item.unitType || 'ls')) + ' @ $' + displayRate.toFixed(2) + calculation + '</div>'
                     + '<div class="row g-2 mb-2">'
                     + '<div class="col-6 col-md-4">'
                     + '<label class="form-label small fw-semibold" for="aiVoiceReviewQuantity' + index + '">Quantity</label>'
@@ -10000,6 +10330,33 @@ Example:
             }
         }
 
+        async function _addPreparedAiVoiceRoomItems(aiRoom, targetRoom, aiAutoGroupDecision, aiRoomIndex) {
+            if (!aiRoom || !targetRoom || !Array.isArray(aiRoom.items)) return;
+            if (!Array.isArray(targetRoom.items)) targetRoom.items = [];
+            for (let aiItemIndex = 0; aiItemIndex < aiRoom.items.length; aiItemIndex++) {
+                var aiLineItem = aiRoom.items[aiItemIndex];
+                var aiItemsToAdd = await resolveAiVoiceAutoGroupedItems(aiLineItem, aiAutoGroupDecision, aiRoomIndex, aiItemIndex);
+                aiItemsToAdd.forEach(function(itemToAdd) {
+                    targetRoom.items.push(itemToAdd);
+                });
+            }
+        }
+
+        function _createAiVoiceQuoteRoom(roomName, scopeNotes) {
+            roomCounter++;
+            var defaultColour = (typeof getDefaultRoomColour === 'function') ? getDefaultRoomColour(roomCounter) : { colorIndex: (roomCounter - 1) % ROOM_COLORS.length };
+            return {
+                id: roomCounter,
+                name: roomName || 'Room ' + roomCounter,
+                colorIndex: defaultColour.colorIndex !== undefined ? defaultColour.colorIndex : (roomCounter - 1) % ROOM_COLORS.length,
+                customColor: defaultColour.customColor || '',
+                colorIntensity: defaultColour.colorIntensity,
+                scopeNotes: scopeNotes || '',
+                items: [],
+                autoGroupingEnabled: getDefaultRoomAutoGroupingEnabled()
+            };
+        }
+
         async function applyAIQuote(result) {
             if (!result.rooms || !Array.isArray(result.rooms)) {
                 qdAlert('AI could not parse the quote. Please try again with more detail.');
@@ -10013,7 +10370,15 @@ Example:
             }
             var aiAutoGroupDecision = await prepareAiVoiceAutoGroupingDecision(preparedAiRooms);
             var targetRoom = null;
-            if (destination.mode === 'existing') {
+            if (destination.mode === 'parsed') {
+                for (let parsedRoomIndex = 0; parsedRoomIndex < preparedAiRooms.length; parsedRoomIndex++) {
+                    const parsedAiRoom = preparedAiRooms[parsedRoomIndex];
+                    var parsedRoomName = (destination.roomNames && destination.roomNames[parsedRoomIndex]) || parsedAiRoom.name || ('Room ' + (parsedRoomIndex + 1));
+                    var parsedTargetRoom = _createAiVoiceQuoteRoom(parsedRoomName, parsedAiRoom.scopeNotes || '');
+                    rooms.push(parsedTargetRoom);
+                    await _addPreparedAiVoiceRoomItems(parsedAiRoom, parsedTargetRoom, aiAutoGroupDecision, parsedRoomIndex);
+                }
+            } else if (destination.mode === 'existing') {
                 targetRoom = rooms.find(function(room) { return room.id === destination.roomId; });
                 if (!targetRoom) {
                     qdAlert('That room is no longer available. Nothing was added.');
@@ -10023,27 +10388,13 @@ Example:
                 var combinedNotes = _combinedAiVoiceScopeNotes(preparedAiRooms);
                 if (combinedNotes) targetRoom.scopeNotes = [targetRoom.scopeNotes || '', combinedNotes].filter(function(note) { return String(note || '').trim(); }).join('\n\n');
             } else {
-                roomCounter++;
-                targetRoom = {
-                    id: roomCounter,
-                    name: destination.roomName || 'Room ' + roomCounter,
-                    colorIndex: (roomCounter - 1) % ROOM_COLORS.length,
-                    scopeNotes: _combinedAiVoiceScopeNotes(preparedAiRooms),
-                    items: [],
-                    autoGroupingEnabled: getDefaultRoomAutoGroupingEnabled()
-                };
+                targetRoom = _createAiVoiceQuoteRoom(destination.roomName || 'AI Voice Room', _combinedAiVoiceScopeNotes(preparedAiRooms));
                 rooms.push(targetRoom);
             }
-            for (let aiRoomIndex = 0; aiRoomIndex < preparedAiRooms.length; aiRoomIndex++) {
-                const aiRoom = preparedAiRooms[aiRoomIndex];
-                if (aiRoom.items && Array.isArray(aiRoom.items)) {
-                    for (let aiItemIndex = 0; aiItemIndex < aiRoom.items.length; aiItemIndex++) {
-                        var aiLineItem = aiRoom.items[aiItemIndex];
-                        var aiItemsToAdd = await resolveAiVoiceAutoGroupedItems(aiLineItem, aiAutoGroupDecision, aiRoomIndex, aiItemIndex);
-                        aiItemsToAdd.forEach(function(itemToAdd) {
-                            targetRoom.items.push(itemToAdd);
-                        });
-                    }
+            if (targetRoom) {
+                for (let aiRoomIndex = 0; aiRoomIndex < preparedAiRooms.length; aiRoomIndex++) {
+                    const aiRoom = preparedAiRooms[aiRoomIndex];
+                    await _addPreparedAiVoiceRoomItems(aiRoom, targetRoom, aiAutoGroupDecision, aiRoomIndex);
                 }
             }
             renderRooms();
@@ -10060,6 +10411,30 @@ Example:
     </script>
 
     <script>
+        function syncManageDetailsSections(detailsId) {
+            var detailsTarget = document.getElementById(detailsId);
+            if (!detailsTarget) return;
+            var menu = document.querySelector('.details-section-menu[data-target="' + detailsId + '"]');
+            var toggles = menu ? Array.from(menu.querySelectorAll('[data-detail-section-toggle]')) : [];
+            var selectedSections = toggles.filter(function(toggle) { return toggle.checked; }).map(function(toggle) {
+                return toggle.getAttribute('data-section');
+            });
+            var anySelected = selectedSections.length > 0;
+            detailsTarget.style.display = anySelected ? 'table-row' : 'none';
+            detailsTarget.querySelectorAll('[data-detail-section]').forEach(function(sectionEl) {
+                var section = sectionEl.getAttribute('data-detail-section');
+                sectionEl.style.display = selectedSections.indexOf(section) >= 0 ? '' : 'none';
+            });
+            if (menu) {
+                var btn = menu.querySelector('.details-menu-btn');
+                if (btn) {
+                    btn.classList.toggle('btn-info', !anySelected);
+                    btn.classList.toggle('btn-secondary', anySelected);
+                    btn.setAttribute('aria-label', anySelected ? 'Details sections selected' : 'Choose item details to display');
+                }
+            }
+        }
+
         // These run independently of auth - always fire on page load
         document.addEventListener('DOMContentLoaded', function() {
             loadInvoiceSettingsDefaultsFromCloud();
@@ -10076,6 +10451,11 @@ Example:
                         var descScope = refineBtn.closest('.description-refine-scope') || refineBtn.closest('tr');
                         var textarea = descScope ? descScope.querySelector('.item-description-textarea') : null;
                         refineDescription(textarea, refineBtn);
+                        return;
+                    }
+                    var detailSectionToggle = e.target.closest('[data-detail-section-toggle]');
+                    if (detailSectionToggle) {
+                        syncManageDetailsSections(detailSectionToggle.dataset.target);
                         return;
                     }
                     var detailsBtn = e.target.closest('.details-toggle-btn');

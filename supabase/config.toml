@@ -21,3 +21,9 @@ verify_jwt = false
 
 [functions.hd-price-sync]
 verify_jwt = false
+
+[functions.labor-notification-dispatch]
+verify_jwt = false
+
+[functions.labor-checkin-submit]
+verify_jwt = true

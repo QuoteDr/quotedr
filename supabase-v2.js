@@ -845,6 +845,85 @@ async function saveLaborLocationEvent(event) {
     return { data, error };
 }
 
+async function getLaborNotificationSettings() {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    const { data, error } = await _supabase
+        .from('labor_notification_settings')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+    if (error) console.error('Labor notification settings load error:', error);
+    return {
+        data: data || {
+            user_id: user.id,
+            enabled: true,
+            morning_enabled: true,
+            evening_enabled: true,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Toronto',
+            morning_time: '08:00',
+            evening_time: '17:30'
+        },
+        error
+    };
+}
+
+async function saveLaborNotificationSettings(settings) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    var now = new Date().toISOString();
+    var payload = {
+        user_id: user.id,
+        enabled: settings.enabled !== false,
+        morning_enabled: settings.morning_enabled !== false && settings.morningEnabled !== false,
+        evening_enabled: settings.evening_enabled !== false && settings.eveningEnabled !== false,
+        timezone: settings.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Toronto',
+        morning_time: settings.morning_time || settings.morningTime || '08:00',
+        evening_time: settings.evening_time || settings.eveningTime || '17:30',
+        last_opened_at: settings.last_opened_at || settings.lastOpenedAt || null,
+        updated_at: now
+    };
+    const { data, error } = await _supabase
+        .from('labor_notification_settings')
+        .upsert(payload, { onConflict: 'user_id' })
+        .select()
+        .single();
+    if (error) console.error('Labor notification settings save error:', error);
+    return { data, error };
+}
+
+async function submitLaborDailyCheckin(checkin) {
+    try {
+        const response = await fetch(SUPABASE_URL + '/functions/v1/labor-checkin-submit', {
+            method: 'POST',
+            headers: await getSupabaseFunctionAuthHeaders(),
+            body: JSON.stringify(checkin || {})
+        });
+        const data = await response.json();
+        if (!response.ok || data.error) return { error: data.error || 'Labor check-in failed' };
+        return { data };
+    } catch (error) {
+        console.error('Labor check-in submit error:', error);
+        return { error: error.message || String(error) };
+    }
+}
+
+async function listLaborProductionRates(options) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    options = options || {};
+    var query = _supabase
+        .from('labor_item_production_rates')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false });
+    if (options.itemName) query = query.ilike('item_name', '%' + options.itemName + '%');
+    if (options.limit) query = query.limit(options.limit);
+    const { data, error } = await query;
+    if (error) console.error('Labor production rates list error:', error);
+    return { data, error };
+}
+
 // Aliases for consistent naming
 var listQuotesFromSupabase = listQuotes;
 var listInvoicesFromSupabase = listInvoices;
@@ -1975,6 +2054,10 @@ document.addEventListener('DOMContentLoaded', function() {
 window.qdMaybeShowProUpgradePrompt = qdMaybeShowProUpgradePrompt;
 window.qdMaybeShowSecondQuoteUpgradePrompt = qdMaybeShowSecondQuoteUpgradePrompt;
 window.refreshPlayForADayWidget = refreshPlayForADayWidget;
+window.getLaborNotificationSettings = getLaborNotificationSettings;
+window.saveLaborNotificationSettings = saveLaborNotificationSettings;
+window.submitLaborDailyCheckin = submitLaborDailyCheckin;
+window.listLaborProductionRates = listLaborProductionRates;
 
 function getMeasurementSystem() {
     try {

@@ -374,10 +374,16 @@
         }
         function toggleManageItemsTopBar(hidden) {
             const topBar = document.getElementById('manageItemsTopBar');
+            const addShell = document.querySelector('#manageItemsModal .manage-items-add-shell');
+            const itemToolbar = document.getElementById('itemListTopAnchor');
+            const itemList = document.getElementById('customItemsList');
             const footerUndo = document.getElementById('undoManageItemsFooterBtn');
             const showTopBarBtn = document.getElementById('showManageItemsTopBarBtn');
             const modal = document.getElementById('manageItemsModal');
             if (topBar) topBar.style.display = hidden ? 'none' : '';
+            if (addShell) addShell.style.display = hidden ? 'none' : '';
+            if (itemToolbar) itemToolbar.style.display = hidden ? 'none' : '';
+            if (itemList) itemList.style.maxHeight = hidden ? 'calc(80vh - 110px)' : '460px';
             if (footerUndo) footerUndo.style.display = hidden ? '' : 'none';
             if (showTopBarBtn) showTopBarBtn.style.display = hidden ? '' : 'none';
             if (modal) modal.classList.toggle('manage-items-top-hidden', hidden);
@@ -578,10 +584,19 @@
             const inputs      = row.querySelectorAll('input.item-input');
             const unitType    = inputs[0]?.value.trim() || '';
             const rate        = parseFloat(inputs[1]?.value) || 0;
-            const matCost     = parseFloat(inputs[2]?.value) || 0;
-            const supplierUrl = inputs[3]?.value.trim() || '';
             const detailsRow  = document.getElementById('details_' + safeId);
+            const detailMaterialInput = detailsRow?.querySelector('.item-detail-material-cost');
+            const detailSupplierInput = detailsRow?.querySelector('.item-detail-supplier-url');
+            const matCost     = parseFloat(detailMaterialInput?.value || inputs[2]?.value) || 0;
+            const supplierUrl = (detailSupplierInput?.value || inputs[3]?.value || '').trim();
             const itemDescription = detailsRow?.querySelector('.item-description-textarea')?.value.trim() || '';
+            const laborMode = detailsRow?.querySelector('.item-labor-mode')?.value || '';
+            const laborTime = {
+                mode: laborMode,
+                unitsPerHour: parseFloat(detailsRow?.querySelector('.item-units-per-hour')?.value || 0) || 0,
+                fixedHours: parseFloat(detailsRow?.querySelector('.item-fixed-hours')?.value || 0) || 0,
+                crewSize: Math.max(1, parseFloat(detailsRow?.querySelector('.item-crew-size')?.value || 1) || 1)
+            };
             const collapseRow = detailsRow;
             let upgrade = null;
             let hasUpgradeEditor = false;
@@ -605,11 +620,11 @@
                 // Not in customItems yet - check pricingDatabase and adopt it
                 const pi = pricingDatabase[cat]?.find(i => i.name === name);
                 if (pi) {
-                    ci = { name: pi.name, unitType: pi.unitType || '', rate: pi.rate || 0, materialCost: pi.materialCost || 0, supplierUrl: pi.supplierUrl || '', itemDescription: pi.itemDescription || '' };
+                    ci = { name: pi.name, unitType: pi.unitType || '', rate: pi.rate || 0, materialCost: pi.materialCost || 0, supplierUrl: pi.supplierUrl || '', itemDescription: pi.itemDescription || '', laborTime: normalizeManageLaborTime(pi.laborTime) };
                     customItems[cat].push(ci);
                 } else {
                     // Brand new item
-                    ci = { name, unitType: '', rate: 0, materialCost: 0, supplierUrl: '', itemDescription: '' };
+                    ci = { name, unitType: '', rate: 0, materialCost: 0, supplierUrl: '', itemDescription: '', laborTime: normalizeManageLaborTime() };
                     customItems[cat].push(ci);
                 }
             }
@@ -621,6 +636,7 @@
             ci.materialCost    = matCost;
             ci.supplierUrl     = supplierUrl;
             ci.itemDescription = itemDescription;
+            ci.laborTime       = normalizeManageLaborTime(laborTime);
             if (upgrade !== null) {
                 // Preserve upgrade photo from previous state
                 var oldUpgPhoto = pricingDatabase[cat]?.find(function(i){return i.name===name||i.name===newName;})?.upgrade?.photo;
@@ -991,6 +1007,42 @@
             return '<span class="manage-margin-pill manage-margin-good"><i class="fas fa-chart-line"></i> ' + pct + '% margin</span>';
         }
 
+        function normalizeManageLaborTime(laborTime) {
+            const source = laborTime || {};
+            const mode = source.mode === 'fixed_hours' ? 'fixed_hours' : (source.mode === 'units_per_hour' ? 'units_per_hour' : '');
+            return {
+                mode,
+                unitsPerHour: parseFloat(source.unitsPerHour || source.units_per_hour || 0) || 0,
+                fixedHours: parseFloat(source.fixedHours || source.fixed_hours || 0) || 0,
+                crewSize: Math.max(1, parseFloat(source.crewSize || source.crew_size || 1) || 1)
+            };
+        }
+
+        function renderManageLaborPill(laborTime, unitType) {
+            const labor = normalizeManageLaborTime(laborTime);
+            if (!labor.mode) return '<span class="manage-margin-pill manage-margin-warn"><i class="fas fa-clock"></i> Time missing</span>';
+            if (labor.mode === 'units_per_hour') {
+                if (labor.unitsPerHour <= 0) return '<span class="manage-margin-pill manage-margin-warn"><i class="fas fa-clock"></i> Time missing</span>';
+                return '<span class="manage-margin-pill manage-margin-good"><i class="fas fa-stopwatch"></i> ' + labor.unitsPerHour + ' ' + (unitType || 'units') + '/hr</span>';
+            }
+            if (labor.fixedHours <= 0) return '<span class="manage-margin-pill manage-margin-warn"><i class="fas fa-clock"></i> Time missing</span>';
+            return '<span class="manage-margin-pill manage-margin-good"><i class="fas fa-clock"></i> ' + labor.fixedHours + ' hr/item</span>';
+        }
+
+        function syncManageDetailBaseField(inputEl) {
+            const detailsRow = inputEl ? inputEl.closest('.item-details-row') : null;
+            const rowKey = detailsRow ? detailsRow.getAttribute('data-row-key') : '';
+            const row = rowKey ? getManageRowByKey(rowKey) : null;
+            if (!row) return;
+            const rowInputs = row.querySelectorAll('input.item-input');
+            if (inputEl.classList.contains('item-detail-material-cost') && rowInputs[2]) {
+                rowInputs[2].value = inputEl.value;
+            }
+            if (inputEl.classList.contains('item-detail-supplier-url') && rowInputs[3]) {
+                rowInputs[3].value = inputEl.value;
+            }
+        }
+
         function renderAllItemsList() {
             const container = document.getElementById('customItemsList');
             let html = '';
@@ -1029,6 +1081,7 @@
                     const isCustom = !!item._custom;
                     const rate = parseFloat(item.rate || 0).toFixed(2);
                     const matCost = parseFloat(item.materialCost || 0).toFixed(2);
+                    const laborTime = normalizeManageLaborTime(item.laborTime);
                     const supplier = manageItemsAttr(item.supplierUrl || '');
                     const catE = manageItemsAttr(cat);
                     const nameE = manageItemsAttr(item.name);
@@ -1045,6 +1098,7 @@
                     const isDirty = dirtyPricingRows.has(rowKey);
                     const searchBlob = [
                         cat, item.name, item.unitType, item.supplierUrl, item.itemDescription,
+                        laborTime.mode, laborTime.unitsPerHour, laborTime.fixedHours,
                         upg.name, upg.unitType || upg.unit, upg.supplierUrl, upg.description
                     ].filter(Boolean).join(' ').toLowerCase();
                     const rowMeta = `data-row-key="${manageItemsAttr(rowKey)}" data-details-id="${detailsId}" data-search="${manageItemsAttr(searchBlob)}" data-custom="${isCustom ? '1' : '0'}" data-has-upgrade="${hasUpgrade ? '1' : '0'}" data-missing-material="${missingMaterial ? '1' : '0'}" data-no-description="${noDescription ? '1' : '0'}"`;
@@ -1055,7 +1109,7 @@
                                 <span class="manage-dirty-dot" title="Unsaved row"></span>
                                 <input type="text" class="form-control form-control-sm item-name-input" value="${manageItemsAttr(item.name)}" placeholder="Item name" oninput="markPricingDirty(this)">
                             </div>
-                            <div class="mt-1">${renderManageMarginPill(rate, matCost)}</div>
+                            <div class="mt-1 d-flex flex-wrap gap-1">${renderManageMarginPill(rate, matCost)} ${renderManageLaborPill(laborTime, item.unitType || '')}</div>
                         </td>
                         <td data-label="Unit"><input type="text" class="form-control form-control-sm item-input" value="${manageItemsAttr(item.unitType || '')}" oninput="markPricingDirty(this)"></td>
                         <td data-label="Rate"><input type="number" class="form-control form-control-sm item-input" value="${rate}" step="0.01" min="0" oninput="markPricingDirty(this)"></td>
@@ -1068,7 +1122,17 @@
                         </td>
                         <td data-label="Actions">
                             <div class="manage-item-actions">
-                                <button class="btn btn-sm btn-info details-toggle-btn" data-target="${detailsId}" title="Show item details"><i class="fas fa-sliders-h"></i> Details</button>
+                                <div class="btn-group details-section-menu" data-target="${detailsId}">
+                                    <button class="btn btn-sm btn-info dropdown-toggle details-menu-btn" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Choose item details to display"><i class="fas fa-sliders-h"></i> Details</button>
+                                    <div class="dropdown-menu dropdown-menu-end p-2" style="min-width:210px;">
+                                        <div class="small text-muted fw-bold px-1 mb-1">Show for this item</div>
+                                        <label class="dropdown-item d-flex align-items-center gap-2"><input class="form-check-input m-0" type="checkbox" data-detail-section-toggle data-target="${detailsId}" data-section="description"> Description</label>
+                                        <label class="dropdown-item d-flex align-items-center gap-2"><input class="form-check-input m-0" type="checkbox" data-detail-section-toggle data-target="${detailsId}" data-section="upgrade"> Upgrade Option ${hasUpgrade ? '<span class="badge text-bg-warning ms-auto">set</span>' : ''}</label>
+                                        <label class="dropdown-item d-flex align-items-center gap-2"><input class="form-check-input m-0" type="checkbox" data-detail-section-toggle data-target="${detailsId}" data-section="labor"> Labor Time ${laborTime.mode ? '<span class="badge text-bg-success ms-auto">set</span>' : ''}</label>
+                                        <label class="dropdown-item d-flex align-items-center gap-2"><input class="form-check-input m-0" type="checkbox" data-detail-section-toggle data-target="${detailsId}" data-section="supplier-cost"> Supplier / Cost</label>
+                                        <label class="dropdown-item d-flex align-items-center gap-2"><input class="form-check-input m-0" type="checkbox" data-detail-section-toggle data-target="${detailsId}" data-section="photos"> Photos ${(item.photo || upg.photo) ? '<span class="badge text-bg-secondary ms-auto">set</span>' : ''}</label>
+                                    </div>
+                                </div>
                                 <button class="btn btn-sm btn-success item-save-btn" data-cat="${catE}" data-name="${nameE}" title="Save this row"><i class="fas fa-save"></i></button>
                                 ${isCustom ? `<button class="btn btn-sm btn-danger item-delete-btn" data-cat="${catE}" data-name="${nameE}" title="Delete"><i class="fas fa-trash"></i></button>` : ''}
                             </div>
@@ -1078,7 +1142,7 @@
                         <td colspan="6">
                             <div class="p-3">
                                 <div class="row g-3">
-                                    <div class="col-lg-6 description-refine-scope">
+                                    <div class="col-12 manage-detail-section description-refine-scope" data-detail-section="description" style="display:none;">
                                         <div class="d-flex justify-content-between align-items-center gap-2">
                                             <small class="text-info fw-bold"><i class="fas fa-align-left"></i> Description shown to clients</small>
                                             <div class="d-flex align-items-center gap-1">
@@ -1087,12 +1151,52 @@
                                             </div>
                                         </div>
                                         <textarea class="form-control form-control-sm item-description-textarea mt-2" rows="4" placeholder="e.g., Complete drywall installation including hanging, mudding, taping, sanding and priming." spellcheck="true" oninput="markPricingDirty(this)">${manageItemsEscape(item.itemDescription || '')}</textarea>
-                                        <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
-                                            <button class="btn btn-sm btn-outline-secondary item-photo-btn" data-cat="${catE}" data-name="${nameE}" data-field="photo" title="Add item photo"><i class="fas fa-camera me-1"></i>Item Photo</button>
-                                            ${item.photo ? `<img src="${manageItemsAttr(item.photo)}" class="rounded" style="max-width:80px;max-height:52px;cursor:pointer;" onclick="openPhotoLightbox(this.src)" title="Click to enlarge">` : ''}
+                                    </div>
+                                    <div class="col-12 manage-detail-section" data-detail-section="labor" style="display:none;">
+                                        <div class="border rounded p-2 mt-2 bg-light">
+                                            <small class="text-primary fw-bold"><i class="fas fa-clock"></i> Labor Time</small>
+                                            <div class="row g-2 mt-1 align-items-end">
+                                                <div class="col-md-4">
+                                                    <label class="form-label" style="font-size:0.75em">Time Mode</label>
+                                                    <select class="form-select form-select-sm item-labor-mode" oninput="markPricingDirty(this)">
+                                                        <option value="" ${!laborTime.mode ? 'selected' : ''}>Not set</option>
+                                                        <option value="units_per_hour" ${laborTime.mode === 'units_per_hour' ? 'selected' : ''}>Units per hour</option>
+                                                        <option value="fixed_hours" ${laborTime.mode === 'fixed_hours' ? 'selected' : ''}>Fixed hours per item</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label class="form-label" style="font-size:0.75em">Units/hr</label>
+                                                    <input type="number" class="form-control form-control-sm item-units-per-hour" value="${manageItemsAttr(laborTime.unitsPerHour || '')}" step="0.01" min="0" placeholder="120" oninput="markPricingDirty(this)">
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label class="form-label" style="font-size:0.75em">Hours/item</label>
+                                                    <input type="number" class="form-control form-control-sm item-fixed-hours" value="${manageItemsAttr(laborTime.fixedHours || '')}" step="0.01" min="0" placeholder="2" oninput="markPricingDirty(this)">
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <label class="form-label" style="font-size:0.75em">Crew</label>
+                                                    <input type="number" class="form-control form-control-sm item-crew-size" value="${manageItemsAttr(laborTime.crewSize || 1)}" step="1" min="1" oninput="markPricingDirty(this)">
+                                                </div>
+                                            </div>
+                                            <small class="text-muted d-block mt-1">Used by Timeline Report. Example: 120 sq ft/hr, or 2 fixed hours per item.</small>
                                         </div>
                                     </div>
-                                    <div class="col-lg-6">
+                                    <div class="col-12 manage-detail-section" data-detail-section="supplier-cost" style="display:none;">
+                                        <div class="border rounded p-2 bg-light">
+                                            <small class="text-success fw-bold"><i class="fas fa-dollar-sign"></i> Base Item Supplier / Cost</small>
+                                            <div class="row g-2 mt-1 align-items-end">
+                                                <div class="col-md-3">
+                                                    <label class="form-label" style="font-size:0.75em">Material Cost</label>
+                                                    <input type="number" class="form-control form-control-sm item-detail-material-cost" value="${matCost}" step="0.01" min="0" oninput="syncManageDetailBaseField(this); markPricingDirty(this)">
+                                                </div>
+                                                <div class="col-md-9">
+                                                    <label class="form-label" style="font-size:0.75em">Supplier URL</label>
+                                                    <input type="url" class="form-control form-control-sm item-detail-supplier-url" value="${supplier}" placeholder="https://..." oninput="syncManageDetailBaseField(this); markPricingDirty(this)">
+                                                </div>
+                                            </div>
+                                            <div class="mt-2">${renderManageMarginPill(rate, matCost)}</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 manage-detail-section" data-detail-section="upgrade" style="display:none;">
                                         <small class="text-warning fw-bold"><i class="fas fa-arrow-up"></i> Upgrade Option</small>
                                         <div class="row g-2 mt-1 align-items-end">
                                             <div class="col-md-5">
@@ -1128,10 +1232,21 @@
                                         </div>
                                         <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
                                             <span>${renderManageMarginPill(upgRate, upgMaterialCost)}</span>
-                                            <button class="btn btn-sm btn-outline-secondary item-photo-btn" data-cat="${catE}" data-name="${nameE}" data-field="upgradePhoto" title="Add upgrade photo"><i class="fas fa-camera me-1"></i>Upgrade Photo</button>
-                                            ${upg.photo ? `<img src="${manageItemsAttr(upg.photo)}" class="rounded" style="max-width:80px;max-height:52px;cursor:pointer;" onclick="openPhotoLightbox(this.src)" title="Click to enlarge">` : ''}
                                         </div>
                                         <small class="text-muted d-block mt-2">Leave upgrade name blank to remove the upgrade when this row is saved.</small>
+                                    </div>
+                                    <div class="col-12 manage-detail-section" data-detail-section="photos" style="display:none;">
+                                        <div class="border rounded p-2 bg-light">
+                                            <small class="text-secondary fw-bold"><i class="fas fa-camera"></i> Photos</small>
+                                            <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
+                                                <button class="btn btn-sm btn-outline-secondary item-photo-btn" data-cat="${catE}" data-name="${nameE}" data-field="photo" title="Add item photo"><i class="fas fa-camera me-1"></i>Item Photo</button>
+                                                ${item.photo ? `<img src="${manageItemsAttr(item.photo)}" class="rounded" style="max-width:80px;max-height:52px;cursor:pointer;" onclick="openPhotoLightbox(this.src)" title="Click to enlarge">` : ''}
+                                            </div>
+                                            <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
+                                            <button class="btn btn-sm btn-outline-secondary item-photo-btn" data-cat="${catE}" data-name="${nameE}" data-field="upgradePhoto" title="Add upgrade photo"><i class="fas fa-camera me-1"></i>Upgrade Photo</button>
+                                            ${upg.photo ? `<img src="${manageItemsAttr(upg.photo)}" class="rounded" style="max-width:80px;max-height:52px;cursor:pointer;" onclick="openPhotoLightbox(this.src)" title="Click to enlarge">` : ''}
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1227,6 +1342,12 @@
             const materialCost = parseFloat(document.getElementById('newItemMaterialCost').value) || 0;
             const supplierUrl = document.getElementById('newItemSupplierUrl').value.trim();
             const itemDescription = document.getElementById('newItemDescription')?.value.trim() || '';
+            const laborTime = normalizeManageLaborTime({
+                mode: document.getElementById('newItemLaborMode')?.value || '',
+                unitsPerHour: parseFloat(document.getElementById('newItemUnitsPerHour')?.value || 0) || 0,
+                fixedHours: parseFloat(document.getElementById('newItemFixedHours')?.value || 0) || 0,
+                crewSize: parseFloat(document.getElementById('newItemCrewSize')?.value || 1) || 1
+            });
 
             if (category === CREATE_NEW_CATEGORY_VALUE) {
                 qdAlert('Please create or choose a category first.');
@@ -1245,7 +1366,7 @@
                 return;
             }
 
-            const newItem = { name, unitType, rate, materialCost, supplierUrl, itemDescription };
+            const newItem = { name, unitType, rate, materialCost, supplierUrl, itemDescription, laborTime };
             customItems[category].push(newItem);
             saveCustomItems();
 
@@ -1257,6 +1378,10 @@
             document.getElementById('newItemRate').value = '';
             document.getElementById('newItemMaterialCost').value = '';
             document.getElementById('newItemSupplierUrl').value = '';
+            if (document.getElementById('newItemLaborMode')) document.getElementById('newItemLaborMode').value = '';
+            if (document.getElementById('newItemUnitsPerHour')) document.getElementById('newItemUnitsPerHour').value = '';
+            if (document.getElementById('newItemFixedHours')) document.getElementById('newItemFixedHours').value = '';
+            if (document.getElementById('newItemCrewSize')) document.getElementById('newItemCrewSize').value = '1';
             if (document.getElementById('newItemDescription')) document.getElementById('newItemDescription').value = '';
             const newItemUndoBtn = document.getElementById('newItemDescription')?.closest('.description-refine-scope')?.querySelector('.undo-refine-desc-btn');
             if (newItemUndoBtn) {
@@ -1292,6 +1417,7 @@
                         supplierUrl: item.supplierUrl || '',
                         photo: item.photo || '',
                         itemDescription: item.itemDescription || item.description || '',
+                        laborTime: normalizeManageLaborTime(item.laborTime),
                         quantityMode: 'inherit',
                         quantityOverride: ''
                     });
@@ -2037,6 +2163,7 @@
         window.filterItemsList = filterItemsList;
         window.renderAllItemsList = renderAllItemsList;
         window.saveItemFieldEdit = saveItemFieldEdit;
+        window.syncManageDetailBaseField = syncManageDetailBaseField;
         window.addCustomItem = addCustomItem;
         window.openChoiceGroupTemplateModal = openChoiceGroupTemplateModal;
         window.openChoiceGroupDefaultOptionPicker = openChoiceGroupDefaultOptionPicker;

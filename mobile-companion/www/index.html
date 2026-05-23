@@ -44,6 +44,49 @@
       <div id="trackingMessage" class="message"></div>
       <div id="sitesList" class="list"></div>
     </section>
+
+    <section id="notificationPanel" class="panel hidden">
+      <h2>Daily Labour Reminders</h2>
+      <p>QuoteDr can remind you in the morning to keep notes, then ask later what you did and how long it took.</p>
+      <label class="check-row"><input id="remindersEnabled" type="checkbox" checked> Enable reminders</label>
+      <div class="split">
+        <div>
+          <label>Morning</label>
+          <input id="morningTime" type="time" value="08:00">
+        </div>
+        <div>
+          <label>Evening</label>
+          <input id="eveningTime" type="time" value="17:30">
+        </div>
+      </div>
+      <button id="saveReminderBtn" class="secondary">Save Reminder Settings</button>
+      <button id="registerPushBtn" class="secondary">Register Push Notifications</button>
+      <div id="notificationMessage" class="message"></div>
+    </section>
+
+    <section id="checkinPanel" class="panel hidden">
+      <h2>What did you do?</h2>
+      <p>Pick the saved item, enter how much you completed, and how long it took. QuoteDr learns the production rate.</p>
+      <label>Saved Item</label>
+      <input id="laborItemSearch" type="search" autocomplete="off" placeholder="Start typing, e.g. flooring, baseboard, paint">
+      <div id="itemSearchResults" class="list compact"></div>
+      <div id="selectedItemSummary" class="message">No item selected yet.</div>
+      <div class="split">
+        <div>
+          <label>Quantity</label>
+          <input id="laborQuantity" type="number" min="0" step="0.01" placeholder="500">
+        </div>
+        <div>
+          <label>Hours</label>
+          <input id="laborHours" type="number" min="0" step="0.25" placeholder="10">
+        </div>
+      </div>
+      <label>Notes</label>
+      <input id="laborNotes" type="text" placeholder="Optional note">
+      <div id="productionRatePreview" class="rate-preview">Enter quantity and hours to calculate the rate.</div>
+      <button id="submitCheckinBtn">Save Labour Check-In</button>
+      <div id="checkinMessage" class="message"></div>
+    </section>
   </main>
 
   <script type="module" src="app.js"></script>

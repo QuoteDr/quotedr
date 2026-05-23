@@ -54,6 +54,10 @@ input {
   font-size: 1rem;
 }
 
+input[type="checkbox"] {
+  width: auto;
+}
+
 button {
   width: 100%;
   margin-top: 14px;
@@ -123,6 +127,11 @@ button.secondary {
   gap: 10px;
 }
 
+.list.compact {
+  margin-top: 8px;
+  gap: 6px;
+}
+
 .site {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -131,3 +140,50 @@ button.secondary {
 
 .site strong { color: var(--blue); }
 .site small { display: block; color: var(--muted); margin-top: 4px; }
+
+.item-result {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fbff;
+  padding: 10px;
+  text-align: left;
+}
+
+.item-result strong {
+  display: block;
+  color: var(--blue);
+}
+
+.item-result small {
+  display: block;
+  color: var(--muted);
+  margin-top: 3px;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rate-preview {
+  border: 1px solid #cfe0f5;
+  border-radius: 8px;
+  background: #f0f7ff;
+  color: var(--blue);
+  font-weight: 800;
+  padding: 12px;
+  margin-top: 12px;
+}
+
+@media (max-width: 520px) {
+  .split {
+    grid-template-columns: 1fr;
+  }
+}
