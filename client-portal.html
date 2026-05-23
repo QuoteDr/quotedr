@@ -53,8 +53,8 @@
     }
 
     #contractor-logo-area img {
-      max-height: 96px;
-      max-width: 180px;
+      max-height: clamp(140px, 13vw, 180px);
+      max-width: clamp(260px, 24vw, 340px);
       object-fit: contain;
     }
 
@@ -272,9 +272,9 @@
       }
 
       #contractor-logo-area img {
-        max-height: 118px;
-        max-width: min(84vw, 220px);
-        margin-bottom: 0.75rem;
+        max-height: 150px;
+        max-width: min(86vw, 300px);
+        margin-bottom: 0.9rem;
       }
 
       .portal-business-info {

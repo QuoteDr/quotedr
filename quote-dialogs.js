@@ -89,8 +89,17 @@
     function qdDialog(message, options) {
         var opts = asOptions(message, options);
         return new Promise(function(resolve) {
+            var hasOtherOpenModal = !!document.querySelector('.modal.show:not(#qdDialogModal)');
+            if (!hasOtherOpenModal) {
+                document.querySelectorAll('.modal-backdrop').forEach(function(backdrop) { backdrop.remove(); });
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('overflow');
+                document.body.style.removeProperty('padding-right');
+            }
             var el = getModal();
-            var modal = bootstrap.Modal.getInstance(el) || new bootstrap.Modal(el);
+            var existingModal = bootstrap.Modal.getInstance(el);
+            if (existingModal) existingModal.dispose();
+            var modal = new bootstrap.Modal(el);
             var title = el.querySelector('#qdDialogTitle');
             var msg = el.querySelector('#qdDialogMessage');
             var inputWrap = el.querySelector('#qdDialogInputWrap');
@@ -113,30 +122,35 @@
             ok.textContent = opts.okText || 'OK';
             ok.className = 'btn ' + (opts.okClass || (opts.type === 'danger' ? 'btn-danger' : 'btn-primary'));
 
-            function cleanup(value) {
+            function cleanup(value, hideFirst) {
                 if (settled) return;
                 settled = true;
                 ok.onclick = null;
                 cancel.onclick = null;
                 secondary.onclick = null;
-                el.removeEventListener('hidden.bs.modal', onHidden);
-                resolve(value);
+                var finish = function() {
+                    el.removeEventListener('hidden.bs.modal', onHidden);
+                    resolve(value);
+                };
+                if (hideFirst) {
+                    el.addEventListener('hidden.bs.modal', finish, { once: true });
+                    modal.hide();
+                } else {
+                    finish();
+                }
             }
             function onHidden() {
-                cleanup(opts.prompt ? null : false);
+                cleanup(opts.prompt ? null : false, false);
             }
             ok.onclick = function() {
                 var value = opts.prompt ? input.value : true;
-                modal.hide();
-                cleanup(value);
+                cleanup(value, true);
             };
             cancel.onclick = function() {
-                modal.hide();
-                cleanup(opts.prompt ? null : false);
+                cleanup(opts.prompt ? null : false, true);
             };
             secondary.onclick = function() {
-                modal.hide();
-                cleanup(opts.secondaryValue !== undefined ? opts.secondaryValue : 'secondary');
+                cleanup(opts.secondaryValue !== undefined ? opts.secondaryValue : 'secondary', true);
             };
             el.addEventListener('hidden.bs.modal', onHidden, { once: true });
             modal.show();

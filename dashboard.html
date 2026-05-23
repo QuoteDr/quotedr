@@ -216,6 +216,9 @@
                             <button class="btn btn-sm btn-outline-primary" onclick="openPortalManager()">
                                 <i class="fas fa-folder-open me-1"></i> Manage Portals
                             </button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="openJunkBox()" title="Restore recently deleted quotes and invoices">
+                                <i class="fas fa-trash-restore me-1"></i> Junk <span class="badge bg-secondary ms-1" id="junkCountBadge" style="display:none;">0</span>
+                            </button>
                             <a class="btn btn-sm btn-outline-primary" href="home-depot-tracker.html" onclick="return openJobTracker(event)">
                                 <i class="fas fa-folder-tree me-1"></i> Job Tracker
                             </a>
@@ -306,6 +309,9 @@
         // DASHBOARD FUNCTIONS
 
         let allQuotes = []; // Store all quotes for client-side filtering
+        let junkQuotes = []; // Recently deleted quotes/invoices, retained temporarily
+        const JUNK_RETENTION_DAYS = 30;
+        const JUNK_RETENTION_MS = JUNK_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
         function escapeHtml(value) {
             return String(value == null ? '' : value)
@@ -322,6 +328,55 @@
 
         function jsAttr(value) {
             return escapeHtml(jsString(value));
+        }
+
+        function quoteData(quote) {
+            return quote && quote.data ? quote.data : {};
+        }
+
+        function quoteIsJunked(quote) {
+            return !!(quoteData(quote).junk_deleted_at);
+        }
+
+        async function setDashboardQuotesFromCloud(rows) {
+            var currentRows = await purgeExpiredJunkQuotes(rows || []);
+            junkQuotes = currentRows.filter(quoteIsJunked).sort(function(a, b) {
+                return new Date(quoteData(b).junk_deleted_at || 0) - new Date(quoteData(a).junk_deleted_at || 0);
+            });
+            allQuotes = autocleanDuplicates(currentRows.filter(function(q) { return !quoteIsJunked(q); }));
+            updateJunkBadge();
+            return allQuotes;
+        }
+
+        async function purgeExpiredJunkQuotes(rows) {
+            var now = Date.now();
+            var expired = (rows || []).filter(function(q) {
+                var deleteAfter = quoteData(q).junk_delete_after;
+                return deleteAfter && new Date(deleteAfter).getTime() <= now;
+            });
+            if (!expired.length) return rows || [];
+            var ids = expired.map(function(q) { return q.id; });
+            try {
+                await _supabase.from('quotes').delete().in('id', ids);
+            } catch(e) {
+                console.warn('Could not purge expired junk:', e);
+                return rows || [];
+            }
+            return (rows || []).filter(function(q) { return ids.indexOf(q.id) === -1; });
+        }
+
+        function updateJunkBadge() {
+            var badge = document.getElementById('junkCountBadge');
+            if (!badge) return;
+            badge.textContent = junkQuotes.length;
+            badge.style.display = junkQuotes.length ? 'inline-block' : 'none';
+        }
+
+        function junkDaysRemaining(quote) {
+            var deleteAfter = quoteData(quote).junk_delete_after;
+            if (!deleteAfter) return JUNK_RETENTION_DAYS;
+            var ms = new Date(deleteAfter).getTime() - Date.now();
+            return Math.max(0, Math.ceil(ms / (24 * 60 * 60 * 1000)));
         }
 
         async function openJobTracker(event) {
@@ -352,7 +407,7 @@
                     setTimeout(async function() {
                         const retry = await listQuotesFromSupabase();
                         if (!retry.error) {
-                            allQuotes = autocleanDuplicates(retry.data || []);
+                            await setDashboardQuotesFromCloud(retry.data || []);
                             renderQuotes(allQuotes);
                             updateStats(allQuotes);
                             applyDashboardDefaultView();
@@ -363,7 +418,7 @@
                     return;
                 }
                 if (error) throw error;
-                allQuotes = autocleanDuplicates(data || []);
+                await setDashboardQuotesFromCloud(data || []);
                 renderQuotes(allQuotes);
                 updateStats(allQuotes);
                 applyDashboardDefaultView();
@@ -921,8 +976,14 @@
                 '<div class="col-sm-4"><label class="form-label small mb-1" for="portal-theme-text-' + portalDom + '">Accent / Text</label><input type="color" class="form-control form-control-color" id="portal-theme-text-' + portalDom + '" value="' + textColor + '" oninput="updatePortalThemePreview(' + jsAttr(portal.id) + ')"></div>' +
                 '</div>' +
                 '<div id="portal-theme-preview-' + portalDom + '" class="mt-3 rounded overflow-hidden border" style="max-width:360px;"><div class="p-2" style="background:' + headerColor + ';color:' + textColor + ';font-weight:700;">Client Portal Header</div><div class="p-2" style="background:' + bgColor + ';color:' + textColor + ';">Quote card preview</div></div>' +
-                '<div class="d-flex gap-2 mt-3"><button type="button" class="btn btn-primary btn-sm" onclick="savePortalThemeOverride(' + jsAttr(portal.id) + ')"><i class="fas fa-save me-1"></i>Save Theme</button><button type="button" class="btn btn-outline-secondary btn-sm" onclick="resetPortalThemeOverride(' + jsAttr(portal.id) + ')">Use Default Theme</button></div>' +
+                '<div class="d-flex gap-2 mt-3 flex-wrap"><button type="button" class="btn btn-primary btn-sm" onclick="savePortalThemeOverride(' + jsAttr(portal.id) + ')"><i class="fas fa-save me-1"></i>Save Theme</button><button type="button" class="btn btn-outline-secondary btn-sm" onclick="resetPortalThemeOverride(' + jsAttr(portal.id) + ')">Use Default Theme</button><a class="btn btn-outline-primary btn-sm" href="settings.html#portal-theme" onclick="return openPortalDefaultThemeSettings()"><i class="fas fa-paint-brush me-1"></i>Edit Default Theme</a></div>' +
                 '</div>';
+        }
+
+        function openPortalDefaultThemeSettings() {
+            localStorage.setItem('ald_settings_tab', 'portal');
+            window.location.href = 'settings.html#portal-theme';
+            return false;
         }
 
         function togglePortalThemeEditor(portalId) {
@@ -1560,22 +1621,109 @@
         }
 
         async function deleteQuote(quoteId) {
-            if (!await qdConfirm('Delete this quote? This cannot be undone.', {
-                title: 'Delete Quote',
-                okText: 'Delete',
+            var quote = allQuotes.find(function(q) { return q.id === quoteId; });
+            if (!quote) return;
+            if (!await qdConfirm('Move this document to Junk? You can restore it for ' + JUNK_RETENTION_DAYS + ' days before it is permanently deleted.', {
+                title: 'Move to Junk',
+                okText: 'Move to Junk',
                 okClass: 'btn-danger',
                 type: 'danger'
             })) return;
 
-            const result = await deleteQuoteFromSupabase(quoteId);
-            if (result && result.error) {
-                console.error('Error deleting quote:', result.error);
-                qdAlert('Failed to delete quote: ' + (result.error.message || result.error));
+            var now = new Date();
+            var data = Object.assign({}, quote.data || {});
+            data.junk_deleted_at = now.toISOString();
+            data.junk_delete_after = new Date(now.getTime() + JUNK_RETENTION_MS).toISOString();
+            data.junk_was_portal_visible = data.portal_visible === true;
+            data.portal_visible = false;
+
+            const { error } = await _supabase
+                .from('quotes')
+                .update({ data: data, updated_at: now.toISOString() })
+                .eq('id', quoteId);
+            if (error) {
+                console.error('Error moving quote to junk:', error);
+                qdAlert('Failed to move document to Junk: ' + (error.message || error));
                 return;
             }
-            allQuotes = allQuotes.filter(q => q.id !== quoteId);
+            quote.data = data;
+            junkQuotes.unshift(quote);
+            allQuotes = allQuotes.filter(function(q) { return q.id !== quoteId; });
             renderQuotes(allQuotes);
             updateStats(allQuotes);
+            updateJunkBadge();
+            qdAlert('Moved to Junk. You can restore it within ' + JUNK_RETENTION_DAYS + ' days.');
+        }
+
+        function openJunkBox() {
+            renderJunkBox();
+            new bootstrap.Modal(document.getElementById('junkBoxModal')).show();
+        }
+
+        function renderJunkBox() {
+            var body = document.getElementById('junkBoxBody');
+            if (!body) return;
+            if (!junkQuotes.length) {
+                body.innerHTML = '<div class="text-center text-muted py-4"><i class="fas fa-trash fa-2x mb-3 opacity-50"></i><div>Junk is empty.</div><div class="small">Deleted dashboard documents will appear here for ' + JUNK_RETENTION_DAYS + ' days.</div></div>';
+                return;
+            }
+            body.innerHTML = '<div class="small text-muted mb-3">Documents in Junk are hidden from the dashboard and client portals. They are permanently deleted after ' + JUNK_RETENTION_DAYS + ' days.</div>' +
+                junkQuotes.map(function(q) {
+                    var title = getQuoteDisplayTitle(q);
+                    var number = q.quote_number || '';
+                    var deletedAt = quoteData(q).junk_deleted_at ? formatDate(quoteData(q).junk_deleted_at) : 'Recently';
+                    var days = junkDaysRemaining(q);
+                    return '<div class="border rounded p-3 mb-2">' +
+                        '<div class="d-flex justify-content-between gap-2 flex-wrap">' +
+                        '<div><div class="fw-bold">' + escapeHtml(title) + '</div>' +
+                        '<div class="text-muted small">' + (number ? '#' + escapeHtml(number) + ' - ' : '') + 'Deleted: ' + escapeHtml(deletedAt) + ' - ' + days + ' day' + (days === 1 ? '' : 's') + ' left</div></div>' +
+                        '<div class="d-flex gap-2 flex-wrap"><button class="btn btn-success btn-sm" onclick="restoreQuoteFromJunk(' + jsAttr(q.id) + ')"><i class="fas fa-trash-restore me-1"></i>Restore</button>' +
+                        '<button class="btn btn-outline-danger btn-sm" onclick="permanentlyDeleteQuote(' + jsAttr(q.id) + ')"><i class="fas fa-times me-1"></i>Delete Forever</button></div>' +
+                        '</div></div>';
+                }).join('');
+        }
+
+        async function restoreQuoteFromJunk(quoteId) {
+            var quote = junkQuotes.find(function(q) { return q.id === quoteId; });
+            if (!quote) return;
+            var data = Object.assign({}, quote.data || {});
+            var wasPortalVisible = data.junk_was_portal_visible === true;
+            delete data.junk_deleted_at;
+            delete data.junk_delete_after;
+            delete data.junk_was_portal_visible;
+            data.portal_visible = wasPortalVisible;
+            const { error } = await _supabase
+                .from('quotes')
+                .update({ data: data, updated_at: new Date().toISOString() })
+                .eq('id', quoteId);
+            if (error) {
+                qdAlert('Could not restore document: ' + (error.message || error));
+                return;
+            }
+            quote.data = data;
+            junkQuotes = junkQuotes.filter(function(q) { return q.id !== quoteId; });
+            allQuotes.unshift(quote);
+            renderJunkBox();
+            renderQuotes(allQuotes);
+            updateStats(allQuotes);
+            updateJunkBadge();
+        }
+
+        async function permanentlyDeleteQuote(quoteId) {
+            if (!await qdConfirm('Permanently delete this document now? This cannot be undone.', {
+                title: 'Delete Forever',
+                okText: 'Delete Forever',
+                okClass: 'btn-danger',
+                type: 'danger'
+            })) return;
+            const result = await deleteQuoteFromSupabase(quoteId);
+            if (result && result.error) {
+                qdAlert('Failed to permanently delete document: ' + (result.error.message || result.error));
+                return;
+            }
+            junkQuotes = junkQuotes.filter(function(q) { return q.id !== quoteId; });
+            renderJunkBox();
+            updateJunkBadge();
         }
 
         function formatDate(dateString) {
@@ -1615,7 +1763,7 @@
                 if (result.error === 'Not authenticated' && attempts < 3) {
                     setTimeout(loadWithRetry, 800 * attempts);
                 } else if (!result.error) {
-                    allQuotes = autocleanDuplicates(result.data || []);
+                    await setDashboardQuotesFromCloud(result.data || []);
                     renderQuotes(allQuotes);
                     updateStats(allQuotes);
                     applyDashboardDefaultView();
@@ -2808,6 +2956,23 @@ function renderBusinessInsights(quotes) {
             }
         });
     </script>
+
+<div class="modal fade" id="junkBoxModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#1a2940; color:white;">
+        <h5 class="modal-title"><i class="fas fa-trash-restore me-2"></i>Junk</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="junkBoxBody">
+        <div class="text-center text-muted py-4"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="modal fade" id="notesReviewModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
