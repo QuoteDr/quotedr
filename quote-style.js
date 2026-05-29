@@ -565,12 +565,44 @@
             await initStyleModal();
             var generateBtn = document.getElementById('quoteStyleGenerateBtn');
             if (generateBtn) {
+                var isChangeOrder = document.body?.classList.contains('change-order-mode');
                 generateBtn.innerHTML = settingsOnly
                     ? '<i class="fas fa-check me-1"></i>Done'
-                    : '<i class="fas fa-share-square me-1"></i>Generate Quote Link';
+                    : '<i class="fas fa-share-square me-1"></i>' + (isChangeOrder ? 'Send Change Order' : 'Generate Quote Link');
             }
             var modal = new bootstrap.Modal(document.getElementById('quoteStyleModal'));
             modal.show();
+        }
+
+        const CHANGE_ORDER_REASON_REQUIRED_MESSAGE = 'Add a short reason/scope-change note before sending the change order.';
+
+        function isChangeOrderReasonRequiredError(err) {
+            return !!err && (
+                err.code === 'CHANGE_ORDER_REASON_REQUIRED' ||
+                /reason\/scope-change note/i.test(err.message || '')
+            );
+        }
+
+        function promptForChangeOrderReason() {
+            var saveStatus = document.getElementById('saveStatus');
+            if (saveStatus) {
+                saveStatus.innerHTML = '<span style="color:#fd7e14;"><i class="fas fa-pen"></i> Reason needed</span>';
+            }
+            var reasonEl = document.getElementById('changeOrderReason');
+            if (reasonEl) {
+                reasonEl.classList.add('is-invalid');
+                reasonEl.addEventListener('input', function clearReasonInvalidState() {
+                    reasonEl.classList.remove('is-invalid');
+                    reasonEl.removeEventListener('input', clearReasonInvalidState);
+                });
+                setTimeout(function() {
+                    reasonEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    reasonEl.focus();
+                }, 150);
+            }
+            var message = 'Add a short reason/scope-change note before sending the change order.';
+            if (typeof qdAlert === 'function') qdAlert(message);
+            else alert(message);
         }
 
         async function confirmGenerateQuote() {
@@ -664,6 +696,10 @@
                 linkModal.show();
 
             } catch(err) {
+                if (isChangeOrderReasonRequiredError(err)) {
+                    promptForChangeOrderReason();
+                    return;
+                }
                 console.error('Failed to save quote:', err);
                 alert('Failed to save quote to cloud: ' + (err.message || err));
                 if (saveStatus) saveStatus.innerHTML = '<span style="color:red;"><i class="fas fa-times"></i> Save failed</span>';
@@ -680,7 +716,11 @@
             const quoteData = collectQuoteData();
             if (quoteData.type === 'change_order') {
                 var reason = (quoteData.changeReason || '').trim();
-                if (!reason) throw new Error('Add a short reason/scope-change note before sending the change order.');
+                if (!reason) {
+                    var reasonError = new Error(CHANGE_ORDER_REASON_REQUIRED_MESSAGE);
+                    reasonError.code = 'CHANGE_ORDER_REASON_REQUIRED';
+                    throw reasonError;
+                }
                 quoteData.status = 'pending_approval';
                 var statusEl = document.getElementById('quoteStatus');
                 if (statusEl) statusEl.value = 'pending_approval';

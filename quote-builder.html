@@ -6220,7 +6220,7 @@ Example:
             rooms.forEach(room => {
                 // Apply room markup if set
                 const roomMarkup = room.markup || 0;
-                let roomTotal = room.items.reduce((sum, item) => sum + item.total, 0);
+                let roomTotal = coDisplayRoomAmount(room);
                 if (roomMarkup > 0) {
                     roomTotal = roomTotal * (1 + roomMarkup / 100);
                 }
@@ -6340,7 +6340,7 @@ Example:
                             const hasChoiceGroup = !!(item.choiceGroup && Array.isArray(item.choiceGroup.options));
                             const selectedChoiceOptions = hasChoiceGroup ? getChoiceGroupSelectedOptions(item.choiceGroup) : [];
                             const displayRate = item.rate * markupFactor;
-                            const displayTotal = item.total * markupFactor;
+                            const displayTotal = (window._quoteDocumentType === 'change_order' ? coDisplayLineAmount(item) : item.total) * markupFactor;
                             const hasUpgrade = !!(item.upgrade && item.upgrade.name);
                             const isUpgraded = !!item.upgraded;
                             const isOptional = !!item.optional;
@@ -6386,7 +6386,14 @@ Example:
                             html += '</td>';
                             html += '<td class="quote-item-qty-cell">' + formatQuoteQuantityDisplay(item.quantity, item.unitType || item.unit || '') + '</td>';
                             html += '<td class="quote-item-rate-cell">$' + displayRate.toFixed(2) + '</td>';
-                            html += '<td class="quote-item-total-cell"><strong>$' + displayTotal.toFixed(2) + '</strong></td>';
+                            var displayTotalText = (displayTotal < 0 ? '-$' : '$') + Math.abs(displayTotal).toFixed(2);
+                            html += '<td class="quote-item-total-cell"><strong>' + displayTotalText + '</strong>';
+                            if (coStatus && item._coOriginal) {
+                                var deltaTotal = (parseFloat(item.total) || 0) * markupFactor;
+                                var deltaText = (deltaTotal >= 0 ? '+$' : '-$') + Math.abs(deltaTotal).toFixed(2);
+                                html += '<div class="small text-muted">Net change: ' + deltaText + '</div>';
+                            }
+                            html += '</td>';
                             if (hasMaterialCosts) {
                                 const matCost = (item.materialCost || 0) * item.quantity;
                                 const profit = displayTotal - matCost;
@@ -8884,6 +8891,37 @@ Example:
 
         function coLineAmount(item) {
             return (parseFloat(item && item.quantity) || 0) * (parseFloat(item && item.rate) || 0);
+        }
+
+        function coOriginalAmount(item) {
+            if (!item || !item._coOriginal) return 0;
+            var original = item._coOriginal;
+            return original.total !== undefined
+                ? (parseFloat(original.total) || 0)
+                : coLineAmount(original);
+        }
+
+        function coDisplayLineAmount(item) {
+            if (!item || window._quoteDocumentType !== 'change_order') {
+                return parseFloat(item && item.total) || 0;
+            }
+            if (item._coOriginal) {
+                if (item._coRemoved) return -Math.abs(coOriginalAmount(item));
+                if ((item._coChangeStatus || 'unchanged') === 'unchanged') return coOriginalAmount(item);
+                return coLineAmount(item);
+            }
+            return parseFloat(item.total) || coLineAmount(item);
+        }
+
+        function coDisplayRoomAmount(room) {
+            if (!room || window._quoteDocumentType !== 'change_order') {
+                return (room && room.items || []).reduce(function(sum, item) {
+                    return sum + (parseFloat(item.total) || 0);
+                }, 0);
+            }
+            return (room.items || []).reduce(function(sum, item) {
+                return sum + coDisplayLineAmount(item);
+            }, 0);
         }
 
         function coSnapshotItem(item) {
