@@ -144,6 +144,51 @@
     .signature-thumb:hover {
       transform: scale(1.05);
     }
+
+    .signed-signature-preview {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.25rem;
+      margin-bottom: 0.55rem;
+      padding: 0.45rem 0.55rem 0.35rem;
+      border: 1px solid #d7e2ef;
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 6px 16px rgba(15, 52, 96, 0.08);
+      color: #0f3460;
+      cursor: pointer;
+    }
+
+    .signed-signature-preview img {
+      display: block;
+      width: 150px;
+      max-width: min(32vw, 150px);
+      max-height: 58px;
+      object-fit: contain;
+    }
+
+    .signed-signature-preview span {
+      font-size: 0.72rem;
+      font-weight: 700;
+      line-height: 1;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+
+    .signed-signature-preview .client-signature-timestamp {
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: #6c757d;
+      text-transform: none;
+    }
+
+    .signed-signature-preview:hover,
+    .signed-signature-preview:focus {
+      border-color: #1a56a0;
+      box-shadow: 0 8px 18px rgba(26, 86, 160, 0.14);
+    }
     
     .quote-card {
       background-color: white;
@@ -302,6 +347,11 @@
       .action-buttons .btn {
         width: 100%;
         margin-bottom: 0.5rem;
+      }
+
+      .signed-signature-preview img {
+        width: 132px;
+        max-width: 42vw;
       }
       
       .summary-value {
@@ -892,6 +942,22 @@
     }
 
     // Create a quote card element
+    function quoteSignatureSrc(quote) {
+      return quote.data?.signature_url || quote.signature_url || quote.data?.signature_data_url || quote.signature_data_url || '';
+    }
+
+    function quoteSignatureTimestamp(quote) {
+      const raw = quote.data?.signed_at || quote.signed_at || quote.data?.accepted_at || quote.accepted_at || quote.data?.approved_at || quote.approved_at || '';
+      if (!raw) return '';
+      const date = new Date(raw);
+      if (Number.isNaN(date.getTime())) return '';
+      return date.toLocaleDateString('en-CA', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    }
+
     function createQuoteCard(quote) {
       const card = document.createElement('div');
       card.className = 'card quote-card';
@@ -907,6 +973,15 @@
       const primaryHref = isInvoiceDocument(quote)
         ? 'invoice-viewer.html?id=' + encodeURIComponent(quote.id) + secureParams
         : 'interactive-quote-viewer.html?id=' + encodeURIComponent(quote.id) + secureParams;
+      const signatureSrc = quoteSignatureSrc(quote);
+      const signatureTimestamp = quoteSignatureTimestamp(quote);
+      const signaturePreviewMarkup = signatureSrc
+        ? `<button type="button" class="signed-signature-preview client-signature-preview" data-src="${escapeHtml(signatureSrc)}" aria-label="View signed client signature">
+            <span>Signed by client</span>
+            <img src="${escapeHtml(signatureSrc)}" alt="Client signature preview">
+            ${signatureTimestamp ? `<span class="client-signature-timestamp">Signed ${signatureTimestamp}</span>` : ''}
+          </button>`
+        : '';
       
       // Format date
       const date = new Date(quote.created_at).toLocaleDateString('en-US', {
@@ -945,6 +1020,8 @@
               <small class="text-muted">Created: ${date}</small>
             </div>
             <div class="action-buttons text-end">
+              ${signaturePreviewMarkup}
+              <div>
               <a href="${primaryHref}" class="btn btn-outline-primary btn-sm">
                 <i class="fas ${docType.actionIcon} me-1"></i> ${docType.actionLabel}
               </a>
@@ -952,23 +1029,19 @@
                 `<a href="quote-builder.html?id=${encodeURIComponent(quote.id)}" class="btn btn-outline-dark btn-sm">
                   <i class="fas fa-pen-to-square me-1"></i> Edit in Builder
                 </a>` : ''}
-              ${quote.data?.signature_url ? 
-                `<button class="btn btn-outline-secondary btn-sm signature-btn" data-src="${quote.data.signature_url}">
-                  <i class="fas fa-signature me-1"></i> Signature
-                </button>` : ''}
+              </div>
             </div>
           </div>
         </div>
       `;
       
-      // Add event listener for signature button
-      const signatureBtn = card.querySelector('.signature-btn');
-      if (signatureBtn) {
+      // Add event listener for signature controls
+      card.querySelectorAll('.signature-btn, .client-signature-preview').forEach(function(signatureBtn) {
         signatureBtn.addEventListener('click', function() {
           const src = this.getAttribute('data-src');
           openSignatureLightbox(src);
         });
-      }
+      });
       
       return card;
     }

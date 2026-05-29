@@ -2141,9 +2141,20 @@ if (location.search.includes('debug')) {
             }
         }
 
+        function scrollToPostApprovalActions() {
+            var approveSection = document.getElementById('approveSection');
+            var depositSection = document.getElementById('stripeDepositSection');
+            var target = approveSection && approveSection.style.display !== 'none' ? approveSection : depositSection;
+            if (!target) return;
+            setTimeout(function() {
+                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 180);
+        }
+
         function handleMainAction() {
             if (quoteIsAccepted()) {
                 applyQuoteCompletionState();
+                scrollToPostApprovalActions();
                 return;
             }
             openSignatureModal();
@@ -2362,7 +2373,8 @@ if (location.search.includes('debug')) {
                 }
             }
 
-            document.getElementById('approveSection').style.display = 'none';
+            document.getElementById('approveSection').style.display = 'block';
+            document.getElementById('approveSection').innerHTML = '<div class="alert alert-success mb-0"><i class="fas fa-check-circle me-1"></i>This quote has been accepted and signed.</div>';
             var stickyActions = document.getElementById('stickyClientActions');
             if (stickyActions) stickyActions.style.display = 'none';
             closeSignatureModal();
@@ -2375,6 +2387,7 @@ if (location.search.includes('debug')) {
             if (signatureUrl) {
                 qdToast({ title: 'Quote Accepted', message: 'Signature saved securely.', type: 'success' });
             }
+            scrollToPostApprovalActions();
         }
 
         function submitUpgrades(event) {
