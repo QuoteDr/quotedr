@@ -100,6 +100,18 @@
             color: #6c757d;
             line-height: 1.25;
         }
+        .portal-added-meta {
+            color: #146c43;
+            font-size: 0.82rem;
+        }
+        .portal-locked-note {
+            border: 1px solid #badbcc;
+            background: #f0fff7;
+            color: #0f5132;
+            border-radius: 6px;
+            padding: 0.35rem 0.5rem;
+            font-size: 0.82rem;
+        }
         @media (max-width: 768px) {
             .quote-card {
                 padding: 0.75rem;
@@ -503,6 +515,7 @@
                 var changeOrders = (allQuotes || []).filter(function(row) { return window.QuoteDrChangeOrders && QuoteDrChangeOrders.parentQuoteId(row) === q.id; });
                 var pendingCos = changeOrders.filter(function(row) { return row.status === 'pending_approval'; }).length;
                 var portalVisible = !!(q.data && q.data.portal_visible);
+                var portalAddedLabel = portalVisible ? formatPortalAddedAt(q.data) : '';
                 var payments = q.data && Array.isArray(q.data.payments) ? q.data.payments : [];
                 var depositPaid = !!(q.data && (q.data.deposit_paid === true || q.data.paymentStatus === 'partially_paid' || q.data.paymentStatus === 'paid' || payments.some(function(payment) { return ['deposit', 'invoice_deposit'].includes(payment.type) && payment.paid_at; })));
                 var depositPayment = payments.slice().reverse().find(function(payment) { return ['deposit', 'invoice_deposit'].includes(payment.type) && payment.paid_at; });
@@ -525,6 +538,7 @@
                               <button class="btn btn-outline-secondary btn-sm" onclick="cancelEditTitle(${jsAttr(q.id)})"><i class="fas fa-times"></i></button>
                             </div>
                             <div class="text-muted small">${quoteTitle ? escapeHtml(clientName) + ' - ' : ''}${quoteNumber ? '#' + escapeHtml(quoteNumber) + ' - ' : ''}${escapeHtml(formatDate((q.data && q.data.savedAt) || q.created_at))}</div>
+                            ${portalVisible ? `<div class="portal-added-meta mt-1"><i class="fas fa-lock me-1"></i>Added to portal: ${escapeHtml(portalAddedLabel)}</div>` : ''}
                         </div>
                         <div class="text-end d-flex flex-column align-items-end gap-1">
                             <div class="fw-bold">$${parseFloat(q.total || 0).toFixed(2)}</div>
@@ -545,6 +559,7 @@
                         </div>
                     </div>
                     ${status === 'accepted' && q.data && q.data.client_upgraded ? `<div class="alert alert-warning py-1 px-2 mt-2 mb-0 small"><i class="fas fa-bolt me-1"></i><strong>Client made upgrades</strong> when signing - <a href="interactive-quote-viewer.html?id=${encodeURIComponent(q.id)}" class="alert-link">review quote</a></div>` : ''}
+                    ${portalVisible ? `<div class="portal-locked-note mt-2"><i class="fas fa-shield-halved me-1"></i>This document is locked while it is in the client portal. Remove from portal or duplicate as a revision to edit.</div>` : ''}
                     ${depositPaid ? `<div class="alert alert-success py-1 px-2 mt-2 mb-0 small"><i class="fas fa-credit-card me-1"></i><strong>${escapeHtml(depositAmount)} paid</strong>${depositPayment && depositPayment.paid_at ? ' on ' + escapeHtml(formatDate(depositPayment.paid_at)) : ''}</div>` : ''}
                     ${pendingCos ? `<div class="alert alert-info py-1 px-2 mt-2 mb-0 small"><i class="fas fa-file-circle-plus me-1"></i><strong>${pendingCos} pending change order${pendingCos === 1 ? '' : 's'}</strong></div>` : ''}
                     ${status === 'in_review' ? `<button class="btn btn-warning btn-sm w-100 mt-2" onclick="openNotesReview(${jsAttr(q.id)}, ${jsAttr(clientName)})"><i class="fas fa-comments me-1"></i> Review Client Notes</button>` : ''}
@@ -583,8 +598,86 @@
             return getQuoteTitle(quote) || (quote && quote.client_name) || 'Unnamed Client';
         }
 
-        function openQuote(quoteId) {
+        async function openQuote(quoteId) {
+            var quote = (allQuotes || []).find(function(q) { return q.id === quoteId; });
+            if (quoteIsInPortal(quote)) {
+                await handlePortalLockedQuoteOpen(quote);
+                return;
+            }
             window.location.href = 'quote-builder.html?load=' + quoteId;
+        }
+
+        async function handlePortalLockedQuoteOpen(quote) {
+            if (!quote) return;
+            var title = getQuoteDisplayTitle(quote);
+            var added = formatPortalAddedAt(quote.data || {});
+            var choice = await qdConfirm('This document is already in a client portal and cannot be edited directly. Remove it from the portal to edit, or duplicate it as a new revision. Documents inside the portal show the dates they were added.' + (added !== 'Not recorded' ? '\n\nAdded to portal: ' + added : ''), {
+                title: 'Portal Document Locked',
+                okText: 'Remove From Portal & Edit',
+                okClass: 'btn-warning',
+                secondaryText: 'Duplicate As Revision',
+                secondaryValue: 'duplicate',
+                secondaryClass: 'btn-outline-primary',
+                cancelText: 'Cancel',
+                type: 'warning'
+            });
+            if (choice === true) {
+                await removeQuoteFromPortalAndEdit(quote.id);
+            } else if (choice === 'duplicate') {
+                await duplicateQuoteAsRevision(quote.id, title);
+            }
+        }
+
+        async function removeQuoteFromPortalAndEdit(quoteId) {
+            var quote = (allQuotes || []).find(function(q) { return q.id === quoteId; });
+            if (!quote) return;
+            try {
+                var data = clearPortalAssignmentForEdit(quote.data || {});
+                var result = await _supabase.from('quotes').update({ data: data, updated_at: new Date().toISOString() }).eq('id', quoteId);
+                if (result.error) throw result.error;
+                quote.data = data;
+                window.location.href = 'quote-builder.html?load=' + quoteId;
+            } catch(err) {
+                qdAlert('Could not remove this document from the portal: ' + err.message);
+            }
+        }
+
+        async function duplicateQuoteAsRevision(quoteId, title) {
+            var quote = (allQuotes || []).find(function(q) { return q.id === quoteId; });
+            if (!quote) return;
+            try {
+                var data = clearPortalAssignmentForEdit(quote.data || {});
+                var now = new Date().toISOString();
+                var revisionTitle = (title || getQuoteDisplayTitle(quote) || 'Quote') + ' - Revision';
+                data.quoteTitle = revisionTitle;
+                data.status = 'draft';
+                data.savedAt = now;
+                data.supabaseId = null;
+                data.revisionOf = quote.id;
+                data.revisionCreatedAt = now;
+                var quoteNumber = (quote.quote_number || data.quoteNumber || 'REV') + '-REV';
+                data.quoteNumber = quoteNumber;
+                var session = await _supabase.auth.getSession();
+                var userId = session.data?.session?.user?.id || quote.user_id;
+                if (!userId) throw new Error('Not logged in');
+                var insertResult = await _supabase.from('quotes').insert({
+                    user_id: userId,
+                    client_name: quote.client_name || data.clientName || '',
+                    quote_number: quoteNumber,
+                    total: quote.total || data.grandTotal || 0,
+                    status: 'draft',
+                    type: data.type || data.documentType || quote.type || 'quote',
+                    parent_quote_id: quote.parent_quote_id || data.parentQuoteId || null,
+                    change_order_number: data.changeOrderNumber || quote.change_order_number || null,
+                    data: data,
+                    created_at: now,
+                    updated_at: now
+                }).select().single();
+                if (insertResult.error) throw insertResult.error;
+                window.location.href = 'quote-builder.html?load=' + insertResult.data.id;
+            } catch(err) {
+                qdAlert('Could not duplicate this document as a revision: ' + err.message);
+            }
         }
 
         function openQuoteForChangeOrder(quoteId) {
@@ -679,7 +772,7 @@
             try {
                 const { data: q } = await _supabase.from('quotes').select('data').eq('id', quoteId).single();
                 if (q) {
-                    const updatedData = Object.assign({}, q.data || {}, { portal_visible: true });
+                    const updatedData = stampPortalAddedAt(Object.assign({}, q.data || {}, { portal_visible: true }));
                     await _supabase.from('quotes').update({ data: updatedData }).eq('id', quoteId);
                 }
             } catch(e) { console.error('Auto-portal-publish error:', e); }
@@ -718,7 +811,9 @@
             try {
                 const { data: quote, error: fetchErr } = await _supabase.from('quotes').select('data').eq('id', quoteId).single();
                 if (fetchErr) throw fetchErr;
-                const updatedData = Object.assign({}, quote.data || {}, { portal_visible: visible });
+                const updatedData = visible
+                    ? stampPortalAddedAt(Object.assign({}, quote.data || {}, { portal_visible: true }))
+                    : clearPortalAssignmentForEdit(quote.data || {});
                 const { error } = await _supabase.from('quotes').update({ data: updatedData }).eq('id', quoteId);
                 if (error) throw error;
                 refreshQuotes();
@@ -735,6 +830,46 @@
         function quoteClientName(q) {
             var d = q && q.data || {};
             return q.client_name || d.clientName || d.client_name || 'Unnamed Client';
+        }
+
+        function quoteIsInPortal(q) {
+            return !!(q && q.data && q.data.portal_visible === true);
+        }
+
+        function stampPortalAddedAt(data) {
+            data = data || {};
+            if (data.portal_visible === true && !data.portal_added_at) {
+                data.portal_added_at = new Date().toISOString();
+            }
+            return data;
+        }
+
+        function clearPortalAssignmentForEdit(data) {
+            data = Object.assign({}, data || {});
+            data.portal_visible = false;
+            delete data.portal_id;
+            delete data.portal_name;
+            delete data.portal_client_name;
+            delete data.portal_client_email;
+            delete data.portal_pin;
+            delete data.portal_added_at;
+            delete data.portal_placeholder;
+            delete data.portal_theme;
+            return data;
+        }
+
+        function formatPortalAddedAt(data) {
+            var raw = data && data.portal_added_at;
+            if (!raw) return 'Not recorded';
+            var date = new Date(raw);
+            if (isNaN(date.getTime())) return 'Not recorded';
+            return date.toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit'
+            });
         }
 
         function quotePortalKey(q) {
@@ -1138,6 +1273,11 @@
                         portal_client_email: targetPortal.clientEmail || '',
                         portal_pin: targetPin
                     });
+                    if (data.portal_visible) {
+                        stampPortalAddedAt(data);
+                    } else {
+                        data = clearPortalAssignmentForEdit(data);
+                    }
                     if (hasTargetTheme) {
                         data.portal_theme = targetTheme;
                     } else {
@@ -1179,6 +1319,7 @@
                         portal_client_email: portal.clientEmail || quoteClientEmail(target),
                         portal_pin: pin
                     });
+                    stampPortalAddedAt(data);
                     if (hasPortalTheme) {
                         data.portal_theme = portalTheme;
                     } else {
@@ -1216,6 +1357,7 @@
                         portal_client_email: clientEmail,
                         portal_pin: pin
                     });
+                    stampPortalAddedAt(data);
                     var result = await _supabase.from('quotes').update({ data: data }).eq('id', quoteId);
                     if (result.error) throw result.error;
                 } else {
@@ -1237,6 +1379,7 @@
                         rooms: [],
                         terms: []
                     };
+                    stampPortalAddedAt(placeholderData);
                     var insertResult = await _supabase.from('quotes').insert({
                         user_id: userId,
                         client_name: clientName,
@@ -1259,7 +1402,7 @@
             var quoteId = window._portalAssignQuoteId || '';
             var target = (allQuotes || []).find(function(q) { return q.id === quoteId; });
             if (!target) return;
-            var data = Object.assign({}, target.data || {}, { portal_visible: false });
+            var data = clearPortalAssignmentForEdit(target.data || {});
             try {
                 var result = await _supabase.from('quotes').update({ data: data }).eq('id', quoteId);
                 if (result.error) throw result.error;
@@ -1300,7 +1443,7 @@
                 for (var i = 0; i < portal.quoteIds.length; i++) {
                     var row = (allQuotes || []).find(function(q) { return q.id === portal.quoteIds[i]; });
                     if (!row) continue;
-                    var data = Object.assign({}, row.data || {}, { portal_visible: false });
+                    var data = clearPortalAssignmentForEdit(row.data || {});
                     var result = await _supabase.from('quotes').update({ data: data }).eq('id', row.id);
                     if (result.error) throw result.error;
                 }

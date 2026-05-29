@@ -958,6 +958,20 @@
       });
     }
 
+    function portalAddedDateLabel(quote) {
+      const raw = quote?.data?.portal_added_at || quote?.portal_added_at || '';
+      if (!raw) return '';
+      const date = new Date(raw);
+      if (Number.isNaN(date.getTime())) return '';
+      return date.toLocaleString('en-CA', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit'
+      });
+    }
+
     function createQuoteCard(quote) {
       const card = document.createElement('div');
       card.className = 'card quote-card';
@@ -975,6 +989,7 @@
         : 'interactive-quote-viewer.html?id=' + encodeURIComponent(quote.id) + secureParams;
       const signatureSrc = quoteSignatureSrc(quote);
       const signatureTimestamp = quoteSignatureTimestamp(quote);
+      const portalAddedLabel = portalAddedDateLabel(quote);
       const signaturePreviewMarkup = signatureSrc
         ? `<button type="button" class="signed-signature-preview client-signature-preview" data-src="${escapeHtml(signatureSrc)}" aria-label="View signed client signature">
             <span>Signed by client</span>
@@ -1018,6 +1033,7 @@
             <div>
               <h6>Total: ${total}</h6>
               <small class="text-muted">Created: ${date}</small>
+              ${portalAddedLabel ? `<small class="text-muted d-block"><i class="fas fa-folder-open me-1"></i>Added to portal: ${escapeHtml(portalAddedLabel)}</small>` : ''}
             </div>
             <div class="action-buttons text-end">
               ${signaturePreviewMarkup}
@@ -1026,8 +1042,8 @@
                 <i class="fas ${docType.actionIcon} me-1"></i> ${docType.actionLabel}
               </a>
               ${portalIsAdminView ?
-                `<a href="quote-builder.html?id=${encodeURIComponent(quote.id)}" class="btn btn-outline-dark btn-sm">
-                  <i class="fas fa-pen-to-square me-1"></i> Edit in Builder
+                `<a href="dashboard.html" class="btn btn-outline-dark btn-sm">
+                  <i class="fas fa-shield-halved me-1"></i> Manage in Dashboard
                 </a>` : ''}
               </div>
             </div>
@@ -1058,11 +1074,13 @@
       const amount = parseFloat(row.total || 0) || 0;
       const sign = amount >= 0 ? '+' : '-';
       const status = quoteStatus(row);
+      const portalAdded = portalAddedDateLabel(row);
       return '<div class="card quote-card mb-2">' +
         '<div class="card-body py-3">' +
         '<div class="d-flex justify-content-between gap-2 flex-wrap">' +
         '<div><div class="d-flex gap-2 flex-wrap align-items-center mb-2"><span class="doc-type-badge doc-type-change-order"><i class="fas fa-file-circle-plus"></i>Change Order</span><span class="status-badge ' + statusClassName(status) + '">' + escapeHtml(getClientStatusText(row)) + '</span></div>' +
         '<strong>Change Order #' + escapeHtml((co && co.number(row)) || '') + '</strong><div class="text-muted small">' + escapeHtml(row.data?.changeReason || 'Scope change') + '</div>' +
+        (portalAdded ? '<div class="text-muted small"><i class="fas fa-folder-open me-1"></i>Added to portal: ' + escapeHtml(portalAdded) + '</div>' : '') +
         '<div class="client-status-line ' + (documentNeedsAction(row) ? 'needs-action' : '') + '">' + escapeHtml(getClientActionLine(row)) + '</div></div>' +
         '<div class="text-end"><div class="fw-bold">' + sign + '$' + Math.abs(amount).toFixed(2) + '</div><a href="interactive-quote-viewer.html?id=' + encodeURIComponent(row.id) + (portalToken ? '&token=' + encodeURIComponent(portalToken) + '&portal_anchor=' + encodeURIComponent(portalAnchorId || row.id) : '') + '" class="btn btn-outline-primary btn-sm mt-2"><i class="fas fa-pen-nib me-1"></i>Review Change Order</a></div>' +
         '</div></div></div>';

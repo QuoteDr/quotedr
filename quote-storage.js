@@ -19,6 +19,23 @@
             return negative ? -amount : amount;
         }
 
+        function quoteIsPortalLockedForBuilder(row) {
+            return !!(row && row.data && row.data.portal_visible === true);
+        }
+
+        async function handlePortalLockedBuilderLoad(q) {
+            var added = q && q.data && q.data.portal_added_at ? new Date(q.data.portal_added_at).toLocaleString() : '';
+            var message = 'This document is already in a client portal and cannot be edited directly. Remove it from the portal in the dashboard to edit, or duplicate it as a new revision.';
+            if (added) message += '\n\nAdded to portal: ' + added;
+            if (typeof qdAlert === 'function') {
+                await qdAlert(message, { title: 'Portal Document Locked', type: 'warning' });
+            } else {
+                alert(message);
+            }
+            window.location.href = 'dashboard.html';
+            return true;
+        }
+
         function collectQuoteData() {
             var grandTotal = parseQuoteMoney(document.getElementById('grandTotalDisplay')?.textContent || '0');
             var isChangeOrder = window._quoteDocumentType === 'change_order';
@@ -490,6 +507,10 @@ async function saveQuote() {
                 var result = await loadQuoteFromSupabase(quoteId);
                 if (result.error) throw new Error(result.error.message || result.error);
                 var q = result.data;
+                if (quoteIsPortalLockedForBuilder(q)) {
+                    await handlePortalLockedBuilderLoad(q);
+                    return;
+                }
                 var qData = q.data || {};
                 qData.supabaseId = q.id;
                 qData.clientName = q.client_name || qData.clientName || '';
@@ -652,21 +673,26 @@ async function saveQuote() {
                     if (error) {
                         console.warn('Could not load quote from cloud:', error.message);
                     } else if (data) {
-                        const q = Object.assign({}, data.data || {});
-                        q.supabaseId = data.id;
-                        q.clientName = data.client_name || q.clientName || '';
-                        q.quoteNumber = data.quote_number || q.quoteNumber || '';
-                        q.status = data.status || q.status || 'draft';
-                        q.type = data.type || q.type || q.documentType || 'quote';
-                        q.documentType = q.type;
-                        q.parentQuoteId = data.parent_quote_id || q.parentQuoteId || '';
-                        q.changeOrderNumber = data.change_order_number || q.changeOrderNumber || null;
-                        if (!q.projectAddress) q.projectAddress = q.project_address || '';
-                        if (!q.clientEmail) q.clientEmail = q.email || '';
-                        if (!q.clientPhone) q.clientPhone = q.phone || '';
+                        const q = data;
+                        if (quoteIsPortalLockedForBuilder(q)) {
+                            await handlePortalLockedBuilderLoad(q);
+                            return;
+                        }
+                        const qData = Object.assign({}, data.data || {});
+                        qData.supabaseId = data.id;
+                        qData.clientName = data.client_name || qData.clientName || '';
+                        qData.quoteNumber = data.quote_number || qData.quoteNumber || '';
+                        qData.status = data.status || qData.status || 'draft';
+                        qData.type = data.type || qData.type || qData.documentType || 'quote';
+                        qData.documentType = qData.type;
+                        qData.parentQuoteId = data.parent_quote_id || qData.parentQuoteId || '';
+                        qData.changeOrderNumber = data.change_order_number || qData.changeOrderNumber || null;
+                        if (!qData.projectAddress) qData.projectAddress = qData.project_address || '';
+                        if (!qData.clientEmail) qData.clientEmail = qData.email || '';
+                        if (!qData.clientPhone) qData.clientPhone = qData.phone || '';
                         window._supabaseQuoteId = data.id;
                         localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
-                        applyQuoteData(q);
+                        applyQuoteData(qData);
                         unsavedChanges = false;
                         window._quoteFullyLoaded = true; // allow autosave now
                         updateSaveStatus('saved', 'Quote loaded ?');
@@ -681,8 +707,8 @@ async function saveQuote() {
                         }
                         // Show client notes banner if ?shownotes=1
                         if (urlParams.get('shownotes') === '1') {
-                            window._loadedQuoteData = q;
-                            showClientNotesBanner(q);
+                            window._loadedQuoteData = qData;
+                            showClientNotesBanner(qData);
                         }
                     }
                 } catch(e) {

@@ -6790,7 +6790,7 @@ Example:
         }
 
         function getInvoiceBaseUrl() {
-            return window.location.href.split('?')[0].split('#')[0].replace(/quote-builder(\.html)?\/?$/, 'invoice-viewer');
+            return window.location.href.split('?')[0].split('#')[0].replace(/quote-builder(\.html)?\/?$/, 'invoice-viewer.html');
         }
 
         function getClientPortalBaseUrl() {
@@ -6947,6 +6947,25 @@ Example:
                 throw new Error('Could not create the shareable invoice link yet. Please wait a moment and try again.');
             }
             return invoiceUrl;
+        }
+
+        async function openCurrentInvoicePreview(event) {
+            if (event && typeof event.preventDefault === 'function') event.preventDefault();
+            var openBtn = document.getElementById('openInvoiceBtn');
+            var invoiceUrl = (openBtn && openBtn.getAttribute('href') && openBtn.getAttribute('href') !== '#')
+                ? openBtn.href
+                : (window._currentInvoiceUrl || '');
+            if (!invoiceUrl || invoiceUrl === '#') {
+                var invoiceState = await prepareInvoiceForViewer({ markInvoiced: false });
+                if (!invoiceState) return false;
+                invoiceUrl = invoiceState.invoiceUrl;
+                window._currentInvoiceUrl = invoiceUrl;
+                window._currentInvoiceData = invoiceState.invoiceData;
+                if (openBtn) openBtn.href = invoiceUrl;
+            }
+            var win = window.open(invoiceUrl, '_blank');
+            if (!win) window.location.href = invoiceUrl;
+            return false;
         }
 
         function normalizeInvoicePortalValue(value) {
@@ -8339,7 +8358,7 @@ Example:
                                     </div>
                                     <div id="sendInvoiceEmailResult" class="mt-2 small"></div>
                                 </div>
-                                <a id="openInvoiceBtn" href="#" target="_blank" class="btn btn-outline-success w-100">
+                                <a id="openInvoiceBtn" href="#" target="_blank" onclick="openCurrentInvoicePreview(event)" class="btn btn-outline-success w-100">
                                     <i class="fas fa-external-link-alt me-1"></i>Open Invoice
                                 </a>
                             </div>

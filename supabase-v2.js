@@ -464,6 +464,14 @@ async function saveQuote(quoteData) {
             hiddenProfileFields: quoteData.hiddenProfileFields || [],
             paymentStatus: quoteData.paymentStatus || '',
             payments: quoteData.payments || [],
+            portal_visible: quoteData.portal_visible === true,
+            portal_id: quoteData.portal_id || '',
+            portal_name: quoteData.portal_name || '',
+            portal_client_name: quoteData.portal_client_name || quoteData.clientName || '',
+            portal_client_email: quoteData.portal_client_email || quoteData.clientEmail || quoteData.email || '',
+            portal_pin: quoteData.portal_pin || '',
+            portal_added_at: quoteData.portal_added_at || null,
+            portal_theme: quoteData.portal_theme || null,
             savedAt: quoteData.savedAt || now
         },
         updated_at: now
