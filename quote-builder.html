@@ -6834,6 +6834,7 @@ Example:
                 phone: document.getElementById('clientPhone')?.value || '',
                 quoteNumber: document.getElementById('quoteNumber')?.value || '',
                 rooms: JSON.parse(JSON.stringify(rooms || [])),
+                categoryStyles: JSON.parse(JSON.stringify(categoryStyles || {})),
                 grandTotal: parseFloat(document.getElementById('grandTotalDisplay')?.textContent.replace(/[^0-9.]/g, '')) || 0,
                 terms: getSelectedTerms(),
                 taxRate: taxPrefs.rate,

@@ -67,6 +67,7 @@
                 clientEmail:    document.getElementById('clientEmail')?.value    || '',
                 terms: getSelectedTerms(),
                 rooms: JSON.parse(JSON.stringify(rooms)),
+                categoryStyles: JSON.parse(JSON.stringify(categoryStyles || {})),
                 roomCounter: roomCounter,
                 grandTotal: grandTotal,
                 total: grandTotal,
@@ -106,6 +107,10 @@
                 });
             }
             rooms = data.rooms || [];
+            if (data.categoryStyles && typeof categoryStyles !== 'undefined') {
+                Object.assign(categoryStyles, data.categoryStyles || {});
+                try { localStorage.setItem('ald_category_styles', JSON.stringify(categoryStyles)); } catch(e) {}
+            }
             roomCounter = data.roomCounter || rooms.length;
             window._quoteDocumentType = data.type || data.documentType || 'quote';
             window._parentQuoteId = data.parentQuoteId || data.parent_quote_id || '';
