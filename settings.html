@@ -744,21 +744,79 @@ Sarah Jones, 905-555-5678"></textarea>
 										<input type="color" id="portalBgColor" class="form-control form-control-color" value="#f5f7fb" oninput="updatePortalPreview()">
 									</div>
 									<div class="mb-3">
+										<label class="form-label fw-semibold" for="portalBgStyle">Background Style</label>
+										<select id="portalBgStyle" class="form-select" onchange="updatePortalPreview()">
+											<option value="solid">Solid</option>
+											<option value="soft-fade" selected>Soft fade</option>
+											<option value="branded-fade">Branded fade</option>
+											<option value="paper">Paper</option>
+										</select>
+									</div>
+									<div class="mb-3">
+										<label class="form-label fw-semibold" for="portalBgStrength">Fade Strength <span class="text-muted fw-normal" id="portalBgStrengthLabel">45%</span></label>
+										<input type="range" id="portalBgStrength" class="form-range" min="0" max="100" value="45" oninput="updatePortalPreview()">
+										<div class="text-muted small">Lower keeps the portal closer to white; higher shows more of the selected background tint.</div>
+									</div>
+									<div class="mb-3">
 										<label class="form-label fw-semibold">Accent / Text Color</label>
 										<input type="color" id="portalTextColor" class="form-control form-control-color" value="#1a2940" oninput="updatePortalPreview()">
+									</div>
+									<div class="mb-3">
+										<label class="form-label fw-semibold">Portal Logo</label>
+										<input type="hidden" id="portalLogoData">
+										<input type="file" id="portalLogoInput" accept="image/*" style="display:none;" onchange="handlePortalLogoUpload(event)">
+										<div class="d-flex align-items-center gap-3 flex-wrap">
+											<div id="portalLogoPreviewBox" style="width:120px;height:70px;border:1px solid #d0dff0;border-radius:8px;background:#f8faff;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+												<span class="text-muted small" id="portalLogoPlaceholder">Business logo</span>
+												<img id="portalLogoPreviewImg" src="" alt="Portal logo preview" style="display:none;width:100%;height:100%;object-fit:contain;padding:6px;">
+											</div>
+											<div>
+												<button type="button" class="btn btn-outline-primary btn-sm" onclick="document.getElementById('portalLogoInput').click()"><i class="fas fa-upload me-1"></i>Upload portal logo</button>
+												<button type="button" class="btn btn-outline-secondary btn-sm ms-1" onclick="useBusinessLogoForPortal()">Use business logo</button>
+												<div class="text-muted small mt-1">This will only change the portal logo. Your main business logo will stay the same.</div>
+											</div>
+										</div>
 									</div>
 									<button class="btn btn-primary" onclick="savePortalTheme()"><i class="fas fa-save me-1"></i> Save Theme</button>
 								</div>
 								<div class="col-md-6">
 									<label class="form-label fw-semibold">Live Preview</label>
-									<div id="portalPreviewHeader" style="background-color:#1a2940;padding:16px;border-radius:8px 8px 0 0;">
-										<span style="color:white;font-weight:600;">Your Company Name</span>
-									</div>
-									<div id="portalPreviewBody" style="background-color:#f5f7fb;padding:16px;border-radius:0 0 8px 8px;border:1px solid #dee2e6;">
-										<span id="portalPreviewText" style="color:#1a2940;font-weight:500;">Client Dashboard</span>
-										<div style="margin-top:8px;background:white;border-radius:6px;padding:10px;">
+									<div id="portalPreviewFrame" style="border:1px solid #d7e2ef;border-radius:10px;overflow:hidden;background:#f5f7fb;box-shadow:0 12px 28px rgba(15,52,96,0.12);">
+									<div id="portalPreviewBody" style="background-color:#f5f7fb;padding:14px;">
+										<div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+											<div>
+												<div class="small fw-semibold" id="portalPreviewText" style="color:#1a2940;"><i class="fas fa-user-check me-1"></i>Client View</div>
+												<div id="portalPreviewClientName" style="font-weight:800;font-size:1.1rem;color:#1a2940;">Adam Client</div>
+											</div>
+											<div id="portalPreviewFilterBar" style="background:white;border:1px solid #e1e8f0;border-radius:8px;padding:6px 8px;min-width:118px;">
+												<div class="text-muted" style="font-size:0.64rem;">Show</div>
+												<div style="font-size:0.72rem;color:#1a2940;">Everything <i class="fas fa-chevron-down ms-1"></i></div>
+											</div>
+										</div>
+										<div id="portalPreviewStats" class="row g-2 mb-3">
+											<div class="col-6"><div style="background:white;border-radius:8px;padding:9px;text-align:center;box-shadow:0 4px 10px rgba(15,52,96,0.08);"><strong style="font-size:1rem;">$0</strong><div class="text-muted" style="font-size:0.68rem;">Balance Due</div></div></div>
+											<div class="col-6"><div style="background:white;border-radius:8px;padding:9px;text-align:center;box-shadow:0 4px 10px rgba(15,52,96,0.08);"><strong style="font-size:1rem;">2</strong><div class="text-muted" style="font-size:0.68rem;">Open Quotes</div></div></div>
+										</div>
+										<div class="d-flex align-items-center justify-content-between mb-2">
+											<div style="font-weight:800;color:#1a2940;"><i class="fas fa-folder-open me-1"></i>Quotes &amp; Invoices</div>
+											<span class="badge rounded-pill bg-secondary">Open</span>
+										</div>
+										<div id="portalPreviewQuoteCard" style="background:white;border:1px solid #dfe8f2;border-radius:8px;padding:12px;box-shadow:0 6px 16px rgba(15,52,96,0.10);">
+											<div class="d-flex justify-content-between align-items-start gap-2">
+												<div>
+													<div class="mb-1"><span style="font-size:0.68rem;font-weight:800;color:#0f3460;background:#eef4fb;border-radius:999px;padding:4px 7px;"><i class="fas fa-file-signature me-1"></i>QUOTE</span></div>
+													<div style="font-weight:800;color:#1a2940;">Quote #1001</div>
+													<div class="text-muted" style="font-size:0.76rem;">Kitchen renovation</div>
+													<div style="font-size:0.78rem;margin-top:6px;"><strong>Total:</strong> $5,200.00</div>
+												</div>
+												<button type="button" class="btn btn-outline-primary btn-sm" style="font-size:0.72rem;white-space:nowrap;"><i class="fas fa-pen-nib me-1"></i>Review</button>
+											</div>
+										</div>
+										<span style="display:none;color:#1a2940;font-weight:500;">Client Dashboard</span>
+										<div style="display:none;margin-top:8px;background:white;border-radius:6px;padding:10px;">
 											<small class="text-muted">Quote #1001 — $5,200.00</small>
 										</div>
+									</div>
 									</div>
 								</div>
 							</div>
@@ -2379,8 +2437,14 @@ Sarah Jones, 905-555-5678"></textarea>
 				if (v.headerColor) document.getElementById('portalHeaderColor').value = v.headerColor;
 				if (v.bgColor) document.getElementById('portalBgColor').value = v.bgColor;
 				if (v.textColor) document.getElementById('portalTextColor').value = v.textColor;
-				updatePortalPreview();
+				if (v.bgStyle) document.getElementById('portalBgStyle').value = v.bgStyle;
+				if (v.bgStrength !== undefined) document.getElementById('portalBgStrength').value = v.bgStrength;
+				if (v.portalLogo) {
+					document.getElementById('portalLogoData').value = v.portalLogo;
+					updatePortalLogoPreview(v.portalLogo);
+				}
 			}
+			updatePortalPreview();
 		}
 		async function savePortalTheme() {
 			const user = window.currentUser;
@@ -2388,7 +2452,10 @@ Sarah Jones, 905-555-5678"></textarea>
 			const theme = {
 				headerColor: document.getElementById('portalHeaderColor').value,
 				bgColor: document.getElementById('portalBgColor').value,
-				textColor: document.getElementById('portalTextColor').value
+				textColor: document.getElementById('portalTextColor').value,
+				bgStyle: document.getElementById('portalBgStyle').value,
+				bgStrength: parseInt(document.getElementById('portalBgStrength').value, 10) || 0,
+				portalLogo: document.getElementById('portalLogoData').value || ''
 			};
 			const { error } = await _supabase.from('user_data').upsert(
 				{ user_id: user.id, key: 'portal_theme', value: theme, updated_at: new Date().toISOString() },
@@ -2399,16 +2466,83 @@ Sarah Jones, 905-555-5678"></textarea>
 				if (btn) { btn.textContent = '✓ Saved!'; setTimeout(() => btn.innerHTML = '<i class="fas fa-save me-1"></i> Save Theme', 2000); }
 			}
 		}
+		function portalThemeHexToRgb(hex) {
+			var clean = String(hex || '').replace('#', '');
+			if (!/^[0-9a-fA-F]{6}$/.test(clean)) return { r: 245, g: 247, b: 251 };
+			return {
+				r: parseInt(clean.slice(0, 2), 16),
+				g: parseInt(clean.slice(2, 4), 16),
+				b: parseInt(clean.slice(4, 6), 16)
+			};
+		}
+		function portalThemeBackgroundCss(headerColor, bgColor, bgStyle, bgStrength) {
+			var strength = Math.max(0, Math.min(100, parseInt(bgStrength, 10) || 0)) / 100;
+			var bg = portalThemeHexToRgb(bgColor);
+			var header = portalThemeHexToRgb(headerColor);
+			var bgAlpha = (0.12 + strength * 0.72).toFixed(2);
+			var headerAlpha = (0.05 + strength * 0.2).toFixed(2);
+			if (bgStyle === 'soft-fade') {
+				return 'linear-gradient(135deg, rgba(' + bg.r + ',' + bg.g + ',' + bg.b + ',' + bgAlpha + ') 0%, #ffffff 52%, rgba(' + bg.r + ',' + bg.g + ',' + bg.b + ',' + (bgAlpha * 0.75).toFixed(2) + ') 100%)';
+			}
+			if (bgStyle === 'branded-fade') {
+				return 'radial-gradient(circle at top left, rgba(' + header.r + ',' + header.g + ',' + header.b + ',' + headerAlpha + ') 0%, transparent 34%), linear-gradient(145deg, rgba(' + bg.r + ',' + bg.g + ',' + bg.b + ',' + bgAlpha + ') 0%, #ffffff 58%, rgba(' + header.r + ',' + header.g + ',' + header.b + ',' + (headerAlpha * 0.65).toFixed(2) + ') 100%)';
+			}
+			if (bgStyle === 'paper') {
+				return 'linear-gradient(180deg, #ffffff 0%, rgba(' + bg.r + ',' + bg.g + ',' + bg.b + ',' + (0.08 + strength * 0.22).toFixed(2) + ') 100%)';
+			}
+			return bgColor;
+		}
+		function updatePortalLogoPreview(src) {
+			var logoData = document.getElementById('portalLogoData');
+			var img = document.getElementById('portalLogoPreviewImg');
+			var placeholder = document.getElementById('portalLogoPlaceholder');
+			var value = src || (logoData ? logoData.value : '');
+			if (img) {
+				img.src = value || '';
+				img.style.display = value ? 'block' : 'none';
+			}
+			if (placeholder) placeholder.style.display = value ? 'none' : '';
+		}
+		function handlePortalLogoUpload(event) {
+			var file = event.target.files && event.target.files[0];
+			if (!file) return;
+			if (file.size > 1024 * 1024) { qdAlert('Portal logo must be under 1MB.'); return; }
+			var reader = new FileReader();
+			reader.onload = function(e) {
+				document.getElementById('portalLogoData').value = e.target.result;
+				updatePortalLogoPreview(e.target.result);
+				updatePortalPreview();
+			};
+			reader.readAsDataURL(file);
+		}
+		function useBusinessLogoForPortal() {
+			document.getElementById('portalLogoData').value = '';
+			var input = document.getElementById('portalLogoInput');
+			if (input) input.value = '';
+			updatePortalLogoPreview('');
+			updatePortalPreview();
+		}
 		function updatePortalPreview() {
 			const hc = document.getElementById('portalHeaderColor').value;
 			const bg = document.getElementById('portalBgColor').value;
 			const tc = document.getElementById('portalTextColor').value;
-			const ph = document.getElementById('portalPreviewHeader');
+			const bgStyle = document.getElementById('portalBgStyle').value;
+			const bgStrength = document.getElementById('portalBgStrength').value;
 			const pb = document.getElementById('portalPreviewBody');
 			const pt = document.getElementById('portalPreviewText');
-			if (ph) ph.style.backgroundColor = hc;
-			if (pb) pb.style.backgroundColor = bg;
+			const frame = document.getElementById('portalPreviewFrame');
+			const client = document.getElementById('portalPreviewClientName');
+			const quoteCard = document.getElementById('portalPreviewQuoteCard');
+			const filterBar = document.getElementById('portalPreviewFilterBar');
+			const strengthLabel = document.getElementById('portalBgStrengthLabel');
+			if (pb) pb.style.background = portalThemeBackgroundCss(hc, bg, bgStyle, bgStrength);
 			if (pt) pt.style.color = tc;
+			if (frame) frame.style.background = portalThemeBackgroundCss(hc, bg, bgStyle, bgStrength);
+			if (client) client.style.color = tc;
+			if (quoteCard) quoteCard.style.borderColor = bgStyle === 'solid' ? '#dfe8f2' : 'rgba(26,86,160,0.18)';
+			if (filterBar) filterBar.style.color = tc;
+			if (strengthLabel) strengthLabel.textContent = bgStrength + '%';
+			updatePortalLogoPreview();
 		}
 
 		function loadPaymentSettingsUI() {

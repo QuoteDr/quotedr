@@ -519,6 +519,8 @@
     let portalIsAdminView = false;
     let portalResolvedClientName = '';
     let portalDefaultTheme = {};
+    let portalBusinessLogoSrc = '';
+    let portalCompanyName = 'Your Contractor';
 
     // DOM Elements
     const clientNameEl = document.getElementById('client-name');
@@ -627,20 +629,13 @@
 
         // Set contractor name in header
         const companyName = headerProfile.business_name || headerProfile.company_name || 'Your Contractor';
+        portalCompanyName = companyName;
         contractorNameEl.textContent = companyName;
 
         // Logo or company name in top-left
-        const logoArea = document.getElementById('contractor-logo-area');
-        const displayName = document.getElementById('contractor-display-name');
         const savedBrowserLogo = localStorage.getItem('ald_company_logo') || localStorage.getItem('ald_logo') || '';
-        const logoSrc = logoRow.logo || logoRow.logoUrl || logoRow.url || savedBrowserLogo || localDevBranding.logo;
-        if (logoSrc) {
-          logoArea.innerHTML = '<img src="' + escapeHtml(logoSrc) + '" alt="' + escapeHtml(companyName) + '">';
-          if (displayName) displayName.textContent = companyName;
-        } else {
-          logoArea.innerHTML = '';
-          if (displayName) displayName.textContent = companyName;
-        }
+        portalBusinessLogoSrc = logoRow.logo || logoRow.logoUrl || logoRow.url || savedBrowserLogo || localDevBranding.logo || '';
+        renderPortalLogo(portalBusinessLogoSrc);
         renderBusinessHeader(headerProfile);
 
         portalDefaultTheme = normalizePortalTheme(theme);
@@ -655,22 +650,76 @@
 
     function normalizePortalTheme(theme) {
       const clean = value => /^#[0-9a-fA-F]{6}$/.test(String(value || '').trim()) ? String(value).trim() : '';
+      const bgStyle = ['solid', 'soft-fade', 'branded-fade', 'paper'].includes(theme?.bgStyle) ? theme.bgStyle : '';
+      const bgStrength = theme?.bgStrength === undefined ? '' : Math.max(0, Math.min(100, parseInt(theme.bgStrength, 10) || 0));
       return {
         headerColor: clean(theme?.headerColor),
         bgColor: clean(theme?.bgColor),
-        textColor: clean(theme?.textColor)
+        textColor: clean(theme?.textColor),
+        bgStyle: bgStyle,
+        bgStrength: bgStrength,
+        portalLogo: theme?.portalLogo || ''
       };
+    }
+
+    function portalThemeHexToRgb(hex) {
+      const clean = String(hex || '').replace('#', '');
+      if (!/^[0-9a-fA-F]{6}$/.test(clean)) return { r: 245, g: 247, b: 251 };
+      return {
+        r: parseInt(clean.slice(0, 2), 16),
+        g: parseInt(clean.slice(2, 4), 16),
+        b: parseInt(clean.slice(4, 6), 16)
+      };
+    }
+
+    function portalBodyBackground(theme) {
+      const t = normalizePortalTheme(theme || {});
+      const headerColor = t.headerColor || '#1a2940';
+      const bgColor = t.bgColor || '#f5f7fb';
+      const bgStyle = t.bgStyle || 'solid';
+      const strength = Math.max(0, Math.min(100, parseInt(t.bgStrength, 10) || 0)) / 100;
+      const bg = portalThemeHexToRgb(bgColor);
+      const header = portalThemeHexToRgb(headerColor);
+      const bgAlpha = (0.12 + strength * 0.72).toFixed(2);
+      const headerAlpha = (0.05 + strength * 0.2).toFixed(2);
+      if (bgStyle === 'soft-fade') {
+        return 'linear-gradient(135deg, rgba(' + bg.r + ',' + bg.g + ',' + bg.b + ',' + bgAlpha + ') 0%, #ffffff 52%, rgba(' + bg.r + ',' + bg.g + ',' + bg.b + ',' + (bgAlpha * 0.75).toFixed(2) + ') 100%)';
+      }
+      if (bgStyle === 'branded-fade') {
+        return 'radial-gradient(circle at top left, rgba(' + header.r + ',' + header.g + ',' + header.b + ',' + headerAlpha + ') 0%, transparent 34%), linear-gradient(145deg, rgba(' + bg.r + ',' + bg.g + ',' + bg.b + ',' + bgAlpha + ') 0%, #ffffff 58%, rgba(' + header.r + ',' + header.g + ',' + header.b + ',' + (headerAlpha * 0.65).toFixed(2) + ') 100%)';
+      }
+      if (bgStyle === 'paper') {
+        return 'linear-gradient(180deg, #ffffff 0%, rgba(' + bg.r + ',' + bg.g + ',' + bg.b + ',' + (0.08 + strength * 0.22).toFixed(2) + ') 100%)';
+      }
+      return bgColor;
+    }
+
+    function renderPortalLogo(logoSrc) {
+      const logoArea = document.getElementById('contractor-logo-area');
+      const displayName = document.getElementById('contractor-display-name');
+      if (!logoArea) return;
+      const companyName = portalCompanyName || 'Your Contractor';
+      if (logoSrc) {
+        logoArea.innerHTML = '<img src="' + escapeHtml(logoSrc) + '" alt="' + escapeHtml(companyName) + '">';
+      } else {
+        logoArea.innerHTML = '';
+      }
+      if (displayName) displayName.textContent = companyName;
     }
 
     function applyPortalTheme(theme) {
       const t = normalizePortalTheme(theme || {});
       const header = document.querySelector('.header-bg');
       if (t.headerColor && header) header.style.backgroundColor = t.headerColor;
-      if (t.bgColor) document.body.style.backgroundColor = t.bgColor;
+      if (t.bgColor) {
+        document.body.style.background = portalBodyBackground(t);
+        document.body.style.backgroundAttachment = t.bgStyle && t.bgStyle !== 'solid' ? 'fixed' : '';
+      }
       if (t.textColor) {
         document.documentElement.style.setProperty('--portal-header-text', t.textColor);
         document.documentElement.style.setProperty('--portal-header-muted', t.textColor);
       }
+      renderPortalLogo(t.portalLogo || portalBusinessLogoSrc);
       const metaTheme = document.querySelector('meta[name="theme-color"]');
       if (metaTheme && t.headerColor) metaTheme.setAttribute('content', t.headerColor);
     }
