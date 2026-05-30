@@ -48,17 +48,16 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 28px 28px 0;
+            padding: 28px 28px 6px;
             border-bottom: 1px solid rgba(219,228,239,0.9);
         }
         .proposal-logo-row img {
-            width: clamp(230px, 34vw, 430px);
+            width: auto;
             max-width: 100%;
-            max-height: 176px;
-            height: auto;
+            height: clamp(185px, 18vw, 250px);
             object-fit: contain;
             display: block;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
         }
         .proposal-eyebrow {
             display: inline-flex;
@@ -622,8 +621,9 @@
                 padding: 14px 16px 0;
             }
             .proposal-logo-row img {
-                width: min(285px, 82vw);
-                max-height: 132px;
+                width: auto;
+                max-width: min(360px, 82vw);
+                height: 148px;
                 margin-bottom: 12px;
             }
             .proposal-title {
@@ -978,7 +978,7 @@ if (location.search.includes('debug')) {
             );
         } catch(e) { console.warn('Supabase init failed:', e); }
     </script>
-    <script src="supabase-v2.js?v=1778194800"></script>
+    <script src="supabase-v2.js?v=1779130000"></script>
     <script src="change-orders.js?v=1778152100"></script>
 
     <script>
@@ -1406,6 +1406,21 @@ if (location.search.includes('debug')) {
             return isFinite(parsed) ? parsed : 0;
         }
 
+        function viewerMoney(value, options) {
+            options = options || {};
+            var amount = viewerNumber(value);
+            var sign = '';
+            if (options.forceSign) {
+                sign = amount >= 0 ? '+' : '-';
+            } else if (amount < 0) {
+                sign = '-';
+            }
+            return sign + '$' + Math.abs(amount).toLocaleString('en-CA', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
         function viewerHasExplicitTotal(item) {
             return !!item && item.total !== undefined && item.total !== null && item.total !== '' && isFinite(parseFloat(item.total));
         }
@@ -1456,9 +1471,9 @@ if (location.search.includes('debug')) {
                 var optionTotal = optionQty * (parseFloat(option.rate) || 0);
                 var optionArg = JSON.stringify(option.id || '').replace(/"/g, '&quot;');
                 html += '<div class="col-md-6"><button type="button" class="w-100 text-start btn ' + (checked ? 'btn-primary' : 'btn-outline-primary') + '" ' + (isSignedDiff ? 'disabled' : 'onclick="toggleViewerChoiceOption(' + roomIdx + ',' + itemIndex + ',' + optionArg + ')"') + '>';
-                html += '<div class="d-flex justify-content-between gap-2"><span><i class="fas ' + (checked ? 'fa-check-circle' : 'fa-circle') + ' me-1"></i>' + escapeHtml(option.name) + '</span><strong>$' + optionTotal.toFixed(2) + '</strong></div>';
+                html += '<div class="d-flex justify-content-between gap-2"><span><i class="fas ' + (checked ? 'fa-check-circle' : 'fa-circle') + ' me-1"></i>' + escapeHtml(option.name) + '</span><strong>' + viewerMoney(optionTotal) + '</strong></div>';
                 if (option.itemDescription || option.description) html += '<div class="small opacity-75 mt-1">' + escapeHtml(option.itemDescription || option.description) + '</div>';
-                html += '<div class="small opacity-75 mt-1">' + optionQty + ' ' + escapeHtml(option.unitType || item.unitType || '') + ' @ $' + (parseFloat(option.rate) || 0).toFixed(2) + '</div>';
+                html += '<div class="small opacity-75 mt-1">' + optionQty + ' ' + escapeHtml(option.unitType || item.unitType || '') + ' @ ' + viewerMoney(option.rate) + '</div>';
                 html += '</button></div>';
             });
             html += '</div></div>';
@@ -1639,10 +1654,10 @@ if (location.search.includes('debug')) {
 
             // Show original total
             const originalTotal = quoteData.grandTotal || 0;
-            document.getElementById('originalTotalDisplay').textContent = '$' + originalTotal.toFixed(2);
-            document.getElementById('newGrandTotal').textContent = '$' + originalTotal.toFixed(2);
+            document.getElementById('originalTotalDisplay').textContent = viewerMoney(originalTotal);
+            document.getElementById('newGrandTotal').textContent = viewerMoney(originalTotal);
             var heroTotal = document.getElementById('heroGrandTotal');
-            if (heroTotal) heroTotal.textContent = '$' + originalTotal.toFixed(2);
+            if (heroTotal) heroTotal.textContent = viewerMoney(originalTotal);
 
             // Set hidden form fields
             document.getElementById('quoteId').value = quoteData.id || '';
@@ -1654,9 +1669,7 @@ if (location.search.includes('debug')) {
             const showScopeNotes = sendStyle.showScopeNotes !== false;
 
             function money(value, showSign) {
-                var amount = parseFloat(value) || 0;
-                var sign = showSign ? (amount >= 0 ? '+' : '-') : (amount < 0 ? '-' : '');
-                return sign + '$' + Math.abs(amount).toFixed(2);
+                return viewerMoney(value, { forceSign: !!showSign });
             }
 
             if (sendStyle.clientMessage) {
@@ -1699,16 +1712,16 @@ if (location.search.includes('debug')) {
                     '<div class="co-price-row"><span>Original accepted quote</span><strong>' + money(parentTotal, false) + '</strong></div>' +
                     '<div class="co-price-row"><span>Approved previous change orders</span><strong>' + money(previousApproved, previousApproved !== 0) + '</strong></div>' +
                     '<div class="co-price-row"><span>Added work</span><strong class="co-positive">' + money(coSummary.addedSubtotal || 0, true) + '</strong></div>' +
-                    '<div class="co-price-row"><span>Credits / deductions</span><strong class="co-negative">-$' + Math.abs(parseFloat(coSummary.creditSubtotal || 0) || 0).toFixed(2) + '</strong></div>' +
+                    '<div class="co-price-row"><span>Credits / deductions</span><strong class="co-negative">-' + viewerMoney(Math.abs(viewerNumber(coSummary.creditSubtotal || 0))) + '</strong></div>' +
                     '<div class="co-price-row"><span>Net change before tax</span><strong>' + money(coSummary.netSubtotal || 0, true) + '</strong></div>' +
                     '<div class="co-price-row"><span>Tax on this change</span><strong>' + money(coSummary.tax || 0, true) + '</strong></div>' +
                     '<div class="co-price-row"><span>This change order total</span><strong>' + money(netChange, true) + '</strong></div>' +
                     '<div class="co-price-row co-price-final"><span>Updated project total if approved</span><strong>' + money(projectedTotal, false) + '</strong></div>' +
                     '</div>' +
                     '</div>';
-                document.getElementById('originalTotalDisplay').textContent = '$' + parentTotal.toFixed(2);
-                document.getElementById('newGrandTotal').textContent = '$' + projectedTotal.toFixed(2);
-                if (heroTotal) heroTotal.textContent = (netChange >= 0 ? '+' : '-') + '$' + Math.abs(netChange).toFixed(2);
+                document.getElementById('originalTotalDisplay').textContent = viewerMoney(parentTotal);
+                document.getElementById('newGrandTotal').textContent = viewerMoney(projectedTotal);
+                if (heroTotal) heroTotal.textContent = viewerMoney(netChange, { forceSign: true });
             }
 
             // Show upgrade diff banner if quote was modified by client when signing
@@ -1779,7 +1792,7 @@ if (location.search.includes('debug')) {
 
                     if (pricingMode === 'category') {
                         const catSubtotal = catEntries.reduce((sum, entry) => entry.item._removed ? sum : sum + viewerItemActiveTotal(entry.item), 0);
-                        html += `<div class="d-flex justify-content-between py-2 border-bottom"><span>${catEntries.length} item${catEntries.length === 1 ? '' : 's'}</span><strong>$${catSubtotal.toFixed(2)}</strong></div>`;
+                        html += `<div class="d-flex justify-content-between py-2 border-bottom"><span>${catEntries.length} item${catEntries.length === 1 ? '' : 's'}</span><strong>${viewerMoney(catSubtotal)}</strong></div>`;
                         return;
                     }
 
@@ -1822,7 +1835,7 @@ if (location.search.includes('debug')) {
                             <div class="py-2 border-bottom" id="item_${roomIdx}_${itemIndex}" style="opacity:0.6; background:#fff5f5;">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <span><s class="text-muted">${item.description || item.name || 'Item'}</s> <span class="badge bg-danger ms-1">Removed by client</span></span>
-                                    <span class="text-muted small">-$${viewerItemBaseTotal(item).toFixed(2)}</span>
+                                    <span class="text-muted small">-${viewerMoney(viewerItemBaseTotal(item))}</span>
                                 </div>
                             </div>`;
                         } else {
@@ -1846,14 +1859,14 @@ if (location.search.includes('debug')) {
                                     ${isOptional && !isSignedDiff ? '<span class="badge bg-info ms-2" style="font-size:0.65em;">Optional</span>' : ''}
                                 </div>
                                 <div style="text-align:right; min-width:140px; padding-left:16px;">
-                                    <div><strong>$${itemTotal.toFixed(2)}</strong></div>
-                                    <small class="text-muted">${typeof qdFormatQuantity === 'function' ? qdFormatQuantity(item.quantity, item.unitType || item.unit || '') : (item.quantity + ' ' + (item.unitType || ''))} @ $${activeRate.toFixed(2)}</small>
+                                    <div><strong>${viewerMoney(itemTotal)}</strong></div>
+                                    <small class="text-muted">${typeof qdFormatQuantity === 'function' ? qdFormatQuantity(item.quantity, item.unitType || item.unit || '') : (item.quantity + ' ' + (item.unitType || ''))} @ ${viewerMoney(activeRate)}</small>
                                 </div>
                             </div>
                             ${renderExpandableDescription(displayDesc, `itemdesc_${roomIdx}_${itemIndex}`)}
                             ${visibleNotes ? `<div class="text-muted mb-1"><small><i class="fas fa-info-circle"></i> ${visibleNotes}</small></div>` : ''}
                             ${isSignedDiff ? `
-                                ${wasUpgraded && origItem ? `<div class="mt-1"><span class="badge bg-success me-1"><i class="fas fa-arrow-up me-1"></i>Upgraded by client</span><span class="text-muted small">was: ${origItem.description} @ $${viewerNumber(origItem.rate).toFixed(2)} = $${viewerItemBaseTotal(origItem).toFixed(2)}</span></div>` : ''}
+                                ${wasUpgraded && origItem ? `<div class="mt-1"><span class="badge bg-success me-1"><i class="fas fa-arrow-up me-1"></i>Upgraded by client</span><span class="text-muted small">was: ${origItem.description} @ ${viewerMoney(origItem.rate)} = ${viewerMoney(viewerItemBaseTotal(origItem))}</span></div>` : ''}
                             ` : `
                             <div class="d-flex gap-2 mt-1 flex-wrap">
                                 ${hasUpgrade ? `
@@ -1880,7 +1893,7 @@ if (location.search.includes('debug')) {
                             <hr>
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <strong>Room Total:</strong>
-                                <span class="room-total" style="font-size: 1.2rem; font-weight: bold; color: #28a745;">$${roomTotal.toFixed(2)}</span>
+                                <span class="room-total" style="font-size: 1.2rem; font-weight: bold; color: #28a745;">${viewerMoney(roomTotal)}</span>
                             </div>
                             <div class="room-note-section">
                                 <button class="btn btn-sm btn-outline-secondary w-100 text-start" type="button"
@@ -2002,14 +2015,14 @@ if (location.search.includes('debug')) {
             const total = subtotal + tax;
 
             var baseEl = document.getElementById('originalTotalDisplay');
-            if (baseEl && !isChangeOrder) baseEl.textContent = `$${(quoteData.grandTotal || quoteData.total || total).toFixed(2)}`;
+            if (baseEl && !isChangeOrder) baseEl.textContent = viewerMoney(quoteData.grandTotal || quoteData.total || total);
 
             var upgradesEl = document.getElementById('upgradesTotalDisplay');
             if (upgradesEl) {
                 var selectedChoices = collectClientChoiceGroups();
                 upgradesEl.style.display = (upgradesTotal > 0 || selectedChoices.length) ? 'flex' : 'none';
                 upgradesEl.innerHTML = upgradesTotal > 0
-                    ? `<span>Selected upgrades${selectedChoices.length ? ' and options' : ''}</span><strong>+$${upgradesTotal.toFixed(2)}</strong>`
+                    ? `<span>Selected upgrades${selectedChoices.length ? ' and options' : ''}</span><strong>${viewerMoney(upgradesTotal, { forceSign: true })}</strong>`
                     : (selectedChoices.length ? `<span>Selected options</span><strong>${selectedChoices.length}</strong>` : '');
             }
 
@@ -2028,8 +2041,8 @@ if (location.search.includes('debug')) {
                     var amountEl = document.getElementById('depositAmountDisplay');
                     var remainingEl = document.getElementById('remainingBalanceDisplay');
                     if (labelEl) labelEl.textContent = `Deposit (${depositPct.toFixed(0)}%)`;
-                    if (amountEl) amountEl.textContent = `$${depositAmt.toFixed(2)}`;
-                    if (remainingEl) remainingEl.textContent = `$${remaining.toFixed(2)}`;
+                    if (amountEl) amountEl.textContent = viewerMoney(depositAmt);
+                    if (remainingEl) remainingEl.textContent = viewerMoney(remaining);
                 }
             }
             if (isChangeOrder) {
@@ -2039,11 +2052,11 @@ if (location.search.includes('debug')) {
                 var projectedTotal = parentTotal + previousApproved + total;
                 var summary = quoteData.changeOrderPriceSummary || {};
                 var baseElCo = document.getElementById('originalTotalDisplay');
-                if (baseElCo) baseElCo.textContent = `$${parentTotal.toFixed(2)}`;
+                if (baseElCo) baseElCo.textContent = viewerMoney(parentTotal);
                 var upgradesElCo = document.getElementById('upgradesTotalDisplay');
                 if (upgradesElCo) {
                     upgradesElCo.style.display = 'flex';
-                    upgradesElCo.innerHTML = `<span>This change order</span><strong>${total >= 0 ? '+' : '-'}$${Math.abs(total).toFixed(2)}</strong>`;
+                    upgradesElCo.innerHTML = `<span>This change order</span><strong>${viewerMoney(total, { forceSign: true })}</strong>`;
                 }
                 if (quoteData.changeOrderPriceSummary) {
                     quoteData.changeOrderPriceSummary = Object.assign({}, summary, {
@@ -2052,14 +2065,14 @@ if (location.search.includes('debug')) {
                         updatedTotal: projectedTotal
                     });
                 }
-                document.getElementById('newGrandTotal').textContent = `$${projectedTotal.toFixed(2)}`;
+                document.getElementById('newGrandTotal').textContent = viewerMoney(projectedTotal);
                 var heroTotal = document.getElementById('heroGrandTotal');
-                if (heroTotal) heroTotal.textContent = `${total >= 0 ? '+' : '-'}$${Math.abs(total).toFixed(2)}`;
+                if (heroTotal) heroTotal.textContent = viewerMoney(total, { forceSign: true });
                 return;
             }
-            document.getElementById('newGrandTotal').textContent = `$${total.toFixed(2)}`;
+            document.getElementById('newGrandTotal').textContent = viewerMoney(total);
             var heroTotal = document.getElementById('heroGrandTotal');
-            if (heroTotal) heroTotal.textContent = `$${total.toFixed(2)}`;
+            if (heroTotal) heroTotal.textContent = viewerMoney(total);
         }
 
         function hasClientNotes() {
@@ -2504,9 +2517,10 @@ if (location.search.includes('debug')) {
             _paymentSettings = await loadContractorPaymentSettings(contractorUserId);
             if (!_paymentSettings || !_paymentSettings.stripe_enabled || !_paymentSettings.accept_deposit) return;
             var pct = _paymentSettings.deposit_default_pct || 50;
-            var depositAmt = (total * pct / 100).toFixed(2);
-            document.getElementById('depositBtnLabel').textContent = 'Pay ' + pct + '% Deposit \u2014 $' + depositAmt;
-            document.getElementById('depositPromptText').textContent = 'A ' + pct + '% deposit ($' + depositAmt + ') is required to confirm your project.';
+            var depositAmt = total * pct / 100;
+            var depositText = viewerMoney(depositAmt);
+            document.getElementById('depositBtnLabel').textContent = 'Pay ' + pct + '% Deposit \u2014 ' + depositText;
+            document.getElementById('depositPromptText').textContent = 'A ' + pct + '% deposit (' + depositText + ') is required to confirm your project.';
             document.getElementById('stripeDepositSection').style.display = 'block';
         }
 

@@ -917,6 +917,10 @@
             text-align: right;
             white-space: nowrap;
         }
+        .quote-item-profit-cell {
+            border-left: 1px solid #e9ecef;
+            color: #495057;
+        }
         .quote-item-actions-cell .quote-item-actions {
             justify-content: flex-end;
         }
@@ -1080,7 +1084,7 @@
 
 </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-v2.js?v=1778194800"></script>
+    <script src="supabase-v2.js?v=1779130000"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <!-- Eruda mobile console (only loads with ?debug in URL) -->
@@ -3268,7 +3272,7 @@ Example:
                         <strong>${item.name}</strong>
                         <small style="color:#888; margin-left:6px;">${cat}</small>
                     </div>
-                    <small style="color:#0652DD;">$${parseFloat(item.rate).toFixed(2)}/${item.unitType}</small>
+                        <small style="color:#0652DD;">${qdFormatMoney(item.rate)}/${item.unitType}</small>
                 </div>`).join('');
             dropdown.style.display = 'block';
 
@@ -4341,11 +4345,11 @@ Example:
                         '<div class="d-flex justify-content-between align-items-start gap-2">' +
                         '<span class="flex-grow-1">' +
                         '<span class="d-block fw-bold">' + qdTemplateEscapeHtml(option.name || option.description || 'Option') + '</span>' +
-                        '<span class="d-block small text-muted">' + qdTemplateEscapeHtml(qty + ' ' + (option.unitType || groupedItem.unitType || groupedItem.unit || '')) + ' @ $' + (parseFloat(option.rate) || 0).toFixed(2) + '</span>' +
+                        '<span class="d-block small text-muted">' + qdTemplateEscapeHtml(qty + ' ' + (option.unitType || groupedItem.unitType || groupedItem.unit || '')) + ' @ ' + qdFormatMoney(option.rate) + '</span>' +
                         (option.itemDescription || option.description ? '<span class="d-block small mt-1">' + qdTemplateEscapeHtml(option.itemDescription || option.description) + '</span>' : '') +
                         '</span>' +
                         '<span class="text-end">' +
-                        '<strong>$' + total.toFixed(2) + '</strong>' +
+                        '<strong>' + qdFormatMoney(total) + '</strong>' +
                         '<span class="d-block quote-choice-option-check text-primary mt-1"><i class="far fa-circle"></i></span>' +
                         '</span>' +
                         '</div>' +
@@ -4988,7 +4992,7 @@ Example:
                         '<div class="d-flex justify-content-between align-items-start gap-2">' +
                         '<span class="flex-grow-1">' +
                         '<span class="d-block fw-bold">' + qdTemplateEscapeHtml(option.name || option.description || 'Option') + '</span>' +
-                        '<span class="d-block small text-muted">' + qdTemplateEscapeHtml(option.category || groupedItem.category || 'Saved Item') + ' - $' + (parseFloat(option.rate) || 0).toFixed(2) + '</span>' +
+                        '<span class="d-block small text-muted">' + qdTemplateEscapeHtml(option.category || groupedItem.category || 'Saved Item') + ' - ' + qdFormatMoney(option.rate) + '</span>' +
                         '</span>' +
                         '<span class="turn-off-grouping-check text-primary"><i class="far fa-circle"></i></span>' +
                         '</div>' +
@@ -5230,15 +5234,15 @@ Example:
 
             document.getElementById('subtotalDisplay').textContent = window._quoteDocumentType === 'change_order'
                 ? coMoney(subtotal, _sym, true)
-                : _sym + subtotal.toFixed(2);
+                : qdFormatMoney(subtotal, _sym);
             var taxLabelEl = document.getElementById('taxLabelDisplay');
             if (taxLabelEl) taxLabelEl.textContent = _taxLabel + ' (' + (_taxRate*100).toFixed(1).replace(/\.0$/,'') + '%)';
             document.getElementById('taxDisplay').textContent = window._quoteDocumentType === 'change_order'
                 ? coMoney(tax, _sym, true)
-                : _sym + tax.toFixed(2);
+                : qdFormatMoney(tax, _sym);
             document.getElementById('grandTotalDisplay').textContent = window._quoteDocumentType === 'change_order'
                 ? coMoney(total, _sym, true)
-                : _sym + total.toFixed(2);
+                : qdFormatMoney(total, _sym);
 
             // Keep sticky total bar in sync
             const stickyAmt = document.getElementById('stickyTotalAmount');
@@ -5246,9 +5250,9 @@ Example:
             const stickyTax = document.getElementById('stickyTax');
             if (stickyAmt) stickyAmt.textContent = window._quoteDocumentType === 'change_order'
                 ? coMoney(total, _sym, true)
-                : _sym + total.toFixed(2);
-            if (stickySub) stickySub.textContent = 'Subtotal: ' + (window._quoteDocumentType === 'change_order' ? coMoney(subtotal, _sym, true) : _sym + subtotal.toFixed(2));
-            if (stickyTax) stickyTax.textContent = _taxLabel + ': ' + (window._quoteDocumentType === 'change_order' ? coMoney(tax, _sym, true) : _sym + tax.toFixed(2));
+                : qdFormatMoney(total, _sym);
+            if (stickySub) stickySub.textContent = 'Subtotal: ' + (window._quoteDocumentType === 'change_order' ? coMoney(subtotal, _sym, true) : qdFormatMoney(subtotal, _sym));
+            if (stickyTax) stickyTax.textContent = _taxLabel + ': ' + (window._quoteDocumentType === 'change_order' ? coMoney(tax, _sym, true) : qdFormatMoney(tax, _sym));
             updateChangeOrderPriceSummary({
                 addedSubtotal: coAddedSubtotal,
                 creditSubtotal: coCreditSubtotal,
@@ -5267,15 +5271,29 @@ Example:
             const remaining = total - depositAmt;
             const depositAmtEl = document.getElementById('depositAmountDisplay');
             const remainingEl = document.getElementById('remainingBalanceDisplay');
-            if (depositAmtEl) depositAmtEl.textContent = depositAmt.toFixed(2);
-            if (remainingEl) remainingEl.textContent = remaining.toFixed(2);
+            if (depositAmtEl) depositAmtEl.textContent = qdFormatMoney(depositAmt, '').trim();
+            if (remainingEl) remainingEl.textContent = qdFormatMoney(remaining, '').trim();
             updateProfitReport();
+        }
+
+        function qdFormatMoney(value, symbol, options) {
+            var amount = parseFloat(value) || 0;
+            var opts = options || {};
+            var sign = '';
+            if (opts.showSign) {
+                sign = amount >= 0 ? '+' : '-';
+            } else if (amount < 0) {
+                sign = '-';
+            }
+            return sign + (symbol === undefined ? '$' : symbol) + Math.abs(amount).toLocaleString('en-CA', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
         }
 
         function coMoney(value, symbol, showSign) {
             var amount = parseFloat(value) || 0;
-            var sign = showSign ? (amount >= 0 ? '+' : '-') : (amount < 0 ? '-' : '');
-            return sign + (symbol || '$') + Math.abs(amount).toFixed(2);
+            return qdFormatMoney(amount, symbol || '$', { showSign: !!showSign });
         }
 
         function updateChangeOrderPriceSummary(summary) {
@@ -5310,7 +5328,7 @@ Example:
                 '<div class="co-summary-row"><span>Original accepted quote</span><strong>' + coMoney(originalTotal, symbol, false) + '</strong></div>' +
                 '<div class="co-summary-row"><span>Approved previous change orders</span><strong>' + coMoney(previousApproved, symbol, previousApproved !== 0) + '</strong></div>' +
                 '<div class="co-summary-row"><span>Added work</span><strong class="co-positive">' + coMoney(summary.addedSubtotal || 0, symbol, true) + '</strong></div>' +
-                '<div class="co-summary-row"><span>Credits / deductions</span><strong class="co-negative">-' + symbol + Math.abs(parseFloat(summary.creditSubtotal || 0) || 0).toFixed(2) + '</strong></div>' +
+                '<div class="co-summary-row"><span>Credits / deductions</span><strong class="co-negative">' + qdFormatMoney(-Math.abs(parseFloat(summary.creditSubtotal || 0) || 0), symbol) + '</strong></div>' +
                 '<div class="co-summary-row"><span>Net change before tax</span><strong>' + coMoney(summary.subtotal || 0, symbol, true) + '</strong></div>' +
                 '<div class="co-summary-row"><span>' + qdTemplateEscapeHtml(taxLabel) + ' on this change' + (taxPct ? ' (' + taxPct + '%)' : '') + '</span><strong>' + coMoney(summary.tax || 0, symbol, true) + '</strong></div>' +
                 '<div class="co-summary-row"><span>This change order total</span><strong>' + coMoney(netChange, symbol, true) + '</strong></div>' +
@@ -6113,18 +6131,22 @@ Example:
                 totalRevenue += roomRevenue;
                 totalMaterialCost += roomMaterial;
                 if (roomRevenue > 0) {
+                    var roomProfitText = qdFormatMoney(roomProfit);
                     roomRows += '<div class="d-flex justify-content-between py-1 border-bottom"><span>' + room.name + '</span>' +
-                        '<span class="' + (roomProfit >= 0 ? 'text-success' : 'text-danger') + '">$' + roomProfit.toFixed(2) + ' (' + roomMargin.toFixed(0) + '%)</span></div>';
+                        '<span class="' + (roomProfit >= 0 ? 'text-success' : 'text-danger') + '">' + roomProfitText + ' (' + roomMargin.toFixed(0) + '%)</span></div>';
                 }
             });
             var totalProfit = totalRevenue - totalMaterialCost;
             var totalMargin = totalRevenue > 0 ? (totalProfit / totalRevenue * 100) : 0;
+            var totalRevenueText = qdFormatMoney(totalRevenue);
+            var totalMaterialCostText = qdFormatMoney(-totalMaterialCost);
+            var totalProfitText = qdFormatMoney(totalProfit);
             var html = '<div class="card border-0 bg-light p-3">';
             html += '<div class="fw-bold mb-2"><i class="fas fa-chart-bar me-1"></i>Job Profit Summary</div>';
             html += roomRows;
-            html += '<div class="d-flex justify-content-between pt-2 mt-1"><span class="text-muted">Total Revenue</span><span>$' + totalRevenue.toFixed(2) + '</span></div>';
-            html += '<div class="d-flex justify-content-between"><span class="text-muted">Material Costs</span><span class="text-danger">-$' + totalMaterialCost.toFixed(2) + '</span></div>';
-            html += '<div class="d-flex justify-content-between fw-bold border-top pt-2 mt-1"><span>Estimated Profit</span><span class="' + (totalProfit >= 0 ? 'text-success' : 'text-danger') + '">$' + totalProfit.toFixed(2) + ' (' + totalMargin.toFixed(0) + '%)</span></div>';
+            html += '<div class="d-flex justify-content-between pt-2 mt-1"><span class="text-muted">Total Revenue</span><span>' + totalRevenueText + '</span></div>';
+            html += '<div class="d-flex justify-content-between"><span class="text-muted">Material Costs</span><span class="text-danger">' + totalMaterialCostText + '</span></div>';
+            html += '<div class="d-flex justify-content-between fw-bold border-top pt-2 mt-1"><span>Estimated Profit</span><span class="' + (totalProfit >= 0 ? 'text-success' : 'text-danger') + '">' + totalProfitText + ' (' + totalMargin.toFixed(0) + '%)</span></div>';
             if (totalMaterialCost === 0) html += '<p class="text-muted mt-2 mb-0" style="font-size:0.8rem;"><i class="fas fa-info-circle me-1"></i>Add material costs to line items for accurate profit tracking.</p>';
             html += '</div>';
             content.innerHTML = html;
@@ -6194,12 +6216,26 @@ Example:
             const quantity = parseFloat(document.getElementById('lineQuantity').value) || 0;
             const materialCost = parseFloat(document.getElementById('lineMaterialCost').value) || 0;
             const totalMaterialCost = quantity * materialCost;
-            document.getElementById('materialTotalDisplay').textContent = '$' + totalMaterialCost.toFixed(2);
+            document.getElementById('materialTotalDisplay').textContent = qdFormatMoney(totalMaterialCost);
+        }
+
+        function isLineProfitDetailsVisible() {
+            var profitReportEl = document.getElementById('profitReport');
+            return !!(window._showLineProfitDetails || (profitReportEl && profitReportEl.classList.contains('show')));
+        }
+
+        function syncLineProfitDetailsVisibility(visible) {
+            var nextValue = !!visible;
+            if (window._showLineProfitDetails === nextValue) return;
+            window._showLineProfitDetails = nextValue;
+            renderRooms();
+            calculateTotals();
         }
 
         function renderRooms() {
             const container = document.getElementById('roomsContainer');
             ensureUniqueRoomIds();
+            const showLineProfitDetails = isLineProfitDetailsVisible();
 
             if (rooms.length === 0) {
                 container.innerHTML = `
@@ -6233,7 +6269,7 @@ Example:
                 html += '<div>';
                 var roomIcon = room.icon || 'fa-door-open';
                 html += '<h3><span class="drag-handle" title="Drag to reorder">&#8801;</span><i class="fas ' + roomIcon + ' room-icon-btn" data-room-id="' + room.id + '" onclick="openIconPicker(' + room.id + ', this)" title="Click to change icon" style="cursor:pointer;"></i> <span id="roomName_' + room.id + '" class="room-name-display" onclick="editRoomName(' + room.id + ')" style="cursor:pointer; text-decoration:underline dotted; padding:2px 4px;" title="Click to edit">' + room.name + '</span></h3>';
-                html += '<p class="mb-0">' + room.items.length + ' items | Total: $' + roomTotal.toFixed(2) + '</p>';
+                html += '<p class="mb-0">' + room.items.length + ' items | Total: ' + qdFormatMoney(roomTotal) + '</p>';
                 html += '</div>';
                 // Color swatches
                 html += '<div class="color-picker-swatches mt-1">';
@@ -6294,7 +6330,6 @@ Example:
                 html += '</div>';
 
                 if (room.items.length > 0) {
-                    const hasMaterialCosts = room.items.some(item => item.materialCost > 0);
                     const markupFactor = 1 + (room.markup || 0) / 100;
 
                     // Build category groups in default trade order
@@ -6321,7 +6356,6 @@ Example:
                     orderedCats.forEach(cat => {
                         const entries = groups[cat];
                         if (!entries) return;
-                        const colSpan = hasMaterialCosts ? 7 : 6;
                         const catDisplay = canonicalCat(cat);
 
                         html += '<div class="cat-group-block" data-cat="' + cat + '">';
@@ -6332,7 +6366,9 @@ Example:
                         html += '<span class="cat-drag-handle" title="Drag to reorder category">&#8801;</span>';
                         html += renderCategoryIconMarkup(catIcon, 'me-1', 'color:#6c757d;') + catDisplay;
                         html += '</div>';
-                        var quoteItemTableColgroup = '<col style="width:32px"><col style="width:34px"><col><col style="width:96px"><col style="width:86px"><col style="width:100px">' + (hasMaterialCosts ? '<col style="width:116px">' : '') + '<col style="width:220px">';
+                        var quoteItemTableColgroup = '<col style="width:32px"><col style="width:34px"><col><col style="width:96px"><col style="width:86px"><col style="width:100px">';
+                        if (showLineProfitDetails) quoteItemTableColgroup += '<col style="width:118px">';
+                        quoteItemTableColgroup += '<col style="width:220px">';
                         html += '<div style="overflow-x:auto;"><table class="table table-sm mb-0 quote-items-table"><colgroup>' + quoteItemTableColgroup + '</colgroup><tbody>';
 
                         entries.forEach(({ item, origIndex }) => {
@@ -6375,7 +6411,7 @@ Example:
                                 html += ' <span class="badge ' + badgeClass + '">' + coStatus.replace(/^\w/, function(ch) { return ch.toUpperCase(); }) + '</span>';
                             }
                             if (item._coOriginal) {
-                                html += '<span class="co-original-summary">Original: ' + qdTemplateEscapeHtml(coFormatQty(item._coOriginal.quantity, item._coOriginal.unitType || item.unitType || item.unit || '')) + ' @ $' + (parseFloat(item._coOriginal.rate) || 0).toFixed(2) + '</span>';
+                                html += '<span class="co-original-summary">Original: ' + qdTemplateEscapeHtml(coFormatQty(item._coOriginal.quantity, item._coOriginal.unitType || item.unitType || item.unit || '')) + ' @ ' + qdFormatMoney(item._coOriginal.rate) + '</span>';
                             }
                             if (item.changeOrderNote) {
                                 html += '<div class="co-change-note"><i class="fas fa-pen-to-square me-1"></i>' + qdTemplateEscapeHtml(item.changeOrderNote) + '</div>';
@@ -6385,22 +6421,23 @@ Example:
                             if (item.notes) html += '<div id="' + _descId + '_notes" class="quote-item-job-note" style="display:none;"><small><i class="fas fa-sticky-note me-1"></i><strong>Job note:</strong> ' + qdTemplateEscapeHtml(item.notes || '') + '</small></div>';
                             html += '</td>';
                             html += '<td class="quote-item-qty-cell">' + formatQuoteQuantityDisplay(item.quantity, item.unitType || item.unit || '') + '</td>';
-                            html += '<td class="quote-item-rate-cell">$' + displayRate.toFixed(2) + '</td>';
-                            var displayTotalText = (displayTotal < 0 ? '-$' : '$') + Math.abs(displayTotal).toFixed(2);
+                            var displayRateText = qdFormatMoney(displayRate);
+                            html += '<td class="quote-item-rate-cell">' + displayRateText + '</td>';
+                            var displayTotalText = qdFormatMoney(displayTotal);
                             html += '<td class="quote-item-total-cell"><strong>' + displayTotalText + '</strong>';
                             if (coStatus && item._coOriginal) {
                                 var deltaTotal = (parseFloat(item.total) || 0) * markupFactor;
-                                var deltaText = (deltaTotal >= 0 ? '+$' : '-$') + Math.abs(deltaTotal).toFixed(2);
+                                var deltaText = qdFormatMoney(deltaTotal, '$', { showSign: true });
                                 html += '<div class="small text-muted">Net change: ' + deltaText + '</div>';
                             }
                             html += '</td>';
-                            if (hasMaterialCosts) {
-                                const matCost = (item.materialCost || 0) * item.quantity;
-                                const profit = displayTotal - matCost;
-                                const margin = displayTotal > 0 ? (profit / displayTotal * 100).toFixed(0) : 0;
-                                const profitClass = profit >= 0 ? 'profit-positive' : 'profit-negative';
-                                const profitIcon = profit >= 0 ? '?' : '?';
-                                html += '<td class="quote-item-profit-cell ' + profitClass + '"><strong>' + profitIcon + ' $' + Math.abs(profit).toFixed(2) + '</strong><br><small>' + margin + '%</small></td>';
+                            if (showLineProfitDetails) {
+                                var profitQuantity = parseFloat(item.quantity) || 1;
+                                var lineMaterialCost = (parseFloat(item.materialCost) || 0) * profitQuantity;
+                                var lineProfit = displayTotal - lineMaterialCost;
+                                var lineMargin = displayTotal > 0 ? (lineProfit / displayTotal * 100) : 0;
+                                var lineProfitText = qdFormatMoney(lineProfit);
+                                html += '<td class="quote-item-profit-cell"><strong class="' + (lineProfit >= 0 ? 'text-success' : 'text-danger') + '">' + lineProfitText + '</strong><div class="small text-muted">' + lineMargin.toFixed(0) + '% margin</div></td>';
                             }
                             let upgradeBtn = '';
                             if (hasUpgrade && !hasChoiceGroup) {
@@ -7554,7 +7591,7 @@ Example:
                 html += `
                     <a class="dropdown-item" href="#" onclick="loadRecentQuote(${index}); return false;">
                         <i class="fas fa-file-alt"></i> ${quote.clientName || 'Client'} - ${quote.projectAddress}
-                        <small class="text-muted d-block">${new Date(quote.savedAt).toLocaleString()} | $${quote.grandTotal.toFixed(2)}</small>
+                        <small class="text-muted d-block">${new Date(quote.savedAt).toLocaleString()} | ${qdFormatMoney(quote.grandTotal)}</small>
                     </a>
                 `;
             });
@@ -8973,7 +9010,7 @@ Example:
             var unit = item.unitType || item.unit || (original && original.unitType) || '';
             if (!original) {
                 item._coChangeStatus = 'added';
-                item.changeOrderNote = 'Added ' + coFormatQty(item.quantity, unit) + ' @ $' + (parseFloat(item.rate) || 0).toFixed(2) + '.';
+                item.changeOrderNote = 'Added ' + coFormatQty(item.quantity, unit) + ' @ ' + qdFormatMoney(item.rate) + '.';
                 item.total = coLineAmount(item);
                 return item;
             }
@@ -8981,7 +9018,7 @@ Example:
             var originalTotal = original.total !== undefined ? parseFloat(original.total) || 0 : coLineAmount(original);
             if (item._coRemoved) {
                 item._coChangeStatus = 'removed';
-                item.changeOrderNote = 'Removed original line: ' + coFormatQty(original.quantity, original.unitType || unit) + ' @ $' + (parseFloat(original.rate) || 0).toFixed(2) + '.';
+                item.changeOrderNote = 'Removed original line: ' + coFormatQty(original.quantity, original.unitType || unit) + ' @ ' + qdFormatMoney(original.rate) + '.';
                 item.total = -Math.abs(originalTotal);
                 return item;
             }
@@ -9003,11 +9040,11 @@ Example:
 
             var parts = [];
             if (qtyChanged) parts.push('quantity ' + coFormatQty(original.quantity, original.unitType || unit) + ' to ' + coFormatQty(item.quantity, unit));
-            if (rateChanged) parts.push('rate $' + (parseFloat(original.rate) || 0).toFixed(2) + ' to $' + (parseFloat(item.rate) || 0).toFixed(2));
+            if (rateChanged) parts.push('rate ' + qdFormatMoney(original.rate) + ' to ' + qdFormatMoney(item.rate));
             if (descChanged) parts.push('item renamed from "' + original.description + '"');
             if (categoryChanged || unitChanged) parts.push('item details updated');
             item._coChangeStatus = 'changed';
-            item.changeOrderNote = 'Changed ' + (parts.length ? parts.join(', ') : 'line item') + '. Net ' + (delta >= 0 ? 'add' : 'credit') + ': $' + Math.abs(delta).toFixed(2) + '.';
+            item.changeOrderNote = 'Changed ' + (parts.length ? parts.join(', ') : 'line item') + '. Net ' + (delta >= 0 ? 'add' : 'credit') + ': ' + qdFormatMoney(Math.abs(delta)) + '.';
             item.total = delta;
             return item;
         }
@@ -9043,7 +9080,7 @@ Example:
             var meta = document.getElementById('changeOrderBannerMeta');
             if (meta) {
                 meta.textContent = isCo
-                    ? 'Linked to Quote #' + (window._parentQuoteNumber || '') + ' | Original total: $' + (parseFloat(window._parentQuoteTotal || 0) || 0).toFixed(2)
+                    ? 'Linked to Quote #' + (window._parentQuoteNumber || '') + ' | Original total: ' + qdFormatMoney(window._parentQuoteTotal || 0)
                     : '';
             }
             var badge = document.getElementById('changeOrderStatusBadge');
@@ -9138,7 +9175,7 @@ Example:
         // Save/load/session core moved to quote-storage.js
     </script>
     <script src="change-orders.js?v=1778152100"></script>
-    <script src="quote-storage.js?v=1778152100"></script>
+    <script src="quote-storage.js?v=1779130000"></script>
     <script>
         // -- End Save / Load ------------------------------------------------------
 
@@ -10132,12 +10169,12 @@ Example:
 
         function _voiceItemDisplay(item) {
             if (!item) return '';
-            return (item.category || 'Miscellaneous') + ' - ' + (item.name || item.description || '') + ' - $' + (parseFloat(item.rate || item.price || 0) || 0).toFixed(2) + '/' + (item.unitType || item.unit || 'ls');
+            return (item.category || 'Miscellaneous') + ' - ' + (item.name || item.description || '') + ' - ' + qdFormatMoney(item.rate || item.price || 0) + '/' + (item.unitType || item.unit || 'ls');
         }
 
         function _voiceMappingDisplay(mapping) {
             if (!mapping) return '';
-            return (mapping.mapped_item_category || mapping.category || 'Miscellaneous') + ' - ' + (mapping.mapped_item_name || mapping.name || '') + ' - $' + (parseFloat(mapping.mapped_price !== undefined ? mapping.mapped_price : mapping.rate) || 0).toFixed(2) + '/' + (mapping.mapped_unit || mapping.unitType || mapping.unit || 'ls');
+            return (mapping.mapped_item_category || mapping.category || 'Miscellaneous') + ' - ' + (mapping.mapped_item_name || mapping.name || '') + ' - ' + qdFormatMoney(mapping.mapped_price !== undefined ? mapping.mapped_price : mapping.rate) + '/' + (mapping.mapped_unit || mapping.unitType || mapping.unit || 'ls');
         }
 
         function _resolveVoiceReviewSelection(value) {
@@ -10886,7 +10923,7 @@ Example:
                     + '</div>'
                     + '<div class="small text-muted">What AI heard</div><div class="fw-semibold mb-2">"' + _escapeHtml(row.phrase || item.description || 'Item') + '"</div>'
                     + '<div class="small text-muted">AI parsed</div>'
-                    + '<div class="mb-2">' + _escapeHtml(item.description || 'Item') + ' - ' + _escapeHtml(formatQuoteQuantityDisplay(item.quantity || 1, item.unit || item.unitType || 'ls')) + ' @ $' + displayRate.toFixed(2) + calculation + '</div>'
+                    + '<div class="mb-2">' + _escapeHtml(item.description || 'Item') + ' - ' + _escapeHtml(formatQuoteQuantityDisplay(item.quantity || 1, item.unit || item.unitType || 'ls')) + ' @ ' + qdFormatMoney(displayRate) + calculation + '</div>'
                     + '<div class="row g-2 mb-2">'
                     + '<div class="col-6 col-md-4">'
                     + '<label class="form-label small fw-semibold" for="aiVoiceReviewQuantity' + index + '">Quantity</label>'
@@ -11272,6 +11309,16 @@ Example:
         // These run independently of auth - always fire on page load
         document.addEventListener('DOMContentLoaded', function() {
             loadInvoiceSettingsDefaultsFromCloud();
+            var profitReportEl = document.getElementById('profitReport');
+            if (profitReportEl) {
+                window._showLineProfitDetails = profitReportEl.classList.contains('show');
+                profitReportEl.addEventListener('shown.bs.collapse', function() {
+                    syncLineProfitDetailsVisibility(true);
+                });
+                profitReportEl.addEventListener('hidden.bs.collapse', function() {
+                    syncLineProfitDetailsVisibility(false);
+                });
+            }
             // Event delegation for Manage Items modal buttons (handles dynamically rendered form + rows)
             var manageItemsRoot = document.getElementById('manageItemsModal') || document.getElementById('customItemsList');
             if (manageItemsRoot) {
@@ -11405,7 +11452,7 @@ Example:
                     var cbId = 'upgradeCheck_' + i;
                     html += '<div class="d-flex align-items-center gap-2 mb-1 p-2 rounded" style="background:rgba(25,135,84,0.07);" id="upgradeRow_' + i + '">';
                     html += '<input type="checkbox" class="form-check-input" id="' + cbId + '" onchange="markBannerRow(\'upgradeRow_' + i + '\', this.checked)" style="width:16px;height:16px;">';
-                    html += '<label for="' + cbId + '" style="margin:0;cursor:pointer;"><strong>' + u.room + ':</strong> ' + u.from + ' ? <span class="text-success fw-bold">' + u.to + '</span> <span class="text-success">(+$' + parseFloat(u.diff||0).toFixed(2) + ')</span></label>';
+                    html += '<label for="' + cbId + '" style="margin:0;cursor:pointer;"><strong>' + u.room + ':</strong> ' + u.from + ' ? <span class="text-success fw-bold">' + u.to + '</span> <span class="text-success">(' + qdFormatMoney(u.diff || 0, '$', { showSign: true }) + ')</span></label>';
                     html += '</div>';
                 });
                 html += '</div>';

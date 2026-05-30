@@ -41,3 +41,20 @@ assert(
     storage.includes('handlePortalLockedBuilderLoad(q)'),
   'Quote builder load path should also block direct edits of portal-visible documents'
 );
+
+assert(
+  storage.includes('Choose Another Quote/Draft') &&
+    storage.includes("secondaryText: 'Start New Quote'") &&
+    storage.includes("quote-builder.html?new=1"),
+  'Quote builder portal lock should let users choose another draft or start a new quote'
+);
+
+assert(
+  /var _savedActiveId = localStorage\.getItem\("ald_active_quote_id"\);[\s\S]*?if \(quoteIsPortalLockedForBuilder\(result\.data\)\) \{[\s\S]*?await handlePortalLockedBuilderLoad\(result\.data\);[\s\S]*?return;[\s\S]*?\}/.test(storage),
+  'Last-opened quote restore should block portal-visible documents before applying quote data'
+);
+
+assert(
+  /var cloudQuoteId = localStorage\.getItem\('ald_open_cloud_quote'\);[\s\S]*?if \(quoteIsPortalLockedForBuilder\(result\.data\)\) \{[\s\S]*?handlePortalLockedBuilderLoad\(result\.data\);[\s\S]*?return;[\s\S]*?\}/.test(storage),
+  'Cloud quote handoff should block portal-visible documents before applying quote data'
+);

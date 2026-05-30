@@ -5,6 +5,13 @@ const source = fs.readFileSync('interactive-quote-viewer.html', 'utf8');
 
 assert(source.includes('function viewerItemBaseTotal'), 'interactive viewer should centralize base line total calculation');
 assert(source.includes('viewerItemActiveTotal(item)'), 'interactive viewer should use saved line totals for live total calculation');
+assert(source.includes('function viewerMoney'), 'interactive viewer should centralize money formatting');
+assert(source.includes("toLocaleString('en-CA'"), 'interactive viewer money should include thousands separators');
+assert(source.includes('viewerMoney(originalTotal)'), 'hero and original totals should use comma-formatted money');
+assert(source.includes('viewerMoney(total)'), 'updated quote totals should use comma-formatted money');
+assert(!source.includes("heroTotal.textContent = '$' + originalTotal.toFixed(2)"), 'hero total should not render ungrouped fixed decimals');
+assert(!source.includes("document.getElementById('newGrandTotal').textContent = `$${total.toFixed(2)}`"), 'bottom total should not render ungrouped fixed decimals');
+assert(source.includes('height: clamp(185px, 18vw, 250px)'), 'proposal logo should be larger on desktop');
 assert(source.includes('room.items.reduce((sum, item) => item._removed ? sum : sum + viewerItemActiveTotal(item), 0)'), 'room totals should use saved item totals and skip removed items');
 assert(source.includes('function viewerVisibleNotes'), 'interactive viewer should centralize note visibility so duplicate descriptions can be suppressed');
 assert(source.includes('viewerVisibleNotes(item, displayDesc)'), 'item rendering should hide notes that duplicate the displayed description');

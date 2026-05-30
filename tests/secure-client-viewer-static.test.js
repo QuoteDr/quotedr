@@ -14,11 +14,15 @@ const quoteViewerSource = read('interactive-quote-viewer.html');
 assert(edgeSource.includes('sha256Hex'), 'client-document edge function should hash share tokens');
 assert(edgeSource.includes('public_share_token_hash'), 'client-document should validate against hashed tokens stored on quote rows');
 assert(edgeSource.includes('portalAnchorId'), 'client-document should support token-scoped portal sibling document access');
+assert(edgeSource.includes('signedInUser?.id && signedInUser.id === target.user_id'), 'client-document should not mark owner preview sessions as client viewed');
+assert(edgeSource.includes('skipped: "owner_view"'), 'client-document should report owner view skips as unchanged');
 assert(!/select\\('\\*'\\).*eq\\('id', documentId\\).*single\\(\\)/s.test(edgeSource), 'client-document should avoid unbounded public row reads without token validation');
 
 assert(supabaseSource.includes('createSecureClientShareLink'), 'supabase-v2 should expose secure share-link creation');
 assert(supabaseSource.includes('loadSecureClientDocument'), 'supabase-v2 should expose secure public document loading');
 assert(supabaseSource.includes('updateSecureClientDocument'), 'supabase-v2 should expose secure public document updates');
+assert(supabaseSource.includes('getSupabaseOptionalUserFunctionHeaders'), 'secure document updates should include the current signed-in user when available');
+assert(supabaseSource.includes('session?.access_token'), 'optional secure update auth should use the current user access token instead of always using anon');
 
 assert(quoteStyleSource.includes('createSecureClientShareLink'), 'quote link generation should mint a secure share token');
 assert(quoteStyleSource.includes('token='), 'quote link generation should include the share token in the URL');

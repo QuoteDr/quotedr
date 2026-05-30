@@ -23,16 +23,43 @@
             return !!(row && row.data && row.data.portal_visible === true);
         }
 
+        function clearPortalLockedBuilderRestoreState() {
+            localStorage.removeItem("ald_active_quote_id");
+            localStorage.removeItem("ald_open_cloud_quote");
+            window._supabaseQuoteId = null;
+        }
+
         async function handlePortalLockedBuilderLoad(q) {
             var added = q && q.data && q.data.portal_added_at ? new Date(q.data.portal_added_at).toLocaleString() : '';
             var message = 'This document is already in a client portal and cannot be edited directly. Remove it from the portal in the dashboard to edit, or duplicate it as a new revision.';
             if (added) message += '\n\nAdded to portal: ' + added;
+            message += '\n\nChoose another quote/draft, or start a new quote.';
+            clearPortalLockedBuilderRestoreState();
             if (typeof qdAlert === 'function') {
-                await qdAlert(message, { title: 'Portal Document Locked', type: 'warning' });
+                var choice = true;
+                if (typeof qdConfirm === 'function') {
+                    choice = await qdConfirm(message, {
+                        title: 'Portal Document Locked',
+                        okText: 'Choose Another Quote/Draft',
+                        okClass: 'btn-primary',
+                        secondaryText: 'Start New Quote',
+                        secondaryValue: 'new',
+                        secondaryClass: 'btn-outline-success',
+                        cancelText: 'Dashboard',
+                        type: 'warning'
+                    });
+                } else {
+                    await qdAlert(message, { title: 'Portal Document Locked', type: 'warning' });
+                }
+                if (choice === 'new') {
+                    window.location.href = 'quote-builder.html?new=1';
+                } else {
+                    window.location.href = 'dashboard.html';
+                }
             } else {
                 alert(message);
+                window.location.href = 'dashboard.html';
             }
-            window.location.href = 'dashboard.html';
             return true;
         }
 
@@ -943,8 +970,12 @@ async function saveQuote() {
                 if (cloudQuoteId) {
                     localStorage.removeItem('ald_open_cloud_quote');
                     if (typeof loadQuoteFromSupabase === 'function') {
-                        loadQuoteFromSupabase(cloudQuoteId).then(function(result) {
+                        loadQuoteFromSupabase(cloudQuoteId).then(async function(result) {
                             if (result && result.data && result.data.data) {
+                                if (quoteIsPortalLockedForBuilder(result.data)) {
+                                    await handlePortalLockedBuilderLoad(result.data);
+                                    return;
+                                }
                                 var qData = result.data.data;
                                 qData.supabaseId = result.data.id;
                                 window._supabaseQuoteId = result.data.id;
@@ -978,13 +1009,25 @@ async function saveQuote() {
                 // Startup modal disabled - using draft warning banner instead
                 // Skip session restore if loading a specific quote from URL
                 var _urlp = new URLSearchParams(window.location.search);
-                if (!_urlp.get('load') && !_urlp.get('shownotes')) {
+                if (_urlp.get('new') === '1') {
+                    clearPortalLockedBuilderRestoreState();
+                    localStorage.removeItem('ald_session_quote');
+                    window._quoteFullyLoaded = true;
+                    if (!document.getElementById('quoteNumber').value) {
+                        document.getElementById('quoteNumber').value = nextQuoteNumberValue();
+                    }
+                    updateDraftWarning();
+                } else if (!_urlp.get('load') && !_urlp.get('shownotes')) {
                     var _savedActiveId = localStorage.getItem("ald_active_quote_id");
                     if (_savedActiveId && typeof loadQuoteFromSupabase === "function") {
                         // Reload the last opened quote from Supabase directly
                         window._supabaseQuoteId = _savedActiveId;
-                        loadQuoteFromSupabase(_savedActiveId).then(function(result) {
+                        loadQuoteFromSupabase(_savedActiveId).then(async function(result) {
                             if (result && result.data && result.data.data) {
+                                if (quoteIsPortalLockedForBuilder(result.data)) {
+                                    await handlePortalLockedBuilderLoad(result.data);
+                                    return;
+                                }
                                 var qData = result.data.data;
                                 qData.supabaseId = result.data.id;
                                 // Map fields - client_name lives at row level, rest in data JSON

@@ -60,6 +60,15 @@ function getSupabaseAnonFunctionHeaders() {
     };
 }
 
+async function getSupabaseOptionalUserFunctionHeaders() {
+    const headers = getSupabaseAnonFunctionHeaders();
+    try {
+        const { data: { session } } = await _supabase.auth.getSession();
+        if (session?.access_token) headers.Authorization = 'Bearer ' + session.access_token;
+    } catch (e) {}
+    return headers;
+}
+
 async function callClientDocumentFunction(body, requireUser) {
     const headers = requireUser ? await getSupabaseFunctionAuthHeaders() : getSupabaseAnonFunctionHeaders();
     const response = await fetch(CLIENT_DOCUMENT_FUNCTION_URL, {
@@ -101,13 +110,21 @@ async function loadSecureClientDocument(documentId, token, portalAnchorId) {
 async function updateSecureClientDocument(documentId, token, updateAction, payload, portalAnchorId) {
     if (!documentId || !token) return { error: 'Missing secure client link token' };
     try {
-        const data = await callClientDocumentFunction(Object.assign({
+        const data = await fetch(CLIENT_DOCUMENT_FUNCTION_URL, {
+            method: 'POST',
+            headers: await getSupabaseOptionalUserFunctionHeaders(),
+            body: JSON.stringify(Object.assign({
             action: 'update',
             updateAction: updateAction,
             documentId: documentId,
             token: token,
             portalAnchorId: portalAnchorId || ''
-        }, payload || {}), false);
+            }, payload || {}))
+        }).then(async function(response) {
+            const data = await response.json().catch(function() { return {}; });
+            if (!response.ok || data.error) throw new Error(data.error || 'Secure client document request failed');
+            return data;
+        });
         return { data: data.document, unchanged: data.unchanged };
     } catch (error) {
         return { error: error };

@@ -14,8 +14,28 @@ assert(
 );
 
 assert(
-  source.includes("hasMaterialCosts ? '<col style=\"width:116px\">' : ''"),
-  'Line item colgroup should reserve the profit/margin column only when material costs are shown'
+  source.includes('quote-item-profit-cell'),
+  'Quote builder should render a line-item profit column when profit report details are open'
+);
+
+assert(
+  source.includes('isLineProfitDetailsVisible()'),
+  'Line-item profit details should be gated by the profit report visibility state'
+);
+
+assert(
+  source.includes("profitReportEl.addEventListener('shown.bs.collapse'"),
+  'Opening the profit report should refresh line items with profit details visible'
+);
+
+assert(
+  source.includes("profitReportEl.addEventListener('hidden.bs.collapse'"),
+  'Closing the profit report should hide line-item profit details again'
+);
+
+assert(
+  !source.includes("profitIcon = profit >= 0 ? '?' : '?'"),
+  'Quote builder should not render broken question-mark profit icons in line item rows'
 );
 
 [

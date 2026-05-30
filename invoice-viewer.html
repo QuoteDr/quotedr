@@ -21,6 +21,21 @@
             padding-bottom: 1rem;
             border-bottom: 3px solid #111;
         }
+        .invoice-brand-lockup {
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+        }
+        .invoice-business-logo {
+            width: auto;
+            height: clamp(140px, 15vw, 172px);
+            max-width: min(360px, 34vw);
+            object-fit: contain;
+            flex: 0 0 auto;
+        }
+        .invoice-business-details {
+            min-width: 0;
+        }
 
         .invoice-badge {
             background: linear-gradient(135deg, #2d2d2d 0%, #111111 100%);
@@ -109,6 +124,24 @@
         .invoice-action-center { grid-column: 2; justify-self: center; }
         .invoice-action-right { grid-column: 3; justify-self: end; }
         @media (max-width: 520px) {
+            .invoice-header .row {
+                gap: 1rem;
+            }
+            .invoice-header .col-8,
+            .invoice-header .col-4 {
+                width: 100%;
+                text-align: left !important;
+            }
+            .invoice-brand-lockup {
+                align-items: flex-start;
+            }
+            .invoice-business-logo {
+                height: 118px;
+                max-width: 42vw;
+            }
+            .invoice-badge {
+                display: inline-block;
+            }
             .invoice-action-bar {
                 grid-template-columns: 1fr;
                 justify-items: stretch;
@@ -220,6 +253,7 @@
         @media print {
             .d-print-none, .no-print { display: none !important; }
             body { background: white !important; }
+            .invoice-business-logo { height: 120px; max-width: 260px; }
             .card { box-shadow: none !important; border: 1px solid #ddd !important; }
             .totals-section { box-shadow: none !important; }
             .warranty-section { break-inside: avoid; }
@@ -254,9 +288,9 @@ if (location.search.includes('debug')) {
         <div class="invoice-header">
             <div class="row align-items-center">
                 <div class="col-8">
-                    <div class="d-flex align-items-center gap-3">
-                        <img id="businessLogoImg" src="quotedr-logo.svg" alt="Company Logo" style="height: 120px; width: auto; max-width: 340px;">
-                        <div>
+                    <div class="invoice-brand-lockup">
+                        <img id="businessLogoImg" class="invoice-business-logo" src="quotedr-logo.svg" alt="Company Logo">
+                        <div class="invoice-business-details">
                             <h3 id="companyNameDisplay" class="mb-0" style="color:#2c3e50;"></h3>
                             <p id="companyTaglineDisplay" class="text-muted mb-0">Professional Services</p>
                             <div class="mt-2" id="businessInfoDisplay" style="font-size:0.8rem; color:#555; line-height:1.7;"></div>
@@ -421,7 +455,7 @@ if (location.search.includes('debug')) {
     <script src="help-content.js?v=1777741200"></script>
     <script src="modal-help.js?v=1777741200"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-v2.js?v=1778194800"></script>
+    <script src="supabase-v2.js?v=1779130000"></script>
     <script>
         const ROOM_COLORS = [
             'linear-gradient(135deg,#2d2d2d 0%,#111111 100%)',
@@ -456,7 +490,12 @@ if (location.search.includes('debug')) {
         function formatMoney(amount, currency) {
             var symbols = { CAD:'$', USD:'$', GBP:'\u00a3', EUR:'\u20ac', AUD:'$', NZD:'$' };
             var symbol = symbols[currency || 'CAD'] || '$';
-            return symbol + (Number(amount || 0)).toFixed(2);
+            var value = Number(amount || 0);
+            var sign = value < 0 ? '-' : '';
+            return sign + symbol + Math.abs(value).toLocaleString('en-CA', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
         }
 
         function escapeHtml(value) {
@@ -983,8 +1022,8 @@ if (location.search.includes('debug')) {
                                     ${descHtml}
                                 </td>
                                 <td style="text-align:center; vertical-align:top; padding-top:10px;">${typeof qdFormatQuantity === 'function' ? qdFormatQuantity(item.quantity || 0, item.unitType || item.unit || '') : ((item.quantity || 0) + ' ' + (item.unitType || ''))}</td>
-                                <td style="text-align:right; vertical-align:top; padding-top:10px;">$${activeRate.toFixed(2)}</td>
-                                <td style="text-align:right; vertical-align:top; padding-top:10px; font-weight:600;">$${itemTotal.toFixed(2)}</td>
+                                <td style="text-align:right; vertical-align:top; padding-top:10px;">${formatMoney(activeRate, _iCurrency)}</td>
+                                <td style="text-align:right; vertical-align:top; padding-top:10px; font-weight:600;">${formatMoney(itemTotal, _iCurrency)}</td>
                             </tr>`;
                     }); // end catItems
                 }); // end catGroups
@@ -994,7 +1033,7 @@ if (location.search.includes('debug')) {
                             ${settings.showRoomTotals !== false ? `<tfoot>
                                 <tr class="table-light">
                                     <td colspan="3" class="text-end fw-bold">Room Total:</td>
-                                    <td class="text-end fw-bold text-success">$${roomTotal.toFixed(2)}</td>
+                                    <td class="text-end fw-bold text-success">${formatMoney(roomTotal, _iCurrency)}</td>
                                 </tr>
                             </tfoot>` : ''}
                         </table>
@@ -1197,7 +1236,7 @@ if (location.search.includes('debug')) {
             var buttonHtml = '';
             if (s.stripe_enabled && s.accept_full_payment !== false && paymentTargetId) {
                 buttonHtml += '<button type="button" class="btn btn-success btn-lg px-5 mb-3 w-100" onclick="handleClientInvoicePayment(' + Math.round(total * 100) + ', \'Pay Invoice in Full\', \'invoice_full\')">';
-                buttonHtml += '<i class="fas fa-credit-card me-2"></i>Pay Invoice - $' + total.toFixed(2) + '</button>';
+                buttonHtml += '<i class="fas fa-credit-card me-2"></i>Pay Invoice - ' + formatMoney(total, _iCurrency) + '</button>';
                 buttonHtml += '<div class="text-muted small mb-3"><i class="fab fa-stripe me-1"></i>Secure card payment powered by Stripe</div>';
             } else if (s.stripe_enabled && s.accept_full_payment !== false) {
                 buttonHtml += '<div class="alert alert-warning small mb-3">Card payment will be available from the shared invoice link after this invoice is saved.</div>';

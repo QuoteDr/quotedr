@@ -231,12 +231,13 @@ function mergeSafeData(existing: Record<string, unknown>, patch: unknown) {
   return { ...existing, ...(patch as Record<string, unknown>) };
 }
 
-async function updateDocument(body: Record<string, unknown>) {
+async function updateDocument(req: Request, body: Record<string, unknown>) {
   const documentId = normalizeId(body.documentId || body.id);
   const token = String(body.token || "").trim();
   const portalAnchorId = normalizeId(body.portalAnchorId || body.portal_anchor);
   const action = String(body.updateAction || body.actionName || "").trim();
   const { target } = await assertTokenAccess(documentId, token, portalAnchorId);
+  const signedInUser = await userFromAuthHeader(req);
 
   const supabase = adminClient();
   const existingData = rowData(target);
@@ -244,6 +245,9 @@ async function updateDocument(body: Record<string, unknown>) {
   const update: Record<string, unknown> = { updated_at: now };
 
   if (action === "mark_viewed") {
+    if (signedInUser?.id && signedInUser.id === target.user_id) {
+      return json({ document: sanitizeQuoteRow(target), unchanged: true, skipped: "owner_view" });
+    }
     if (!target.status || ["draft", "sent"].includes(String(target.status))) {
       update.status = "viewed";
       update.viewed_at = now;
@@ -291,7 +295,7 @@ serve(async (req) => {
     if (action === "create_link") return await createLink(req, body);
     if (action === "view") return await viewDocument(body);
     if (action === "portal") return await portalDocuments(body);
-    if (action === "update") return await updateDocument(body);
+    if (action === "update") return await updateDocument(req, body);
     return json({ error: "Unknown action" }, 400);
   } catch (error) {
     console.error("client-document error:", error);
