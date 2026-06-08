@@ -562,13 +562,22 @@ async function listInvoices() {
 }
 
 // Save an invoice for cross-device sharing (stored in quotes table)
+function qdCanonicalInvoiceNumber(value) {
+    var base = String(value || '').trim();
+    if (!base) return 'INV';
+    if (/(?:-INV)+$/i.test(base)) return base.replace(/(?:-INV)+$/i, '-INV');
+    return base + '-INV';
+}
+
 async function saveInvoiceForSharing(invoiceData) {
     const user = await getCurrentUser();
     const now = new Date().toISOString();
+    const invoiceQuoteNumber = qdCanonicalInvoiceNumber(invoiceData.quoteNumber || invoiceData.quote_number || '');
     const payload = {
         user_id: user ? user.id : null,
         data: {
             ...invoiceData,
+            quoteNumber: invoiceQuoteNumber,
             _type: 'invoice',
             type: invoiceData.type || 'invoice',
             documentType: 'invoice',
@@ -578,7 +587,7 @@ async function saveInvoiceForSharing(invoiceData) {
             portal_added_at: invoiceData.portal_added_at || null
         },
         client_name: invoiceData.clientName || '',
-        quote_number: (invoiceData.quoteNumber || '') + '-INV',
+        quote_number: invoiceQuoteNumber,
         total: invoiceData.grandTotal || 0,
         status: 'invoiced',
         updated_at: now

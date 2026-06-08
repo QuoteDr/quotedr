@@ -598,6 +598,39 @@
             return getQuoteTitle(quote) || (quote && quote.client_name) || 'Unnamed Client';
         }
 
+        function dashboardIsInvoiceDocument(quote) {
+            var data = quote && quote.data || {};
+            var status = String((quote && quote.status) || data.status || '').toLowerCase();
+            return status === 'invoiced' ||
+                status === 'paid' ||
+                quote && quote.type === 'invoice' ||
+                data.type === 'invoice' ||
+                data.documentType === 'invoice' ||
+                data._type === 'invoice';
+        }
+
+        function dashboardCanonicalInvoiceNumber(value) {
+            return String(value || '').trim().replace(/(?:-INV)+$/i, '-INV');
+        }
+
+        function dashboardInvoiceDuplicateKey(quote) {
+            if (!dashboardIsInvoiceDocument(quote)) return '';
+            var data = quote && quote.data || {};
+            var number = dashboardCanonicalInvoiceNumber((quote && quote.quote_number) || data.quoteNumber || '');
+            if (!number) return '';
+            var total = (parseFloat((quote && quote.total) || data.grandTotal || 0) || 0).toFixed(2);
+            var client = normalizePortalDashboardValue(data.portal_client_name || (quote && quote.client_name) || data.clientName || '');
+            return client + '|' + number.toLowerCase() + '|' + total;
+        }
+
+        function findPortalInvoiceDuplicate(target, portal) {
+            var targetKey = dashboardInvoiceDuplicateKey(target);
+            if (!targetKey) return null;
+            return (portal && portal.quotes || []).find(function(row) {
+                return row.id !== target.id && dashboardInvoiceDuplicateKey(row) === targetKey;
+            }) || null;
+        }
+
         async function openQuote(quoteId) {
             var quote = (allQuotes || []).find(function(q) { return q.id === quoteId; });
             if (quoteIsInPortal(quote)) {
@@ -1404,12 +1437,27 @@
             var pin = portal.pin || Math.floor(1000 + Math.random() * 9000).toString();
             var portalTheme = portalThemeForDashboard(portal);
             var hasPortalTheme = !!(portalTheme.headerColor || portalTheme.bgColor || portalTheme.textColor);
+            var duplicateInPortal = findPortalInvoiceDuplicate(target, portal);
             var idsToUpdate = portal.quoteIds.slice();
+            if (duplicateInPortal) idsToUpdate = idsToUpdate.filter(function(id) { return id !== duplicateInPortal.id; });
             if (!idsToUpdate.includes(quoteId)) idsToUpdate.push(quoteId);
+            if (duplicateInPortal && !idsToUpdate.includes(duplicateInPortal.id)) idsToUpdate.push(duplicateInPortal.id);
             try {
                 for (var i = 0; i < idsToUpdate.length; i++) {
                     var row = (allQuotes || []).find(function(q) { return q.id === idsToUpdate[i]; });
                     if (!row) continue;
+                    if (duplicateInPortal && row.id === duplicateInPortal.id) {
+                        var duplicateData = clearPortalAssignmentForEdit(row.data || {});
+                        var duplicateUpdate = { data: duplicateData };
+                        var duplicateCanonicalNumber = dashboardCanonicalInvoiceNumber(row.quote_number || duplicateData.quoteNumber || '');
+                        if (duplicateCanonicalNumber) {
+                            duplicateData.quoteNumber = duplicateCanonicalNumber;
+                            duplicateUpdate.quote_number = duplicateCanonicalNumber;
+                        }
+                        var duplicateResult = await _supabase.from('quotes').update(duplicateUpdate).eq('id', row.id);
+                        if (duplicateResult.error) throw duplicateResult.error;
+                        continue;
+                    }
                     var data = Object.assign({}, row.data || {}, {
                         portal_visible: true,
                         portal_id: durablePortalId,
@@ -1424,7 +1472,15 @@
                     } else {
                         delete data.portal_theme;
                     }
-                    var result = await _supabase.from('quotes').update({ data: data }).eq('id', row.id);
+                    var updatePayload = { data: data };
+                    if (dashboardIsInvoiceDocument(row)) {
+                        var canonicalInvoiceNumber = dashboardCanonicalInvoiceNumber(row.quote_number || data.quoteNumber || '');
+                        if (canonicalInvoiceNumber) {
+                            data.quoteNumber = canonicalInvoiceNumber;
+                            updatePayload.quote_number = canonicalInvoiceNumber;
+                        }
+                    }
+                    var result = await _supabase.from('quotes').update(updatePayload).eq('id', row.id);
                     if (result.error) throw result.error;
                 }
                 await refreshQuotes();

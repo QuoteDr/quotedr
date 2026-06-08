@@ -6865,6 +6865,7 @@ Example:
             businessProfile.hidden_profile_fields = getLocalHiddenProfileFieldsSnapshot();
             return {
                 id: invoiceId,
+                quoteTitle: document.getElementById('quoteTitle')?.value || '',
                 clientName: document.getElementById('clientName')?.value || 'Client',
                 projectAddress: document.getElementById('projectAddress')?.value || 'Project Address',
                 email: document.getElementById('clientEmail')?.value || '',

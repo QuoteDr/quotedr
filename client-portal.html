@@ -198,6 +198,20 @@
       border: 2px solid #f27a1a;
       box-shadow: 0 8px 20px rgba(242, 122, 26, 0.18);
     }
+
+    .portal-document-title {
+      color: #10233d;
+      font-size: 1.18rem;
+      font-weight: 800;
+      line-height: 1.25;
+      margin-bottom: 0.25rem;
+    }
+
+    .portal-document-number {
+      color: #667085;
+      font-size: 0.92rem;
+      margin-bottom: 0.35rem;
+    }
     
     .summary-card {
       background-color: white;
@@ -784,7 +798,7 @@
             documentId: portalAnchorId,
             token: portalToken
           });
-          const quotes = portalResult.documents || [];
+          const quotes = dedupePortalDocuments(portalResult.documents || []);
           if (quotes.length > 0) {
             portalResolvedClientName = quotes[0].client_name || quotes[0].data?.clientName || quotes[0].data?.client_name || '';
             clientNameEl.textContent = titleCase(portalResolvedClientName || clientEmail || 'Client');
@@ -844,11 +858,11 @@
           if (b.id === portalQuoteId) return 1;
           return new Date(b.created_at || 0) - new Date(a.created_at || 0);
         });
-        const quotes = sortedBaseQuotes.concat((allQuotes || []).filter(function(q) {
+        const quotes = dedupePortalDocuments(sortedBaseQuotes.concat((allQuotes || []).filter(function(q) {
           return window.QuoteDrChangeOrders &&
             QuoteDrChangeOrders.isChangeOrder(q) &&
             visibleBaseIds.includes(QuoteDrChangeOrders.parentQuoteId(q));
-        }));
+        })));
 
         // Set client name from actual quote data
         if (quotes.length > 0) {
@@ -885,7 +899,7 @@
       const show = document.getElementById('portalShowFilter')?.value || 'all';
       const sort = document.getElementById('portalSortBy')?.value || 'newest';
       const co = window.QuoteDrChangeOrders;
-      const filtered = (quotes || []).filter(function(quote) {
+      const filtered = dedupePortalDocuments(quotes || []).filter(function(quote) {
         const isChangeOrder = !!(co && co.isChangeOrder(quote));
         const isInvoice = isInvoiceDocument(quote);
         const status = quoteStatus(quote);
@@ -909,6 +923,66 @@
         if (sort === 'status') return String(a.status || '').localeCompare(String(b.status || ''));
         return new Date(b.created_at || 0) - new Date(a.created_at || 0);
       });
+    }
+
+    function canonicalPortalInvoiceNumber(value) {
+      const raw = String(value || '').trim();
+      return raw.replace(/(?:-INV)+$/i, '-INV');
+    }
+
+    function portalDocumentTitle(quote) {
+      const data = quote?.data || {};
+      return String(
+        data.quoteTitle ||
+        data.invoiceTitle ||
+        data.documentTitle ||
+        data.title ||
+        quote?.title ||
+        quote?.client_name ||
+        quote?.quote_number ||
+        'Document'
+      ).trim();
+    }
+
+    function portalDocumentNumberLine(quote, docType) {
+      const rawNumber = String(quote?.quote_number || quote?.data?.quoteNumber || '').trim();
+      const number = isInvoiceDocument(quote) ? canonicalPortalInvoiceNumber(rawNumber) : rawNumber;
+      const title = portalDocumentTitle(quote);
+      if (!number || number === title) return '';
+      return (docType?.label || 'Document') + ' #' + number;
+    }
+
+    function portalDocumentDuplicateKey(quote) {
+      if (!isInvoiceDocument(quote)) return 'document|' + quote.id;
+      const number = canonicalPortalInvoiceNumber(quote.quote_number || quote.data?.quoteNumber || '');
+      if (!number) return 'invoice|' + quote.id;
+      const client = normalizePortalValue(quote.data?.portal_client_name || quote.client_name || quote.data?.clientName || '');
+      const total = (parseFloat(quote.total || 0) || 0).toFixed(2);
+      return 'invoice|' + client + '|' + number.toLowerCase() + '|' + total;
+    }
+
+    function portalDuplicateScore(quote) {
+      const title = portalDocumentTitle(quote);
+      const number = String(quote?.quote_number || '').trim();
+      let score = 0;
+      if (quote.id === portalQuoteId) score += 25;
+      if (documentIsCompleted(quote)) score += 120;
+      if (title && title !== number && title !== quote?.client_name) score += 220;
+      if (!/(?:-INV){2,}$/i.test(number)) score += 120;
+      if (quote?.data?.portal_added_at) score += 10;
+      score += Math.min(9, Math.max(0, new Date(quote?.updated_at || quote?.created_at || 0).getTime() / 1000000000000));
+      return score;
+    }
+
+    function dedupePortalDocuments(quotes) {
+      const byKey = {};
+      (quotes || []).forEach(function(quote) {
+        const key = portalDocumentDuplicateKey(quote);
+        if (!byKey[key] || portalDuplicateScore(quote) > portalDuplicateScore(byKey[key])) {
+          byKey[key] = quote;
+        }
+      });
+      return Object.values(byKey);
     }
 
     // Process and display quotes
@@ -1071,7 +1145,8 @@
                 <span class="doc-type-badge ${docType.className}"><i class="fas ${docType.icon}"></i>${docType.label}</span>
                 <span class="status-badge ${statusClass}"><i class="fas ${statusIcon} me-1"></i> ${escapeHtml(statusText)}</span>
               </div>
-              <h5 class="quote-number">${escapeHtml(quote.quote_number || docType.label)}</h5>
+              <h5 class="quote-number portal-document-title">${escapeHtml(portalDocumentTitle(quote))}</h5>
+              ${portalDocumentNumberLine(quote, docType) ? `<div class="portal-document-number">${escapeHtml(portalDocumentNumberLine(quote, docType))}</div>` : ''}
               <p class="project-address">${escapeHtml(projectAddress)}</p>
               <div class="client-status-line ${needsAction ? 'needs-action' : ''}">${escapeHtml(getClientActionLine(quote))}</div>
               <div class="admin-meta-line"><i class="fas fa-shield-halved me-1"></i>${escapeHtml(getAdminMetaLine(quote))}</div>
