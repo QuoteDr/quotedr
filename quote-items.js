@@ -616,10 +616,12 @@
 
             // Find existing item by original name
             let ci = customItems[cat].find(i => i.name === name);
+            let hadSavedItemForQuoteSync = !!ci;
             if (!ci) {
                 // Not in customItems yet - check pricingDatabase and adopt it
                 const pi = pricingDatabase[cat]?.find(i => i.name === name);
                 if (pi) {
+                    hadSavedItemForQuoteSync = true;
                     ci = { name: pi.name, unitType: pi.unitType || '', rate: pi.rate || 0, materialCost: pi.materialCost || 0, supplierUrl: pi.supplierUrl || '', itemDescription: pi.itemDescription || '', laborTime: normalizeManageLaborTime(pi.laborTime) };
                     customItems[cat].push(ci);
                 } else {
@@ -628,6 +630,7 @@
                     customItems[cat].push(ci);
                 }
             }
+            const beforeQuoteSyncItem = hadSavedItemForQuoteSync ? ((typeof cloneSavedItemForQuoteSync === 'function') ? cloneSavedItemForQuoteSync(ci) : JSON.parse(JSON.stringify(ci || {}))) : null;
 
             // Overwrite all fields in place
             ci.name            = newName;
@@ -649,6 +652,9 @@
             if (!ci.photo) {
                 var oldPhoto = pricingDatabase[cat]?.find(function(i){return i.name===name||i.name===newName;})?.photo;
                 if (oldPhoto) ci.photo = oldPhoto;
+            }
+            if (beforeQuoteSyncItem && typeof recordSavedItemQuoteChange === 'function' && typeof getSavedItemFingerprintForQuoteSync === 'function') {
+                recordSavedItemQuoteChange(cat, name, beforeQuoteSyncItem, ci);
             }
 
             // Mirror into pricingDatabase

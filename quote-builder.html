@@ -155,6 +155,47 @@
             margin-bottom: 12px;
             display: none;
         }
+        .saved-item-sync-banner {
+            display: none;
+            border: 1px solid #b6d4fe;
+            border-left: 5px solid #1a56a0;
+            background: #f0f6ff;
+            color: #0f3460;
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin: 10px 0 12px;
+        }
+        .saved-item-sync-row {
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 10px;
+            background: #fff;
+        }
+        .saved-item-sync-chip {
+            border: 1px solid #b6d4fe;
+            background: #f0f6ff;
+            color: #0f3460;
+            border-radius: 999px;
+            padding: 2px 8px;
+            font-size: 0.74rem;
+            font-weight: 700;
+        }
+        .saved-item-sync-diff {
+            display: none;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 8px;
+            margin-top: 8px;
+        }
+        .saved-item-sync-diff.visible {
+            display: block;
+        }
+        .saved-item-sync-diff-value {
+            white-space: pre-wrap;
+            font-size: 0.8rem;
+            color: #344054;
+        }
         body.change-order-mode #quoteNumber {
             border-color: #f0ad4e;
             background: #fff8e1;
@@ -1207,6 +1248,7 @@ if (location.search.includes('debug')) {
             <i class="fas fa-save me-1"></i>Save to File Now
         </button>
     </div>
+    <div id="savedItemQuoteChangeBanner" class="saved-item-sync-banner"></div>
     <div id="changeOrderBanner" class="change-order-banner">
         <div class="d-flex flex-wrap justify-content-between gap-2 align-items-start">
             <div>
@@ -3475,6 +3517,305 @@ Example:
             }
         }
 
+        const SAVED_ITEM_QUOTE_CHANGES_KEY = 'ald_saved_item_quote_changes';
+
+        function normalizeSavedItemQuoteSyncText(value) {
+            return String(value || '').trim().toLowerCase();
+        }
+
+        function savedItemQuoteSyncKey(category, name) {
+            return normalizeSavedItemQuoteSyncText(category) + '::' + normalizeSavedItemQuoteSyncText(name);
+        }
+
+        function cloneSavedItemForQuoteSync(item) {
+            try {
+                return JSON.parse(JSON.stringify(item || {}));
+            } catch(e) {
+                return {};
+            }
+        }
+
+        function getSavedItemFingerprintForQuoteSync(item) {
+            item = item || {};
+            var upgrade = item.upgrade ? {
+                name: item.upgrade.name || '',
+                unitType: item.upgrade.unitType || item.upgrade.unit || '',
+                rate: parseFloat(item.upgrade.rate) || 0,
+                materialCost: parseFloat(item.upgrade.materialCost !== undefined ? item.upgrade.materialCost : item.upgrade.material_cost) || 0,
+                supplierUrl: item.upgrade.supplierUrl || '',
+                description: item.upgrade.description || item.upgrade.itemDescription || item.upgrade.notes || '',
+                laborTime: normalizeLaborTime(item.upgrade.laborTime)
+            } : null;
+            return JSON.stringify({
+                name: item.name || item.description || '',
+                unitType: item.unitType || item.unit || '',
+                rate: parseFloat(item.rate) || 0,
+                materialCost: parseFloat(item.materialCost !== undefined ? item.materialCost : item.material_cost) || 0,
+                supplierUrl: item.supplierUrl || '',
+                itemDescription: item.itemDescription || item.displayDescription || '',
+                photo: item.photo || '',
+                laborTime: normalizeLaborTime(item.laborTime),
+                upgrade: upgrade
+            });
+        }
+
+        function savedItemQuoteSource(category, item) {
+            item = item || {};
+            return {
+                category: category || item.category || '',
+                name: item.name || item.description || '',
+                key: savedItemQuoteSyncKey(category || item.category || '', item.name || item.description || ''),
+                fingerprint: getSavedItemFingerprintForQuoteSync(item)
+            };
+        }
+
+        function getSavedItemQuoteChanges() {
+            try {
+                var changes = JSON.parse(localStorage.getItem(SAVED_ITEM_QUOTE_CHANGES_KEY) || '[]');
+                return Array.isArray(changes) ? changes : [];
+            } catch(e) {
+                return [];
+            }
+        }
+
+        function saveSavedItemQuoteChanges(changes) {
+            localStorage.setItem(SAVED_ITEM_QUOTE_CHANGES_KEY, JSON.stringify(changes || []));
+        }
+
+        function recordSavedItemQuoteChange(category, originalName, beforeItem, afterItem) {
+            if (!beforeItem || !afterItem) return;
+            var beforeFingerprint = getSavedItemFingerprintForQuoteSync(beforeItem);
+            var afterFingerprint = getSavedItemFingerprintForQuoteSync(afterItem);
+            if (beforeFingerprint === afterFingerprint) return;
+            var oldKey = savedItemQuoteSyncKey(category, originalName || beforeItem.name);
+            var newKey = savedItemQuoteSyncKey(category, afterItem.name || originalName || beforeItem.name);
+            var changes = getSavedItemQuoteChanges().filter(function(change) {
+                return !(change && change.category === category && (change.oldKey === oldKey || change.newKey === oldKey || change.oldKey === newKey || change.newKey === newKey));
+            });
+            changes.push({
+                id: 'sic_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8),
+                category: category || '',
+                originalName: originalName || beforeItem.name || '',
+                newName: afterItem.name || originalName || beforeItem.name || '',
+                oldKey: oldKey,
+                newKey: newKey,
+                beforeFingerprint: beforeFingerprint,
+                afterFingerprint: afterFingerprint,
+                before: cloneSavedItemForQuoteSync(beforeItem),
+                after: cloneSavedItemForQuoteSync(afterItem),
+                changedAt: new Date().toISOString()
+            });
+            saveSavedItemQuoteChanges(changes.slice(-80));
+            if (typeof renderSavedItemQuoteChangeBanner === 'function') renderSavedItemQuoteChangeBanner();
+        }
+
+        function quoteItemMatchesSavedChange(item, change) {
+            if (!item || !change) return false;
+            if (item.savedItemFingerprint && item.savedItemFingerprint === change.afterFingerprint) return false;
+            var source = item.savedItemSource || {};
+            if (source.key && (source.key === change.oldKey || source.key === change.newKey)) return true;
+            var itemCategory = normalizeSavedItemQuoteSyncText(item.category || source.category);
+            var changeCategory = normalizeSavedItemQuoteSyncText(change.category);
+            if (itemCategory !== changeCategory) return false;
+            var names = [item.serviceName, item.description, item.name, source.name].map(normalizeSavedItemQuoteSyncText).filter(Boolean);
+            return names.indexOf(normalizeSavedItemQuoteSyncText(change.originalName)) !== -1 ||
+                names.indexOf(normalizeSavedItemQuoteSyncText(change.newName)) !== -1;
+        }
+
+        function getSavedItemQuoteChangeMatches() {
+            var matches = [];
+            var changes = getSavedItemQuoteChanges();
+            changes.forEach(function(change) {
+                (rooms || []).forEach(function(room) {
+                    (room.items || []).forEach(function(item, itemIndex) {
+                        if (quoteItemMatchesSavedChange(item, change)) {
+                            matches.push({ change: change, room: room, item: item, itemIndex: itemIndex });
+                        }
+                    });
+                });
+            });
+            return matches;
+        }
+
+        function renderSavedItemQuoteChangeBanner() {
+            var banner = document.getElementById('savedItemQuoteChangeBanner');
+            if (!banner) return;
+            var matches = getSavedItemQuoteChangeMatches();
+            if (!matches.length) {
+                banner.style.display = 'none';
+                banner.innerHTML = '';
+                return;
+            }
+            var count = matches.length;
+            banner.style.display = 'block';
+            banner.innerHTML = '<div class="d-flex flex-wrap align-items-center justify-content-between gap-2">' +
+                '<div><strong><i class="fas fa-triangle-exclamation me-1"></i>' + count + ' items in quote have been modified in Manage Items.</strong>' +
+                '<div class="small text-muted">Review which saved-item updates should apply to this quote.</div></div>' +
+                '<button type="button" class="btn btn-sm btn-primary" onclick="openSavedItemQuoteChangeModal()"><i class="fas fa-list-check me-1"></i>Review Updates</button>' +
+                '</div>';
+        }
+
+        function savedItemQuoteChangeFieldDiffs(change) {
+            var before = change && change.before ? change.before : {};
+            var after = change && change.after ? change.after : {};
+            var fields = [
+                { key: 'name', label: 'Name changed', before: before.name || '', after: after.name || '' },
+                { key: 'description', label: 'Description changed', before: before.itemDescription || before.description || '', after: after.itemDescription || after.description || '' }
+            ];
+            return fields.filter(function(field) {
+                return String(field.before || '').trim() !== String(field.after || '').trim();
+            });
+        }
+
+        function savedItemQuoteChangeDiffsHtml(change, rowIndex) {
+            var diffs = savedItemQuoteChangeFieldDiffs(change);
+            if (!diffs.length) return '';
+            var chips = diffs.map(function(diff) {
+                var targetId = 'savedItemSyncDiff_' + rowIndex + '_' + diff.key;
+                return '<button type="button" class="saved-item-sync-chip" onclick="toggleSavedItemQuoteChangeDiff(\'' + targetId + '\', event)">' + qdTemplateEscapeHtml(diff.label) + '</button>';
+            }).join('');
+            var panels = diffs.map(function(diff) {
+                var targetId = 'savedItemSyncDiff_' + rowIndex + '_' + diff.key;
+                return '<div class="saved-item-sync-diff" id="' + targetId + '">' +
+                    '<div class="row g-2">' +
+                    '<div class="col-md-6"><div class="small fw-bold text-muted text-uppercase">Before</div><div class="saved-item-sync-diff-value">' + qdTemplateEscapeHtml(diff.before || '(blank)') + '</div></div>' +
+                    '<div class="col-md-6"><div class="small fw-bold text-muted text-uppercase">After</div><div class="saved-item-sync-diff-value">' + qdTemplateEscapeHtml(diff.after || '(blank)') + '</div></div>' +
+                    '</div></div>';
+            }).join('');
+            return '<div class="d-flex gap-1 flex-wrap mt-2">' + chips + '</div>' + panels;
+        }
+
+        function toggleSavedItemQuoteChangeDiff(targetId, event) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            var el = document.getElementById(targetId);
+            if (el) el.classList.toggle('visible');
+        }
+
+        function savedItemQuoteChangeRowsHtml(matches) {
+            if (!matches.length) return '<div class="alert alert-success mb-0">No saved item changes match this quote anymore.</div>';
+            return matches.map(function(match, index) {
+                var change = match.change;
+                var item = match.item;
+                var room = match.room;
+                var id = 'savedItemSync_' + index;
+                var before = change.originalName || change.before?.name || 'Saved item';
+                var after = change.newName || change.after?.name || before;
+                var priceText = qdFormatMoney(parseFloat(item.rate) || 0) + ' -> ' + qdFormatMoney(parseFloat(change.after?.rate) || 0);
+                return '<div class="saved-item-sync-row d-flex gap-2 align-items-start mb-2">' +
+                    '<input class="form-check-input mt-1 saved-item-sync-checkbox" type="checkbox" checked id="' + id + '" data-change-id="' + qdTemplateEscapeHtml(change.id) + '" data-room-id="' + qdTemplateEscapeHtml(room.id) + '" data-item-index="' + match.itemIndex + '">' +
+                    '<div class="flex-grow-1">' +
+                    '<label class="d-flex flex-wrap justify-content-between gap-2 mb-0" for="' + id + '"><strong>' + qdTemplateEscapeHtml(room.name || 'Room') + ' - ' + qdTemplateEscapeHtml(item.description || item.name || before) + '</strong><span class="badge bg-light text-dark border">' + qdTemplateEscapeHtml(change.category || item.category || '') + '</span></label>' +
+                    '<span class="d-block small text-muted">Saved item: ' + qdTemplateEscapeHtml(before) + (before !== after ? ' -> ' + qdTemplateEscapeHtml(after) : '') + '</span>' +
+                    '<span class="d-block small text-muted">Rate: ' + qdTemplateEscapeHtml(priceText) + '</span>' +
+                    savedItemQuoteChangeDiffsHtml(change, index) +
+                    '</div></div>';
+            }).join('');
+        }
+
+        function openSavedItemQuoteChangeModal() {
+            var matches = getSavedItemQuoteChangeMatches();
+            var modalEl = document.getElementById('savedItemQuoteChangeModal');
+            if (!modalEl) {
+                modalEl = document.createElement('div');
+                modalEl.className = 'modal fade';
+                modalEl.id = 'savedItemQuoteChangeModal';
+                modalEl.tabIndex = -1;
+                modalEl.innerHTML = '<div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">' +
+                    '<div class="modal-header"><h5 class="modal-title"><i class="fas fa-list-check me-2"></i>Saved Item Updates</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>' +
+                    '<div class="modal-body">' +
+                    '<div class="alert alert-info small">Choose which updated saved items should update this quote. Job-specific line-item notes will be preserved.</div>' +
+                    '<div class="d-flex gap-2 flex-wrap mb-2"><button type="button" class="btn btn-sm btn-outline-primary" onclick="setSavedItemQuoteChangeSelection(true)">Select All</button><button type="button" class="btn btn-sm btn-outline-secondary" onclick="setSavedItemQuoteChangeSelection(false)">Deselect All</button></div>' +
+                    '<div id="savedItemQuoteChangeList"></div>' +
+                    '</div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" onclick="ignoreSavedItemQuoteChanges()">Ignore All</button><button type="button" class="btn btn-primary" onclick="applySavedItemQuoteChanges()">Apply Changes to Quote</button></div>' +
+                    '</div></div>';
+                document.body.appendChild(modalEl);
+            }
+            var list = document.getElementById('savedItemQuoteChangeList');
+            if (list) list.innerHTML = savedItemQuoteChangeRowsHtml(matches);
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
+
+        function setSavedItemQuoteChangeSelection(checked) {
+            document.querySelectorAll('#savedItemQuoteChangeModal .saved-item-sync-checkbox').forEach(function(cb) {
+                cb.checked = !!checked;
+            });
+        }
+
+        function applySavedItemDataToQuoteItem(item, category, savedItem) {
+            if (!item || !savedItem) return;
+            var existingNotes = item.notes || '';
+            var wasUpgraded = !!item.upgraded;
+            item.category = category || item.category || '';
+            item.serviceName = savedItem.name || item.serviceName || item.description;
+            item.description = savedItem.name || item.description || '';
+            item.unitType = savedItem.unitType || savedItem.unit || item.unitType || '';
+            item.itemDescription = savedItem.itemDescription || '';
+            item.materialCost = parseFloat(savedItem.materialCost !== undefined ? savedItem.materialCost : savedItem.material_cost) || 0;
+            item.supplierUrl = savedItem.supplierUrl || '';
+            item.photo = savedItem.photo || item.photo || '';
+            item.laborTime = normalizeLaborTime(savedItem.laborTime);
+            if (savedItem.upgrade) {
+                item.upgrade = cloneSavedItemForQuoteSync(savedItem.upgrade);
+            } else {
+                delete item.upgrade;
+                item.upgraded = false;
+            }
+            if (wasUpgraded && item.upgrade && item.upgrade.name) {
+                item.upgraded = true;
+                item.rate = parseFloat(item.upgrade.rate) || 0;
+                item.unitType = item.upgrade.unitType || item.upgrade.unit || item.unitType;
+                item.materialCost = parseFloat(item.upgrade.materialCost !== undefined ? item.upgrade.materialCost : item.upgrade.material_cost) || 0;
+                item.supplierUrl = item.upgrade.supplierUrl || item.supplierUrl || '';
+                if (item.upgrade.laborTime) item.laborTime = normalizeLaborTime(item.upgrade.laborTime);
+            } else {
+                item.rate = parseFloat(savedItem.rate) || 0;
+            }
+            item.notes = existingNotes;
+            item.total = (parseFloat(item.quantity) || 0) * (parseFloat(item.rate) || 0);
+            item.savedItemSource = savedItemQuoteSource(category, savedItem);
+            item.savedItemFingerprint = getSavedItemFingerprintForQuoteSync(savedItem);
+        }
+
+        function pruneAppliedSavedItemQuoteChanges() {
+            var changes = getSavedItemQuoteChanges();
+            var matches = getSavedItemQuoteChangeMatches();
+            var remainingIds = new Set(matches.map(function(match) { return match.change.id; }));
+            saveSavedItemQuoteChanges(changes.filter(function(change) { return remainingIds.has(change.id); }));
+        }
+
+        function applySavedItemQuoteChanges() {
+            var checked = Array.from(document.querySelectorAll('#savedItemQuoteChangeModal .saved-item-sync-checkbox:checked'));
+            if (!checked.length) {
+                qdAlert('Select at least one item to update, or click Ignore All.');
+                return;
+            }
+            _pushUndo();
+            checked.forEach(function(cb) {
+                var change = getSavedItemQuoteChanges().find(function(c) { return c.id === cb.dataset.changeId; });
+                var room = (rooms || []).find(function(r) { return String(r.id) === String(cb.dataset.roomId); });
+                var item = room && room.items ? room.items[parseInt(cb.dataset.itemIndex, 10)] : null;
+                if (change && item && quoteItemMatchesSavedChange(item, change)) {
+                    applySavedItemDataToQuoteItem(item, change.category, change.after);
+                }
+            });
+            pruneAppliedSavedItemQuoteChanges();
+            bootstrap.Modal.getInstance(document.getElementById('savedItemQuoteChangeModal'))?.hide();
+            renderRooms();
+            calculateTotals();
+            markUnsaved();
+            renderSavedItemQuoteChangeBanner();
+        }
+
+        function ignoreSavedItemQuoteChanges() {
+            var ignoreIds = new Set(getSavedItemQuoteChangeMatches().map(function(match) { return match.change.id; }));
+            saveSavedItemQuoteChanges(getSavedItemQuoteChanges().filter(function(change) { return !ignoreIds.has(change.id); }));
+            bootstrap.Modal.getInstance(document.getElementById('savedItemQuoteChangeModal'))?.hide();
+            renderSavedItemQuoteChangeBanner();
+        }
+
         // Global variables for deposit calculator
         let depositPercentage = 50; // Default 50% deposit
 
@@ -4045,6 +4386,7 @@ Example:
                 // If editing existing item, update it; otherwise add new
                 if (editingItemIndex !== null && rooms[roomIndex].items[editingItemIndex]) {
                     const item = rooms[roomIndex].items[editingItemIndex];
+                    const savedItemForEdit = pricingDatabase[category]?.find(i => i.name === document.getElementById('lineService').value);
                     if (window._quoteDocumentType === 'change_order') item._coRemoved = false;
                     item.description = description;
                     item.category = category;
@@ -4056,6 +4398,10 @@ Example:
                     item.materialCost = materialCost;
                     item.supplierUrl = document.getElementById('supplierLinkBtn')?.href !== '#' ? document.getElementById('supplierLinkBtn')?.href : '';
                     item.laborTime = normalizeLaborTime(item.laborTime);
+                    if (savedItemForEdit) {
+                        item.savedItemSource = savedItemQuoteSource(category, savedItemForEdit);
+                        item.savedItemFingerprint = getSavedItemFingerprintForQuoteSync(savedItemForEdit);
+                    }
                     item.total = quantity * rate;
                     coRefreshItemDelta(item);
                 } else {
@@ -4079,6 +4425,8 @@ Example:
                         optional: false,
                         itemDescription: dbItem?.itemDescription || '',
                         laborTime: normalizeLaborTime(dbItem?.laborTime),
+                        savedItemSource: dbItem ? savedItemQuoteSource(category, dbItem) : null,
+                        savedItemFingerprint: dbItem ? getSavedItemFingerprintForQuoteSync(dbItem) : '',
                         total: quantity * rate
                     };
                     const itemsToAdd = await autoGroupQuoteItem(newItem, rooms[roomIndex]);
@@ -6235,6 +6583,7 @@ Example:
         function renderRooms() {
             const container = document.getElementById('roomsContainer');
             ensureUniqueRoomIds();
+            renderSavedItemQuoteChangeBanner();
             const showLineProfitDetails = isLineProfitDetailsVisible();
 
             if (rooms.length === 0) {
@@ -11323,6 +11672,9 @@ Example:
             // Event delegation for Manage Items modal buttons (handles dynamically rendered form + rows)
             var manageItemsRoot = document.getElementById('manageItemsModal') || document.getElementById('customItemsList');
             if (manageItemsRoot) {
+                manageItemsRoot.addEventListener('hidden.bs.modal', function() {
+                    if (typeof renderSavedItemQuoteChangeBanner === 'function') renderSavedItemQuoteChangeBanner();
+                });
                 manageItemsRoot.addEventListener('click', function(e) {
                     var saveBtn = e.target.closest('.item-save-btn');
                     if (saveBtn) { saveItemRow(saveBtn.dataset.cat, saveBtn.dataset.name); return; }
