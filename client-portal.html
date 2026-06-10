@@ -194,6 +194,17 @@
       background-color: white;
     }
 
+    .quote-card.portal-open-card {
+      cursor: pointer;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+    }
+
+    .quote-card.portal-open-card:hover,
+    .quote-card.portal-open-card:focus-visible {
+      border-color: rgba(26, 86, 160, 0.45);
+      box-shadow: 0 10px 24px rgba(26, 86, 160, 0.14);
+    }
+
     .quote-card.portal-focus {
       border: 2px solid #f27a1a;
       box-shadow: 0 8px 20px rgba(242, 122, 26, 0.18);
@@ -1095,6 +1106,38 @@
       });
     }
 
+    function portalCardInteractiveClick(event) {
+      return !!(event && event.target && event.target.closest('a, button, input, select, textarea, label, [role="button"], .client-signature-preview'));
+    }
+
+    function openPortalDocumentHref(href) {
+      if (!href) return;
+      window.location.href = href;
+    }
+
+    function handlePortalCardOpen(event) {
+      if (portalCardInteractiveClick(event)) return;
+      openPortalDocumentHref(event.currentTarget.getAttribute('data-open-href'));
+    }
+
+    function handlePortalCardKeyOpen(event) {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      if (portalCardInteractiveClick(event)) return;
+      event.preventDefault();
+      openPortalDocumentHref(event.currentTarget.getAttribute('data-open-href'));
+    }
+
+    function enhancePortalOpenCard(card, href, label) {
+      if (!card || !href) return;
+      card.classList.add('portal-open-card');
+      card.setAttribute('data-open-href', href);
+      card.setAttribute('role', 'link');
+      card.setAttribute('tabindex', '0');
+      card.setAttribute('aria-label', label || 'Open document');
+      card.addEventListener('click', handlePortalCardOpen);
+      card.addEventListener('keydown', handlePortalCardKeyOpen);
+    }
+
     function createQuoteCard(quote) {
       const card = document.createElement('div');
       card.className = 'card quote-card';
@@ -1182,6 +1225,7 @@
           openSignatureLightbox(src);
         });
       });
+      enhancePortalOpenCard(card, primaryHref, docType.actionLabel + ': ' + portalDocumentTitle(quote));
       
       return card;
     }
@@ -1199,14 +1243,15 @@
       const sign = amount >= 0 ? '+' : '-';
       const status = quoteStatus(row);
       const portalAdded = portalAddedDateLabel(row);
-      return '<div class="card quote-card mb-2">' +
+      const href = 'interactive-quote-viewer.html?id=' + encodeURIComponent(row.id) + (portalToken ? '&token=' + encodeURIComponent(portalToken) + '&portal_anchor=' + encodeURIComponent(portalAnchorId || row.id) : '');
+      return '<div class="card quote-card portal-open-card mb-2" role="link" tabindex="0" aria-label="Review Change Order" data-open-href="' + escapeHtml(href) + '" onclick="handlePortalCardOpen(event)" onkeydown="handlePortalCardKeyOpen(event)">' +
         '<div class="card-body py-3">' +
         '<div class="d-flex justify-content-between gap-2 flex-wrap">' +
         '<div><div class="d-flex gap-2 flex-wrap align-items-center mb-2"><span class="doc-type-badge doc-type-change-order"><i class="fas fa-file-circle-plus"></i>Change Order</span><span class="status-badge ' + statusClassName(status) + '">' + escapeHtml(getClientStatusText(row)) + '</span></div>' +
         '<strong>Change Order #' + escapeHtml((co && co.number(row)) || '') + '</strong><div class="text-muted small">' + escapeHtml(row.data?.changeReason || 'Scope change') + '</div>' +
         (portalAdded ? '<div class="text-muted small"><i class="fas fa-folder-open me-1"></i>Added to portal: ' + escapeHtml(portalAdded) + '</div>' : '') +
         '<div class="client-status-line ' + (documentNeedsAction(row) ? 'needs-action' : '') + '">' + escapeHtml(getClientActionLine(row)) + '</div></div>' +
-        '<div class="text-end"><div class="fw-bold">' + sign + '$' + Math.abs(amount).toFixed(2) + '</div><a href="interactive-quote-viewer.html?id=' + encodeURIComponent(row.id) + (portalToken ? '&token=' + encodeURIComponent(portalToken) + '&portal_anchor=' + encodeURIComponent(portalAnchorId || row.id) : '') + '" class="btn btn-outline-primary btn-sm mt-2"><i class="fas fa-pen-nib me-1"></i>Review Change Order</a></div>' +
+        '<div class="text-end"><div class="fw-bold">' + sign + '$' + Math.abs(amount).toFixed(2) + '</div><a href="' + escapeHtml(href) + '" class="btn btn-outline-primary btn-sm mt-2"><i class="fas fa-pen-nib me-1"></i>Review Change Order</a></div>' +
         '</div></div></div>';
     }
 
