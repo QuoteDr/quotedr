@@ -529,13 +529,13 @@
                               <div class="fw-bold" id="title-display-${escapeHtml(q.id)}">${isChangeOrder ? '<span class="badge change-order-badge me-1">CO #' + escapeHtml(QuoteDrChangeOrders.number(q) || '') + '</span>' : ''}${escapeHtml(displayTitle)}</div>
                               <button class="btn btn-link btn-sm p-0 text-muted" onclick="event.stopPropagation();startEditTitle(${jsAttr(q.id)})" title="Edit title" style="font-size:0.75rem;"><i class="fas fa-pencil-alt"></i></button>
                             </div>
-                            <div id="title-edit-${escapeHtml(q.id)}" style="display:none; gap:0.25rem;" class="mt-1">
+                            <div id="title-edit-${escapeHtml(q.id)}" style="display:none; gap:0.25rem;" class="mt-1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()">
                               <input type="text" class="form-control form-control-sm" id="title-input-${escapeHtml(q.id)}"
                                      value="${escapeHtml(displayTitle)}"
                                      placeholder="${escapeHtml(clientName || 'Add a title...')}"
                                      onkeydown="if(event.key==='Enter') saveTitle(${jsAttr(q.id)}); if(event.key==='Escape') cancelEditTitle(${jsAttr(q.id)})">
-                              <button class="btn btn-success btn-sm" onclick="saveTitle(${jsAttr(q.id)})"><i class="fas fa-check"></i></button>
-                              <button class="btn btn-outline-secondary btn-sm" onclick="cancelEditTitle(${jsAttr(q.id)})"><i class="fas fa-times"></i></button>
+                              <button class="btn btn-success btn-sm" onclick="event.stopPropagation();saveTitle(${jsAttr(q.id)})"><i class="fas fa-check"></i></button>
+                              <button class="btn btn-outline-secondary btn-sm" onclick="event.stopPropagation();cancelEditTitle(${jsAttr(q.id)})"><i class="fas fa-times"></i></button>
                             </div>
                             <div class="text-muted small">${quoteTitle ? escapeHtml(clientName) + ' - ' : ''}${quoteNumber ? '#' + escapeHtml(quoteNumber) + ' - ' : ''}${escapeHtml(formatDate((q.data && q.data.savedAt) || q.created_at))}</div>
                             ${portalVisible ? `<div class="portal-added-meta mt-1"><i class="fas fa-lock me-1"></i>Added to portal: ${escapeHtml(portalAddedLabel)}</div>` : ''}
@@ -631,7 +631,13 @@
             }) || null;
         }
 
+        function isTitleEditing(quoteId) {
+            var editEl = document.getElementById('title-edit-' + quoteId);
+            return !!(editEl && editEl.style.display !== 'none');
+        }
+
         async function openQuote(quoteId) {
+            if (isTitleEditing(quoteId)) return;
             var quote = (allQuotes || []).find(function(q) { return q.id === quoteId; });
             if (quoteIsInPortal(quote)) {
                 await handlePortalLockedQuoteOpen(quote);
@@ -814,14 +820,18 @@
         }
 
         function startEditTitle(quoteId) {
-            document.getElementById('title-row-' + quoteId).style.display = 'none';
-            document.getElementById('title-edit-' + quoteId).style.display = 'flex';
+            var row = document.getElementById('title-row-' + quoteId);
+            var edit = document.getElementById('title-edit-' + quoteId);
+            if (row) row.style.display = 'none';
+            if (edit) edit.style.display = 'flex';
             var input = document.getElementById('title-input-' + quoteId);
             if (input) { input.focus(); input.select(); }
         }
         function cancelEditTitle(quoteId) {
-            document.getElementById('title-edit-' + quoteId).style.display = 'none';
-            document.getElementById('title-row-' + quoteId).style.display = 'flex';
+            var edit = document.getElementById('title-edit-' + quoteId);
+            var row = document.getElementById('title-row-' + quoteId);
+            if (edit) edit.style.display = 'none';
+            if (row) row.style.display = 'flex';
         }
         async function saveTitle(quoteId) {
             var newTitle = document.getElementById('title-input-' + quoteId).value.trim();
@@ -833,8 +843,8 @@
                 if (saveErr) throw saveErr;
                 var row = (allQuotes || []).find(function(q) { return q.id === quoteId; });
                 if (row) row.data = updatedData;
-                renderQuotes(allQuotes);
                 cancelEditTitle(quoteId);
+                renderQuotes(allQuotes);
             } catch(err) {
                 qdAlert('Could not save title: ' + err.message);
             }
@@ -3012,16 +3022,7 @@ function renderBusinessInsights(quotes) {
         }
 
         function populateNewQuoteClientSuggestions() {
-            var datalist = document.getElementById('newQuoteClientSuggestions');
-            if (!datalist) return;
-            datalist.innerHTML = '';
-            getDashboardSavedClients().forEach(function(client) {
-                var option = document.createElement('option');
-                option.value = client.name || '';
-                var details = [client.address, client.phone, client.email].filter(Boolean).join(' - ');
-                if (details) option.label = details;
-                datalist.appendChild(option);
-            });
+            hideNewQuoteClientSuggestions();
         }
 
         function populatePortalAssignClientSuggestions() {
@@ -3043,6 +3044,67 @@ function renderBusinessInsights(quotes) {
             return getDashboardSavedClients().find(function(client) {
                 return String(client.email || '').trim().toLowerCase() === needle;
             }) || null;
+        }
+
+        function searchNewQuoteClients(query) {
+            var needle = String(query || '').trim().toLowerCase();
+            if (needle.length < 2) return [];
+            return getDashboardSavedClients().map(function(client) {
+                var fields = [
+                    client.name || '',
+                    client.email || '',
+                    client.phone || '',
+                    client.address || '',
+                    client.city || ''
+                ];
+                var name = String(client.name || '');
+                var haystack = fields.join(' ').toLowerCase();
+                if (!haystack.includes(needle)) return null;
+                var nameLower = name.toLowerCase();
+                var score = nameLower === needle ? 100 : (nameLower.startsWith(needle) ? 90 : (nameLower.includes(needle) ? 75 : 55));
+                return Object.assign({}, client, { _score: score });
+            }).filter(Boolean).sort(function(a, b) {
+                return b._score - a._score || String(a.name || '').localeCompare(String(b.name || ''));
+            }).slice(0, 8);
+        }
+
+        function hideNewQuoteClientSuggestions() {
+            var dropdown = document.getElementById('newQuoteClientDropdown');
+            if (!dropdown) return;
+            setTimeout(function() {
+                dropdown.style.display = 'none';
+            }, 160);
+        }
+
+        function showNewQuoteClientSuggestions() {
+            var input = document.getElementById('newQuoteClientName');
+            var dropdown = document.getElementById('newQuoteClientDropdown');
+            if (!input || !dropdown) return;
+            var results = searchNewQuoteClients(input.value);
+            dropdown.innerHTML = '';
+            window._newQuoteSelectedClient = null;
+            if (!results.length) {
+                dropdown.style.display = 'none';
+                return;
+            }
+            results.forEach(function(client) {
+                var item = document.createElement('button');
+                item.type = 'button';
+                item.className = 'portal-client-suggestion text-start w-100 border-0';
+                var title = document.createElement('strong');
+                title.textContent = client.name || client.email || 'Saved client';
+                var details = document.createElement('small');
+                details.textContent = [client.address, client.phone, client.email].filter(Boolean).join(' - ');
+                item.appendChild(title);
+                if (details.textContent) item.appendChild(details);
+                item.addEventListener('mousedown', function(event) {
+                    event.preventDefault();
+                    applyNewQuoteClientSelection(client);
+                    dropdown.style.display = 'none';
+                });
+                dropdown.appendChild(item);
+            });
+            dropdown.style.display = 'block';
         }
 
         function searchPortalAssignClients(query, source) {
@@ -3108,15 +3170,19 @@ function renderBusinessInsights(quotes) {
             dropdown.style.display = 'block';
         }
 
-        function applyNewQuoteClientSelection() {
+        function applyNewQuoteClientSelection(selectedClient) {
             var nameInput = document.getElementById('newQuoteClientName');
             var addressInput = document.getElementById('newQuoteAddress');
-            if (!nameInput || !addressInput) return;
-            var client = findNewQuoteClientByName(nameInput.value);
+            var emailInput = document.getElementById('newQuoteClientEmail');
+            var phoneInput = document.getElementById('newQuoteClientPhone');
+            if (!nameInput || !addressInput || !emailInput || !phoneInput) return;
+            var client = selectedClient || findNewQuoteClientByName(nameInput.value) || findDashboardClientByEmail(emailInput.value);
             window._newQuoteSelectedClient = client || null;
             if (!client) return;
             nameInput.value = client.name || nameInput.value;
             if (client.address) addressInput.value = client.address;
+            if (client.email) emailInput.value = client.email;
+            if (client.phone) phoneInput.value = client.phone;
         }
 
         function applyPortalAssignClientSelection(source, selectedClient) {
@@ -3144,6 +3210,8 @@ function renderBusinessInsights(quotes) {
         function openNewQuoteModal() {
             document.getElementById('newQuoteClientName').value = '';
             document.getElementById('newQuoteAddress').value = '';
+            document.getElementById('newQuoteClientEmail').value = '';
+            document.getElementById('newQuoteClientPhone').value = '';
             document.getElementById('newQuoteNumber').value = '';
             document.getElementById('newQuoteError').textContent = '';
             window._newQuoteSelectedClient = null;
@@ -3159,12 +3227,14 @@ function renderBusinessInsights(quotes) {
         async function createAndOpenQuote() {
             var clientName = document.getElementById('newQuoteClientName').value.trim();
             var address = document.getElementById('newQuoteAddress').value.trim();
+            var clientEmail = document.getElementById('newQuoteClientEmail').value.trim();
+            var clientPhone = document.getElementById('newQuoteClientPhone').value.trim();
             var quoteNum = document.getElementById('newQuoteNumber').value.trim();
             var errEl = document.getElementById('newQuoteError');
             var btn = document.getElementById('newQuoteCreateBtn');
-            var savedClient = findNewQuoteClientByName(clientName) || window._newQuoteSelectedClient || null;
-            var clientEmail = savedClient && savedClient.email ? savedClient.email : '';
-            var clientPhone = savedClient && savedClient.phone ? savedClient.phone : '';
+            var savedClient = findNewQuoteClientByName(clientName) || findDashboardClientByEmail(clientEmail) || window._newQuoteSelectedClient || null;
+            if (!clientEmail && savedClient && savedClient.email) clientEmail = savedClient.email;
+            if (!clientPhone && savedClient && savedClient.phone) clientPhone = savedClient.phone;
             if (!address && savedClient && savedClient.address) address = savedClient.address;
 
             if (!clientName) {
@@ -3229,7 +3299,7 @@ function renderBusinessInsights(quotes) {
 
         // Allow Enter key to submit
         document.addEventListener('DOMContentLoaded', function() {
-            ['newQuoteClientName','newQuoteAddress','newQuoteNumber'].forEach(function(id) {
+            ['newQuoteClientName','newQuoteAddress','newQuoteClientEmail','newQuoteClientPhone','newQuoteNumber'].forEach(function(id) {
                 var el = document.getElementById(id);
                 if (el) el.addEventListener('keydown', function(e) {
                     if (e.key === 'Enter') createAndOpenQuote();
@@ -3237,8 +3307,16 @@ function renderBusinessInsights(quotes) {
             });
             var newQuoteClientName = document.getElementById('newQuoteClientName');
             if (newQuoteClientName) {
-                newQuoteClientName.addEventListener('input', applyNewQuoteClientSelection);
+                newQuoteClientName.addEventListener('input', showNewQuoteClientSuggestions);
                 newQuoteClientName.addEventListener('change', applyNewQuoteClientSelection);
+                newQuoteClientName.addEventListener('blur', hideNewQuoteClientSuggestions);
+            }
+            var newQuoteClientEmail = document.getElementById('newQuoteClientEmail');
+            if (newQuoteClientEmail) {
+                newQuoteClientEmail.addEventListener('change', function() {
+                    var client = findDashboardClientByEmail(newQuoteClientEmail.value);
+                    if (client) applyNewQuoteClientSelection(client);
+                });
             }
             var portalAssignClientName = document.getElementById('portalAssignClientName');
             if (portalAssignClientName) {
@@ -3514,12 +3592,24 @@ function renderBusinessInsights(quotes) {
         <p class="text-muted small mb-3">Give this quote a name so it saves to the cloud right away. You can always change these in the builder.</p>
         <div class="mb-3">
           <label class="form-label fw-semibold">Client Name <span class="text-danger">*</span></label>
-          <input type="text" id="newQuoteClientName" class="form-control" placeholder="e.g. John Smith" list="newQuoteClientSuggestions" autocomplete="off" autofocus>
-          <datalist id="newQuoteClientSuggestions"></datalist>
+          <div class="portal-client-typeahead">
+            <input type="text" id="newQuoteClientName" class="form-control" placeholder="e.g. John Smith" autocomplete="off" autofocus>
+            <div id="newQuoteClientDropdown" class="portal-client-dropdown"></div>
+          </div>
         </div>
         <div class="mb-3">
           <label class="form-label fw-semibold">Project Address <span class="text-muted fw-normal">(optional)</span></label>
           <input type="text" id="newQuoteAddress" class="form-control" placeholder="e.g. 123 Main St">
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Email Address <span class="text-muted fw-normal">(optional)</span></label>
+            <input type="email" id="newQuoteClientEmail" class="form-control" placeholder="client@example.com" autocomplete="off">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Phone Number <span class="text-muted fw-normal">(optional)</span></label>
+            <input type="tel" id="newQuoteClientPhone" class="form-control" placeholder="e.g. 905 555 1234" autocomplete="off">
+          </div>
         </div>
         <div class="mb-3">
           <label class="form-label fw-semibold">Quote Number <span class="text-muted fw-normal">(optional - auto-assigned if blank)</span></label>
