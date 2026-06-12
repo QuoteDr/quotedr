@@ -23,9 +23,14 @@
             return !!(row && row.data && row.data.portal_visible === true);
         }
 
+        function quoteDataIsPortalLockedForBuilder(data) {
+            return !!(data && (data.portal_visible === true || (data.data && data.data.portal_visible === true)));
+        }
+
         function clearPortalLockedBuilderRestoreState() {
             localStorage.removeItem("ald_active_quote_id");
             localStorage.removeItem("ald_open_cloud_quote");
+            localStorage.removeItem("ald_session_quote");
             window._supabaseQuoteId = null;
         }
 
@@ -69,6 +74,7 @@
             var statusEl = document.getElementById('quoteStatus');
             var status = statusEl ? statusEl.value : (isChangeOrder ? 'draft' : 'draft');
             var supabaseId = window._supabaseQuoteId || null;
+            var loadedData = window._loadedQuoteData || window._currentQuoteData || {};
             if (isChangeOrder && supabaseId && window._parentQuoteId && supabaseId === window._parentQuoteId) {
                 supabaseId = null;
             }
@@ -102,7 +108,15 @@
                 currency: (function(){ try { return JSON.parse(localStorage.getItem('ald_quote_prefs')||'{}').currency||'CAD'; } catch(e){return 'CAD';} })(),
                 paymentSettings: (typeof getLocalPaymentSettingsSnapshot === 'function') ? getLocalPaymentSettingsSnapshot() : null,
                 businessProfile: (typeof getLocalBusinessProfileSnapshot === 'function') ? getLocalBusinessProfileSnapshot() : {},
-                hiddenProfileFields: (typeof getLocalHiddenProfileFieldsSnapshot === 'function') ? getLocalHiddenProfileFieldsSnapshot() : []
+                hiddenProfileFields: (typeof getLocalHiddenProfileFieldsSnapshot === 'function') ? getLocalHiddenProfileFieldsSnapshot() : [],
+                portal_visible: loadedData.portal_visible === true,
+                portal_id: loadedData.portal_id || '',
+                portal_name: loadedData.portal_name || '',
+                portal_client_name: loadedData.portal_client_name || loadedData.clientName || '',
+                portal_client_email: loadedData.portal_client_email || loadedData.clientEmail || loadedData.email || '',
+                portal_pin: loadedData.portal_pin || '',
+                portal_added_at: loadedData.portal_added_at || null,
+                portal_theme: loadedData.portal_theme || null
             };
         }
 
@@ -156,7 +170,9 @@
             if (data.supabaseId) {
                 window._supabaseQuoteId = data.supabaseId;
                 localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
+                window._quoteFullyLoaded = true;
             }
+            window._loadedQuoteData = Object.assign({}, data, { supabaseId: window._supabaseQuoteId || data.supabaseId || null });
             renderRooms();
             initDone = wasInitDone;
             unsavedChanges = false; // clean slate after load
@@ -354,6 +370,7 @@ async function saveQuote() {
             }
 
             _saveDialogData.supabaseId = null; // Force new insert
+            _saveDialogData.forceNew = true;
             window._supabaseQuoteId = null;
             localStorage.removeItem("ald_active_quote_id");
             var saveBtn = document.getElementById('saveAsNewBtn');
@@ -604,6 +621,10 @@ async function saveQuote() {
             // Cloud save to Supabase - always runs regardless of file handle
             if (typeof saveQuoteToSupabase === 'function') {
                 var qData = collectQuoteData();
+                if (quoteDataIsPortalLockedForBuilder(qData)) {
+                    console.warn('[AutoSave] Skipping cloud save - this quote is locked in a client portal');
+                    return;
+                }
                 // SAFETY GUARD: never overwrite cloud data with empty rooms unless we know the quote is intentionally empty
                 // _quoteFullyLoaded is set true only after a successful Supabase load
                 if (!window._quoteFullyLoaded && (!qData.rooms || qData.rooms.length === 0)) {
@@ -756,6 +777,17 @@ async function saveQuote() {
             if (!session) {
                 // No saved session - just start fresh, no alert needed
                 updateDraftWarning();
+                return;
+            }
+            if (quoteDataIsPortalLockedForBuilder(session)) {
+                localStorage.removeItem('ald_session_quote');
+                updateDraftWarning();
+                if (typeof qdAlert === 'function') {
+                    qdAlert('The last opened document is already in a client portal, so it was not restored for editing. Remove it from the portal in the dashboard before editing.', {
+                        title: 'Portal Document Locked',
+                        type: 'warning'
+                    });
+                }
                 return;
             }
             // Hide startup modal if it's open

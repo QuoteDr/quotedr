@@ -8275,6 +8275,7 @@ Example:
                 qdAlert('No rooms to save. Add at least one room first.');
                 return;
             }
+            currentSupabaseId = window._supabaseQuoteId || currentSupabaseId || null;
 
             const draftData = {
                 id: currentSupabaseId || Date.now(),
@@ -8312,7 +8313,9 @@ Example:
                     } else {
                         // Store the Supabase ID for future updates
                         currentSupabaseId = data.id;
+                        window._supabaseQuoteId = data.id;
                         draftData.supabaseId = data.id;
+                        localStorage.setItem("ald_active_quote_id", data.id);
                         localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
                         qdAlert('Quote saved! ? (Saved to cloud + local backup)');
                     }

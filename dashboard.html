@@ -179,8 +179,8 @@
     <div class="container py-4">
 
         <!-- Stats Cards -->
-        <div class="row mb-4">
-            <div class="col-md-3 col-sm-6 mb-3">
+        <div class="row row-cols-2 row-cols-lg-5 mb-4 g-3">
+            <div class="col">
                 <div class="card border-primary">
                     <div class="card-body text-center">
                         <h5 class="card-title">Total Quotes</h5>
@@ -188,7 +188,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 col-sm-6 mb-3">
+            <div class="col">
                 <div class="card border-success">
                     <div class="card-body text-center">
                         <h5 class="card-title">Accepted</h5>
@@ -196,19 +196,27 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 col-sm-6 mb-3">
+            <div class="col">
                 <div class="card border-warning">
                     <div class="card-body text-center">
-                        <h5 class="card-title">In Review</h5>
+                        <h5 class="card-title">Viewed / Review</h5>
                         <p class="display-6" id="inReviewCount">0</p>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 col-sm-6 mb-3">
+            <div class="col">
                 <div class="card border-info">
                     <div class="card-body text-center">
                         <h5 class="card-title">Revenue</h5>
                         <p class="display-6" id="totalRevenue">$0.00</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="card border-danger">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">Outstanding</h5>
+                        <p class="display-6" id="outstandingRevenue">$0.00</p>
                     </div>
                 </div>
             </div>
@@ -443,13 +451,15 @@
         function updateStats(quotes) {
             const total = quotes.length;
             const accepted = quotes.filter(q => q.status === 'accepted').length;
-            const inReview = quotes.filter(q => q.status === 'in_review').length;
+            const inReview = quotes.filter(q => q.status === 'viewed' || q.status === 'in_review').length;
             const revenue = quotes.reduce((sum, q) => sum + (parseFloat(q.total) || 0), 0);
+            const outstanding = quotes.reduce((sum, q) => sum + dashboardOutstandingAmount(q), 0);
 
             document.getElementById('totalQuotesCount').textContent = total;
             document.getElementById('acceptedQuotesCount').textContent = accepted;
             document.getElementById('inReviewCount').textContent = inReview;
             document.getElementById('totalRevenue').textContent = '$' + revenue.toLocaleString('en-CA', {minimumFractionDigits:0, maximumFractionDigits:0});
+            document.getElementById('outstandingRevenue').textContent = '$' + outstanding.toLocaleString('en-CA', {minimumFractionDigits:0, maximumFractionDigits:0});
         }
 
         function autocleanDuplicates(data) {
@@ -607,6 +617,25 @@
                 data.type === 'invoice' ||
                 data.documentType === 'invoice' ||
                 data._type === 'invoice';
+        }
+
+        function dashboardPaidAmount(quote) {
+            var data = quote && quote.data || {};
+            var payments = Array.isArray(data.payments) ? data.payments : [];
+            return payments.reduce(function(sum, payment) {
+                if (!payment || !payment.paid_at) return sum;
+                return sum + ((parseFloat(payment.amount_cents || 0) || 0) / 100);
+            }, 0);
+        }
+
+        function dashboardOutstandingAmount(quote) {
+            var data = quote && quote.data || {};
+            var status = String((quote && quote.status) || data.status || '').toLowerCase();
+            var paymentStatus = String(data.paymentStatus || '').toLowerCase();
+            if (status !== 'invoiced' || paymentStatus === 'paid') return 0;
+            var total = parseFloat((quote && quote.total) || data.grandTotal || data.total || 0) || 0;
+            if (total <= 0) return 0;
+            return Math.max(total - dashboardPaidAmount(quote), 0);
         }
 
         function dashboardCanonicalInvoiceNumber(value) {

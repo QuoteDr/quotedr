@@ -495,6 +495,31 @@ async function saveQuote(quoteData) {
     };
 
     let data, error;
+    if (!quoteData.supabaseId && !quoteData.forceNew && !quoteData._forceNewQuote && quoteData.quoteNumber) {
+        try {
+            var existingResult = await _supabase
+                .from('quotes')
+                .select('id,data,type,quote_number,updated_at')
+                .eq('user_id', user.id)
+                .eq('quote_number', quoteData.quoteNumber)
+                .order('updated_at', { ascending: false })
+                .limit(1);
+            var existingQuote = existingResult && existingResult.data && existingResult.data[0];
+            if (existingQuote && existingQuote.id) {
+                if (existingQuote.data && existingQuote.data.portal_visible === true && quoteData.portal_visible !== true) {
+                    return {
+                        error: {
+                            message: 'This quote is already in a client portal and cannot be edited directly. Remove it from the portal in the dashboard before editing.'
+                        }
+                    };
+                }
+                quoteData.supabaseId = existingQuote.id;
+            }
+        } catch(e) {
+            console.warn('Quote duplicate guard could not check quote number:', e);
+        }
+    }
+
     async function runSave(savePayload) {
     if (quoteData.supabaseId) {
         // Update existing quote
