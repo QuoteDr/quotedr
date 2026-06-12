@@ -559,6 +559,56 @@
         }
         .drag-handle:hover { opacity: 1; }
         .room-card.sortable-ghost { opacity: 0.4; }
+        .room-card.room-jump-highlight {
+            outline: 3px solid #ff7a1a;
+            box-shadow: 0 0 0 6px rgba(255,122,26,0.18), 0 14px 34px rgba(13, 63, 117, 0.18);
+            transition: outline-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .quote-builder-room-nav-list {
+            display: grid;
+            gap: 8px;
+            max-height: min(58vh, 430px);
+            overflow-y: auto;
+        }
+        .quote-builder-room-nav-item {
+            align-items: center;
+            border: 1px solid #d5e1f2;
+            border-radius: 8px;
+            display: flex;
+            gap: 10px;
+            justify-content: space-between;
+            padding: 10px 12px;
+            text-align: left;
+            width: 100%;
+        }
+        .quote-builder-room-nav-item:hover,
+        .quote-builder-room-nav-item:focus {
+            background: #eef6ff;
+            border-color: #0d6efd;
+        }
+        .quote-builder-room-nav-icon {
+            align-items: center;
+            background: #edf4ff;
+            border-radius: 8px;
+            color: #1a56a0;
+            display: inline-flex;
+            height: 34px;
+            justify-content: center;
+            width: 34px;
+        }
+        @media (max-width: 576px) {
+            #quoteBuilderRoomNavModal .modal-dialog {
+                align-items: flex-end;
+                display: flex;
+                margin: 0;
+                min-height: 100%;
+                max-width: 100%;
+            }
+            #quoteBuilderRoomNavModal .modal-content {
+                border-radius: 18px 18px 0 0;
+                margin-top: auto;
+            }
+        }
         .cat-drag-handle {
             cursor: grab;
             font-size: 0.9rem;
@@ -6854,6 +6904,79 @@ Example:
             calculateTotals();
         }
 
+        function quoteBuilderRoomAnchorId(roomId) {
+            return 'quoteBuilderRoom_' + String(roomId === undefined || roomId === null ? '' : roomId).replace(/[^a-zA-Z0-9_-]/g, '_');
+        }
+
+        function quoteBuilderSafeIconClass(iconClass) {
+            var icon = String(iconClass || 'fa-door-open').trim();
+            return /^[a-zA-Z0-9_\-\s]+$/.test(icon) ? icon : 'fa-door-open';
+        }
+
+        function renderQuoteBuilderRoomNav() {
+            var list = document.getElementById('quoteBuilderRoomNavList');
+            var empty = document.getElementById('quoteBuilderRoomNavEmpty');
+            if (!list || !empty) return;
+
+            if (!Array.isArray(rooms) || rooms.length === 0) {
+                list.innerHTML = '';
+                empty.style.display = '';
+                return;
+            }
+
+            empty.style.display = 'none';
+            list.innerHTML = rooms.map(function(room, index) {
+                var roomName = qdTemplateEscapeHtml(room.name || ('Room ' + (index + 1)));
+                var roomId = qdTemplateEscapeHtml(room.id);
+                var itemCount = Array.isArray(room.items) ? room.items.length : 0;
+                var roomTotal = typeof coDisplayRoomAmount === 'function' ? coDisplayRoomAmount(room) : 0;
+                var totalText = typeof qdFormatMoney === 'function' ? qdFormatMoney(roomTotal) : ('$' + (Number(roomTotal) || 0).toFixed(2));
+                var roomIcon = quoteBuilderSafeIconClass(room.icon || 'fa-door-open');
+                return '<button type="button" class="quote-builder-room-nav-item bg-white" data-room-nav-id="' + roomId + '" onclick="jumpToQuoteBuilderRoomById(this.dataset.roomNavId)">' +
+                    '<span class="d-flex align-items-center gap-2 min-w-0">' +
+                        '<span class="quote-builder-room-nav-icon"><i class="fas ' + roomIcon + '"></i></span>' +
+                        '<span class="min-w-0"><span class="fw-bold d-block text-truncate">' + roomName + '</span><span class="small text-muted">' + itemCount + ' item' + (itemCount === 1 ? '' : 's') + '</span></span>' +
+                    '</span>' +
+                    '<span class="fw-bold text-success text-nowrap">' + totalText + '</span>' +
+                '</button>';
+            }).join('');
+        }
+
+        function openQuoteBuilderRoomNav() {
+            renderQuoteBuilderRoomNav();
+            if (!Array.isArray(rooms) || rooms.length === 0) {
+                var message = 'No rooms yet. Add a room first.';
+                if (typeof showToast === 'function') showToast(message, 'info');
+                else if (typeof qdAlert === 'function') qdAlert(message);
+                else window.alert(message);
+                return;
+            }
+            var modalEl = document.getElementById('quoteBuilderRoomNavModal');
+            if (!modalEl) return;
+            if (window.bootstrap && bootstrap.Modal) {
+                bootstrap.Modal.getOrCreateInstance(modalEl).show();
+            }
+        }
+
+        function jumpToQuoteBuilderRoomById(roomId) {
+            jumpToQuoteBuilderRoom(quoteBuilderRoomAnchorId(roomId));
+        }
+
+        function jumpToQuoteBuilderRoom(anchorId) {
+            var target = document.getElementById(anchorId);
+            if (!target) return;
+            var modalEl = document.getElementById('quoteBuilderRoomNavModal');
+            var modal = modalEl && window.bootstrap && bootstrap.Modal ? bootstrap.Modal.getInstance(modalEl) : null;
+            if (modal) modal.hide();
+            window.setTimeout(function() {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                target.classList.add('room-jump-highlight');
+                window.setTimeout(function() {
+                    target.classList.remove('room-jump-highlight');
+                }, 1700);
+            }, modal ? 180 : 0);
+        }
+
         function renderRooms() {
             const container = document.getElementById('roomsContainer');
             ensureUniqueRoomIds();
@@ -6871,6 +6994,7 @@ Example:
                     </button>
                 </div>`;
                 calculateTotals();
+                renderQuoteBuilderRoomNav();
                 return;
             }
 
@@ -6886,7 +7010,7 @@ Example:
 
                 const colorIdx = (room.colorIndex !== undefined) ? room.colorIndex : 0;
                 const headerBg = roomHeaderBackground(room);
-                html += '<div class="room-card" data-room-id="' + room.id + '">';
+                html += '<div class="room-card" id="' + quoteBuilderRoomAnchorId(room.id) + '" data-room-id="' + room.id + '">';
                 html += '<div class="room-header' + (room.invertHeaderText ? ' room-text-dark' : '') + '" style="background:' + headerBg + '">';
                 html += '<div class="d-flex justify-content-between align-items-start">';
                 html += '<div>';
@@ -7121,6 +7245,7 @@ Example:
             container.innerHTML = html;
             calculateTotals();
             markUnsaved();
+            renderQuoteBuilderRoomNav();
             updateChangeOrderModeUI();
             initSortable();
         }
@@ -12562,9 +12687,9 @@ Example:
                 <li><a class="dropdown-item" href="javascript:void(0)" onclick="generateInvoiceLink()"><i class="fas fa-paper-plane me-2 text-danger"></i>Send Invoice</a></li>
             </ul>
         </div>
-        <a href="javascript:void(0)" onclick="previewInvoice()" class="btn btn-success btn-sm" style="flex:1; flex-direction:column; display:flex; align-items:center; justify-content:center; padding:4px 2px; min-width:0;">
-            <i class="fas fa-file-pdf d-block" style="font-size:1rem;"></i>
-            <span style="font-size:0.55rem;">PDF</span>
+        <a href="javascript:void(0)" id="quoteBuilderRoomNavBtn" onclick="openQuoteBuilderRoomNav(); return false;" class="btn btn-success btn-sm" style="flex:1; flex-direction:column; display:flex; align-items:center; justify-content:center; padding:4px 2px; min-width:0;">
+            <i class="fas fa-location-dot d-block" style="font-size:1rem;"></i>
+            <span style="font-size:0.55rem;">Rooms</span>
         </a>
         <a href="javascript:void(0)" onclick="openManageItemsModal()" class="btn btn-dark btn-sm" style="flex:1; flex-direction:column; display:flex; align-items:center; justify-content:center; padding:4px 2px; min-width:0;">
             <i class="fas fa-database d-block" style="font-size:1rem;"></i>
@@ -12582,6 +12707,23 @@ Example:
             <i class="fas fa-cog d-block" style="font-size:1rem;"></i>
             <span style="font-size:0.55rem;">Settings</span>
         </a>
+    </div>
+
+    <div class="modal fade" id="quoteBuilderRoomNavModal" tabindex="-1" aria-labelledby="quoteBuilderRoomNavTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header" style="background:#1a56a0; color:white;">
+                    <h5 class="modal-title" id="quoteBuilderRoomNavTitle"><i class="fas fa-location-dot me-2"></i>Find Room</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="quoteBuilderRoomNavEmpty" class="alert alert-light border mb-0" style="display:none;">
+                        No rooms yet. Add a room first.
+                    </div>
+                    <div id="quoteBuilderRoomNavList" class="quote-builder-room-nav-list"></div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Save Quote Dialog Modal -->
