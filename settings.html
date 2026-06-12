@@ -575,6 +575,34 @@ Sarah Jones, 905-555-5678"></textarea>
 					</div>
 
 					<div class="settings-card">
+						<h5><i class="fab fa-google me-2" style="color:#1a56a0"></i>Google Review Requests</h5>
+						<p class="text-muted small">Ask happy clients for a review after a job is paid and complete. QuoteDr will never send these automatically without you clicking the request button.</p>
+						<div class="mb-3">
+							<label class="form-label fw-bold" for="googleReviewLink">Google Review Link</label>
+							<input type="url" id="googleReviewLink" class="form-control" placeholder="https://g.page/r/your-review-link/review">
+							<div class="form-text">Paste your direct Google review URL. This is the link clients will receive.</div>
+						</div>
+						<div class="mb-3">
+							<label class="form-label fw-bold" for="reviewRequestMessage">Review Request Message</label>
+							<textarea id="reviewRequestMessage" class="form-control" rows="4" placeholder="Hi {client}, thanks again for choosing {company}. If you're happy with the work, we'd really appreciate a quick Google review: {reviewLink}"></textarea>
+							<div class="form-text">Variables: {client}, {company}, {reviewLink}</div>
+						</div>
+						<div class="form-check form-switch mb-3">
+							<input class="form-check-input" type="checkbox" id="reviewNudgeEnabled" role="switch" checked>
+							<label class="form-check-label fw-bold" for="reviewNudgeEnabled">Nudge me if I forget to ask</label>
+						</div>
+						<div class="mb-3">
+							<label class="form-label fw-bold">Show nudge after</label>
+							<div class="d-flex align-items-center gap-2">
+								<input type="number" id="reviewNudgeDays" class="form-control" style="width:90px;" min="1" max="30" value="3">
+								<span class="text-muted">days after payment</span>
+							</div>
+							<div class="form-text">The dashboard will show a reminder only if the review request has not been sent or dismissed for that job.</div>
+						</div>
+						<button class="btn btn-primary btn-save" onclick="saveNotificationSettings()"><i class="fas fa-save me-1"></i> Save Review Settings</button>
+					</div>
+
+					<div class="settings-card">
 						<h5><i class="fas fa-clock me-2" style="color:#e87e2a"></i>Automatic Reminders</h5>
 						<p class="text-muted small">Automatically remind clients who haven't responded to a quote.</p>
 						<div class="form-check form-switch mb-3">
@@ -1355,7 +1383,11 @@ Sarah Jones, 905-555-5678"></textarea>
 			var settings = {
 				followupMessage: (document.getElementById('followupMessage') || {}).value || '',
 				autoReminderEnabled: !!(document.getElementById('autoReminderEnabled') || {}).checked,
-				reminderDays: parseInt((document.getElementById('reminderDays') || {}).value || '3')
+				reminderDays: parseInt((document.getElementById('reminderDays') || {}).value || '3'),
+				googleReviewLink: (document.getElementById('googleReviewLink') || {}).value || '',
+				reviewRequestMessage: (document.getElementById('reviewRequestMessage') || {}).value || '',
+				reviewNudgeEnabled: !!(document.getElementById('reviewNudgeEnabled') || {}).checked,
+				reviewNudgeDays: parseInt((document.getElementById('reviewNudgeDays') || {}).value || '3')
 			};
 			localStorage.setItem('ald_notification_settings', JSON.stringify(settings));
 			if (typeof _supabase !== 'undefined' && typeof getCurrentUser === 'function') {
@@ -1378,6 +1410,14 @@ Sarah Jones, 905-555-5678"></textarea>
 				if (ar) ar.checked = !!s.autoReminderEnabled;
 				var rd = document.getElementById('reminderDays');
 				if (rd && s.reminderDays) rd.value = s.reminderDays;
+				var gr = document.getElementById('googleReviewLink');
+				if (gr && s.googleReviewLink) gr.value = s.googleReviewLink;
+				var rm = document.getElementById('reviewRequestMessage');
+				if (rm) rm.value = s.reviewRequestMessage || "Hi {client}, thanks again for choosing {company}. If you're happy with the work, we'd really appreciate a quick Google review: {reviewLink}";
+				var rn = document.getElementById('reviewNudgeEnabled');
+				if (rn) rn.checked = s.reviewNudgeEnabled !== false;
+				var rnd = document.getElementById('reviewNudgeDays');
+				if (rnd && s.reviewNudgeDays) rnd.value = s.reviewNudgeDays;
 			} catch(e) {}
 		}
 

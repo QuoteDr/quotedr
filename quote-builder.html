@@ -76,6 +76,8 @@
         .icon-picker-wrap .icon-opt { width:42px; height:42px; display:flex; align-items:center; justify-content:center; border-radius:8px; cursor:pointer; font-size:1.15rem; color:#343a40; border:2px solid transparent; transition:all 0.1s; }
         .icon-picker-wrap .icon-opt:hover { background:#e8f0fe; border-color:#1a56a0; color:#1a56a0; }
         .icon-picker-wrap .icon-opt.active { background:#1a56a0; color:#fff; border-color:#1a56a0; }
+        .icon-picker-wrap .icon-auto-actions { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:10px; }
+        .icon-picker-wrap .icon-auto-actions button { border-radius:8px; font-weight:700; font-size:0.78rem; padding:7px 8px; }
         .line-item {
             background: white;
             border-left: 4px solid #1a56a0;
@@ -2812,8 +2814,49 @@ Example:
             ]},
         ];
 
+        var ROOM_ICON_AUTO_DETECT_RULES = [
+            { pattern: /\b(bathroom|bath|ensuite|washroom|powder|toilet)\b/, icon: 'fa-bath' },
+            { pattern: /\b(kitchen|pantry|galley)\b/, icon: 'fa-utensils' },
+            { pattern: /\b(primary bedroom|master bedroom|bedroom|guest room|bed)\b/, icon: 'fa-bed' },
+            { pattern: /\b(nursery|kids|kid|child|children|playroom)\b/, icon: 'fa-child' },
+            { pattern: /\b(living|family room|lounge|sitting|great room|den)\b/, icon: 'fa-couch' },
+            { pattern: /\b(dining|breakfast nook)\b/, icon: 'fa-wine-glass' },
+            { pattern: /\b(office|study|library)\b/, icon: 'fa-book' },
+            { pattern: /\b(media|theatre|theater|cinema|tv)\b/, icon: 'fa-tv' },
+            { pattern: /\b(game|rec room|recreation)\b/, icon: 'fa-gamepad' },
+            { pattern: /\b(gym|fitness|exercise|workout)\b/, icon: 'fa-dumbbell' },
+            { pattern: /\b(laundry|mudroom|mud room)\b/, icon: 'fa-tshirt' },
+            { pattern: /\b(pool|swimming)\b/, icon: 'fa-swimming-pool' },
+            { pattern: /\b(spa|sauna|steam)\b/, icon: 'fa-spa' },
+            { pattern: /\b(garage|carport)\b/, icon: 'fa-car' },
+            { pattern: /\b(workshop|shop|tool)\b/, icon: 'fa-tools' },
+            { pattern: /\b(warehouse|storage)\b/, icon: 'fa-warehouse' },
+            { pattern: /\b(store|retail|commercial|showroom)\b/, icon: 'fa-store' },
+            { pattern: /\b(hallway|hall|corridor|foyer|entry|entrance)\b/, icon: 'fa-archway' },
+            { pattern: /\b(stair|stairs|stairwell)\b/, icon: 'fa-stairs' },
+            { pattern: /\b(deck|patio|porch|outdoor|balcony)\b/, icon: 'fa-campground' },
+            { pattern: /\b(yard|garden|landscape|landscaping)\b/, icon: 'fa-tree' },
+            { pattern: /\b(basement|mechanical|utility)\b/, icon: 'fa-industry' },
+            { pattern: /\b(home|house|main floor|whole house)\b/, icon: 'fa-home' },
+        ];
+
+        function detectRoomIconForName(roomName) {
+            var name = String(roomName || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
+            for (var i = 0; i < ROOM_ICON_AUTO_DETECT_RULES.length; i++) {
+                if (ROOM_ICON_AUTO_DETECT_RULES[i].pattern.test(name)) {
+                    return ROOM_ICON_AUTO_DETECT_RULES[i].icon;
+                }
+            }
+            return 'fa-door-open';
+        }
+
         function _iconPickerHTML(roomId, currentIcon) {
-            var html = '';
+            var html = '<div class="icon-auto-actions">' +
+                '<button type="button" class="btn btn-outline-primary btn-sm" onclick="autoDetectRoomIcon(' + roomId + ')">' +
+                '<i class="fas fa-magic me-1"></i>Auto Detect</button>' +
+                '<button type="button" class="btn btn-outline-warning btn-sm" onclick="autoDetectAllRoomIcons()">' +
+                '<i class="fas fa-wand-magic-sparkles me-1"></i>Auto Detect All</button>' +
+                '</div>';
             ROOM_ICONS.forEach(function(section) {
                 html += '<div class="icon-section-label">' + section.label + '</div><div class="icon-grid">';
                 section.icons.forEach(function(ico) {
@@ -2824,6 +2867,48 @@ Example:
                 html += '</div>';
             });
             return html;
+        }
+
+        function autoDetectRoomIcon(roomId) {
+            var room = rooms.find(function(r) { return r.id === roomId; });
+            if (!room) return;
+            var detectedIcon = detectRoomIconForName(room.name);
+            selectRoomIcon(roomId, detectedIcon);
+        }
+
+        async function autoDetectAllRoomIcons() {
+            var message = 'This will change all room icons if the tool thinks theirs better fits.';
+            var confirmed = true;
+            if (typeof qdConfirm === 'function') {
+                confirmed = await qdConfirm(message + ' Continue?', {
+                    title: 'Auto Detect All Room Icons',
+                    okText: 'Auto Detect All',
+                    cancelText: 'Cancel',
+                    type: 'warning'
+                });
+            } else {
+                confirmed = window.confirm(message + ' Continue?');
+            }
+            if (!confirmed) return;
+
+            var changed = 0;
+            rooms.forEach(function(room) {
+                var detectedIcon = detectRoomIconForName(room && room.name);
+                if (room && detectedIcon && room.icon !== detectedIcon) {
+                    room.icon = detectedIcon;
+                    changed++;
+                }
+            });
+
+            if (changed > 0) {
+                try { localStorage.setItem('ald_session_quote', JSON.stringify(collectQuoteData())); } catch(e) {}
+                markUnsaved();
+                renderRooms();
+            }
+            closeIconPicker();
+            if (typeof qdAlert === 'function') {
+                qdAlert(changed ? ('Updated ' + changed + ' room icon' + (changed === 1 ? '.' : 's.')) : 'Room icons already match the detected room names.');
+            }
         }
 
         function closeIconPicker() {
@@ -2916,9 +3001,7 @@ Example:
                 iconEl.className = classes.join(' ');
             }
             // Close picker
-            var picker = document.getElementById('roomIconPicker');
-            if (picker) picker.remove();
-            _iconPickerRoomId = null;
+            closeIconPicker();
         }
         // -- End Room Icon Picker -----------------------------------------
 

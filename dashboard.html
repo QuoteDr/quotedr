@@ -48,6 +48,7 @@
         .status-in_review { color: #fd7e14; font-weight: 600; }
         .status-accepted { color: #198754; }
         .status-invoiced { color: #fd7e14; font-weight: 600; }
+        .status-paid { color: #198754; font-weight: 700; }
         .status-declined { color: #dc3545; }
         .quote-card .status-select {
             padding: 0.25rem 0.5rem;
@@ -271,6 +272,7 @@
                                     <option value="sent">Sent</option>
                                     <option value="accepted">Accepted</option>
                                     <option value="invoiced">Invoiced</option>
+                                    <option value="paid">Paid</option>
                                     <option value="declined">Declined</option>
                                 </select>
                             </div>
@@ -530,6 +532,9 @@
                 var depositPaid = !!(q.data && (q.data.deposit_paid === true || q.data.paymentStatus === 'partially_paid' || q.data.paymentStatus === 'paid' || payments.some(function(payment) { return ['deposit', 'invoice_deposit'].includes(payment.type) && payment.paid_at; })));
                 var depositPayment = payments.slice().reverse().find(function(payment) { return ['deposit', 'invoice_deposit'].includes(payment.type) && payment.paid_at; });
                 var depositAmount = depositPayment && depositPayment.amount_cents ? '$' + (depositPayment.amount_cents / 100).toFixed(2) : 'Deposit';
+                var reviewReady = dashboardIsPaidForReviewRequest(q);
+                var reviewSentAt = q.data && q.data.review_request_sent_at;
+                var reviewNudge = shouldShowReviewNudge(q);
                 return `
                 <div class="quote-card ${isChangeOrder ? 'change-order-card' : ''}">
                     <div class="d-flex justify-content-between align-items-start">
@@ -559,6 +564,7 @@
                                 <option value="in_review" ${status === 'in_review' ? 'selected' : ''}>In Review</option>
                                 <option value="accepted" ${status === 'accepted' ? 'selected' : ''}>Accepted</option>
                                 <option value="invoiced" ${status === 'invoiced' ? 'selected' : ''}>Invoiced</option>
+                                <option value="paid" ${status === 'paid' ? 'selected' : ''}>Paid</option>
                                 <option value="pending_approval" ${status === 'pending_approval' ? 'selected' : ''}>Pending CO Approval</option>
                                 <option value="approved" ${status === 'approved' ? 'selected' : ''}>CO Approved</option>
                                 <option value="declined" ${status === 'declined' ? 'selected' : ''}>Declined</option>
@@ -571,9 +577,12 @@
                     ${status === 'accepted' && q.data && q.data.client_upgraded ? `<div class="alert alert-warning py-1 px-2 mt-2 mb-0 small"><i class="fas fa-bolt me-1"></i><strong>Client made upgrades</strong> when signing - <a href="interactive-quote-viewer.html?id=${encodeURIComponent(q.id)}" class="alert-link">review quote</a></div>` : ''}
                     ${portalVisible ? `<div class="portal-locked-note mt-2"><i class="fas fa-shield-halved me-1"></i>This document is locked while it is in the client portal. Remove from portal or duplicate as a revision to edit.</div>` : ''}
                     ${depositPaid ? `<div class="alert alert-success py-1 px-2 mt-2 mb-0 small"><i class="fas fa-credit-card me-1"></i><strong>${escapeHtml(depositAmount)} paid</strong>${depositPayment && depositPayment.paid_at ? ' on ' + escapeHtml(formatDate(depositPayment.paid_at)) : ''}</div>` : ''}
+                    ${reviewSentAt ? `<div class="alert alert-success py-1 px-2 mt-2 mb-0 small"><i class="fab fa-google me-1"></i><strong>Review requested</strong> on ${escapeHtml(formatDate(reviewSentAt))}</div>` : ''}
+                    ${reviewNudge ? `<div class="alert alert-warning py-2 px-2 mt-2 mb-0 small d-flex justify-content-between align-items-center gap-2 flex-wrap"><span><i class="fas fa-star me-1"></i>You haven't asked ${escapeHtml(clientName)} for a Google review yet. Click while the job is still fresh in their mind.</span><span class="d-flex gap-1"><button class="btn btn-sm btn-warning" onclick="sendGoogleReviewRequest(${jsAttr(q.id)}, ${jsAttr(clientName)}, ${jsAttr(clientEmail)})"><i class="fab fa-google me-1"></i>Request now</button><button class="btn btn-sm btn-outline-secondary" onclick="dismissGoogleReviewNudge(${jsAttr(q.id)})">Never show again</button></span></div>` : ''}
                     ${pendingCos ? `<div class="alert alert-info py-1 px-2 mt-2 mb-0 small"><i class="fas fa-file-circle-plus me-1"></i><strong>${pendingCos} pending change order${pendingCos === 1 ? '' : 's'}</strong></div>` : ''}
                     ${status === 'in_review' ? `<button class="btn btn-warning btn-sm w-100 mt-2" onclick="openNotesReview(${jsAttr(q.id)}, ${jsAttr(clientName)})"><i class="fas fa-comments me-1"></i> Review Client Notes</button>` : ''}
                     ${(!isChangeOrder && (status === 'accepted' || status === 'invoiced')) ? `<button class="btn btn-warning btn-sm w-100 mt-1" onclick="openQuoteForChangeOrder(${jsAttr(q.id)})"><i class="fas fa-file-circle-plus me-1"></i>Create Change Order</button>` : ''}
+                    ${reviewReady && !reviewSentAt ? `<button class="btn btn-outline-success btn-sm w-100 mt-1" onclick="sendGoogleReviewRequest(${jsAttr(q.id)}, ${jsAttr(clientName)}, ${jsAttr(clientEmail)})"><i class="fab fa-google me-1"></i> Request Review</button>` : ''}
                     <button class="btn btn-sm w-100 mt-1 ${portalVisible ? 'btn-success' : 'btn-outline-secondary'}" onclick="openPortalAssignment(${jsAttr(q.id)})" title="${portalVisible ? 'Manage portal assignment' : 'Choose a client portal'}"><i class="fas ${portalVisible ? 'fa-eye' : 'fa-eye-slash'} me-1"></i> ${portalVisible ? 'In Portal' : 'Add to Portal'}</button>
                     <button class="btn btn-outline-info btn-sm w-100 mt-1" onclick="shareClientPortal(${jsAttr(q.id)}, ${jsAttr(clientName)}, ${jsAttr(clientEmail)})" title="Share client portal"><i class="fas fa-external-link-alt me-1"></i> Client Portal</button>
                     ${(status === 'sent' || status === 'viewed') ? `<button class="btn btn-outline-primary btn-sm w-100 mt-1" onclick="sendFollowUpReminder(${jsAttr(q.id)}, ${jsAttr(clientName)}, ${jsAttr(clientEmail)})"><i class="fas fa-bell me-1"></i> Send Follow-up</button>` : ''}
@@ -636,6 +645,60 @@
             var total = parseFloat((quote && quote.total) || data.grandTotal || data.total || 0) || 0;
             if (total <= 0) return 0;
             return Math.max(total - dashboardPaidAmount(quote), 0);
+        }
+
+        function getNotificationSettings() {
+            try {
+                return JSON.parse(localStorage.getItem('ald_notification_settings') || '{}') || {};
+            } catch(e) {
+                return {};
+            }
+        }
+
+        function dashboardReviewRequestMessage(settings, clientName) {
+            var profile = {};
+            try { profile = JSON.parse(localStorage.getItem('ald_business_profile') || '{}') || {}; } catch(e) {}
+            var company = profile.business_name || localStorage.getItem('ald_business_name') || 'our team';
+            var reviewLink = String(settings.googleReviewLink || '').trim();
+            var template = settings.reviewRequestMessage || "Hi {client}, thanks again for choosing {company}. If you're happy with the work, we'd really appreciate a quick Google review: {reviewLink}";
+            return template
+                .replace(/\{client\}/g, clientName || 'there')
+                .replace(/\{company\}/g, company)
+                .replace(/\{reviewLink\}/g, reviewLink);
+        }
+
+        function dashboardPaidAtForReviewRequest(q) {
+            var data = q && q.data || {};
+            var payments = Array.isArray(data.payments) ? data.payments : [];
+            var paidPayment = payments.slice().reverse().find(function(payment) {
+                var type = String(payment.type || '').toLowerCase();
+                return payment.paid_at && ['invoice', 'full', 'final', 'balance', 'invoice_full', 'full_payment'].includes(type);
+            });
+            return data.invoice_paid_at || data.payment_paid_at || (paidPayment && paidPayment.paid_at) || q.updated_at || q.created_at || null;
+        }
+
+        function dashboardIsPaidForReviewRequest(q) {
+            var data = q && q.data || {};
+            var status = String((q && q.status) || data.status || '').toLowerCase();
+            var paymentStatus = String(data.paymentStatus || data.payment_status || '').toLowerCase();
+            var payments = Array.isArray(data.payments) ? data.payments : [];
+            var fullPaymentRecorded = payments.some(function(payment) {
+                var type = String(payment.type || '').toLowerCase();
+                return payment.paid_at && ['invoice', 'full', 'final', 'balance', 'invoice_full', 'full_payment'].includes(type);
+            });
+            return status === 'paid' || data.invoice_paid === true || paymentStatus === 'paid' || fullPaymentRecorded;
+        }
+
+        function shouldShowReviewNudge(q) {
+            if (!dashboardIsPaidForReviewRequest(q)) return false;
+            var data = q && q.data || {};
+            if (data.review_request_sent_at || data.review_request_nudge_ignored) return false;
+            var settings = getNotificationSettings();
+            if (settings.reviewNudgeEnabled === false) return false;
+            var days = Math.max(1, parseInt(settings.reviewNudgeDays || '3', 10) || 3);
+            var paidAt = dashboardPaidAtForReviewRequest(q);
+            if (!paidAt) return false;
+            return Date.now() - new Date(paidAt).getTime() >= days * 24 * 60 * 60 * 1000;
         }
 
         function dashboardCanonicalInvoiceNumber(value) {
@@ -1930,6 +1993,75 @@
             } catch(e) {
                 qdAlert('Failed to send: ' + e.message);
                 if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-bell me-1"></i> Send Follow-up'; }
+            }
+        }
+
+        async function sendGoogleReviewRequest(quoteId, clientName, savedEmail) {
+            var quote = allQuotes.find(function(q) { return q.id === quoteId; });
+            if (!quote) return;
+            var settings = getNotificationSettings();
+            var reviewLink = String(settings.googleReviewLink || '').trim();
+            if (!reviewLink) {
+                qdAlert('Add your Google Review Link in Settings > Notifications before sending review requests.');
+                return;
+            }
+            var clientEmail = await qdPrompt('Send Google review request to:', savedEmail || (quote.data && (quote.data.clientEmail || quote.data.email || quote.data.client_email)) || '', {
+                title: 'Request Google Review'
+            });
+            if (!clientEmail || !clientEmail.includes('@')) { if (clientEmail !== null) qdAlert('Invalid email'); return; }
+            var btn = (typeof event !== 'undefined' && event.target) ? event.target.closest('button') : null;
+            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Sending...'; }
+            try {
+                var message = dashboardReviewRequestMessage(settings, clientName);
+                var res = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/send-quote-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso' },
+                    body: JSON.stringify({
+                        to: clientEmail,
+                        clientName: clientName,
+                        contractorName: '',
+                        companyName: '',
+                        quoteNumber: quote.quote_number || 'Google Review',
+                        total: quote.total || 0,
+                        quoteUrl: reviewLink,
+                        message: message
+                    })
+                });
+                var data = await res.json();
+                if (data.error) throw new Error(data.error);
+
+                var now = new Date().toISOString();
+                var updatedData = Object.assign({}, quote.data || {}, {
+                    review_request_sent_at: now,
+                    review_request_sent_to: clientEmail,
+                    review_request_nudge_ignored: false
+                });
+                var update = await _supabase.from('quotes').update({ data: updatedData, updated_at: now }).eq('id', quoteId);
+                if (update.error) throw update.error;
+                quote.data = updatedData;
+                renderQuotes(allQuotes);
+                if (typeof qdAlert === 'function') qdAlert('Google review request sent.');
+            } catch(e) {
+                qdAlert('Failed to send review request: ' + e.message);
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fab fa-google me-1"></i> Request Review'; }
+            }
+        }
+
+        async function dismissGoogleReviewNudge(quoteId) {
+            var quote = allQuotes.find(function(q) { return q.id === quoteId; });
+            if (!quote) return;
+            var now = new Date().toISOString();
+            var updatedData = Object.assign({}, quote.data || {}, {
+                review_request_nudge_ignored: true,
+                review_request_nudge_ignored_at: now
+            });
+            try {
+                var update = await _supabase.from('quotes').update({ data: updatedData, updated_at: now }).eq('id', quoteId);
+                if (update.error) throw update.error;
+                quote.data = updatedData;
+                renderQuotes(allQuotes);
+            } catch(e) {
+                qdAlert('Could not dismiss this review reminder: ' + e.message);
             }
         }
 
