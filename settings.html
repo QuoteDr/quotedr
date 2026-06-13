@@ -1498,8 +1498,10 @@ Sarah Jones, 905-555-5678"></textarea>
 			if (!session) { window.location.href = 'login.html'; return; }
 			window.currentUser = session.user;
 			applyAnalyticsAdminVisibility(window.currentUser);
-			// Restore last active tab
-			var lastTab = localStorage.getItem('ald_settings_tab') || 'business';
+			// Restore last active tab, unless the URL asks for a specific settings area.
+			var hashTab = (window.location.hash || '').replace(/^#/, '');
+			var allowedHashTabs = ['business', 'quotes', 'pricing', 'notifications', 'payments', 'portal', 'integrations', 'analytics', 'account', 'feedback'];
+			var lastTab = allowedHashTabs.indexOf(hashTab) !== -1 ? hashTab : (localStorage.getItem('ald_settings_tab') || 'business');
 			if (lastTab === 'analytics' && !isAnalyticsAdminUser(window.currentUser)) lastTab = 'business';
 			var tabEl = document.querySelector('#settingsTabs [onclick*="\'' + lastTab + '\'"]');
 			showTab(lastTab, tabEl);
