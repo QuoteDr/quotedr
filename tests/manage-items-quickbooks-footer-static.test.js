@@ -15,6 +15,11 @@ assert(
 );
 
 assert(
+  quoteBuilder.includes("localStorage.setItem('ald_settings_tab','integrations')"),
+  'QuickBooks footer button should set the integrations tab before navigating so stale settings state cannot win'
+);
+
+assert(
   quoteBuilder.includes('QuickBooks'),
   'QuickBooks footer button should have a clear label'
 );
