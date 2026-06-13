@@ -859,6 +859,8 @@
             box-shadow: 0 8px 24px rgba(15, 52, 96, 0.08);
             margin: 0 0 1rem;
             overflow: hidden;
+            position: relative;
+            z-index: 1031;
         }
         .builder-guide-header {
             display: flex;
@@ -960,8 +962,111 @@
             gap: 0.5rem;
             margin-top: 0.9rem;
         }
-        #builderGuideShowBtn {
+        .builder-guide-track-switcher {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+            margin-top: 0.65rem;
+        }
+        .builder-guide-track-btn {
+            border: 1px solid #cbd5e1;
+            border-radius: 999px;
+            background: #fff;
+            color: #32465f;
+            font-size: 0.78rem;
+            font-weight: 800;
+            padding: 0.28rem 0.7rem;
+        }
+        .builder-guide-track-btn.active {
+            background: #1a56a0;
+            border-color: #1a56a0;
+            color: #fff;
+        }
+        .builder-guide-step.optional .builder-guide-check {
+            border-style: dashed;
+        }
+        .builder-guide-step.locked {
+            opacity: 0.72;
+        }
+        .builder-guide-tag {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            background: #eef4ff;
+            color: #1a56a0;
+            font-size: 0.68rem;
+            font-weight: 850;
+            padding: 0.08rem 0.4rem;
+            margin-left: 0.35rem;
+            vertical-align: middle;
+            text-transform: uppercase;
+        }
+        .builder-guide-note {
+            border: 1px solid #d9e7fb;
+            border-radius: 8px;
+            background: #fff;
+            color: #46566a;
+            font-size: 0.78rem;
+            padding: 0.55rem 0.7rem;
+            margin-top: 0.8rem;
+        }
+        .builder-guide-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 1030;
+            pointer-events: none;
+            background: rgba(15, 32, 51, 0.18);
+            opacity: 0;
+            transition: opacity 0.18s ease;
+        }
+        .builder-guide-backdrop.active {
+            opacity: 1;
+        }
+        .builder-guide-spotlight {
+            position: relative !important;
+            z-index: 1081 !important;
+            border-radius: 10px;
+            box-shadow: 0 0 0 4px rgba(242, 122, 26, 0.38), 0 0 0 9999px rgba(15, 32, 51, 0.08), 0 12px 34px rgba(15, 32, 51, 0.22) !important;
+            animation: builderGuidePulse 1.15s ease-in-out infinite;
+        }
+        @keyframes builderGuidePulse {
+            0%, 100% { outline: 0 solid rgba(242, 122, 26, 0.0); }
+            50% { outline: 6px solid rgba(242, 122, 26, 0.22); }
+        }
+        .builder-guide-coachmark {
+            position: fixed;
+            z-index: 1082;
+            width: min(320px, calc(100vw - 28px));
+            border: 1px solid #f7b267;
+            border-radius: 10px;
+            background: #fffaf3;
+            color: #27364a;
+            box-shadow: 0 18px 42px rgba(15, 32, 51, 0.22);
+            padding: 0.85rem 0.95rem;
             display: none;
+        }
+        .builder-guide-coachmark.show {
+            display: block;
+        }
+        .builder-guide-coachmark-title {
+            color: #0f3460;
+            font-weight: 850;
+            margin-bottom: 0.25rem;
+        }
+        .builder-guide-coachmark-body {
+            color: #516173;
+            font-size: 0.86rem;
+            line-height: 1.35;
+        }
+        .builder-guide-coachmark-actions {
+            display: flex;
+            gap: 0.45rem;
+            justify-content: flex-end;
+            margin-top: 0.75rem;
+        }
+        #builderGuideShowBtn {
+            display: inline-flex;
+            align-items: center;
         }
         #manageItemsModal .manage-items-add-shell {
             border: 1px solid #d8e2ee;
@@ -1376,8 +1481,8 @@ if (location.search.includes('debug')) {
                         <input class="form-check-input" type="checkbox" id="autoSaveToggle" style="cursor:pointer;">
                         <label class="form-check-label text-muted" for="autoSaveToggle">Auto-save</label>
                     </div>
-                    <button type="button" id="builderGuideShowBtn" class="btn btn-sm btn-outline-primary ms-auto" onclick="toggleBuilderGuide(true)">
-                        <i class="fas fa-route me-1"></i>Show Guide
+                    <button type="button" id="builderGuideShowBtn" class="btn btn-sm btn-outline-primary ms-auto" onclick="toggleBuilderGuide()">
+                        <i class="fas fa-eye-slash me-1"></i>Hide Guide
                     </button>
                 </div>
             </div>
@@ -1408,15 +1513,20 @@ if (location.search.includes('debug')) {
     <div id="builderGuideCard" class="builder-guide-card">
         <div class="builder-guide-header">
             <div>
-                <h2 class="builder-guide-title"><i class="fas fa-route"></i> Quote Builder Guide</h2>
-                <div class="text-muted small">Follow the steps from client info to sending. You can hide this anytime.</div>
+                <h2 class="builder-guide-title"><i class="fas fa-route"></i> QuoteDr Tutorial</h2>
+                <div class="text-muted small" id="builderGuideSubtitle">Build your first client-ready quote, then learn the advanced tools when you need them.</div>
+                <div class="builder-guide-track-switcher" aria-label="Tutorial track">
+                    <button type="button" class="builder-guide-track-btn" id="builderGuideTrackFirst" onclick="setBuilderGuideTrack('first_quote')">
+                        First Quote
+                    </button>
+                    <button type="button" class="builder-guide-track-btn" id="builderGuideTrackAdvanced" onclick="setBuilderGuideTrack('advanced_tools')">
+                        Power Tools
+                    </button>
+                </div>
             </div>
             <div class="d-flex align-items-center gap-2 flex-wrap">
-                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="restartBuilderGuide()">
-                    <i class="fas fa-rotate-left me-1"></i>Restart
-                </button>
-                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleBuilderGuide(false)">
-                    <i class="fas fa-eye-slash me-1"></i>Hide Guide
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="builderGuideRestartBtn" onclick="restartCurrentBuilderGuideTrack()">
+                    <i class="fas fa-rotate-left me-1"></i><span id="builderGuideRestartLabel">Restart Tutorial</span>
                 </button>
             </div>
         </div>
@@ -1434,6 +1544,7 @@ if (location.search.includes('debug')) {
                 <div class="text-muted small fw-bold text-uppercase mb-2">Current Step</div>
                 <h6 id="builderGuideCurrentTitle" class="mb-2">Start with client info</h6>
                 <p id="builderGuideCurrentDetail" class="text-muted small mb-0">Add the client name and confirm the quote number.</p>
+                <div id="builderGuideCurrentNote" class="builder-guide-note" style="display:none;"></div>
                 <div class="builder-guide-actions">
                     <button type="button" class="btn btn-sm btn-outline-secondary" onclick="moveBuilderGuide(-1)">
                         <i class="fas fa-chevron-left me-1"></i>Back
@@ -1441,11 +1552,27 @@ if (location.search.includes('debug')) {
                     <button type="button" class="btn btn-sm btn-primary" id="builderGuideActionBtn" onclick="runBuilderGuideAction()">
                         Do This Step
                     </button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="builderGuideDoneBtn" onclick="markBuilderGuideStepDone()">
+                        Mark Done
+                    </button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" onclick="moveBuilderGuide(1)">
                         Next<i class="fas fa-chevron-right ms-1"></i>
                     </button>
                 </div>
             </div>
+        </div>
+    </div>
+    <div id="builderGuideBackdrop" class="builder-guide-backdrop" aria-hidden="true"></div>
+    <div id="builderGuideCoachmark" class="builder-guide-coachmark" role="status" aria-live="polite">
+        <div class="builder-guide-coachmark-title" id="builderGuideCoachTitle"></div>
+        <div class="builder-guide-coachmark-body" id="builderGuideCoachBody"></div>
+        <div class="builder-guide-coachmark-actions">
+            <button type="button" class="btn btn-sm btn-outline-primary" id="builderGuideCoachNextBtn" onclick="moveBuilderGuideSubstep(1)">
+                Next
+            </button>
+            <button type="button" class="btn btn-sm btn-primary" id="builderGuideCoachDoneBtn" onclick="markBuilderGuideStepDone()">
+                Click When Complete
+            </button>
         </div>
     </div>
 
@@ -1576,7 +1703,7 @@ if (location.search.includes('debug')) {
                 </div>
                 <!-- Mobile: Add Room button always visible + dropdown for rest -->
                 <div class="d-flex d-md-none gap-2 align-items-center">
-                    <a href="javascript:void(0)" onclick="addRoom()" class="btn btn-sm btn-primary">
+                    <a href="javascript:void(0)" onclick="addRoom()" class="btn btn-sm btn-primary btn-add-room">
                         <i class="fas fa-plus"></i> Add Room
                     </a>
                     <div class="dropdown">
@@ -2143,6 +2270,9 @@ Example:
                         <label><strong>New Item or Quick Search:</strong> <small class="text-muted">type to find any service instantly</small></label>
                         <input type="text" id="itemQuickSearch" class="form-control" placeholder="e.g., drywall, tile, baseboard..." oninput="showItemSearchResults()" onblur="hideItemSearchDropdown()" autocomplete="off">
                         <div id="itemSearchDropdown" style="display:none; position:absolute; left:0; right:0; z-index:2000; background:white; border:1px solid #dee2e6; border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.15); max-height:220px; overflow-y:auto;"></div>
+                        <div id="lineItemQuickSearchTip" class="alert alert-info py-2 px-3 mt-2 mb-0 small">
+                            <strong>Saved items save tons of time.</strong> Start typing a saved item name here and QuoteDr can autofill the category, unit, rate, material cost, and notes for you.
+                        </div>
                     </div>
 
                     <div class="row">
@@ -2613,77 +2743,552 @@ Example:
         let showTimelines = true;
 
         // -- Guided builder flow -----------------------------------------------
-        var _builderGuideIndex = parseInt(localStorage.getItem('ald_builder_guide_step') || '0', 10) || 0;
-        var BUILDER_GUIDE_STEPS = [
-            {
-                id: 'client',
-                title: 'Add client info',
-                detail: 'Enter the client name and confirm the quote number. Address, phone, and email help when sending later.',
-                actionText: 'Go to Client Info',
-                complete: function() {
-                    return !!(document.getElementById('clientName')?.value.trim() && document.getElementById('quoteNumber')?.value.trim());
-                },
-                action: function() {
-                    var body = document.getElementById('clientInfoBody');
-                    if (body && body.style.display === 'none') toggleClientInfo();
-                    focusBuilderGuideTarget('clientName');
-                }
+        var ONBOARDING_TRACK_KEY = 'ald_onboarding_track';
+        var ONBOARDING_STEP_KEY = 'ald_onboarding_step';
+        var ONBOARDING_COMPLETED_KEY = 'ald_onboarding_completed_steps';
+        var ONBOARDING_SEEN_KEY = 'ald_onboarding_seen';
+        var ONBOARDING_DISMISSED_KEY = 'ald_onboarding_dismissed';
+        var ONBOARDING_SUBSTEPS_KEY = 'ald_onboarding_substeps';
+        var _builderGuideTrack = localStorage.getItem(ONBOARDING_TRACK_KEY) || 'first_quote';
+        var _builderGuideIndex = parseInt(localStorage.getItem(ONBOARDING_STEP_KEY) || localStorage.getItem('ald_builder_guide_step') || '0', 10) || 0;
+        var _builderGuideManualStepIndex = null;
+        var _builderGuideSpotlightTarget = null;
+        var _builderGuideSpotlightKey = '';
+        var BUILDER_GUIDE_TRACKS = {
+            first_quote: {
+                label: 'First Quote',
+                subtitle: 'Build your first client-ready quote. Keep the first pass simple; the advanced tools are available when you need them.',
+                steps: [
+                    {
+                        id: 'welcome',
+                        title: 'Build your first quote',
+                        detail: 'QuoteDr turns job details into a client-ready quote. Start with client info, add rooms, add work items, review totals, then send the quote link.',
+                        note: 'The goal is not to configure everything today. Get one quote built, preview it, and send it.',
+                        target: '#clientName',
+                        coach: 'Start here. The next step will walk you through client info before moving on to rooms.',
+                        actionText: 'Start',
+                        completeOnAction: true,
+                        complete: function() { return isBuilderGuideStepCompleted('first_quote:welcome'); },
+                        action: function() { focusBuilderGuideTarget('clientName'); }
+                    },
+                    {
+                        id: 'client',
+                        title: 'Add client info',
+                        detail: 'Add the client name, job address, phone, and email. QuoteDr uses this when saving, sending, invoicing, and organizing client portals.',
+                        target: '#clientName',
+                        coach: 'Fill this section in first. When it looks right to you, click the completion button here to move on to Add Room.',
+                        actionText: 'Go to Client Info',
+                        manualComplete: true,
+                        completeText: 'Client Info Complete',
+                        substeps: [
+                            {
+                                title: 'Client Name',
+                                target: '#clientName',
+                                coach: 'Enter or confirm the client name first. Click Next when the name looks right.'
+                            },
+                            {
+                                title: 'Project Address',
+                                target: '#projectAddress',
+                                coach: 'Enter or confirm the job address. This keeps the quote, invoice, and portal tied to the right project.'
+                            },
+                            {
+                                title: 'Phone Number',
+                                target: '#clientPhone',
+                                coach: 'Add the client phone number if you have it. Click Next when this field is ready.'
+                            },
+                            {
+                                title: 'Email Address',
+                                target: '#clientEmail',
+                                coach: 'Add the email address used for quote links, invoices, and client portal communication. Click Client Info Complete when this looks right.'
+                            }
+                        ],
+                        complete: function() { return isBuilderGuideStepCompleted('first_quote:client'); },
+                        action: function() {
+                            var body = document.getElementById('clientInfoBody');
+                            if (body && body.style.display === 'none') toggleClientInfo();
+                        }
+                    },
+                    {
+                        id: 'room',
+                        title: 'Create a room or area',
+                        detail: 'Break the job into sections the client can understand: Bathroom, Kitchen, Basement, Exterior, Roof, Deck, or another work area.',
+                        target: '.btn-add-room',
+                        coach: 'Click Add Room next. A room or area is the container for the work you are quoting.',
+                        actionText: 'Add Room',
+                        complete: function() { return rooms.length > 0; },
+                        action: function() { addRoom(); }
+                    },
+                    {
+                        id: 'saved_item_setup',
+                        title: 'Set up a saved item',
+                        detail: 'Before adding work to the quote, add one reusable saved item in Manage Items. This is your price book for services, materials, rates, labor time, and supplier links.',
+                        note: 'QuoteDr can import QuickBooks Products & Services and customers from Settings > Integrations. You can also use the Importer tool in Settings for QuickBooks exports, spreadsheets, old price lists, or messy notes.',
+                        target: '.btn-manage',
+                        coach: 'Open Manage Items first. This is where your reusable price book lives, including items imported from QuickBooks Products & Services or the Importer tool in Settings.',
+                        actionText: 'Open Manage Items',
+                        manualComplete: true,
+                        completeText: 'Saved Item Setup Complete',
+                        closeModalOnComplete: 'manageItemsModal',
+                        substeps: [
+                            {
+                                title: 'Open Manage Items',
+                                target: '.btn-manage',
+                                coach: 'Open Manage Items. This is where QuoteDr stores reusable services, material info, labor time, and supplier links.'
+                            },
+                            {
+                                title: 'Open New Item',
+                                target: '#toggleAddItemPanelBtn',
+                                coach: 'Open the New Item panel. If you already synced QuickBooks or used the importer, your existing items will appear below.'
+                            },
+                            {
+                                title: 'Item Name',
+                                target: '#newItemName',
+                                coach: 'Name the saved service clearly, such as Drywall Hang and Finish or Recessed Pot Light Installation.'
+                            },
+                            {
+                                title: 'Category',
+                                target: '#newItemCategory',
+                                coach: 'Choose or create a category. Categories keep your saved items searchable when quoting.'
+                            },
+                            {
+                                title: 'Unit and Rate',
+                                target: '#newItemUnit',
+                                coach: 'Set the unit type and your selling rate. Use sq ft, LF, each, hourly, Flatrate, or whatever matches how you quote this work.'
+                            },
+                            {
+                                title: 'Material Cost',
+                                target: '#newItemMaterialCost',
+                                coach: 'Add material cost when you know it. QuoteDr uses this to help you track margin and job profitability.'
+                            },
+                            {
+                                title: 'Save the Item',
+                                target: '#manageNewItemPanel button[onclick="addCustomItem()"]',
+                                coach: 'Click Add Item to save it. Then click Saved Item Setup Complete so the tutorial can move on to adding work into the room.'
+                            }
+                        ],
+                        complete: function() { return isBuilderGuideStepCompleted('first_quote:saved_item_setup'); },
+                        action: function() {
+                            if (typeof openManageItemsModal === 'function') openManageItemsModal();
+                            setTimeout(function() {
+                                if (typeof toggleManageNewItemPanel === 'function') toggleManageNewItemPanel(true);
+                            }, 350);
+                        }
+                    },
+                    {
+                        id: 'items',
+                        title: 'Add line items',
+                        detail: 'Line items are the work, materials, labour, and services inside each room. Use saved items when possible so pricing stays consistent.',
+                        target: '.btn-add-item',
+                        targetFallback: '#roomsContainer',
+                        coach: 'Now add the work inside the room. Each line item should be something the client can understand and approve.',
+                        actionText: 'Add Line Item',
+                        substeps: [
+                            {
+                                title: 'Open Add Line Item',
+                                target: '.btn-add-item',
+                                targetFallback: '#roomsContainer',
+                                coach: 'Click Add Line Item. This opens the form for adding work, materials, labour, or services to the room.',
+                                actionText: 'Add Line Item',
+                                advanceSubstepAfterAction: true
+                            },
+                            {
+                                title: 'Search saved items',
+                                target: '#itemQuickSearch',
+                                targetFallback: '#addLineModal .modal-content',
+                                coach: 'Start typing a saved item name. QuoteDr will search your saved price book and autofill the item details, so repeat work is much faster.'
+                            }
+                        ],
+                        complete: function() {
+                            return rooms.some(function(room) { return room.items && room.items.length > 0; });
+                        },
+                        action: function() {
+                            if (!rooms.length) { addRoom(); return; }
+                            addLine(rooms[0].id);
+                        }
+                    },
+                    {
+                        id: 'ai_drafting',
+                        title: 'Use AI when it helps',
+                        detail: 'AI Voice can turn spoken scope into accurate rooms and line items in seconds, then get even better as it learns your corrections, saved items, and trade rules.',
+                        note: 'AI Memory learns phrase corrections. Trade Rules handle contractor shorthand. Voice Templates handle repeatable packages.',
+                        target: '[onclick="startVoiceQuote()"], #aiBtn',
+                        coach: 'AI Voice saves serious time and learns from your corrections. Give the results a quick review before they reach the client, then let it keep getting faster for repeat work.',
+                        actionText: 'Open AI Quote',
+                        substeps: [
+                            {
+                                title: 'Open AI Quote Builder',
+                                target: '[onclick="startVoiceQuote()"], #aiBtn',
+                                coach: 'Open AI Quote Builder. This is one of the fastest ways to turn a walkthrough or spoken scope into a structured quote.',
+                                actionText: 'Open AI Quote'
+                            },
+                            {
+                                title: 'Start talking',
+                                target: '#voiceMicBtn',
+                                targetFallback: '#voiceQuoteModal .modal-content',
+                                coach: 'Try it out: hit the microphone button now. Describe the job naturally, then generate the quote. The tutorial will continue when you reach the review page.'
+                            },
+                            {
+                                title: 'Watch the transcript',
+                                target: '#voiceTranscript',
+                                targetFallback: '#voiceQuoteModal .modal-content',
+                                coach: 'Your words appear here as you talk. You can pause, continue, or try again before generating the quote.'
+                            },
+                            {
+                                title: 'Separate rooms',
+                                target: '#voiceNextRoomBtn',
+                                targetFallback: '#voiceQuoteModal .modal-content',
+                                coach: 'Use Next Room when you move to another area. That helps AI Voice organize the quote into clean room sections automatically.'
+                            },
+                            {
+                                title: 'Generate and review',
+                                target: '#voiceActions',
+                                targetFallback: '#voiceTranscript',
+                                coach: 'After recording, Generate Quote builds the rooms and line items. The review screen lets you adjust quantities, match saved items, and teach QuoteDr what phrases mean.'
+                            },
+                            {
+                                title: 'Verify AI results',
+                                target: '#aiVoiceReviewList',
+                                targetFallback: '#aiVoiceReviewModal .modal-content',
+                                coach: 'This is the verification page. Check quantities, saved-item matches, notes, and room grouping before adding the AI results to the quote.'
+                            },
+                            {
+                                title: 'AI Memory',
+                                target: '#aiVoiceMemoryBtn',
+                                targetFallback: '#voiceQuoteModal .modal-content',
+                                coach: 'AI Memory is where QuoteDr remembers phrase corrections. The more you use AI Voice and confirm matches, the faster repeat quoting gets.'
+                            },
+                            {
+                                title: 'AI Trade Rules',
+                                target: '#aiVoiceTradeRulesBtn',
+                                targetFallback: '#voiceQuoteModal .modal-content',
+                                coach: 'Trade Rules handle contractor shorthand and reusable math, like casing doors, painting walls, or adding standard quantities from how you speak.'
+                            },
+                            {
+                                title: 'Voice Templates',
+                                target: '#aiVoiceTemplatesBtn',
+                                targetFallback: '#voiceQuoteModal .modal-content',
+                                coach: 'Voice Templates let one phrase add a saved package of work. Use them for repeat scopes like standard bedrooms, bathrooms, decks, or service calls.',
+                                manualComplete: true,
+                                completeText: 'AI Voice Tour Complete'
+                            }
+                        ],
+                        optional: true,
+                        complete: function() { return isBuilderGuideStepCompleted('first_quote:ai_drafting'); },
+                        action: function() { if (typeof startVoiceQuote === 'function') startVoiceQuote(); }
+                    },
+                    {
+                        id: 'measurement_tools',
+                        title: 'Use measurement tools',
+                        detail: 'Use measurements when quantities come from maps, plans, or room dimensions. Always review calculated quantities before adding them.',
+                        note: 'Satellite Measure is best outdoors. Floor Plan Scanner works from calibrated plans. Quick Room Quoter converts room dimensions into common line items.',
+                        target: '.btn-quick-room',
+                        coach: 'Use measurement tools when quantity matters. QuoteDr can help convert dimensions, maps, and plans into quote quantities.',
+                        actionText: 'Try Satellite Measure',
+                        optional: true,
+                        complete: function() { return isBuilderGuideStepCompleted('first_quote:measurement_tools'); },
+                        action: function() { if (typeof openMeasureModal === 'function') openMeasureModal(); }
+                    },
+                    {
+                        id: 'review',
+                        title: 'Review scope and totals',
+                        detail: 'Check room subtotals, tax, material costs, markup, and final total. Use AI Scope to draft client-facing room notes, then edit them.',
+                        target: '#grandTotalDisplay',
+                        targetFallback: '.btn-total',
+                        coach: 'Review the total and the visible client scope before sending. This is the checkpoint before the quote leaves your hands.',
+                        actionText: 'Review Total',
+                        complete: function() { return getBuilderGuideTotal() > 0; },
+                        action: function() { scrollBuilderGuideTarget('grandTotalDisplay'); }
+                    },
+                    {
+                        id: 'save',
+                        title: 'Save the quote',
+                        detail: 'Save before leaving the builder so the quote is available later and can sync across devices.',
+                        target: '[onclick="saveQuote()"]',
+                        coach: 'Save locks in the quote so it is available later from the dashboard and client workflows.',
+                        actionText: 'Save Quote',
+                        complete: function() {
+                            return !!(window._supabaseQuoteId || localStorage.getItem('ald_active_quote_id'));
+                        },
+                        action: function() { if (typeof saveQuote === 'function') saveQuote(); }
+                    },
+                    {
+                        id: 'send',
+                        title: 'Preview and send',
+                        detail: 'Choose the client view style, pricing detail, deposit display, and approval type. Preview the client view before sending.',
+                        target: '[onclick="generateInteractiveLink()"], .btn-send-quote',
+                        coach: 'Preview the client view, choose what pricing detail they can see, then send the quote link.',
+                        actionText: 'Preview & Send',
+                        complete: function() {
+                            var status = document.getElementById('quoteStatus')?.value || 'draft';
+                            return status === 'sent' || status === 'accepted' || status === 'invoiced' || !!document.getElementById('interactiveLinkModal');
+                        },
+                        action: function() { if (typeof generateInteractiveLink === 'function') generateInteractiveLink(); }
+                    }
+                ]
             },
-            {
-                id: 'room',
-                title: 'Create a room or area',
-                detail: 'Break the quote into sections like Kitchen, Bathroom, Basement, Exterior, or Garage.',
-                actionText: 'Add Room',
-                complete: function() { return rooms.length > 0; },
-                action: function() { addRoom(); }
-            },
-            {
-                id: 'items',
-                title: 'Add line items',
-                detail: 'Add the labour, materials, and services that make up each room total.',
-                actionText: 'Add Line Item',
-                complete: function() {
-                    return rooms.some(function(room) { return room.items && room.items.length > 0; });
-                },
-                action: function() {
-                    if (!rooms.length) { addRoom(); return; }
-                    addLine(rooms[0].id);
-                }
-            },
-            {
-                id: 'review',
-                title: 'Review totals and details',
-                detail: 'Check room subtotals, tax, material costs, markup, and the final quote total before sending.',
-                actionText: 'Review Total',
-                complete: function() { return getBuilderGuideTotal() > 0; },
-                action: function() { scrollBuilderGuideTarget('grandTotalDisplay'); }
-            },
-            {
-                id: 'save',
-                title: 'Save the quote',
-                detail: 'Save before leaving the builder so the quote is available later and can sync across devices.',
-                actionText: 'Save Quote',
-                complete: function() {
-                    return !!(window._supabaseQuoteId || localStorage.getItem('ald_active_quote_id'));
-                },
-                action: function() { if (typeof saveQuote === 'function') saveQuote(); }
-            },
-            {
-                id: 'send',
-                title: 'Preview and send',
-                detail: 'Choose the client view settings, preview the quote, then send the link or email it directly.',
-                actionText: 'Preview & Send',
-                complete: function() {
-                    var status = document.getElementById('quoteStatus')?.value || 'draft';
-                    return status === 'sent' || status === 'accepted' || status === 'invoiced' || !!document.getElementById('interactiveLinkModal');
-                },
-                action: function() { if (typeof generateInteractiveLink === 'function') generateInteractiveLink(); }
+            advanced_tools: {
+                label: 'Power Tools',
+                subtitle: 'Use these after the first quote flow is clear. Each tool speeds up a specific part of quoting, invoicing, or client follow-up.',
+                steps: [
+                    {
+                        id: 'templates',
+                        title: 'Templates and community templates',
+                        detail: 'Save repeatable room setups and reuse them. Community templates are starting points; review quantities and pricing before using them.',
+                        target: '.btn-templates',
+                        coach: 'Templates are for repeatable jobs. Save a room setup once, then reuse it instead of rebuilding from scratch.',
+                        actionText: 'Open Templates',
+                        optional: true,
+                        complete: function() { return isBuilderGuideStepCompleted('advanced_tools:templates'); },
+                        action: function() { if (typeof openManageTemplates === 'function') openManageTemplates(); }
+                    },
+                    {
+                        id: 'ai_automation',
+                        title: 'AI automation setup',
+                        detail: 'Improve AI accuracy by keeping Manage Items current, saving phrase corrections, creating Trade Rules, and using Voice Templates for repeat packages.',
+                        target: '[onclick="startVoiceQuote()"], #aiBtn',
+                        coach: 'This is where AI gets practical: clear saved pricing, phrase corrections, and trade rules make drafts more predictable.',
+                        actionText: 'Open AI Quote',
+                        optional: true,
+                        complete: function() { return isBuilderGuideStepCompleted('advanced_tools:ai_automation'); },
+                        action: function() { if (typeof startVoiceQuote === 'function') startVoiceQuote(); }
+                    },
+                    {
+                        id: 'measurements',
+                        title: 'Measurement workflows',
+                        detail: 'Use Satellite Measure, Floor Plan Scanner, and Quick Room Quoter to convert maps, plans, and dimensions into quote quantities.',
+                        target: '.btn-quick-room',
+                        coach: 'Measurement tools are quantity helpers. Use the one that matches the source: room dimensions, satellite map, or calibrated floor plan.',
+                        actionText: 'Open Quick Room Quoter',
+                        optional: true,
+                        complete: function() { return isBuilderGuideStepCompleted('advanced_tools:measurements'); },
+                        action: function() { if (typeof openMaterialEstimator === 'function') openMaterialEstimator(); }
+                    },
+                    {
+                        id: 'portal',
+                        title: 'Client portal',
+                        detail: 'Group quotes, invoices, change orders, and documents into one client-facing portal with PIN access from the dashboard.',
+                        note: 'After saving a quote, use Add to Portal or Client Portal on the dashboard quote card.',
+                        actionText: 'Open Dashboard',
+                        optional: true,
+                        complete: function() { return isBuilderGuideStepCompleted('advanced_tools:portal'); },
+                        action: function() { window.location.href = 'dashboard.html'; }
+                    },
+                    {
+                        id: 'invoice',
+                        title: 'Invoices and payments',
+                        detail: 'Turn accepted work into an invoice, send it, and track invoice/payment status from the quote and dashboard.',
+                        target: '[onclick="openInvoiceSettingsModal()"], [onclick*="Invoice"]',
+                        coach: 'Invoices build on the accepted quote. Use this when the quote is ready to become a billing document.',
+                        actionText: 'Invoice Actions',
+                        optional: true,
+                        complete: function() { return isBuilderGuideStepCompleted('advanced_tools:invoice'); },
+                        action: function() { if (typeof openInvoiceSettingsModal === 'function') openInvoiceSettingsModal(); }
+                    },
+                    {
+                        id: 'change_orders',
+                        title: 'Change orders',
+                        detail: 'Create linked changes without editing the original quote. Explain what changed, review net add or credit, then send for approval.',
+                        note: 'Change orders are available from accepted or invoiced quote cards on the dashboard.',
+                        actionText: 'Open Dashboard',
+                        optional: true,
+                        complete: function() { return isBuilderGuideStepCompleted('advanced_tools:change_orders'); },
+                        action: function() { window.location.href = 'dashboard.html'; }
+                    }
+                ]
             }
-        ];
+        };
 
         function getBuilderGuideTotal() {
             var totalText = document.getElementById('grandTotalDisplay')?.textContent || '';
             return parseFloat(totalText.replace(/[^0-9.]/g, '')) || 0;
+        }
+
+        function isBuilderGuideClientInfoReady() {
+            return !!(document.getElementById('clientName')?.value.trim() && document.getElementById('quoteNumber')?.value.trim());
+        }
+
+        function getBuilderGuideSteps() {
+            var track = BUILDER_GUIDE_TRACKS[_builderGuideTrack] || BUILDER_GUIDE_TRACKS.first_quote;
+            return track.steps || [];
+        }
+
+        function getBuilderGuideTrackLabel(trackKey) {
+            var track = BUILDER_GUIDE_TRACKS[trackKey || _builderGuideTrack] || BUILDER_GUIDE_TRACKS.first_quote;
+            return track.label || 'Tutorial';
+        }
+
+        function getBuilderGuideStepKey(step) {
+            return _builderGuideTrack + ':' + (step && step.id ? step.id : 'step');
+        }
+
+        function getBuilderGuideCompletedSteps() {
+            try {
+                var value = JSON.parse(localStorage.getItem(ONBOARDING_COMPLETED_KEY) || '[]');
+                return Array.isArray(value) ? value : [];
+            } catch(e) {
+                return [];
+            }
+        }
+
+        function setBuilderGuideCompletedSteps(steps) {
+            localStorage.setItem(ONBOARDING_COMPLETED_KEY, JSON.stringify(Array.from(new Set(steps || []))));
+        }
+
+        function isBuilderGuideStepCompleted(stepKey) {
+            return getBuilderGuideCompletedSteps().indexOf(stepKey) >= 0;
+        }
+
+        function getBuilderGuideSubsteps() {
+            try {
+                var value = JSON.parse(localStorage.getItem(ONBOARDING_SUBSTEPS_KEY) || '{}');
+                return value && typeof value === 'object' ? value : {};
+            } catch(e) {
+                return {};
+            }
+        }
+
+        function setBuilderGuideSubstep(step, index) {
+            if (!step || !Array.isArray(step.substeps)) return;
+            var map = getBuilderGuideSubsteps();
+            var key = getBuilderGuideStepKey(step);
+            map[key] = Math.max(0, Math.min(step.substeps.length - 1, index || 0));
+            localStorage.setItem(ONBOARDING_SUBSTEPS_KEY, JSON.stringify(map));
+        }
+
+        function getBuilderGuideSubstepIndex(step) {
+            if (!step || !Array.isArray(step.substeps) || !step.substeps.length) return 0;
+            var map = getBuilderGuideSubsteps();
+            var value = parseInt(map[getBuilderGuideStepKey(step)] || '0', 10);
+            return Math.max(0, Math.min(step.substeps.length - 1, isNaN(value) ? 0 : value));
+        }
+
+        function isBuilderGuideLastSubstep(step) {
+            return !step || !Array.isArray(step.substeps) || getBuilderGuideSubstepIndex(step) >= step.substeps.length - 1;
+        }
+
+        function getBuilderGuideActiveStep(step) {
+            if (!step || !Array.isArray(step.substeps) || !step.substeps.length) return step;
+            var substep = step.substeps[getBuilderGuideSubstepIndex(step)] || step.substeps[0];
+            return Object.assign({}, step, substep, {
+                title: substep.title || step.title,
+                detail: substep.detail || step.detail,
+                coach: substep.coach || step.coach || step.detail,
+                actionText: substep.actionText || step.actionText
+            });
+        }
+
+        function completeBuilderGuideStep(step) {
+            if (!step) return;
+            var completed = getBuilderGuideCompletedSteps();
+            var key = getBuilderGuideStepKey(step);
+            if (completed.indexOf(key) < 0) {
+                completed.push(key);
+                setBuilderGuideCompletedSteps(completed);
+            }
+            setBuilderGuideSubstep(step, 0);
+        }
+
+        function isFirstQuoteTutorialComplete() {
+            return (BUILDER_GUIDE_TRACKS.first_quote.steps || []).every(function(step) {
+                if (step.optional) return true;
+                try { return !!step.complete(); } catch(e) { return false; }
+            });
+        }
+
+        function isBuilderGuideTargetVisible(el) {
+            if (!el) return false;
+            var style = window.getComputedStyle(el);
+            if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+            var rect = el.getBoundingClientRect();
+            return rect.width > 0 && rect.height > 0;
+        }
+
+        function getBuilderGuideTarget(selector, fallbackSelector) {
+            var selectors = [selector, fallbackSelector].filter(Boolean);
+            for (var i = 0; i < selectors.length; i++) {
+                var matches = [];
+                try { matches = Array.from(document.querySelectorAll(selectors[i])); } catch(e) { matches = []; }
+                var visible = matches.find(isBuilderGuideTargetVisible);
+                if (visible) return visible;
+                if (matches[0]) return matches[0];
+            }
+            return null;
+        }
+
+        function positionBuilderGuideCoachmark(target) {
+            var coach = document.getElementById('builderGuideCoachmark');
+            if (!coach || !target || !isBuilderGuideTargetVisible(target)) return;
+            var rect = target.getBoundingClientRect();
+            var margin = 12;
+            var coachWidth = coach.offsetWidth || Math.min(320, window.innerWidth - 28);
+            var coachHeight = coach.offsetHeight || 110;
+            var left = rect.left + (rect.width / 2) - (coachWidth / 2);
+            left = Math.max(14, Math.min(left, window.innerWidth - coachWidth - 14));
+            var top = rect.bottom + margin;
+            if (top + coachHeight > window.innerHeight - 14) {
+                top = rect.top - coachHeight - margin;
+            }
+            if (top < 14) top = 14;
+            coach.style.left = left + 'px';
+            coach.style.top = top + 'px';
+        }
+
+        function clearBuilderGuideSpotlight() {
+            if (_builderGuideSpotlightTarget) {
+                _builderGuideSpotlightTarget.classList.remove('builder-guide-spotlight');
+            }
+            _builderGuideSpotlightTarget = null;
+            _builderGuideSpotlightKey = '';
+            var backdrop = document.getElementById('builderGuideBackdrop');
+            var coach = document.getElementById('builderGuideCoachmark');
+            if (backdrop) backdrop.classList.remove('active');
+            if (coach) coach.classList.remove('show');
+        }
+
+        function applyBuilderGuideSpotlight(step) {
+            if (isBuilderGuideHidden() || !step || !step.target) {
+                clearBuilderGuideSpotlight();
+                return;
+            }
+            var activeStep = getBuilderGuideActiveStep(step);
+            var target = getBuilderGuideTarget(activeStep.target, activeStep.targetFallback);
+            if (!target) {
+                clearBuilderGuideSpotlight();
+                return;
+            }
+
+            var key = _builderGuideTrack + ':' + step.id + ':' + getBuilderGuideSubstepIndex(step) + ':' + activeStep.target;
+            if (_builderGuideSpotlightTarget && _builderGuideSpotlightTarget !== target) {
+                _builderGuideSpotlightTarget.classList.remove('builder-guide-spotlight');
+            }
+            _builderGuideSpotlightTarget = target;
+            target.classList.add('builder-guide-spotlight');
+
+            var backdrop = document.getElementById('builderGuideBackdrop');
+            var coach = document.getElementById('builderGuideCoachmark');
+            var coachTitle = document.getElementById('builderGuideCoachTitle');
+            var coachBody = document.getElementById('builderGuideCoachBody');
+            var coachNextBtn = document.getElementById('builderGuideCoachNextBtn');
+            var coachDoneBtn = document.getElementById('builderGuideCoachDoneBtn');
+            if (backdrop) backdrop.classList.add('active');
+            if (coachTitle) coachTitle.textContent = activeStep.title || step.title || 'Next step';
+            if (coachBody) coachBody.textContent = activeStep.coach || activeStep.detail || step.detail || '';
+            if (coachNextBtn) {
+                coachNextBtn.style.display = step.substeps && !isBuilderGuideLastSubstep(step) ? '' : 'none';
+            }
+            if (coachDoneBtn) {
+                coachDoneBtn.style.display = (step.manualComplete || activeStep.manualComplete) && isBuilderGuideLastSubstep(step) ? '' : 'none';
+                coachDoneBtn.textContent = activeStep.completeText || step.completeText || 'Click When Complete';
+            }
+            if (coach) coach.classList.add('show');
+
+            if (_builderGuideSpotlightKey !== key) {
+                _builderGuideSpotlightKey = key;
+                try { target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' }); } catch(e) {}
+                setTimeout(function() { positionBuilderGuideCoachmark(target); }, 260);
+            } else {
+                positionBuilderGuideCoachmark(target);
+            }
         }
 
         function focusBuilderGuideTarget(id) {
@@ -2701,14 +3306,25 @@ Example:
             el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
 
+        function focusBuilderGuideSelector(selector, fallbackSelector) {
+            var el = getBuilderGuideTarget(selector, fallbackSelector);
+            if (!el) return;
+            el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+            setTimeout(function() {
+                try { el.focus(); } catch(e) {}
+            }, 250);
+        }
+
         function isBuilderGuideHidden() {
-            return localStorage.getItem('ald_builder_guide_hidden') === '1';
+            return localStorage.getItem(ONBOARDING_DISMISSED_KEY) === '1' || localStorage.getItem('ald_builder_guide_hidden') === '1';
         }
 
         function toggleBuilderGuide(show) {
             var hidden = show === undefined ? !isBuilderGuideHidden() : !show;
             localStorage.setItem('ald_builder_guide_hidden', hidden ? '1' : '0');
+            localStorage.setItem(ONBOARDING_DISMISSED_KEY, hidden ? '1' : '0');
             applyBuilderGuideVisibility();
+            if (!hidden) setTimeout(updateBuilderGuide, 0);
         }
 
         function applyBuilderGuideVisibility() {
@@ -2716,29 +3332,193 @@ Example:
             var showBtn = document.getElementById('builderGuideShowBtn');
             var hidden = isBuilderGuideHidden();
             if (card) card.style.display = hidden ? 'none' : '';
-            if (showBtn) showBtn.style.display = hidden ? 'inline-flex' : 'none';
+            if (showBtn) {
+                showBtn.style.display = 'inline-flex';
+                showBtn.innerHTML = hidden
+                    ? '<i class="fas fa-route me-1"></i>Show Guide'
+                    : '<i class="fas fa-eye-slash me-1"></i>Hide Guide';
+            }
+            if (hidden) {
+                clearBuilderGuideSpotlight();
+            }
         }
 
         function restartBuilderGuide() {
             _builderGuideIndex = 0;
+            _builderGuideManualStepIndex = null;
+            localStorage.setItem(ONBOARDING_STEP_KEY, '0');
+            localStorage.setItem('ald_builder_guide_step', '0');
+            localStorage.removeItem(ONBOARDING_SUBSTEPS_KEY);
+            setBuilderGuideCompletedSteps([]);
+            toggleBuilderGuide(true);
+            updateBuilderGuide();
+        }
+
+        function restartCurrentBuilderGuideTrack() {
+            var completed = getBuilderGuideCompletedSteps().filter(function(stepKey) {
+                return stepKey.indexOf(_builderGuideTrack + ':') !== 0;
+            });
+            setBuilderGuideCompletedSteps(completed);
+
+            var map = getBuilderGuideSubsteps();
+            Object.keys(map).forEach(function(key) {
+                if (key.indexOf(_builderGuideTrack + ':') === 0) {
+                    delete map[key];
+                }
+            });
+            localStorage.setItem(ONBOARDING_SUBSTEPS_KEY, JSON.stringify(map));
+
+            _builderGuideIndex = 0;
+            _builderGuideManualStepIndex = null;
+            localStorage.setItem(ONBOARDING_STEP_KEY, '0');
             localStorage.setItem('ald_builder_guide_step', '0');
             toggleBuilderGuide(true);
             updateBuilderGuide();
         }
 
-        function setBuilderGuideStep(index) {
-            _builderGuideIndex = Math.max(0, Math.min(BUILDER_GUIDE_STEPS.length - 1, index));
+        function setBuilderGuideTrack(track) {
+            if (!BUILDER_GUIDE_TRACKS[track]) track = 'first_quote';
+            _builderGuideTrack = track;
+            _builderGuideIndex = 0;
+            _builderGuideManualStepIndex = null;
+            localStorage.setItem(ONBOARDING_TRACK_KEY, _builderGuideTrack);
+            localStorage.setItem(ONBOARDING_STEP_KEY, '0');
+            updateBuilderGuide();
+        }
+
+        function setBuilderGuideStep(index, manual) {
+            var steps = getBuilderGuideSteps();
+            _builderGuideIndex = Math.max(0, Math.min(steps.length - 1, index));
+            _builderGuideManualStepIndex = manual ? _builderGuideIndex : null;
+            localStorage.setItem(ONBOARDING_STEP_KEY, String(_builderGuideIndex));
             localStorage.setItem('ald_builder_guide_step', String(_builderGuideIndex));
             updateBuilderGuide();
         }
 
-        function moveBuilderGuide(delta) {
-            setBuilderGuideStep(_builderGuideIndex + delta);
+        function setBuilderGuideAiVoiceSubstep(targetSelector) {
+            if (isBuilderGuideHidden()) return;
+            var track = BUILDER_GUIDE_TRACKS.first_quote;
+            var steps = (track && track.steps) || [];
+            var aiIndex = steps.findIndex(function(step) { return step.id === 'ai_drafting'; });
+            if (aiIndex < 0) return;
+            var aiStep = steps[aiIndex];
+            var substepIndex = 1;
+            if (targetSelector && Array.isArray(aiStep.substeps)) {
+                var found = aiStep.substeps.findIndex(function(substep) {
+                    return substep.target === targetSelector;
+                });
+                if (found >= 0) substepIndex = found;
+            }
+            _builderGuideTrack = 'first_quote';
+            _builderGuideIndex = aiIndex;
+            _builderGuideManualStepIndex = null;
+            localStorage.setItem(ONBOARDING_TRACK_KEY, _builderGuideTrack);
+            localStorage.setItem(ONBOARDING_STEP_KEY, String(_builderGuideIndex));
+            localStorage.setItem('ald_builder_guide_step', String(_builderGuideIndex));
+            setBuilderGuideSubstep(aiStep, substepIndex);
+            setTimeout(updateBuilderGuide, 120);
+        }
+
+        function syncBuilderGuideWithAiVoiceModal() {
+            setBuilderGuideAiVoiceSubstep('#voiceMicBtn');
+        }
+
+        function syncBuilderGuideWithAiVoiceReview() {
+            setBuilderGuideAiVoiceSubstep('#aiVoiceReviewList');
+        }
+
+        function moveBuilderGuide(delta, manual) {
+            if (manual === false) {
+                setBuilderGuideStep(_builderGuideIndex + delta, false);
+                return;
+            }
+            setBuilderGuideStep(_builderGuideIndex + delta, true);
+        }
+
+        function moveBuilderGuideSubstep(delta) {
+            var step = getBuilderGuideSteps()[_builderGuideIndex];
+            if (!step || !Array.isArray(step.substeps) || !step.substeps.length) return;
+            setBuilderGuideSubstep(step, getBuilderGuideSubstepIndex(step) + delta);
+            updateBuilderGuide();
+        }
+
+        function closeBuilderGuideModalBeforeAdvance(step, onClosed) {
+            var modalId = step && step.closeModalOnComplete;
+            var modalEl = modalId ? document.getElementById(modalId) : null;
+            if (!modalEl || !modalEl.classList.contains('show')) {
+                onClosed();
+                return;
+            }
+
+            var finished = false;
+            var done = function() {
+                if (finished) return;
+                finished = true;
+                modalEl.removeEventListener('hidden.bs.modal', done);
+                onClosed();
+            };
+            modalEl.addEventListener('hidden.bs.modal', done, { once: true });
+
+            try {
+                var modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+                modal.hide();
+            } catch(e) {
+                modalEl.classList.remove('show');
+                modalEl.style.display = 'none';
+                document.querySelectorAll('.modal-backdrop').forEach(function(backdrop) { backdrop.remove(); });
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('overflow');
+                document.body.style.removeProperty('padding-right');
+                done();
+                return;
+            }
+
+            setTimeout(done, 450);
         }
 
         function runBuilderGuideAction() {
-            var step = BUILDER_GUIDE_STEPS[_builderGuideIndex];
+            var step = getBuilderGuideSteps()[_builderGuideIndex];
+            var activeStep = getBuilderGuideActiveStep(step);
             if (step && typeof step.action === 'function') step.action();
+            if (step && activeStep && activeStep.advanceSubstepAfterAction) {
+                setTimeout(function() {
+                    setBuilderGuideSubstep(step, getBuilderGuideSubstepIndex(step) + 1);
+                    updateBuilderGuide();
+                }, 450);
+                return;
+            }
+            if (activeStep && activeStep.target) {
+                setTimeout(function() {
+                    focusBuilderGuideSelector(activeStep.target, activeStep.targetFallback);
+                }, 80);
+            }
+            if (step && step.completeOnAction) {
+                completeBuilderGuideStep(step);
+                setTimeout(function() {
+                    if (_builderGuideIndex < getBuilderGuideSteps().length - 1) {
+                        moveBuilderGuide(1, false);
+                    } else {
+                        updateBuilderGuide();
+                    }
+                }, 120);
+                return;
+            }
+            if (step && step.optional) {
+                completeBuilderGuideStep(step);
+                setTimeout(updateBuilderGuide, 250);
+            }
+        }
+
+        function markBuilderGuideStepDone() {
+            var step = getBuilderGuideSteps()[_builderGuideIndex];
+            completeBuilderGuideStep(step);
+            closeBuilderGuideModalBeforeAdvance(step, function() {
+                if (_builderGuideIndex < getBuilderGuideSteps().length - 1) {
+                    moveBuilderGuide(1, false);
+                } else {
+                    updateBuilderGuide();
+                }
+            });
         }
 
         function updateBuilderGuide() {
@@ -2747,48 +3527,82 @@ Example:
             var text = document.getElementById('builderGuideProgressText');
             var title = document.getElementById('builderGuideCurrentTitle');
             var detail = document.getElementById('builderGuideCurrentDetail');
+            var note = document.getElementById('builderGuideCurrentNote');
             var actionBtn = document.getElementById('builderGuideActionBtn');
-            if (!list || !bar || !text || !title || !detail || !actionBtn) return;
+            var doneBtn = document.getElementById('builderGuideDoneBtn');
+            if (!list || !bar || !text || !title || !detail || !actionBtn || !doneBtn) return;
+
+            var track = BUILDER_GUIDE_TRACKS[_builderGuideTrack] || BUILDER_GUIDE_TRACKS.first_quote;
+            var steps = getBuilderGuideSteps();
+            if (!steps.length) return;
+            if (_builderGuideIndex >= steps.length) _builderGuideIndex = steps.length - 1;
+            var subtitle = document.getElementById('builderGuideSubtitle');
+            if (subtitle) subtitle.textContent = track.subtitle || '';
+            var restartLabel = document.getElementById('builderGuideRestartLabel');
+            if (restartLabel) restartLabel.textContent = 'Restart ' + getBuilderGuideTrackLabel();
+            var firstBtn = document.getElementById('builderGuideTrackFirst');
+            var advancedBtn = document.getElementById('builderGuideTrackAdvanced');
+            if (firstBtn) firstBtn.classList.toggle('active', _builderGuideTrack === 'first_quote');
+            if (advancedBtn) advancedBtn.classList.toggle('active', _builderGuideTrack === 'advanced_tools');
 
             var completed = 0;
-            var statuses = BUILDER_GUIDE_STEPS.map(function(step) {
+            var statuses = steps.map(function(step) {
                 var done = false;
                 try { done = !!step.complete(); } catch(e) {}
+                if (isBuilderGuideStepCompleted(getBuilderGuideStepKey(step))) done = true;
                 if (done) completed++;
                 return done;
             });
-            var progress = Math.round((completed / BUILDER_GUIDE_STEPS.length) * 100);
+            var progress = Math.round((completed / steps.length) * 100);
             bar.style.width = progress + '%';
             text.textContent = progress + '%';
 
-            if (statuses[_builderGuideIndex] && _builderGuideIndex < BUILDER_GUIDE_STEPS.length - 1) {
+            if (statuses[_builderGuideIndex] && _builderGuideManualStepIndex !== _builderGuideIndex && _builderGuideIndex < steps.length - 1) {
                 var nextOpen = statuses.findIndex(function(done, idx) { return idx > _builderGuideIndex && !done; });
                 if (nextOpen !== -1) {
                     _builderGuideIndex = nextOpen;
+                    _builderGuideManualStepIndex = null;
+                    localStorage.setItem(ONBOARDING_STEP_KEY, String(_builderGuideIndex));
                     localStorage.setItem('ald_builder_guide_step', String(_builderGuideIndex));
                 }
             }
 
-            list.innerHTML = BUILDER_GUIDE_STEPS.map(function(step, index) {
+            list.innerHTML = steps.map(function(step, index) {
                 var done = statuses[index];
                 var active = index === _builderGuideIndex;
-                return '<button type="button" class="builder-guide-step' + (done ? ' done' : '') + (active ? ' active' : '') + '" onclick="setBuilderGuideStep(' + index + ')">' +
+                var locked = _builderGuideTrack === 'advanced_tools' && !isFirstQuoteTutorialComplete();
+                return '<button type="button" class="builder-guide-step' + (done ? ' done' : '') + (active ? ' active' : '') + (step.optional ? ' optional' : '') + (locked ? ' locked' : '') + '" onclick="setBuilderGuideStep(' + index + ', true)">' +
                     '<span class="builder-guide-check"><i class="fas ' + (done ? 'fa-check' : 'fa-' + (index + 1)) + '"></i></span>' +
-                    '<span><strong>' + step.title + '</strong><br><small class="text-muted">' + step.detail + '</small></span>' +
+                    '<span><strong>' + step.title + (step.optional ? '<span class="builder-guide-tag">Optional</span>' : '') + '</strong><br><small class="text-muted">' + step.detail + '</small></span>' +
                     '</button>';
             }).join('');
 
-            var current = BUILDER_GUIDE_STEPS[_builderGuideIndex];
-            title.textContent = current.title;
-            detail.textContent = current.detail;
+            var current = steps[_builderGuideIndex];
+            var activeCurrent = getBuilderGuideActiveStep(current);
+            title.textContent = current.substeps ? current.title + ': ' + activeCurrent.title : current.title;
+            detail.textContent = activeCurrent.detail || current.detail;
+            if (note) {
+                var noteText = current.note || (_builderGuideTrack === 'advanced_tools' && !isFirstQuoteTutorialComplete() ? 'Recommended after your first quote is built and sent. You can still explore these tools now.' : '');
+                note.style.display = noteText ? '' : 'none';
+                note.textContent = noteText;
+            }
             actionBtn.innerHTML = statuses[_builderGuideIndex]
                 ? '<i class="fas fa-check me-1"></i>Done'
-                : current.actionText;
-            actionBtn.disabled = statuses[_builderGuideIndex] && _builderGuideIndex === BUILDER_GUIDE_STEPS.length - 1;
+                : activeCurrent.actionText;
+            actionBtn.disabled = statuses[_builderGuideIndex] && _builderGuideIndex === steps.length - 1;
+            var canManualComplete = current.manualComplete && isBuilderGuideLastSubstep(current);
+            doneBtn.style.display = current.optional || canManualComplete || current.id === 'welcome' || _builderGuideTrack === 'advanced_tools' ? '' : 'none';
+            doneBtn.textContent = current.completeText || 'Mark Done';
             applyBuilderGuideVisibility();
+            applyBuilderGuideSpotlight(current);
         }
 
         function initBuilderGuide() {
+            if (!localStorage.getItem(ONBOARDING_SEEN_KEY)) {
+                localStorage.setItem(ONBOARDING_SEEN_KEY, '1');
+                localStorage.setItem(ONBOARDING_DISMISSED_KEY, '0');
+                localStorage.setItem('ald_builder_guide_hidden', '0');
+            }
             applyBuilderGuideVisibility();
             updateBuilderGuide();
             document.addEventListener('input', function(e) {
@@ -2797,6 +3611,22 @@ Example:
                 }
             });
             document.addEventListener('change', updateBuilderGuide);
+            var voiceQuoteModal = document.getElementById('voiceQuoteModal');
+            if (voiceQuoteModal && !voiceQuoteModal._builderGuideHooked) {
+                voiceQuoteModal._builderGuideHooked = true;
+                voiceQuoteModal.addEventListener('shown.bs.modal', syncBuilderGuideWithAiVoiceModal);
+            }
+            var aiVoiceReviewModal = document.getElementById('aiVoiceReviewModal');
+            if (aiVoiceReviewModal && !aiVoiceReviewModal._builderGuideHooked) {
+                aiVoiceReviewModal._builderGuideHooked = true;
+                aiVoiceReviewModal.addEventListener('shown.bs.modal', syncBuilderGuideWithAiVoiceReview);
+            }
+            window.addEventListener('resize', function() {
+                if (_builderGuideSpotlightTarget) positionBuilderGuideCoachmark(_builderGuideSpotlightTarget);
+            });
+            window.addEventListener('scroll', function() {
+                if (_builderGuideSpotlightTarget) positionBuilderGuideCoachmark(_builderGuideSpotlightTarget);
+            }, true);
             setInterval(updateBuilderGuide, 1600);
         }
         // -----------------------------------------------------------------------
@@ -7284,7 +8114,7 @@ Example:
                 html += '<button onclick="toggleMarkupVisibility(' + room.id + ')" class="btn btn-sm btn-outline-secondary" title="' + markupToggleTitle + '"><i id="markupIcon_' + room.id + '" class="fas ' + markupIcon + '"></i></button>';
                 html += '<span id="markupWarning_' + room.id + '" class="markup-client-warning" style="' + (markupVisibleToClient ? '' : 'display:none;') + '"><i class="fas fa-exclamation-triangle"></i>Client can see the room markup! Turn off to hide</span>';
                 html += '</div>';
-                html += '<button onclick="addLine(' + room.id + ')" class="btn btn-sm btn-light text-dark mt-1">';
+                html += '<button onclick="addLine(' + room.id + ')" class="btn btn-sm btn-light text-dark mt-1 btn-add-item">';
                 html += '<i class="fas fa-plus"></i> Add Item</button>';
                 html += '<button onclick="deleteRoom(' + room.id + ', this)" class="btn btn-sm btn-danger mt-1">';
                 html += '<i class="fas fa-trash"></i> Delete Room</button>';
@@ -10353,6 +11183,11 @@ Example:
             _setVoicePauseButton(false);
             var modal = new bootstrap.Modal(document.getElementById('voiceQuoteModal'));
             modal.show();
+            setTimeout(function() {
+                if (typeof syncBuilderGuideWithAiVoiceModal === 'function') {
+                    syncBuilderGuideWithAiVoiceModal();
+                }
+            }, 120);
         }
 
         function toggleVoiceRecording() {
@@ -11999,6 +12834,11 @@ Example:
                     _forceOpenAiVoiceReviewModal();
                 }
             }, 150);
+            setTimeout(function() {
+                if (typeof syncBuilderGuideWithAiVoiceReview === 'function') {
+                    syncBuilderGuideWithAiVoiceReview();
+                }
+            }, 180);
         }
 
         function _hideBootstrapModalAndWait(modalId) {
@@ -13068,17 +13908,17 @@ Example:
                     </button>
                     <div class="mb-3">
                         <button id="voicePauseBtn" onclick="toggleVoicePause()" class="btn btn-outline-warning me-2" disabled><i class="fas fa-pause me-1"></i>Pause</button>
-                        <button type="button" onclick="addVoiceNextRoomMarker()" class="btn btn-outline-primary"><i class="fas fa-door-open me-1"></i>Next Room</button>
+                        <button type="button" id="voiceNextRoomBtn" onclick="addVoiceNextRoomMarker()" class="btn btn-outline-primary"><i class="fas fa-door-open me-1"></i>Next Room</button>
                     </div>
                     <div id="voiceTranscript" class="text-muted" style="min-height:60px; font-style:italic; padding:10px; background:#f8f9fa; border-radius:8px; text-align:left; margin-bottom:16px;">Your words will appear here...</div>
                     <div id="voiceActions" style="display:none;">
-                        <button onclick="submitVoiceQuote()" class="btn btn-success me-2"><i class="fas fa-magic me-1"></i>Generate Quote</button>
+                        <button id="voiceGenerateQuoteBtn" onclick="submitVoiceQuote()" class="btn btn-success me-2"><i class="fas fa-magic me-1"></i>Generate Quote</button>
                         <button onclick="clearVoiceTranscript()" class="btn btn-outline-secondary"><i class="fas fa-redo me-1"></i>Try Again</button>
                     </div>
                     <div class="d-flex justify-content-center gap-2 flex-wrap mt-2">
-                        <button type="button" class="btn btn-link btn-sm" onclick="openAiVoiceMemorySettings()"><i class="fas fa-brain me-1"></i>AI Memory</button>
-                        <button type="button" class="btn btn-link btn-sm" onclick="openAiVoiceTradeRulesSettings()"><i class="fas fa-hammer me-1"></i>AI Trade Rules</button>
-                        <button type="button" class="btn btn-link btn-sm" onclick="openAiVoiceTemplatesSettings()"><i class="fas fa-layer-group me-1"></i>Voice Templates</button>
+                        <button type="button" id="aiVoiceMemoryBtn" class="btn btn-link btn-sm" onclick="openAiVoiceMemorySettings()"><i class="fas fa-brain me-1"></i>AI Memory</button>
+                        <button type="button" id="aiVoiceTradeRulesBtn" class="btn btn-link btn-sm" onclick="openAiVoiceTradeRulesSettings()"><i class="fas fa-hammer me-1"></i>AI Trade Rules</button>
+                        <button type="button" id="aiVoiceTemplatesBtn" class="btn btn-link btn-sm" onclick="openAiVoiceTemplatesSettings()"><i class="fas fa-layer-group me-1"></i>Voice Templates</button>
                     </div>
                     <div id="voiceLoading" style="display:none;">
                         <div class="spinner-border" style="color:#7c3aed;" role="status"></div>

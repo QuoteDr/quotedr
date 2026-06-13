@@ -217,6 +217,33 @@
                         <p class="text-center text-muted mb-1">Pre-load your common services so they're ready in the quote builder.</p>
                         <p class="text-center mb-4"><small class="text-muted"><i class="fas fa-stethoscope me-1"></i>Dr. Anxiety says: <em>"Don't panic — you can add, edit, or remove these anytime from the quote builder. No prescription needed."</em></small></p>
 
+                        <div class="border rounded p-3 mb-4 bg-light" id="onboardingQuickBooksSetup">
+                            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                                <div>
+                                    <h5 class="mb-1"><i class="fab fa-intuit me-2" style="color:#2b6cb0"></i>Connect QuickBooks or import your data</h5>
+                                    <p class="text-muted small mb-2">QuoteDr can read your QuickBooks customers and Products &amp; Services, then import the selected records into your client list and saved items. Already have exports, spreadsheets, or old price lists? Use the Importer tool in Settings.</p>
+                                    <div id="obQbStatus" class="small mb-2"><span class="badge bg-secondary">QuickBooks optional</span></div>
+                                </div>
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <button type="button" class="btn btn-primary btn-sm" onclick="obConnectQuickBooks()">
+                                        <i class="fas fa-plug me-1"></i>Connect QuickBooks
+                                    </button>
+                                    <a href="settings.html#pricing-import" class="btn btn-outline-secondary btn-sm">
+                                        <i class="fas fa-file-import me-1"></i>Importer tool in Settings
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="d-flex gap-2 flex-wrap mt-2">
+                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="obSyncQuickBooksCustomers()">
+                                    <i class="fas fa-users me-1"></i>Preview QuickBooks Customers
+                                </button>
+                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="obSyncQuickBooksItems()">
+                                    <i class="fas fa-boxes-stacked me-1"></i>Preview QuickBooks Products &amp; Services
+                                </button>
+                            </div>
+                            <div id="obQbSyncResult" class="mt-3"></div>
+                        </div>
+
                         <div class="row g-2 mb-2 align-items-end">
                             <div class="col-md-3">
                                 <label class="form-label form-label-sm"><strong>Category</strong></label>
@@ -464,7 +491,15 @@
         }
 
         // Initialize first step
-        showStep(1);
+        var _onboardingParams = new URLSearchParams(window.location.search);
+        showStep(_onboardingParams.get('qb') === 'connected' ? 5 : 1);
+        if (_onboardingParams.get('qb') === 'connected') {
+            setTimeout(function() {
+                var statusEl = document.getElementById('obQbStatus');
+                if (statusEl) statusEl.innerHTML = '<span class="badge bg-success"><i class="fas fa-check-circle me-1"></i>QuickBooks connected</span>';
+                if (typeof checkOnboardingQBStatus === 'function') checkOnboardingQBStatus();
+            }, 250);
+        }
 
         function saveOnboardingPaymentSettings() {
             var existing = {};
@@ -539,6 +574,205 @@
             localStorage.setItem('ald_custom_terms', JSON.stringify(_onboardingTerms));
             nextStep();
         }
+
+        // ---- QuickBooks / Import Setup (Step 5) ----
+        function obEscapeHtml(value) {
+            return String(value || '').replace(/[&<>"']/g, function(c) {
+                return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+            });
+        }
+
+        function obNormalizeMatchName(value) {
+            return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+        }
+
+        function obNotify(message) {
+            if (window.qdAlert) qdAlert(message);
+            else alert(message);
+        }
+
+        async function obGetQBHeaders() {
+            const { data } = await _supabase.auth.getSession();
+            return data?.session?.access_token ? {
+                'Authorization': 'Bearer ' + data.session.access_token,
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_ANON_KEY
+            } : null;
+        }
+
+        async function checkOnboardingQBStatus() {
+            try {
+                const headers = await obGetQBHeaders();
+                if (!headers) return;
+                const resp = await fetch(SUPABASE_URL + '/functions/v1/qb-oauth', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ action: 'status' })
+                });
+                const data = await resp.json();
+                const statusEl = document.getElementById('obQbStatus');
+                if (!statusEl) return;
+                if (data.connected) {
+                    statusEl.innerHTML = '<span class="badge bg-success"><i class="fas fa-check-circle me-1"></i>Connected' + (data.company_name ? ' - ' + obEscapeHtml(data.company_name) : '') + '</span>';
+                } else {
+                    statusEl.innerHTML = '<span class="badge bg-secondary"><i class="fas fa-circle me-1"></i>Not connected yet</span>';
+                }
+            } catch(e) {
+                console.warn('Onboarding QuickBooks status check failed:', e);
+            }
+        }
+
+        async function obConnectQuickBooks() {
+            try {
+                if (typeof requireProFeature === 'function') {
+                    var allowed = await requireProFeature('quickbooks', 'QuickBooks sync');
+                    if (!allowed) return;
+                }
+                const headers = await obGetQBHeaders();
+                if (!headers) { obNotify('Please sign in first.'); return; }
+                localStorage.setItem('ald_qb_return_to_onboarding', '1');
+                const res = await fetch(SUPABASE_URL + '/functions/v1/qb-oauth', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ action: 'get_auth_url' })
+                });
+                const data = await res.json();
+                if (data.error) throw new Error(data.error);
+                var authUrl = data.url || data.auth_url;
+                if (!authUrl) throw new Error('No QuickBooks auth URL returned.');
+                window.location.href = authUrl;
+            } catch(e) {
+                obNotify('Error starting QuickBooks connection: ' + e.message);
+            }
+        }
+
+        async function obFetchQuickBooksSync(action) {
+            const headers = await obGetQBHeaders();
+            if (!headers) throw new Error('Please sign in first.');
+            const resp = await fetch(SUPABASE_URL + '/functions/v1/qb-sync', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ action: action })
+            });
+            const data = await resp.json();
+            if (!resp.ok || data.error) throw new Error(data.error || 'QuickBooks sync failed.');
+            return data;
+        }
+
+        function obRenderQBSyncPreview(type, records, meta) {
+            const resultEl = document.getElementById('obQbSyncResult');
+            const isCustomers = type === 'customers';
+            const title = isCustomers ? 'QuickBooks Customers' : 'QuickBooks Products & Services';
+            const importFn = isCustomers ? 'obImportQBCustomers()' : 'obImportQBItems()';
+            const existingMap = {};
+            if (isCustomers) {
+                let existingClients = {};
+                try { existingClients = JSON.parse(localStorage.getItem('ald_clients') || '{}'); } catch(e) {}
+                Object.values(existingClients || {}).forEach(function(client) {
+                    if (client && client.name) existingMap[obNormalizeMatchName(client.name)] = client;
+                    if (client && client.qb_id) existingMap['qb:' + client.qb_id] = client;
+                });
+            } else {
+                let existingItems = {};
+                try { existingItems = JSON.parse(localStorage.getItem('ald_custom_items') || '{}'); } catch(e) {}
+                Object.values(existingItems || {}).forEach(function(group) {
+                    (Array.isArray(group) ? group : []).forEach(function(item) {
+                        if (item && item.name) existingMap[obNormalizeMatchName(item.name)] = item;
+                        if (item && item.qb_id) existingMap['qb:' + item.qb_id] = item;
+                    });
+                });
+            }
+            records.forEach(function(record) {
+                record._existsInQuoteDr = !!(existingMap['qb:' + record.id] || existingMap[obNormalizeMatchName(record.name)]);
+            });
+            if (!records.length) {
+                resultEl.innerHTML = '<div class="alert alert-light border small mb-0">No active ' + (isCustomers ? 'customers' : 'items') + ' found in QuickBooks.</div>';
+                return;
+            }
+            const rows = records.map(function(record, i) {
+                const sub = isCustomers
+                    ? [record.email, record.phone, record.address].filter(Boolean).join(' | ')
+                    : [record.type, record.description, record.rate ? '$' + Number(record.rate).toFixed(2) : ''].filter(Boolean).join(' | ');
+                const badge = record._existsInQuoteDr ? '<span class="badge bg-secondary ms-2">Already in QuoteDr</span>' : '<span class="badge bg-success ms-2">New</span>';
+                return '<label class="list-group-item d-flex gap-2 align-items-start">' +
+                    '<input class="form-check-input mt-1 ob-qb-import-check" type="checkbox" ' + (record._existsInQuoteDr ? '' : 'checked ') + 'data-index="' + i + '">' +
+                    '<span class="flex-grow-1"><strong>' + obEscapeHtml(record.name) + '</strong>' + badge +
+                    '<br><span class="text-muted small">' + obEscapeHtml(sub || 'No extra details') + '</span></span>' +
+                '</label>';
+            }).join('');
+            resultEl.innerHTML =
+                '<div class="border rounded p-3 bg-white">' +
+                    '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">' +
+                        '<div><strong>' + title + '</strong> <span class="badge bg-info text-dark ms-1">' + obEscapeHtml((meta.environment || 'sandbox').toUpperCase()) + '</span>' +
+                        '<div class="text-muted small">' + records.length + ' found. Existing records are unchecked by default.</div></div>' +
+                        '<button class="btn btn-primary btn-sm" onclick="' + importFn + '"><i class="fas fa-download me-1"></i>Import Selected</button>' +
+                    '</div>' +
+                    '<div class="list-group" style="max-height:260px; overflow:auto;">' + rows + '</div>' +
+                '</div>';
+        }
+
+        async function obSyncQuickBooksCustomers() {
+            const resultEl = document.getElementById('obQbSyncResult');
+            resultEl.innerHTML = '<div class="alert alert-info py-2 small"><i class="fas fa-spinner fa-spin me-1"></i>Reading customers from QuickBooks...</div>';
+            try {
+                const data = await obFetchQuickBooksSync('get_customers');
+                window._obPendingQBCustomers = (data.customers || []).filter(function(c) { return c.active !== false && c.name; });
+                window._obActiveQBSyncType = 'customers';
+                obRenderQBSyncPreview('customers', window._obPendingQBCustomers, data);
+            } catch(e) {
+                resultEl.innerHTML = '<div class="alert alert-danger py-2 small">' + obEscapeHtml(e.message) + '</div>';
+            }
+        }
+
+        async function obSyncQuickBooksItems() {
+            const resultEl = document.getElementById('obQbSyncResult');
+            resultEl.innerHTML = '<div class="alert alert-info py-2 small"><i class="fas fa-spinner fa-spin me-1"></i>Reading products and services from QuickBooks...</div>';
+            try {
+                const data = await obFetchQuickBooksSync('get_items');
+                window._obPendingQBItems = (data.items || []).filter(function(item) { return item.active !== false && item.name; });
+                window._obActiveQBSyncType = 'items';
+                obRenderQBSyncPreview('items', window._obPendingQBItems, data);
+            } catch(e) {
+                resultEl.innerHTML = '<div class="alert alert-danger py-2 small">' + obEscapeHtml(e.message) + '</div>';
+            }
+        }
+
+        function obSelectedQBRecords(records) {
+            return Array.from(document.querySelectorAll('#obQbSyncResult .ob-qb-import-check:checked'))
+                .map(function(check) { return records[parseInt(check.dataset.index, 10)]; })
+                .filter(Boolean);
+        }
+
+        async function obImportQBCustomers() {
+            const selected = obSelectedQBRecords(window._obPendingQBCustomers || []);
+            if (!selected.length) { obNotify('Select at least one customer to import.'); return; }
+            let existing = {};
+            try { existing = JSON.parse(localStorage.getItem('ald_clients') || '{}'); } catch(e) {}
+            selected.forEach(function(c) {
+                existing[c.name] = { name: c.name, phone: c.phone || '', email: c.email || '', address: c.address || '', qb_id: c.id, source: 'quickbooks', source_label: 'Imported from QuickBooks' };
+            });
+            localStorage.setItem('ald_clients', JSON.stringify(existing));
+            if (typeof saveAllClientsToSupabase === 'function') await saveAllClientsToSupabase(Object.values(existing));
+            document.getElementById('obQbSyncResult').innerHTML = '<div class="alert alert-success py-2 small"><i class="fas fa-check-circle me-1"></i>Imported ' + selected.length + ' QuickBooks customers into QuoteDr.</div>';
+        }
+
+        async function obImportQBItems() {
+            const selected = obSelectedQBRecords(window._obPendingQBItems || []);
+            if (!selected.length) { obNotify('Select at least one item to import.'); return; }
+            let existing = {};
+            try { existing = JSON.parse(localStorage.getItem('ald_custom_items') || '{}'); } catch(e) {}
+            if (!existing.QuickBooks) existing.QuickBooks = [];
+            selected.forEach(function(item) {
+                const mapped = { name: item.name, description: item.description || '', unitType: item.unitType || 'service', rate: Number(item.rate || 0), materialCost: Number(item.materialCost || 0), qb_id: item.id, source: 'quickbooks', source_label: 'Imported from QuickBooks' };
+                const idx = existing.QuickBooks.findIndex(function(old) { return old.qb_id === item.id || old.name === item.name; });
+                if (idx >= 0) existing.QuickBooks[idx] = Object.assign({}, existing.QuickBooks[idx], mapped);
+                else existing.QuickBooks.push(mapped);
+            });
+            localStorage.setItem('ald_custom_items', JSON.stringify(existing));
+            if (typeof saveItemsToSupabase === 'function') await saveItemsToSupabase(existing);
+            document.getElementById('obQbSyncResult').innerHTML = '<div class="alert alert-success py-2 small"><i class="fas fa-check-circle me-1"></i>Imported ' + selected.length + ' QuickBooks items into the QuickBooks category.</div>';
+        }
+        // ---- End QuickBooks / Import Setup ----
 
         // Custom items functions
         function saveCustomItems() {
