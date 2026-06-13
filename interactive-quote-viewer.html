@@ -2232,6 +2232,8 @@ if (location.search.includes('debug')) {
         async function markQuoteViewed(quoteId) {
             try {
                 const params = new URLSearchParams(window.location.search);
+                var isPreview = params.get('preview') === '1';
+                if (isPreview) return;
                 const token = params.get('token') || '';
                 const portalAnchorId = params.get('portal_anchor') || '';
                 if (!quoteId || !token || typeof updateSecureClientDocument !== 'function') return;

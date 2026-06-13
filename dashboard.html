@@ -584,6 +584,7 @@
                     ${(!isChangeOrder && (status === 'accepted' || status === 'invoiced')) ? `<button class="btn btn-warning btn-sm w-100 mt-1" onclick="openQuoteForChangeOrder(${jsAttr(q.id)})"><i class="fas fa-file-circle-plus me-1"></i>Create Change Order</button>` : ''}
                     ${reviewReady && !reviewSentAt ? `<button class="btn btn-outline-success btn-sm w-100 mt-1" onclick="sendGoogleReviewRequest(${jsAttr(q.id)}, ${jsAttr(clientName)}, ${jsAttr(clientEmail)})"><i class="fab fa-google me-1"></i> Request Review</button>` : ''}
                     <button class="btn btn-sm w-100 mt-1 ${portalVisible ? 'btn-success' : 'btn-outline-secondary'}" onclick="openPortalAssignment(${jsAttr(q.id)})" title="${portalVisible ? 'Manage portal assignment' : 'Choose a client portal'}"><i class="fas ${portalVisible ? 'fa-eye' : 'fa-eye-slash'} me-1"></i> ${portalVisible ? 'In Portal' : 'Add to Portal'}</button>
+                    ${portalVisible ? `<button class="btn btn-outline-primary btn-sm w-100 mt-1" onclick="openClientDocumentPreview(${jsAttr(q.id)}, this)" title="Open this document exactly as the client sees it"><i class="fas fa-eye me-1"></i> Client View</button>` : ''}
                     <button class="btn btn-outline-info btn-sm w-100 mt-1" onclick="shareClientPortal(${jsAttr(q.id)}, ${jsAttr(clientName)}, ${jsAttr(clientEmail)})" title="Share client portal"><i class="fas fa-external-link-alt me-1"></i> Client Portal</button>
                     ${(status === 'sent' || status === 'viewed') ? `<button class="btn btn-outline-primary btn-sm w-100 mt-1" onclick="sendFollowUpReminder(${jsAttr(q.id)}, ${jsAttr(clientName)}, ${jsAttr(clientEmail)})"><i class="fas fa-bell me-1"></i> Send Follow-up</button>` : ''}
                 </div>
@@ -1729,6 +1730,32 @@
             return 'https://quotedr.io/client-portal.html';
         }
 
+        async function openClientDocumentPreview(quoteId, btn) {
+            var quote = (allQuotes || []).find(function(q) { return q.id === quoteId; });
+            if (!quote) return;
+            var originalHtml = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Opening...';
+            }
+            try {
+                var viewerPath = dashboardIsInvoiceDocument(quote) ? '/invoice-viewer.html' : '/interactive-quote-viewer.html';
+                var share = await createSecureClientShareLink(quoteId, window.location.origin + viewerPath, { mode: 'document' });
+                var viewerUrl = share && share.url ? share.url : '';
+                if (!viewerUrl) throw new Error('Could not create the client view link.');
+                var url = new URL(viewerUrl, window.location.origin);
+                url.searchParams.set('preview', '1');
+                window.location.href = url.toString();
+            } catch(err) {
+                qdAlert('Could not open client view: ' + err.message);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                }
+            }
+        }
+
         function previewPortalFromDashboard(portalId) {
             var portal = buildPortalRegistry(allQuotes).find(function(p) { return p.id === portalId; });
             if (!portal) return;
@@ -1740,6 +1767,7 @@
         Object.assign(window, {
             openPortalAssignment: openPortalAssignment,
             openPortalManager: openPortalManager,
+            openClientDocumentPreview: openClientDocumentPreview,
             showNewPortalForm: showNewPortalForm,
             renderPortalAssignmentList: renderPortalAssignmentList,
             startPortalMergeMode: startPortalMergeMode,
