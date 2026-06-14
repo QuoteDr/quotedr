@@ -24,6 +24,8 @@ assert(source.includes('isBuilderGuideStepRestarted(step)'), 'tutorial status sh
 assert(source.includes('if (!suppressAutoComplete)'), 'restarted tutorials should not auto-complete from existing quote data');
 assert(source.includes('setBuilderGuideTrackRestarted(_builderGuideTrack, true)'), 'full track restart should clear the visual step status completely');
 assert(source.includes("Build your first quote"), 'tutorial should start with first-quote onboarding copy');
+assert(source.includes("target: '#builderGuideActionBtn'"), 'welcome step should spotlight the Start button instead of the client info field');
+assert(source.includes('Click Start to begin the client info walkthrough'), 'welcome coachmark should explain how to move into client info');
 assert(source.includes("AI Voice can turn spoken scope into accurate rooms and line items in seconds"), 'tutorial should position AI Voice as a strong time-saving workflow');
 assert(source.includes("AI Voice saves serious time and learns from your corrections"), 'tutorial coachmark should emphasize AI Voice speed and learning');
 assert(source.includes("target: '#voiceMicBtn'"), 'AI Voice tutorial should continue inside the modal and target the mic');
