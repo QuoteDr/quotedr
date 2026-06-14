@@ -2867,6 +2867,8 @@ Example:
                         target: '#builderGuideStopBtn',
                         coach: 'You can stop the tutorial anytime with this button. Your quote stays exactly as it is, and you can show the guide again later.',
                         actionText: 'Got It',
+                        manualComplete: true,
+                        completeText: 'OK',
                         completeOnAction: true,
                         complete: function() { return isBuilderGuideStepCompleted('first_quote:stop_control'); }
                     },
