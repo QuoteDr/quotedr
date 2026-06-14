@@ -23,7 +23,13 @@ assert(source.includes('isBuilderGuideTrackRestarted(_builderGuideTrack)'), 'tut
 assert(source.includes('isBuilderGuideStepRestarted(step)'), 'tutorial status should know when the current step was restarted');
 assert(source.includes('if (!suppressAutoComplete)'), 'restarted tutorials should not auto-complete from existing quote data');
 assert(source.includes('setBuilderGuideTrackRestarted(_builderGuideTrack, true)'), 'full track restart should clear the visual step status completely');
+assert(source.includes('id="builderGuideStopBtn"'), 'tutorial should expose a sticky stop button near the chatbot');
+assert(source.includes('function stopBuilderGuide()'), 'sticky stop button should be able to stop the tutorial');
+assert(source.includes("target: '#builderGuideStopBtn'"), 'first tutorial step should point at the sticky stop button');
+assert(source.includes('You can stop the tutorial anytime'), 'first tutorial step should explain the stop button');
+assert(source.includes("stopBtn.style.display = hidden ? 'none' : 'inline-flex'"), 'stop button should only show while the guide is active');
 assert(source.includes("Build your first quote"), 'tutorial should start with first-quote onboarding copy');
+assert(source.indexOf("id: 'stop_control'") < source.indexOf("id: 'welcome'"), 'stop tutorial step should be shown before the first quote walkthrough');
 assert(source.includes("target: '#builderGuideActionBtn'"), 'welcome step should spotlight the Start button instead of the client info field');
 assert(source.includes('Click Start to begin the client info walkthrough'), 'welcome coachmark should explain how to move into client info');
 assert(source.includes("AI Voice can turn spoken scope into accurate rooms and line items in seconds"), 'tutorial should position AI Voice as a strong time-saving workflow');

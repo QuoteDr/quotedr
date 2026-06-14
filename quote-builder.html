@@ -1069,6 +1069,30 @@
             display: inline-flex;
             align-items: center;
         }
+        #builderGuideStopBtn {
+            position: fixed;
+            right: 5.15rem;
+            bottom: 5.15rem;
+            z-index: 100050;
+            display: none;
+            align-items: center;
+            gap: 0.35rem;
+            border-radius: 999px;
+            box-shadow: 0 10px 24px rgba(15, 31, 55, 0.22);
+            font-weight: 800;
+            white-space: nowrap;
+        }
+        @media (max-width: 575.98px) {
+            #builderGuideStopBtn {
+                right: 4.55rem;
+                bottom: 4.8rem;
+                padding-left: 0.65rem;
+                padding-right: 0.65rem;
+            }
+            #builderGuideStopBtn .builder-guide-stop-label {
+                display: none;
+            }
+        }
         #manageItemsModal .manage-items-add-shell {
             border: 1px solid #d8e2ee;
             border-radius: 8px;
@@ -1579,6 +1603,9 @@ if (location.search.includes('debug')) {
             </button>
         </div>
     </div>
+    <button type="button" id="builderGuideStopBtn" class="btn btn-sm btn-warning" onclick="stopBuilderGuide()" title="Stop tutorial">
+        <i class="fas fa-stop-circle"></i><span class="builder-guide-stop-label">Stop Tutorial</span>
+    </button>
 
         <!-- Client Info -->
         <div class="card mb-3">
@@ -2825,6 +2852,16 @@ Example:
                 subtitle: 'Build your first client-ready quote. Keep the first pass simple; the advanced tools are available when you need them.',
                 steps: [
                     {
+                        id: 'stop_control',
+                        title: 'You can stop anytime',
+                        detail: 'Use the sticky Stop Tutorial button beside the chatbot if you want the guide out of your way.',
+                        target: '#builderGuideStopBtn',
+                        coach: 'You can stop the tutorial anytime with this button. Your quote stays exactly as it is, and you can show the guide again later.',
+                        actionText: 'Got It',
+                        completeOnAction: true,
+                        complete: function() { return isBuilderGuideStepCompleted('first_quote:stop_control'); }
+                    },
+                    {
                         id: 'welcome',
                         title: 'Build your first quote',
                         detail: 'QuoteDr turns job details into a client-ready quote. Start with client info, add rooms, add work items, review totals, then send the quote link.',
@@ -3442,11 +3479,17 @@ Example:
             if (!hidden) setTimeout(updateBuilderGuide, 0);
         }
 
+        function stopBuilderGuide() {
+            toggleBuilderGuide(false);
+        }
+
         function applyBuilderGuideVisibility() {
             var card = document.getElementById('builderGuideCard');
             var showBtn = document.getElementById('builderGuideShowBtn');
+            var stopBtn = document.getElementById('builderGuideStopBtn');
             var hidden = isBuilderGuideHidden();
             if (card) card.style.display = hidden ? 'none' : '';
+            if (stopBtn) stopBtn.style.display = hidden ? 'none' : 'inline-flex';
             if (showBtn) {
                 showBtn.style.display = 'inline-flex';
                 showBtn.innerHTML = hidden
