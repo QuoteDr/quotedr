@@ -17,6 +17,12 @@ assert(source.includes('restartCurrentBuilderGuideStep'), 'tutorial should resta
 assert(source.includes('resetBuilderGuideStepState'), 'tutorial should clear one step without clearing the whole track');
 assert(source.includes('return stepKey !== key;'), 'step restart should remove only the selected completed step');
 assert(source.includes("title: 'Restart this tutorial?'"), 'step restart should confirm before clearing step progress');
+assert(source.includes("ald_onboarding_restarted_tracks"), 'track restart should remember that auto-complete is suppressed');
+assert(source.includes("ald_onboarding_restarted_steps"), 'step restart should remember that auto-complete is suppressed for one step');
+assert(source.includes('isBuilderGuideTrackRestarted(_builderGuideTrack)'), 'tutorial status should know when the current track was restarted');
+assert(source.includes('isBuilderGuideStepRestarted(step)'), 'tutorial status should know when the current step was restarted');
+assert(source.includes('if (!suppressAutoComplete)'), 'restarted tutorials should not auto-complete from existing quote data');
+assert(source.includes('setBuilderGuideTrackRestarted(_builderGuideTrack, true)'), 'full track restart should clear the visual step status completely');
 assert(source.includes("Build your first quote"), 'tutorial should start with first-quote onboarding copy');
 assert(source.includes("AI Voice can turn spoken scope into accurate rooms and line items in seconds"), 'tutorial should position AI Voice as a strong time-saving workflow');
 assert(source.includes("AI Voice saves serious time and learns from your corrections"), 'tutorial coachmark should emphasize AI Voice speed and learning');

@@ -2812,6 +2812,8 @@ Example:
         var ONBOARDING_SEEN_KEY = 'ald_onboarding_seen';
         var ONBOARDING_DISMISSED_KEY = 'ald_onboarding_dismissed';
         var ONBOARDING_SUBSTEPS_KEY = 'ald_onboarding_substeps';
+        var ONBOARDING_RESTARTED_TRACKS_KEY = 'ald_onboarding_restarted_tracks';
+        var ONBOARDING_RESTARTED_STEPS_KEY = 'ald_onboarding_restarted_steps';
         var _builderGuideTrack = localStorage.getItem(ONBOARDING_TRACK_KEY) || 'first_quote';
         var _builderGuideIndex = parseInt(localStorage.getItem(ONBOARDING_STEP_KEY) || localStorage.getItem('ald_builder_guide_step') || '0', 10) || 0;
         var _builderGuideManualStepIndex = null;
@@ -3201,6 +3203,55 @@ Example:
             return getBuilderGuideCompletedSteps().indexOf(stepKey) >= 0;
         }
 
+        function getBuilderGuideRestartedTracks() {
+            try {
+                var value = JSON.parse(localStorage.getItem(ONBOARDING_RESTARTED_TRACKS_KEY) || '{}');
+                return value && typeof value === 'object' ? value : {};
+            } catch(e) {
+                return {};
+            }
+        }
+
+        function setBuilderGuideTrackRestarted(trackKey, restarted) {
+            var map = getBuilderGuideRestartedTracks();
+            if (restarted) {
+                map[trackKey] = true;
+            } else {
+                delete map[trackKey];
+            }
+            localStorage.setItem(ONBOARDING_RESTARTED_TRACKS_KEY, JSON.stringify(map));
+        }
+
+        function isBuilderGuideTrackRestarted(trackKey) {
+            return !!getBuilderGuideRestartedTracks()[trackKey || _builderGuideTrack];
+        }
+
+        function getBuilderGuideRestartedSteps() {
+            try {
+                var value = JSON.parse(localStorage.getItem(ONBOARDING_RESTARTED_STEPS_KEY) || '{}');
+                return value && typeof value === 'object' ? value : {};
+            } catch(e) {
+                return {};
+            }
+        }
+
+        function setBuilderGuideStepRestarted(step, restarted) {
+            if (!step) return;
+            var map = getBuilderGuideRestartedSteps();
+            var key = getBuilderGuideStepKey(step);
+            if (restarted) {
+                map[key] = true;
+            } else {
+                delete map[key];
+            }
+            localStorage.setItem(ONBOARDING_RESTARTED_STEPS_KEY, JSON.stringify(map));
+        }
+
+        function isBuilderGuideStepRestarted(step) {
+            if (!step) return false;
+            return !!getBuilderGuideRestartedSteps()[getBuilderGuideStepKey(step)];
+        }
+
         function getBuilderGuideSubsteps() {
             try {
                 var value = JSON.parse(localStorage.getItem(ONBOARDING_SUBSTEPS_KEY) || '{}');
@@ -3244,6 +3295,7 @@ Example:
             if (!step) return;
             var completed = getBuilderGuideCompletedSteps();
             var key = getBuilderGuideStepKey(step);
+            setBuilderGuideStepRestarted(step, false);
             if (completed.indexOf(key) < 0) {
                 completed.push(key);
                 setBuilderGuideCompletedSteps(completed);
@@ -3412,6 +3464,8 @@ Example:
             localStorage.setItem(ONBOARDING_STEP_KEY, '0');
             localStorage.setItem('ald_builder_guide_step', '0');
             localStorage.removeItem(ONBOARDING_SUBSTEPS_KEY);
+            localStorage.removeItem(ONBOARDING_RESTARTED_STEPS_KEY);
+            setBuilderGuideTrackRestarted(_builderGuideTrack, true);
             setBuilderGuideCompletedSteps([]);
             toggleBuilderGuide(true);
             updateBuilderGuide();
@@ -3422,6 +3476,7 @@ Example:
                 return stepKey.indexOf(_builderGuideTrack + ':') !== 0;
             });
             setBuilderGuideCompletedSteps(completed);
+            setBuilderGuideTrackRestarted(_builderGuideTrack, true);
 
             var map = getBuilderGuideSubsteps();
             Object.keys(map).forEach(function(key) {
@@ -3430,6 +3485,14 @@ Example:
                 }
             });
             localStorage.setItem(ONBOARDING_SUBSTEPS_KEY, JSON.stringify(map));
+
+            var restartedSteps = getBuilderGuideRestartedSteps();
+            Object.keys(restartedSteps).forEach(function(key) {
+                if (key.indexOf(_builderGuideTrack + ':') === 0) {
+                    delete restartedSteps[key];
+                }
+            });
+            localStorage.setItem(ONBOARDING_RESTARTED_STEPS_KEY, JSON.stringify(restartedSteps));
 
             _builderGuideIndex = 0;
             _builderGuideManualStepIndex = null;
@@ -3450,6 +3513,7 @@ Example:
             var map = getBuilderGuideSubsteps();
             delete map[key];
             localStorage.setItem(ONBOARDING_SUBSTEPS_KEY, JSON.stringify(map));
+            setBuilderGuideStepRestarted(step, true);
         }
 
         async function restartCurrentBuilderGuideStep() {
@@ -3650,7 +3714,10 @@ Example:
             var completed = 0;
             var statuses = steps.map(function(step) {
                 var done = false;
-                try { done = !!step.complete(); } catch(e) {}
+                var suppressAutoComplete = isBuilderGuideTrackRestarted(_builderGuideTrack) || isBuilderGuideStepRestarted(step);
+                if (!suppressAutoComplete) {
+                    try { done = !!step.complete(); } catch(e) {}
+                }
                 if (isBuilderGuideStepCompleted(getBuilderGuideStepKey(step))) done = true;
                 if (done) completed++;
                 return done;
@@ -3693,7 +3760,8 @@ Example:
                 : activeCurrent.actionText;
             actionBtn.disabled = statuses[_builderGuideIndex] && _builderGuideIndex === steps.length - 1;
             var canManualComplete = current.manualComplete && isBuilderGuideLastSubstep(current);
-            doneBtn.style.display = current.optional || canManualComplete || current.id === 'welcome' || _builderGuideTrack === 'advanced_tools' ? '' : 'none';
+            var allowRestartedManualComplete = isBuilderGuideTrackRestarted(_builderGuideTrack) || isBuilderGuideStepRestarted(current);
+            doneBtn.style.display = current.optional || canManualComplete || current.id === 'welcome' || _builderGuideTrack === 'advanced_tools' || allowRestartedManualComplete ? '' : 'none';
             doneBtn.textContent = current.completeText || 'Mark Done';
             applyBuilderGuideVisibility();
             applyBuilderGuideSpotlight(current);
