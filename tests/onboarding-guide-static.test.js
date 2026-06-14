@@ -28,6 +28,7 @@ assert(source.includes('function stopBuilderGuide()'), 'sticky stop button shoul
 assert(source.includes("target: '#builderGuideStopBtn'"), 'first tutorial step should point at the sticky stop button');
 assert(source.includes('You can stop the tutorial anytime'), 'first tutorial step should explain the stop button');
 assert(source.includes("stopBtn.style.display = hidden ? 'none' : 'inline-flex'"), 'stop button should only show while the guide is active');
+assert(source.includes('#builderGuideStopBtn.builder-guide-spotlight'), 'stop button should stay fixed when the tutorial spotlight highlights it');
 assert(source.includes("Build your first quote"), 'tutorial should start with first-quote onboarding copy');
 assert(source.indexOf("id: 'stop_control'") < source.indexOf("id: 'welcome'"), 'stop tutorial step should be shown before the first quote walkthrough');
 assert(source.includes("target: '#builderGuideActionBtn'"), 'welcome step should spotlight the Start button instead of the client info field');
