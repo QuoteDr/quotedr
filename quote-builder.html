@@ -1550,6 +1550,9 @@ if (location.search.includes('debug')) {
                     <button type="button" class="btn btn-sm btn-outline-secondary" onclick="moveBuilderGuide(-1)">
                         <i class="fas fa-chevron-left me-1"></i>Back
                     </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="builderGuideRestartStepBtn" onclick="restartCurrentBuilderGuideStep()">
+                        <i class="fas fa-rotate-left me-1"></i>Restart Step
+                    </button>
                     <button type="button" class="btn btn-sm btn-primary" id="builderGuideActionBtn" onclick="runBuilderGuideAction()">
                         Do This Step
                     </button>
@@ -3432,6 +3435,45 @@ Example:
             _builderGuideManualStepIndex = null;
             localStorage.setItem(ONBOARDING_STEP_KEY, '0');
             localStorage.setItem('ald_builder_guide_step', '0');
+            toggleBuilderGuide(true);
+            updateBuilderGuide();
+        }
+
+        function resetBuilderGuideStepState(step) {
+            if (!step) return;
+            var key = getBuilderGuideStepKey(step);
+            var completed = getBuilderGuideCompletedSteps().filter(function(stepKey) {
+                return stepKey !== key;
+            });
+            setBuilderGuideCompletedSteps(completed);
+
+            var map = getBuilderGuideSubsteps();
+            delete map[key];
+            localStorage.setItem(ONBOARDING_SUBSTEPS_KEY, JSON.stringify(map));
+        }
+
+        async function restartCurrentBuilderGuideStep() {
+            var steps = getBuilderGuideSteps();
+            var step = steps[_builderGuideIndex];
+            if (!step) return;
+            var title = step.title || 'this step';
+            var message = 'Restart "' + title + '" from the beginning?';
+            var confirmed = true;
+            if (typeof qdConfirm === 'function') {
+                confirmed = await qdConfirm(message, {
+                    title: 'Restart this tutorial?',
+                    okText: 'Restart Step',
+                    cancelText: 'Cancel',
+                    type: 'warning'
+                });
+            } else {
+                confirmed = window.confirm(message);
+            }
+            if (!confirmed) return;
+            resetBuilderGuideStepState(step);
+            _builderGuideManualStepIndex = _builderGuideIndex;
+            localStorage.setItem(ONBOARDING_STEP_KEY, String(_builderGuideIndex));
+            localStorage.setItem('ald_builder_guide_step', String(_builderGuideIndex));
             toggleBuilderGuide(true);
             updateBuilderGuide();
         }

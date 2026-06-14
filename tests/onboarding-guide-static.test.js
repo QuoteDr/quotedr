@@ -12,6 +12,11 @@ assert(source.includes('restartCurrentBuilderGuideTrack'), 'tutorial should rest
 assert(source.includes("stepKey.indexOf(_builderGuideTrack + ':') !== 0"), 'restart should only clear completed state for the current track');
 assert(source.includes("delete map[key]"), 'restart should clear saved substeps for the current track');
 assert(source.includes('getBuilderGuideTrackLabel'), 'restart button should name the current tutorial track');
+assert(source.includes('id="builderGuideRestartStepBtn"'), 'tutorial should expose a per-step restart button');
+assert(source.includes('restartCurrentBuilderGuideStep'), 'tutorial should restart the selected tutorial step');
+assert(source.includes('resetBuilderGuideStepState'), 'tutorial should clear one step without clearing the whole track');
+assert(source.includes('return stepKey !== key;'), 'step restart should remove only the selected completed step');
+assert(source.includes("title: 'Restart this tutorial?'"), 'step restart should confirm before clearing step progress');
 assert(source.includes("Build your first quote"), 'tutorial should start with first-quote onboarding copy');
 assert(source.includes("AI Voice can turn spoken scope into accurate rooms and line items in seconds"), 'tutorial should position AI Voice as a strong time-saving workflow');
 assert(source.includes("AI Voice saves serious time and learns from your corrections"), 'tutorial coachmark should emphasize AI Voice speed and learning');
