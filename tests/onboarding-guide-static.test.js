@@ -101,8 +101,12 @@ assert(source.includes('Start typing a saved item name'), 'add line item modal s
 assert(source.includes("target: '#itemQuickSearch'"), 'line item tutorial should point at the quick search field after opening the modal');
 assert(source.includes('Saved items save tons of time'), 'line item tutorial should explain why saved items matter');
 assert(source.includes("target: '#newItemName'"), 'saved item setup should guide the new saved item name');
+assert(source.includes("target: '#newItemUnit'"), 'saved item setup should guide the saved item unit type');
+assert(source.includes("target: '#newItemRate'"), 'saved item setup should guide the saved item rate');
 assert(source.includes("target: '#newItemMaterialCost'"), 'saved item setup should include material cost guidance');
 assert(source.indexOf("target: '#newItemCategory'") < source.indexOf("target: '#newItemName'"), 'saved item setup should guide category before item name');
+assert(source.indexOf("target: '#newItemUnit'") < source.indexOf("target: '#newItemRate'"), 'saved item setup should guide unit type before rate');
+assert(source.indexOf("target: '#newItemRate'") < source.indexOf("target: '#newItemMaterialCost'"), 'saved item setup should guide rate before material cost');
 assert(source.includes('function notifyBuilderGuideSavedItemCategorySelected()'), 'tutorial should react after a saved-item category is selected');
 assert(source.includes("title: 'Category',\r\n                                target: '#newItemCategory',\r\n                                coach: 'Choose or create a category. Categories keep your saved items searchable when quoting.',\r\n                                waitForAction: true")
     || source.includes("title: 'Category',\n                                target: '#newItemCategory',\n                                coach: 'Choose or create a category. Categories keep your saved items searchable when quoting.',\n                                waitForAction: true"),
