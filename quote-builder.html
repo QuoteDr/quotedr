@@ -2958,7 +2958,8 @@ Example:
                             {
                                 title: 'Category',
                                 target: '#newItemCategory',
-                                coach: 'Choose or create a category. Categories keep your saved items searchable when quoting.'
+                                coach: 'Choose or create a category. Categories keep your saved items searchable when quoting.',
+                                waitForAction: true
                             },
                             {
                                 title: 'Item Name',
@@ -3774,7 +3775,16 @@ Example:
             setTimeout(updateBuilderGuide, 120);
         }
 
+        function notifyBuilderGuideSavedItemCategorySelected() {
+            if (isBuilderGuideHidden() || _builderGuideTrack !== 'first_quote') return;
+            var step = getBuilderGuideSteps()[_builderGuideIndex];
+            if (!step || step.id !== 'saved_item_setup' || getBuilderGuideSubstepIndex(step) !== 2) return;
+            setBuilderGuideSubstep(step, 3);
+            setTimeout(updateBuilderGuide, 120);
+        }
+
         window.notifyBuilderGuideNewItemPanelOpened = notifyBuilderGuideNewItemPanelOpened;
+        window.notifyBuilderGuideSavedItemCategorySelected = notifyBuilderGuideSavedItemCategorySelected;
 
         function updateBuilderGuide() {
             var list = document.getElementById('builderGuideList');
@@ -11453,7 +11463,7 @@ Example:
 
         // Manage Items behavior lives in quote-items.js.
     </script>
-    <script src="quote-items.js?v=1778194801"></script>
+    <script src="quote-items.js?v=1778194902"></script>
     <script src="quote-import.js?v=1778200000"></script>
     <script>
         // Load templates from localStorage on startup

@@ -179,10 +179,16 @@
             if (existing) {
                 qdAlert('Category already exists!');
                 populateNewItemCategorySelect(existing);
+                if (typeof window.notifyBuilderGuideSavedItemCategorySelected === 'function') {
+                    window.notifyBuilderGuideSavedItemCategorySelected();
+                }
                 return existing;
             }
             pricingDatabase[newCat] = [];
             populateNewItemCategorySelect(newCat);
+            if (typeof window.notifyBuilderGuideSavedItemCategorySelected === 'function') {
+                window.notifyBuilderGuideSavedItemCategorySelected();
+            }
             return newCat;
         }
 
@@ -210,6 +216,9 @@
                 return;
             }
             catSelect.dataset.previousCategory = catSelect.value;
+            if (catSelect.value && typeof window.notifyBuilderGuideSavedItemCategorySelected === 'function') {
+                window.notifyBuilderGuideSavedItemCategorySelected();
+            }
         }
 
         function handleItemPhotoUpload(input) {

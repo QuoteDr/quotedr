@@ -103,6 +103,11 @@ assert(source.includes('Saved items save tons of time'), 'line item tutorial sho
 assert(source.includes("target: '#newItemName'"), 'saved item setup should guide the new saved item name');
 assert(source.includes("target: '#newItemMaterialCost'"), 'saved item setup should include material cost guidance');
 assert(source.indexOf("target: '#newItemCategory'") < source.indexOf("target: '#newItemName'"), 'saved item setup should guide category before item name');
+assert(source.includes('function notifyBuilderGuideSavedItemCategorySelected()'), 'tutorial should react after a saved-item category is selected');
+assert(source.includes("title: 'Category',\r\n                                target: '#newItemCategory',\r\n                                coach: 'Choose or create a category. Categories keep your saved items searchable when quoting.',\r\n                                waitForAction: true")
+    || source.includes("title: 'Category',\n                                target: '#newItemCategory',\n                                coach: 'Choose or create a category. Categories keep your saved items searchable when quoting.',\n                                waitForAction: true"),
+    'saved item category substep should wait for category selection instead of showing Next');
+assert(quoteItemsSource.includes('window.notifyBuilderGuideSavedItemCategorySelected'), 'category select/create flow should notify the tutorial before moving to item name');
 assert(source.includes('QuickBooks Products & Services'), 'builder tutorial should mention QuickBooks products/services sync');
 assert(source.includes('Importer tool in Settings'), 'builder tutorial should mention the settings importer fallback');
 assert(source.includes("closeModalOnComplete: 'manageItemsModal'"), 'saved item setup should close Manage Items before advancing');
