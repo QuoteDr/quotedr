@@ -125,6 +125,80 @@ body {
     font-weight: 800;
 }
 
+.whats-new-promo {
+    align-items: center;
+    display: flex;
+    gap: 24px;
+    justify-content: space-between;
+}
+
+.whats-new-promo h2 {
+    margin-bottom: 8px;
+}
+
+.newsletter-panel {
+    background: #ffffff;
+}
+
+.newsletter-hp {
+    left: -9999px;
+    opacity: 0;
+    position: absolute;
+}
+
+.newsletter-status {
+    color: #526070;
+    font-size: 0.92rem;
+    font-weight: 700;
+    min-height: 1.3em;
+}
+
+.newsletter-status.success {
+    color: #0f8a4b;
+}
+
+.newsletter-status.error {
+    color: #b42318;
+}
+
+.whats-new-list {
+    display: grid;
+    gap: 18px;
+}
+
+.whats-new-card h2 {
+    color: #0f3460;
+    font-size: clamp(1.45rem, 3vw, 2rem);
+    margin-bottom: 10px;
+}
+
+.whats-new-card time {
+    color: #64748b;
+    font-size: 0.88rem;
+    font-weight: 700;
+}
+
+.lead-small {
+    color: #24364b;
+    font-size: 1.08rem;
+    font-weight: 700;
+    line-height: 1.55;
+}
+
+.update-status {
+    background: #eef4fb;
+    border-radius: 999px;
+    color: #0f3460;
+    font-size: 0.78rem;
+    font-weight: 800;
+    padding: 4px 10px;
+}
+
+.update-cta {
+    color: #0f3460;
+    font-weight: 800;
+}
+
 .btn-brand {
     background: #e87e2a;
     border-color: #e87e2a;
@@ -242,5 +316,10 @@ body {
     .marketing-footer img {
         height: 86px;
         margin: -24px 0 -22px;
+    }
+
+    .whats-new-promo {
+        align-items: flex-start;
+        flex-direction: column;
     }
 }

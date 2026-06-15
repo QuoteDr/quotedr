@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>What&rsquo;s New in QuoteDr</title>
+    <meta name="description" content="Recent QuoteDr product updates, new contractor quoting tools, invoice improvements, client portal updates, and weekly product notes.">
+    <link rel="icon" type="image/svg+xml" href="quotedr-logo.svg">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="brand-theme.css?v=1777661601">
+    <link rel="stylesheet" href="marketing-pages.css?v=1778120000">
+</head>
+<body>
+<nav class="navbar navbar-expand-xl marketing-nav">
+    <div class="container">
+        <a class="navbar-brand" href="landing.html"><img src="quotedr-logo.svg" alt="QuoteDr"></a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#marketingNav" aria-label="Open navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse justify-content-end" id="marketingNav">
+            <ul class="navbar-nav align-items-xl-center gap-xl-2">
+                <li class="nav-item"><a class="nav-link" href="landing.html#how-it-works">How It Works</a></li>
+                <li class="nav-item"><a class="nav-link" href="landing.html#features">Features</a></li>
+                <li class="nav-item"><a class="nav-link" href="landing.html#pricing">Pricing</a></li>
+                <li class="nav-item"><a class="nav-link" href="blog/index.html">Blog</a></li>
+                <li class="nav-item"><a class="nav-link" href="about.html">About</a></li>
+                <li class="nav-item"><a class="nav-link" href="login.html">Sign In</a></li>
+                <li class="nav-item"><a class="nav-link nav-cta" href="login.html?signup=1">Start Free</a></li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<header class="page-hero">
+    <div class="container">
+        <p class="eyebrow hero-eyebrow-large">Built from the job site</p>
+        <h1>What&rsquo;s New in QuoteDr</h1>
+        <p class="lead mt-3">A running list of the tools, fixes, and workflow upgrades being added while QuoteDr grows into the quoting system contractors actually need.</p>
+        <div class="d-flex flex-wrap gap-3 mt-4">
+            <a class="btn btn-brand" href="login.html?signup=1">Start Free</a>
+            <a class="btn btn-outline-light rounded-pill fw-bold px-4" href="blog/index.html">Read the Blog</a>
+        </div>
+    </div>
+</header>
+
+<main>
+    <section class="content-section">
+        <div class="container" style="max-width:1120px;">
+            <div class="row g-4 align-items-start">
+                <div class="col-lg-8">
+                    <div id="whatsNewList" class="whats-new-list" aria-live="polite">
+                        <div class="plain-panel">
+                            <p class="eyebrow">Loading updates</p>
+                            <h2 class="h4 mb-0">Pulling in the latest QuoteDr notes...</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <aside class="plain-panel newsletter-panel">
+                        <p class="eyebrow">Weekly updates</p>
+                        <h2 class="h4">Get the useful stuff.</h2>
+                        <p>Once a week, I will send the practical QuoteDr updates: what changed, why it matters for contractors, and one quoting tip you can actually use.</p>
+                        <form id="newsletterSignupForm" data-newsletter-signup data-source="whats-new">
+                            <label class="form-label fw-bold" for="newsletterEmailWhatsNew">Email</label>
+                            <input class="form-control mb-2" id="newsletterEmailWhatsNew" type="email" name="email" autocomplete="email" placeholder="you@example.com" required>
+                            <input type="text" name="company" tabindex="-1" autocomplete="off" class="newsletter-hp" aria-hidden="true">
+                            <button class="btn btn-brand w-100" type="submit">Join the Weekly Update</button>
+                            <p class="newsletter-status mt-3 mb-0" data-newsletter-status></p>
+                        </form>
+                    </aside>
+                </div>
+            </div>
+        </div>
+    </section>
+</main>
+
+<footer class="marketing-footer">
+    <div class="container d-flex flex-column flex-lg-row align-items-center justify-content-between gap-3">
+        <img src="quotedr-logo.svg" alt="QuoteDr">
+        <div class="d-flex flex-wrap justify-content-center gap-3">
+            <a href="landing.html">Home</a>
+            <a href="blog/index.html">Blog</a>
+            <a href="whats-new.html">What&rsquo;s New</a>
+            <a href="about.html">About</a>
+            <a href="tutorials.html">Tutorials</a>
+            <a href="contact.html">Contact</a>
+        </div>
+        <span>&copy; 2026 QuoteDr</span>
+    </div>
+</footer>
+
+<script>
+(function() {
+    function escapeHtml(value) {
+        return String(value || '').replace(/[&<>"']/g, function(ch) {
+            return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
+        });
+    }
+
+    function renderEntry(entry) {
+        return '<article class="whats-new-card plain-panel">' +
+            '<div class="d-flex flex-wrap align-items-center gap-2 mb-2">' +
+            '<span class="eyebrow mb-0">' + escapeHtml(entry.category) + '</span>' +
+            '<span class="update-status">' + escapeHtml(entry.status) + '</span>' +
+            '<time datetime="' + escapeHtml(entry.date) + '">' + escapeHtml(entry.date) + '</time>' +
+            '</div>' +
+            '<h2>' + escapeHtml(entry.title) + '</h2>' +
+            '<p class="lead-small">' + escapeHtml(entry.summary) + '</p>' +
+            '<p>' + escapeHtml(entry.details) + '</p>' +
+            '<p class="update-cta mb-0">' + escapeHtml(entry.cta) + '</p>' +
+            '</article>';
+    }
+
+    fetch('data/whats-new.json')
+        .then(function(response) {
+            if (!response.ok) throw new Error('Could not load updates');
+            return response.json();
+        })
+        .then(function(data) {
+            var list = document.getElementById('whatsNewList');
+            var entries = (data.entries || []).slice().sort(function(a, b) {
+                return String(b.date).localeCompare(String(a.date));
+            });
+            list.innerHTML = entries.map(renderEntry).join('');
+        })
+        .catch(function() {
+            document.getElementById('whatsNewList').innerHTML =
+                '<div class="plain-panel"><p class="eyebrow">Updates</p><h2>QuoteDr is moving fast.</h2><p>Could not load the update feed right now. Check back soon for the latest build notes.</p></div>';
+        });
+})();
+</script>
+<script src="newsletter-signup.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -16,6 +16,9 @@ verify_jwt = false
 [functions.pro-trial-followup]
 verify_jwt = false
 
+[functions.newsletter-signup]
+verify_jwt = false
+
 [functions.analytics-brief]
 verify_jwt = false
 

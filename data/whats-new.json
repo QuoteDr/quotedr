@@ -1,0 +1,94 @@
+{
+  "app": "QuoteDr",
+  "updatedAt": "2026-06-15",
+  "entries": [
+    {
+      "date": "2026-06-15",
+      "title": "Legacy Quote Import",
+      "category": "Quoting",
+      "status": "Beta",
+      "summary": "Bring old PDF, Excel, CSV, or pasted quote text into QuoteDr as rooms and line items.",
+      "details": "This is built for contractors who already have years of old quotes sitting in spreadsheets or PDFs. The first version keeps the source pricing intact, lets you review the parsed rooms and items, and gives you optional saved-item candidates without automatically filling your catalog with duplicates.",
+      "cta": "Try it from Quote Builder under Tools, then review the preview before applying it.",
+      "newsletterBlurb": "The old-quote importer is now in beta. It can turn older PDF, Excel, CSV, or pasted quote text into QuoteDr rooms and line items, with review before anything gets applied.",
+      "newsletterEligible": true
+    },
+    {
+      "date": "2026-06-12",
+      "title": "Change Orders Are Taking Shape",
+      "category": "Client Portal",
+      "status": "In progress",
+      "summary": "A clearer change-order flow is being built to protect the contractor and the client when scope changes.",
+      "details": "Change orders happen constantly on real jobs. The QuoteDr flow is being shaped around fast contractor entry, client review, clear pricing impact, and a portal record both sides can look back on later.",
+      "cta": "Use change orders to keep extra work documented instead of buried in texts.",
+      "newsletterBlurb": "Change orders are being built into the QuoteDr workflow so extra work can be priced, reviewed, and documented in the client portal.",
+      "newsletterEligible": true
+    },
+    {
+      "date": "2026-06-10",
+      "title": "Client Portal Improvements",
+      "category": "Client Experience",
+      "status": "Updated",
+      "summary": "The client-facing quote flow is getting cleaner, with stronger portal visibility and better quote-to-invoice handoff.",
+      "details": "The portal is becoming the place where clients can review quotes, see options, approve work, and eventually track related documents without digging through old email threads.",
+      "cta": "Send client links when you want the quote to feel easier to review than a static PDF.",
+      "newsletterBlurb": "The client portal keeps getting cleaner: better review flow, clearer client-facing totals, and a stronger place for approvals and job documents.",
+      "newsletterEligible": true
+    },
+    {
+      "date": "2026-06-08",
+      "title": "Invoice Payment Options",
+      "category": "Invoicing",
+      "status": "Updated",
+      "summary": "Invoices now support more realistic payment instructions, including e-transfer, cheque, cash, and Stripe when connected.",
+      "details": "Not every contractor wants Stripe on every job. The invoice viewer is being shaped so clients see practical payment instructions based on the user's settings, with Stripe as an option when it is connected.",
+      "cta": "Add e-transfer and cheque details in settings so clients know how to pay.",
+      "newsletterBlurb": "Invoices now support more realistic payment options: e-transfer instructions, cheques, cash, and Stripe when the account is connected.",
+      "newsletterEligible": true
+    },
+    {
+      "date": "2026-06-05",
+      "title": "AI Voice to Quote",
+      "category": "AI Tools",
+      "status": "Pro",
+      "summary": "Talk through the job naturally and turn messy notes into rooms, scope, line items, quantities, and a polished starting quote.",
+      "details": "The goal is not generic AI copy. The tool is built to learn the user's wording, saved items, repeated rooms, and quote style so each pass starts closer to how that contractor actually sells the job.",
+      "cta": "Use voice when the job is still fresh in your head and you do not want to stare at a blank quote.",
+      "newsletterBlurb": "AI Voice to Quote is one of the biggest time savers in QuoteDr: talk through the job like you would with another contractor and get a structured quote starting point.",
+      "newsletterEligible": true
+    },
+    {
+      "date": "2026-06-03",
+      "title": "Floor Plan Scanner",
+      "category": "Takeoffs",
+      "status": "Pro",
+      "summary": "Upload a floor plan or sketch, calibrate from a known measurement, and move into quote-ready rooms and quantities faster.",
+      "details": "The scanner is designed to be lightweight and accurate: the user gives it a real measurement from the plan, the tool calibrates from that, and contractors can build from drawings without relying on AI guessing.",
+      "cta": "Use it when a plan, sketch, or layout file has the information you need but not the quote structure.",
+      "newsletterBlurb": "The floor plan scanner helps turn plans and sketches into room structure and quote-ready quantities by calibrating from a known measurement.",
+      "newsletterEligible": true
+    },
+    {
+      "date": "2026-06-01",
+      "title": "IKEA Kitchen Quoter",
+      "category": "Specialty Tools",
+      "status": "Pro",
+      "summary": "Parse IKEA kitchen plans or order lists into itemized quote lines instead of pricing complex kitchens by gut feel.",
+      "details": "IKEA kitchens can punish simple linear-foot pricing because complex kitchens have far more parts, fillers, panels, and inner fittings. This tool breaks the job down more fairly so simple kitchens stay simple and complex kitchens are priced like complex kitchens.",
+      "cta": "Use it when an IKEA package would otherwise take an evening to itemize.",
+      "newsletterBlurb": "The IKEA Kitchen Quoter breaks down cabinet packages into detailed quote lines so complex kitchens do not get underpriced.",
+      "newsletterEligible": true
+    },
+    {
+      "date": "2026-05-28",
+      "title": "Play For a Day",
+      "category": "Pro Access",
+      "status": "Updated",
+      "summary": "Users can try Pro tools for 24 hours from the first time they open a feature.",
+      "details": "Instead of a tiny one-click trial, Play For a Day gives users real time to try a Pro tool on real work. The flow includes a clear start prompt, status visibility, grace period, and feedback path.",
+      "cta": "Try a Pro tool when you have a real quote where the time savings will be obvious.",
+      "newsletterBlurb": "Play For a Day lets users try Pro features for 24 hours from the first time they open the tool, with a clear trial timer and feedback path.",
+      "newsletterEligible": true
+    }
+  ]
+}
