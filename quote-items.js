@@ -300,6 +300,9 @@
                 setTimeout(function() {
                     document.getElementById('newItemName')?.focus();
                 }, 0);
+                if (typeof window.notifyBuilderGuideNewItemPanelOpened === 'function') {
+                    window.notifyBuilderGuideNewItemPanelOpened();
+                }
             }
         }
 

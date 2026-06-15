@@ -2952,7 +2952,8 @@ Example:
                             {
                                 title: 'Open New Item',
                                 target: '#toggleAddItemPanelBtn',
-                                coach: 'Open the New Item panel. If you already synced QuickBooks or used the importer, your existing items will appear below.'
+                                coach: 'Open the New Item panel. If you already synced QuickBooks or used the importer, your existing items will appear below.',
+                                waitForAction: true
                             },
                             {
                                 title: 'Item Name',
@@ -3764,6 +3765,16 @@ Example:
             setBuilderGuideSubstep(step, 1);
             setTimeout(updateBuilderGuide, 120);
         }
+
+        function notifyBuilderGuideNewItemPanelOpened() {
+            if (isBuilderGuideHidden() || _builderGuideTrack !== 'first_quote') return;
+            var step = getBuilderGuideSteps()[_builderGuideIndex];
+            if (!step || step.id !== 'saved_item_setup' || getBuilderGuideSubstepIndex(step) !== 1) return;
+            setBuilderGuideSubstep(step, 2);
+            setTimeout(updateBuilderGuide, 120);
+        }
+
+        window.notifyBuilderGuideNewItemPanelOpened = notifyBuilderGuideNewItemPanelOpened;
 
         function updateBuilderGuide() {
             var list = document.getElementById('builderGuideList');
@@ -11442,7 +11453,7 @@ Example:
 
         // Manage Items behavior lives in quote-items.js.
     </script>
-    <script src="quote-items.js?v=1778194800"></script>
+    <script src="quote-items.js?v=1778194801"></script>
     <script src="quote-import.js?v=1778200000"></script>
     <script>
         // Load templates from localStorage on startup
