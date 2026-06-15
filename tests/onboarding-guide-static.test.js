@@ -104,9 +104,13 @@ assert(source.includes("target: '#newItemName'"), 'saved item setup should guide
 assert(source.includes("target: '#newItemUnit'"), 'saved item setup should guide the saved item unit type');
 assert(source.includes("target: '#newItemRate'"), 'saved item setup should guide the saved item rate');
 assert(source.includes("target: '#newItemMaterialCost'"), 'saved item setup should include material cost guidance');
+assert(source.includes("target: '#newItemSupplierUrl'"), 'saved item setup should include supplier URL guidance');
+assert(source.includes('partners like Home Depot'), 'supplier URL tutorial should mention partner pricing sync direction');
 assert(source.indexOf("target: '#newItemCategory'") < source.indexOf("target: '#newItemName'"), 'saved item setup should guide category before item name');
 assert(source.indexOf("target: '#newItemUnit'") < source.indexOf("target: '#newItemRate'"), 'saved item setup should guide unit type before rate');
 assert(source.indexOf("target: '#newItemRate'") < source.indexOf("target: '#newItemMaterialCost'"), 'saved item setup should guide rate before material cost');
+assert(source.indexOf("target: '#newItemMaterialCost'") < source.indexOf("target: '#newItemSupplierUrl'"), 'saved item setup should guide material cost before supplier URL');
+assert(source.indexOf("target: '#newItemSupplierUrl'") < source.indexOf("target: '#manageNewItemPanel button[onclick=\"addCustomItem()\"]'"), 'saved item setup should guide supplier URL before saving the item');
 assert(source.includes('function notifyBuilderGuideSavedItemCategorySelected()'), 'tutorial should react after a saved-item category is selected');
 assert(source.includes("title: 'Category',\r\n                                target: '#newItemCategory',\r\n                                coach: 'Choose or create a category. Categories keep your saved items searchable when quoting.',\r\n                                waitForAction: true")
     || source.includes("title: 'Category',\n                                target: '#newItemCategory',\n                                coach: 'Choose or create a category. Categories keep your saved items searchable when quoting.',\n                                waitForAction: true"),
