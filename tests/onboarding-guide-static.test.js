@@ -88,6 +88,10 @@ assert(!source.includes("isBuilderGuideStepCompleted('first_quote:welcome') || i
 assert(source.indexOf("id: 'saved_item_setup'") > source.indexOf("id: 'room'"), 'saved item setup should happen after adding a room');
 assert(source.indexOf("id: 'saved_item_setup'") < source.indexOf("id: 'items'"), 'saved item setup should happen before adding quote line items');
 assert(source.includes("target: '.btn-manage'"), 'saved item setup should first target Manage Items');
+assert(source.includes('waitForAction: true'), 'saved item setup should wait for Manage Items to open instead of showing coachmark Next');
+assert(source.includes('function syncBuilderGuideWithManageItemsModal()'), 'tutorial should advance saved item setup when Manage Items opens');
+assert(source.includes("manageItemsModal.addEventListener('shown.bs.modal'"), 'Manage Items modal should notify the tutorial when opened');
+assert(source.includes('!activeStep.waitForAction'), 'coachmark Next should hide for action-gated substeps');
 assert(source.includes('id="lineItemQuickSearchTip"'), 'add line item modal should include a quick-search saved-item tip');
 assert(source.includes('Start typing a saved item name'), 'add line item modal should explain saved item search autofill');
 assert(source.includes("target: '#itemQuickSearch'"), 'line item tutorial should point at the quick search field after opening the modal');

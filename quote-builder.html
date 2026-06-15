@@ -2946,7 +2946,8 @@ Example:
                             {
                                 title: 'Open Manage Items',
                                 target: '.btn-manage',
-                                coach: 'Open Manage Items. This is where QuoteDr stores reusable services, material info, labor time, and supplier links.'
+                                coach: 'Open Manage Items. This is where QuoteDr stores reusable services, material info, labor time, and supplier links.',
+                                waitForAction: true
                             },
                             {
                                 title: 'Open New Item',
@@ -3437,7 +3438,7 @@ Example:
             if (coachTitle) coachTitle.textContent = activeStep.title || step.title || 'Next step';
             if (coachBody) coachBody.textContent = activeStep.coach || activeStep.detail || step.detail || '';
             if (coachNextBtn) {
-                coachNextBtn.style.display = step.substeps && !isBuilderGuideLastSubstep(step) ? '' : 'none';
+                coachNextBtn.style.display = step.substeps && !isBuilderGuideLastSubstep(step) && !activeStep.waitForAction ? '' : 'none';
             }
             if (coachDoneBtn) {
                 coachDoneBtn.style.display = (step.manualComplete || activeStep.manualComplete) && isBuilderGuideLastSubstep(step) ? '' : 'none';
@@ -3756,6 +3757,14 @@ Example:
             }, 180);
         }
 
+        function syncBuilderGuideWithManageItemsModal() {
+            if (isBuilderGuideHidden() || _builderGuideTrack !== 'first_quote') return;
+            var step = getBuilderGuideSteps()[_builderGuideIndex];
+            if (!step || step.id !== 'saved_item_setup' || getBuilderGuideSubstepIndex(step) !== 0) return;
+            setBuilderGuideSubstep(step, 1);
+            setTimeout(updateBuilderGuide, 120);
+        }
+
         function updateBuilderGuide() {
             var list = document.getElementById('builderGuideList');
             var bar = document.getElementById('builderGuideProgressBar');
@@ -3859,6 +3868,11 @@ Example:
             if (aiVoiceReviewModal && !aiVoiceReviewModal._builderGuideHooked) {
                 aiVoiceReviewModal._builderGuideHooked = true;
                 aiVoiceReviewModal.addEventListener('shown.bs.modal', syncBuilderGuideWithAiVoiceReview);
+            }
+            var manageItemsModal = document.getElementById('manageItemsModal');
+            if (manageItemsModal && !manageItemsModal._builderGuideHooked) {
+                manageItemsModal._builderGuideHooked = true;
+                manageItemsModal.addEventListener('shown.bs.modal', syncBuilderGuideWithManageItemsModal);
             }
             window.addEventListener('resize', function() {
                 if (_builderGuideSpotlightTarget) positionBuilderGuideCoachmark(_builderGuideSpotlightTarget);
