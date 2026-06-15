@@ -7,9 +7,11 @@
         var _quoteStyle = {
             preset: 'clean-blue',
             accent: '#1a56a0',
+            optionAccent: '#1a56a0',
             bg: '#f7fbff',
             bgOpacity: 100,
             headerStyle: 'branded',
+            headerEffect: 'soft-gradient',
             headerOpacity: 100,
             fontFeel: 'clean',
             pricingMode: 'full',
@@ -186,10 +188,28 @@
             date.setDate(date.getDate() + days);
             var expiryEl = document.getElementById('quoteExpiryDate');
             if (expiryEl) expiryEl.value = formatDateInput(date);
-            document.querySelectorAll('.expiry-preset-btn').forEach(function(btn) {
-                btn.classList.toggle('active', parseInt(btn.dataset.days, 10) === days);
-            });
+            updateQuoteExpiryPresetButtons();
             updateStylePreview();
+        }
+
+        function clearQuoteExpiry() {
+            var expiryEl = document.getElementById('quoteExpiryDate');
+            if (expiryEl) expiryEl.value = '';
+            updateQuoteExpiryPresetButtons();
+            updateStylePreview();
+        }
+
+        function updateQuoteExpiryPresetButtons() {
+            var expiryValue = document.getElementById('quoteExpiryDate')?.value || '';
+            document.querySelectorAll('.expiry-preset-btn').forEach(function(btn) {
+                if (btn.getAttribute('data-no-expiry') === 'true') {
+                    btn.classList.toggle('active', !expiryValue);
+                    return;
+                }
+                var date = new Date();
+                date.setDate(date.getDate() + parseInt(btn.dataset.days, 10));
+                btn.classList.toggle('active', expiryValue === formatDateInput(date));
+            });
         }
 
         async function saveQuoteStyleDefaults(showToast) {
@@ -212,6 +232,7 @@
         function readQuoteStyleFromControls() {
             var style = Object.assign({}, _quoteStyle);
             style.headerStyle = document.getElementById('quoteHeaderStyle')?.value || style.headerStyle;
+            style.headerEffect = document.getElementById('quoteHeaderEffect')?.value || style.headerEffect || 'soft-gradient';
             style.headerOpacity = parseInt(document.getElementById('quoteHeaderOpacity')?.value || style.headerOpacity || 100, 10);
             if (!isFinite(style.headerOpacity)) style.headerOpacity = 100;
             style.headerOpacity = Math.max(20, Math.min(style.headerOpacity, 100));
@@ -219,6 +240,7 @@
             if (!isFinite(style.bgOpacity)) style.bgOpacity = 100;
             style.bgOpacity = Math.max(0, Math.min(style.bgOpacity, 100));
             style.fontFeel = document.getElementById('quoteFontFeel')?.value || style.fontFeel;
+            style.optionAccent = document.querySelector('#optionAccentSwatches .style-swatch.selected')?.getAttribute('data-option-accent') || document.getElementById('quoteOptionAccent')?.value || style.optionAccent || style.accent || '#1a56a0';
             style.pricingMode = document.getElementById('quotePricingMode')?.value || style.pricingMode;
             style.depositMode = document.getElementById('quoteDepositMode')?.value || style.depositMode;
             style.depositPercent = parseFloat(document.getElementById('quoteDepositPercent')?.value || style.depositPercent || 50);
@@ -253,11 +275,13 @@
             if (!isFinite(parseInt(_quoteStyle.bgOpacity, 10))) _quoteStyle.bgOpacity = 100;
             syncQuoteStyleGlobal();
             setFieldValue('quoteHeaderStyle', _quoteStyle.headerStyle);
+            setFieldValue('quoteHeaderEffect', _quoteStyle.headerEffect || 'soft-gradient');
             setFieldValue('quoteHeaderOpacity', _quoteStyle.headerOpacity);
             updateHeaderOpacityLabel(_quoteStyle.headerOpacity);
             setFieldValue('quoteBgOpacity', _quoteStyle.bgOpacity);
             updateBgOpacityLabel(_quoteStyle.bgOpacity);
             setFieldValue('quoteFontFeel', _quoteStyle.fontFeel);
+            setFieldValue('quoteOptionAccent', _quoteStyle.optionAccent || _quoteStyle.accent || '#1a56a0');
             setFieldValue('quotePricingMode', _quoteStyle.pricingMode);
             setFieldValue('quoteDepositMode', _quoteStyle.depositMode);
             setFieldValue('quoteDepositPercent', _quoteStyle.depositPercent || 50);
@@ -279,11 +303,7 @@
             }
             refreshCommitmentIconButtons();
             setFieldValue('quoteClientMessage', _quoteStyle.clientMessage);
-            document.querySelectorAll('.expiry-preset-btn').forEach(function(btn) {
-                var date = new Date();
-                date.setDate(date.getDate() + parseInt(btn.dataset.days, 10));
-                btn.classList.toggle('active', _quoteStyle.expiryDate === formatDateInput(date));
-            });
+            updateQuoteExpiryPresetButtons();
 
             document.querySelectorAll('#stylePresets .quote-style-preset').forEach(function(btn) {
                 btn.classList.toggle('selected', btn.getAttribute('data-preset') === _quoteStyle.preset);
@@ -293,6 +313,9 @@
             });
             document.querySelectorAll('#bgSwatches .style-swatch').forEach(function(sw) {
                 sw.classList.toggle('selected', sw.getAttribute('data-bg') === _quoteStyle.bg);
+            });
+            document.querySelectorAll('#optionAccentSwatches .style-swatch').forEach(function(sw) {
+                sw.classList.toggle('selected', sw.getAttribute('data-option-accent') === (_quoteStyle.optionAccent || _quoteStyle.accent || '#1a56a0'));
             });
             updateStylePreview();
         }
@@ -317,9 +340,7 @@
             var isLight = _quoteStyle.headerStyle === 'light' || accent === '#ffffff' || headerOpacity < 55;
             if (prev) prev.style.background = previewBg;
             if (hdr) {
-                var headerBg = _quoteStyle.headerStyle === 'dark'
-                    ? colorWithOpacity('#172033', headerOpacity)
-                    : (_quoteStyle.headerStyle === 'light' || accent === '#ffffff' ? '#ffffff' : colorWithOpacity(accent, headerOpacity));
+                var headerBg = quoteHeaderBackgroundForEffect(accent, _quoteStyle.headerStyle, headerOpacity, _quoteStyle.headerEffect || 'soft-gradient');
                 hdr.style.background = headerBg;
                 hdr.style.color = isLight ? '#1f3349' : '#ffffff';
                 hdr.style.borderBottom = isLight ? '1px solid #dbe4ef' : 'none';
@@ -356,6 +377,35 @@
             if (!rgb) return hex || '#1a56a0';
             var alpha = Math.max(20, Math.min(parseInt(opacityPercent || 100, 10), 100)) / 100;
             return 'rgba(' + rgb.r + ', ' + rgb.g + ', ' + rgb.b + ', ' + alpha.toFixed(2) + ')';
+        }
+
+        function quoteHeaderBackgroundForEffect(accent, headerStyle, headerOpacity, effect) {
+            var safeAccent = accent && accent !== '#ffffff' ? accent : '#1a56a0';
+            var opacity = Math.max(20, Math.min(parseInt(headerOpacity || 100, 10), 100));
+            var base = headerStyle === 'dark'
+                ? colorWithOpacity('#172033', opacity)
+                : (headerStyle === 'light' ? '#ffffff' : colorWithOpacity(safeAccent, opacity));
+            var soft = headerStyle === 'dark' ? colorWithOpacity('#274567', Math.max(35, opacity - 18)) : colorWithOpacity(safeAccent, Math.max(28, opacity - 26));
+            var pale = headerStyle === 'dark' ? colorWithOpacity('#425a78', 35) : blendColorWithWhite(safeAccent, 26);
+            var selected = effect || 'soft-gradient';
+
+            if (selected === 'solid') return base;
+            if (headerStyle === 'light') {
+                if (selected === 'subtle-texture') {
+                    return 'linear-gradient(90deg, rgba(15,52,96,0.035) 1px, transparent 1px), linear-gradient(0deg, rgba(15,52,96,0.035) 1px, transparent 1px), linear-gradient(135deg, #ffffff 0%, ' + pale + ' 100%)';
+                }
+                return 'radial-gradient(circle at 18% 12%, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0) 34%), linear-gradient(135deg, #ffffff 0%, ' + pale + ' 100%)';
+            }
+            if (selected === 'spotlight') {
+                return 'radial-gradient(circle at 22% 18%, rgba(255,255,255,0.34) 0%, rgba(255,255,255,0) 34%), linear-gradient(135deg, ' + base + ' 0%, ' + soft + ' 58%, rgba(16,32,51,0.28) 100%)';
+            }
+            if (selected === 'premium-sheen') {
+                return 'linear-gradient(118deg, rgba(255,255,255,0.34) 0%, rgba(255,255,255,0.14) 22%, rgba(255,255,255,0) 23%), linear-gradient(135deg, ' + base + ' 0%, ' + soft + ' 100%)';
+            }
+            if (selected === 'subtle-texture') {
+                return 'linear-gradient(90deg, rgba(255,255,255,0.055) 1px, transparent 1px), linear-gradient(0deg, rgba(255,255,255,0.045) 1px, transparent 1px), linear-gradient(135deg, ' + base + ' 0%, ' + soft + ' 100%)';
+            }
+            return 'linear-gradient(135deg, ' + base + ' 0%, ' + soft + ' 56%, ' + pale + ' 100%)';
         }
 
         function blendColorWithWhite(hex, opacityPercent) {
@@ -536,6 +586,7 @@
                 btn.onclick = function() {
                     _quoteStyle.preset = btn.getAttribute('data-preset') || 'custom';
                     _quoteStyle.accent = btn.getAttribute('data-accent') || _quoteStyle.accent;
+                    _quoteStyle.optionAccent = btn.getAttribute('data-option-accent') || _quoteStyle.accent;
                     _quoteStyle.bg = btn.getAttribute('data-bg') || _quoteStyle.bg;
                     _quoteStyle.headerStyle = btn.getAttribute('data-header') || _quoteStyle.headerStyle;
                     _quoteStyle.fontFeel = btn.getAttribute('data-font') || _quoteStyle.fontFeel;
@@ -559,11 +610,23 @@
                     applyQuoteStyleToControls(_quoteStyle);
                 };
             });
-            ['quoteHeaderStyle','quoteHeaderOpacity','quoteBgOpacity','quoteFontFeel','quotePricingMode','quoteDepositMode','quoteDepositPercent','quoteApprovalMode','quoteExpiryDate','quoteShowUpgrades','quoteShowScopeNotes','quoteShowCommitment','quoteSkipSettingsOnGenerate','commitmentTitleInput','commitmentIcon1','commitmentImage1','commitmentLabel1','commitmentText1','commitmentIcon2','commitmentImage2','commitmentLabel2','commitmentText2','commitmentIcon3','commitmentImage3','commitmentLabel3','commitmentText3','commitmentIcon4','commitmentImage4','commitmentLabel4','commitmentText4','quoteClientMessage'].forEach(function(id) {
+            document.querySelectorAll('#optionAccentSwatches .style-swatch').forEach(function(sw) {
+                sw.onclick = function() {
+                    _quoteStyle.preset = 'custom';
+                    _quoteStyle.optionAccent = sw.getAttribute('data-option-accent');
+                    syncQuoteStyleGlobal();
+                    applyQuoteStyleToControls(_quoteStyle);
+                };
+            });
+            ['quoteHeaderStyle','quoteHeaderEffect','quoteHeaderOpacity','quoteBgOpacity','quoteFontFeel','quoteOptionAccent','quotePricingMode','quoteDepositMode','quoteDepositPercent','quoteApprovalMode','quoteExpiryDate','quoteShowUpgrades','quoteShowScopeNotes','quoteShowCommitment','quoteSkipSettingsOnGenerate','commitmentTitleInput','commitmentIcon1','commitmentImage1','commitmentLabel1','commitmentText1','commitmentIcon2','commitmentImage2','commitmentLabel2','commitmentText2','commitmentIcon3','commitmentImage3','commitmentLabel3','commitmentText3','commitmentIcon4','commitmentImage4','commitmentLabel4','commitmentText4','quoteClientMessage'].forEach(function(id) {
                 var el = document.getElementById(id);
                 if (el && !el.dataset.styleBound) {
                     el.addEventListener('input', updateStylePreview);
                     el.addEventListener('change', updateStylePreview);
+                    if (id === 'quoteExpiryDate') {
+                        el.addEventListener('input', updateQuoteExpiryPresetButtons);
+                        el.addEventListener('change', updateQuoteExpiryPresetButtons);
+                    }
                     el.dataset.styleBound = '1';
                 }
             });
@@ -805,6 +868,8 @@
         window.setFieldValue = setFieldValue;
         window.formatDateInput = formatDateInput;
         window.setQuoteExpiryPreset = setQuoteExpiryPreset;
+        window.clearQuoteExpiry = clearQuoteExpiry;
+        window.updateQuoteExpiryPresetButtons = updateQuoteExpiryPresetButtons;
         window.saveQuoteStyleDefaults = saveQuoteStyleDefaults;
         window.loadQuoteStyleDefaults = loadQuoteStyleDefaults;
         window.readQuoteStyleFromControls = readQuoteStyleFromControls;
