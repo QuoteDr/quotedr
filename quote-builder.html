@@ -3015,7 +3015,7 @@ Example:
                                 targetFallback: '#roomsContainer',
                                 coach: 'Click Add Line Item. This opens the form for adding work, materials, labour, or services to the room.',
                                 actionText: 'Add Line Item',
-                                advanceSubstepAfterAction: true
+                                waitForAction: true
                             },
                             {
                                 title: 'Search saved items',
@@ -3793,8 +3793,17 @@ Example:
             setTimeout(updateBuilderGuide, 120);
         }
 
+        function notifyBuilderGuideAddLineModalOpened() {
+            if (isBuilderGuideHidden() || _builderGuideTrack !== 'first_quote') return;
+            var step = getBuilderGuideSteps()[_builderGuideIndex];
+            if (!step || step.id !== 'items' || getBuilderGuideSubstepIndex(step) !== 0) return;
+            setBuilderGuideSubstep(step, 1);
+            setTimeout(updateBuilderGuide, 120);
+        }
+
         window.notifyBuilderGuideNewItemPanelOpened = notifyBuilderGuideNewItemPanelOpened;
         window.notifyBuilderGuideSavedItemCategorySelected = notifyBuilderGuideSavedItemCategorySelected;
+        window.notifyBuilderGuideAddLineModalOpened = notifyBuilderGuideAddLineModalOpened;
 
         function updateBuilderGuide() {
             var list = document.getElementById('builderGuideList');
@@ -4967,6 +4976,9 @@ Example:
             // Don't call updatePricingOptions() here - let user pick category first
 
             modal.show();
+            if (typeof window.notifyBuilderGuideAddLineModalOpened === 'function') {
+                window.notifyBuilderGuideAddLineModalOpened();
+            }
         }
 
         async function handleLineCategoryChange() {
