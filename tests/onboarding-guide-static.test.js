@@ -102,6 +102,7 @@ assert(source.includes("target: '#itemQuickSearch'"), 'line item tutorial should
 assert(source.includes('Saved items save tons of time'), 'line item tutorial should explain why saved items matter');
 assert(source.includes("target: '#newItemName'"), 'saved item setup should guide the new saved item name');
 assert(source.includes("target: '#newItemMaterialCost'"), 'saved item setup should include material cost guidance');
+assert(source.indexOf("target: '#newItemCategory'") < source.indexOf("target: '#newItemName'"), 'saved item setup should guide category before item name');
 assert(source.includes('QuickBooks Products & Services'), 'builder tutorial should mention QuickBooks products/services sync');
 assert(source.includes('Importer tool in Settings'), 'builder tutorial should mention the settings importer fallback');
 assert(source.includes("closeModalOnComplete: 'manageItemsModal'"), 'saved item setup should close Manage Items before advancing');
