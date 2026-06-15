@@ -66,6 +66,9 @@ assert(source.includes('builder-guide-backdrop'), 'tutorial should dim the page 
 assert(source.includes('applyBuilderGuideSpotlight'), 'tutorial should update spotlight/callout state as steps change');
 assert(source.includes('clearBuilderGuideSpotlight'), 'tutorial should clean up spotlight state when hidden');
 assert(source.includes("target: '.btn-add-room'"), 'room step should target the Add Room button');
+assert(source.includes('function notifyBuilderGuideRoomCreated()'), 'tutorial should react when a room is actually created');
+assert(source.includes("step.id === 'room'"), 'room creation trigger should target the room tutorial step');
+assert(source.includes('notifyBuilderGuideRoomCreated();'), 'confirmAddRoom should notify the tutorial after the room is confirmed');
 assert(source.includes("target: '#clientName'"), 'client step should target the client name field');
 assert(source.includes('scrollIntoView'), 'tutorial should scroll the next target into view');
 assert(source.includes('id="builderGuideCoachDoneBtn"'), 'coachmark should include an inline completion button');

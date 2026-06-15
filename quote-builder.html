@@ -3741,6 +3741,21 @@ Example:
             });
         }
 
+        function notifyBuilderGuideRoomCreated() {
+            if (isBuilderGuideHidden() || _builderGuideTrack !== 'first_quote') return;
+            var steps = getBuilderGuideSteps();
+            var roomIndex = steps.findIndex(function(step) { return step.id === 'room'; });
+            if (roomIndex < 0 || _builderGuideIndex !== roomIndex) return;
+            completeBuilderGuideStep(steps[roomIndex]);
+            setTimeout(function() {
+                if (_builderGuideIndex === roomIndex && _builderGuideIndex < getBuilderGuideSteps().length - 1) {
+                    moveBuilderGuide(1, false);
+                } else {
+                    updateBuilderGuide();
+                }
+            }, 180);
+        }
+
         function updateBuilderGuide() {
             var list = document.getElementById('builderGuideList');
             var bar = document.getElementById('builderGuideProgressBar');
@@ -4773,6 +4788,7 @@ Example:
             const modalEl = document.getElementById('addRoomModal');
             const modal = bootstrap.Modal.getInstance(modalEl);
             modal.hide();
+            notifyBuilderGuideRoomCreated();
         }
 
         function showItemSearchResults() {
