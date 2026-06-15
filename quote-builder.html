@@ -3021,7 +3021,21 @@ Example:
                                 title: 'Search saved items',
                                 target: '#itemQuickSearch',
                                 targetFallback: '#addLineModal .modal-content',
-                                coach: 'Start typing a saved item name. QuoteDr will search your saved price book and autofill the item details, so repeat work is much faster.'
+                                coach: 'Start typing a saved item name. QuoteDr will search your saved price book and autofill the item details, so repeat work is much faster.',
+                                waitForAction: true
+                            },
+                            {
+                                title: 'Set quantity',
+                                target: '#lineQuantity',
+                                targetFallback: '#addLineModal .modal-content',
+                                coach: 'Enter the quantity for this line item. Check the unit and rate beside it, then click Next when it looks right.'
+                            },
+                            {
+                                title: 'Add the line item',
+                                target: '#addLineModal button[onclick="confirmAddLine()"]',
+                                targetFallback: '#addLineModal .modal-content',
+                                coach: 'Click Add Line Item to place this work into the room. The tutorial will continue after the item is added.',
+                                waitForAction: true
                             }
                         ],
                         complete: function() {
@@ -3801,9 +3815,33 @@ Example:
             setTimeout(updateBuilderGuide, 120);
         }
 
+        function notifyBuilderGuideLineItemSelected() {
+            if (isBuilderGuideHidden() || _builderGuideTrack !== 'first_quote') return;
+            var step = getBuilderGuideSteps()[_builderGuideIndex];
+            if (!step || step.id !== 'items' || getBuilderGuideSubstepIndex(step) !== 1) return;
+            setBuilderGuideSubstep(step, 2);
+            setTimeout(updateBuilderGuide, 120);
+        }
+
+        function notifyBuilderGuideLineItemAdded() {
+            if (isBuilderGuideHidden() || _builderGuideTrack !== 'first_quote') return;
+            var step = getBuilderGuideSteps()[_builderGuideIndex];
+            if (!step || step.id !== 'items') return;
+            completeBuilderGuideStep(step);
+            setTimeout(function() {
+                if (_builderGuideIndex < getBuilderGuideSteps().length - 1) {
+                    moveBuilderGuide(1, false);
+                } else {
+                    updateBuilderGuide();
+                }
+            }, 120);
+        }
+
         window.notifyBuilderGuideNewItemPanelOpened = notifyBuilderGuideNewItemPanelOpened;
         window.notifyBuilderGuideSavedItemCategorySelected = notifyBuilderGuideSavedItemCategorySelected;
         window.notifyBuilderGuideAddLineModalOpened = notifyBuilderGuideAddLineModalOpened;
+        window.notifyBuilderGuideLineItemSelected = notifyBuilderGuideLineItemSelected;
+        window.notifyBuilderGuideLineItemAdded = notifyBuilderGuideLineItemAdded;
 
         function updateBuilderGuide() {
             var list = document.getElementById('builderGuideList');
@@ -5086,6 +5124,9 @@ Example:
                     linkBtn.href = supplierUrl || '#';
                     linkBtn.style.display = supplierUrl ? 'inline-block' : 'none';
                 }
+                if (selectedOption.value && selectedOption.value !== 'custom' && typeof window.notifyBuilderGuideLineItemSelected === 'function') {
+                    window.notifyBuilderGuideLineItemSelected();
+                }
             }
         }
 
@@ -6045,7 +6086,11 @@ Example:
                 }
 
                 renderRooms();
-                updateBuilderGuide();
+                if (typeof window.notifyBuilderGuideLineItemAdded === 'function') {
+                    window.notifyBuilderGuideLineItemAdded();
+                } else {
+                    updateBuilderGuide();
+                }
 
                 // Close modal
                 const modalEl = document.getElementById('addLineModal');

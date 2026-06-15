@@ -101,9 +101,15 @@ assert(source.includes('Start typing a saved item name'), 'add line item modal s
 assert(source.includes("target: '#itemQuickSearch'"), 'line item tutorial should point at the quick search field after opening the modal');
 assert(source.includes('Saved items save tons of time'), 'line item tutorial should explain why saved items matter');
 assert(source.includes('function notifyBuilderGuideAddLineModalOpened()'), 'line item tutorial should react when the Add Line Item modal opens');
+assert(source.includes('function notifyBuilderGuideLineItemSelected()'), 'line item tutorial should react after the user selects a saved item');
+assert(source.includes('function notifyBuilderGuideLineItemAdded()'), 'line item tutorial should finish after the user adds the line item');
 assert(source.includes("title: 'Open Add Line Item',\r\n                                target: '.btn-add-item',\r\n                                targetFallback: '#roomsContainer',\r\n                                coach: 'Click Add Line Item. This opens the form for adding work, materials, labour, or services to the room.',\r\n                                actionText: 'Add Line Item',\r\n                                waitForAction: true")
     || source.includes("title: 'Open Add Line Item',\n                                target: '.btn-add-item',\n                                targetFallback: '#roomsContainer',\n                                coach: 'Click Add Line Item. This opens the form for adding work, materials, labour, or services to the room.',\n                                actionText: 'Add Line Item',\n                                waitForAction: true"),
     'Open Add Line Item substep should wait for the user to click Add Item instead of showing Next');
+assert(source.includes("target: '#lineQuantity'"), 'line item tutorial should guide the quantity field after item selection');
+assert(source.includes("target: '#addLineModal button[onclick=\"confirmAddLine()\"]'"), 'line item tutorial should guide the Add Line Item button after quantity');
+assert(source.indexOf("target: '#itemQuickSearch'") < source.indexOf("target: '#lineQuantity'"), 'line item tutorial should guide saved item search before quantity');
+assert(source.indexOf("target: '#lineQuantity'") < source.indexOf("target: '#addLineModal button[onclick=\"confirmAddLine()\"]'"), 'line item tutorial should guide quantity before final Add Line Item');
 assert(source.includes("target: '#newItemName'"), 'saved item setup should guide the new saved item name');
 assert(source.includes("target: '#newItemUnit'"), 'saved item setup should guide the saved item unit type');
 assert(source.includes("target: '#newItemRate'"), 'saved item setup should guide the saved item rate');
