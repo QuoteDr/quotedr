@@ -27,6 +27,26 @@ assert(
 );
 
 assert(
+  /btn-add-room\s*\{[^}]*background:\s*#dcd5d5/.test(source),
+  'Add Room should use the muted grey toolbar background'
+);
+
+assert(
+  /btn-markup\s*\{[^}]*background:\s*#ff5c5c[^}]*color:\s*#ffffff/.test(source),
+  'Markup All should use the requested red background with white text'
+);
+
+assert(
+  /btn-community\s*\{[^}]*background:\s*#c6eeb4/.test(source),
+  'Community should use the requested soft green toolbar background'
+);
+
+assert(
+  /btn-timelines\s*\{[^}]*background:\s*#9ac3f9/.test(source),
+  'Hide Timelines should use the requested soft blue toolbar background'
+);
+
+assert(
   toolbar.includes('fa-plus') &&
     toolbar.includes('fa-ruler-combined') &&
     toolbar.includes('fa-save') &&

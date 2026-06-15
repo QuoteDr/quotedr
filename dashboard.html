@@ -3199,7 +3199,8 @@ function renderBusinessInsights(quotes) {
                         email: client.email || (existing[client.name] && existing[client.name].email) || '',
                         address: client.address || (existing[client.name] && existing[client.name].address) || '',
                         city: client.city || (existing[client.name] && existing[client.name].city) || '',
-                        notes: client.notes || (existing[client.name] && existing[client.name].notes) || ''
+                        notes: client.notes || (existing[client.name] && existing[client.name].notes) || '',
+                        crm: client.crm || (existing[client.name] && existing[client.name].crm) || {}
                     });
                 });
                 localStorage.setItem('ald_clients', JSON.stringify(existing));

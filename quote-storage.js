@@ -19,6 +19,76 @@
             return negative ? -amount : amount;
         }
 
+        function quoteStorageData(row) {
+            return row && row.data ? row.data : {};
+        }
+
+        function quoteStorageIsJunked(row) {
+            return !!quoteStorageData(row).junk_deleted_at;
+        }
+
+        function quoteStorageEscapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function quoteStorageJsAttr(value) {
+            return quoteStorageEscapeHtml(JSON.stringify(String(value == null ? '' : value)));
+        }
+
+        function quoteStorageClientName(row) {
+            var data = quoteStorageData(row);
+            return String((row && row.client_name) || data.clientName || data.client_name || '').trim();
+        }
+
+        function quoteStorageQuoteNumber(row) {
+            var data = quoteStorageData(row);
+            return String((row && row.quote_number) || data.quoteNumber || data.quote_number || '').trim();
+        }
+
+        function quoteStorageDisplayTitle(row) {
+            var data = quoteStorageData(row);
+            var title = String(data.quoteTitle || data.invoiceTitle || data.title || '').trim();
+            return title || quoteStorageClientName(row) || 'Unnamed Client';
+        }
+
+        function quoteStorageRowTime(row) {
+            var data = quoteStorageData(row);
+            return new Date(data.savedAt || (row && row.updated_at) || (row && row.created_at) || 0).getTime() || 0;
+        }
+
+        function quoteStorageDuplicateKey(row) {
+            var status = String((row && row.status) || quoteStorageData(row).status || '').toLowerCase();
+            if (status !== 'draft') return '';
+            var client = quoteStorageClientName(row);
+            var quoteNumber = quoteStorageQuoteNumber(row);
+            return (client || quoteNumber) ? (client + '|' + quoteNumber) : '';
+        }
+
+        function quoteStorageActiveRows(rows) {
+            var active = (rows || []).filter(function(row) { return !quoteStorageIsJunked(row); });
+            var seen = {};
+            var deduped = [];
+            active.forEach(function(row) {
+                var key = quoteStorageDuplicateKey(row);
+                if (!key || !Object.prototype.hasOwnProperty.call(seen, key)) {
+                    if (key) seen[key] = deduped.length;
+                    deduped.push(row);
+                    return;
+                }
+                var existingIndex = seen[key];
+                var existing = deduped[existingIndex];
+                if (quoteStorageRowTime(row) > quoteStorageRowTime(existing)) {
+                    deduped[existingIndex] = row;
+                }
+            });
+            return deduped;
+        }
+
         function quoteIsPortalLockedForBuilder(row) {
             return !!(row && row.data && row.data.portal_visible === true);
         }
@@ -531,19 +601,31 @@ async function saveQuote() {
             var listEl = document.getElementById('loadQuoteList');
             if (typeof listQuotesFromSupabase === 'function') {
                 var result = await listQuotesFromSupabase();
-                var quotes = (result && result.data) ? result.data : [];
+                var quotes = quoteStorageActiveRows((result && result.data) ? result.data : []);
                 if (!quotes.length) {
                     listEl.innerHTML = '<div class="text-muted small text-center py-3">No saved cloud quotes yet.<br>Save a quote first using the Save button.</div>';
                     return;
                 }
                 listEl.innerHTML = quotes.map(function(q) {
-                    var date = q.updated_at ? new Date(q.updated_at).toLocaleDateString() : '';
-                    var total = q.total ? ('$' + parseFloat(q.total).toFixed(2)) : '$0.00';
+                    var data = quoteStorageData(q);
+                    var quoteTitle = String(data.quoteTitle || data.invoiceTitle || data.title || '').trim();
+                    var clientName = quoteStorageClientName(q);
+                    var displayTitle = quoteStorageDisplayTitle(q);
+                    var quoteNumber = quoteStorageQuoteNumber(q);
+                    var dateValue = data.savedAt || q.updated_at || q.created_at;
+                    var date = dateValue ? new Date(dateValue).toLocaleDateString() : '';
+                    var totalValue = parseFloat(q.total || data.grandTotal || data.total || 0) || 0;
+                    var total = '$' + totalValue.toFixed(2);
+                    var details = [];
+                    if (quoteTitle && clientName) details.push(clientName);
+                    if (quoteNumber) details.push('#' + quoteNumber);
+                    if (date) details.push(date);
+                    details.push(total);
                     return '<div class="p-2 mb-1 rounded" style="border:1px solid #dee2e6; cursor:pointer;" ' +
-                        'onclick="loadCloudQuote(\'' + q.id + '\')" ' +
+                        'onclick="loadCloudQuote(' + quoteStorageJsAttr(q.id) + ')" ' +
                         'onmouseover="this.style.background=\'#e8f0fe\'" onmouseout="this.style.background=\'\'">' +
-                        '<div class="fw-bold">' + (q.client_name || 'Unnamed') + '</div>' +
-                        '<div class="text-muted small">' + date + ' &middot; ' + total + '</div>' +
+                        '<div class="fw-bold">' + quoteStorageEscapeHtml(displayTitle) + '</div>' +
+                        '<div class="text-muted small">' + details.map(quoteStorageEscapeHtml).join(' &middot; ') + '</div>' +
                         '</div>';
                 }).join('');
             }
@@ -988,7 +1070,7 @@ async function saveQuote() {
                             }
                             result.data.forEach(function(sc) {
                                 if (sc.name && !existing[sc.name]) {
-                                    existing[sc.name] = { name: sc.name, phone: sc.phone || '', email: sc.email || '', address: sc.address || '', city: sc.city || '', notes: sc.notes || '' };
+                                    existing[sc.name] = { name: sc.name, phone: sc.phone || '', email: sc.email || '', address: sc.address || '', city: sc.city || '', notes: sc.notes || '', crm: sc.crm || {} };
                                 }
                             });
                             localStorage.setItem('ald_clients', JSON.stringify(existing));

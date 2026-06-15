@@ -659,6 +659,7 @@ async function saveClientToSupabase(client) {
             address: client.address || '',
             city: client.city || '',
             notes: client.notes || '',
+            crm: client.crm || {},
             updated_at: new Date().toISOString()
         }, { onConflict: 'user_id,name' })
         .select();
@@ -1137,7 +1138,8 @@ async function saveAllClientsToSupabase(clientsArray) {
         email: c.email || '',
         address: c.address || '',
         city: c.city || '',
-        notes: c.notes || ''
+        notes: c.notes || '',
+        crm: c.crm || {}
     }));
     return await _supabase.from('clients').insert(rows);
 }

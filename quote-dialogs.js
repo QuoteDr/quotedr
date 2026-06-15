@@ -128,6 +128,7 @@
                 ok.onclick = null;
                 cancel.onclick = null;
                 secondary.onclick = null;
+                el.removeEventListener('keydown', onEnterSubmit);
                 var finish = function() {
                     el.removeEventListener('hidden.bs.modal', onHidden);
                     resolve(value);
@@ -142,6 +143,17 @@
             function onHidden() {
                 cleanup(opts.prompt ? null : false, false);
             }
+            function onEnterSubmit(event) {
+                if (!opts.enterSubmits) return;
+                if (event.key !== 'Enter' || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) return;
+                var target = event.target;
+                var tagName = target && target.tagName ? target.tagName : '';
+                if (tagName === 'TEXTAREA' || (target && target.isContentEditable)) return;
+                if (tagName === 'BUTTON' || tagName === 'A') return;
+                if (ok.disabled || ok.getAttribute('aria-disabled') === 'true') return;
+                event.preventDefault();
+                ok.click();
+            }
             ok.onclick = function() {
                 var value = opts.prompt ? input.value : true;
                 cleanup(value, true);
@@ -153,6 +165,7 @@
                 cleanup(opts.secondaryValue !== undefined ? opts.secondaryValue : 'secondary', true);
             };
             el.addEventListener('hidden.bs.modal', onHidden, { once: true });
+            el.addEventListener('keydown', onEnterSubmit);
             modal.show();
             if (opts.prompt) setTimeout(function(){ input.focus(); input.select(); }, 180);
         });
@@ -191,6 +204,7 @@
         var opts = asOptions(message, options);
         opts.cancelText = null;
         opts.okText = opts.okText || 'Got it';
+        opts.enterSubmits = opts.enterSubmits !== false;
         return qdDialog(opts);
     };
     window.qdConfirm = function(message, options) {

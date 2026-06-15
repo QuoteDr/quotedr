@@ -830,12 +830,13 @@
             justify-content: flex-end;
         }
         .room-toolbar .btn i { display: block; margin-bottom: 2px; }
-        .room-toolbar .btn-add-room { background:#ffffff; color:var(--qd-blue-dark, #0f3460); border-color:#cfdbe9; }
+        .room-toolbar .btn-add-room { background:#dcd5d5; color:var(--qd-blue-dark, #0f3460); border-color:#c6bebe; }
         .room-toolbar .btn-quick-room { background:#4d93d6; color:#ffffff; border-color:#367bc0; }
         .room-toolbar .btn-save-template { background:#174b82; color:#ffffff; border-color:#174b82; }
         .room-toolbar .btn-templates { background:var(--qd-orange, #f27a1a); color:#ffffff; border-color:var(--qd-orange-dark, #c95b08); }
-        .room-toolbar .btn-timelines { background:#f8fbff; color:#31506f; border-color:#cfdbe9; }
-        .room-toolbar .btn-markup { background:#f8fbff; color:var(--qd-blue-dark, #0f3460); border-color:#cfdbe9; }
+        .room-toolbar .btn-timelines { background:#9ac3f9; color:#31506f; border-color:#7aaef2; }
+        .room-toolbar .btn-markup { background:#ff5c5c; color:#ffffff; border-color:#e64747; }
+        .room-toolbar .btn-community { background:#c6eeb4; color:#007a55; border-color:#a9df90; }
         .room-toolbar .btn-manage { background:#102033; color:#ffffff; border-color:#102033; }
         .room-toolbar .btn-total { background:#fff7ed; color:var(--qd-orange-dark, #c95b08); border-color:#fed7aa; }
         .room-toolbar .btn-total.btn-total-active { background:var(--qd-orange, #f27a1a); color:#ffffff; border-color:var(--qd-orange-dark, #c95b08); }
@@ -1691,7 +1692,7 @@ if (location.search.includes('debug')) {
                     <a href="javascript:void(0)" onclick="applyGlobalMarkup()" class="btn btn-sm btn-markup" title="Apply markup to all rooms">
                         <i class="fas fa-percent"></i> Markup All
                     </a>
-                    <a href="javascript:void(0)" onclick="openCommunityTemplates()" class="btn btn-sm btn-outline-success" title="Browse community quote templates">
+                    <a href="javascript:void(0)" onclick="openCommunityTemplates()" class="btn btn-sm btn-community" title="Browse community quote templates">
                         <i class="fas fa-users"></i> Community
                     </a>
                     <a href="javascript:void(0)" id="toggleTimelinesBtn" onclick="toggleTimelines()" class="btn btn-sm btn-timelines" title="Show/hide timeline estimates">
@@ -2198,7 +2199,7 @@ Example:
     </div>
 
     <!-- Add Room Modal -->
-    <div class="modal fade" id="addRoomModal" tabindex="-1">
+    <div class="modal fade" id="addRoomModal" tabindex="-1" data-enter-submit="#addRoomBreakBtn">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
@@ -2212,7 +2213,7 @@ Example:
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" onclick="confirmAddRoom()">Add Room Break</button>
+                    <button type="button" class="btn btn-primary" id="addRoomBreakBtn" onclick="confirmAddRoom()">Add Room Break</button>
                 </div>
             </div>
         </div>
@@ -2255,7 +2256,7 @@ Example:
     </div>
 
     <!-- Add Line Item Modal -->
-    <div class="modal fade" id="addLineModal" tabindex="-1">
+    <div class="modal fade" id="addLineModal" tabindex="-1" data-enter-submit="#addLineItemBtn">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
@@ -2344,7 +2345,7 @@ Example:
                     <button type="button" class="btn btn-outline-success" id="saveNewItemBtn" onclick="saveLineItemToDatabase()" style="display:none;" title="Save this item to your database for future use">
                         <i class="fas fa-bookmark me-1"></i>Save New Item
                     </button>
-                    <button type="button" class="btn btn-primary" onclick="confirmAddLine()">Add Line Item</button>
+                    <button type="button" class="btn btn-primary" id="addLineItemBtn" onclick="confirmAddLine()">Add Line Item</button>
                 </div>
             </div>
         </div>
@@ -2532,6 +2533,47 @@ Example:
                         <div class="col-md-6">
                             <label class="form-label"><strong>Address</strong></label>
                             <input type="text" id="newClientAddress" class="form-control" placeholder="123 Main St, Toronto, ON">
+                        </div>
+                        <div class="col-12">
+                            <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#clientCrmDetails" aria-expanded="false" aria-controls="clientCrmDetails">
+                                <i class="fas fa-user-clock me-1"></i>More Client Details
+                            </button>
+                            <span class="text-muted small ms-2">Internal CRM details, not shown on quotes.</span>
+                        </div>
+                        <div class="col-12 collapse" id="clientCrmDetails">
+                            <div class="border rounded p-3 bg-light">
+                                <div class="row g-2">
+                                    <div class="col-md-6">
+                                        <label class="form-label"><strong>Birthday</strong></label>
+                                        <input type="date" id="newClientBirthday" class="form-control">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label"><strong>Preferred Contact</strong></label>
+                                        <select id="newClientPreferredContact" class="form-select">
+                                            <option value="">No preference</option>
+                                            <option value="Phone">Phone</option>
+                                            <option value="Text">Text</option>
+                                            <option value="Email">Email</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label"><strong>Client Type / Tags</strong></label>
+                                        <input type="text" id="newClientTags" class="form-control" placeholder="e.g., repeat client, referral, VIP">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label"><strong>Follow-up Date</strong></label>
+                                        <input type="date" id="newClientFollowUpDate" class="form-control">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label"><strong>Referral / Source</strong></label>
+                                        <input type="text" id="newClientReferralSource" class="form-control" placeholder="e.g., Google, neighbour, past client">
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label"><strong>Internal Notes</strong></label>
+                                        <textarea id="newClientCrmNotes" class="form-control" rows="3" placeholder="Relationship notes, preferences, reminders, family details, or anything useful for future work."></textarea>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-12">
                             <button onclick="saveClientFromModal()" class="btn btn-success">
@@ -2735,6 +2777,24 @@ Example:
                 undoLastAction();
             }
         });
+
+        function handleModalEnterSubmit(event) {
+            if (event.key !== 'Enter' || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) return;
+            var target = event.target;
+            if (!target) return;
+            var tagName = target.tagName || '';
+            if (tagName === 'TEXTAREA' || target.isContentEditable) return;
+            if (tagName === 'BUTTON' || tagName === 'A') return;
+            var modal = target.closest && target.closest('.modal[data-enter-submit]');
+            if (!modal) return;
+            var selector = modal.getAttribute('data-enter-submit');
+            var button = selector ? modal.querySelector(selector) : null;
+            if (!button || button.disabled || button.getAttribute('aria-disabled') === 'true') return;
+            event.preventDefault();
+            button.click();
+        }
+
+        document.addEventListener('keydown', handleModalEnterSubmit);
         // -------------------------------------------------------------------------
         let customItems = {};
         let categoryStyles = {}; // { "Tile & Stone": { icon: "fa-border-all", color: "#f0f4ff" } }
@@ -4498,7 +4558,12 @@ Example:
             document.body.style.removeProperty('overflow');
             document.body.style.removeProperty('padding-right');
 
-            var roomModal = new bootstrap.Modal(document.getElementById('addRoomModal'));
+            var modalEl = document.getElementById('addRoomModal');
+            modalEl.addEventListener('shown.bs.modal', function focusAddRoomName() {
+                document.getElementById('newRoomName').focus();
+                modalEl.removeEventListener('shown.bs.modal', focusAddRoomName);
+            });
+            var roomModal = new bootstrap.Modal(modalEl);
             document.getElementById('newRoomName').value = '';
             roomModal.show();
         }
@@ -5832,7 +5897,8 @@ Example:
                 title: 'Delete Room',
                 okText: 'Delete',
                 okClass: 'btn-danger',
-                type: 'danger'
+                type: 'danger',
+                enterSubmits: true
             })) return;
             _pushUndo();
             rooms.splice(roomIndex, 1);
@@ -14630,15 +14696,24 @@ Example:
                         </div>
 
                         <div class="row mb-3">
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <label for="drywallWaste" class="form-label">Waste %</label>
                                 <input type="number" class="form-control" id="drywallWaste" value="10" min="0" max="100">
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <label for="drywallFinishLevel" class="form-label">Finish Level</label>
                                 <select class="form-select" id="drywallFinishLevel">
                                     <option value="standard" selected>Standard (3-coat)</option>
                                     <option value="level5">Level 5 (skim coat)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="drywallSheetSize" class="form-label">Sheet Size</label>
+                                <select class="form-select" id="drywallSheetSize">
+                                    <option value="32" selected>4x8 sheets</option>
+                                    <option value="36">4x9 sheets</option>
+                                    <option value="40">4x10 sheets</option>
+                                    <option value="48">4x12 sheets</option>
                                 </select>
                             </div>
                         </div>
@@ -14647,7 +14722,7 @@ Example:
                     <!-- Scan Quote Tab -->
                     <div class="tab-pane fade" id="scan-drywall" role="tabpanel">
                         <div class="alert alert-info">
-                            <i class="fas fa-info-circle me-2"></i>Scanning quote for Drywall items...
+                            <i class="fas fa-info-circle me-2"></i>Press Scan Quote below to scan your quote and calculate how much drywall you need.
                         </div>
                         <button type="button" class="btn btn-primary mb-3" onclick="scanDrywallQuote()">Scan Quote</button>
                         <div id="drywallScanResults" class="d-none">
@@ -14672,7 +14747,6 @@ Example:
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-success" id="drywallAddToQuoteBtn" disabled onclick="addToDrywallQuote()">Add to Quote</button>
                 <button type="button" class="btn btn-primary" id="drywallCalculateBtn" onclick="calculateDrywall()">Calculate</button>
             </div>
         </div>

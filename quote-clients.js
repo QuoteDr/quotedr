@@ -92,6 +92,87 @@
         // ── Client Database (localStorage) ──────────────────────────────────────
         let savedClients = {};
 
+        function escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function normalizeClientCrm(client) {
+            const crm = client && typeof client.crm === 'object' && !Array.isArray(client.crm) ? client.crm : {};
+            return {
+                notes: crm.notes || client?.notes || '',
+                birthday: crm.birthday || '',
+                preferredContact: crm.preferredContact || '',
+                tags: crm.tags || '',
+                followUpDate: crm.followUpDate || '',
+                referralSource: crm.referralSource || ''
+            };
+        }
+
+        function normalizeClientRecord(client, fallbackName) {
+            const source = client || {};
+            const name = (source.name || fallbackName || '').trim();
+            const crm = normalizeClientCrm(source);
+            return {
+                name,
+                phone: source.phone || '',
+                email: source.email || '',
+                address: source.address || '',
+                city: source.city || '',
+                notes: crm.notes || '',
+                crm
+            };
+        }
+
+        function readClientCrmForm() {
+            return {
+                notes: (document.getElementById('newClientCrmNotes')?.value || '').trim(),
+                birthday: (document.getElementById('newClientBirthday')?.value || '').trim(),
+                preferredContact: (document.getElementById('newClientPreferredContact')?.value || '').trim(),
+                tags: (document.getElementById('newClientTags')?.value || '').trim(),
+                followUpDate: (document.getElementById('newClientFollowUpDate')?.value || '').trim(),
+                referralSource: (document.getElementById('newClientReferralSource')?.value || '').trim()
+            };
+        }
+
+        function writeClientCrmForm(crm) {
+            const data = normalizeClientCrm({ crm: crm || {} });
+            const fields = {
+                newClientCrmNotes: data.notes,
+                newClientBirthday: data.birthday,
+                newClientPreferredContact: data.preferredContact,
+                newClientTags: data.tags,
+                newClientFollowUpDate: data.followUpDate,
+                newClientReferralSource: data.referralSource
+            };
+            Object.entries(fields).forEach(([id, value]) => {
+                const el = document.getElementById(id);
+                if (el) el.value = value || '';
+            });
+        }
+
+        function getClientSearchText(client) {
+            const c = normalizeClientRecord(client, client?.name);
+            const crm = c.crm || {};
+            return [
+                c.name,
+                c.phone,
+                c.email,
+                c.address,
+                c.city,
+                crm.notes,
+                crm.tags,
+                crm.referralSource,
+                crm.preferredContact,
+                crm.birthday,
+                crm.followUpDate
+            ].join(' ').toLowerCase();
+        }
+
         function loadSavedClients() {
             try { savedClients = JSON.parse(localStorage.getItem('ald_clients') || '{}'); }
             catch(e) { savedClients = {}; }
@@ -102,11 +183,14 @@
                 savedClients = obj;
                 localStorage.setItem('ald_clients', JSON.stringify(savedClients));
             }
+            Object.entries(savedClients).forEach(([name, data]) => {
+                savedClients[name] = normalizeClientRecord(data, name);
+            });
             // One-time migration: import legacy clients that aren't already saved
             let migrated = false;
             LEGACY_CLIENTS.forEach(name => {
                 if (!savedClients[name]) {
-                    savedClients[name] = { name, phone: '', email: '', address: '' };
+                    savedClients[name] = normalizeClientRecord({ name, phone: '', email: '', address: '' }, name);
                     migrated = true;
                 }
             });
@@ -114,6 +198,9 @@
         }
 
         function persistClients() {
+            Object.entries(savedClients).forEach(([name, data]) => {
+                savedClients[name] = normalizeClientRecord(data, name);
+            });
             localStorage.setItem('ald_clients', JSON.stringify(savedClients));
 
             // Also sync to Supabase if available
@@ -128,7 +215,7 @@
             // All clients live in savedClients - no hardcoded list
             const merged = {};
             Object.entries(savedClients).forEach(([name, data]) => {
-                merged[name] = { ...data, name };
+                merged[name] = normalizeClientRecord(data, name);
             });
             return merged;
         }
@@ -146,7 +233,8 @@
             const email   = document.getElementById('clientEmail').value.trim();
             const address = document.getElementById('projectAddress').value.trim();
             if (!name) { alert('Please enter a client name first.'); return; }
-            savedClients[name] = { name, phone, email, address };
+            const existing = normalizeClientRecord(savedClients[name], name);
+            savedClients[name] = normalizeClientRecord({ ...existing, name, phone, email, address }, name);
             persistClients();
             // Flash save status
             const el = document.getElementById('saveStatus');
@@ -163,15 +251,21 @@
             ['newClientName','newClientPhone','newClientEmail','newClientAddress'].forEach(id => {
                 document.getElementById(id).value = '';
             });
+            writeClientCrmForm({});
+            const crmCollapse = document.getElementById('clientCrmDetails');
+            if (crmCollapse && crmCollapse.classList.contains('show') && window.bootstrap?.Collapse) {
+                bootstrap.Collapse.getOrCreateInstance(crmCollapse, { toggle: false }).hide();
+            }
         }
 
         function editClientInModal(name) {
-            const c = savedClients[name];
+            const c = normalizeClientRecord(savedClients[name], name);
             if (!c) return;
             document.getElementById('newClientName').value    = c.name    || name;
             document.getElementById('newClientPhone').value   = c.phone   || '';
             document.getElementById('newClientEmail').value   = c.email   || '';
             document.getElementById('newClientAddress').value = c.address || '';
+            writeClientCrmForm(c.crm || {});
             // Scroll to top of modal body and highlight the form
             const modalBody = document.querySelector('#manageClientsModal .modal-body');
             if (modalBody) modalBody.scrollTop = 0;
@@ -191,7 +285,7 @@
             const email   = document.getElementById('newClientEmail').value.trim();
             const address = document.getElementById('newClientAddress').value.trim();
             if (!name) { alert('Please enter a client name.'); return; }
-            savedClients[name] = { name, phone, email, address };
+            savedClients[name] = normalizeClientRecord({ name, phone, email, address, crm: readClientCrmForm() }, name);
             persistClients();
             clearClientForm();
             renderClientsList();
@@ -207,17 +301,23 @@
         function renderClientsList() {
             const filter = (document.getElementById('clientSearchFilter')?.value || '').toLowerCase();
             const all = getAllClients();
-            const filtered = Object.values(all).filter(c => c.name.toLowerCase().includes(filter)).sort((a,b) => a.name.localeCompare(b.name));
+            const filtered = Object.values(all).filter(c => getClientSearchText(c).includes(filter)).sort((a,b) => a.name.localeCompare(b.name));
             const container = document.getElementById('clientsList');
             if (!filtered.length) { container.innerHTML = '<p class="text-muted text-center py-3">No clients found.</p>'; return; }
             let html = '<table class="table table-sm table-hover"><thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Address</th><th></th></tr></thead><tbody>';
             filtered.forEach(c => {
-                const escapedName = c.name.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+                const crm = c.crm || {};
+                const crmBadges = [crm.tags, crm.followUpDate ? 'Follow up: ' + crm.followUpDate : '', crm.notes ? 'Notes' : '']
+                    .filter(Boolean)
+                    .slice(0, 3)
+                    .map(label => '<span class="badge text-bg-light border me-1">' + escapeHtml(label) + '</span>')
+                    .join('');
+                const escapedName = escapeHtml(c.name);
                 html += `<tr>
-                    <td><strong>${c.name.replace(/&/g,'&amp;')}</strong></td>
-                    <td>${c.phone || '<span class="text-muted">-</span>'}</td>
-                    <td>${c.email || '<span class="text-muted">-</span>'}</td>
-                    <td>${c.address || '<span class="text-muted">-</span>'}</td>
+                    <td><strong>${escapeHtml(c.name)}</strong>${crmBadges ? '<div class="mt-1">' + crmBadges + '</div>' : ''}</td>
+                    <td>${c.phone ? escapeHtml(c.phone) : '<span class="text-muted">-</span>'}</td>
+                    <td>${c.email ? escapeHtml(c.email) : '<span class="text-muted">-</span>'}</td>
+                    <td>${c.address ? escapeHtml(c.address) : '<span class="text-muted">-</span>'}</td>
                     <td>
                         <div class="d-flex gap-1">
                             <button class="btn btn-sm btn-outline-primary client-edit-btn" data-name="${escapedName}" title="Edit"><i class="fas fa-edit"></i></button>
@@ -249,6 +349,7 @@
         window.loadSavedClients = loadSavedClients;
         window.persistClients = persistClients;
         window.getAllClients = getAllClients;
+        window.normalizeClientRecord = normalizeClientRecord;
         window.fillClientInfo = fillClientInfo;
         window.saveCurrentClient = saveCurrentClient;
         window.openManageClientsModal = openManageClientsModal;

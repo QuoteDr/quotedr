@@ -48,6 +48,7 @@ create table if not exists clients (
     phone text default '',
     email text default '',
     notes text default '',
+    crm jsonb not null default '{}'::jsonb,
     created_at timestamptz default now(),
     updated_at timestamptz default now(),
     unique(user_id, name)

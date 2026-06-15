@@ -1260,8 +1260,8 @@ function openDrywallCalc() {
     document.getElementById('drywallWindows').value = '0';
     document.getElementById('drywallIncludeCeiling').checked = true;
     document.getElementById('drywallWaste').value = '10';
+    document.getElementById('drywallSheetSize').value = '32';
     document.getElementById('drywallResults').classList.add('d-none');
-    document.getElementById('drywallAddToQuoteBtn').disabled = true;
     document.getElementById('drywallScanResults').classList.add('d-none');
     document.getElementById('drywallToggleDimensions').checked = false;
     toggleDrywallDimensions();
@@ -1297,43 +1297,31 @@ function calculateDrywall() {
     var includeCeiling = document.getElementById('drywallIncludeCeiling').checked;
     var waste = parseFloat(document.getElementById('drywallWaste').value) || 10;
     var finishLevel = document.getElementById('drywallFinishLevel') ? document.getElementById('drywallFinishLevel').value : 'standard';
+    var sheetSelect = document.getElementById('drywallSheetSize');
+    var sheetSqft = parseFloat(document.getElementById('drywallSheetSize').value) || 32;
+    var sheetLabel = sheetSelect && sheetSelect.options[sheetSelect.selectedIndex] ? sheetSelect.options[sheetSelect.selectedIndex].text.replace(' sheets', '') : '4x8';
     var roomName = document.getElementById('drywallRoomName').value || 'Room';
     var totalSqft = wallSqft + (includeCeiling ? ceilingSqft : 0);
     if (totalSqft <= 0) { qdAlert('Please enter valid dimensions or square footage.'); return; }
     var totalWithWaste = totalSqft * (1 + waste / 100);
-    var sheets = Math.ceil(totalWithWaste / 32);
+    var sheets = Math.ceil(totalWithWaste / sheetSqft);
     // Standard 3-coat: 4.5 gal bucket covers ~950 sqft total
     // Level 5 finish: 0.05 gal/sqft = 4.5 gal covers ~90 sqft
     var mudBuckets = finishLevel === 'level5' ? Math.ceil(totalWithWaste * 0.05 / 4.5) : Math.ceil(totalWithWaste / 950);
-    var tapeRolls = Math.ceil(totalWithWaste / 500);
-    var cornerBead = (doors * 2) + (windows * 4) + 2;
-    var screwBoxes = Math.ceil(totalWithWaste / 200);
+    var tapeLinearFeet = Math.ceil(totalWithWaste * 0.4);
+    var tapeRolls = Math.ceil(tapeLinearFeet / 500);
+    var drywallScrews = Math.ceil(totalWithWaste * 1.25);
     var txt = '<table class="table table-sm table-bordered mb-0">';
     txt += '<tr><th colspan="2">Drywall Materials &mdash; ' + roomName + ' (' + (finishLevel === 'level5' ? 'Level 5 finish' : 'Standard 3-coat') + ')</th></tr>';
     txt += '<tr><td>Total ' + calcAreaUnit() + ' (with ' + waste + '% waste)</td><td><strong>' + totalWithWaste.toFixed(1) + ' ' + calcAreaUnit() + '</strong> <small class="text-muted">(' + totalSqft.toFixed(1) + ' base)</small></td></tr>';
-    txt += '<tr><td>Sheets of 4&times;8 drywall</td><td><strong>' + sheets + ' sheets</strong></td></tr>';
-    txt += '<tr><td>Joint compound (4.5 gal buckets)</td><td><strong>' + mudBuckets + ' buckets</strong></td></tr>';
-    txt += '<tr><td>Paper tape rolls (500ft)</td><td><strong>' + tapeRolls + ' rolls</strong></td></tr>';
-    txt += '<tr><td>Corner bead pieces (8ft)</td><td><strong>' + cornerBead + ' pieces</strong></td></tr>';
-    txt += '<tr><td>Drywall screws (1lb boxes)</td><td><strong>' + screwBoxes + ' boxes</strong></td></tr>';
+    txt += '<tr><td>Sheets of ' + sheetLabel + ' drywall</td><td><strong>' + sheets + ' sheets</strong></td></tr>';
+    txt += '<tr><td>Joint compound (4.5 gal buckets/17L boxes)</td><td><strong>' + mudBuckets + ' buckets</strong></td></tr>';
+    txt += '<tr><td>Paper tape (400 linear ft per 1,000 sqft)</td><td><strong>' + tapeLinearFeet.toLocaleString() + ' linear ft</strong> <small class="text-muted">(' + tapeRolls + ' ' + (tapeRolls === 1 ? 'roll' : 'rolls') + ' @ 500ft)</small></td></tr>';
+    txt += '<tr><td>Drywall screws</td><td><strong>' + drywallScrews.toLocaleString() + ' screws</strong></td></tr>';
     txt += '</table>';
     document.getElementById('drywallResultText').innerHTML = txt;
     document.getElementById('drywallResults').classList.remove('d-none');
-    document.getElementById('drywallAddToQuoteBtn').disabled = false;
     document.getElementById('drywallCalcModal').dataset.calcSqft = totalSqft.toFixed(1);
-}
-
-function addToDrywallQuote() {
-    var roomName = document.getElementById('drywallRoomName').value || 'Room';
-    var totalSqft = parseFloat(document.getElementById('drywallCalcModal').dataset.calcSqft) || 0;
-    if (totalSqft <= 0) { qdAlert('Please calculate before adding to quote.'); return; }
-    var room = rooms[0];
-    if (!room) { qdAlert('Please create a room in the quote first.'); return; }
-    room.items.push({ description: 'Drywall Hang \u2014 ' + roomName, category: 'Drywall', unitType: calcAreaUnit(), quantity: totalSqft, rate: 0, total: 0, notes: 'Auto-calculated', itemDescription: '' });
-    room.items.push({ description: 'Drywall Mud & Tape \u2014 ' + roomName, category: 'Drywall', unitType: calcAreaUnit(), quantity: totalSqft, rate: 0, total: 0, notes: 'Auto-calculated', itemDescription: '' });
-    renderQuote();
-    bootstrap.Modal.getInstance(document.getElementById('drywallCalcModal')).hide();
-    qdAlert('Drywall items added to quote!');
 }
 
 function scanDrywallQuote() {
