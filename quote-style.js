@@ -20,6 +20,7 @@
             showUpgrades: true,
             showScopeNotes: true,
             showCommitment: true,
+            skipSettingsOnGenerate: false,
             commitment: {
                 title: 'OUR COMMITMENT TO YOU',
                 items: [
@@ -71,6 +72,21 @@
                 console.warn('Quote send defaults cloud load failed:', e);
             }
             return savedDefault;
+        }
+
+        async function saveQuoteStyleSkipPreference(skip) {
+            var savedDefault = await loadQuoteStyleDefaults();
+            var nextDefault = Object.assign({}, savedDefault, { skipSettingsOnGenerate: !!skip });
+            try {
+                localStorage.setItem('ald_quote_send_style', JSON.stringify(nextDefault));
+                await saveQuoteStyleDefaultsToCloud(nextDefault);
+                _quoteStyle.skipSettingsOnGenerate = !!skip;
+                syncQuoteStyleGlobal();
+                return true;
+            } catch(e) {
+                console.warn('Quote send skip preference save failed:', e);
+                return false;
+            }
         }
 
         var COMMITMENT_ICON_LIBRARY = [
@@ -213,6 +229,7 @@
             style.showUpgrades = document.getElementById('quoteShowUpgrades')?.checked !== false;
             style.showScopeNotes = document.getElementById('quoteShowScopeNotes')?.checked !== false;
             style.showCommitment = document.getElementById('quoteShowCommitment')?.checked !== false;
+            style.skipSettingsOnGenerate = document.getElementById('quoteSkipSettingsOnGenerate')?.checked === true;
             var commitmentItems = defaultCommitmentItemsForModal().map(function(item, i) {
                 var n = i + 1;
                 return {
@@ -249,6 +266,7 @@
             setFieldValue('quoteShowUpgrades', _quoteStyle.showUpgrades);
             setFieldValue('quoteShowScopeNotes', _quoteStyle.showScopeNotes);
             setFieldValue('quoteShowCommitment', _quoteStyle.showCommitment !== false);
+            setFieldValue('quoteSkipSettingsOnGenerate', _quoteStyle.skipSettingsOnGenerate === true);
             var commitment = _quoteStyle.commitment || {};
             var items = Array.isArray(commitment.items) && commitment.items.length ? commitment.items : defaultCommitmentItemsForModal();
             setFieldValue('commitmentTitleInput', commitment.title || 'OUR COMMITMENT TO YOU');
@@ -541,7 +559,7 @@
                     applyQuoteStyleToControls(_quoteStyle);
                 };
             });
-            ['quoteHeaderStyle','quoteHeaderOpacity','quoteBgOpacity','quoteFontFeel','quotePricingMode','quoteDepositMode','quoteDepositPercent','quoteApprovalMode','quoteExpiryDate','quoteShowUpgrades','quoteShowScopeNotes','quoteShowCommitment','commitmentTitleInput','commitmentIcon1','commitmentImage1','commitmentLabel1','commitmentText1','commitmentIcon2','commitmentImage2','commitmentLabel2','commitmentText2','commitmentIcon3','commitmentImage3','commitmentLabel3','commitmentText3','commitmentIcon4','commitmentImage4','commitmentLabel4','commitmentText4','quoteClientMessage'].forEach(function(id) {
+            ['quoteHeaderStyle','quoteHeaderOpacity','quoteBgOpacity','quoteFontFeel','quotePricingMode','quoteDepositMode','quoteDepositPercent','quoteApprovalMode','quoteExpiryDate','quoteShowUpgrades','quoteShowScopeNotes','quoteShowCommitment','quoteSkipSettingsOnGenerate','commitmentTitleInput','commitmentIcon1','commitmentImage1','commitmentLabel1','commitmentText1','commitmentIcon2','commitmentImage2','commitmentLabel2','commitmentText2','commitmentIcon3','commitmentImage3','commitmentLabel3','commitmentText3','commitmentIcon4','commitmentImage4','commitmentLabel4','commitmentText4','quoteClientMessage'].forEach(function(id) {
                 var el = document.getElementById(id);
                 if (el && !el.dataset.styleBound) {
                     el.addEventListener('input', updateStylePreview);
@@ -551,12 +569,18 @@
             });
         }
 
-        function generateInteractiveLink() {
+        async function generateInteractiveLink() {
             if (rooms.length === 0) {
                 alert('Please add at least one room before generating an interactive quote.');
                 return;
             }
             markQuoteNumberUsed(document.getElementById('quoteNumber')?.value);
+            await initStyleModal();
+            if (_quoteStyle.skipSettingsOnGenerate) {
+                window._quoteStyleSettingsOnly = false;
+                await confirmGenerateQuote();
+                return;
+            }
             openQuoteSendSettingsModal(false);
         }
 
@@ -612,6 +636,8 @@
                 if (styleModal) styleModal.hide();
                 return;
             }
+            var skipSettingsOnGenerate = document.getElementById('quoteSkipSettingsOnGenerate')?.checked === true;
+            await saveQuoteStyleSkipPreference(skipSettingsOnGenerate);
             if (styleModal) styleModal.hide();
 
             // Show saving indicator
@@ -741,7 +767,7 @@
             if (typeof createSecureClientShareLink !== 'function') {
                 throw new Error('Secure client links are not available. Please refresh and try again.');
             }
-            const share = await createSecureClientShareLink(supabaseId, _base + 'interactive-quote-viewer', { mode: 'document' });
+            const share = await createSecureClientShareLink(supabaseId, _base + 'interactive-quote-viewer.html', { mode: 'document' });
             if (!share || !share.url || share.url.indexOf('token=') < 0) {
                 throw new Error('Could not create the secure client link.');
             }
