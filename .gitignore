@@ -2,4 +2,17 @@
 venv/
 __pycache__/
 *.aldquote
+android-app/node_modules/
+android-app/www/
+android-app/public/
+android-app/android/.gradle/
+android-app/android/app/build/
+android-app/android/build/
+android-app/android/keystore.properties
+android-app/android/*.jks
 mobile-companion/node_modules/
+mobile-companion/android/.gradle/
+mobile-companion/android/app/build/
+mobile-companion/android/build/
+mobile-companion/android/keystore.properties
+mobile-companion/android/*.jks

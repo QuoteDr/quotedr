@@ -208,6 +208,30 @@
             font-weight: 700;
             padding: 2px 0 0;
         }
+        .invoice-line-items {
+            table-layout: fixed;
+            width: 100%;
+        }
+        .invoice-line-items th,
+        .invoice-line-items td {
+            overflow-wrap: anywhere;
+        }
+        .invoice-line-items .invoice-qty-cell {
+            text-align: center;
+            vertical-align: top;
+            padding-top: 10px;
+        }
+        .invoice-line-items .invoice-rate-cell,
+        .invoice-line-items .invoice-amount-cell {
+            text-align: right;
+            vertical-align: top;
+            padding-top: 10px;
+            white-space: nowrap;
+            font-variant-numeric: tabular-nums;
+        }
+        .invoice-line-items .invoice-amount-cell {
+            font-weight: 600;
+        }
         .item-upgraded-badge {
             display: inline-block;
             background: #fff3cd;
@@ -258,6 +282,123 @@
             }
             .invoice-action-bar .btn {
                 width: 100%;
+            }
+        }
+        @media (max-width: 575.98px) {
+            .container.py-4 {
+                padding-top: calc(env(safe-area-inset-top, 0px) + 1rem) !important;
+                padding-left: 0.75rem;
+                padding-right: 0.75rem;
+            }
+            .invoice-action-bar {
+                margin-top: 0.25rem;
+            }
+            .invoice-header {
+                margin-bottom: 1.25rem;
+                padding-bottom: 0.85rem;
+            }
+            .invoice-header .row {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr);
+                gap: 0.8rem;
+            }
+            .invoice-header .col-8,
+            .invoice-header .col-4 {
+                width: 100%;
+                max-width: none;
+                flex: none;
+            }
+            .invoice-header .col-4 {
+                text-align: left !important;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 0.7rem;
+            }
+            .invoice-header .d-flex {
+                align-items: flex-start !important;
+                flex-wrap: wrap;
+                gap: 0.8rem !important;
+            }
+            #businessLogoImg {
+                height: 78px !important;
+                max-width: 140px !important;
+            }
+            .invoice-business-copy {
+                flex: 1 1 150px;
+                min-width: 0;
+            }
+            #companyNameDisplay {
+                font-size: 1.45rem;
+                line-height: 1.08;
+            }
+            #companyTaglineDisplay {
+                font-size: 0.95rem;
+            }
+            .invoice-business-info-grid {
+                flex: 1 0 100%;
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                column-gap: 0.75rem;
+                row-gap: 0.15rem;
+                line-height: 1.35 !important;
+            }
+            .invoice-business-info-grid > div {
+                min-width: 0;
+                overflow-wrap: anywhere;
+            }
+            .invoice-badge {
+                margin-bottom: 0 !important;
+                white-space: nowrap;
+            }
+            #invoiceNumberDisplay,
+            #invoiceDateDisplay {
+                text-align: right;
+            }
+            .invoice-line-items {
+                font-size: 0.9rem;
+            }
+            .invoice-line-items th,
+            .invoice-line-items td {
+                padding-left: 0.35rem;
+                padding-right: 0.35rem;
+            }
+            .invoice-line-items th:nth-child(1) { width: 42% !important; }
+            .invoice-line-items th:nth-child(2) { width: 17% !important; }
+            .invoice-line-items th:nth-child(3) { width: 17% !important; }
+            .invoice-line-items th:nth-child(4) { width: 24% !important; }
+            .invoice-line-items .item-name {
+                font-size: 0.95rem;
+                line-height: 1.18;
+            }
+            .invoice-line-items .item-desc {
+                font-size: 0.82rem;
+                line-height: 1.35;
+            }
+            .invoice-line-items .invoice-qty-cell {
+                overflow-wrap: break-word;
+            }
+            .invoice-line-items .invoice-rate-cell {
+                font-size: 0.82rem;
+            }
+            .invoice-line-items .invoice-amount-cell {
+                font-size: 0.84rem;
+            }
+            .totals-section {
+                padding: 1.1rem;
+            }
+        }
+        @media (max-width: 380px) {
+            .invoice-line-items th:nth-child(1) { width: 39% !important; }
+            .invoice-line-items th:nth-child(2) { width: 16% !important; }
+            .invoice-line-items th:nth-child(3) { width: 17% !important; }
+            .invoice-line-items th:nth-child(4) { width: 28% !important; }
+            .invoice-line-items .invoice-rate-cell,
+            .invoice-line-items .invoice-amount-cell {
+                font-size: 0.78rem;
+            }
+            .invoice-business-info-grid {
+                grid-template-columns: 1fr;
             }
         }
 
@@ -380,7 +521,7 @@ if (location.search.includes('debug')) {
 
         <!-- Invoice actions -->
         <div class="mb-3 d-print-none invoice-action-bar">
-            <button onclick="window.print()" class="btn btn-outline-secondary btn-sm invoice-action-center">
+            <button onclick="printInvoice()" class="btn btn-outline-secondary btn-sm invoice-action-center">
                 <i class="fas fa-print me-1"></i> Print / Save as PDF
             </button>
             <button id="qbPushBtn" onclick="pushInvoiceToQB()" class="btn btn-outline-primary btn-sm invoice-action-right" style="display:none;">
@@ -397,7 +538,7 @@ if (location.search.includes('debug')) {
                         <div class="invoice-business-details">
                             <h3 id="companyNameDisplay" class="mb-0" style="color:#2c3e50;"></h3>
                             <p id="companyTaglineDisplay" class="text-muted mb-0">Professional Services</p>
-                            <div class="mt-2" id="businessInfoDisplay" style="font-size:0.8rem; color:#555; line-height:1.7;"></div>
+                            <div class="mt-2 invoice-business-info-grid" id="businessInfoDisplay" style="font-size:0.8rem; color:#555; line-height:1.7;"></div>
                         </div>
                     </div>
                 </div>
@@ -721,6 +862,18 @@ if (location.search.includes('debug')) {
             if (!wrap) return;
             var collapsed = wrap.classList.toggle('is-collapsed');
             btn.textContent = collapsed ? 'Show more' : 'Show less';
+        }
+
+        function printInvoice() {
+            try {
+                if (window.QuoteDrAndroid && typeof window.QuoteDrAndroid.printCurrentPage === 'function') {
+                    window.QuoteDrAndroid.printCurrentPage();
+                    return;
+                }
+            } catch(e) {
+                console.warn('Native Android print bridge failed, falling back to browser print.', e);
+            }
+            window.print();
         }
 
         function invoiceRoomAnchorId(roomIndex) {
@@ -1152,7 +1305,7 @@ if (location.search.includes('debug')) {
                         <strong><i class="${roomIconClass}"></i> ${escapeHtml(room.name || ('Room ' + (roomIndex + 1)))}</strong>
                     </div>
                     <div class="card-body p-0">
-                        <table class="table table-sm mb-0" style="table-layout:fixed;">
+                        <table class="table table-sm mb-0 invoice-line-items">
                             <thead class="table-light">
                                 <tr>
                                     <th style="width:45%">Description</th>
@@ -1202,9 +1355,9 @@ if (location.search.includes('debug')) {
                                     ${choiceGroupSelection ? '<span class="item-upgraded-badge" style="background:#0d6efd;">Selected Option: ' + escapeHtml(choiceGroupSelection.groupName || 'Choice Group') + '</span>' : ''}
                                     ${descHtml}
                                 </td>
-                                <td style="text-align:center; vertical-align:top; padding-top:10px;">${typeof qdFormatQuantity === 'function' ? qdFormatQuantity(item.quantity || 0, item.unitType || item.unit || '') : ((item.quantity || 0) + ' ' + (item.unitType || ''))}</td>
-                                <td style="text-align:right; vertical-align:top; padding-top:10px;">${formatMoney(activeRate, _iCurrency)}</td>
-                                <td style="text-align:right; vertical-align:top; padding-top:10px; font-weight:600;">${formatMoney(itemTotal, _iCurrency)}</td>
+                                <td class="invoice-qty-cell">${typeof qdFormatQuantity === 'function' ? qdFormatQuantity(item.quantity || 0, item.unitType || item.unit || '') : ((item.quantity || 0) + ' ' + (item.unitType || ''))}</td>
+                                <td class="invoice-rate-cell">${formatMoney(activeRate, _iCurrency)}</td>
+                                <td class="invoice-amount-cell">${formatMoney(itemTotal, _iCurrency)}</td>
                             </tr>`;
                     }); // end catItems
                 }); // end catGroups
@@ -1214,7 +1367,7 @@ if (location.search.includes('debug')) {
                             ${settings.showRoomTotals !== false ? `<tfoot>
                                 <tr class="table-light">
                                     <td colspan="3" class="text-end fw-bold">Room Total:</td>
-                                    <td class="text-end fw-bold text-success">${formatMoney(roomTotal, _iCurrency)}</td>
+                                    <td class="text-end fw-bold text-success invoice-amount-cell">${formatMoney(roomTotal, _iCurrency)}</td>
                                 </tr>
                             </tfoot>` : ''}
                         </table>

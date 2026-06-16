@@ -16,6 +16,103 @@
     <link rel="stylesheet" href="brand-theme.css?v=1777661601">
     <style>
         body { background-color: #eef4fb; }
+        .quote-actions-dropdown .quote-actions-menu {
+            width: max-content !important;
+            min-width: 100%;
+            max-width: calc(100vw - 1.5rem);
+            white-space: normal;
+        }
+        .quote-actions-dropdown .quote-actions-menu .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            line-height: 1.25;
+        }
+        .quote-actions-dropdown .quote-actions-menu .dropdown-item i {
+            flex: 0 0 1.35rem;
+            margin-right: 0 !important;
+            text-align: center;
+        }
+        .quote-actions-dropdown .quote-actions-menu .dropdown-item span {
+            min-width: 0;
+        }
+        .quote-identity-grid {
+            display: grid;
+            grid-template-columns: minmax(220px, 280px) minmax(260px, 1fr) auto;
+            gap: 0.85rem;
+            align-items: end;
+        }
+        .quote-number-block,
+        .quote-title-block,
+        .quote-status-block {
+            min-width: 0;
+        }
+        .quote-number-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.65rem;
+            margin-bottom: 0.35rem;
+        }
+        .quote-number-heading label,
+        .quote-title-block label,
+        .quote-status-block label {
+            margin-bottom: 0;
+        }
+        .quote-number-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            flex: 0 0 auto;
+        }
+        .quote-number-actions .btn {
+            white-space: nowrap;
+        }
+        .quote-number-actions .btn .action-text {
+            margin-left: 0.25rem;
+        }
+        #quoteNumber.quote-number-input {
+            max-width: 100% !important;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+        #quoteTitle.quote-title-input {
+            min-width: 0 !important;
+            max-width: none !important;
+            font-weight: 600;
+        }
+        .quote-status-block .form-select {
+            min-width: 120px;
+        }
+        @media (max-width: 767.98px) {
+            .quote-identity-grid {
+                grid-template-columns: 1fr;
+                gap: 0.9rem;
+            }
+            .quote-number-heading {
+                align-items: center;
+            }
+            .quote-number-actions .btn {
+                padding-left: 0.55rem;
+                padding-right: 0.55rem;
+            }
+            .quote-status-block .form-select {
+                width: 100% !important;
+            }
+        }
+        @media (max-width: 390px) {
+            .quote-number-heading {
+                flex-wrap: wrap;
+            }
+            .quote-number-actions {
+                width: 100%;
+            }
+            .quote-number-actions .btn {
+                flex: 1 1 0;
+            }
+        }
         .room-header {
             background: linear-gradient(135deg, #2d2d2d 0%, #111111 100%);
             color: white;
@@ -551,6 +648,21 @@
         #stickyTotalBar .total-label { font-size: 0.85rem; opacity: 0.85; }
         #stickyTotalBar .total-amount { font-size: 1.6rem; font-weight: 800; }
         #stickyTotalBar .total-sub { font-size: 0.8rem; opacity: 0.8; }
+        #mobileActionBar {
+            bottom: calc(env(safe-area-inset-bottom, 0px) + 4px) !important;
+            transition: transform 0.18s ease, opacity 0.18s ease;
+            will-change: transform;
+        }
+        #mobileActionBar.mobile-action-bar-hidden {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(calc(100% + env(safe-area-inset-bottom, 0px) + 16px));
+        }
+        @media (max-width: 767.98px) {
+            body {
+                padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+            }
+        }
         .drag-handle {
             cursor: grab;
             font-size: 1.2rem;
@@ -1279,8 +1391,16 @@
             .card-header { flex-wrap: wrap; gap: 4px; }
             .builder-guide-body { grid-template-columns: 1fr; }
             .builder-guide-header { align-items: stretch; flex-direction: column; }
-            /* Hide autosave toggle label on mobile to save space (only target the toolbar toggle) */
-            #autoSaveToggle + .form-check-label { display: none !important; }
+            .autosave-toolbar-toggle {
+                display: flex;
+                align-items: center;
+                gap: 0.35rem;
+                flex: 0 0 auto;
+                margin-left: 0.25rem !important;
+                font-size: 0.72rem !important;
+                white-space: nowrap;
+            }
+            #autoSaveToggle + .form-check-label { display: inline-block !important; }
             /* Hide floating and bottom action bars when a modal is open on mobile */
             body.modal-open #stickyToolbar,
             body.modal-open #mobileActionBar { display: none !important; }
@@ -1469,11 +1589,11 @@ if (location.search.includes('debug')) {
                     </div>
 
                     <!-- Always visible: Quote actions + Send Invoice -->
-                    <div class="dropdown flex-grow-1">
+                    <div class="dropdown flex-grow-1 quote-actions-dropdown">
                         <button class="btn btn-primary btn-sm shadow-sm dropdown-toggle w-100" data-bs-toggle="dropdown" title="Quote actions">
                             <i class="fas fa-share-square me-1"></i>Quote Actions
                         </button>
-                        <ul class="dropdown-menu w-100">
+                        <ul class="dropdown-menu w-100 quote-actions-menu">
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openQuoteSendSettingsModal(true)"><i class="fas fa-sliders-h me-2 text-primary"></i>Quote Settings</a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="generateInteractiveLink()"><i class="fas fa-link me-2 text-success"></i><span id="quoteGenerateLinkLabel">Generate Quote Link</span></a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="createChangeOrderFromCurrentQuote()" id="createChangeOrderMenuItem" style="display:none;"><i class="fas fa-file-circle-plus me-2 text-warning"></i>Create Change Order</a></li>
@@ -1511,7 +1631,7 @@ if (location.search.includes('debug')) {
                 </div>
                 <div class="d-flex align-items-center gap-2 mt-1">
                     <div id="saveStatus" class="text-muted small" style="min-height: 1.2em;"></div>
-                    <div class="form-check form-switch mb-0 ms-2" style="font-size:0.78rem;" title="Auto-save writes your file instantly when you make changes. Turning this off is not recommended.">
+                    <div class="form-check form-switch mb-0 ms-2 autosave-toolbar-toggle" style="font-size:0.78rem;" title="Auto-save writes your file instantly when you make changes. Turning this off is not recommended.">
                         <input class="form-check-input" type="checkbox" id="autoSaveToggle" style="cursor:pointer;">
                         <label class="form-check-label text-muted" for="autoSaveToggle">Auto-save</label>
                     </div>
@@ -1628,27 +1748,38 @@ if (location.search.includes('debug')) {
                 <div class="row">
                     <!-- Quote Number -->
                     <div class="col-md-12 mb-3">
-                        <div class="d-flex align-items-center gap-3 flex-wrap">
-                            <label class="mb-0"><strong>Quote #:</strong><button type="button" class="qd-inline-help-btn" title="Help with quote numbers" aria-label="Help with quote numbers" onclick="QuoteDrModalHelp.openInline('quoteNumber'); return false;"><i class="fas fa-question"></i></button></label>
-                            <input type="text" id="quoteNumber" class="form-control" style="max-width: 200px; font-weight: bold; font-size: 1.1rem;" placeholder="2026-001" oninput="checkQuoteNumberDuplicate()">
-                            <label class="mb-0"><strong>File Name:</strong></label>
-                            <input type="text" id="quoteTitle" class="form-control flex-grow-1" style="min-width: 220px; max-width: 360px; font-weight: 600;" spellcheck="true" placeholder="e.g., Michelle Bathroom" oninput="markUnsaved()">
-                            <select id="quoteStatus" class="form-select form-select-sm d-inline-block" style="width:auto; font-size:0.8rem;" onchange="markUnsaved(); updateChangeOrderModeUI();">
-                                <option value="draft">Draft</option>
-                                <option value="sent">Sent</option>
-                                <option value="accepted">Accepted</option>
-                                <option value="pending_approval">Pending CO Approval</option>
-                                <option value="approved">CO Approved</option>
-                                <option value="declined">Declined</option>
-                                <option value="invoiced">Invoiced</option>
-                            </select>
-                            <button onclick="randomizeQuoteNumber()" class="btn btn-sm btn-outline-secondary" title="Generate a random unused quote number">
-                                <i class="fas fa-random"></i> Randomize
-                            </button>
-                            <button onclick="nextQuoteNumber()" class="btn btn-sm btn-outline-primary" title="Use the next number in sequence after your highest sent quote">
-                                <i class="fas fa-sort-numeric-up"></i> Next
-                            </button>
-                            <span id="quoteNumWarning" style="display:none; color:#dc3545; font-size:0.85rem;"><i class="fas fa-exclamation-triangle"></i> Already used!</span>
+                        <div class="quote-identity-grid">
+                            <div class="quote-number-block">
+                                <div class="quote-number-heading">
+                                    <label><strong>Quote #:</strong><button type="button" class="qd-inline-help-btn" title="Help with quote numbers" aria-label="Help with quote numbers" onclick="QuoteDrModalHelp.openInline('quoteNumber'); return false;"><i class="fas fa-question"></i></button></label>
+                                    <div class="quote-number-actions" aria-label="Quote number actions">
+                                        <button type="button" onclick="randomizeQuoteNumber()" class="btn btn-sm btn-outline-secondary" title="Generate a random unused quote number">
+                                            <i class="fas fa-random"></i><span class="action-text">Randomize</span>
+                                        </button>
+                                        <button type="button" onclick="nextQuoteNumber()" class="btn btn-sm btn-outline-primary" title="Use the next number in sequence after your highest sent quote">
+                                            <i class="fas fa-sort-numeric-up"></i><span class="action-text">Next</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <input type="text" id="quoteNumber" class="form-control quote-number-input" placeholder="2026-001" oninput="checkQuoteNumberDuplicate()">
+                                <span id="quoteNumWarning" style="display:none; color:#dc3545; font-size:0.85rem;"><i class="fas fa-exclamation-triangle"></i> Already used!</span>
+                            </div>
+                            <div class="quote-title-block">
+                                <label><strong>File Name:</strong></label>
+                                <input type="text" id="quoteTitle" class="form-control quote-title-input" spellcheck="true" placeholder="e.g., Michelle Bathroom" oninput="markUnsaved()">
+                            </div>
+                            <div class="quote-status-block">
+                                <label class="text-muted small fw-semibold">Status</label>
+                                <select id="quoteStatus" class="form-select form-select-sm" style="font-size:0.8rem;" onchange="markUnsaved(); updateChangeOrderModeUI();">
+                                    <option value="draft">Draft</option>
+                                    <option value="sent">Sent</option>
+                                    <option value="accepted">Accepted</option>
+                                    <option value="pending_approval">Pending CO Approval</option>
+                                    <option value="approved">CO Approved</option>
+                                    <option value="declined">Declined</option>
+                                    <option value="invoiced">Invoiced</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
 
@@ -1702,7 +1833,7 @@ if (location.search.includes('debug')) {
                         <!-- Populated dynamically from ald_custom_terms -->
                     </div>
                     <div class="mt-2">
-                        <a href="settings.html" class="text-muted small" style="font-size:0.8rem;"><i class="fas fa-cog me-1"></i>Manage terms in Settings</a>
+                        <a href="settings.html?tab=quotes&section=terms" class="text-muted small" style="font-size:0.8rem;"><i class="fas fa-cog me-1"></i>Manage terms in Settings</a>
                     </div>
                 </div>
             </div>
@@ -7355,6 +7486,26 @@ Example:
         window.addEventListener('scroll', syncStickyTotalBarVisibility, { passive: true });
         window.addEventListener('resize', syncStickyTotalBarVisibility);
 
+        function syncMobileActionBarVisibility() {
+            const bar = document.getElementById('mobileActionBar');
+            if (!bar) return;
+            const isMobile = window.matchMedia && window.matchMedia('(max-width: 767.98px)').matches;
+            const modalOpen = !!document.querySelector('.modal.show');
+            const scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
+            const viewportBottom = scrollTop + window.innerHeight;
+            const pageHeight = Math.max(
+                document.body.scrollHeight,
+                document.documentElement.scrollHeight,
+                document.body.offsetHeight,
+                document.documentElement.offsetHeight
+            );
+            const nearBottom = pageHeight - viewportBottom < 96;
+            bar.classList.toggle('mobile-action-bar-hidden', isMobile && (nearBottom || modalOpen));
+        }
+        window.addEventListener('scroll', syncMobileActionBarVisibility, { passive: true });
+        window.addEventListener('resize', syncMobileActionBarVisibility);
+        document.addEventListener('DOMContentLoaded', syncMobileActionBarVisibility);
+
         // IKEA Quick Quote lives in ikea-quote.js.
 
         // Floor plan scanner moved to floor-plan-scanner.js
@@ -8940,7 +9091,9 @@ Example:
                 { id: 't11', label: 'Subcontractors', text: 'The contractor reserves the right to use qualified subcontractors for portions of the work. All subcontractors are vetted and held to the same quality standards.', defaultOn: false },
                 { id: 't12', label: 'Dispute Resolution', text: 'Any disputes arising from this agreement will first be addressed through good-faith negotiation. If unresolved, disputes will be submitted to mediation before any legal action is taken.', defaultOn: false }
             ];
-            var terms = JSON.parse(localStorage.getItem('ald_custom_terms') || 'null') || defaultTerms;
+            var savedTerms = null;
+            try { savedTerms = JSON.parse(localStorage.getItem('ald_custom_terms') || 'null'); } catch(e) { savedTerms = null; }
+            var terms = (Array.isArray(savedTerms) && savedTerms.length) ? savedTerms : defaultTerms;
             container.innerHTML = terms.map(function(t) {
                 return '<div class="form-check mb-1">' +
                     '<input class="form-check-input" type="checkbox" id="term_' + t.id + '" data-text="' + t.text.replace(/"/g, '&quot;') + '"' + (t.defaultOn ? ' checked' : '') + ' onchange="updateTermsCount()">' +
@@ -14198,12 +14351,12 @@ Example:
             <i class="fas fa-save d-block" style="font-size:1rem;"></i>
             <span style="font-size:0.55rem;">Save</span>
         </a>
-        <div class="dropup" style="flex:1; min-width:0;">
+        <div class="dropup quote-actions-dropdown" style="flex:1; min-width:0;">
             <button type="button" class="btn btn-primary btn-sm dropdown-toggle" data-bs-toggle="dropdown" style="width:100%; height:100%; flex-direction:column; display:flex; align-items:center; justify-content:center; padding:4px 2px; min-width:0;">
                 <i class="fas fa-share-square d-block" style="font-size:1rem;"></i>
                 <span style="font-size:0.55rem;">Quote</span>
             </button>
-            <ul class="dropdown-menu">
+            <ul class="dropdown-menu quote-actions-menu">
                 <li><a class="dropdown-item" href="javascript:void(0)" onclick="openQuoteSendSettingsModal(true)"><i class="fas fa-sliders-h me-2 text-primary"></i>Quote Settings</a></li>
                 <li><a class="dropdown-item" href="javascript:void(0)" onclick="generateInteractiveLink()"><i class="fas fa-link me-2 text-success"></i>Generate Link</a></li>
                 <li><a class="dropdown-item" href="javascript:void(0)" onclick="openCommunityTemplates()"><i class="fas fa-users me-2 text-success"></i>Community Templates</a></li>

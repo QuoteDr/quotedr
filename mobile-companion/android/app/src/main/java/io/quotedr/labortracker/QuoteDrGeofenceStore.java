@@ -59,4 +59,15 @@ public class QuoteDrGeofenceStore {
         }
         return null;
     }
+
+    public static Boolean insideState(Context context, String id) {
+        String key = "inside_" + id;
+        SharedPreferences p = prefs(context);
+        if (!p.contains(key)) return null;
+        return p.getBoolean(key, false);
+    }
+
+    public static void saveInsideState(Context context, String id, boolean inside) {
+        prefs(context).edit().putBoolean("inside_" + id, inside).apply();
+    }
 }

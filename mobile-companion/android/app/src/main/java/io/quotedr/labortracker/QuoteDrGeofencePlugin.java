@@ -133,27 +133,35 @@ public class QuoteDrGeofencePlugin extends Plugin {
                     .build());
             }
             QuoteDrGeofenceStore.saveSites(getContext(), storedSites);
-            geofencingClient.removeGeofences(getGeofencePendingIntent());
-            if (geofences.isEmpty()) {
-                JSObject ret = new JSObject();
-                ret.put("registered", 0);
-                call.resolve(ret);
-                return;
-            }
-            GeofencingRequest request = new GeofencingRequest.Builder()
-                .setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER)
-                .addGeofences(geofences)
-                .build();
-            geofencingClient.addGeofences(request, getGeofencePendingIntent())
-                .addOnSuccessListener(unused -> {
+            geofencingClient.removeGeofences(getGeofencePendingIntent()).addOnCompleteListener(removeTask -> {
+                if (geofences.isEmpty()) {
                     JSObject ret = new JSObject();
-                    ret.put("registered", geofences.size());
+                    ret.put("registered", 0);
+                    ret.put("message", "No Android geofences to register.");
                     call.resolve(ret);
-                })
-                .addOnFailureListener(e -> call.reject(e.getMessage()));
+                    return;
+                }
+                addRegisteredGeofences(call, geofences);
+            });
         } catch (Exception e) {
             call.reject(e.getMessage());
         }
+    }
+
+    private void addRegisteredGeofences(PluginCall call, List<Geofence> geofences) {
+        GeofencingRequest request = new GeofencingRequest.Builder()
+            .setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER)
+            .addGeofences(geofences)
+            .build();
+        geofencingClient.addGeofences(request, getGeofencePendingIntent())
+            .addOnSuccessListener(unused -> {
+                int registeredCount = geofences.size();
+                JSObject ret = new JSObject();
+                ret.put("registered", registeredCount);
+                ret.put("message", "Registered " + registeredCount + " Android geofence" + (registeredCount == 1 ? "." : "s."));
+                call.resolve(ret);
+            })
+            .addOnFailureListener(e -> call.reject(e.getMessage()));
     }
 
     @PluginMethod
@@ -161,6 +169,26 @@ public class QuoteDrGeofencePlugin extends Plugin {
         geofencingClient.removeGeofences(getGeofencePendingIntent())
             .addOnSuccessListener(unused -> call.resolve())
             .addOnFailureListener(e -> call.reject(e.getMessage()));
+    }
+
+    @PluginMethod
+    public void startForegroundTracking(PluginCall call) {
+        if (!hasFineLocation()) {
+            call.reject("Location permission is required before foreground tracking can start.");
+            return;
+        }
+        Intent intent = new Intent(getContext(), LaborTrackingService.class);
+        ContextCompat.startForegroundService(getContext(), intent);
+        JSObject ret = new JSObject();
+        ret.put("started", true);
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void stopForegroundTracking(PluginCall call) {
+        Intent intent = new Intent(getContext(), LaborTrackingService.class);
+        getContext().stopService(intent);
+        call.resolve();
     }
 
     private boolean hasFineLocation() {

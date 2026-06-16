@@ -1,0 +1,23 @@
+{
+  "name": "quotedr-android-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "QuoteDr Android app wrapper",
+  "scripts": {
+    "check": "node --check www/app.js",
+    "prepare:release": "node scripts/prepare-release-webdir.js",
+    "sync": "npx cap sync android",
+    "sync:release": "npm run prepare:release && npx cap sync android",
+    "build:aab": "npm run sync:release && cd android && gradlew.bat bundleRelease",
+    "open:android": "npx cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/app": "^7.0.0",
+    "@capacitor/browser": "^7.0.0",
+    "@capacitor/core": "^7.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.0.0"
+  }
+}

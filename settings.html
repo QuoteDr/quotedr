@@ -312,7 +312,7 @@ if (location.search.includes('debug')) {
 		</div>
 
 		<!-- Terms & Conditions -->
-		<div class="settings-card">
+		<div class="settings-card" id="quoteTermsSettings">
 			<h5><i class="fas fa-file-contract me-2" style="color:#1a56a0"></i>Terms & Conditions</h5>
 			<p class="text-muted small">Customize the default terms that appear on your quotes.</p>
 			<div class="mb-3">
@@ -1326,6 +1326,31 @@ Sarah Jones, 905-555-5678"></textarea>
 			localStorage.setItem('ald_settings_tab', name);
 		}
 
+		function getRequestedSettingsTab() {
+			var params = new URLSearchParams(window.location.search || '');
+			var tab = params.get('tab');
+			if (tab) return tab;
+			var hash = (window.location.hash || '').replace(/^#/, '');
+			if (hash.indexOf('tab-') === 0) return hash.replace(/^tab-/, '');
+			return '';
+		}
+
+		function openSettingsDeepLink() {
+			var params = new URLSearchParams(window.location.search || '');
+			var tab = getRequestedSettingsTab();
+			var section = params.get('section') || (window.location.hash || '').replace(/^#/, '');
+			if (tab) {
+				var tabEl = document.querySelector('#settingsTabs [onclick*="\'' + tab + '\'"]');
+				showTab(tab, tabEl);
+			}
+			if (section === 'terms') {
+				setTimeout(function() {
+					var termsCard = document.getElementById('quoteTermsSettings');
+					if (termsCard) termsCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+				}, 80);
+			}
+		}
+
 		// ── Settings Search ──────────────────────────────────────────────────
 		var settingsIndex = [
 			{ tab: 'business', keywords: ['business','company','name','logo','phone','email','address','hst','tagline','owner','city','province','postal'], label: 'Business Profile' },
@@ -1501,10 +1526,12 @@ Sarah Jones, 905-555-5678"></textarea>
 			// Restore last active tab, unless the URL asks for a specific settings area.
 			var hashTab = (window.location.hash || '').replace(/^#/, '');
 			var allowedHashTabs = ['business', 'quotes', 'pricing', 'notifications', 'payments', 'portal', 'integrations', 'analytics', 'account', 'feedback'];
-			var lastTab = allowedHashTabs.indexOf(hashTab) !== -1 ? hashTab : (localStorage.getItem('ald_settings_tab') || 'business');
+			var requestedTab = getRequestedSettingsTab();
+			var lastTab = requestedTab || (allowedHashTabs.indexOf(hashTab) !== -1 ? hashTab : (localStorage.getItem('ald_settings_tab') || 'business'));
 			if (lastTab === 'analytics' && !isAnalyticsAdminUser(window.currentUser)) lastTab = 'business';
 			var tabEl = document.querySelector('#settingsTabs [onclick*="\'' + lastTab + '\'"]');
 			showTab(lastTab, tabEl);
+			openSettingsDeepLink();
 			// Load notification settings
 			loadNotificationSettings();
 			// Load payment settings
@@ -1542,7 +1569,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			}
 
 			// Load terms
-			const savedTerms = JSON.parse(localStorage.getItem('ald_custom_terms') || '[]');
+			terms = getSavedQuoteTerms();
 			renderTermsEditor();
 
 			// Load custom items
@@ -1636,40 +1663,164 @@ Sarah Jones, 905-555-5678"></textarea>
 		];
 
 		// Terms editor
-		var terms = JSON.parse(localStorage.getItem('ald_custom_terms') || '[]');
+		const DEFAULT_QUOTE_TERMS = [
+			{ id: 't1', label: 'Deposit Required', text: 'A deposit of 30-50% of the total project cost is required before work begins. Work will not commence until the deposit is received.', defaultOn: true },
+			{ id: 't2', label: 'Timeline Estimate', text: 'All project timelines provided are estimates only and are subject to change due to unforeseen conditions, material delays, weather, or client-requested changes.', defaultOn: true },
+			{ id: 't3', label: 'Workmanship Warranty', text: 'All labor is warranted for 1 year from the date of project completion. This warranty covers defects in workmanship only and does not cover damage caused by client misuse, third parties, or normal wear and tear.', defaultOn: true },
+			{ id: 't4', label: 'Payment Terms', text: 'Final payment is due within 7 days of project completion. Overdue balances may be subject to a 2% monthly interest charge.', defaultOn: true },
+			{ id: 't5', label: 'Change Orders', text: 'Any changes to the agreed scope of work must be submitted in writing and approved by both parties. Change orders may affect the project timeline and total cost.', defaultOn: true },
+			{ id: 't6', label: 'Site Access', text: 'The client agrees to provide safe and reasonable access to the property during agreed working hours. Delays caused by lack of access may affect the project timeline.', defaultOn: true },
+			{ id: 't7', label: 'Material Costs', text: 'Material costs are estimated based on current pricing and may fluctuate. Any significant increase in material costs will be communicated to the client before proceeding.', defaultOn: false },
+			{ id: 't8', label: 'Permits & Inspections', text: 'The contractor will obtain all required permits unless otherwise agreed in writing. Permit fees are the responsibility of the client and will be billed at cost.', defaultOn: false },
+			{ id: 't9', label: 'Hidden Conditions', text: 'Unforeseen conditions discovered during work (e.g., rot, mold, faulty wiring, structural issues) are not included in the original quote. Additional costs will be discussed and approved before proceeding.', defaultOn: true },
+			{ id: 't10', label: 'Debris & Cleanup', text: 'The contractor will remove all project-related debris upon completion. The client is responsible for clearing personal items from the work area prior to project start.', defaultOn: false },
+			{ id: 't11', label: 'Subcontractors', text: 'The contractor reserves the right to use qualified subcontractors for portions of the work. All subcontractors are vetted and held to the same quality standards.', defaultOn: false },
+			{ id: 't12', label: 'Dispute Resolution', text: 'Any disputes arising from this agreement will first be addressed through good-faith negotiation. If unresolved, disputes will be submitted to mediation before any legal action is taken.', defaultOn: false }
+		];
+		function cloneDefaultQuoteTerms() {
+			return DEFAULT_QUOTE_TERMS.map(function(term) {
+				return Object.assign({}, term);
+			});
+		}
+		function getSavedQuoteTerms() {
+			try {
+				var saved = JSON.parse(localStorage.getItem('ald_custom_terms') || 'null');
+				if (Array.isArray(saved) && saved.length) return saved;
+			} catch(e) {}
+			return cloneDefaultQuoteTerms();
+		}
+		var terms = getSavedQuoteTerms();
 		function renderTermsEditor() {
 			var el = document.getElementById('termsList');
 			if (!el) return;
 			el.innerHTML = terms.map(function(t, i) {
-				return '<div class="card mb-2">' +
+				return '<div class="card mb-2 term-refine-scope"' + (t.isNew ? ' data-new-term="true"' : '') + ' data-term-index="' + i + '">' +
 					'<div class="card-body p-3">' +
-						'<div class="d-flex gap-2 align-items-center mb-2">' +
-							'<input type="text" class="form-control form-control-sm" value="' + t.label.replace(/"/g, '&quot;') + '" onchange="terms[' + i + '].label=this.value" placeholder="Term label" style="max-width:200px;">' +
+						'<div class="d-flex gap-2 align-items-center mb-2 flex-wrap">' +
+							'<input type="text" class="form-control form-control-sm" value="' + escapeHtml(t.label) + '" onchange="terms[' + i + '].label=this.value" placeholder="Term label" style="max-width:200px;">' +
 							'<div class="form-check mb-0">' +
 								'<input class="form-check-input" type="checkbox"' + (t.defaultOn ? ' checked' : '') + ' onchange="terms[' + i + '].defaultOn=this.checked">' +
 								'<label class="form-check-label small">Default on</label>' +
 							'</div>' +
+							'<button type="button" class="btn btn-sm btn-outline-secondary undo-refine-term-btn" onclick="toggleRefinedTerm(this)" title="Undo AI refined term" style="display:none;font-size:0.75rem;padding:2px 7px;"><i class="fas fa-undo"></i></button>' +
+							'<button type="button" class="btn btn-sm btn-outline-primary refine-term-btn" onclick="refineTermText(' + i + ', this)" style="font-size:0.75rem;padding:2px 8px;"><i class="fas fa-wand-magic-sparkles me-1"></i>AI Refine</button>' +
 							'<button class="btn btn-sm btn-outline-danger" onclick="terms.splice(' + i + ',1);renderTermsEditor();"><i class="fas fa-trash"></i></button>' +
 						'</div>' +
-						'<textarea class="form-control form-control-sm" rows="3" onchange="terms[' + i + '].text=this.value" placeholder="Enter the full term text here...">' + t.text.replace(/"/g, '&quot;') + '</textarea>' +
+						'<textarea class="form-control form-control-sm term-textarea" rows="3" oninput="terms[' + i + '].text=this.value" placeholder="Enter the full term text here...">' + escapeHtml(t.text) + '</textarea>' +
 					'</div>' +
 				'</div>';
 			}).join('');
 		}
 		function addTerm() {
-			terms.push({ id: 't' + Date.now(), label: 'New Term', text: '', defaultOn: false });
+			terms.forEach(function(term) { delete term.isNew; });
+			terms.unshift({ id: 't' + Date.now(), label: '', text: '', defaultOn: false, isNew: true });
 			renderTermsEditor();
+			focusNewTermEditor();
+		}
+
+		function focusNewTermEditor() {
+			setTimeout(function() {
+				var card = document.querySelector('#termsList [data-new-term="true"]');
+				if (!card) return;
+				card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+				var input = card.querySelector('input[type="text"]');
+				if (input) input.focus();
+			}, 60);
+		}
+
+		async function refineTermText(index, btnEl) {
+			var term = terms[index];
+			var scope = btnEl ? btnEl.closest('.term-refine-scope') : null;
+			var textarea = scope ? scope.querySelector('.term-textarea') : null;
+			if (!term || !textarea) return;
+			var currentText = textarea.value || '';
+			if (!currentText.trim()) { qdAlert('Please enter term text first.'); return; }
+			if (typeof requireProFeature === 'function') {
+				var allowed = await requireProFeature('ai_refine', 'AI Refine');
+				if (!allowed) return;
+			}
+			var originalHtml = btnEl.innerHTML;
+			btnEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+			btnEl.disabled = true;
+			try {
+				if (typeof getSupabaseFunctionAuthHeaders !== 'function') throw new Error('Please sign in again before using AI Refine.');
+				var prompt = [
+					'Improve this contractor terms and conditions clause so it is clear, professional, fair, client-friendly, and concise.',
+					'Keep the same legal/business meaning. Do not add new obligations, prices, dates, headings, signatures, or unrelated clauses.',
+					'Return only the improved clause text, with no heading and no quotes.',
+					'',
+					'Clause label: ' + (term.label || 'Term'),
+					'Clause text: ' + currentText
+				].join('\n');
+				var response = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/ai-assistant', {
+					method: 'POST',
+					headers: await getSupabaseFunctionAuthHeaders(),
+					body: JSON.stringify({ feature: 'ai_refine', messages: [{ role: 'user', content: prompt }] })
+				});
+				var data = await response.json();
+				if (!response.ok || data.error) throw new Error(data.error || 'AI refine failed');
+				var refinedText = String(data.reply || '').replace(/^["']|["']$/g, '').trim();
+				if (!refinedText) throw new Error('AI did not return revised text. Please try again.');
+				if (refinedText !== currentText) {
+					var undoBtn = scope ? scope.querySelector('.undo-refine-term-btn') : null;
+					if (undoBtn) {
+						undoBtn._previousTermText = currentText;
+						undoBtn._refinedTermText = refinedText;
+						undoBtn._showingRefined = true;
+						undoBtn.innerHTML = '<i class="fas fa-undo"></i>';
+						undoBtn.title = 'Undo AI refined term';
+						undoBtn.style.display = '';
+					}
+				}
+				textarea.value = refinedText;
+				terms[index].text = refinedText;
+				if (typeof completeProTrialFeature === 'function') completeProTrialFeature('ai_refine', 'AI Refine');
+				if (typeof qdMaybeShowProUpgradePrompt === 'function') {
+					qdMaybeShowProUpgradePrompt('ai_refine_success', {
+						featureKey: 'ai_refine',
+						featureLabel: 'AI Refine',
+						message: 'AI made this easier. Keep it with Pro access.'
+					});
+				}
+			} catch(e) {
+				console.error('AI term refine failed:', e);
+				qdAlert(e.message || 'AI refine failed. Please try again.');
+			} finally {
+				btnEl.innerHTML = originalHtml;
+				btnEl.disabled = false;
+			}
+		}
+
+		function toggleRefinedTerm(btnEl) {
+			if (!btnEl || typeof btnEl._previousTermText !== 'string' || typeof btnEl._refinedTermText !== 'string') return;
+			var scope = btnEl.closest('.term-refine-scope');
+			var textarea = scope ? scope.querySelector('.term-textarea') : null;
+			var index = scope ? parseInt(scope.dataset.termIndex, 10) : -1;
+			if (!textarea || !terms[index]) return;
+			if (btnEl._showingRefined) {
+				textarea.value = btnEl._previousTermText;
+				terms[index].text = btnEl._previousTermText;
+				btnEl._showingRefined = false;
+				btnEl.innerHTML = '<i class="fas fa-redo"></i>';
+				btnEl.title = 'Redo AI refined term';
+			} else {
+				textarea.value = btnEl._refinedTermText;
+				terms[index].text = btnEl._refinedTermText;
+				btnEl._showingRefined = true;
+				btnEl.innerHTML = '<i class="fas fa-undo"></i>';
+				btnEl.title = 'Undo AI refined term';
+			}
 		}
 
 		async function saveTerms() {
-			var btn = document.querySelector('.btn-save');
+			var btn = document.querySelector('#quoteTermsSettings .btn-save');
 			btn.disabled = true;
 			btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
 
 			localStorage.setItem('ald_custom_terms', JSON.stringify(terms));
 
 			try {
-				await saveTermsToCloud(terms);
+				if (typeof saveTermsToCloud === 'function') await saveTermsToCloud(terms);
 				var badge = document.getElementById('termsSaved');
 				badge.innerHTML = '<i class="fas fa-check-circle me-1"></i>Saved!';
 				badge.style.display = 'inline';

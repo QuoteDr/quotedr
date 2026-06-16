@@ -5,6 +5,7 @@ import android.location.Location;
 
 import org.json.JSONObject;
 
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -32,7 +33,10 @@ public class QuoteDrEventUploader {
         payload.put("device_id", deviceId.isEmpty() ? JSONObject.NULL : deviceId);
         payload.put("device_key", config.optString("deviceKey", ""));
         payload.put("job_site_id", jobSiteId);
-        if (site != null && !site.optString("quote_id", "").isEmpty()) payload.put("quote_id", site.optString("quote_id"));
+        if (site != null && !site.isNull("quote_id")) {
+            String quoteId = site.optString("quote_id", "");
+            if (!quoteId.isEmpty() && !"null".equalsIgnoreCase(quoteId)) payload.put("quote_id", quoteId);
+        }
         payload.put("event_type", eventType);
         payload.put("transition_source", "android_geofence");
         payload.put("occurred_at", isoNow());
@@ -57,12 +61,26 @@ public class QuoteDrEventUploader {
             os.write(body);
         }
         int code = conn.getResponseCode();
-        if (code < 200 || code >= 300) throw new IllegalStateException("Supabase event insert failed: HTTP " + code);
+        if (code < 200 || code >= 300) {
+            throw new IllegalStateException("Supabase event insert failed: HTTP " + code + " " + readResponseBody(conn));
+        }
     }
 
     private static String isoNow() {
         SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US);
         fmt.setTimeZone(TimeZone.getTimeZone("UTC"));
         return fmt.format(new Date());
+    }
+
+    private static String readResponseBody(HttpURLConnection conn) {
+        try {
+            InputStream stream = conn.getErrorStream();
+            if (stream == null) stream = conn.getInputStream();
+            if (stream == null) return "";
+            byte[] bytes = stream.readAllBytes();
+            return new String(bytes, StandardCharsets.UTF_8);
+        } catch (Exception ignored) {
+            return "";
+        }
     }
 }

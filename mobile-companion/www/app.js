@@ -184,6 +184,7 @@ async function syncSites(showMessage) {
   currentSites = data || [];
   renderSites();
   const plugin = NativeGeofence();
+  let registrationResult = null;
   if (plugin) {
     await plugin.configure({
       supabaseUrl: SUPABASE_URL,
@@ -193,10 +194,13 @@ async function syncSites(showMessage) {
       deviceId: currentDevice?.id || null,
       deviceKey: getDeviceKey()
     });
-    await plugin.registerGeofences({ sites: currentSites });
+    registrationResult = await plugin.registerGeofences({ sites: currentSites });
   }
   await markDeviceSynced(true, null);
-  if (showMessage) setMessage('trackingMessage', `Synced ${currentSites.length} pinned job site${currentSites.length === 1 ? '' : 's'}.`);
+  if (showMessage) {
+    setMessage('trackingMessage', registrationResult?.message || `Synced ${currentSites.length} pinned job site${currentSites.length === 1 ? '' : 's'}.`);
+  }
+  return registrationResult;
 }
 
 async function markDeviceSynced(enabled, errorMessage) {
@@ -226,9 +230,10 @@ async function enableBackgroundTracking() {
   try {
     setMessage('trackingMessage', 'Requesting location permission...');
     await plugin.requestTrackingPermissions();
-    await syncSites(false);
+    const registrationResult = await syncSites(false);
+    await plugin.startForegroundTracking();
     await markDeviceSynced(true, null);
-    setMessage('trackingMessage', 'Background tracking is enabled. Android will send events when geofences trigger.');
+    setMessage('trackingMessage', `${registrationResult?.message || 'Android geofences synced.'} Live watcher is running.`);
   } catch (error) {
     await markDeviceSynced(false, error.message || String(error));
     setMessage('trackingMessage', error.message || String(error));
