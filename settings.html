@@ -51,6 +51,309 @@
 			color: #198754;
 			font-size: 0.9rem;
 		}
+		.portal-layout-preview #portalPreviewMiniHeader {
+			display: flex;
+			justify-content: space-between;
+			align-items: flex-start;
+			gap: 0.5rem;
+			margin-bottom: 0.85rem;
+		}
+		.portal-preview-stat {
+			background: white;
+			border-radius: 8px;
+			padding: 9px;
+			text-align: center;
+			box-shadow: 0 4px 10px rgba(15,52,96,0.08);
+		}
+		#portalPreviewAttention {
+			border: 1px solid rgba(232,126,42,0.25);
+			border-left: 4px solid #f27a1a;
+			border-radius: 8px;
+			padding: 10px 12px;
+			background: linear-gradient(135deg, #fff8f0, #fff);
+			color: #1a2940;
+		}
+		.portal-preview-quote-viewer #portalPreviewMiniHeader {
+			padding: 12px;
+			border-radius: 8px;
+			background: #fff;
+			box-shadow: 0 5px 16px rgba(15,52,96,0.08);
+		}
+		.portal-preview-quote-viewer #portalPreviewAttention {
+			border-left-color: #1a56a0;
+			background: #f8fbff;
+		}
+		.portal-preview-client-os {
+			display: grid;
+			grid-template-columns: 116px minmax(0, 1fr);
+			gap: 10px;
+		}
+		.portal-preview-client-os #portalPreviewMiniHeader,
+		.portal-preview-client-os #portalPreviewStats,
+		.portal-preview-client-os #portalPreviewAttention {
+			grid-column: 1;
+			display: block;
+			margin-bottom: 0;
+		}
+		.portal-preview-client-os #portalPreviewFilterBar {
+			display: none;
+		}
+		.portal-preview-client-os #portalPreviewStats {
+			margin-bottom: 0 !important;
+		}
+		.portal-preview-client-os #portalPreviewStats > div {
+			width: 100%;
+			margin-bottom: 0.45rem;
+		}
+		.portal-preview-client-os #portalPreviewAttention,
+		.portal-preview-client-os #portalPreviewSectionTitle,
+		.portal-preview-client-os #portalPreviewQuoteCard {
+			grid-column: 2;
+		}
+		.portal-studio-shell {
+			display: grid;
+			grid-template-columns: minmax(320px, 420px) minmax(680px, 1fr);
+			gap: 1.25rem;
+			align-items: start;
+		}
+		#tab-portal .card {
+			width: 100%;
+			margin-left: 0;
+			transform: none;
+		}
+		.portal-theme-launch-card {
+			display: grid;
+			grid-template-columns: minmax(0, 1fr) auto;
+			gap: 1rem;
+			align-items: center;
+			border: 1px solid #d6e3f2;
+			border-radius: 12px;
+			padding: 1.1rem;
+			background: linear-gradient(135deg, #f8fbff 0%, #ffffff 52%, #fff7ef 100%);
+			box-shadow: 0 8px 22px rgba(15,52,96,0.08);
+		}
+		#tab-portal #portalThemeStudio {
+			display: none;
+		}
+		.portal-studio-panel {
+			border: 1px solid #d8e4f2;
+			border-radius: 12px;
+			background: #ffffff;
+			box-shadow: 0 10px 26px rgba(15,52,96,0.08);
+		}
+		.portal-studio-controls {
+			position: sticky;
+			top: 0.75rem;
+			padding: 1rem;
+			max-height: calc(100vh - 130px);
+			overflow: auto;
+		}
+		.portal-studio-preview-wrap {
+			padding: 1rem;
+			background: #f4f8fd;
+		}
+		.portal-studio-preview {
+			min-height: 620px;
+			overflow: hidden;
+			border: 1px solid #d7e2ef;
+			border-radius: 14px;
+			background: #ffffff;
+			box-shadow: 0 18px 42px rgba(15,52,96,0.14);
+			transform-origin: top center;
+		}
+		.portal-studio-preview-frame {
+			width: 100%;
+			min-height: 820px;
+			border: 1px solid #d7e2ef;
+			border-radius: 14px;
+			background: #fff;
+			box-shadow: 0 18px 42px rgba(15,52,96,0.14);
+		}
+		.portal-studio-preview-note {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			gap: 0.75rem;
+			margin-bottom: 0.75rem;
+			color: #50637a;
+			font-size: 0.86rem;
+		}
+		.portal-studio-pill {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.35rem;
+			padding: 0.25rem 0.65rem;
+			border-radius: 999px;
+			background: #fff0c7;
+			color: #8a5200;
+			font-weight: 800;
+			font-size: 0.78rem;
+		}
+		.portal-studio-toolbar {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			gap: 0.75rem;
+			padding: 0.75rem 1rem;
+			border-bottom: 1px solid #d8e4f2;
+			background: #f8fbff;
+		}
+		.portal-theme-preset-list {
+			display: grid;
+			gap: 0.45rem;
+			max-height: 180px;
+			overflow: auto;
+		}
+		.portal-theme-preset-item {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 0.5rem;
+			padding: 0.55rem 0.65rem;
+			border: 1px solid #d8e4f2;
+			border-radius: 8px;
+			background: #fff;
+		}
+		.portal-theme-preset-item.active {
+			border-color: #1a56a0;
+			background: #eef6ff;
+		}
+		.portal-studio-preview-body {
+			min-height: 620px;
+			padding: 1.2rem;
+			background: #f5f7fb;
+			color: #1a2940;
+		}
+		.portal-demo-header {
+			display: grid;
+			grid-template-columns: minmax(0, 1fr) minmax(220px, 0.6fr);
+			gap: 1rem;
+			align-items: center;
+			padding: 1.2rem;
+			border-radius: 12px;
+			background: #1a2940;
+			color: #fff;
+		}
+		.portal-demo-logo {
+			width: 92px;
+			height: 62px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			border-radius: 8px;
+			background: rgba(255,255,255,0.92);
+			color: #1a2940;
+			font-weight: 800;
+			font-size: 0.72rem;
+			overflow: hidden;
+			flex-shrink: 0;
+		}
+		.portal-demo-logo img {
+			width: 100%;
+			height: 100%;
+			object-fit: contain;
+			padding: 0.35rem;
+		}
+		.portal-demo-brand {
+			display: flex;
+			align-items: center;
+			gap: 1rem;
+			min-width: 0;
+		}
+		.portal-demo-card {
+			border: 1px solid #dfe8f2;
+			border-radius: 10px;
+			background: #fff;
+			box-shadow: 0 8px 20px rgba(15,52,96,0.10);
+		}
+		.portal-demo-stats {
+			display: grid;
+			grid-template-columns: repeat(4, minmax(0, 1fr));
+			gap: 0.8rem;
+			margin: 1rem 0;
+		}
+		.portal-demo-stat {
+			padding: 0.95rem;
+			text-align: center;
+		}
+		.portal-demo-docs-head {
+			display: flex;
+			justify-content: space-between;
+			gap: 1rem;
+			align-items: end;
+			margin: 1.25rem 0 0.85rem;
+		}
+		.portal-demo-attention {
+			padding: 1rem;
+			border-left: 5px solid #f97316;
+			background: linear-gradient(135deg, #fff8ef, #fff);
+		}
+		.portal-demo-document {
+			display: flex;
+			justify-content: space-between;
+			gap: 1rem;
+			align-items: center;
+			padding: 1.15rem;
+			border-left: 5px solid #12579c;
+		}
+		.portal-demo-button {
+			border: 1px solid #12579c;
+			border-radius: 7px;
+			padding: 0.55rem 0.9rem;
+			background: #12579c;
+			color: #fff;
+			font-weight: 800;
+			white-space: nowrap;
+		}
+		.portal-studio-preview-body.preview-layout-quote-viewer .portal-demo-header {
+			grid-template-columns: minmax(0, 1.1fr) minmax(250px, 0.7fr);
+			background: #fff;
+			color: #1a2940;
+			border: 0;
+			padding: 1.4rem 1.1rem;
+		}
+		.portal-studio-preview-body.preview-layout-quote-viewer .portal-demo-title {
+			font-size: 2.25rem;
+			line-height: 1.05;
+			font-weight: 900;
+			margin-top: 0.9rem;
+		}
+		.portal-studio-preview-body.preview-layout-client-os {
+			display: grid;
+			grid-template-columns: 180px minmax(0, 1fr);
+			gap: 1rem;
+		}
+		.portal-studio-preview-body.preview-layout-client-os .portal-demo-header {
+			grid-column: 1 / -1;
+			background: #fff;
+			color: #1a2940;
+			border: 1px solid #d8e4f2;
+		}
+		.portal-studio-preview-body.preview-layout-client-os .portal-demo-stats {
+			display: grid;
+			grid-template-columns: 1fr;
+			margin: 0;
+		}
+		.portal-studio-preview-body.preview-layout-client-os .portal-demo-main {
+			min-width: 0;
+		}
+		.portal-logo-size-small .portal-demo-logo { width: 70px; height: 48px; }
+		.portal-logo-size-large .portal-demo-logo { width: 130px; height: 88px; }
+		.portal-density-compact .portal-demo-header { padding: 0.85rem; }
+		.portal-density-spacious .portal-demo-header { padding: 1.8rem; }
+		.portal-button-style-outline .portal-demo-button { background: #fff; color: #12579c; }
+		.portal-button-style-soft .portal-demo-button { background: #dbeafe; color: #12579c; border-color: #bfdbfe; }
+		.portal-card-style-flat .portal-demo-card { box-shadow: none; }
+		.portal-card-style-premium .portal-demo-card { box-shadow: 0 18px 38px rgba(15,52,96,0.16); border-color: rgba(18,87,156,0.24); }
+		@media (max-width: 992px) {
+			.portal-studio-shell {
+				grid-template-columns: 1fr;
+			}
+			.portal-studio-controls {
+				position: static;
+				max-height: none;
+			}
+		}
 	</style>
 <!-- Eruda mobile console (only loads with ?debug in URL) -->
 <script>
@@ -761,15 +1064,63 @@ Sarah Jones, 905-555-5678"></textarea>
 							<p class="text-muted mb-0 mt-1" style="font-size:0.9rem;">Customize the default client portal look. Individual portals can override this in Manage Portals.</p>
 						</div>
 						<div class="card-body">
-							<div class="row">
-								<div class="col-md-6">
+							<div class="portal-theme-launch-card mb-3">
+								<div>
+									<div class="portal-studio-pill mb-2"><i class="fas fa-paint-brush me-1"></i>Theme Studio</div>
+									<h5 class="mb-1">Open the full Portal Theme Studio</h5>
+									<p class="text-muted mb-0">Edit colors, layout, logo, buttons, and saved custom themes while looking at a real client portal preview.</p>
+								</div>
+								<a class="btn btn-primary" href="portal-theme-studio.html"><i class="fas fa-up-right-from-square me-1"></i>Open Theme Studio</a>
+							</div>
+							<div id="portalThemeStudio" class="portal-studio-shell">
+								<div class="portal-studio-panel portal-studio-controls">
+									<div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-3">
+										<div>
+											<div class="portal-studio-pill">Theme Studio</div>
+											<h5 class="mb-1 mt-2">Build a custom client portal theme</h5>
+											<div class="text-muted small">Start from a built-in layout, fine tune it here, then save your own named theme.</div>
+										</div>
+										<button type="button" class="btn btn-outline-secondary btn-sm" onclick="resetPortalThemeDraft()"><i class="fas fa-rotate-left me-1"></i>Reset draft</button>
+									</div>
+									<div class="mb-3">
+										<label class="form-label fw-semibold" for="portalThemeStartPoint">Start from</label>
+										<select id="portalThemeStartPoint" class="form-select" onchange="applyPortalThemeStartPoint(this.value)">
+											<option value="premium-hub">Premium Client Hub</option>
+											<option value="quote-viewer">Quote Viewer Style</option>
+											<option value="client-os">Client OS</option>
+										</select>
+										<div class="text-muted small">Built-in themes are read-only. Saving creates your own custom theme.</div>
+									</div>
+									<div class="mb-3">
+										<label class="form-label fw-semibold">Saved custom themes</label>
+										<div id="portalThemePresetsList" class="portal-theme-preset-list"></div>
+									</div>
+									<div class="mb-3">
+										<label class="form-label fw-semibold" for="portalThemePresetTitle">Custom theme title</label>
+										<input type="text" id="portalThemePresetTitle" class="form-control" placeholder="e.g., ALD Premium Blue">
+									</div>
+									<div class="mb-3">
+										<label class="form-label fw-semibold" for="portalLayoutStyle">Portal Layout Style</label>
+										<select id="portalLayoutStyle" class="form-select" onchange="updatePortalPreview()">
+											<option value="premium-hub" selected>Premium Client Hub</option>
+											<option value="quote-viewer">Quote Viewer Style</option>
+											<option value="client-os">Client OS</option>
+										</select>
+										<div class="text-muted small">Choose the default layout. Individual portals can override this in Manage Portals.</div>
+									</div>
 									<div class="mb-3">
 										<label class="form-label fw-semibold">Header Color</label>
 										<input type="color" id="portalHeaderColor" class="form-control form-control-color" value="#1a2940" oninput="updatePortalPreview()">
 									</div>
 									<div class="mb-3">
-										<label class="form-label fw-semibold">Page Background</label>
-										<input type="color" id="portalBgColor" class="form-control form-control-color" value="#f5f7fb" oninput="updatePortalPreview()">
+										<label class="form-label fw-semibold">Background</label>
+										<input type="color" id="portalBgColor" class="form-control form-control-color" value="#ffffff" oninput="updatePortalPreview()">
+										<div class="text-muted small">Card and document panel color.</div>
+									</div>
+									<div class="mb-3">
+										<label class="form-label fw-semibold">Background 2</label>
+										<input type="color" id="portalBgColor2" class="form-control form-control-color" value="#f5f7fb" oninput="updatePortalPreview()">
+										<div class="text-muted small">Larger portal canvas behind the cards.</div>
 									</div>
 									<div class="mb-3">
 										<label class="form-label fw-semibold" for="portalBgStyle">Background Style</label>
@@ -789,6 +1140,45 @@ Sarah Jones, 905-555-5678"></textarea>
 										<label class="form-label fw-semibold">Accent / Text Color</label>
 										<input type="color" id="portalTextColor" class="form-control form-control-color" value="#1a2940" oninput="updatePortalPreview()">
 									</div>
+									<div class="row g-2 mb-3">
+										<div class="col-sm-6">
+											<label class="form-label fw-semibold" for="portalLogoSize">Logo Size</label>
+											<select id="portalLogoSize" class="form-select" onchange="updatePortalPreview()">
+												<option value="small">Small</option>
+												<option value="medium" selected>Medium</option>
+												<option value="large">Large</option>
+											</select>
+										</div>
+										<div class="col-sm-6">
+											<label class="form-label fw-semibold" for="portalHeaderDensity">Header Density</label>
+											<select id="portalHeaderDensity" class="form-select" onchange="updatePortalPreview()">
+												<option value="compact">Compact</option>
+												<option value="standard" selected>Standard</option>
+												<option value="spacious">Spacious</option>
+											</select>
+										</div>
+										<div class="col-sm-6">
+											<label class="form-label fw-semibold" for="portalButtonStyle">Button Style</label>
+											<select id="portalButtonStyle" class="form-select" onchange="updatePortalPreview()">
+												<option value="filled" selected>Filled</option>
+												<option value="outline">Outline</option>
+												<option value="soft">Soft</option>
+											</select>
+										</div>
+										<div class="col-sm-6">
+											<label class="form-label fw-semibold" for="portalCardStyle">Card Style</label>
+											<select id="portalCardStyle" class="form-select" onchange="updatePortalPreview()">
+												<option value="flat">Flat</option>
+												<option value="shadow" selected>Shadow</option>
+												<option value="premium">Premium</option>
+											</select>
+										</div>
+									</div>
+									<div class="mb-3">
+										<label class="form-label fw-semibold" for="portalLogoScale">Logo Scale <span class="text-muted fw-normal" id="portalLogoScaleLabel">100%</span></label>
+										<input type="range" id="portalLogoScale" class="form-range" min="70" max="180" value="100" oninput="updatePortalPreview()">
+										<div class="text-muted small">Fine tune the logo size without changing the selected layout.</div>
+									</div>
 									<div class="mb-3">
 										<label class="form-label fw-semibold">Portal Logo</label>
 										<input type="hidden" id="portalLogoData">
@@ -805,13 +1195,30 @@ Sarah Jones, 905-555-5678"></textarea>
 											</div>
 										</div>
 									</div>
-									<button class="btn btn-primary" onclick="savePortalTheme()"><i class="fas fa-save me-1"></i> Save Theme</button>
+									<div class="form-check mb-2">
+										<input class="form-check-input" type="checkbox" id="portalThemeSetDefault">
+										<label class="form-check-label" for="portalThemeSetDefault">Set this custom theme as the default portal theme when saving</label>
+									</div>
+									<div class="d-flex align-items-center gap-2 flex-wrap">
+										<button id="portalThemePresetSaveBtn" class="btn btn-primary" onclick="savePortalThemePreset()"><i class="fas fa-layer-group me-1"></i> Save Custom Theme</button>
+										<button id="portalThemeSaveBtn" class="btn btn-outline-primary" onclick="savePortalTheme()"><i class="fas fa-save me-1"></i> Save Current as Default</button>
+										<button id="portalThemeDuplicateBtn" class="btn btn-outline-secondary" onclick="duplicatePortalThemePreset()" disabled><i class="fas fa-copy me-1"></i> Duplicate</button>
+										<button id="portalThemeDeleteBtn" class="btn btn-outline-danger" onclick="deletePortalThemePreset()" disabled><i class="fas fa-trash me-1"></i> Delete</button>
+										<span id="portalThemeSaveStatus" class="small text-muted"></span>
+									</div>
 								</div>
-								<div class="col-md-6">
-									<label class="form-label fw-semibold">Live Preview</label>
-									<div id="portalPreviewFrame" style="border:1px solid #d7e2ef;border-radius:10px;overflow:hidden;background:#f5f7fb;box-shadow:0 12px 28px rgba(15,52,96,0.12);">
-									<div id="portalPreviewBody" style="background-color:#f5f7fb;padding:14px;">
-										<div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+								<div class="portal-studio-panel portal-studio-preview-wrap">
+									<div class="portal-studio-preview-note">
+										<div>
+											<label class="form-label fw-semibold mb-0">Live Portal Preview</label>
+											<div>This is the real client portal running in demo mode. Changes update live.</div>
+										</div>
+										<a class="btn btn-outline-primary btn-sm" href="client-portal.html?theme_studio=1" target="_blank"><i class="fas fa-up-right-from-square me-1"></i>Open large</a>
+									</div>
+									<iframe id="portalThemeStudioFrame" class="portal-studio-preview-frame" title="Portal theme studio preview" src="client-portal.html?theme_studio=1"></iframe>
+									<div id="portalPreviewFrame" class="portal-studio-preview" style="display:none;border:1px solid #d7e2ef;border-radius:10px;overflow:hidden;background:#f5f7fb;box-shadow:0 12px 28px rgba(15,52,96,0.12);">
+										<div id="portalPreviewBody" class="portal-layout-preview portal-studio-preview-body portal-preview-premium-hub preview-layout-premium-hub portal-logo-size-medium portal-density-standard portal-button-style-filled portal-card-style-shadow" style="background-color:#f5f7fb;padding:14px;">
+										<div id="portalPreviewMiniHeader">
 											<div>
 												<div class="small fw-semibold" id="portalPreviewText" style="color:#1a2940;"><i class="fas fa-user-check me-1"></i>Client View</div>
 												<div id="portalPreviewClientName" style="font-weight:800;font-size:1.1rem;color:#1a2940;">Adam Client</div>
@@ -822,18 +1229,22 @@ Sarah Jones, 905-555-5678"></textarea>
 											</div>
 										</div>
 										<div id="portalPreviewStats" class="row g-2 mb-3">
-											<div class="col-6"><div style="background:white;border-radius:8px;padding:9px;text-align:center;box-shadow:0 4px 10px rgba(15,52,96,0.08);"><strong style="font-size:1rem;">$0</strong><div class="text-muted" style="font-size:0.68rem;">Balance Due</div></div></div>
-											<div class="col-6"><div style="background:white;border-radius:8px;padding:9px;text-align:center;box-shadow:0 4px 10px rgba(15,52,96,0.08);"><strong style="font-size:1rem;">2</strong><div class="text-muted" style="font-size:0.68rem;">Open Quotes</div></div></div>
+											<div class="col-6"><div class="portal-preview-stat"><strong style="font-size:1rem;">$0</strong><div class="text-muted" style="font-size:0.68rem;">Balance Due</div></div></div>
+											<div class="col-6"><div class="portal-preview-stat"><strong style="font-size:1rem;">2</strong><div class="text-muted" style="font-size:0.68rem;">Open Quotes</div></div></div>
+										</div>
+										<div id="portalPreviewAttention" class="mb-3">
+											<div class="small fw-bold mb-1"><i class="fas fa-bolt me-1"></i>Needs attention</div>
+											<div class="small">Invoice ready for payment.</div>
 										</div>
 										<div class="d-flex align-items-center justify-content-between mb-2">
-											<div style="font-weight:800;color:#1a2940;"><i class="fas fa-folder-open me-1"></i>Quotes &amp; Invoices</div>
+											<div id="portalPreviewSectionTitle" style="font-weight:800;color:#1a2940;"><i class="fas fa-folder-open me-1"></i>Quotes &amp; Invoices</div>
 											<span class="badge rounded-pill bg-secondary">Open</span>
 										</div>
 										<div id="portalPreviewQuoteCard" style="background:white;border:1px solid #dfe8f2;border-radius:8px;padding:12px;box-shadow:0 6px 16px rgba(15,52,96,0.10);">
 											<div class="d-flex justify-content-between align-items-start gap-2">
 												<div>
 													<div class="mb-1"><span style="font-size:0.68rem;font-weight:800;color:#0f3460;background:#eef4fb;border-radius:999px;padding:4px 7px;"><i class="fas fa-file-signature me-1"></i>QUOTE</span></div>
-													<div style="font-weight:800;color:#1a2940;">Quote #1001</div>
+													<div style="font-weight:800;color:#1a2940;">Kitchen renovation</div>
 													<div class="text-muted" style="font-size:0.76rem;">Kitchen renovation</div>
 													<div style="font-size:0.78rem;margin-top:6px;"><strong>Total:</strong> $5,200.00</div>
 												</div>
@@ -1331,6 +1742,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			var tab = params.get('tab');
 			if (tab) return tab;
 			var hash = (window.location.hash || '').replace(/^#/, '');
+			if (hash === 'portal-theme') return 'portal';
 			if (hash.indexOf('tab-') === 0) return hash.replace(/^tab-/, '');
 			return '';
 		}
@@ -2621,43 +3033,253 @@ Sarah Jones, 905-555-5678"></textarea>
 		}
 
 		// === PORTAL THEME ===
+		let portalThemePresets = [];
+		let activePortalThemePresetId = '';
+		let lastLoadedPortalTheme = {};
+
+		function portalThemeChoice(value, allowed, fallback) {
+			return allowed.includes(value) ? value : fallback;
+		}
+
+		function portalThemeObjectFromControls() {
+			return {
+				headerColor: document.getElementById('portalHeaderColor').value,
+				bgColor: document.getElementById('portalBgColor').value,
+				bgColor2: document.getElementById('portalBgColor2')?.value || document.getElementById('portalBgColor').value,
+				textColor: document.getElementById('portalTextColor').value,
+				bgStyle: portalThemeChoice(document.getElementById('portalBgStyle').value, ['solid', 'soft-fade', 'branded-fade', 'paper'], 'soft-fade'),
+				bgStrength: parseInt(document.getElementById('portalBgStrength').value, 10) || 0,
+				layoutStyle: portalLayoutStyleValue(document.getElementById('portalLayoutStyle').value),
+				portalLogo: document.getElementById('portalLogoData').value || '',
+				logoSize: portalThemeChoice(document.getElementById('portalLogoSize')?.value, ['small', 'medium', 'large'], 'medium'),
+				logoScale: Math.max(70, Math.min(180, parseInt(document.getElementById('portalLogoScale')?.value, 10) || 100)),
+				headerDensity: portalThemeChoice(document.getElementById('portalHeaderDensity')?.value, ['compact', 'standard', 'spacious'], 'standard'),
+				buttonStyle: portalThemeChoice(document.getElementById('portalButtonStyle')?.value, ['filled', 'outline', 'soft'], 'filled'),
+				cardStyle: portalThemeChoice(document.getElementById('portalCardStyle')?.value, ['flat', 'shadow', 'premium'], 'shadow')
+			};
+		}
+
+		function applyPortalThemeToControls(theme, options) {
+			const v = theme || {};
+			if (v.headerColor) document.getElementById('portalHeaderColor').value = v.headerColor;
+			if (v.bgColor) document.getElementById('portalBgColor').value = v.bgColor;
+			if (document.getElementById('portalBgColor2')) document.getElementById('portalBgColor2').value = v.bgColor2 || v.bgColor || '#f5f7fb';
+			if (v.textColor) document.getElementById('portalTextColor').value = v.textColor;
+			if (v.bgStyle) document.getElementById('portalBgStyle').value = portalThemeChoice(v.bgStyle, ['solid', 'soft-fade', 'branded-fade', 'paper'], 'soft-fade');
+			if (v.bgStrength !== undefined) document.getElementById('portalBgStrength').value = v.bgStrength;
+			if (v.layoutStyle) document.getElementById('portalLayoutStyle').value = portalLayoutStyleValue(v.layoutStyle);
+			if (document.getElementById('portalLogoSize')) document.getElementById('portalLogoSize').value = portalThemeChoice(v.logoSize, ['small', 'medium', 'large'], 'medium');
+			if (document.getElementById('portalLogoScale')) document.getElementById('portalLogoScale').value = Math.max(70, Math.min(180, parseInt(v.logoScale, 10) || (portalLayoutStyleValue(v.layoutStyle) === 'client-os' ? 130 : 100)));
+			if (document.getElementById('portalHeaderDensity')) document.getElementById('portalHeaderDensity').value = portalThemeChoice(v.headerDensity, ['compact', 'standard', 'spacious'], 'standard');
+			if (document.getElementById('portalButtonStyle')) document.getElementById('portalButtonStyle').value = portalThemeChoice(v.buttonStyle, ['filled', 'outline', 'soft'], 'filled');
+			if (document.getElementById('portalCardStyle')) document.getElementById('portalCardStyle').value = portalThemeChoice(v.cardStyle, ['flat', 'shadow', 'premium'], 'shadow');
+			if (v.portalLogo !== undefined) {
+				document.getElementById('portalLogoData').value = v.portalLogo || '';
+				updatePortalLogoPreview(v.portalLogo || '');
+			}
+			if (options && options.title !== undefined) document.getElementById('portalThemePresetTitle').value = options.title || '';
+			updatePortalPreview(options && options.markDirty);
+		}
+
+		function portalThemeBuiltInTemplate(layoutStyle) {
+			const style = portalLayoutStyleValue(layoutStyle);
+			const common = { portalLogo: '', logoSize: 'medium', logoScale: 100, headerDensity: 'standard', buttonStyle: 'filled', cardStyle: 'shadow' };
+			if (style === 'quote-viewer') {
+				return Object.assign({}, common, { layoutStyle: 'quote-viewer', headerColor: '#ffffff', bgColor: '#ffffff', bgColor2: '#eef6ff', textColor: '#10233d', bgStyle: 'paper', bgStrength: 35, logoSize: 'large', headerDensity: 'spacious', buttonStyle: 'filled', cardStyle: 'flat' });
+			}
+			if (style === 'client-os') {
+				return Object.assign({}, common, { layoutStyle: 'client-os', headerColor: '#ffffff', bgColor: '#ffffff', bgColor2: '#eaf7f5', textColor: '#10233d', bgStyle: 'soft-fade', bgStrength: 45, logoSize: 'small', logoScale: 130, headerDensity: 'compact', buttonStyle: 'outline', cardStyle: 'flat' });
+			}
+			return Object.assign({}, common, { layoutStyle: 'premium-hub', headerColor: '#1a2940', bgColor: '#ffffff', bgColor2: '#edf7f5', textColor: '#10233d', bgStyle: 'branded-fade', bgStrength: 52, logoSize: 'medium', headerDensity: 'spacious', buttonStyle: 'filled', cardStyle: 'premium' });
+		}
+
+		function renderPortalThemePresets() {
+			const list = document.getElementById('portalThemePresetsList');
+			const duplicateBtn = document.getElementById('portalThemeDuplicateBtn');
+			const deleteBtn = document.getElementById('portalThemeDeleteBtn');
+			if (!list) return;
+			if (!portalThemePresets.length) {
+				list.innerHTML = '<div class="text-muted small border rounded p-2 bg-white">No custom themes saved yet. Pick a start point, tune it, then save your first custom theme.</div>';
+			} else {
+				list.innerHTML = portalThemePresets.map(function(preset) {
+					const active = preset.id === activePortalThemePresetId ? ' active' : '';
+					return '<button type="button" class="portal-theme-preset-item' + active + '" onclick="applyPortalThemePreset(' + JSON.stringify(preset.id).replace(/"/g, '&quot;') + ')">' +
+						'<strong>' + escapeHtml(preset.title || 'Untitled theme') + '</strong>' +
+						'<span>' + escapeHtml(portalLayoutLabel(portalLayoutStyleValue(preset.theme?.layoutStyle))) + ' · Updated ' + escapeHtml(new Date(preset.updatedAt || preset.createdAt || Date.now()).toLocaleDateString()) + '</span>' +
+						'</button>';
+				}).join('');
+			}
+			if (duplicateBtn) duplicateBtn.disabled = !activePortalThemePresetId;
+			if (deleteBtn) deleteBtn.disabled = !activePortalThemePresetId;
+		}
+
+		function normalizePortalThemePreset(raw) {
+			const theme = raw && raw.theme ? raw.theme : {};
+			return {
+				id: raw?.id || ('theme-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7)),
+				title: String(raw?.title || 'Untitled theme').trim() || 'Untitled theme',
+				createdAt: raw?.createdAt || new Date().toISOString(),
+				updatedAt: raw?.updatedAt || raw?.createdAt || new Date().toISOString(),
+				theme: Object.assign(portalThemeBuiltInTemplate(theme.layoutStyle || 'premium-hub'), theme)
+			};
+		}
+
+		async function loadPortalThemePresets() {
+			const user = window.currentUser;
+			if (!user) return;
+			const { data } = await _supabase.from('user_data').select('value').eq('user_id', user.id).eq('key', 'portal_theme_presets').maybeSingle();
+			const presets = Array.isArray(data?.value) ? data.value : [];
+			portalThemePresets = presets.map(normalizePortalThemePreset);
+			renderPortalThemePresets();
+		}
+
+		async function persistPortalThemePresets() {
+			const user = window.currentUser;
+			if (!user) return { error: new Error('No user') };
+			return _supabase.from('user_data').upsert(
+				{ user_id: user.id, key: 'portal_theme_presets', value: portalThemePresets, updated_at: new Date().toISOString() },
+				{ onConflict: 'user_id,key' }
+			);
+		}
+
+		function applyPortalThemeStartPoint(layoutStyle) {
+			activePortalThemePresetId = '';
+			const existingPortalLogo = document.getElementById('portalLogoData')?.value || '';
+			const theme = portalThemeBuiltInTemplate(layoutStyle);
+			if (existingPortalLogo) theme.portalLogo = existingPortalLogo;
+			applyPortalThemeToControls(theme, { title: '', markDirty: true });
+			renderPortalThemePresets();
+		}
+
+		function applyPortalThemePreset(presetId) {
+			const preset = portalThemePresets.find(function(item) { return item.id === presetId; });
+			if (!preset) return;
+			activePortalThemePresetId = preset.id;
+			applyPortalThemeToControls(preset.theme, { title: preset.title, markDirty: false });
+			renderPortalThemePresets();
+			setPortalThemeDefaultSaveState('saved', 'Loaded custom theme "' + preset.title + '".');
+		}
+
+		function resetPortalThemeDraft() {
+			activePortalThemePresetId = '';
+			applyPortalThemeToControls(lastLoadedPortalTheme || portalThemeBuiltInTemplate('premium-hub'), { title: '', markDirty: false });
+			renderPortalThemePresets();
+			setPortalThemeDefaultSaveState('saved', 'Draft reset to the current default theme.');
+		}
+
 		async function loadPortalTheme() {
 			const user = window.currentUser;
 			if (!user) return;
-			const { data } = await _supabase.from('user_data').select('value').eq('user_id', user.id).eq('key', 'portal_theme').single();
+			const { data } = await _supabase.from('user_data').select('value').eq('user_id', user.id).eq('key', 'portal_theme').maybeSingle();
 			if (data?.value) {
-				const v = data.value;
-				if (v.headerColor) document.getElementById('portalHeaderColor').value = v.headerColor;
-				if (v.bgColor) document.getElementById('portalBgColor').value = v.bgColor;
-				if (v.textColor) document.getElementById('portalTextColor').value = v.textColor;
-				if (v.bgStyle) document.getElementById('portalBgStyle').value = v.bgStyle;
-				if (v.bgStrength !== undefined) document.getElementById('portalBgStrength').value = v.bgStrength;
-				if (v.portalLogo) {
-					document.getElementById('portalLogoData').value = v.portalLogo;
-					updatePortalLogoPreview(v.portalLogo);
-				}
+				lastLoadedPortalTheme = Object.assign(portalThemeBuiltInTemplate(data.value.layoutStyle || 'premium-hub'), data.value);
+				applyPortalThemeToControls(lastLoadedPortalTheme, { title: '', markDirty: false });
+			} else {
+				lastLoadedPortalTheme = portalThemeBuiltInTemplate('premium-hub');
+				applyPortalThemeToControls(lastLoadedPortalTheme, { title: '', markDirty: false });
 			}
-			updatePortalPreview();
+			await loadPortalThemePresets();
+			updatePortalPreview(false);
+		}
+		function setPortalThemeDefaultSaveState(state, message) {
+			const btn = document.getElementById('portalThemeSaveBtn');
+			const status = document.getElementById('portalThemeSaveStatus');
+			if (btn) {
+				btn.disabled = state === 'saving';
+				btn.classList.toggle('btn-success', state === 'saved');
+				btn.classList.toggle('btn-primary', state !== 'saved');
+				if (state === 'saving') btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving...';
+				else if (state === 'saved') btn.innerHTML = '<i class="fas fa-check me-1"></i> Saved';
+				else btn.innerHTML = '<i class="fas fa-save me-1"></i> Save Theme';
+			}
+			if (status) {
+				status.className = state === 'saved' ? 'small text-success fw-semibold' : (state === 'error' ? 'small text-danger fw-semibold' : 'small text-warning fw-semibold');
+				status.textContent = message || '';
+			}
 		}
 		async function savePortalTheme() {
 			const user = window.currentUser;
 			if (!user) return;
-			const theme = {
-				headerColor: document.getElementById('portalHeaderColor').value,
-				bgColor: document.getElementById('portalBgColor').value,
-				textColor: document.getElementById('portalTextColor').value,
-				bgStyle: document.getElementById('portalBgStyle').value,
-				bgStrength: parseInt(document.getElementById('portalBgStrength').value, 10) || 0,
-				portalLogo: document.getElementById('portalLogoData').value || ''
-			};
+			const theme = portalThemeObjectFromControls();
+			setPortalThemeDefaultSaveState('saving', 'Saving default portal theme...');
 			const { error } = await _supabase.from('user_data').upsert(
 				{ user_id: user.id, key: 'portal_theme', value: theme, updated_at: new Date().toISOString() },
 				{ onConflict: 'user_id,key' }
 			);
 			if (!error) {
-				const btn = document.querySelector('[onclick="savePortalTheme()"]');
-				if (btn) { btn.textContent = '✓ Saved!'; setTimeout(() => btn.innerHTML = '<i class="fas fa-save me-1"></i> Save Theme', 2000); }
+				lastLoadedPortalTheme = Object.assign({}, theme);
+				setPortalThemeDefaultSaveState('saved', 'Default portal theme saved. Portals using the default will update.');
+			} else {
+				setPortalThemeDefaultSaveState('error', 'Could not save default theme.');
 			}
+		}
+
+		async function savePortalThemePreset() {
+			const titleInput = document.getElementById('portalThemePresetTitle');
+			const title = String(titleInput?.value || '').trim();
+			if (!title) {
+				setPortalThemeDefaultSaveState('error', 'Name your custom theme before saving.');
+				if (titleInput) titleInput.focus();
+				return;
+			}
+			const now = new Date().toISOString();
+			const theme = portalThemeObjectFromControls();
+			let preset = activePortalThemePresetId ? portalThemePresets.find(function(item) { return item.id === activePortalThemePresetId; }) : null;
+			if (preset) {
+				preset.title = title;
+				preset.theme = theme;
+				preset.updatedAt = now;
+			} else {
+				preset = {
+					id: 'theme-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+					title: title,
+					createdAt: now,
+					updatedAt: now,
+					theme: theme
+				};
+				portalThemePresets.unshift(preset);
+				activePortalThemePresetId = preset.id;
+			}
+			setPortalThemeDefaultSaveState('saving', 'Saving custom theme...');
+			const result = await persistPortalThemePresets();
+			if (result.error) {
+				setPortalThemeDefaultSaveState('error', 'Could not save custom theme.');
+				return;
+			}
+			if (document.getElementById('portalThemeSetDefault')?.checked) {
+				await savePortalTheme();
+				document.getElementById('portalThemeSetDefault').checked = false;
+				setPortalThemeDefaultSaveState('saved', 'Custom theme saved and set as the default.');
+			} else {
+				setPortalThemeDefaultSaveState('saved', 'Custom theme saved.');
+			}
+			renderPortalThemePresets();
+		}
+
+		function duplicatePortalThemePreset() {
+			const preset = portalThemePresets.find(function(item) { return item.id === activePortalThemePresetId; });
+			if (!preset) return;
+			activePortalThemePresetId = '';
+			applyPortalThemeToControls(preset.theme, { title: preset.title + ' Copy', markDirty: true });
+			renderPortalThemePresets();
+			setPortalThemeDefaultSaveState('dirty', 'Duplicated draft. Save it as a new custom theme.');
+		}
+
+		async function deletePortalThemePreset() {
+			const preset = portalThemePresets.find(function(item) { return item.id === activePortalThemePresetId; });
+			if (!preset) return;
+			if (!await qdConfirm('Delete custom theme "' + preset.title + '"? Built-in themes and your current default will not be changed.', { title: 'Delete Custom Theme', okText: 'Delete', cancelText: 'Cancel' })) return;
+			portalThemePresets = portalThemePresets.filter(function(item) { return item.id !== activePortalThemePresetId; });
+			activePortalThemePresetId = '';
+			setPortalThemeDefaultSaveState('saving', 'Deleting custom theme...');
+			const result = await persistPortalThemePresets();
+			if (result.error) {
+				setPortalThemeDefaultSaveState('error', 'Could not delete custom theme.');
+				return;
+			}
+			document.getElementById('portalThemePresetTitle').value = '';
+			renderPortalThemePresets();
+			setPortalThemeDefaultSaveState('saved', 'Custom theme deleted.');
 		}
 		function portalThemeHexToRgb(hex) {
 			var clean = String(hex || '').replace('#', '');
@@ -2685,6 +3307,20 @@ Sarah Jones, 905-555-5678"></textarea>
 			}
 			return bgColor;
 		}
+		function portalLayoutStyleValue(value) {
+			return ['premium-hub', 'quote-viewer', 'client-os'].includes(value) ? value : 'premium-hub';
+		}
+		function portalLayoutLabel(value) {
+			const labels = {
+				'premium-hub': 'Premium Client Hub',
+				'quote-viewer': 'Quote Viewer Style',
+				'client-os': 'Client OS'
+			};
+			return labels[portalLayoutStyleValue(value)] || labels['premium-hub'];
+		}
+		function portalLayoutPreviewClass(value) {
+			return 'portal-preview-' + portalLayoutStyleValue(value);
+		}
 		function updatePortalLogoPreview(src) {
 			var logoData = document.getElementById('portalLogoData');
 			var img = document.getElementById('portalLogoPreviewImg');
@@ -2702,9 +3338,14 @@ Sarah Jones, 905-555-5678"></textarea>
 			if (file.size > 1024 * 1024) { qdAlert('Portal logo must be under 1MB.'); return; }
 			var reader = new FileReader();
 			reader.onload = function(e) {
+				if (String(e.target.result || '').length > 1400000) {
+					qdAlert('That logo is a little too large once converted for storage. Try a smaller image, ideally under 750KB.');
+					return;
+				}
 				document.getElementById('portalLogoData').value = e.target.result;
 				updatePortalLogoPreview(e.target.result);
 				updatePortalPreview();
+				setPortalThemeDefaultSaveState('dirty', 'Portal-specific logo ready. Save this theme or set it as default when ready.');
 			};
 			reader.readAsDataURL(file);
 		}
@@ -2715,12 +3356,29 @@ Sarah Jones, 905-555-5678"></textarea>
 			updatePortalLogoPreview('');
 			updatePortalPreview();
 		}
-		function updatePortalPreview() {
+		function postPortalThemeStudioDraft() {
+			const theme = portalThemeObjectFromControls();
+			try {
+				localStorage.setItem('portal-theme-studio-draft', JSON.stringify(theme));
+			} catch (err) {}
+			const frame = document.getElementById('portalThemeStudioFrame');
+			if (frame && frame.contentWindow) {
+				frame.contentWindow.postMessage({ type: 'portal-theme-studio-draft', theme: theme }, window.location.origin);
+			}
+		}
+		function updatePortalPreview(markDirty) {
 			const hc = document.getElementById('portalHeaderColor').value;
 			const bg = document.getElementById('portalBgColor').value;
+			const bg2 = document.getElementById('portalBgColor2')?.value || bg;
 			const tc = document.getElementById('portalTextColor').value;
 			const bgStyle = document.getElementById('portalBgStyle').value;
 			const bgStrength = document.getElementById('portalBgStrength').value;
+			const layoutStyle = portalLayoutStyleValue(document.getElementById('portalLayoutStyle').value);
+			const logoSize = portalThemeChoice(document.getElementById('portalLogoSize')?.value, ['small', 'medium', 'large'], 'medium');
+			const logoScale = Math.max(70, Math.min(180, parseInt(document.getElementById('portalLogoScale')?.value, 10) || 100));
+			const headerDensity = portalThemeChoice(document.getElementById('portalHeaderDensity')?.value, ['compact', 'standard', 'spacious'], 'standard');
+			const buttonStyle = portalThemeChoice(document.getElementById('portalButtonStyle')?.value, ['filled', 'outline', 'soft'], 'filled');
+			const cardStyle = portalThemeChoice(document.getElementById('portalCardStyle')?.value, ['flat', 'shadow', 'premium'], 'shadow');
 			const pb = document.getElementById('portalPreviewBody');
 			const pt = document.getElementById('portalPreviewText');
 			const frame = document.getElementById('portalPreviewFrame');
@@ -2728,15 +3386,48 @@ Sarah Jones, 905-555-5678"></textarea>
 			const quoteCard = document.getElementById('portalPreviewQuoteCard');
 			const filterBar = document.getElementById('portalPreviewFilterBar');
 			const strengthLabel = document.getElementById('portalBgStrengthLabel');
-			if (pb) pb.style.background = portalThemeBackgroundCss(hc, bg, bgStyle, bgStrength);
+			const logoScaleLabel = document.getElementById('portalLogoScaleLabel');
+			if (pb) {
+				pb.style.background = portalThemeBackgroundCss(hc, bg2, bgStyle, bgStrength);
+				pb.classList.remove('portal-preview-premium-hub', 'portal-preview-quote-viewer', 'portal-preview-client-os');
+				pb.classList.remove('preview-layout-premium-hub', 'preview-layout-quote-viewer', 'preview-layout-client-os');
+				pb.classList.remove('portal-logo-size-small', 'portal-logo-size-medium', 'portal-logo-size-large');
+				pb.classList.remove('portal-density-compact', 'portal-density-standard', 'portal-density-spacious');
+				pb.classList.remove('portal-button-style-filled', 'portal-button-style-outline', 'portal-button-style-soft');
+				pb.classList.remove('portal-card-style-flat', 'portal-card-style-shadow', 'portal-card-style-premium');
+				pb.classList.add(portalLayoutPreviewClass(layoutStyle));
+				pb.classList.add('preview-layout-' + layoutStyle);
+				pb.classList.add('portal-logo-size-' + logoSize);
+				pb.classList.add('portal-density-' + headerDensity);
+				pb.classList.add('portal-button-style-' + buttonStyle);
+				pb.classList.add('portal-card-style-' + cardStyle);
+			}
 			if (pt) pt.style.color = tc;
-			if (frame) frame.style.background = portalThemeBackgroundCss(hc, bg, bgStyle, bgStrength);
+			if (frame) frame.style.background = portalThemeBackgroundCss(hc, bg2, bgStyle, bgStrength);
+			if (quoteCard) quoteCard.style.background = bg;
 			if (client) client.style.color = tc;
 			if (quoteCard) quoteCard.style.borderColor = bgStyle === 'solid' ? '#dfe8f2' : 'rgba(26,86,160,0.18)';
 			if (filterBar) filterBar.style.color = tc;
 			if (strengthLabel) strengthLabel.textContent = bgStrength + '%';
+			if (logoScaleLabel) logoScaleLabel.textContent = logoScale + '%';
+			const start = document.getElementById('portalThemeStartPoint');
+			if (start) start.value = layoutStyle;
 			updatePortalLogoPreview();
+			postPortalThemeStudioDraft();
+			if (markDirty !== false) {
+				renderPortalThemePresets();
+				setPortalThemeDefaultSaveState('dirty', 'Unsaved changes. Save Theme before opening a portal.');
+			}
 		}
+
+		document.addEventListener('DOMContentLoaded', function() {
+			const portalFrame = document.getElementById('portalThemeStudioFrame');
+			if (portalFrame) {
+				portalFrame.addEventListener('load', function() {
+					postPortalThemeStudioDraft();
+				});
+			}
+		});
 
 		function loadPaymentSettingsUI() {
 			if (typeof loadPaymentSettings !== 'function') return;

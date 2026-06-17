@@ -271,6 +271,10 @@
     }
 
     function initObserver() {
+        if (!document.body) {
+            document.addEventListener('DOMContentLoaded', initObserver, { once: true });
+            return;
+        }
         const observer = new MutationObserver(function(mutations) {
             for (const mutation of mutations) {
                 if (!mutation.addedNodes || !mutation.addedNodes.length) continue;

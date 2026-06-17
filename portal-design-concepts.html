@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QuoteDr Portal Design Concepts</title>
+  <style>
+    :root {
+      --qd-blue: #0f4f94;
+      --qd-blue-deep: #102842;
+      --qd-blue-soft: #e8f2ff;
+      --qd-orange: #f97316;
+      --qd-orange-soft: #fff1e7;
+      --ink: #162235;
+      --muted: #637085;
+      --line: #dbe4ef;
+      --paper: #ffffff;
+      --wash: #f4f8fb;
+      --success: #138a55;
+      --warning: #9b5a00;
+      --shadow: 0 18px 45px rgba(16, 40, 66, 0.13);
+      --soft-shadow: 0 12px 30px rgba(16, 40, 66, 0.09);
+      --radius: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: #eaf1f7;
+      letter-spacing: 0;
+    }
+
+    img {
+      display: block;
+      max-width: 100%;
+    }
+
+    button,
+    select {
+      font: inherit;
+    }
+
+    .concept-nav {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 22px;
+      color: #fff;
+      background: rgba(16, 40, 66, 0.96);
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+    }
+
+    .concept-nav strong {
+      font-size: 18px;
+    }
+
+    .concept-nav span {
+      color: rgba(255, 255, 255, 0.74);
+      font-size: 13px;
+    }
+
+    .concept-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .concept-tabs a {
+      color: #fff;
+      text-decoration: none;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .concept-tabs a:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .concept-intro {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 34px 22px 6px;
+    }
+
+    .concept-intro h1 {
+      margin: 0 0 8px;
+      font-size: clamp(30px, 4vw, 48px);
+      line-height: 1.02;
+      color: var(--qd-blue-deep);
+    }
+
+    .concept-intro p {
+      max-width: 760px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 17px;
+      line-height: 1.55;
+    }
+
+    .concept-section {
+      max-width: 1440px;
+      margin: 28px auto 70px;
+      padding: 0 22px;
+    }
+
+    .concept-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      max-width: 1180px;
+      margin: 0 auto 16px;
+    }
+
+    .concept-label h2 {
+      margin: 0;
+      color: var(--qd-blue-deep);
+      font-size: clamp(24px, 3vw, 34px);
+    }
+
+    .concept-label p {
+      max-width: 560px;
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .portal-frame {
+      overflow: hidden;
+      max-width: 1180px;
+      margin: 0 auto;
+      border: 1px solid rgba(15, 79, 148, 0.18);
+      border-radius: 14px;
+      background: var(--paper);
+      box-shadow: var(--shadow);
+    }
+
+    .brand-logo {
+      width: 152px;
+      height: auto;
+      object-fit: contain;
+    }
+
+    .tiny-logo {
+      width: 92px;
+      height: auto;
+      object-fit: contain;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 28px;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+
+    .badge-blue {
+      color: var(--qd-blue);
+      background: var(--qd-blue-soft);
+    }
+
+    .badge-orange {
+      color: var(--warning);
+      background: #fff2cf;
+    }
+
+    .badge-green {
+      color: var(--success);
+      background: #e8f8ef;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 40px;
+      border: 1px solid transparent;
+      border-radius: 7px;
+      padding: 9px 14px;
+      font-size: 14px;
+      font-weight: 900;
+      text-decoration: none;
+      cursor: default;
+      white-space: nowrap;
+    }
+
+    .btn-primary {
+      color: #fff;
+      background: var(--qd-blue);
+      box-shadow: 0 8px 18px rgba(15, 79, 148, 0.2);
+    }
+
+    .btn-orange {
+      color: #fff;
+      background: var(--qd-orange);
+      box-shadow: 0 8px 18px rgba(249, 115, 22, 0.2);
+    }
+
+    .btn-outline {
+      color: var(--qd-blue);
+      border-color: rgba(15, 79, 148, 0.35);
+      background: #fff;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .metric {
+      min-height: 122px;
+      border: 1px solid rgba(219, 228, 239, 0.95);
+      border-radius: var(--radius);
+      padding: 24px 20px;
+      background: #fff;
+      box-shadow: var(--soft-shadow);
+    }
+
+    .metric strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: clamp(28px, 3vw, 42px);
+      line-height: 1;
+    }
+
+    .metric span {
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .doc-card {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 18px;
+      border: 1px solid rgba(219, 228, 239, 1);
+      border-radius: var(--radius);
+      background: #fff;
+      box-shadow: var(--soft-shadow);
+    }
+
+    .doc-card h3 {
+      margin: 12px 0 8px;
+      font-size: clamp(21px, 2vw, 28px);
+      line-height: 1.15;
+      color: var(--qd-blue-deep);
+    }
+
+    .doc-card p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .doc-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .doc-actions {
+      display: flex;
+      align-items: end;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    .concept-one {
+      background: linear-gradient(180deg, #ffffff 0%, #f3f9fb 48%, #eaf7f3 100%);
+    }
+
+    .hub-hero {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 28px;
+      padding: 44px 48px 76px;
+      background:
+        linear-gradient(130deg, rgba(16, 40, 66, 0.92), rgba(15, 79, 148, 0.88)),
+        radial-gradient(circle at 16% 0%, rgba(249, 115, 22, 0.32), transparent 34%);
+      color: #fff;
+    }
+
+    .hub-brand {
+      display: flex;
+      gap: 24px;
+      align-items: center;
+    }
+
+    .hub-brand .brand-logo {
+      width: 170px;
+      padding: 12px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.96);
+    }
+
+    .hub-brand h2 {
+      margin: 0;
+      font-size: clamp(34px, 4vw, 56px);
+      line-height: 1;
+    }
+
+    .hub-brand p {
+      margin: 8px 0 18px;
+      color: rgba(255, 255, 255, 0.82);
+      font-size: 18px;
+    }
+
+    .hub-contact {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 18px;
+      color: rgba(255, 255, 255, 0.86);
+      font-size: 14px;
+    }
+
+    .hub-client-card {
+      align-self: stretch;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: var(--radius);
+      padding: 24px;
+      background: rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(12px);
+    }
+
+    .hub-client-card span {
+      color: #ffd9c0;
+      font-weight: 900;
+      font-size: 13px;
+      text-transform: uppercase;
+    }
+
+    .hub-client-card h3 {
+      margin: 12px 0 4px;
+      font-size: 34px;
+    }
+
+    .hub-client-card p {
+      margin: 0 0 22px;
+      color: rgba(255, 255, 255, 0.72);
+    }
+
+    .hub-body {
+      padding: 0 48px 52px;
+      margin-top: -44px;
+    }
+
+    .attention-panel {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(260px, 0.8fr);
+      gap: 18px;
+      margin: 28px 0;
+    }
+
+    .attention-card {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(249, 115, 22, 0.24);
+      border-left: 6px solid var(--qd-orange);
+      border-radius: var(--radius);
+      padding: 26px;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 96% 0%, rgba(249, 115, 22, 0.16), transparent 32%),
+        linear-gradient(135deg, #fff8f0 0%, #ffffff 72%);
+      box-shadow: var(--shadow);
+    }
+
+    .attention-card h3 {
+      margin: 8px 0 8px;
+      font-size: 30px;
+    }
+
+    .attention-card p {
+      max-width: 640px;
+      margin: 0 0 20px;
+      color: var(--muted);
+    }
+
+    .mini-timeline {
+      border: 1px solid rgba(219, 228, 239, 0.9);
+      border-radius: var(--radius);
+      padding: 22px;
+      background: #fff;
+      box-shadow: var(--soft-shadow);
+    }
+
+    .mini-timeline h3 {
+      margin: 0 0 16px;
+      color: var(--qd-blue-deep);
+    }
+
+    .timeline-row {
+      display: grid;
+      grid-template-columns: 24px 1fr;
+      gap: 12px;
+      margin-top: 12px;
+      color: var(--muted);
+    }
+
+    .timeline-dot {
+      display: grid;
+      width: 24px;
+      height: 24px;
+      place-items: center;
+      border-radius: 999px;
+      color: #fff;
+      background: var(--qd-blue);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .hub-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin: 36px 0 16px;
+    }
+
+    .hub-toolbar h2 {
+      margin: 0;
+      color: var(--qd-blue-deep);
+      font-size: 34px;
+    }
+
+    .filter-card {
+      display: flex;
+      gap: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 12px;
+      background: #fff;
+      box-shadow: var(--soft-shadow);
+    }
+
+    .filter-card label {
+      display: grid;
+      gap: 5px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .filter-card select {
+      min-width: 145px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 9px 10px;
+      color: var(--ink);
+      background: #fff;
+    }
+
+    .hub-docs {
+      display: grid;
+      gap: 18px;
+    }
+
+    .hub-doc {
+      padding: 24px;
+    }
+
+    .hub-doc.invoice {
+      border-left: 6px solid var(--qd-orange);
+    }
+
+    .hub-doc.quote {
+      border-left: 6px solid var(--qd-blue);
+    }
+
+    .concept-two {
+      background: linear-gradient(180deg, #f7fbff 0%, #eef5fb 100%);
+    }
+
+    .proposal-hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 380px;
+      gap: 28px;
+      padding: 48px;
+      background: #fff;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .proposal-left {
+      display: grid;
+      gap: 24px;
+      align-content: start;
+    }
+
+    .proposal-brand {
+      display: flex;
+      gap: 22px;
+      align-items: center;
+    }
+
+    .proposal-brand .brand-logo {
+      width: 145px;
+    }
+
+    .proposal-brand h2 {
+      margin: 0;
+      font-size: clamp(34px, 4vw, 54px);
+      line-height: 1;
+      color: var(--qd-blue-deep);
+    }
+
+    .proposal-brand p {
+      margin: 7px 0 0;
+      color: var(--muted);
+      font-size: 18px;
+    }
+
+    .proposal-copy h1 {
+      max-width: 620px;
+      margin: 0;
+      font-size: clamp(38px, 5vw, 70px);
+      line-height: 0.98;
+      color: var(--qd-blue-deep);
+    }
+
+    .proposal-copy p {
+      max-width: 620px;
+      margin: 18px 0 0;
+      color: var(--muted);
+      font-size: 18px;
+      line-height: 1.55;
+    }
+
+    .proposal-total {
+      align-self: stretch;
+      border-top: 5px solid var(--qd-blue);
+      border-radius: var(--radius);
+      padding: 26px;
+      background: #f8fbff;
+      box-shadow: var(--soft-shadow);
+    }
+
+    .proposal-total h3 {
+      margin: 0 0 16px;
+      font-size: 14px;
+      text-transform: uppercase;
+      color: var(--qd-blue-deep);
+    }
+
+    .proposal-total strong {
+      display: block;
+      font-size: 52px;
+      line-height: 1;
+      color: var(--qd-blue-deep);
+    }
+
+    .proposal-total p {
+      margin: 12px 0 24px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .proposal-body {
+      padding: 42px 48px 52px;
+    }
+
+    .proposal-heading {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      align-items: end;
+      margin-bottom: 18px;
+    }
+
+    .proposal-heading h2 {
+      margin: 0;
+      font-size: 34px;
+      color: var(--qd-blue-deep);
+    }
+
+    .proposal-stack {
+      display: grid;
+      gap: 18px;
+    }
+
+    .proposal-doc {
+      padding: 22px;
+      background:
+        linear-gradient(90deg, rgba(15, 79, 148, 0.06), transparent 35%),
+        #fff;
+    }
+
+    .proposal-doc .doc-actions {
+      align-items: center;
+    }
+
+    .concept-three {
+      background: #f5f7fa;
+    }
+
+    .saas-topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 18px;
+      min-height: 88px;
+      padding: 18px 34px;
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .saas-brand {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .saas-brand .tiny-logo {
+      width: 74px;
+    }
+
+    .saas-brand h2,
+    .saas-client h3 {
+      margin: 0;
+      color: var(--qd-blue-deep);
+    }
+
+    .saas-brand p,
+    .saas-client p {
+      margin: 3px 0 0;
+      color: var(--muted);
+    }
+
+    .saas-body {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      min-height: 720px;
+    }
+
+    .saas-sidebar {
+      padding: 30px 24px;
+      border-right: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .side-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 18px;
+      margin-bottom: 16px;
+      background: #f9fbfd;
+    }
+
+    .side-card strong {
+      display: block;
+      font-size: 28px;
+      color: var(--qd-blue-deep);
+    }
+
+    .side-card span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .side-nav {
+      display: grid;
+      gap: 8px;
+      margin-top: 24px;
+    }
+
+    .side-nav button {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 11px 12px;
+      text-align: left;
+      color: var(--ink);
+      background: #fff;
+      font-weight: 800;
+    }
+
+    .side-nav button.active {
+      color: #fff;
+      background: var(--qd-blue);
+      border-color: var(--qd-blue);
+    }
+
+    .saas-main {
+      padding: 32px;
+      background: linear-gradient(180deg, #f7fbff 0%, #edf7f5 100%);
+    }
+
+    .saas-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 20px;
+    }
+
+    .saas-toolbar h2 {
+      margin: 0;
+      color: var(--qd-blue-deep);
+      font-size: 32px;
+    }
+
+    .saas-doc-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .saas-doc {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 16px;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 18px;
+      background: #fff;
+      box-shadow: 0 8px 18px rgba(16, 40, 66, 0.06);
+    }
+
+    .saas-doc h3 {
+      margin: 8px 0 5px;
+      color: var(--qd-blue-deep);
+      font-size: 20px;
+    }
+
+    .saas-doc p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .amount {
+      font-size: 24px;
+      font-weight: 950;
+      color: var(--ink);
+      text-align: right;
+    }
+
+    .note-strip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      border: 1px solid rgba(249, 115, 22, 0.35);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      margin-bottom: 18px;
+      background: var(--qd-orange-soft);
+      color: #743d0d;
+    }
+
+    @media (max-width: 900px) {
+      .concept-nav,
+      .concept-label,
+      .hub-toolbar,
+      .proposal-heading,
+      .saas-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .hub-hero,
+      .attention-panel,
+      .proposal-hero,
+      .doc-card,
+      .saas-body,
+      .saas-doc {
+        grid-template-columns: 1fr;
+      }
+
+      .hub-hero,
+      .proposal-hero {
+        padding: 30px 22px 56px;
+      }
+
+      .hub-body,
+      .proposal-body,
+      .saas-main {
+        padding: 0 18px 28px;
+      }
+
+      .metric-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .hub-brand,
+      .proposal-brand,
+      .saas-topbar {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .doc-actions {
+        justify-content: stretch;
+      }
+
+      .doc-actions .btn,
+      .filter-card,
+      .filter-card label {
+        width: 100%;
+      }
+
+      .filter-card {
+        flex-direction: column;
+      }
+
+      .saas-sidebar {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .saas-doc .amount {
+        text-align: left;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .concept-section {
+        padding: 0 12px;
+      }
+
+      .portal-frame {
+        border-radius: 10px;
+      }
+
+      .metric-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .brand-logo {
+        width: 132px;
+      }
+
+      .hub-client-card h3,
+      .hub-toolbar h2,
+      .proposal-heading h2,
+      .saas-toolbar h2 {
+        font-size: 28px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <nav class="concept-nav">
+    <div>
+      <strong>Client Portal Concept Board</strong>
+      <span>Preview only. This file does not change the real app.</span>
+    </div>
+    <div class="concept-tabs">
+      <a href="#premium-hub">Premium Hub</a>
+      <a href="#quote-style">Quote Viewer Style</a>
+      <a href="#client-os">Client OS</a>
+    </div>
+  </nav>
+
+  <main>
+    <section class="concept-intro">
+      <h1>Three directions for a more premium client portal.</h1>
+      <p>The common thread is less empty space, stronger client guidance, and document cards that feel closer to the polished quote viewer experience without turning the portal into a marketing page.</p>
+    </section>
+
+    <section id="premium-hub" class="concept-section">
+      <div class="concept-label">
+        <div>
+          <h2>1. Premium Client Hub</h2>
+          <p>Recommended. Strong branded header, immediate next-action panel, clear metrics, and richer quote/invoice cards.</p>
+        </div>
+      </div>
+      <div class="portal-frame concept-one">
+        <header class="hub-hero">
+          <div class="hub-brand">
+            <img class="brand-logo" src="ald-logo.jpg" alt="ALD Direct logo">
+            <div>
+              <h2>ALD Direct Inc.</h2>
+              <p>Secure Client Portal</p>
+              <div class="hub-contact">
+                <span>2051 Prospect, Burlington Ontario L7R1Z2</span>
+                <span>9054676882</span>
+                <span>Info@alddirect.ca</span>
+                <span>HST: 74245 9969 RT0001</span>
+              </div>
+            </div>
+          </div>
+          <aside class="hub-client-card">
+            <span>Client View</span>
+            <h3>Michelle Ventrella</h3>
+            <p>2 documents need review.</p>
+            <a class="btn btn-orange" href="#">View what needs attention</a>
+          </aside>
+        </header>
+
+        <div class="hub-body">
+          <section class="metric-grid">
+            <div class="metric"><strong>CA$524.38</strong><span>Balance Due</span></div>
+            <div class="metric"><strong>1</strong><span>Open Quote</span></div>
+            <div class="metric"><strong>1</strong><span>Invoice</span></div>
+            <div class="metric"><strong>0</strong><span>Jobs Completed</span></div>
+          </section>
+
+          <section class="attention-panel">
+            <div class="attention-card">
+              <span class="badge badge-orange">Needs Action</span>
+              <h3>Invoice ready for payment</h3>
+              <p>Michelle Ventrella - TV Mount + Cabinet Hinges is ready to review. Total due is CA$524.38.</p>
+              <a class="btn btn-primary" href="#">View / Pay Invoice</a>
+            </div>
+            <div class="mini-timeline">
+              <h3>Portal activity</h3>
+              <div class="timeline-row"><span class="timeline-dot">1</span><span>Invoice added Jun 9, 2026 at 9:59 p.m.</span></div>
+              <div class="timeline-row"><span class="timeline-dot">2</span><span>Quote awaiting signature.</span></div>
+              <div class="timeline-row"><span class="timeline-dot">3</span><span>Payment status updates here after completion.</span></div>
+            </div>
+          </section>
+
+          <section class="hub-toolbar">
+            <h2>Quotes & Invoices</h2>
+            <div class="filter-card">
+              <label>Show
+                <select><option>Everything</option><option>Needs Action</option><option>Invoices</option></select>
+              </label>
+              <label>Sort by
+                <select><option>Newest first</option><option>Highest amount</option><option>Status</option></select>
+              </label>
+            </div>
+          </section>
+
+          <section class="hub-docs">
+            <article class="doc-card hub-doc invoice">
+              <div>
+                <div class="doc-meta">
+                  <span class="badge badge-green">Invoice</span>
+                  <span class="badge badge-orange">Invoice Due</span>
+                </div>
+                <h3>Michelle Ventrella - TV Mount + Cabinet Hinges</h3>
+                <p>Invoice #ALD-2026-742459971-INV</p>
+                <p>581 Phoebe Crescent, Burlington, Ontario, L7L 6H7</p>
+                <p><strong>CA$524.38</strong> due. Visible to client, not viewed yet.</p>
+              </div>
+              <div class="doc-actions">
+                <a class="btn btn-primary" href="#">View / Pay Invoice</a>
+              </div>
+            </article>
+            <article class="doc-card hub-doc quote">
+              <div>
+                <div class="doc-meta">
+                  <span class="badge badge-blue">Quote</span>
+                  <span class="badge badge-blue">Needs Review</span>
+                </div>
+                <h3>Michelle Ventrella - Main Floor Paint and Trim</h3>
+                <p>Quote #ALD-2026-742459971</p>
+                <p>Please review and sign when ready.</p>
+              </div>
+              <div class="doc-actions">
+                <a class="btn btn-outline" href="#">Review / Sign Quote</a>
+              </div>
+            </article>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <section id="quote-style" class="concept-section">
+      <div class="concept-label">
+        <div>
+          <h2>2. Quote Viewer Style</h2>
+          <p>Closest to the premium quote viewer. Bigger headline, proposal-style total panel, and action-led document cards.</p>
+        </div>
+      </div>
+      <div class="portal-frame concept-two">
+        <header class="proposal-hero">
+          <div class="proposal-left">
+            <div class="proposal-brand">
+              <img class="brand-logo" src="ald-logo.jpg" alt="ALD Direct logo">
+              <div>
+                <h2>ALD Direct Inc.</h2>
+                <p>Secure Client Portal</p>
+              </div>
+            </div>
+            <div class="proposal-copy">
+              <span class="badge badge-orange">Client View</span>
+              <h1>Your project documents in one place.</h1>
+              <p>Review quotes, pay invoices, and track completed work from the same clean portal.</p>
+            </div>
+          </div>
+          <aside class="proposal-total">
+            <span class="badge badge-orange">Action Required</span>
+            <h3>Current balance due</h3>
+            <strong>CA$524.38</strong>
+            <p>One invoice is ready for review and payment. One quote is waiting for approval.</p>
+            <a class="btn btn-orange" href="#">Continue Review</a>
+          </aside>
+        </header>
+
+        <section class="proposal-body">
+          <div class="proposal-heading">
+            <h2>Quotes & Invoices</h2>
+            <div class="filter-card">
+              <label>Show
+                <select><option>Everything</option></select>
+              </label>
+              <label>Sort by
+                <select><option>Newest first</option></select>
+              </label>
+            </div>
+          </div>
+          <div class="proposal-stack">
+            <article class="doc-card proposal-doc">
+              <div>
+                <div class="doc-meta">
+                  <span class="badge badge-green">Invoice</span>
+                  <span class="badge badge-orange">Invoice Due</span>
+                </div>
+                <h3>Michelle Ventrella - TV Mount + Cabinet Hinges</h3>
+                <p>Invoice #ALD-2026-742459971-INV</p>
+                <p>Invoice is ready for review and payment.</p>
+              </div>
+              <div class="doc-actions">
+                <span class="amount">CA$524.38</span>
+                <a class="btn btn-primary" href="#">View / Pay Invoice</a>
+              </div>
+            </article>
+            <article class="doc-card proposal-doc">
+              <div>
+                <div class="doc-meta">
+                  <span class="badge badge-blue">Quote</span>
+                  <span class="badge badge-blue">Needs Review</span>
+                </div>
+                <h3>Michelle Ventrella - Main Floor Paint and Trim</h3>
+                <p>Quote #ALD-2026-742459971</p>
+                <p>Please review and sign when ready.</p>
+              </div>
+              <div class="doc-actions">
+                <span class="amount">CA$12,437.91</span>
+                <a class="btn btn-outline" href="#">Review / Sign Quote</a>
+              </div>
+            </article>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section id="client-os" class="concept-section">
+      <div class="concept-label">
+        <div>
+          <h2>3. Client OS</h2>
+          <p>Best for clients with lots of documents. More compact, more organized, and less dramatic.</p>
+        </div>
+      </div>
+      <div class="portal-frame concept-three">
+        <header class="saas-topbar">
+          <div class="saas-brand">
+            <img class="tiny-logo" src="ald-logo.jpg" alt="ALD Direct logo">
+            <div>
+              <h2>ALD Direct Inc.</h2>
+              <p>Secure Client Portal</p>
+            </div>
+          </div>
+          <div class="saas-client">
+            <h3>Michelle Ventrella</h3>
+            <p>Client View</p>
+          </div>
+        </header>
+        <div class="saas-body">
+          <aside class="saas-sidebar">
+            <div class="side-card"><strong>CA$524.38</strong><span>Balance Due</span></div>
+            <div class="side-card"><strong>2</strong><span>Needs Action</span></div>
+            <div class="side-card"><strong>0</strong><span>Completed Jobs</span></div>
+            <nav class="side-nav">
+              <button class="active">All documents</button>
+              <button>Needs action</button>
+              <button>Invoices</button>
+              <button>Quotes</button>
+              <button>Completed</button>
+            </nav>
+          </aside>
+          <section class="saas-main">
+            <div class="saas-toolbar">
+              <h2>Project Documents</h2>
+              <div class="filter-card">
+                <label>Sort by
+                  <select><option>Newest first</option></select>
+                </label>
+              </div>
+            </div>
+            <div class="note-strip">
+              <strong>2 documents need attention</strong>
+              <a class="btn btn-orange" href="#">Start with newest</a>
+            </div>
+            <div class="saas-doc-list">
+              <article class="saas-doc">
+                <div>
+                  <div class="doc-meta">
+                    <span class="badge badge-green">Invoice</span>
+                    <span class="badge badge-orange">Invoice Due</span>
+                  </div>
+                  <h3>Michelle Ventrella - TV Mount + Cabinet Hinges</h3>
+                  <p>Invoice #ALD-2026-742459971-INV - Jun 9, 2026</p>
+                </div>
+                <div class="amount">CA$524.38</div>
+                <a class="btn btn-primary" href="#">Open</a>
+              </article>
+              <article class="saas-doc">
+                <div>
+                  <div class="doc-meta">
+                    <span class="badge badge-blue">Quote</span>
+                    <span class="badge badge-blue">Needs Review</span>
+                  </div>
+                  <h3>Michelle Ventrella - Main Floor Paint and Trim</h3>
+                  <p>Quote #ALD-2026-742459971 - Jun 9, 2026</p>
+                </div>
+                <div class="amount">CA$12,437.91</div>
+                <a class="btn btn-outline" href="#">Open</a>
+              </article>
+              <article class="saas-doc">
+                <div>
+                  <div class="doc-meta">
+                    <span class="badge badge-green">Invoice</span>
+                    <span class="badge badge-green">Paid</span>
+                  </div>
+                  <h3>Michelle Ventrella - Basement Fixture Install</h3>
+                  <p>Invoice #ALD-2026-7215-INV - May 18, 2026</p>
+                </div>
+                <div class="amount">CA$1,280.00</div>
+                <a class="btn btn-outline" href="#">Open</a>
+              </article>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

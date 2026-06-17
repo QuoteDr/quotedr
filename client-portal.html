@@ -24,15 +24,27 @@
       --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
       --portal-header-text: #10233d;
       --portal-header-muted: #4d5c70;
+      --portal-card-text: #10233d;
+      --portal-muted-text: #637085;
+      --portal-button-text: #ffffff;
+      --portal-accent-color: #12579c;
+      --portal-surface-bg: #ffffff;
+      --portal-page-bg: #f5f7fb;
+      --portal-page-background: #f5f7fb;
+      --portal-logo-render-width: auto;
+      --portal-logo-render-height: auto;
+      --portal-logo-max-width: 340px;
+      --portal-logo-max-height: 180px;
     }
-    
+
     body {
       background-color: #f5f7fb;
+      color: var(--portal-card-text, #10233d);
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
-    
+
     .header-bg {
-      background-color: #ffffff;
+      background: var(--portal-header-bg, #ffffff);
       color: var(--portal-header-text);
       padding: 2.3rem 0;
     }
@@ -110,11 +122,11 @@
       margin-bottom: 1.5rem;
       transition: transform 0.2s;
     }
-    
+
     .card:hover {
       transform: translateY(-5px);
     }
-    
+
     .status-badge {
       font-size: 0.85rem;
       padding: 0.4rem 0.75rem;
@@ -122,7 +134,7 @@
       display: inline-block;
       width: fit-content;
     }
-    
+
     .status-draft { background-color: #e9ecef; color: #495057; }
     .status-sent { background-color: #cce5ff; color: #004085; }
     .status-accepted { background-color: #d4edda; color: #155724; }
@@ -131,7 +143,7 @@
     .status-declined { background-color: #f8d7da; color: #721c24; }
     .status-invoiced { background-color: #fff3cd; color: #856404; }
     .status-paid { background-color: #d1ecf1; color: #0c5460; }
-    
+
     .signature-thumb {
       width: 120px;
       height: auto;
@@ -140,7 +152,7 @@
       cursor: pointer;
       transition: transform 0.2s;
     }
-    
+
     .signature-thumb:hover {
       transform: scale(1.05);
     }
@@ -189,9 +201,9 @@
       border-color: #1a56a0;
       box-shadow: 0 8px 18px rgba(26, 86, 160, 0.14);
     }
-    
+
     .quote-card {
-      background-color: white;
+      background-color: var(--portal-surface-bg, #ffffff);
     }
 
     .quote-card.portal-open-card {
@@ -223,26 +235,26 @@
       font-size: 0.92rem;
       margin-bottom: 0.35rem;
     }
-    
+
     .summary-card {
-      background-color: white;
+      background-color: var(--portal-surface-bg, #ffffff);
       text-align: center;
       padding: 1.5rem 1rem;
     }
-    
+
     .summary-value {
       font-size: 2rem;
       font-weight: bold;
       margin-bottom: 0.5rem;
     }
-    
+
     .summary-label {
       color: #6c757d;
       font-size: 0.9rem;
     }
 
     .portal-controls {
-      background: white;
+      background: var(--portal-surface-bg, #ffffff);
       border-radius: 12px;
       box-shadow: var(--card-shadow);
       padding: 1rem;
@@ -253,6 +265,25 @@
       display: flex;
       align-items: center;
       gap: 0.65rem;
+    }
+
+    .portal-title-client-os,
+    .portal-side-filter-nav,
+    .portal-job-folders {
+      display: none;
+    }
+
+    .portal-premium-feature-row {
+      display: block;
+    }
+
+    .portal-activity-card {
+      display: none;
+    }
+
+    .quote-viewer-hero-copy,
+    .quote-viewer-balance-panel {
+      display: none;
     }
 
     .portal-section-title {
@@ -308,28 +339,1362 @@
     .admin-mode .admin-meta-line {
       display: block;
     }
-    
+
     .no-quotes {
       text-align: center;
       padding: 3rem 1rem;
       color: #6c757d;
     }
-    
+
     .quote-number {
       font-weight: bold;
       color: var(--primary-dark);
     }
-    
+
     .project-address {
       font-size: 0.9rem;
-      color: #495057;
+      color: var(--portal-muted-text, #495057);
     }
-    
+
     .action-buttons .btn {
       margin-right: 0.5rem;
       margin-bottom: 0.5rem;
     }
-    
+
+    .portal-attention-panel {
+      display: none;
+      border: 1px solid rgba(242, 122, 26, 0.25);
+      border-left: 6px solid #f27a1a;
+      border-radius: 12px;
+      padding: 1.25rem;
+      margin-bottom: 1.5rem;
+      background: radial-gradient(circle at 95% 0%, rgba(242, 122, 26, 0.13), transparent 32%), linear-gradient(135deg, #fff8f0, #fff);
+      box-shadow: 0 10px 24px rgba(15, 52, 96, 0.08);
+    }
+
+    .portal-attention-panel.is-visible {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .portal-attention-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.25rem 0.6rem;
+      border-radius: 999px;
+      background: #fff1d6;
+      color: #9b5a00;
+      font-size: 0.76rem;
+      font-weight: 800;
+      margin-bottom: 0.45rem;
+    }
+
+    .portal-attention-title {
+      margin: 0 0 0.35rem;
+      color: #10233d;
+      font-size: 1.35rem;
+      font-weight: 850;
+      line-height: 1.15;
+    }
+
+    .portal-attention-copy {
+      margin: 0;
+      color: #637085;
+      max-width: 640px;
+    }
+
+    .portal-layout-premium-hub {
+      background: var(--portal-page-background, linear-gradient(180deg, #edf5fb 0%, #eef9f6 72%, #f7fbff 100%)) !important;
+    }
+
+    .portal-layout-premium-hub .header-bg {
+      max-width: min(98vw, 1680px);
+      margin: 0.65rem auto 0;
+      padding: 4rem 4.25rem 7.1rem;
+      border-radius: 16px 16px 0 0;
+      background:
+        radial-gradient(circle at 72% 28%, rgba(255, 255, 255, 0.1), transparent 28%),
+        linear-gradient(135deg, #1f3750 0%, var(--portal-header-bg, #214d7d) 54%, #1b65a8 100%);
+      color: #fff;
+      box-shadow: 0 18px 44px rgba(11, 42, 74, 0.17);
+    }
+
+    .portal-layout-premium-hub .portal-header-shell {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(320px, 520px);
+      align-items: center;
+      gap: 3rem;
+    }
+
+    .portal-layout-premium-hub .portal-brand-block {
+      min-width: 0;
+      gap: 2rem;
+    }
+
+    .portal-layout-premium-hub #contractor-display-name {
+      color: var(--portal-header-contrast, #fff);
+      font-size: clamp(2.9rem, 4vw, 4.3rem);
+      font-weight: 900;
+      letter-spacing: 0;
+    }
+
+    .portal-layout-premium-hub .portal-view-badge {
+      color: #ffe1c2;
+      text-transform: uppercase;
+      letter-spacing: 0;
+      font-size: 0.95rem;
+    }
+
+    .portal-layout-premium-hub .portal-client-panel,
+    .portal-layout-premium-hub .portal-client-panel h3,
+    .portal-layout-premium-hub .portal-client-panel p {
+      color: var(--portal-header-contrast, #fff);
+    }
+
+    .portal-layout-premium-hub .portal-business-info,
+    .portal-layout-premium-hub .portal-business-info span {
+      color: #243f5d;
+      font-size: 1rem;
+      font-weight: 750;
+      text-shadow: 0 1px 1px rgba(255, 255, 255, 0.18);
+    }
+
+    .portal-layout-premium-hub .portal-business-info {
+      display: inline-flex;
+      padding: 0.45rem 0.65rem;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.16);
+    }
+
+    .portal-layout-premium-hub #contractor-logo-area img {
+      max-height: 188px;
+      max-width: 246px;
+      padding: 1rem;
+      border-radius: 9px;
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 20px 48px rgba(0, 0, 0, 0.18);
+    }
+
+    .portal-layout-premium-hub .portal-client-panel {
+      min-height: 255px;
+      padding: 2.4rem 2.6rem;
+      text-align: left;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.14);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    }
+
+    .portal-layout-premium-hub .portal-client-panel h3 {
+      margin-top: 1rem;
+      font-size: clamp(2.2rem, 3.1vw, 3rem);
+      font-weight: 900;
+      line-height: 1.05;
+    }
+
+    .portal-layout-premium-hub .portal-client-panel p {
+      color: rgba(255, 255, 255, 0.78);
+      font-size: 1.18rem;
+    }
+
+    .portal-layout-premium-hub .portal-client-panel #contractor-name {
+      display: inline-flex;
+      margin-top: 0.25rem;
+      padding: 0.28rem 0.65rem;
+      border-radius: 999px;
+      color: #fff;
+      background: rgba(18, 43, 68, 0.28);
+      font-weight: 800;
+      text-shadow: 0 1px 2px rgba(9, 24, 42, 0.32);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    }
+
+    .portal-layout-premium-hub .portal-admin-tools {
+      justify-content: flex-start;
+    }
+
+    .portal-layout-premium-hub .portal-admin-tools .btn {
+      color: #fff;
+      border-color: rgba(255, 255, 255, 0.42);
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .portal-layout-premium-hub .portal-admin-tools .btn:hover {
+      color: #10233d;
+      background: #fff;
+    }
+
+    .portal-layout-premium-hub main.container {
+      max-width: min(92vw, 1530px);
+      margin-top: -4rem !important;
+    }
+
+    .portal-layout-premium-hub .portal-summary-row {
+      margin-bottom: 1.55rem !important;
+    }
+
+    .portal-layout-premium-hub .summary-card {
+      min-height: 166px;
+      padding: 1.45rem 1.7rem;
+      text-align: left;
+      border: 1px solid rgba(216, 226, 238, 0.95);
+      border-radius: 8px;
+      background: var(--portal-surface-bg, #fff);
+      box-shadow: 0 16px 36px rgba(15, 52, 96, 0.14);
+    }
+
+    .portal-layout-premium-hub .summary-value {
+      color: #162235;
+      font-size: clamp(2.35rem, 3vw, 3rem);
+      line-height: 1;
+    }
+
+    .portal-layout-premium-hub .summary-label {
+      color: #5f6f86;
+      font-size: 1.05rem;
+    }
+
+    .portal-layout-premium-hub .portal-premium-feature-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1.5fr) minmax(320px, 1fr);
+      gap: 1.65rem;
+      margin-bottom: 2.6rem;
+    }
+
+    .portal-layout-premium-hub .portal-attention-panel {
+      display: none;
+      min-height: 305px;
+      margin: 0;
+      padding: 2.15rem 2.45rem;
+      border: 1px solid rgba(242, 122, 26, 0.3);
+      border-left: 7px solid #f97316;
+      border-radius: 8px;
+      background: radial-gradient(circle at 96% 2%, rgba(249, 115, 22, 0.13), transparent 35%), linear-gradient(135deg, #fff8ef, #fff);
+      box-shadow: 0 18px 42px rgba(15, 52, 96, 0.12);
+    }
+
+    .portal-layout-premium-hub .portal-attention-panel.is-visible {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      flex-direction: column;
+    }
+
+    .portal-layout-premium-hub .portal-attention-eyebrow {
+      background: #fff1cc;
+      color: #8a5200;
+      font-size: 0.9rem;
+    }
+
+    .portal-layout-premium-hub .portal-attention-title {
+      margin-top: 1rem;
+      color: #14233a;
+      font-size: clamp(2rem, 2.8vw, 2.7rem);
+      font-weight: 900;
+    }
+
+    .portal-layout-premium-hub .portal-attention-copy {
+      color: #61708a;
+      font-size: 1.1rem;
+    }
+
+    .portal-layout-premium-hub .portal-attention-panel .btn,
+    .portal-layout-premium-hub .quote-card .btn-outline-primary {
+      padding: 0.8rem 1.25rem;
+      border-color: #12579c;
+      border-radius: 7px;
+      color: #fff;
+      background: #12579c;
+      box-shadow: 0 12px 24px rgba(18, 87, 156, 0.2);
+      font-weight: 850;
+    }
+
+    .portal-layout-premium-hub .quote-card .portal-action-full,
+    .portal-layout-premium-hub .quote-card .portal-action-icon {
+      display: inline;
+      color: #fff;
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .portal-layout-premium-hub .quote-card .portal-action-short {
+      display: none;
+    }
+
+    .portal-layout-premium-hub .portal-attention-panel .btn:hover,
+    .portal-layout-premium-hub .quote-card .btn-outline-primary:hover {
+      border-color: #0f4a85;
+      background: #0f4a85;
+      transform: translateY(-1px);
+    }
+
+    .portal-layout-premium-hub .portal-activity-card {
+      display: block;
+      min-height: 305px;
+      margin: 0;
+      padding: 2rem 2.05rem;
+      border: 1px solid #dbe6f3;
+      border-radius: 8px;
+      background: var(--portal-surface-bg, #fff);
+      box-shadow: 0 18px 42px rgba(15, 52, 96, 0.09);
+    }
+
+    .portal-layout-premium-hub .portal-activity-card h3 {
+      margin: 0 0 1.25rem;
+      color: #14233a;
+      font-size: 1.55rem;
+      font-weight: 900;
+    }
+
+    .portal-activity-list {
+      display: grid;
+      gap: 1.05rem;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .portal-activity-list li {
+      display: grid;
+      grid-template-columns: 2rem minmax(0, 1fr);
+      gap: 0.75rem;
+      align-items: start;
+      color: #637085;
+      font-size: 1.02rem;
+    }
+
+    .portal-activity-index {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2rem;
+      height: 2rem;
+      border-radius: 999px;
+      color: #fff;
+      background: #12579c;
+      font-weight: 900;
+      font-size: 0.9rem;
+    }
+
+    .portal-layout-premium-hub .portal-documents-header {
+      margin-bottom: 1.3rem !important;
+    }
+
+    .portal-layout-premium-hub .portal-toolbar-title {
+      color: #12345c;
+      font-size: clamp(2.25rem, 3.3vw, 3rem);
+      font-weight: 900;
+    }
+
+    .portal-layout-premium-hub .portal-controls {
+      padding: 1rem 1.1rem;
+      border: 1px solid #dbe6f3;
+      border-radius: 8px;
+      box-shadow: 0 14px 30px rgba(15, 52, 96, 0.08);
+    }
+
+    .portal-layout-premium-hub.admin-mode .portal-controls .portal-job-folders,
+    .portal-layout-quote-viewer.admin-mode .portal-controls .portal-job-folders {
+      display: block;
+      position: relative;
+    }
+
+    .portal-layout-premium-hub .portal-jobs-toggle,
+    .portal-layout-quote-viewer .portal-jobs-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      min-height: 39px;
+      border: 1px solid #dbe6f3;
+      border-radius: 7px;
+      padding: 0.45rem 0.75rem;
+      color: #12579c;
+      background: var(--portal-surface-bg, #ffffff);
+      font-weight: 850;
+    }
+
+    .portal-layout-premium-hub .portal-jobs-toggle:hover,
+    .portal-layout-premium-hub .portal-job-folders.is-open .portal-jobs-toggle,
+    .portal-layout-quote-viewer .portal-jobs-toggle:hover,
+    .portal-layout-quote-viewer .portal-job-folders.is-open .portal-jobs-toggle {
+      border-color: #12579c;
+      color: #fff;
+      background: #12579c;
+    }
+
+    .portal-layout-premium-hub .portal-jobs-menu,
+    .portal-layout-quote-viewer .portal-jobs-menu {
+      display: none;
+      position: absolute;
+      right: 0;
+      z-index: 20;
+      width: min(320px, 86vw);
+      margin-top: 0.5rem;
+      padding: 0.75rem;
+      border: 1px solid #dbe6f3;
+      border-radius: 8px;
+      background: var(--portal-surface-bg, #ffffff);
+      box-shadow: 0 18px 38px rgba(15, 52, 96, 0.16);
+    }
+
+    .portal-layout-premium-hub .portal-job-folders.is-open .portal-jobs-menu,
+    .portal-layout-quote-viewer .portal-job-folders.is-open .portal-jobs-menu {
+      display: block;
+    }
+
+    .portal-layout-premium-hub .quote-card {
+      overflow: hidden;
+      border: 1px solid #dbe6f3;
+      border-radius: 8px;
+      background: var(--portal-surface-bg, #fff);
+      box-shadow: 0 16px 36px rgba(15, 52, 96, 0.11);
+    }
+
+    .portal-layout-premium-hub .quote-card .card-body {
+      padding: 2rem 2.35rem;
+      border-left: 7px solid #12579c;
+    }
+
+    .portal-layout-premium-hub .quote-card:has(.doc-type-invoice) .card-body {
+      border-left-color: #f97316;
+    }
+
+    .portal-layout-premium-hub .portal-doc-main {
+      margin-bottom: 1.2rem !important;
+    }
+
+    .portal-layout-premium-hub .portal-document-title {
+      color: #13233b;
+      font-size: 1.85rem;
+      font-weight: 900;
+    }
+
+    .portal-layout-premium-hub .portal-document-number,
+    .portal-layout-premium-hub .project-address {
+      color: #64748b;
+      font-size: 1.05rem;
+    }
+
+    .portal-layout-premium-hub .client-status-line.needs-action {
+      color: #a34700;
+    }
+
+    .portal-layout-quote-viewer {
+      background: var(--portal-page-background, linear-gradient(180deg, #eef6fb 0%, #e7f1f8 100%)) !important;
+    }
+
+    .portal-layout-quote-viewer #portalContent {
+      overflow: hidden;
+      max-width: min(98vw, 1700px);
+      margin: 1.5rem auto 2.75rem;
+      border: 1px solid rgba(15, 79, 148, 0.18);
+      border-radius: 16px;
+      background: var(--portal-surface-bg, #ffffff);
+      box-shadow: 0 20px 48px rgba(15, 35, 60, 0.14);
+    }
+
+    .portal-layout-quote-viewer .header-bg {
+      padding: 4.4rem 4.25rem 4.25rem;
+      background: #fff !important;
+      border-bottom: 1px solid #dbe6f3;
+    }
+
+    .portal-layout-quote-viewer .portal-header-shell {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(460px, 0.85fr);
+      align-items: center;
+      gap: 2.75rem;
+    }
+
+    .portal-layout-quote-viewer .portal-brand-block {
+      display: grid;
+      grid-template-columns: minmax(260px, 310px) minmax(0, 1fr);
+      align-items: flex-start;
+      gap: 2.45rem;
+    }
+
+    .portal-layout-quote-viewer .portal-brand-block > div:not(#contractor-logo-area) {
+      display: contents;
+    }
+
+    .portal-layout-quote-viewer #contractor-logo-area img {
+      max-width: 300px;
+      max-height: 220px;
+      padding: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .portal-layout-quote-viewer #contractor-display-name {
+      grid-column: 2;
+      color: #10233d;
+      font-size: clamp(3rem, 4.2vw, 4.5rem);
+      font-weight: 900;
+    }
+
+    .portal-layout-quote-viewer #portal-tagline {
+      grid-column: 2;
+      color: #65758d;
+      font-size: 1.45rem;
+    }
+
+    .portal-layout-quote-viewer .portal-business-info,
+    .portal-layout-quote-viewer .portal-client-panel > .portal-view-badge,
+    .portal-layout-quote-viewer .portal-client-panel > h3,
+    .portal-layout-quote-viewer .portal-client-panel > p {
+      display: none;
+    }
+
+    .portal-layout-quote-viewer .quote-viewer-hero-copy {
+      grid-column: 1 / -1;
+      display: block;
+      margin-top: 3.6rem;
+      max-width: 860px;
+    }
+
+    .quote-viewer-client-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      margin-bottom: 1.15rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      color: #8a5200;
+      background: #fff0c7;
+      font-weight: 900;
+      font-size: 0.92rem;
+    }
+
+    .portal-layout-quote-viewer .quote-viewer-hero-copy h1 {
+      margin: 0;
+      color: #10233d;
+      font-size: clamp(3.35rem, 5.8vw, 5.8rem);
+      font-weight: 950;
+      line-height: 1.03;
+      letter-spacing: 0;
+    }
+
+    .portal-layout-quote-viewer .quote-viewer-hero-copy p {
+      max-width: 810px;
+      margin: 1.4rem 0 0;
+      color: #65758d;
+      font-size: 1.38rem;
+      line-height: 1.6;
+    }
+
+    .portal-layout-quote-viewer .portal-client-panel {
+      min-width: 0;
+      text-align: left;
+    }
+
+    .portal-layout-quote-viewer .quote-viewer-balance-panel {
+      display: block;
+      min-height: 610px;
+      padding: 2.65rem 2.6rem;
+      border-top: 7px solid #12579c;
+      border-radius: 8px;
+      background: #f6f9fd;
+      box-shadow: 0 22px 46px rgba(15, 52, 96, 0.12);
+    }
+
+    .quote-viewer-action-pill {
+      display: inline-flex;
+      align-items: center;
+      margin-bottom: 0.9rem;
+      padding: 0.4rem 0.85rem;
+      border-radius: 999px;
+      color: #8a5200;
+      background: #fff0c7;
+      font-weight: 900;
+    }
+
+    .quote-viewer-balance-label {
+      color: #10233d;
+      font-weight: 900;
+      text-transform: uppercase;
+      font-size: 1.02rem;
+    }
+
+    .quote-viewer-balance-amount {
+      margin: 1.1rem 0 1rem;
+      color: #10233d;
+      font-size: clamp(3.4rem, 4.7vw, 4.9rem);
+      font-weight: 950;
+      line-height: 1;
+      overflow-wrap: normal;
+      white-space: nowrap;
+    }
+
+    .quote-viewer-balance-copy {
+      color: #65758d;
+      font-size: 1.2rem;
+      line-height: 1.45;
+    }
+
+    .quote-viewer-balance-panel .btn {
+      margin-top: 2rem;
+      padding: 0.95rem 1.35rem;
+      border: 0;
+      border-radius: 7px;
+      background: #f97316;
+      box-shadow: 0 16px 30px rgba(249, 115, 22, 0.24);
+      color: #fff;
+      font-weight: 900;
+    }
+
+    .quote-viewer-balance-panel .btn:hover {
+      background: #ea650d;
+      color: #fff;
+      transform: translateY(-1px);
+    }
+
+    .portal-layout-quote-viewer main.container {
+      max-width: none;
+      margin-top: 0 !important;
+      padding: 0;
+      background: var(--portal-page-bg, #eef6fb);
+    }
+
+    .portal-layout-quote-viewer .portal-summary-row,
+    .portal-layout-quote-viewer .portal-premium-feature-row,
+    .portal-layout-quote-viewer .portal-section-title {
+      display: none !important;
+    }
+
+    .portal-layout-quote-viewer .portal-documents-row {
+      margin: 0;
+      padding: 4.1rem 4.25rem 4.75rem;
+      background: var(--portal-page-bg, #eef6fb);
+    }
+
+    .portal-layout-quote-viewer .portal-documents-row > .col-12 {
+      padding: 0;
+    }
+
+    .portal-layout-quote-viewer .portal-documents-header {
+      margin-bottom: 1.65rem !important;
+    }
+
+    .portal-layout-quote-viewer .portal-toolbar-title {
+      color: #12345c;
+      font-size: clamp(2.6rem, 3.5vw, 3.35rem);
+      font-weight: 900;
+    }
+
+    .portal-layout-quote-viewer .portal-toolbar-title i {
+      display: none;
+    }
+
+    .portal-layout-quote-viewer .portal-controls {
+      padding: 1rem;
+      border: 1px solid #dbe6f3;
+      border-radius: 8px;
+      background: var(--portal-surface-bg, #ffffff);
+      box-shadow: 0 16px 34px rgba(15, 52, 96, 0.1);
+    }
+
+    .portal-layout-quote-viewer.admin-mode .portal-controls .portal-job-folders {
+      display: block;
+      position: relative;
+    }
+
+    .portal-layout-quote-viewer .quote-card {
+      overflow: hidden;
+      margin-bottom: 1.55rem !important;
+      border: 1px solid #d8e5f2;
+      border-radius: 8px;
+      background: var(--portal-surface-bg, #ffffff);
+      box-shadow: 0 18px 40px rgba(15, 52, 96, 0.09);
+    }
+
+    .portal-layout-quote-viewer .quote-card .card-body {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 1.5rem;
+      align-items: center;
+      padding: 2rem 2.1rem;
+    }
+
+    .portal-layout-quote-viewer .portal-doc-main {
+      margin: 0 !important;
+    }
+
+    .portal-layout-quote-viewer .portal-doc-footer {
+      display: contents !important;
+    }
+
+    .portal-layout-quote-viewer .portal-doc-total {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+      text-align: right;
+    }
+
+    .portal-layout-quote-viewer .portal-doc-total h6 {
+      margin: 0;
+      color: #10233d;
+      font-size: 1.75rem;
+      font-weight: 950;
+      white-space: nowrap;
+    }
+
+    .portal-layout-quote-viewer .portal-doc-total h6::before {
+      content: '';
+    }
+
+    .portal-layout-quote-viewer .portal-doc-total-label {
+      display: none;
+    }
+
+    .portal-layout-quote-viewer .portal-doc-total small,
+    .portal-layout-quote-viewer .project-address,
+    .portal-layout-quote-viewer .admin-meta-line {
+      display: none !important;
+    }
+
+    .portal-layout-quote-viewer .client-status-line {
+      color: #65758d;
+      font-size: 1.08rem;
+      font-weight: 500;
+    }
+
+    .portal-layout-quote-viewer .client-status-line.needs-action {
+      color: #65758d;
+    }
+
+    .portal-layout-quote-viewer .portal-document-title {
+      color: #10233d;
+      font-size: 1.9rem;
+      font-weight: 900;
+    }
+
+    .portal-layout-quote-viewer .portal-document-number {
+      color: #65758d;
+      font-size: 1.14rem;
+    }
+
+    .portal-layout-quote-viewer .portal-doc-actions {
+      text-align: right;
+    }
+
+    .portal-layout-quote-viewer .quote-card .btn-outline-primary {
+      min-width: 172px;
+      padding: 0.85rem 1.15rem;
+      border-color: #12579c;
+      border-radius: 7px;
+      color: #fff;
+      background: #12579c;
+      box-shadow: 0 14px 28px rgba(18, 87, 156, 0.18);
+      font-weight: 900;
+    }
+
+    .portal-layout-quote-viewer .quote-card .btn-outline-primary:hover {
+      border-color: #0f4a85;
+      background: #0f4a85;
+      transform: translateY(-1px);
+    }
+
+    .portal-layout-client-os {
+      --client-os-line: #dbe4ef;
+      --client-os-ink: #162235;
+      --client-os-muted: #637085;
+      --client-os-blue: #0f4f94;
+      background: linear-gradient(180deg, #f7fbff 0%, #edf7f5 100%) !important;
+    }
+
+    .portal-layout-client-os #portalContent {
+      overflow: hidden;
+      max-width: 1500px;
+      margin: 1.25rem auto 2.5rem;
+      border: 1px solid rgba(15, 79, 148, 0.18);
+      border-radius: 14px;
+      background: #fff;
+      box-shadow: 0 18px 45px rgba(16, 40, 66, 0.13);
+    }
+
+    .portal-layout-client-os .header-bg {
+      background: #fff !important;
+      color: var(--client-os-ink);
+      padding: 1.65rem 0;
+      border-bottom: 1px solid var(--client-os-line);
+      box-shadow: none;
+    }
+
+    .portal-layout-client-os .portal-header-shell {
+      align-items: center;
+      gap: 1.25rem;
+      flex-wrap: nowrap;
+    }
+
+    .portal-layout-client-os .portal-brand-block {
+      min-width: 0;
+      gap: 1rem;
+    }
+
+    .portal-layout-client-os .portal-business-info {
+      display: none;
+    }
+
+    .portal-layout-client-os #contractor-logo-area img {
+      max-height: 82px;
+      max-width: 120px;
+    }
+
+    .portal-logo-size-small #contractor-logo-area img {
+      max-height: 96px;
+      max-width: 160px;
+    }
+
+    .portal-logo-size-large #contractor-logo-area img {
+      max-height: clamp(190px, 17vw, 270px);
+      max-width: clamp(320px, 31vw, 460px);
+    }
+
+    .portal-layout-client-os.portal-logo-size-large #contractor-logo-area img {
+      max-height: 118px;
+      max-width: 180px;
+    }
+
+    .portal-layout-quote-viewer.portal-logo-size-large #contractor-logo-area img {
+      max-height: 260px;
+      max-width: 380px;
+    }
+
+    body #contractor-logo-area img {
+      width: var(--portal-logo-render-width, auto) !important;
+      height: var(--portal-logo-render-height, auto) !important;
+      max-height: var(--portal-logo-max-height, 180px) !important;
+      max-width: var(--portal-logo-max-width, 340px) !important;
+    }
+
+    .portal-density-compact .header-bg {
+      padding-top: 2rem;
+      padding-bottom: 2.25rem;
+    }
+
+    .portal-density-spacious .header-bg {
+      padding-top: 5rem;
+      padding-bottom: 6rem;
+    }
+
+    .portal-density-compact.portal-layout-premium-hub .header-bg {
+      padding-top: 2.8rem;
+      padding-bottom: 5.6rem;
+    }
+
+    .portal-density-spacious.portal-layout-premium-hub .header-bg {
+      padding-top: 5rem;
+      padding-bottom: 8rem;
+    }
+
+    .portal-button-style-outline .portal-attention-panel .btn,
+    .portal-button-style-outline .quote-viewer-balance-panel .btn,
+    .portal-button-style-outline .quote-card .btn-outline-primary {
+      background: #fff !important;
+      color: #12579c !important;
+      border-color: #12579c !important;
+      box-shadow: none !important;
+    }
+
+    .portal-button-style-soft .portal-attention-panel .btn,
+    .portal-button-style-soft .quote-viewer-balance-panel .btn,
+    .portal-button-style-soft .quote-card .btn-outline-primary {
+      background: #dbeafe !important;
+      color: #12579c !important;
+      border-color: #bfdbfe !important;
+      box-shadow: 0 10px 24px rgba(18, 87, 156, 0.12) !important;
+    }
+
+    .portal-card-style-flat .summary-card,
+    .portal-card-style-flat .quote-card,
+    .portal-card-style-flat .portal-attention-panel,
+    .portal-card-style-flat .portal-activity-card,
+    .portal-card-style-flat .quote-viewer-balance-panel {
+      box-shadow: none !important;
+    }
+
+    .portal-card-style-premium .summary-card,
+    .portal-card-style-premium .quote-card,
+    .portal-card-style-premium .portal-attention-panel,
+    .portal-card-style-premium .portal-activity-card,
+    .portal-card-style-premium .quote-viewer-balance-panel {
+      border-color: rgba(18, 87, 156, 0.24) !important;
+      box-shadow: 0 20px 46px rgba(15, 52, 96, 0.15) !important;
+    }
+
+    .portal-layout-client-os #contractor-display-name {
+      color: var(--client-os-ink);
+      font-size: 2rem;
+    }
+
+    .portal-layout-client-os .portal-client-panel {
+      min-width: 220px;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+    }
+
+    .portal-layout-client-os .portal-view-badge,
+    .portal-layout-client-os .portal-client-panel h3 {
+      color: var(--client-os-ink);
+    }
+
+    .portal-layout-client-os .portal-client-panel p {
+      color: var(--client-os-muted);
+    }
+
+    .portal-layout-client-os main.container {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      gap: 0;
+      max-width: none;
+      margin-top: 0 !important;
+      padding: 0;
+    }
+
+    .portal-layout-client-os .portal-summary-row {
+      grid-column: 1;
+      grid-row: 1 / span 3;
+      display: block;
+      align-self: start;
+      margin: 0;
+      min-height: 720px;
+      padding: 2rem 1.5rem;
+      border: 0;
+      border-right: 1px solid var(--client-os-line);
+      border-radius: 0;
+      background: var(--portal-surface-bg, #fff);
+      box-shadow: none;
+    }
+
+    .portal-layout-client-os .portal-summary-row > [class*="col-"] {
+      width: 100%;
+      max-width: 100%;
+      padding: 0;
+      margin: 0 0 0.75rem;
+    }
+
+    .portal-layout-client-os .summary-card {
+      min-height: 0;
+      margin: 0;
+      padding: 1rem;
+      text-align: left;
+      border: 1px solid var(--client-os-line);
+      border-radius: 8px;
+      background: var(--portal-surface-bg, #f9fbfd);
+      box-shadow: none;
+    }
+
+    .portal-layout-client-os .portal-side-filter-nav {
+      display: grid;
+      gap: 0.65rem;
+      margin-top: 1.35rem;
+    }
+
+    .portal-layout-client-os .portal-controls .portal-job-folders {
+      display: none !important;
+    }
+
+    .portal-layout-client-os .portal-side-filter-nav > button,
+    .portal-layout-client-os .portal-jobs-toggle {
+      width: 100%;
+      min-height: 54px;
+      border: 1px solid var(--client-os-line);
+      border-radius: 7px;
+      padding: 0.8rem 1rem;
+      text-align: left;
+      color: var(--client-os-ink);
+      background: var(--portal-surface-bg, #fff);
+      font-weight: 850;
+      font-size: 1rem;
+    }
+
+    .portal-layout-client-os .portal-side-filter-nav button.active {
+      color: #fff;
+      border-color: var(--client-os-blue);
+      background: var(--client-os-blue);
+      box-shadow: 0 8px 18px rgba(15, 79, 148, 0.16);
+    }
+
+    .portal-layout-client-os.admin-mode .portal-job-folders {
+      display: block;
+      position: relative;
+    }
+
+    .portal-layout-client-os.admin-mode .portal-jobs-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+
+    .portal-layout-client-os.admin-mode .portal-jobs-menu {
+      display: none;
+      margin-top: 0.5rem;
+      padding: 0.7rem;
+      border: 1px solid var(--client-os-line);
+      border-radius: 8px;
+      background: var(--portal-surface-bg, #fff);
+      box-shadow: 0 12px 28px rgba(15, 35, 60, 0.12);
+    }
+
+    .portal-layout-client-os.admin-mode .portal-job-folders.is-open .portal-jobs-menu {
+      display: block;
+    }
+
+    .portal-job-create-btn {
+      width: 100%;
+      border: 1px solid rgba(15, 79, 148, 0.22);
+      border-radius: 7px;
+      padding: 0.65rem 0.75rem;
+      color: var(--client-os-blue);
+      background: #eef6ff;
+      font-weight: 800;
+      text-align: left;
+    }
+
+    .portal-job-empty {
+      margin: 0.65rem 0 0;
+      padding: 0.65rem 0.75rem;
+      border-radius: 7px;
+      color: var(--client-os-muted);
+      background: #f7fafc;
+      font-size: 0.85rem;
+    }
+
+    .portal-job-folder-list {
+      display: grid;
+      gap: 0.5rem;
+      margin-top: 0.65rem;
+    }
+
+    .portal-job-folder-item {
+      border: 1px solid var(--client-os-line);
+      border-radius: 7px;
+      padding: 0.65rem 0.75rem;
+      background: var(--portal-surface-bg, #fff);
+    }
+
+    .portal-job-folder-title {
+      color: var(--client-os-ink);
+      font-weight: 850;
+      line-height: 1.1;
+    }
+
+    .portal-job-folder-meta {
+      margin-top: 0.2rem;
+      color: var(--client-os-muted);
+      font-size: 0.78rem;
+    }
+
+    .portal-job-document-list {
+      max-height: 320px;
+      overflow: auto;
+      border: 1px solid #dee2e6;
+      border-radius: 8px;
+      background: var(--portal-surface-bg, #fff);
+    }
+
+    .portal-job-document-option {
+      display: flex;
+      gap: 0.65rem;
+      padding: 0.75rem;
+      border-bottom: 1px solid #edf2f7;
+    }
+
+    .portal-job-document-option:last-child {
+      border-bottom: 0;
+    }
+
+    .portal-job-document-option input {
+      margin-top: 0.2rem;
+    }
+
+    .portal-layout-client-os .summary-value {
+      margin-bottom: 0.2rem;
+      color: var(--client-os-ink);
+      font-size: 1.75rem;
+      line-height: 1;
+    }
+
+    .portal-layout-client-os .summary-label {
+      color: var(--client-os-muted);
+      font-size: 0.8rem;
+    }
+
+    .portal-layout-client-os .portal-attention-panel {
+      grid-column: 2;
+      display: none;
+      margin: 0 0 1rem;
+      padding: 1rem 1.1rem;
+      border: 1px solid rgba(249, 115, 22, 0.35);
+      border-left: 5px solid #f97316;
+      border-radius: 8px;
+      background: #fff1e7;
+      box-shadow: none;
+    }
+
+    .portal-layout-client-os .portal-attention-panel.is-visible {
+      display: flex;
+    }
+
+    .portal-layout-client-os .portal-attention-title {
+      margin: 0;
+      color: #743d0d;
+      font-size: 1.08rem;
+    }
+
+    .portal-layout-client-os .portal-attention-eyebrow,
+    .portal-layout-client-os .portal-attention-copy {
+      display: none;
+    }
+
+    .portal-layout-client-os .portal-attention-copy {
+      color: #743d0d;
+    }
+
+    .portal-layout-client-os .portal-documents-row {
+      grid-column: 2;
+      min-width: 0;
+      margin: 0;
+      padding: 3rem 2.5rem 3.5rem;
+      background: var(--portal-page-background, linear-gradient(180deg, #f7fbff 0%, #edf7f5 100%));
+    }
+
+    .portal-layout-client-os .portal-documents-row > .col-12 {
+      padding: 0;
+    }
+
+    .portal-layout-client-os .portal-documents-header {
+      align-items: flex-start !important;
+      margin-bottom: 1.8rem !important;
+    }
+
+    .portal-layout-client-os .portal-toolbar-title {
+      color: var(--client-os-ink);
+      font-size: clamp(2rem, 3.3vw, 2.85rem);
+      font-weight: 850;
+    }
+
+    .portal-layout-client-os .portal-toolbar-title i {
+      display: none;
+    }
+
+    .portal-layout-client-os .portal-title-default {
+      display: none;
+    }
+
+    .portal-layout-client-os .portal-title-client-os {
+      display: inline;
+    }
+
+    .portal-layout-client-os .portal-show-control {
+      display: none;
+    }
+
+    .portal-layout-client-os .portal-controls {
+      margin: 0;
+      padding: 1rem;
+      border: 1px solid var(--client-os-line);
+      border-radius: 8px;
+      background: var(--portal-surface-bg, #fff);
+      box-shadow: 0 8px 18px rgba(16, 40, 66, 0.06);
+    }
+
+    .portal-layout-client-os .quote-card {
+      margin-bottom: 0.75rem !important;
+      border: 1px solid var(--client-os-line);
+      border-radius: 8px;
+      box-shadow: 0 8px 18px rgba(15, 52, 96, 0.06);
+    }
+
+    .portal-layout-client-os .quote-card .card-body {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 1.35rem;
+      align-items: center;
+      padding: 1.4rem 1.5rem;
+    }
+
+    .portal-layout-client-os .portal-doc-main {
+      margin: 0 !important;
+    }
+
+    .portal-layout-client-os .portal-doc-footer {
+      display: contents !important;
+    }
+
+    .portal-layout-client-os .portal-doc-total {
+      min-width: 140px;
+      text-align: right;
+    }
+
+    .portal-layout-client-os .portal-doc-total h6 {
+      margin: 0;
+      color: var(--client-os-ink);
+      font-size: 1.85rem;
+      font-weight: 900;
+    }
+
+    .portal-layout-client-os .portal-doc-total small,
+    .portal-layout-client-os .project-address,
+    .portal-layout-client-os .portal-document-number {
+      color: var(--client-os-muted) !important;
+    }
+
+    .portal-layout-client-os .project-address,
+    .portal-layout-client-os .client-status-line,
+    .portal-layout-client-os .admin-meta-line {
+      display: none;
+    }
+
+    .portal-layout-client-os .portal-doc-actions {
+      grid-column: 2;
+      text-align: right;
+    }
+
+    .portal-layout-client-os .portal-document-title {
+      margin: 0.45rem 0 0.2rem;
+      color: var(--client-os-ink);
+      font-size: 1.38rem;
+    }
+
+    .portal-layout-client-os .client-status-line {
+      margin-top: 0.45rem;
+      font-size: 0.85rem;
+    }
+
+    .portal-layout-client-os .action-buttons .btn {
+      margin-right: 0;
+      min-width: 84px;
+      padding: 0.75rem 1rem;
+      font-weight: 850;
+    }
+
+    .portal-action-short {
+      display: none;
+    }
+
+    .portal-layout-client-os .portal-action-full,
+    .portal-layout-client-os .portal-action-icon {
+      display: none;
+    }
+
+    .portal-layout-client-os .portal-action-short {
+      display: inline;
+    }
+
+    .portal-layout-client-os .no-quotes {
+      border: 1px solid var(--client-os-line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .portal-layout-premium-hub #contractor-display-name,
+    .portal-layout-premium-hub .portal-client-panel h3,
+    .portal-layout-quote-viewer #contractor-display-name,
+    .portal-layout-quote-viewer .quote-viewer-hero-copy h1,
+    .portal-layout-client-os #contractor-display-name,
+    .portal-layout-client-os .portal-client-panel h3,
+    .portal-layout-client-os .portal-view-badge {
+      color: var(--portal-header-text, #10233d) !important;
+    }
+
+    .portal-layout-premium-hub #portal-tagline,
+    .portal-layout-premium-hub .portal-view-badge,
+    .portal-layout-premium-hub .portal-business-info,
+    .portal-layout-premium-hub .portal-business-info span,
+    .portal-layout-premium-hub .portal-client-panel p,
+    .portal-layout-premium-hub .portal-client-panel #contractor-name,
+    .portal-layout-quote-viewer #portal-tagline,
+    .portal-layout-quote-viewer .quote-viewer-hero-copy p,
+    .portal-layout-client-os .portal-client-panel p {
+      color: var(--portal-header-muted, #4d5c70) !important;
+    }
+
+    .portal-layout-premium-hub .summary-value,
+    .portal-layout-premium-hub .portal-attention-title,
+    .portal-layout-premium-hub .portal-activity-card h3,
+    .portal-layout-premium-hub .portal-toolbar-title,
+    .portal-layout-premium-hub .portal-document-title,
+    .portal-layout-premium-hub .portal-doc-total h6,
+    .portal-layout-quote-viewer .quote-viewer-balance-label,
+    .portal-layout-quote-viewer .quote-viewer-balance-amount,
+    .portal-layout-quote-viewer .portal-toolbar-title,
+    .portal-layout-quote-viewer .portal-document-title,
+    .portal-layout-quote-viewer .portal-doc-total h6,
+    .portal-layout-client-os .summary-value,
+    .portal-layout-client-os .portal-toolbar-title,
+    .portal-layout-client-os .portal-document-title,
+    .portal-layout-client-os .portal-doc-total h6,
+    .portal-job-folder-title {
+      color: var(--portal-card-text, #10233d) !important;
+    }
+
+    .portal-layout-premium-hub .summary-label,
+    .portal-layout-premium-hub .portal-attention-copy,
+    .portal-layout-premium-hub .portal-activity-list li,
+    .portal-layout-premium-hub .portal-document-number,
+    .portal-layout-premium-hub .project-address,
+    .portal-layout-premium-hub .admin-meta-line,
+    .portal-layout-quote-viewer .quote-viewer-balance-copy,
+    .portal-layout-quote-viewer .client-status-line,
+    .portal-layout-quote-viewer .portal-document-number,
+    .portal-layout-quote-viewer .project-address,
+    .portal-layout-quote-viewer .admin-meta-line,
+    .portal-layout-client-os .summary-label,
+    .portal-layout-client-os .portal-document-number,
+    .portal-layout-client-os .project-address,
+    .portal-layout-client-os .admin-meta-line,
+    .portal-job-empty,
+    .portal-job-folder-meta {
+      color: var(--portal-muted-text, #637085) !important;
+    }
+
+    .portal-layout-premium-hub .portal-attention-panel .btn,
+    .portal-layout-premium-hub .quote-card .btn-outline-primary,
+    .portal-layout-quote-viewer .quote-viewer-balance-panel .btn,
+    .portal-layout-quote-viewer .quote-card .btn-outline-primary,
+    .portal-layout-client-os .quote-card .btn-outline-primary,
+    .portal-activity-index {
+      color: var(--portal-button-text, #ffffff) !important;
+      border-color: var(--portal-accent-color, #12579c) !important;
+      background-color: var(--portal-accent-color, #12579c) !important;
+    }
+
+    .portal-button-style-outline .portal-attention-panel .btn,
+    .portal-button-style-outline .quote-viewer-balance-panel .btn,
+    .portal-button-style-outline .quote-card .btn-outline-primary {
+      color: var(--portal-accent-color, #12579c) !important;
+      border-color: var(--portal-accent-color, #12579c) !important;
+      background: var(--portal-surface-bg, #ffffff) !important;
+    }
+
+    .portal-button-style-soft .portal-attention-panel .btn,
+    .portal-button-style-soft .quote-viewer-balance-panel .btn,
+    .portal-button-style-soft .quote-card .btn-outline-primary {
+      color: var(--portal-accent-color, #12579c) !important;
+      border-color: color-mix(in srgb, var(--portal-accent-color, #12579c) 28%, #ffffff) !important;
+      background: color-mix(in srgb, var(--portal-accent-color, #12579c) 14%, #ffffff) !important;
+    }
+
+    .portal-layout-premium-hub .portal-jobs-toggle,
+    .portal-layout-quote-viewer .portal-jobs-toggle,
+    .portal-job-create-btn {
+      color: var(--portal-accent-color, #12579c) !important;
+    }
+
+    .portal-layout-premium-hub .quote-card .card-body,
+    .portal-layout-quote-viewer .quote-card .card-body,
+    .portal-layout-client-os .quote-card .card-body {
+      color: var(--portal-card-text, #10233d);
+    }
+
     @media (max-width: 768px) {
       .header-bg {
         padding: 1.5rem 0;
@@ -378,9 +1743,142 @@
         width: 132px;
         max-width: 42vw;
       }
-      
+
+      .portal-layout-premium-hub .header-bg {
+        margin: 0;
+        padding: 2rem 1.25rem 5.25rem;
+        border-radius: 0;
+      }
+
+      .portal-layout-premium-hub .portal-header-shell,
+      .portal-layout-premium-hub .portal-brand-block {
+        display: block;
+        text-align: center;
+      }
+
+      .portal-layout-premium-hub .portal-client-panel {
+        min-height: 0;
+        margin-top: 1.5rem;
+        padding: 1.3rem;
+        text-align: center;
+      }
+
+      .portal-layout-premium-hub #contractor-display-name {
+        font-size: 2.45rem;
+      }
+
+      .portal-layout-premium-hub .portal-business-info {
+        justify-content: center;
+      }
+
+      .portal-layout-premium-hub main.container {
+        max-width: 100%;
+        margin-top: -3.25rem !important;
+        padding-left: 1rem;
+        padding-right: 1rem;
+      }
+
+      .portal-layout-premium-hub .summary-card {
+        min-height: 0;
+      }
+
+      .portal-layout-premium-hub .portal-premium-feature-row {
+        display: block;
+      }
+
+      .portal-layout-premium-hub .portal-attention-panel,
+      .portal-layout-premium-hub .portal-activity-card {
+        min-height: 0;
+        margin-bottom: 1rem;
+        padding: 1.35rem;
+      }
+
+      .portal-layout-premium-hub .portal-document-title {
+        font-size: 1.35rem;
+      }
+
+      .portal-layout-quote-viewer #portalContent {
+        margin: 0;
+        border-radius: 0;
+      }
+
+      .portal-layout-quote-viewer .header-bg {
+        padding: 2rem 1.25rem;
+      }
+
+      .portal-layout-quote-viewer .portal-header-shell,
+      .portal-layout-quote-viewer .portal-brand-block {
+        display: block;
+        text-align: center;
+      }
+
+      .portal-layout-quote-viewer .quote-viewer-hero-copy {
+        margin-top: 2rem;
+      }
+
+      .portal-layout-quote-viewer .quote-viewer-hero-copy h1 {
+        font-size: 3rem;
+      }
+
+      .portal-layout-quote-viewer .quote-viewer-balance-panel {
+        min-height: 0;
+        margin-top: 1.5rem;
+        padding: 1.5rem;
+      }
+
+      .portal-layout-quote-viewer .portal-documents-row {
+        padding: 2rem 1rem 2.5rem;
+      }
+
+      .portal-layout-quote-viewer .quote-card .card-body {
+        display: block;
+      }
+
+      .portal-layout-quote-viewer .portal-doc-total,
+      .portal-layout-quote-viewer .portal-doc-actions {
+        margin-top: 1rem;
+        text-align: left;
+      }
+
       .summary-value {
         font-size: 1.5rem;
+      }
+    }
+
+    @media (max-width: 992px) {
+      .portal-layout-client-os .portal-header-shell,
+      .portal-layout-client-os .portal-brand-block {
+        display: block;
+        text-align: center;
+      }
+
+      .portal-layout-client-os .portal-client-panel {
+        margin: 1rem auto 0;
+        text-align: center;
+      }
+
+      .portal-layout-client-os main.container {
+        display: block;
+      }
+
+      .portal-layout-client-os .portal-summary-row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+      }
+
+      .portal-layout-client-os .portal-summary-row > [class*="col-"] {
+        margin: 0;
+      }
+
+      .portal-layout-client-os .quote-card .card-body {
+        display: block;
+      }
+
+      .portal-layout-client-os .portal-doc-total,
+      .portal-layout-client-os .portal-doc-actions {
+        text-align: left;
       }
     }
   </style>
@@ -417,6 +1915,11 @@
             <h2 id="contractor-display-name" class="mb-0">Loading...</h2>
             <p class="mb-0" id="portal-tagline">Secure Client Portal</p>
             <div id="business-info-header" class="portal-business-info"></div>
+            <div class="quote-viewer-hero-copy">
+              <div class="quote-viewer-client-pill">Client View</div>
+              <h1>Your project documents in one place.</h1>
+              <p>Review quotes, pay invoices, and track completed work from the same clean portal.</p>
+            </div>
           </div>
         </div>
         <div class="portal-client-panel">
@@ -427,6 +1930,13 @@
             <a href="dashboard.html" class="btn btn-outline-primary btn-sm"><i class="fas fa-gauge-high me-1"></i> Dashboard</a>
             <button type="button" class="btn btn-outline-secondary btn-sm" onclick="copyAdminPortalLink()"><i class="fas fa-link me-1"></i> Copy Admin Link</button>
           </div>
+          <div class="quote-viewer-balance-panel">
+            <div class="quote-viewer-action-pill">Action Required</div>
+            <div class="quote-viewer-balance-label">Current Balance Due</div>
+            <div class="quote-viewer-balance-amount" id="quoteViewerBalanceDue">$0.00</div>
+            <div class="quote-viewer-balance-copy" id="quoteViewerBalanceCopy">Your portal is up to date.</div>
+            <a id="quoteViewerContinueAction" href="#quotes-container" class="btn btn-warning">Continue Review</a>
+          </div>
         </div>
       </div>
     </div>
@@ -434,7 +1944,7 @@
 
   <main class="container mt-4">
     <!-- Summary Cards -->
-    <div class="row mb-4">
+    <div class="row mb-4 portal-summary-row">
       <div class="col-md-3 col-sm-6">
         <div class="card summary-card">
           <div class="summary-value" id="balance-due">$0.00</div>
@@ -444,7 +1954,7 @@
       <div class="col-md-3 col-sm-6">
         <div class="card summary-card">
           <div class="summary-value" id="open-quotes">0</div>
-          <div class="summary-label">Open Quotes</div>
+          <div class="summary-label" id="open-quotes-label">Open Quotes</div>
         </div>
       </div>
       <div class="col-md-3 col-sm-6">
@@ -459,15 +1969,54 @@
           <div class="summary-label" id="jobs-completed-label">Jobs Completed</div>
         </div>
       </div>
+      <div class="portal-side-filter-nav" aria-label="Show portal documents">
+        <button type="button" class="active" data-filter="all" onclick="setPortalShowFilter('all')">All documents</button>
+        <button type="button" data-filter="needs_action" onclick="setPortalShowFilter('needs_action')">Needs action</button>
+        <button type="button" data-filter="invoices" onclick="setPortalShowFilter('invoices')">Invoices</button>
+        <button type="button" data-filter="quotes" onclick="setPortalShowFilter('quotes')">Quotes</button>
+        <button type="button" data-filter="completed" onclick="setPortalShowFilter('completed')">Completed</button>
+        <div class="portal-job-folders" id="portalJobFoldersSide">
+          <button type="button" class="portal-jobs-toggle" onclick="togglePortalJobsMenu(this)" aria-expanded="false" aria-controls="portalJobsMenuSide">
+            <span><i class="fas fa-folder-tree me-2"></i>Jobs</span>
+            <i class="fas fa-chevron-down"></i>
+          </button>
+          <div class="portal-jobs-menu" id="portalJobsMenuSide">
+            <button type="button" class="portal-job-create-btn" onclick="openPortalJobFolderModal()">
+              <i class="fas fa-plus me-2"></i>Create Job Folder
+            </button>
+            <div class="portal-job-folder-list">
+              <div class="portal-job-empty">No job folders yet.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="portal-premium-feature-row">
+      <section id="portalAttentionPanel" class="portal-attention-panel" aria-live="polite">
+        <div>
+          <div class="portal-attention-eyebrow"><i class="fas fa-bolt"></i> Needs attention</div>
+          <h2 id="portalAttentionTitle" class="portal-attention-title">Document ready for review</h2>
+          <p id="portalAttentionCopy" class="portal-attention-copy">Open the newest document to continue.</p>
+        </div>
+        <a id="portalAttentionAction" href="#" class="btn btn-primary btn-sm"><i class="fas fa-arrow-up-right-from-square me-1"></i>Open</a>
+      </section>
+
+      <aside id="portalActivityCard" class="portal-activity-card" aria-live="polite">
+        <h3>Portal activity</h3>
+        <ol id="portalActivityList" class="portal-activity-list">
+          <li><span class="portal-activity-index">1</span><span>Portal updates will appear here.</span></li>
+        </ol>
+      </aside>
     </div>
 
     <!-- Quotes List -->
-    <div class="row">
+    <div class="row portal-documents-row">
       <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-3">
-          <h2 class="portal-toolbar-title mb-0"><i class="fas fa-folder-open"></i> Quotes & Invoices</h2>
+        <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-3 portal-documents-header">
+          <h2 class="portal-toolbar-title mb-0"><i class="fas fa-folder-open"></i><span class="portal-title-default">Quotes & Invoices</span><span class="portal-title-client-os">Project Documents</span></h2>
           <div class="portal-controls d-flex gap-2 flex-wrap align-items-end mb-0">
-            <div>
+            <div class="portal-show-control">
               <label class="form-label small text-muted mb-1" for="portalShowFilter">Show</label>
               <select id="portalShowFilter" class="form-select form-select-sm" onchange="renderPortalDocuments()">
                 <option value="all">Everything</option>
@@ -489,6 +2038,20 @@
                 <option value="amount_asc">Lowest amount</option>
                 <option value="status">Status</option>
               </select>
+            </div>
+            <div class="portal-job-folders" id="portalJobFolders">
+              <button type="button" class="portal-jobs-toggle" onclick="togglePortalJobsMenu(this)" aria-expanded="false" aria-controls="portalJobsMenu">
+                <span><i class="fas fa-folder-tree me-2"></i>Jobs</span>
+                <i class="fas fa-chevron-down"></i>
+              </button>
+              <div class="portal-jobs-menu" id="portalJobsMenu">
+                <button type="button" class="portal-job-create-btn" onclick="openPortalJobFolderModal()">
+                  <i class="fas fa-plus me-2"></i>Create Job Folder
+                </button>
+                <div id="portalJobFolderList" class="portal-job-folder-list">
+                  <div class="portal-job-empty">No job folders yet.</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -519,12 +2082,41 @@
     </div>
   </div>
 
+  <!-- Job Folder Modal -->
+  <div id="portalJobFolderModal" class="modal fade" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="fas fa-folder-plus me-2"></i>Create Job Folder</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-bold" for="portalJobFolderName">Job folder name</label>
+            <input type="text" class="form-control" id="portalJobFolderName" placeholder="e.g., Main Floor Renovation">
+          </div>
+          <div class="mb-2 fw-bold">Select documents</div>
+          <div id="portalJobFolderDocuments" class="portal-job-document-list">
+            <div class="text-muted p-3">No documents available yet.</div>
+          </div>
+          <div id="portalJobFolderStatus" class="small mt-3 text-muted" aria-live="polite"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" id="portalJobFolderSaveBtn" onclick="savePortalJobFolder()">
+            <i class="fas fa-save me-1"></i>Save Job Folder
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="help-content.js?v=1777741200"></script>
 <script src="modal-help.js?v=1777741200"></script>
 <script src="change-orders.js?v=1778060200"></script>
-  
+
   <script>
     // Supabase initialization
     const supabaseUrl = 'https://axmoffknvblluibuitrq.supabase.co';
@@ -540,6 +2132,7 @@
     const portalToken = urlParams.get('token') || '';
     const portalAnchorId = urlParams.get('portal_anchor') || portalQuoteId || '';
     const portalId = urlParams.get('portal');
+    const portalThemeStudioMode = ['1', 'true', 'studio'].includes(String(urlParams.get('theme_studio') || '').toLowerCase());
     const requestedAdminView = ['1', 'true', 'admin'].includes(String(urlParams.get('admin') || urlParams.get('view') || '').toLowerCase());
     let portalIsAdminView = false;
     let portalResolvedClientName = '';
@@ -552,17 +2145,24 @@
     const contractorNameEl = document.getElementById('contractor-name');
     const quotesContainer = document.getElementById('quotes-container');
     const noQuotesEl = document.getElementById('no-quotes');
-    
+
     // Summary cards
     const balanceDueEl = document.getElementById('balance-due');
     const openQuotesEl = document.getElementById('open-quotes');
+    const openQuotesLabelEl = document.getElementById('open-quotes-label');
     const invoiceCountEl = document.getElementById('invoice-count');
     const jobsCompletedEl = document.getElementById('jobs-completed');
     const jobsCompletedLabelEl = document.getElementById('jobs-completed-label');
     let portalQuotesCache = [];
+    let portalJobFolders = [];
 
     // Initialize page
     async function init() {
+      if (portalThemeStudioMode) {
+        await loadThemeStudioDemoPortal();
+        return;
+      }
+
       if ((!clientName && !clientEmail && !portalQuoteId && !portalId) || !contractorId) {
         alert('Missing client or contractor parameters');
         return;
@@ -572,10 +2172,10 @@
 
       // Set client name (title-cased) — will be updated from quote data later
       clientNameEl.textContent = titleCase(clientName || clientEmail || 'Client');
-      
+
       // Get contractor company name
       await getContractorName();
-      
+
       // Load quotes
       await loadQuotes();
 
@@ -677,14 +2277,71 @@
       const clean = value => /^#[0-9a-fA-F]{6}$/.test(String(value || '').trim()) ? String(value).trim() : '';
       const bgStyle = ['solid', 'soft-fade', 'branded-fade', 'paper'].includes(theme?.bgStyle) ? theme.bgStyle : '';
       const bgStrength = theme?.bgStrength === undefined ? '' : Math.max(0, Math.min(100, parseInt(theme.bgStrength, 10) || 0));
+      const layoutStyle = ['premium-hub', 'quote-viewer', 'client-os'].includes(theme?.layoutStyle) ? theme.layoutStyle : '';
+      const logoSize = ['small', 'medium', 'large'].includes(theme?.logoSize) ? theme.logoSize : '';
+      const logoScale = theme?.logoScale === undefined ? (layoutStyle === 'client-os' ? 130 : '') : Math.max(70, Math.min(180, parseInt(theme.logoScale, 10) || 100));
+      const headerDensity = ['compact', 'standard', 'spacious'].includes(theme?.headerDensity) ? theme.headerDensity : '';
+      const buttonStyle = ['filled', 'outline', 'soft'].includes(theme?.buttonStyle) ? theme.buttonStyle : '';
+      const cardStyle = ['flat', 'shadow', 'premium'].includes(theme?.cardStyle) ? theme.cardStyle : '';
       return {
         headerColor: clean(theme?.headerColor),
         bgColor: clean(theme?.bgColor),
+        bgColor2: clean(theme?.bgColor2),
         textColor: clean(theme?.textColor),
+        headerTextColor: clean(theme?.headerTextColor),
+        headerDetailColor: clean(theme?.headerDetailColor),
+        cardTextColor: clean(theme?.cardTextColor),
+        mutedTextColor: clean(theme?.mutedTextColor),
+        buttonTextColor: clean(theme?.buttonTextColor),
         bgStyle: bgStyle,
         bgStrength: bgStrength,
-        portalLogo: theme?.portalLogo || ''
+        layoutStyle: layoutStyle,
+        portalLogo: theme?.portalLogo || '',
+        logoSize: logoSize,
+        logoScale: logoScale,
+        headerDensity: headerDensity,
+        buttonStyle: buttonStyle,
+        cardStyle: cardStyle
       };
+    }
+
+    function portalLayoutClass(layoutStyle) {
+      const clean = ['premium-hub', 'quote-viewer', 'client-os'].includes(layoutStyle) ? layoutStyle : 'premium-hub';
+      return 'portal-layout-' + clean;
+    }
+
+    function portalLogoDimensions(layoutStyle, logoSize, logoScale) {
+      const layout = ['premium-hub', 'quote-viewer', 'client-os'].includes(layoutStyle) ? layoutStyle : 'premium-hub';
+      const size = ['small', 'medium', 'large'].includes(logoSize) ? logoSize : 'medium';
+      const scale = Math.max(70, Math.min(180, parseInt(logoScale, 10) || 100)) / 100;
+      const dimensions = {
+        'premium-hub': {
+          small: { width: 180, height: 110 },
+          medium: { width: 246, height: 188 },
+          large: { width: 460, height: 270 }
+        },
+        'quote-viewer': {
+          small: { width: 220, height: 140 },
+          medium: { width: 300, height: 210 },
+          large: { width: 380, height: 260 }
+        },
+        'client-os': {
+          small: { width: 160, height: 96 },
+          medium: { width: 200, height: 118 },
+          large: { width: 240, height: 150 }
+        }
+      };
+      const base = dimensions[layout][size] || dimensions[layout].medium;
+      return {
+        width: Math.round(base.width * scale),
+        height: Math.round(base.height * scale)
+      };
+    }
+
+    function portalContrastText(hex) {
+      const rgb = portalThemeHexToRgb(hex || '#1a2940');
+      const luminance = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
+      return luminance > 0.58 ? { text: '#10233d', muted: '#4d5c70' } : { text: '#ffffff', muted: 'rgba(255,255,255,0.84)' };
     }
 
     function portalThemeHexToRgb(hex) {
@@ -700,7 +2357,7 @@
     function portalBodyBackground(theme) {
       const t = normalizePortalTheme(theme || {});
       const headerColor = t.headerColor || '#1a2940';
-      const bgColor = t.bgColor || '#f5f7fb';
+      const bgColor = t.bgColor2 || t.bgColor || '#f5f7fb';
       const bgStyle = t.bgStyle || 'solid';
       const strength = Math.max(0, Math.min(100, parseInt(t.bgStrength, 10) || 0)) / 100;
       const bg = portalThemeHexToRgb(bgColor);
@@ -735,14 +2392,51 @@
     function applyPortalTheme(theme) {
       const t = normalizePortalTheme(theme || {});
       const header = document.querySelector('.header-bg');
-      if (t.headerColor && header) header.style.backgroundColor = t.headerColor;
-      if (t.bgColor) {
+      const layoutStyle = t.layoutStyle || 'premium-hub';
+      document.body.classList.remove('portal-layout-premium-hub', 'portal-layout-quote-viewer', 'portal-layout-client-os');
+      document.body.classList.add(portalLayoutClass(layoutStyle));
+      document.body.classList.remove(
+        'portal-logo-size-small', 'portal-logo-size-medium', 'portal-logo-size-large',
+        'portal-density-compact', 'portal-density-standard', 'portal-density-spacious',
+        'portal-button-style-filled', 'portal-button-style-outline', 'portal-button-style-soft',
+        'portal-card-style-flat', 'portal-card-style-shadow', 'portal-card-style-premium'
+      );
+      document.body.classList.add('portal-logo-size-' + (t.logoSize || 'medium'));
+      document.body.classList.add('portal-density-' + (t.headerDensity || 'standard'));
+      document.body.classList.add('portal-button-style-' + (t.buttonStyle || 'filled'));
+      document.body.classList.add('portal-card-style-' + (t.cardStyle || 'shadow'));
+      const logoDimensions = portalLogoDimensions(layoutStyle, t.logoSize || 'medium', t.logoScale || 100);
+      document.documentElement.style.setProperty('--portal-logo-render-width', logoDimensions.width + 'px');
+      document.documentElement.style.setProperty('--portal-logo-render-height', logoDimensions.height + 'px');
+      document.documentElement.style.setProperty('--portal-logo-max-width', logoDimensions.width + 'px');
+      document.documentElement.style.setProperty('--portal-logo-max-height', logoDimensions.height + 'px');
+      const surfaceBg = t.bgColor || '#ffffff';
+      const pageBg = t.bgColor2 || t.bgColor || '#f5f7fb';
+      const accentColor = t.textColor || '#12579c';
+      const headerTextColor = t.headerTextColor || t.textColor || '#10233d';
+      const headerDetailColor = t.headerDetailColor || t.mutedTextColor || '#4d5c70';
+      const cardTextColor = t.cardTextColor || t.textColor || '#10233d';
+      const mutedTextColor = t.mutedTextColor || '#637085';
+      const buttonTextColor = t.buttonTextColor || '#ffffff';
+      document.documentElement.style.setProperty('--portal-surface-bg', surfaceBg);
+      document.documentElement.style.setProperty('--portal-page-bg', pageBg);
+      document.documentElement.style.setProperty('--portal-page-background', portalBodyBackground(t));
+      document.documentElement.style.setProperty('--portal-accent-color', accentColor);
+      document.documentElement.style.setProperty('--portal-header-text', headerTextColor);
+      document.documentElement.style.setProperty('--portal-header-muted', headerDetailColor);
+      document.documentElement.style.setProperty('--portal-card-text', cardTextColor);
+      document.documentElement.style.setProperty('--portal-muted-text', mutedTextColor);
+      document.documentElement.style.setProperty('--portal-button-text', buttonTextColor);
+      if (t.headerColor) {
+        document.documentElement.style.setProperty('--portal-header-bg', t.headerColor);
+        if (header) header.style.backgroundColor = t.headerColor;
+        const contrast = portalContrastText(t.headerColor);
+        document.documentElement.style.setProperty('--portal-header-contrast', contrast.text);
+        document.documentElement.style.setProperty('--portal-header-contrast-muted', contrast.muted);
+      }
+      if (t.bgColor || t.bgColor2) {
         document.body.style.background = portalBodyBackground(t);
         document.body.style.backgroundAttachment = t.bgStyle && t.bgStyle !== 'solid' ? 'fixed' : '';
-      }
-      if (t.textColor) {
-        document.documentElement.style.setProperty('--portal-header-text', t.textColor);
-        document.documentElement.style.setProperty('--portal-header-muted', t.textColor);
       }
       renderPortalLogo(t.portalLogo || portalBusinessLogoSrc);
       const metaTheme = document.querySelector('meta[name="theme-color"]');
@@ -753,8 +2447,197 @@
       const quoteWithTheme = (quotes || []).find(function(q) {
         return q.data && q.data.portal_theme && q.data.portal_theme.useDefault !== true;
       });
-      return quoteWithTheme ? normalizePortalTheme(quoteWithTheme.data.portal_theme) : {};
+      if (quoteWithTheme) return normalizePortalTheme(quoteWithTheme.data.portal_theme);
+      const quoteWithPortalLogo = (quotes || []).find(function(q) {
+        return q.data && q.data.portal_theme && q.data.portal_theme.portalLogo;
+      });
+      if (!quoteWithPortalLogo) return {};
+      const logoTheme = quoteWithPortalLogo.data.portal_theme || {};
+      return normalizePortalTheme({
+        portalLogo: logoTheme.portalLogo || '',
+        logoSize: logoTheme.logoSize,
+        logoScale: logoTheme.logoScale
+      });
     }
+
+    function mergePortalTheme(defaultTheme, overrideTheme) {
+      const merged = normalizePortalTheme(defaultTheme || {});
+      const override = normalizePortalTheme(overrideTheme || {});
+      Object.keys(override).forEach(function(key) {
+        const value = override[key];
+        if (value !== '' && value !== null && value !== undefined) {
+          merged[key] = value;
+        }
+      });
+      return merged;
+    }
+
+    function readPortalThemeStudioDraft() {
+      try {
+        return JSON.parse(localStorage.getItem('portal-theme-studio-draft') || '{}') || {};
+      } catch (err) {
+        return {};
+      }
+    }
+
+    function themeStudioDemoDocuments() {
+      const demoSignature = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="260" height="96" viewBox="0 0 260 96"><rect width="260" height="96" fill="white"/><path d="M22 60 C45 25, 55 25, 48 58 C44 80, 70 20, 82 58 C88 78, 112 38, 125 50 C138 62, 145 62, 158 44 C168 30, 170 68, 184 56 C199 43, 209 42, 236 50" fill="none" stroke="#10233d" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><path d="M26 75 H232" stroke="#cfd8e3" stroke-width="2" stroke-linecap="round"/></svg>');
+      return [
+        {
+          id: 'theme-studio-invoice',
+          user_id: 'theme-studio',
+          client_name: 'Jordan Mercer',
+          quote_number: 'DEMO-2026-1042-INV',
+          status: 'invoiced',
+          total: 1840.75,
+          created_at: '2026-06-12T14:30:00Z',
+          type: 'invoice',
+          data: {
+            quoteTitle: 'Jordan Mercer - Kitchen Lighting Upgrade',
+            quoteNumber: 'DEMO-2026-1042-INV',
+            documentType: 'invoice',
+            status: 'invoiced',
+            paymentStatus: 'unpaid',
+            projectAddress: '128 Maple Studio Lane, Hamilton, Ontario, L8P 2B4',
+            currency: 'CAD',
+            portal_added_at: '2026-06-12T14:30:00Z',
+            portal_visible: true
+          }
+        },
+        {
+          id: 'theme-studio-quote',
+          user_id: 'theme-studio',
+          client_name: 'Jordan Mercer',
+          quote_number: 'DEMO-2026-1041',
+          status: 'accepted',
+          total: 9685.4,
+          created_at: '2026-06-10T16:15:00Z',
+          type: 'quote',
+          accepted_at: '2026-06-11T18:42:00Z',
+          data: {
+            quoteTitle: 'Jordan Mercer - Main Floor Paint and Trim',
+            quoteNumber: 'DEMO-2026-1041',
+            documentType: 'quote',
+            status: 'accepted',
+            projectAddress: '128 Maple Studio Lane, Hamilton, Ontario, L8P 2B4',
+            currency: 'CAD',
+            portal_added_at: '2026-06-10T16:15:00Z',
+            portal_visible: true,
+            signature_data_url: demoSignature,
+            signed_at: '2026-06-11T18:42:00Z'
+          }
+        },
+        {
+          id: 'theme-studio-paid',
+          user_id: 'theme-studio',
+          client_name: 'Jordan Mercer',
+          quote_number: 'DEMO-2026-0998-INV',
+          status: 'paid',
+          total: 1280,
+          created_at: '2026-05-28T15:00:00Z',
+          type: 'invoice',
+          data: {
+            quoteTitle: 'Jordan Mercer - Powder Room Fixture Install',
+            quoteNumber: 'DEMO-2026-0998-INV',
+            documentType: 'invoice',
+            status: 'paid',
+            paymentStatus: 'paid',
+            projectAddress: '128 Maple Studio Lane, Hamilton, Ontario, L8P 2B4',
+            currency: 'CAD',
+            portal_added_at: '2026-05-28T15:00:00Z',
+            portal_visible: true
+          }
+        }
+      ];
+    }
+
+    async function loadThemeStudioBusinessBranding() {
+      const fallbackProfile = {
+        business_name: 'Your Company Name',
+        company_name: 'Your Company Name',
+        address: '',
+        city: '',
+        province: '',
+        postal_code: '',
+        phone: '',
+        email: ''
+      };
+      let userId = '';
+      try {
+        const { data: { session } } = await _sbClient.auth.getSession();
+        userId = session?.user?.id || '';
+      } catch (error) {}
+
+      let localProfile = {};
+      try {
+        localProfile = JSON.parse(localStorage.getItem('ald_business_profile') || '{}') || {};
+      } catch (error) {
+        localProfile = {};
+      }
+      let profile = Object.keys(localProfile).length ? localProfile : fallbackProfile;
+      let logoSrc = localStorage.getItem('ald_company_logo') || localStorage.getItem('ald_logo') || '';
+      let theme = {};
+
+      if (userId) {
+        try {
+          const { data: rows } = await _sbClient
+            .from('user_data')
+            .select('key,value')
+            .eq('user_id', userId)
+            .in('key', ['business_profile', 'company_logo', 'portal_theme']);
+          const profileRow = rows?.find(r => r.key === 'business_profile')?.value || null;
+          const logoRow = rows?.find(r => r.key === 'company_logo')?.value || {};
+          theme = rows?.find(r => r.key === 'portal_theme')?.value || {};
+          if (profileRow && Object.keys(profileRow).length) profile = profileRow;
+          logoSrc = logoRow.logo || logoRow.logoUrl || logoRow.url || logoSrc || '';
+        } catch (error) {
+          console.warn('Theme Studio demo branding fallback used:', error);
+        }
+      }
+
+      return { profile: Object.assign({}, fallbackProfile, profile || {}), logo: logoSrc, theme: theme };
+    }
+
+    function applyThemeStudioDraft(theme) {
+      portalDefaultTheme = normalizePortalTheme(theme || {});
+      applyPortalTheme(portalDefaultTheme);
+      updatePortalAttention(portalQuotesCache);
+      updatePortalActivity(portalQuotesCache);
+      updateSummaryCards(portalQuotesCache);
+    }
+
+    async function loadThemeStudioDemoPortal() {
+      const branding = await loadThemeStudioBusinessBranding();
+      const profile = branding.profile || {};
+      const companyName = profile.business_name || profile.company_name || 'Your Company Name';
+      portalIsAdminView = false;
+      portalResolvedClientName = 'Jordan Mercer';
+      portalCompanyName = companyName;
+      portalBusinessLogoSrc = branding.logo || '';
+      document.body.classList.add('portal-theme-studio-demo');
+      hidePinGate();
+      updatePortalModeBadge(false);
+      clientNameEl.textContent = 'Jordan Mercer';
+      contractorNameEl.textContent = companyName;
+      renderPortalLogo(portalBusinessLogoSrc);
+      renderBusinessHeader(profile);
+      portalDefaultTheme = normalizePortalTheme(branding.theme || {});
+      portalQuotesCache = themeStudioDemoDocuments();
+      noQuotesEl.classList.add('d-none');
+      applyThemeStudioDraft(readPortalThemeStudioDraft());
+      renderPortalDocuments();
+      updateSummaryCards(portalQuotesCache);
+      updatePortalAttention(portalQuotesCache);
+      updatePortalActivity(portalQuotesCache);
+    }
+
+    window.addEventListener('message', function(event) {
+      if (!portalThemeStudioMode || event.origin !== window.location.origin) return;
+      if (event.data && event.data.type === 'portal-theme-studio-draft') {
+        applyThemeStudioDraft(event.data.theme || {});
+        renderPortalDocuments();
+      }
+    });
 
     function getLocalDevPortalBranding() {
       const isLocalHost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
@@ -819,9 +2702,12 @@
             return;
           }
           portalQuotesCache = quotes;
-          applyPortalTheme(Object.assign({}, portalDefaultTheme, portalThemeOverrideFromQuotes(quotes)));
+          refreshPortalJobFolders();
+          applyPortalTheme(mergePortalTheme(portalDefaultTheme, portalThemeOverrideFromQuotes(quotes)));
           processQuotes(getFilteredSortedQuotes(quotes));
           updateSummaryCards(quotes);
+          updatePortalAttention(quotes);
+          updatePortalActivity(quotes);
           return;
         }
 
@@ -880,22 +2766,24 @@
           portalResolvedClientName = quotes[0].client_name || quotes[0].data?.clientName || quotes[0].data?.client_name || '';
           clientNameEl.textContent = titleCase(portalResolvedClientName || clientEmail || 'Client');
         }
-        
+
         if (!quotes || quotes.length === 0) {
           noQuotesEl.classList.remove('d-none');
           return;
         }
-        
+
         // Hide no quotes message
         noQuotesEl.classList.add('d-none');
-        
+
         // Process and display quotes
         portalQuotesCache = quotes;
-        applyPortalTheme(Object.assign({}, portalDefaultTheme, portalThemeOverrideFromQuotes(quotes)));
+        refreshPortalJobFolders();
+        applyPortalTheme(mergePortalTheme(portalDefaultTheme, portalThemeOverrideFromQuotes(quotes)));
         renderPortalDocuments();
-        
+
         // Update summary cards
         updateSummaryCards(quotes);
+        updatePortalAttention(quotes);
       } catch (error) {
         console.error('Error loading quotes:', error);
         noQuotesEl.classList.remove('d-none');
@@ -904,6 +2792,211 @@
 
     function renderPortalDocuments() {
       processQuotes(getFilteredSortedQuotes(portalQuotesCache));
+      updatePortalAttention(portalQuotesCache);
+      updatePortalActivity(portalQuotesCache);
+      updatePortalSideFilterNav();
+      refreshPortalJobFolders();
+    }
+
+    function setPortalShowFilter(value) {
+      const showSelect = document.getElementById('portalShowFilter');
+      if (showSelect) showSelect.value = value || 'all';
+      renderPortalDocuments();
+    }
+
+    function updatePortalSideFilterNav() {
+      const show = document.getElementById('portalShowFilter')?.value || 'all';
+      document.querySelectorAll('.portal-side-filter-nav button[data-filter]').forEach(function(btn) {
+        btn.classList.toggle('active', btn.getAttribute('data-filter') === show);
+      });
+    }
+
+    function portalJobFolderSourceRows(quotes) {
+      return dedupePortalDocuments(quotes || []).filter(function(quote) {
+        return quote && quote.id;
+      });
+    }
+
+    function sanitizePortalJobFolder(folder) {
+      if (!folder || !folder.id || !folder.name) return null;
+      const documentIds = Array.isArray(folder.documentIds)
+        ? folder.documentIds.map(String).filter(Boolean)
+        : [];
+      return {
+        id: String(folder.id),
+        name: String(folder.name).trim(),
+        documentIds: Array.from(new Set(documentIds)),
+        createdAt: folder.createdAt || new Date().toISOString()
+      };
+    }
+
+    function portalJobFoldersFromQuotes(quotes) {
+      const byId = {};
+      portalJobFolderSourceRows(quotes).forEach(function(quote) {
+        const folders = Array.isArray(quote.data?.portal_job_folders) ? quote.data.portal_job_folders : [];
+        folders.forEach(function(folder) {
+          const clean = sanitizePortalJobFolder(folder);
+          if (!clean) return;
+          if (!byId[clean.id]) {
+            byId[clean.id] = clean;
+          } else {
+            byId[clean.id].documentIds = Array.from(new Set(byId[clean.id].documentIds.concat(clean.documentIds)));
+          }
+        });
+      });
+      return Object.values(byId).sort(function(a, b) {
+        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+      });
+    }
+
+    function refreshPortalJobFolders() {
+      portalJobFolders = portalJobFoldersFromQuotes(portalQuotesCache);
+      renderPortalJobsMenu();
+    }
+
+    function renderPortalJobsMenu() {
+      const folderRoots = Array.from(document.querySelectorAll('.portal-job-folders'));
+      if (!folderRoots.length) return;
+      const listMarkup = portalJobFolders.length ? portalJobFolders.map(function(folder) {
+        const count = folder.documentIds.length;
+        return '<div class="portal-job-folder-item">' +
+          '<div class="portal-job-folder-title"><i class="fas fa-folder me-2"></i>' + escapeHtml(folder.name) + '</div>' +
+          '<div class="portal-job-folder-meta">' + count + ' ' + (count === 1 ? 'document' : 'documents') + ' grouped</div>' +
+          '</div>';
+      }).join('') : '<div class="portal-job-empty">No job folders yet. Create one to group this client\'s portal documents.</div>';
+
+      folderRoots.forEach(function(folderRoot) {
+        const list = folderRoot.querySelector('.portal-job-folder-list');
+        folderRoot.style.display = portalIsAdminView ? '' : 'none';
+        if (!portalIsAdminView) {
+          folderRoot.classList.remove('is-open');
+          const toggle = folderRoot.querySelector('.portal-jobs-toggle');
+          if (toggle) toggle.setAttribute('aria-expanded', 'false');
+          return;
+        }
+        if (list) list.innerHTML = listMarkup;
+      });
+    }
+
+    function togglePortalJobsMenu(trigger) {
+      if (!portalIsAdminView) return;
+      const root = trigger?.closest?.('.portal-job-folders') || document.getElementById('portalJobFolders') || document.getElementById('portalJobFoldersSide');
+      const toggle = root?.querySelector('.portal-jobs-toggle');
+      if (!root) return;
+      const isOpen = !root.classList.contains('is-open');
+      document.querySelectorAll('.portal-job-folders.is-open').forEach(function(openRoot) {
+        if (openRoot === root) return;
+        openRoot.classList.remove('is-open');
+        const openToggle = openRoot.querySelector('.portal-jobs-toggle');
+        if (openToggle) openToggle.setAttribute('aria-expanded', 'false');
+      });
+      root.classList.toggle('is-open', isOpen);
+      if (toggle) toggle.setAttribute('aria-expanded', String(isOpen));
+    }
+
+    function openPortalJobFolderModal() {
+      if (!portalIsAdminView) return;
+      const nameInput = document.getElementById('portalJobFolderName');
+      const docsEl = document.getElementById('portalJobFolderDocuments');
+      const statusEl = document.getElementById('portalJobFolderStatus');
+      if (nameInput) nameInput.value = '';
+      if (statusEl) {
+        statusEl.textContent = 'Select the documents that belong inside this job folder. They will still stay visible on the main portal screen.';
+        statusEl.className = 'small mt-3 text-muted';
+      }
+
+      const docs = portalJobFolderSourceRows(portalQuotesCache);
+      if (docsEl) {
+        docsEl.innerHTML = docs.length ? docs.map(function(quote) {
+          const docType = getDocumentType(quote);
+          const total = new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: quote.data?.currency || 'CAD'
+          }).format(quote.total || 0);
+          const numberLine = portalDocumentNumberLine(quote, docType);
+          return '<label class="portal-job-document-option">' +
+            '<input class="form-check-input" type="checkbox" value="' + escapeHtml(quote.id) + '">' +
+            '<span>' +
+              '<span class="fw-bold d-block">' + escapeHtml(portalDocumentTitle(quote)) + '</span>' +
+              '<span class="text-muted small d-block">' + escapeHtml(numberLine || docType.label) + ' - ' + total + '</span>' +
+            '</span>' +
+          '</label>';
+        }).join('') : '<div class="text-muted p-3">No documents available yet.</div>';
+      }
+
+      const modalEl = document.getElementById('portalJobFolderModal');
+      if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).show();
+      setTimeout(function() { nameInput?.focus(); }, 150);
+    }
+
+    async function persistPortalJobFolders(folders) {
+      const rows = portalJobFolderSourceRows(portalQuotesCache);
+      if (!rows.length) throw new Error('No portal documents are available to save this folder.');
+      const sanitizedFolders = folders.map(sanitizePortalJobFolder).filter(Boolean);
+
+      for (const row of rows) {
+        const data = Object.assign({}, row.data || {});
+        data.portal_job_folders = sanitizedFolders;
+        const { error } = await _sbClient
+          .from('quotes')
+          .update({ data: data })
+          .eq('id', row.id);
+        if (error) throw error;
+        row.data = data;
+      }
+
+      portalJobFolders = sanitizedFolders;
+      renderPortalJobsMenu();
+    }
+
+    async function savePortalJobFolder() {
+      if (!portalIsAdminView) return;
+      const nameInput = document.getElementById('portalJobFolderName');
+      const statusEl = document.getElementById('portalJobFolderStatus');
+      const saveBtn = document.getElementById('portalJobFolderSaveBtn');
+      const name = String(nameInput?.value || '').trim();
+      const selectedIds = Array.from(document.querySelectorAll('#portalJobFolderDocuments input[type="checkbox"]:checked')).map(function(input) {
+        return input.value;
+      });
+
+      function setStatus(message, className) {
+        if (!statusEl) return;
+        statusEl.textContent = message;
+        statusEl.className = 'small mt-3 ' + (className || 'text-muted');
+      }
+
+      if (!name) {
+        setStatus('Name the job folder before saving.', 'text-danger');
+        nameInput?.focus();
+        return;
+      }
+      if (!selectedIds.length) {
+        setStatus('Choose at least one document for this job folder.', 'text-danger');
+        return;
+      }
+
+      const folder = {
+        id: (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'job-' + Date.now().toString(36),
+        name: name,
+        documentIds: Array.from(new Set(selectedIds)),
+        createdAt: new Date().toISOString()
+      };
+
+      try {
+        if (saveBtn) saveBtn.disabled = true;
+        setStatus('Saving job folder...', 'text-muted');
+        await persistPortalJobFolders(portalJobFolders.concat(folder));
+        setStatus('Saved. This folder now appears under Jobs, and the documents still remain on the main screen.', 'text-success fw-bold');
+        const modalEl = document.getElementById('portalJobFolderModal');
+        setTimeout(function() {
+          if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+        }, 700);
+      } catch (error) {
+        console.error('Error saving portal job folder:', error);
+        setStatus(error.message || 'Could not save this job folder. Please try again.', 'text-danger');
+      } finally {
+        if (saveBtn) saveBtn.disabled = false;
+      }
     }
 
     function getFilteredSortedQuotes(quotes) {
@@ -926,8 +3019,10 @@
       });
 
       return filtered.sort(function(a, b) {
-        if (a.id === portalQuoteId) return -1;
-        if (b.id === portalQuoteId) return 1;
+        if (sort === 'newest') {
+          if (a.id === portalQuoteId) return -1;
+          if (b.id === portalQuoteId) return 1;
+        }
         if (sort === 'oldest') return new Date(a.created_at || 0) - new Date(b.created_at || 0);
         if (sort === 'amount_desc') return (parseFloat(b.total || 0) || 0) - (parseFloat(a.total || 0) || 0);
         if (sort === 'amount_asc') return (parseFloat(a.total || 0) || 0) - (parseFloat(b.total || 0) || 0);
@@ -939,6 +3034,88 @@
     function canonicalPortalInvoiceNumber(value) {
       const raw = String(value || '').trim();
       return raw.replace(/(?:-INV)+$/i, '-INV');
+    }
+
+    function portalDocumentPrimaryHref(quote) {
+      const secureParams = portalToken ? '&token=' + encodeURIComponent(portalToken) + '&portal_anchor=' + encodeURIComponent(portalAnchorId || quote.id) : '';
+      return isInvoiceDocument(quote)
+        ? 'invoice-viewer.html?id=' + encodeURIComponent(quote.id) + secureParams
+        : 'interactive-quote-viewer.html?id=' + encodeURIComponent(quote.id) + secureParams;
+    }
+
+    function updatePortalAttention(quotes) {
+      const panel = document.getElementById('portalAttentionPanel');
+      if (!panel) return;
+      const candidates = dedupePortalDocuments(quotes || []).filter(function(quote) {
+        return documentNeedsAction(quote) && !documentIsCompleted(quote);
+      });
+      const doc = candidates[0];
+      if (!doc) {
+        panel.classList.remove('is-visible');
+        return;
+      }
+      const docType = getDocumentType(doc);
+      const title = document.getElementById('portalAttentionTitle');
+      const copy = document.getElementById('portalAttentionCopy');
+      const action = document.getElementById('portalAttentionAction');
+      const total = new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: doc.data?.currency || 'CAD'
+      }).format(doc.total || 0);
+      const isClientOs = document.body.classList.contains('portal-layout-client-os');
+      const premiumTitle = isInvoiceDocument(doc) ? 'Invoice ready for payment' : docType.label + ' ready for review';
+      if (title) title.textContent = isClientOs ? candidates.length + ' ' + (candidates.length === 1 ? 'document needs' : 'documents need') + ' attention' : premiumTitle;
+      if (copy) copy.textContent = isClientOs ? '' : portalDocumentTitle(doc) + ' is ready to review. Total due is ' + total + '.';
+      if (action) {
+        action.href = portalDocumentPrimaryHref(doc);
+        action.innerHTML = isClientOs ? 'Start with newest' : '<i class="fas ' + docType.actionIcon + ' me-1"></i>' + docType.actionLabel;
+      }
+      const quoteViewerAction = document.getElementById('quoteViewerContinueAction');
+      if (quoteViewerAction) {
+        quoteViewerAction.href = portalDocumentPrimaryHref(doc);
+        quoteViewerAction.textContent = isInvoiceDocument(doc) ? 'Continue Review' : 'Review Quote';
+      }
+      panel.classList.add('is-visible');
+    }
+
+    function updatePortalActivity(quotes) {
+      const card = document.getElementById('portalActivityCard');
+      const list = document.getElementById('portalActivityList');
+      if (!card || !list) return;
+
+      const docs = dedupePortalDocuments(quotes || []);
+      const events = [];
+      const newestAdded = docs
+        .filter(function(quote) { return quote.data?.portal_added_at; })
+        .sort(function(a, b) { return new Date(b.data.portal_added_at || 0) - new Date(a.data.portal_added_at || 0); })[0];
+      const quoteWaiting = docs.find(function(quote) {
+        return !isInvoiceDocument(quote) && documentNeedsAction(quote) && !documentIsCompleted(quote);
+      });
+      const invoiceDue = docs.find(function(quote) {
+        return isInvoiceDocument(quote) && documentNeedsAction(quote) && !documentIsCompleted(quote);
+      });
+      const paidDoc = docs.find(function(quote) {
+        return documentIsCompleted(quote);
+      });
+
+      if (newestAdded) {
+        events.push(getDocumentType(newestAdded).label + ' added ' + portalAddedDateLabel(newestAdded) + '.');
+      }
+      if (quoteWaiting) {
+        events.push('Quote awaiting signature.');
+      }
+      if (invoiceDue) {
+        events.push('Invoice ready for payment.');
+      } else if (paidDoc) {
+        events.push('Payment status updated after completion.');
+      }
+      if (!events.length) {
+        events.push('Portal is up to date.');
+      }
+
+      list.innerHTML = events.slice(0, 3).map(function(message, index) {
+        return '<li><span class="portal-activity-index">' + (index + 1) + '</span><span>' + escapeHtml(message) + '</span></li>';
+      }).join('');
     }
 
     function portalDocumentTitle(quote) {
@@ -1142,17 +3319,14 @@
       const card = document.createElement('div');
       card.className = 'card quote-card';
       if (quote.id === portalQuoteId) card.classList.add('portal-focus');
-      
+
       const status = quoteStatus(quote);
       const statusClass = statusClassName(status);
       const statusText = getClientStatusText(quote);
       const statusIcon = getStatusIcon(status);
       const docType = getDocumentType(quote);
       const needsAction = documentNeedsAction(quote);
-      const secureParams = portalToken ? '&token=' + encodeURIComponent(portalToken) + '&portal_anchor=' + encodeURIComponent(portalAnchorId || quote.id) : '';
-      const primaryHref = isInvoiceDocument(quote)
-        ? 'invoice-viewer.html?id=' + encodeURIComponent(quote.id) + secureParams
-        : 'interactive-quote-viewer.html?id=' + encodeURIComponent(quote.id) + secureParams;
+      const primaryHref = portalDocumentPrimaryHref(quote);
       const signatureSrc = quoteSignatureSrc(quote);
       const signatureTimestamp = quoteSignatureTimestamp(quote);
       const portalAddedLabel = portalAddedDateLabel(quote);
@@ -1163,26 +3337,26 @@
             ${signatureTimestamp ? `<span class="client-signature-timestamp">Signed ${signatureTimestamp}</span>` : ''}
           </button>`
         : '';
-      
+
       // Format date
       const date = new Date(quote.created_at).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
         day: 'numeric'
       });
-      
+
       // Extract project address from data
       const projectAddress = quote.data?.projectAddress || quote.data?.project_address || 'No address provided';
-      
+
       // Format total
       const total = new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: quote.data?.currency || 'CAD'
       }).format(quote.total);
-      
+
       card.innerHTML = `
         <div class="card-body">
-          <div class="d-flex justify-content-between align-items-start mb-3">
+          <div class="d-flex justify-content-between align-items-start mb-3 portal-doc-main">
             <div>
               <div class="d-flex gap-2 flex-wrap align-items-center mb-2">
                 <span class="doc-type-badge ${docType.className}"><i class="fas ${docType.icon}"></i>${docType.label}</span>
@@ -1195,18 +3369,18 @@
               <div class="admin-meta-line"><i class="fas fa-shield-halved me-1"></i>${escapeHtml(getAdminMetaLine(quote))}</div>
             </div>
           </div>
-          
-          <div class="d-flex justify-content-between align-items-center mb-3">
-            <div>
-              <h6>Total: ${total}</h6>
+
+          <div class="d-flex justify-content-between align-items-center mb-3 portal-doc-footer">
+            <div class="portal-doc-total">
+              <h6><span class="portal-doc-total-label">Total: </span>${total}</h6>
               <small class="text-muted">Created: ${date}</small>
               ${portalAddedLabel ? `<small class="text-muted d-block"><i class="fas fa-folder-open me-1"></i>Added to portal: ${escapeHtml(portalAddedLabel)}</small>` : ''}
             </div>
-            <div class="action-buttons text-end">
+            <div class="action-buttons text-end portal-doc-actions">
               ${signaturePreviewMarkup}
               <div>
               <a href="${primaryHref}" class="btn btn-outline-primary btn-sm">
-                <i class="fas ${docType.actionIcon} me-1"></i> ${docType.actionLabel}
+                <i class="fas ${docType.actionIcon} me-1 portal-action-icon"></i><span class="portal-action-full">${docType.actionLabel}</span><span class="portal-action-short">Open</span>
               </a>
               ${portalIsAdminView ?
                 `<a href="dashboard.html" class="btn btn-outline-dark btn-sm">
@@ -1217,7 +3391,7 @@
           </div>
         </div>
       `;
-      
+
       // Add event listener for signature controls
       card.querySelectorAll('.signature-btn, .client-signature-preview').forEach(function(signatureBtn) {
         signatureBtn.addEventListener('click', function() {
@@ -1226,7 +3400,7 @@
         });
       });
       enhancePortalOpenCard(card, primaryHref, docType.actionLabel + ': ' + portalDocumentTitle(quote));
-      
+
       return card;
     }
 
@@ -1251,7 +3425,7 @@
         '<strong>Change Order #' + escapeHtml((co && co.number(row)) || '') + '</strong><div class="text-muted small">' + escapeHtml(row.data?.changeReason || 'Scope change') + '</div>' +
         (portalAdded ? '<div class="text-muted small"><i class="fas fa-folder-open me-1"></i>Added to portal: ' + escapeHtml(portalAdded) + '</div>' : '') +
         '<div class="client-status-line ' + (documentNeedsAction(row) ? 'needs-action' : '') + '">' + escapeHtml(getClientActionLine(row)) + '</div></div>' +
-        '<div class="text-end"><div class="fw-bold">' + sign + '$' + Math.abs(amount).toFixed(2) + '</div><a href="' + escapeHtml(href) + '" class="btn btn-outline-primary btn-sm mt-2"><i class="fas fa-pen-nib me-1"></i>Review Change Order</a></div>' +
+        '<div class="text-end"><div class="fw-bold">' + sign + '$' + Math.abs(amount).toFixed(2) + '</div><a href="' + escapeHtml(href) + '" class="btn btn-outline-primary btn-sm mt-2"><i class="fas fa-pen-nib me-1 portal-action-icon"></i><span class="portal-action-full">Review Change Order</span><span class="portal-action-short">Open</span></a></div>' +
         '</div></div></div>';
     }
 
@@ -1342,7 +3516,10 @@
       let openQuotes = 0;
       let invoiceCount = 0;
       let jobsCompleted = 0;
-      
+      let needsActionCount = 0;
+      let invoiceDueCount = 0;
+      let quoteWaitingCount = 0;
+
       quotes.forEach(quote => {
         const total = parseFloat(quote.total || 0) || 0;
         const payments = quote.data && Array.isArray(quote.data.payments) ? quote.data.payments : [];
@@ -1356,31 +3533,53 @@
         if (status === 'accepted' || status === 'invoiced' || status === 'paid') clientLifetimeValue += total;
         if (isInvoice) invoiceCount++;
         if (status === 'paid' || quote.data?.paymentStatus === 'paid') jobsCompleted++;
+        if (documentNeedsAction(quote) && !documentIsCompleted(quote)) {
+          needsActionCount++;
+          if (isInvoice) invoiceDueCount++;
+          else quoteWaitingCount++;
+        }
         if (status === 'invoiced') balanceDue += Math.max(total - paidAmount, 0);
         if (paymentStatus === 'partially_paid' && status !== 'invoiced') balanceDue += Math.max(total - paidAmount, 0);
-        
+
         if (status === 'sent' || status === 'draft' || status === 'viewed') {
           openQuotes++;
         }
       });
-      
+
       const money = new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: 'CAD'
       });
-      
+
       balanceDueEl.textContent = money.format(balanceDue);
-      openQuotesEl.textContent = openQuotes;
+      const isClientOs = document.body.classList.contains('portal-layout-client-os');
+      const isPremiumHub = document.body.classList.contains('portal-layout-premium-hub');
+      openQuotesEl.textContent = isClientOs ? needsActionCount : openQuotes;
+      if (openQuotesLabelEl) openQuotesLabelEl.textContent = isClientOs ? 'Needs Action' : (openQuotes === 1 ? 'Open Quote' : 'Open Quotes');
       invoiceCountEl.textContent = invoiceCount;
       jobsCompletedEl.textContent = portalIsAdminView ? money.format(clientLifetimeValue) : jobsCompleted;
       jobsCompletedLabelEl.textContent = portalIsAdminView ? 'Client Lifetime Value' : 'Jobs Completed';
+      const quoteViewerBalanceDue = document.getElementById('quoteViewerBalanceDue');
+      const quoteViewerBalanceCopy = document.getElementById('quoteViewerBalanceCopy');
+      if (quoteViewerBalanceDue) quoteViewerBalanceDue.textContent = money.format(balanceDue);
+      if (quoteViewerBalanceCopy) {
+        const lines = [];
+        if (invoiceDueCount) lines.push((invoiceDueCount === 1 ? 'One invoice is' : invoiceDueCount + ' invoices are') + ' ready for review and payment.');
+        if (quoteWaitingCount) lines.push((quoteWaitingCount === 1 ? 'One quote is' : quoteWaitingCount + ' quotes are') + ' waiting for approval.');
+        quoteViewerBalanceCopy.innerHTML = lines.length ? lines.map(escapeHtml).join('<br>') : 'Your portal is up to date.';
+      }
+      if (contractorNameEl) {
+        contractorNameEl.textContent = isPremiumHub
+          ? needsActionCount + ' ' + (needsActionCount === 1 ? 'document needs' : 'documents need') + ' review.'
+          : portalCompanyName;
+      }
     }
 
     // Open signature in lightbox
     function openSignatureLightbox(src) {
       const lightbox = document.getElementById('signature-lightbox');
       const img = document.getElementById('lightbox-image');
-      
+
       img.src = src;
       const modal = new bootstrap.Modal(lightbox);
       modal.show();
@@ -1394,7 +3593,7 @@
 
     // Helper function to title-case strings
     function titleCase(str) {
-      return str.replace(/\w\S*/g, (txt) => 
+      return str.replace(/\w\S*/g, (txt) =>
         txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase()
       );
     }
@@ -1415,7 +3614,7 @@
 
     // Initialize when page loads
     document.addEventListener('DOMContentLoaded', init);
-  
+
     // === PIN GATE ===
     function getPinDigits() {
       return [0, 1, 2, 3].map(function(i) {
@@ -1495,23 +3694,23 @@
         }
       }
     }
-    
+
     async function checkPin() {
       const fullPin = document.getElementById('pinFull');
       const enteredPin = syncPinInputs((fullPin && fullPin.value) || getPinDigits());
-      
+
       if (enteredPin.length !== 4 || !/^\d{4}$/.test(enteredPin)) {
         shakeError();
         return;
       }
-      
+
       const _cp = new URLSearchParams(window.location.search);
       const cpEmail = _cp.get('email');
       const cpName = _cp.get('client');
       const contractorId = _cp.get('contractor');
       const displayedClientName = clientNameEl && clientNameEl.textContent ? clientNameEl.textContent.trim() : '';
       const resolvedClientName = cpName || portalResolvedClientName || displayedClientName || '';
-      
+
       // Check if already unlocked
       const cpPortal = _cp.get('portal') || '';
       const unlockKey = `portal_unlocked_${cpEmail || cpName || cpPortal}_${contractorId}_${cpPortal}`;
@@ -1519,7 +3718,7 @@
         hidePinGate();
         return;
       }
-      
+
       // Validate PIN server-side (never expose the stored PIN to the browser)
       try {
         const res = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/verify-portal-pin', {
@@ -1546,7 +3745,7 @@
         document.getElementById('pinError').textContent = 'Connection error. Please try again.';
       }
     }
-    
+
     function shakeError() {
       const errorDiv = document.getElementById('pinError');
       errorDiv.textContent = 'Incorrect PIN';
@@ -1555,12 +3754,12 @@
         errorDiv.style.animation = '';
       }, 500);
     }
-    
+
     function hidePinGate() {
       document.getElementById('pinGate').style.display = 'none';
       document.getElementById('portalContent').style.display = 'block';
     }
-    
+
     // Check on load
     window.addEventListener('load', () => {
       const _lp = new URLSearchParams(window.location.search);
@@ -1568,9 +3767,9 @@
       const _name = _lp.get('client');
       const _cid = _lp.get('contractor');
       const _portal = _lp.get('portal') || '';
-      
+
       if ((!_email && !_name && !_lp.get('quote') && !_portal) || !_cid) return;
-      
+
       const unlockKey = `portal_unlocked_${_email || _name || _portal}_${_cid}_${_portal}`;
       if (sessionStorage.getItem(unlockKey)) {
         hidePinGate();
