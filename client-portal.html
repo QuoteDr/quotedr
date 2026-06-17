@@ -479,6 +479,13 @@
       box-shadow: 0 20px 48px rgba(0, 0, 0, 0.18);
     }
 
+    body.portal-logo-custom #contractor-logo-area img {
+      padding: 0 !important;
+      border-radius: 0 !important;
+      background: transparent !important;
+      box-shadow: none !important;
+    }
+
     .portal-layout-premium-hub .portal-client-panel {
       min-height: 255px;
       padding: 2.4rem 2.6rem;
@@ -2405,6 +2412,7 @@
       document.body.classList.add('portal-density-' + (t.headerDensity || 'standard'));
       document.body.classList.add('portal-button-style-' + (t.buttonStyle || 'filled'));
       document.body.classList.add('portal-card-style-' + (t.cardStyle || 'shadow'));
+      document.body.classList.toggle('portal-logo-custom', !!t.portalLogo);
       const logoDimensions = portalLogoDimensions(layoutStyle, t.logoSize || 'medium', t.logoScale || 100);
       document.documentElement.style.setProperty('--portal-logo-render-width', logoDimensions.width + 'px');
       document.documentElement.style.setProperty('--portal-logo-render-height', logoDimensions.height + 'px');

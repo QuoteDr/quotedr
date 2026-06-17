@@ -26,4 +26,6 @@ assert(dashboard.includes('handlePortalThemeLogoUpload'), 'Manage Portals should
 assert(portal.includes('function portalBodyBackground(theme)'), 'Client portal should centralize themed background rendering');
 assert(portal.includes('bgStyle') && portal.includes('bgStrength'), 'Client portal should read background style and strength from portal theme');
 assert(portal.includes('portalLogo') && portal.includes('renderPortalLogo'), 'Client portal should support a portal-specific logo override');
+assert(portal.includes('portal-logo-custom'), 'Client portal should mark custom portal logos so they render without the business-logo card treatment');
+assert(portal.includes("classList.toggle('portal-logo-custom', !!t.portalLogo)"), 'Client portal should toggle the custom-logo state when the theme draft changes');
 assert(portal.includes('linear-gradient') && portal.includes('radial-gradient'), 'Client portal should support faded/gradient background styles');
