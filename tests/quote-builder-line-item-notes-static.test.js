@@ -41,3 +41,34 @@ assert(
     source.includes('fa-sticky-note'),
   'Rows should provide a dedicated note action that opens the item editor focused on the job note'
 );
+
+assert(
+  source.includes('id="lineItemDescription"') &&
+    source.includes('Reusable Item Description') &&
+    source.includes("document.getElementById('lineItemDescription').value"),
+  'Add/edit line item modal should include a reusable item description field separate from the item name and job note'
+);
+
+const saveLineItemBlock = source.slice(
+  source.indexOf('function saveLineItemToDatabase()'),
+  source.indexOf('function toggleDepositSection()')
+);
+
+assert(
+  saveLineItemBlock.includes('rate: rate') &&
+    saveLineItemBlock.includes('materialCost: materialCost') &&
+    saveLineItemBlock.includes('unitType: unitType') &&
+    saveLineItemBlock.includes('itemDescription: itemDescription'),
+  'Saving a new quote line item to the database should persist rate, material cost, unit type, and reusable description'
+);
+
+assert(
+  saveLineItemBlock.includes('_doBackupItemsToCloud(customItems)') || saveLineItemBlock.includes('backupItemsToCloud(customItems)'),
+  'Saving a new quote line item to the database should use the cloud snapshot backup path'
+);
+
+assert(
+  !/newItem\s*=\s*{[^}]*notes\s*:/s.test(saveLineItemBlock) &&
+    !/saveItem\(\{[^}]*notes\s*:/s.test(saveLineItemBlock),
+  'Saving a reusable line item should not persist job-specific notes to the item database'
+);

@@ -2441,8 +2441,13 @@ Example:
                         <label><strong>New Item or Quick Search:</strong> <small class="text-muted">type to find any service instantly</small></label>
                         <input type="text" id="itemQuickSearch" class="form-control" placeholder="e.g., drywall, tile, baseboard..." oninput="showItemSearchResults()" onblur="hideItemSearchDropdown()" autocomplete="off">
                         <div id="itemSearchDropdown" style="display:none; position:absolute; left:0; right:0; z-index:2000; background:white; border:1px solid #dee2e6; border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.15); max-height:220px; overflow-y:auto;"></div>
-                        <div id="lineItemQuickSearchTip" class="alert alert-info py-2 px-3 mt-2 mb-0 small">
-                            <strong>Saved items save tons of time.</strong> Start typing a saved item name here and QuoteDr can autofill the category, unit, rate, material cost, and notes for you.
+                        <div id="lineItemQuickSearchTip" class="alert alert-info py-2 px-3 mt-2 mb-0 small d-flex align-items-start gap-2">
+                            <button type="button" id="lineItemQuickSearchTipToggle" class="btn btn-sm btn-outline-primary rounded-circle flex-shrink-0" style="width:24px;height:24px;padding:0;line-height:1;" aria-label="Hide saved items tip" aria-expanded="true" title="Hide saved items tip" onclick="toggleLineItemQuickSearchTip()">
+                                ?
+                            </button>
+                            <span id="lineItemQuickSearchTipText">
+                                <strong>Saved items save tons of time.</strong> Start typing a saved item name here and QuoteDr can autofill the category, unit, rate, material cost, and reusable description for you.
+                            </span>
                         </div>
                     </div>
 
@@ -2461,8 +2466,11 @@ Example:
                         </div>
                     </div>
 
-                    <label><strong>Description:</strong></label>
-                    <input type="text" id="lineDescription" class="form-control mb-3" placeholder="e.g., 2x4 Wall Framing, Drywall Hang & Finish" spellcheck="true" oninput="checkIfNewItem()">
+                    <label><strong>Item Name:</strong></label>
+                    <input type="text" id="lineDescription" class="form-control mb-2" placeholder="e.g., 2x4 Wall Framing, Drywall Hang & Finish" spellcheck="true" oninput="checkIfNewItem()">
+
+                    <label><strong>Reusable Item Description (Optional):</strong></label>
+                    <textarea id="lineItemDescription" class="form-control mb-3" rows="2" placeholder="Describe the reusable scope shown to clients. This saves with the item database, unlike the job note below." spellcheck="true"></textarea>
 
                     <div class="row">
                         <div class="col-md-6 mb-3">
@@ -5247,6 +5255,31 @@ Example:
             document.getElementById('itemSearchDropdown').style.display = 'none';
         }
 
+        function applyLineItemQuickSearchTipState(collapsed) {
+            const tip = document.getElementById('lineItemQuickSearchTip');
+            const text = document.getElementById('lineItemQuickSearchTipText');
+            const toggle = document.getElementById('lineItemQuickSearchTipToggle');
+            if (!tip || !text || !toggle) return;
+            text.style.display = collapsed ? 'none' : '';
+            tip.classList.toggle('py-1', collapsed);
+            tip.classList.toggle('px-2', collapsed);
+            tip.classList.toggle('py-2', !collapsed);
+            tip.classList.toggle('px-3', !collapsed);
+            toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            toggle.setAttribute('aria-label', collapsed ? 'Show saved items tip' : 'Hide saved items tip');
+            toggle.title = collapsed ? 'Show saved items tip' : 'Hide saved items tip';
+        }
+
+        function toggleLineItemQuickSearchTip() {
+            const toggle = document.getElementById('lineItemQuickSearchTipToggle');
+            const isExpanded = toggle ? toggle.getAttribute('aria-expanded') !== 'false' : true;
+            const nextCollapsed = isExpanded;
+            try {
+                localStorage.setItem('ald_line_item_quick_search_tip_collapsed', nextCollapsed ? '1' : '');
+            } catch(e) {}
+            applyLineItemQuickSearchTipState(nextCollapsed);
+        }
+
         function hideItemSearchDropdown() {
             setTimeout(() => {
                 const d = document.getElementById('itemSearchDropdown');
@@ -5293,6 +5326,7 @@ Example:
 
             // Reset form fields
             document.getElementById('lineDescription').value = '';
+            document.getElementById('lineItemDescription').value = '';
             document.getElementById('lineQuantity').value = '1';
             document.getElementById('lineRate').value = '0';
             document.getElementById('lineNotes').value = '';
@@ -5304,6 +5338,7 @@ Example:
             if (qs) { qs.value = ''; }
             const qd = document.getElementById('itemSearchDropdown');
             if (qd) qd.style.display = 'none';
+            applyLineItemQuickSearchTipState(localStorage.getItem('ald_line_item_quick_search_tip_collapsed') === '1');
 
             // Populate category dropdown dynamically - no pre-selection so placeholder shows
             populateCategoryDropdown(null);
@@ -5387,6 +5422,7 @@ Example:
                     option.dataset.unitType = service.unitType;
                     option.dataset.rate = service.rate;
                     if (service.note) option.dataset.note = service.note;
+                    if (service.itemDescription) option.dataset.itemDescription = service.itemDescription;
                     if (service.materialCost) option.dataset.materialCost = service.materialCost;
                     if (service.supplierUrl) option.dataset.supplierUrl = service.supplierUrl;
                     serviceSelect.appendChild(option);
@@ -5409,6 +5445,7 @@ Example:
                 if (selectedOption.value !== 'custom') {
                     document.getElementById('lineDescription').value = selectedOption.text;
                 }
+                document.getElementById('lineItemDescription').value = selectedOption.dataset.itemDescription || '';
                 // Pre-fill material cost if saved
                 const matCost = selectedOption.dataset.materialCost || 0;
                 document.getElementById('lineMaterialCost').value = matCost;
@@ -6231,6 +6268,7 @@ Example:
             // Populate form with existing data
             document.getElementById('currentRoomId').value = roomId;
             document.getElementById('lineDescription').value = item.description;
+            document.getElementById('lineItemDescription').value = item.itemDescription || '';
             populateCategoryDropdown(item.category);
             updatePricingOptions();
 
@@ -6288,6 +6326,7 @@ Example:
         async function confirmAddLine() {
             const roomId = parseInt(document.getElementById('currentRoomId').value);
             const description = document.getElementById('lineDescription').value.trim();
+            const itemDescription = document.getElementById('lineItemDescription').value.trim();
             const category = document.getElementById('lineCategory').value;
             const unitType = document.getElementById('lineUnitType').value.trim();
             const quantity = parseFloat(document.getElementById('lineQuantity').value) || 0;
@@ -6327,6 +6366,7 @@ Example:
                     item.quantity = quantity;
                     item.rate = rate;
                     item.notes = notes;
+                    item.itemDescription = itemDescription;
                     item.materialCost = materialCost;
                     item.supplierUrl = document.getElementById('supplierLinkBtn')?.href !== '#' ? document.getElementById('supplierLinkBtn')?.href : '';
                     item.laborTime = normalizeLaborTime(item.laborTime);
@@ -6355,7 +6395,7 @@ Example:
                         upgrade: dbItem?.upgrade || null,
                         upgraded: false,
                         optional: false,
-                        itemDescription: dbItem?.itemDescription || '',
+                        itemDescription: itemDescription || dbItem?.itemDescription || '',
                         laborTime: normalizeLaborTime(dbItem?.laborTime),
                         savedItemSource: dbItem ? savedItemQuoteSource(category, dbItem) : null,
                         savedItemFingerprint: dbItem ? getSavedItemFingerprintForQuoteSync(dbItem) : '',
@@ -6414,26 +6454,38 @@ Example:
 
         function saveLineItemToDatabase() {
             const desc = document.getElementById('lineDescription').value.trim();
+            const itemDescription = document.getElementById('lineItemDescription').value.trim();
             const category = document.getElementById('lineCategory').value || 'Custom';
             const unitType = document.getElementById('lineUnitType').value.trim();
             const rate = parseFloat(document.getElementById('lineRate').value) || 0;
             const materialCost = parseFloat(document.getElementById('lineMaterialCost').value) || 0;
+            const supplierLinkBtn = document.getElementById('supplierLinkBtn');
+            const supplierUrl = (supplierLinkBtn && supplierLinkBtn.style.display !== 'none' && supplierLinkBtn.href !== '#') ? supplierLinkBtn.href : '';
             if (!desc) return;
             try {
-                const items = JSON.parse(localStorage.getItem('ald_custom_items') || '{}');
-                if (!items[category]) items[category] = [];
-                // Don't add duplicate
-                if (!items[category].find(i => i.name === desc)) {
-                    var newItem = { name: desc, unitType: unitType, rate: rate, materialCost: materialCost, supplierUrl: '', itemDescription: '', upgrade: null };
-                    items[category].push(newItem);
-                    localStorage.setItem('ald_custom_items', JSON.stringify(items));
-                    // Update pricingDatabase in memory
-                    if (!pricingDatabase[category]) pricingDatabase[category] = [];
-                    pricingDatabase[category].push(newItem);
-                    // Also save to Supabase cloud
-                    if (typeof saveItem === 'function') {
-                        saveItem({ name: desc, category: category, unitType: unitType, rate: rate, materialCost: materialCost, supplierUrl: '' }).catch(function(){});
-                    }
+                if (!customItems || typeof customItems !== 'object') customItems = {};
+                if (!customItems[category]) customItems[category] = [];
+                var newItem = { name: desc, unitType: unitType, rate: rate, materialCost: materialCost, supplierUrl: supplierUrl, itemDescription: itemDescription, upgrade: null };
+                var existingCustom = customItems[category].find(function(i) { return i && i.name === desc; });
+                if (existingCustom) {
+                    Object.assign(existingCustom, newItem);
+                } else {
+                    customItems[category].push(newItem);
+                }
+                localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
+                // Update pricingDatabase in memory
+                if (!pricingDatabase[category]) pricingDatabase[category] = [];
+                var existingPricingItem = pricingDatabase[category].find(function(i) { return i && i.name === desc; });
+                if (existingPricingItem) {
+                    Object.assign(existingPricingItem, newItem, { _custom: true });
+                } else {
+                    pricingDatabase[category].push(Object.assign({}, newItem, { _custom: true }));
+                }
+                // Save the real item database snapshot to cloud so pricing and descriptions survive reloads/devices.
+                if (typeof _doBackupItemsToCloud === 'function') {
+                    _doBackupItemsToCloud(customItems).catch(function(){});
+                } else if (typeof backupItemsToCloud === 'function') {
+                    backupItemsToCloud(customItems).catch(function(){});
                 }
             } catch(e) { console.error('Error saving item:', e); }
             const saveNewItemBtn = document.getElementById('saveNewItemBtn');

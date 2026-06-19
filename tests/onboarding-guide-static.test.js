@@ -98,6 +98,9 @@ assert(source.includes('!activeStep.waitForAction'), 'coachmark Next should hide
 assert(quoteItemsSource.includes('window.notifyBuilderGuideNewItemPanelOpened'), 'New Item panel toggle should notify the tutorial when opened');
 assert(source.includes('id="lineItemQuickSearchTip"'), 'add line item modal should include a quick-search saved-item tip');
 assert(source.includes('Start typing a saved item name'), 'add line item modal should explain saved item search autofill');
+assert(source.includes('id="lineItemQuickSearchTipToggle"'), 'saved item quick-search tip should have a compact show/hide toggle');
+assert(source.includes('function toggleLineItemQuickSearchTip()'), 'saved item quick-search tip toggle should be wired to collapse and expand the help text');
+assert(source.includes('aria-expanded="true"'), 'saved item quick-search tip should start expanded for first-time users');
 assert(source.includes("target: '#itemQuickSearch'"), 'line item tutorial should point at the quick search field after opening the modal');
 assert(source.includes('Saved items save tons of time'), 'line item tutorial should explain why saved items matter');
 assert(source.includes('function notifyBuilderGuideAddLineModalOpened()'), 'line item tutorial should react when the Add Line Item modal opens');
