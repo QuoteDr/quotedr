@@ -3374,6 +3374,74 @@ function renderBusinessInsights(quotes) {
             }) || null;
         }
 
+        function getNewQuoteClientDraft() {
+            return {
+                name: document.getElementById('newQuoteClientName').value.trim(),
+                address: document.getElementById('newQuoteAddress').value.trim(),
+                email: document.getElementById('newQuoteClientEmail').value.trim(),
+                phone: document.getElementById('newQuoteClientPhone').value.trim()
+            };
+        }
+
+        function isNewQuoteClientDraftSaveable(client) {
+            return !!(client && client.name);
+        }
+
+        function dashboardClientExistsForDraft(client) {
+            if (!client || !client.name) return false;
+            return !!(findNewQuoteClientByName(client.name) || findDashboardClientByEmail(client.email) || window._newQuoteSelectedClient);
+        }
+
+        async function saveNewQuoteClientDraft(clientDraft) {
+            if (!isNewQuoteClientDraftSaveable(clientDraft)) return false;
+            var client = {
+                name: clientDraft.name,
+                phone: clientDraft.phone || '',
+                email: clientDraft.email || '',
+                address: clientDraft.address || '',
+                city: '',
+                notes: '',
+                crm: {}
+            };
+            var saved = {};
+            try { saved = JSON.parse(localStorage.getItem('ald_clients') || '{}'); } catch(e) { saved = {}; }
+            if (Array.isArray(saved)) {
+                var converted = {};
+                saved.forEach(function(c) { if (c && c.name) converted[c.name] = c; });
+                saved = converted;
+            }
+            saved[client.name] = Object.assign({}, saved[client.name] || {}, client);
+            localStorage.setItem('ald_clients', JSON.stringify(saved));
+            window._newQuoteSelectedClient = client;
+            populateNewQuoteClientSuggestions();
+            if (typeof saveClientToSupabase === 'function') {
+                saveClientToSupabase(client).catch(function(e) {
+                    console.warn('Dashboard new quote client sync error:', e);
+                });
+            }
+            return true;
+        }
+
+        async function maybePromptSaveNewQuoteClient(clientDraft) {
+            if (!isNewQuoteClientDraftSaveable(clientDraft) || dashboardClientExistsForDraft(clientDraft)) return false;
+            var shouldSave = false;
+            if (typeof qdConfirm === 'function') {
+                shouldSave = await qdConfirm('Would you like to save this client information to the database?', {
+                    title: 'Save Client?',
+                    okText: 'Yes',
+                    cancelText: 'No',
+                    okClass: 'btn-success',
+                    type: 'info',
+                    enterSubmits: true
+                });
+            } else {
+                shouldSave = window.confirm('Would you like to save this client information to the database?');
+            }
+            if (!shouldSave) return false;
+            await saveNewQuoteClientDraft(clientDraft);
+            return true;
+        }
+
         function searchNewQuoteClients(query) {
             var needle = String(query || '').trim().toLowerCase();
             if (needle.length < 2) return [];
@@ -3553,10 +3621,11 @@ function renderBusinessInsights(quotes) {
         }
 
         async function createAndOpenQuote() {
-            var clientName = document.getElementById('newQuoteClientName').value.trim();
-            var address = document.getElementById('newQuoteAddress').value.trim();
-            var clientEmail = document.getElementById('newQuoteClientEmail').value.trim();
-            var clientPhone = document.getElementById('newQuoteClientPhone').value.trim();
+            var clientDraft = getNewQuoteClientDraft();
+            var clientName = clientDraft.name;
+            var address = clientDraft.address;
+            var clientEmail = clientDraft.email;
+            var clientPhone = clientDraft.phone;
             var quoteNum = document.getElementById('newQuoteNumber').value.trim();
             var errEl = document.getElementById('newQuoteError');
             var btn = document.getElementById('newQuoteCreateBtn');
@@ -3571,6 +3640,7 @@ function renderBusinessInsights(quotes) {
                 return;
             }
             errEl.textContent = '';
+            await maybePromptSaveNewQuoteClient(clientDraft);
             btn.disabled = true;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Creating...';
 

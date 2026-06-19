@@ -46,8 +46,10 @@ assert(
 );
 
 assert(
-  /var clientEmail\s*=\s*document\.getElementById\('newQuoteClientEmail'\)\.value\.trim\(\)/.test(dashboard) &&
-    /var clientPhone\s*=\s*document\.getElementById\('newQuoteClientPhone'\)\.value\.trim\(\)/.test(dashboard),
+  (/var clientEmail\s*=\s*document\.getElementById\('newQuoteClientEmail'\)\.value\.trim\(\)/.test(dashboard) ||
+    /var clientEmail\s*=\s*clientDraft\.email/.test(dashboard)) &&
+    (/var clientPhone\s*=\s*document\.getElementById\('newQuoteClientPhone'\)\.value\.trim\(\)/.test(dashboard) ||
+    /var clientPhone\s*=\s*clientDraft\.phone/.test(dashboard)),
   'New quote creation should save the visible email and phone fields'
 );
 
