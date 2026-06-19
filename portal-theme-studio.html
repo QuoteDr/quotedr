@@ -215,6 +215,9 @@
             <option value="quote-viewer">Quote Viewer Style</option>
             <option value="client-os">Client OS</option>
           </select>
+          <button type="button" id="portalThemeApplyStarterBtn" class="btn btn-outline-primary btn-sm w-100 mt-2" onclick="applyPortalThemeStartPoint(document.getElementById('portalThemeStartPoint').value)">
+            <i class="fas fa-wand-magic-sparkles me-1"></i>Apply built-in defaults
+          </button>
           <div class="text-muted small mt-1">Built-in themes are read-only. Saving creates your own custom theme.</div>
         </div>
         <label class="form-label fw-semibold">Saved custom themes</label>
@@ -262,7 +265,7 @@
             </div>
             <div class="col-6">
               <label class="form-label fw-semibold">Header Details</label>
-              <input type="color" id="portalHeaderDetailColor" class="form-control form-control-color w-100" value="#4d5c70" oninput="updatePortalPreview()">
+              <input type="color" id="portalHeaderDetailColor" class="form-control form-control-color w-100" value="#26364d" oninput="updatePortalPreview()">
             </div>
             <div class="col-6">
               <label class="form-label fw-semibold">Card Text</label>
@@ -270,7 +273,7 @@
             </div>
             <div class="col-6">
               <label class="form-label fw-semibold">Muted Text</label>
-              <input type="color" id="portalMutedTextColor" class="form-control form-control-color w-100" value="#637085" oninput="updatePortalPreview()">
+              <input type="color" id="portalMutedTextColor" class="form-control form-control-color w-100" value="#26364d" oninput="updatePortalPreview()">
             </div>
             <div class="col-6">
               <label class="form-label fw-semibold">Button Text</label>
@@ -443,9 +446,9 @@
         buttonStyle: 'filled',
         cardStyle: 'shadow',
         headerTextColor: '#10233d',
-        headerDetailColor: '#4d5c70',
+        headerDetailColor: '#26364d',
         cardTextColor: '#10233d',
-        mutedTextColor: '#637085',
+        mutedTextColor: '#26364d',
         buttonTextColor: '#ffffff'
       };
       if (style === 'quote-viewer') {
@@ -454,7 +457,7 @@
       if (style === 'client-os') {
         return Object.assign({}, common, { layoutStyle: 'client-os', headerColor: '#ffffff', bgColor: '#ffffff', bgColor2: '#eaf7f5', textColor: '#12579c', bgStyle: 'soft-fade', bgStrength: 45, logoSize: 'small', logoScale: 130, headerDensity: 'compact', buttonStyle: 'outline', cardStyle: 'flat' });
       }
-      return Object.assign({}, common, { layoutStyle: 'premium-hub', headerColor: '#1a2940', bgColor: '#ffffff', bgColor2: '#edf7f5', textColor: '#12579c', bgStyle: 'branded-fade', bgStrength: 52, logoSize: 'medium', headerDensity: 'spacious', buttonStyle: 'filled', cardStyle: 'premium' });
+      return Object.assign({}, common, { layoutStyle: 'premium-hub', headerColor: '#1a2940', bgColor: '#ffffff', bgColor2: '#ffffff', textColor: '#12579c', bgStyle: 'paper', bgStrength: 28, logoSize: 'medium', headerDensity: 'spacious', buttonStyle: 'filled', cardStyle: 'premium' });
     }
 
     function portalThemeObjectFromControls() {
@@ -498,10 +501,10 @@
       document.getElementById('portalBgColor').value = v.bgColor || '#ffffff';
       document.getElementById('portalBgColor2').value = v.bgColor2 || v.bgColor || '#f5f7fb';
       document.getElementById('portalTextColor').value = v.textColor || '#10233d';
-      document.getElementById('portalHeaderTextColor').value = v.headerTextColor || v.textColor || '#10233d';
-      document.getElementById('portalHeaderDetailColor').value = v.headerDetailColor || v.mutedTextColor || '#4d5c70';
-      document.getElementById('portalCardTextColor').value = v.cardTextColor || v.textColor || '#10233d';
-      document.getElementById('portalMutedTextColor').value = v.mutedTextColor || '#637085';
+      document.getElementById('portalHeaderTextColor').value = v.headerTextColor || '#10233d';
+      document.getElementById('portalHeaderDetailColor').value = v.headerDetailColor || v.mutedTextColor || '#26364d';
+      document.getElementById('portalCardTextColor').value = v.cardTextColor || '#10233d';
+      document.getElementById('portalMutedTextColor').value = v.mutedTextColor || '#26364d';
       document.getElementById('portalButtonTextColor').value = v.buttonTextColor || '#ffffff';
       document.getElementById('portalBgStyle').value = portalThemeChoice(v.bgStyle, ['solid', 'soft-fade', 'branded-fade', 'paper'], 'soft-fade');
       document.getElementById('portalBgStrength').value = v.bgStrength !== undefined ? v.bgStrength : 45;
@@ -530,10 +533,10 @@
       document.getElementById('portalBgColor').value = defaults.bgColor || '#ffffff';
       document.getElementById('portalBgColor2').value = defaults.bgColor2 || defaults.bgColor || '#f5f7fb';
       document.getElementById('portalTextColor').value = defaults.textColor || '#10233d';
-      document.getElementById('portalHeaderTextColor').value = defaults.headerTextColor || defaults.textColor || '#10233d';
-      document.getElementById('portalHeaderDetailColor').value = defaults.headerDetailColor || defaults.mutedTextColor || '#4d5c70';
-      document.getElementById('portalCardTextColor').value = defaults.cardTextColor || defaults.textColor || '#10233d';
-      document.getElementById('portalMutedTextColor').value = defaults.mutedTextColor || '#637085';
+      document.getElementById('portalHeaderTextColor').value = defaults.headerTextColor || '#10233d';
+      document.getElementById('portalHeaderDetailColor').value = defaults.headerDetailColor || defaults.mutedTextColor || '#26364d';
+      document.getElementById('portalCardTextColor').value = defaults.cardTextColor || '#10233d';
+      document.getElementById('portalMutedTextColor').value = defaults.mutedTextColor || '#26364d';
       document.getElementById('portalButtonTextColor').value = defaults.buttonTextColor || '#ffffff';
       updatePortalPreview(true);
       setPortalThemeDefaultSaveState('dirty', 'Colours reset to the ' + label + ' defaults. Save when ready.');
@@ -611,25 +614,29 @@
 
     function resetPortalThemeDraft() {
       activePortalThemePresetId = '';
-      applyPortalThemeToControls(lastLoadedPortalTheme || portalThemeBuiltInTemplate('premium-hub'), { title: '', markDirty: false });
+      const layout = portalLayoutStyleValue(document.getElementById('portalThemeStartPoint')?.value || 'premium-hub');
+      applyPortalThemeToControls(portalThemeBuiltInTemplate(layout), { title: '', markDirty: false });
       renderPortalThemePresets();
-      setPortalThemeDefaultSaveState('saved', 'Draft reset to the current default theme.');
+      setPortalThemeDefaultSaveState('saved', 'Draft reset to the ' + portalLayoutLabel(layout) + ' built-in defaults.');
     }
 
     async function loadPortalTheme() {
       const user = window.currentUser;
+      const initialDraftTheme = portalThemeBuiltInTemplate('premium-hub');
       if (!user) {
-        lastLoadedPortalTheme = portalThemeBuiltInTemplate('premium-hub');
-        applyPortalThemeToControls(lastLoadedPortalTheme, { title: '', markDirty: false });
+        lastLoadedPortalTheme = initialDraftTheme;
+        applyPortalThemeToControls(initialDraftTheme, { title: '', markDirty: false });
+        setPortalThemeDefaultSaveState('saved', 'Started from Premium Client Hub built-in defaults.');
         return;
       }
       const { data } = await _supabase.from('user_data').select('value').eq('user_id', user.id).eq('key', 'portal_theme').maybeSingle();
       lastLoadedPortalTheme = data?.value
         ? Object.assign(portalThemeBuiltInTemplate(data.value.layoutStyle || 'premium-hub'), data.value)
         : portalThemeBuiltInTemplate('premium-hub');
-      applyPortalThemeToControls(lastLoadedPortalTheme, { title: '', markDirty: false });
+      applyPortalThemeToControls(initialDraftTheme, { title: '', markDirty: false });
       await loadPortalThemePresets();
       updatePortalPreview(false);
+      setPortalThemeDefaultSaveState('saved', 'Started from Premium Client Hub built-in defaults. Saved custom themes are listed above.');
     }
 
     function setPortalThemeDefaultSaveState(state, message) {

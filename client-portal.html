@@ -23,9 +23,9 @@
       --secondary-light: #f8f9fa;
       --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
       --portal-header-text: #10233d;
-      --portal-header-muted: #4d5c70;
+      --portal-header-muted: #26364d;
       --portal-card-text: #10233d;
-      --portal-muted-text: #637085;
+      --portal-muted-text: #26364d;
       --portal-button-text: #ffffff;
       --portal-accent-color: #12579c;
       --portal-surface-bg: #ffffff;
@@ -403,12 +403,12 @@
 
     .portal-attention-copy {
       margin: 0;
-      color: #637085;
+      color: #26364d;
       max-width: 640px;
     }
 
     .portal-layout-premium-hub {
-      background: var(--portal-page-background, linear-gradient(180deg, #edf5fb 0%, #eef9f6 72%, #f7fbff 100%)) !important;
+      background: var(--portal-page-background, #ffffff) !important;
     }
 
     .portal-layout-premium-hub .header-bg {
@@ -670,7 +670,7 @@
       grid-template-columns: 2rem minmax(0, 1fr);
       gap: 0.75rem;
       align-items: start;
-      color: #637085;
+      color: #26364d;
       font-size: 1.02rem;
     }
 
@@ -1108,7 +1108,7 @@
     .portal-layout-client-os {
       --client-os-line: #dbe4ef;
       --client-os-ink: #162235;
-      --client-os-muted: #637085;
+      --client-os-muted: #26364d;
       --client-os-blue: #0f4f94;
       background: linear-gradient(180deg, #f7fbff 0%, #edf7f5 100%) !important;
     }
@@ -1621,7 +1621,7 @@
     .portal-layout-quote-viewer #portal-tagline,
     .portal-layout-quote-viewer .quote-viewer-hero-copy p,
     .portal-layout-client-os .portal-client-panel p {
-      color: var(--portal-header-muted, #4d5c70) !important;
+      color: var(--portal-header-muted, #26364d) !important;
     }
 
     .portal-layout-premium-hub .summary-value,
@@ -1660,7 +1660,7 @@
     .portal-layout-client-os .admin-meta-line,
     .portal-job-empty,
     .portal-job-folder-meta {
-      color: var(--portal-muted-text, #637085) !important;
+      color: var(--portal-muted-text, #26364d) !important;
     }
 
     .portal-layout-premium-hub .portal-attention-panel .btn,
@@ -2348,7 +2348,7 @@
     function portalContrastText(hex) {
       const rgb = portalThemeHexToRgb(hex || '#1a2940');
       const luminance = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
-      return luminance > 0.58 ? { text: '#10233d', muted: '#4d5c70' } : { text: '#ffffff', muted: 'rgba(255,255,255,0.84)' };
+      return luminance > 0.58 ? { text: '#10233d', muted: '#26364d' } : { text: '#ffffff', muted: 'rgba(255,255,255,0.84)' };
     }
 
     function portalThemeHexToRgb(hex) {
@@ -2378,6 +2378,7 @@
         return 'radial-gradient(circle at top left, rgba(' + header.r + ',' + header.g + ',' + header.b + ',' + headerAlpha + ') 0%, transparent 34%), linear-gradient(145deg, rgba(' + bg.r + ',' + bg.g + ',' + bg.b + ',' + bgAlpha + ') 0%, #ffffff 58%, rgba(' + header.r + ',' + header.g + ',' + header.b + ',' + (headerAlpha * 0.65).toFixed(2) + ') 100%)';
       }
       if (bgStyle === 'paper') {
+        if (bgColor.toLowerCase() === '#ffffff') return '#ffffff';
         return 'linear-gradient(180deg, #ffffff 0%, rgba(' + bg.r + ',' + bg.g + ',' + bg.b + ',' + (0.08 + strength * 0.22).toFixed(2) + ') 100%)';
       }
       return bgColor;
@@ -2421,10 +2422,10 @@
       const surfaceBg = t.bgColor || '#ffffff';
       const pageBg = t.bgColor2 || t.bgColor || '#f5f7fb';
       const accentColor = t.textColor || '#12579c';
-      const headerTextColor = t.headerTextColor || t.textColor || '#10233d';
-      const headerDetailColor = t.headerDetailColor || t.mutedTextColor || '#4d5c70';
-      const cardTextColor = t.cardTextColor || t.textColor || '#10233d';
-      const mutedTextColor = t.mutedTextColor || '#637085';
+      const headerTextColor = t.headerTextColor || '#10233d';
+      const headerDetailColor = t.headerDetailColor || t.mutedTextColor || '#26364d';
+      const cardTextColor = t.cardTextColor || '#10233d';
+      const mutedTextColor = t.mutedTextColor || '#26364d';
       const buttonTextColor = t.buttonTextColor || '#ffffff';
       document.documentElement.style.setProperty('--portal-surface-bg', surfaceBg);
       document.documentElement.style.setProperty('--portal-page-bg', pageBg);
