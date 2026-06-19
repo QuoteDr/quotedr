@@ -104,6 +104,10 @@ assert(items.includes('editChoiceGroupTemplate'), 'choice group manager should e
 assert(items.includes('renameChoiceGroupTemplate'), 'choice group manager should rename existing groups');
 assert(items.includes('deleteChoiceGroupTemplate'), 'choice group manager should delete existing groups');
 assert(items.includes('data-choice-group-template-action'), 'choice group manager should expose row actions');
+assert(items.includes('openChoiceGroupHelpModal'), 'choice group manager should include an in-modal help explainer');
+assert(items.includes('choiceGroupTemplateHelpBtn'), 'choice group manager header should expose a Help button');
+assert(items.includes('Pick One') && items.includes('Pick Multiple') && items.includes('Always use grouping'), 'choice group help should explain choice types and auto grouping');
+assert(!builder.includes('quote-items.js?v=1778194800'), 'quote-builder should bump quote-items.js cache after Choice Group manager changes');
 assert(items.includes('openChoiceGroupItemPicker'), 'choice group templates should use a searchable saved-item picker');
 assert(items.includes('openChoiceGroupDefaultOptionPicker'), 'single choice group templates should use a clickable default-option picker');
 assert(items.includes('openChoiceGroupTypePicker'), 'choice group templates should use a clickable type picker');

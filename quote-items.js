@@ -5,8 +5,10 @@
 
         var CREATE_NEW_CATEGORY_VALUE = '__quote_dr_create_new_category__';
         var MANAGE_CATEGORY_STATE_KEY = 'ald_manage_items_category_state';
+        var MANAGE_CATEGORY_RENAMES_KEY = 'ald_manage_items_category_renames';
         var manageItemsFilter = 'all';
         var manageItemsCategoryState = {};
+        var manageCategoryRenames = {};
         var dirtyPricingRows = new Set();
         var pricingOtherDirty = false;
 
@@ -45,6 +47,165 @@
                 return manageItemsCategoryState[cat] === true;
             }
             return false;
+        }
+
+        function loadManageCategoryRenames() {
+            try {
+                manageCategoryRenames = JSON.parse(localStorage.getItem(MANAGE_CATEGORY_RENAMES_KEY) || '{}') || {};
+            } catch(e) {
+                manageCategoryRenames = {};
+            }
+        }
+
+        function saveManageCategoryRenames() {
+            localStorage.setItem(MANAGE_CATEGORY_RENAMES_KEY, JSON.stringify(manageCategoryRenames || {}));
+            _saveCategoryRenamesToCloud().catch(function(){});
+        }
+
+        async function _saveCategoryRenamesToCloud() {
+            try {
+                if (typeof _supabase === 'undefined') return;
+                var user = await _supabase.auth.getUser();
+                if (!user.data?.user) return;
+                await _supabase.from('user_data').upsert(
+                    { user_id: user.data.user.id, key: 'category_renames', value: manageCategoryRenames || {}, updated_at: new Date().toISOString() },
+                    { onConflict: 'user_id,key' }
+                );
+            } catch(e) {
+                console.warn('Category renames cloud save failed:', e);
+            }
+        }
+
+        async function _restoreCategoryRenamesFromCloud() {
+            try {
+                if (typeof _supabase === 'undefined') return;
+                var user = await _supabase.auth.getUser();
+                if (!user.data?.user) return;
+                var { data } = await _supabase.from('user_data').select('value').eq('user_id', user.data.user.id).eq('key', 'category_renames').single();
+                if (data?.value && typeof data.value === 'object') {
+                    Object.assign(manageCategoryRenames, data.value);
+                    localStorage.setItem(MANAGE_CATEGORY_RENAMES_KEY, JSON.stringify(manageCategoryRenames || {}));
+                    applyManageCategoryRenames();
+                    populateNewItemCategorySelect(document.getElementById('newItemCategory')?.value);
+                    renderAllItemsList();
+                }
+            } catch(e) {
+                console.warn('Category renames cloud restore failed:', e);
+            }
+        }
+
+        function mergeManageCategoryItems(store, oldCat, newCat) {
+            if (!store || !Array.isArray(store[oldCat])) return;
+            if (!Array.isArray(store[newCat])) store[newCat] = [];
+            var existingNames = new Set(store[newCat].filter(Boolean).map(function(item) {
+                return String(item.name || '').toLowerCase();
+            }));
+            store[oldCat].forEach(function(item) {
+                if (!item) return;
+                item.category = newCat;
+                var key = String(item.name || '').toLowerCase();
+                if (!key || !existingNames.has(key)) {
+                    store[newCat].push(item);
+                    if (key) existingNames.add(key);
+                }
+            });
+            delete store[oldCat];
+        }
+
+        function moveManageCategoryData(oldCat, newCat) {
+            mergeManageCategoryItems(pricingDatabase, oldCat, newCat);
+            mergeManageCategoryItems(customItems, oldCat, newCat);
+
+            if (categoryStyles && categoryStyles[oldCat]) {
+                if (!categoryStyles[newCat]) categoryStyles[newCat] = categoryStyles[oldCat];
+                delete categoryStyles[oldCat];
+            }
+
+            if (Object.prototype.hasOwnProperty.call(manageItemsCategoryState, oldCat)) {
+                manageItemsCategoryState[newCat] = manageItemsCategoryState[oldCat];
+                delete manageItemsCategoryState[oldCat];
+            }
+
+            var templates = customItems && Array.isArray(customItems.__choiceGroupTemplates) ? customItems.__choiceGroupTemplates : [];
+            templates.forEach(function(group) {
+                (group.options || []).forEach(function(option) {
+                    if (option.category === oldCat) option.category = newCat;
+                });
+            });
+
+            var quoteRooms = [];
+            try {
+                if (typeof rooms !== 'undefined' && Array.isArray(rooms)) {
+                    quoteRooms = rooms;
+                } else if (Array.isArray(window.rooms)) {
+                    quoteRooms = window.rooms;
+                }
+            } catch (err) {
+                quoteRooms = Array.isArray(window.rooms) ? window.rooms : [];
+            }
+            if (quoteRooms.length) {
+                quoteRooms.forEach(function(room) {
+                    (room.items || []).forEach(function(item) {
+                        if (item.category === oldCat) item.category = newCat;
+                    });
+                });
+            }
+        }
+
+        function applyManageCategoryRenames() {
+            loadManageCategoryRenames();
+            Object.keys(manageCategoryRenames || {}).forEach(function(oldCat) {
+                var newCat = (manageCategoryRenames[oldCat] || '').trim();
+                if (!newCat || oldCat === newCat) return;
+                moveManageCategoryData(oldCat, newCat);
+            });
+        }
+
+        function categoryNameExists(cat) {
+            var key = String(cat || '').trim().toLowerCase();
+            if (!key) return false;
+            return Object.keys(pricingDatabase || {}).concat(Object.keys(customItems || {}).filter(function(k) {
+                return k !== '__choiceGroupTemplates';
+            })).some(function(existing) {
+                return String(existing || '').trim().toLowerCase() === key;
+            });
+        }
+
+        async function renameManageItemsCategory(oldCat) {
+            oldCat = String(oldCat || '').trim();
+            if (!oldCat) return false;
+            var nextName = (await qdPrompt('Rename category:', oldCat, {
+                title: 'Rename Category'
+            }) || '').trim();
+            if (!nextName || nextName === oldCat) return false;
+            if (categoryNameExists(nextName)) {
+                qdAlert('A category named "' + nextName + '" already exists. Choose a unique name so QuoteDr does not merge unrelated items.');
+                return false;
+            }
+
+            pushUndoState();
+            Object.keys(manageCategoryRenames || {}).forEach(function(sourceCat) {
+                if (manageCategoryRenames[sourceCat] === oldCat) manageCategoryRenames[sourceCat] = nextName;
+            });
+            delete manageCategoryRenames[nextName];
+            manageCategoryRenames[oldCat] = nextName;
+            moveManageCategoryData(oldCat, nextName);
+            saveManageCategoryRenames();
+            saveManageItemsCategoryState();
+            saveCustomItems(false);
+            populateNewItemCategorySelect(nextName);
+            renderAllItemsList();
+            if (typeof renderRooms === 'function') renderRooms();
+            if (typeof calculateTotals === 'function') calculateTotals();
+            if (typeof markUnsaved === 'function') markUnsaved();
+            showManageItemsToast('Category renamed to "' + nextName + '".', true);
+            return true;
+        }
+
+        function renameSelectedCategory() {
+            var catSelect = document.getElementById('newItemCategory');
+            if (!catSelect || catSelect.value === CREATE_NEW_CATEGORY_VALUE) return;
+            renameManageItemsCategory(catSelect.value);
         }
 
                 function _injectItemsIntoPricingDB(itemsObj) {
@@ -112,6 +273,8 @@
             // Restore from cloud (fire and forget)
             _restoreCategoryStylesFromCloud().catch(function(){});
             _restoreHiddenCategoriesFromCloud().catch(function(){});
+            loadManageCategoryRenames();
+            _restoreCategoryRenamesFromCloud().catch(function(){});
             for (const [category, items] of Object.entries(customItems)) {
                 if (category === '__choiceGroupTemplates') continue;
                 if (!Array.isArray(items)) continue; // skip corrupted entries
@@ -122,6 +285,7 @@
                     }
                 });
             }
+            applyManageCategoryRenames();
             loadItemOverrides();
         }
 
@@ -272,6 +436,7 @@
             if (typeof customItems === 'object' && typeof _injectItemsIntoPricingDB === 'function') {
                 _injectItemsIntoPricingDB(customItems);
             }
+            applyManageCategoryRenames();
             const catSelect = document.getElementById('newItemCategory');
             if (!catSelect) { console.error('newItemCategory not found'); return; }
             loadManageItemsCategoryState();
@@ -1085,6 +1250,9 @@
                         ${catIconMarkup}
                         <h6 class="fw-bold mb-0 text-primary" style="flex:1;">${manageItemsEscape(cat)}</h6>
                         <span class="manage-items-category-count">${items.length}</span>
+                        <button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem; padding:1px 8px;" onclick="renameManageItemsCategory(${catJs})" title="Rename category">
+                            <i class="fas fa-pen me-1"></i>Rename
+                        </button>
                         <button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem; padding:1px 8px;" onclick="openCategoryStylePicker(${catJs}, this)" title="Customize icon and colour">
                             <i class="fas fa-palette me-1"></i>Style
                         </button>
@@ -1908,6 +2076,46 @@
             bootstrap.Modal.getInstance(modalEl).hide();
         }
 
+        function openChoiceGroupHelpModal() {
+            var existing = document.getElementById('choiceGroupHelpModal');
+            if (existing) existing.remove();
+            var modalHtml = '' +
+                '<div class="modal fade" id="choiceGroupHelpModal" tabindex="-1" aria-hidden="true">' +
+                '<div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">' +
+                '<div class="modal-content">' +
+                '<div class="modal-header bg-primary text-white">' +
+                '<h5 class="modal-title"><i class="fas fa-question-circle me-2"></i>How Choice Groups Work</h5>' +
+                '<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>' +
+                '</div>' +
+                '<div class="modal-body">' +
+                '<p class="mb-3">Choice Groups turn a set of saved line items into client-facing options. They are useful when the client should choose between materials, finishes, upgrades, or add-ons without you rebuilding the quote every time.</p>' +
+                '<div class="border rounded p-3 mb-3 bg-light">' +
+                '<div class="fw-bold mb-1">Example: flooring options</div>' +
+                '<div class="small">Create one group with Laminate Installation, Vinyl Plank Installation, and Hardwood Flooring Installation. When that group is on a quote, the client sees the available options and the quote total updates from their selection.</div>' +
+                '</div>' +
+                '<h6 class="fw-bold">Pick One</h6>' +
+                '<p class="mb-3">Use Pick One when the client should choose only one option, like laminate versus vinyl versus hardwood. You choose a default/base option when creating the group, and you can still switch which option is selected inside the quote builder.</p>' +
+                '<h6 class="fw-bold">Pick Multiple</h6>' +
+                '<p class="mb-3">Use Pick Multiple when the client can choose more than one item, like baseboards, shoe molding, and crown molding. Each selected option can add to the quote total.</p>' +
+                '<h6 class="fw-bold">Always use grouping</h6>' +
+                '<p class="mb-3">When this is turned on for a saved group, QuoteDr can automatically use the group when one of its saved items is added to a quote. This works for normal Add Item flows and AI Voice items after they land in the quote flow.</p>' +
+                '<h6 class="fw-bold">Turning grouping off for one quote</h6>' +
+                '<p class="mb-3">If a group appears on a quote but you only want a normal line item for that job, use the Turn Off Grouping button on the quote row. That changes only that quote line and does not change the saved group.</p>' +
+                '<h6 class="fw-bold">Managing groups</h6>' +
+                '<p class="mb-0">Use New Choice Group to create a group from saved items. Existing groups can be edited, renamed, or deleted here. Deleting a saved group does not delete the original saved line items.</p>' +
+                '</div>' +
+                '<div class="modal-footer">' +
+                '<button type="button" class="btn btn-primary" data-bs-dismiss="modal">Got it</button>' +
+                '</div>' +
+                '</div></div></div>';
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            var modalEl = document.getElementById('choiceGroupHelpModal');
+            modalEl.addEventListener('hidden.bs.modal', function() {
+                if (document.body.contains(modalEl)) modalEl.remove();
+            }, { once: true });
+            new bootstrap.Modal(modalEl).show();
+        }
+
         function openChoiceGroupTemplateModal() {
             var existing = document.getElementById('choiceGroupTemplateManagerModal');
             if (existing) existing.remove();
@@ -1917,7 +2125,10 @@
                 '<div class="modal-content">' +
                 '<div class="modal-header bg-primary text-white">' +
                 '<h5 class="modal-title"><i class="fas fa-layer-group me-2"></i>Choice Groups</h5>' +
+                '<div class="d-flex align-items-center gap-2 ms-auto">' +
+                '<button type="button" class="btn btn-sm btn-light text-primary fw-semibold" id="choiceGroupTemplateHelpBtn" onclick="openChoiceGroupHelpModal(); return false;"><i class="fas fa-question-circle me-1"></i>Help</button>' +
                 '<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>' +
+                '</div>' +
                 '</div>' +
                 '<div class="modal-body">' +
                 '<div class="d-flex justify-content-between align-items-center gap-2 mb-3 flex-wrap">' +
@@ -2154,6 +2365,8 @@
         window.loadCustomItems = loadCustomItems;
         window.saveCustomItems = saveCustomItems;
         window.addNewCategory = addNewCategory;
+        window.renameManageItemsCategory = renameManageItemsCategory;
+        window.renameSelectedCategory = renameSelectedCategory;
         window.addNewUnitType = addNewUnitType;
         window.handleCategoryChange = handleCategoryChange;
         window.handleItemPhotoUpload = handleItemPhotoUpload;
@@ -2183,6 +2396,7 @@
         window.saveItemFieldEdit = saveItemFieldEdit;
         window.syncManageDetailBaseField = syncManageDetailBaseField;
         window.addCustomItem = addCustomItem;
+        window.openChoiceGroupHelpModal = openChoiceGroupHelpModal;
         window.openChoiceGroupTemplateModal = openChoiceGroupTemplateModal;
         window.openChoiceGroupDefaultOptionPicker = openChoiceGroupDefaultOptionPicker;
         window.openChoiceGroupTypePicker = openChoiceGroupTypePicker;
