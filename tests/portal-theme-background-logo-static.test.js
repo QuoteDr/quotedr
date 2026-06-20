@@ -17,8 +17,8 @@ assert(settings.includes('portalPreviewQuoteCard'), 'Settings live preview shoul
 assert(settings.includes('portalPreviewFilterBar'), 'Settings live preview should show the portal filter controls');
 assert(settings.includes('portalPreviewClientName'), 'Settings live preview should show the client identity area');
 assert(!settings.includes('id="portalPreviewHeader"'), 'Settings live preview should not include a fake portal header strip');
-assert(settings.includes("layoutStyle: 'premium-hub', headerColor: '#1a2940', bgColor: '#ffffff', bgColor2: '#ffffff'"), 'Settings Premium built-in theme should default both portal backgrounds to white');
-assert(studio.includes("layoutStyle: 'premium-hub', headerColor: '#1a2940', bgColor: '#ffffff', bgColor2: '#ffffff'"), 'Theme Studio Premium built-in theme should default both portal backgrounds to white');
+assert(settings.includes("layoutStyle: 'premium-hub', headerColor: '#b9d0f3', bgColor: '#ffffff', bgColor2: '#ffffff'"), 'Settings Premium built-in theme should default to the approved soft blue header and white backgrounds');
+assert(studio.includes("layoutStyle: 'premium-hub', headerColor: '#b9d0f3', bgColor: '#ffffff', bgColor2: '#ffffff'"), 'Theme Studio Premium built-in theme should default to the approved soft blue header and white backgrounds');
 assert(studio.includes('id="portalThemeApplyStarterBtn"'), 'Theme Studio should provide an explicit button to reapply built-in defaults');
 assert(studio.includes("headerDetailColor: '#26364d'"), 'Theme Studio should default header detail text to a readable dark muted color');
 assert(studio.includes("mutedTextColor: '#26364d'"), 'Theme Studio should default muted text to a readable dark muted color');

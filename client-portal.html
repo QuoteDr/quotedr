@@ -340,6 +340,19 @@
       display: block;
     }
 
+    .admin-only {
+      display: none !important;
+    }
+
+    .admin-mode .admin-only {
+      display: block !important;
+    }
+
+    .admin-mode button.admin-only,
+    .admin-mode a.admin-only {
+      display: inline-flex !important;
+    }
+
     .no-quotes {
       text-align: center;
       padding: 3rem 1rem;
@@ -1385,6 +1398,23 @@
       border-radius: 7px;
       padding: 0.65rem 0.75rem;
       background: var(--portal-surface-bg, #fff);
+      text-align: left;
+      cursor: pointer;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+      width: 100%;
+    }
+
+    .portal-job-folder-item:hover,
+    .portal-job-folder-item:focus-visible {
+      border-color: var(--portal-accent-color, #12579c);
+      box-shadow: 0 8px 18px rgba(18, 87, 156, 0.14);
+      transform: translateY(-1px);
+      outline: none;
+    }
+
+    .portal-job-folder-item.active {
+      border-color: var(--portal-accent-color, #12579c);
+      box-shadow: inset 3px 0 0 var(--portal-accent-color, #12579c);
     }
 
     .portal-job-folder-title {
@@ -1420,6 +1450,123 @@
 
     .portal-job-document-option input {
       margin-top: 0.2rem;
+    }
+
+    .portal-job-dashboard {
+      display: none;
+      border: 1px solid #d8e4f0;
+      border-radius: 12px;
+      background: var(--portal-surface-bg, #fff);
+      box-shadow: var(--card-shadow);
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .portal-job-dashboard.is-visible {
+      display: block;
+    }
+
+    .portal-job-dashboard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+
+    .portal-job-dashboard-eyebrow {
+      color: var(--portal-muted-text, #26364d);
+      font-weight: 800;
+      text-transform: uppercase;
+      font-size: 0.76rem;
+      letter-spacing: 0.03em;
+    }
+
+    .portal-job-dashboard-title {
+      color: var(--portal-card-text, #10233d);
+      font-size: clamp(1.5rem, 3vw, 2.25rem);
+      font-weight: 900;
+      margin: 0.15rem 0;
+    }
+
+    .portal-job-dashboard-meta {
+      color: var(--portal-muted-text, #26364d);
+      font-size: 0.95rem;
+    }
+
+    .portal-job-dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.85rem;
+    }
+
+    .portal-job-panel {
+      border: 1px solid #dce7f3;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.78);
+      padding: 1rem;
+      min-height: 132px;
+    }
+
+    .portal-job-panel h3 {
+      color: var(--portal-card-text, #10233d);
+      font-size: 1rem;
+      font-weight: 850;
+      margin-bottom: 0.65rem;
+    }
+
+    .portal-job-notes {
+      color: var(--portal-muted-text, #26364d);
+      white-space: pre-wrap;
+      margin-bottom: 0;
+    }
+
+    .portal-job-empty-panel {
+      color: var(--portal-muted-text, #26364d);
+      font-size: 0.9rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .portal-job-asset-list {
+      display: grid;
+      gap: 0.45rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .portal-job-asset-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      border: 1px solid #e3ebf5;
+      border-radius: 8px;
+      padding: 0.45rem 0.55rem;
+      color: var(--portal-card-text, #10233d);
+      background: #fff;
+      font-size: 0.86rem;
+    }
+
+    .portal-job-asset-item a {
+      color: var(--portal-accent-color, #12579c);
+      font-weight: 800;
+      text-decoration: none;
+    }
+
+    .portal-job-asset-form {
+      display: none;
+      gap: 0.4rem;
+      margin-top: 0.5rem;
+    }
+
+    .portal-job-asset-form.is-visible {
+      display: grid;
+    }
+
+    @media (max-width: 991px) {
+      .portal-job-dashboard-grid {
+        grid-template-columns: 1fr;
+      }
     }
 
     .portal-layout-client-os .summary-value {
@@ -2062,6 +2209,54 @@
             </div>
           </div>
         </div>
+        <section id="portalJobDashboard" class="portal-job-dashboard" aria-live="polite">
+          <div class="portal-job-dashboard-header">
+            <div>
+              <div class="portal-job-dashboard-eyebrow"><i class="fas fa-folder-tree me-1"></i>Job Folder</div>
+              <h2 id="portalJobDashboardTitle" class="portal-job-dashboard-title">Job folder</h2>
+              <div id="portalJobDashboardMeta" class="portal-job-dashboard-meta">0 documents grouped</div>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+              <button type="button" class="btn btn-outline-primary btn-sm" onclick="closePortalJobFolderDashboard()">
+                <i class="fas fa-arrow-left me-1"></i>All documents
+              </button>
+              <button type="button" class="btn btn-primary btn-sm admin-only" onclick="editPortalJobFolder()">
+                <i class="fas fa-pen me-1"></i>Edit folder
+              </button>
+            </div>
+          </div>
+          <div class="portal-job-dashboard-grid">
+            <div class="portal-job-panel">
+              <h3><i class="fas fa-note-sticky me-1"></i>Notes</h3>
+              <p id="portalJobFolderNotesDisplay" class="portal-job-notes">No notes added yet.</p>
+            </div>
+            <div class="portal-job-panel">
+              <h3><i class="fas fa-images me-1"></i>Photos</h3>
+              <div id="portalJobFolderPhotoList" class="portal-job-asset-list"></div>
+              <div id="portalJobPhotoEmpty" class="portal-job-empty-panel">No photos added yet.</div>
+              <div class="admin-only">
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="togglePortalJobAssetForm('photo')"><i class="fas fa-plus me-1"></i>Add photo link</button>
+                <div id="portalJobPhotoForm" class="portal-job-asset-form">
+                  <input type="url" class="form-control form-control-sm" id="portalJobPhotoUrl" placeholder="Photo URL">
+                  <button type="button" class="btn btn-primary btn-sm" onclick="addPortalJobAsset('photo')">Save photo</button>
+                </div>
+              </div>
+            </div>
+            <div class="portal-job-panel">
+              <h3><i class="fas fa-paperclip me-1"></i>Files</h3>
+              <div id="portalJobFolderFileList" class="portal-job-asset-list"></div>
+              <div id="portalJobFileEmpty" class="portal-job-empty-panel">No files added yet.</div>
+              <div class="admin-only">
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="togglePortalJobAssetForm('file')"><i class="fas fa-plus me-1"></i>Add file link</button>
+                <div id="portalJobFileForm" class="portal-job-asset-form">
+                  <input type="text" class="form-control form-control-sm" id="portalJobFileName" placeholder="File name">
+                  <input type="url" class="form-control form-control-sm" id="portalJobFileUrl" placeholder="File URL">
+                  <button type="button" class="btn btn-primary btn-sm" onclick="addPortalJobAsset('file')">Save file</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
         <div id="quotes-container">
           <!-- Quotes will be loaded here -->
         </div>
@@ -2098,17 +2293,30 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
+          <input type="hidden" id="portalJobFolderMode" value="create">
+          <input type="hidden" id="portalJobFolderId" value="">
           <div class="mb-3">
             <label class="form-label fw-bold" for="portalJobFolderName">Job folder name</label>
             <input type="text" class="form-control" id="portalJobFolderName" placeholder="e.g., Main Floor Renovation">
           </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold" for="portalJobFolderNotes">Folder notes</label>
+            <textarea class="form-control" id="portalJobFolderNotes" rows="3" placeholder="Internal summary, client preferences, next steps, or project context"></textarea>
+          </div>
           <div class="mb-2 fw-bold">Select documents</div>
+          <div class="input-group input-group-sm mb-2">
+            <span class="input-group-text"><i class="fas fa-search"></i></span>
+            <input type="search" class="form-control" id="portalJobFolderSearch" placeholder="Search by name, number, address, type, or amount..." oninput="renderPortalJobFolderDocumentOptions()">
+          </div>
           <div id="portalJobFolderDocuments" class="portal-job-document-list">
             <div class="text-muted p-3">No documents available yet.</div>
           </div>
           <div id="portalJobFolderStatus" class="small mt-3 text-muted" aria-live="polite"></div>
         </div>
         <div class="modal-footer">
+          <button type="button" class="btn btn-outline-danger me-auto d-none" id="portalJobFolderDeleteBtn" onclick="deletePortalJobFolder()">
+            <i class="fas fa-trash me-1"></i>Delete folder
+          </button>
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
           <button type="button" class="btn btn-primary" id="portalJobFolderSaveBtn" onclick="savePortalJobFolder()">
             <i class="fas fa-save me-1"></i>Save Job Folder
@@ -2146,6 +2354,8 @@
     let portalDefaultTheme = {};
     let portalBusinessLogoSrc = '';
     let portalCompanyName = 'Your Contractor';
+    let activePortalJobFolderId = '';
+    let portalJobFolderEditorSelectedIds = new Set();
 
     // DOM Elements
     const clientNameEl = document.getElementById('client-name');
@@ -2800,11 +3010,13 @@
     }
 
     function renderPortalDocuments() {
-      processQuotes(getFilteredSortedQuotes(portalQuotesCache));
+      const source = activePortalJobFolderId ? portalDocumentsForJobFolder(activePortalJobFolderId) : portalQuotesCache;
+      processQuotes(getFilteredSortedQuotes(source));
       updatePortalAttention(portalQuotesCache);
       updatePortalActivity(portalQuotesCache);
       updatePortalSideFilterNav();
       refreshPortalJobFolders();
+      updatePortalJobDashboard();
     }
 
     function setPortalShowFilter(value) {
@@ -2826,6 +3038,27 @@
       });
     }
 
+    function normalizePortalJobAssets(assets) {
+      const cleanAssets = assets && typeof assets === 'object' ? assets : {};
+      function normalizeItems(items, type) {
+        return Array.isArray(items) ? items.map(function(item) {
+          if (!item) return null;
+          const url = safePortalJobAssetUrl(item.url || item.href || '', type);
+          if (!url) return null;
+          return {
+            id: String(item.id || ('asset-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7))),
+            title: String(item.title || item.name || (type === 'photo' ? 'Project photo' : 'Project file')).trim(),
+            url: url,
+            createdAt: item.createdAt || new Date().toISOString()
+          };
+        }).filter(Boolean) : [];
+      }
+      return {
+        photos: normalizeItems(cleanAssets.photos, 'photo'),
+        files: normalizeItems(cleanAssets.files, 'file')
+      };
+    }
+
     function sanitizePortalJobFolder(folder) {
       if (!folder || !folder.id || !folder.name) return null;
       const documentIds = Array.isArray(folder.documentIds)
@@ -2835,7 +3068,10 @@
         id: String(folder.id),
         name: String(folder.name).trim(),
         documentIds: Array.from(new Set(documentIds)),
-        createdAt: folder.createdAt || new Date().toISOString()
+        notes: String(folder.notes || '').trim(),
+        assets: normalizePortalJobAssets(folder.assets),
+        createdAt: folder.createdAt || new Date().toISOString(),
+        updatedAt: folder.updatedAt || folder.createdAt || new Date().toISOString()
       };
     }
 
@@ -2868,10 +3104,11 @@
       if (!folderRoots.length) return;
       const listMarkup = portalJobFolders.length ? portalJobFolders.map(function(folder) {
         const count = folder.documentIds.length;
-        return '<div class="portal-job-folder-item">' +
+        const active = folder.id === activePortalJobFolderId ? ' active' : '';
+        return '<button type="button" class="portal-job-folder-item' + active + '" data-folder-id="' + escapeHtml(folder.id) + '" onclick="openPortalJobFolderDashboard(this.dataset.folderId)">' +
           '<div class="portal-job-folder-title"><i class="fas fa-folder me-2"></i>' + escapeHtml(folder.name) + '</div>' +
           '<div class="portal-job-folder-meta">' + count + ' ' + (count === 1 ? 'document' : 'documents') + ' grouped</div>' +
-          '</div>';
+          '</button>';
       }).join('') : '<div class="portal-job-empty">No job folders yet. Create one to group this client\'s portal documents.</div>';
 
       folderRoots.forEach(function(folderRoot) {
@@ -2885,6 +3122,162 @@
         }
         if (list) list.innerHTML = listMarkup;
       });
+    }
+
+    function getPortalJobFolder(folderId) {
+      return portalJobFolders.find(function(folder) {
+        return folder.id === folderId;
+      }) || null;
+    }
+
+    function portalDocumentsForJobFolder(folderId) {
+      const folder = getPortalJobFolder(folderId);
+      if (!folder) return [];
+      const wanted = new Set(folder.documentIds.map(String));
+      return portalJobFolderSourceRows(portalQuotesCache).filter(function(quote) {
+        return wanted.has(String(quote.id));
+      });
+    }
+
+    function portalJobFolderSearchText(quote) {
+      if (!quote) return '';
+      const docType = getDocumentType(quote);
+      const total = new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: quote.data?.currency || 'CAD'
+      }).format(quote.total || 0);
+      const parts = [
+        portalDocumentTitle(quote),
+        portalDocumentNumberLine(quote, docType),
+        docType.label,
+        quote.quote_number,
+        quote.data?.quoteNumber,
+        quote.data?.projectAddress,
+        quote.data?.address,
+        quote.data?.clientName,
+        quote.total,
+        total
+      ];
+      return parts.filter(function(part) {
+        return part !== null && part !== undefined && String(part).trim();
+      }).join(' ').toLowerCase();
+    }
+
+    function updatePortalJobFolderDocumentSelection(input) {
+      if (!input) return;
+      const id = String(input.value || '');
+      if (!id) return;
+      if (input.checked) {
+        portalJobFolderEditorSelectedIds.add(id);
+      } else {
+        portalJobFolderEditorSelectedIds.delete(id);
+      }
+    }
+
+    function syncPortalJobFolderDocumentSelection() {
+      document.querySelectorAll('#portalJobFolderDocuments input[type="checkbox"]').forEach(function(input) {
+        updatePortalJobFolderDocumentSelection(input);
+      });
+    }
+
+    function renderPortalJobFolderDocumentOptions() {
+      const docsEl = document.getElementById('portalJobFolderDocuments');
+      if (!docsEl) return;
+      syncPortalJobFolderDocumentSelection();
+      const docs = portalJobFolderSourceRows(portalQuotesCache);
+      const query = String(document.getElementById('portalJobFolderSearch')?.value || '').trim().toLowerCase();
+      const filteredDocs = query
+        ? docs.filter(function(quote) { return portalJobFolderSearchText(quote).includes(query); })
+        : docs;
+
+      if (!docs.length) {
+        docsEl.innerHTML = '<div class="text-muted p-3">No documents available yet.</div>';
+        return;
+      }
+
+      if (!filteredDocs.length) {
+        docsEl.innerHTML = '<div class="text-muted p-3">No documents match this search.</div>';
+        return;
+      }
+
+      docsEl.innerHTML = filteredDocs.map(function(quote) {
+        const docType = getDocumentType(quote);
+        const total = new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: quote.data?.currency || 'CAD'
+        }).format(quote.total || 0);
+        const numberLine = portalDocumentNumberLine(quote, docType);
+        const checked = portalJobFolderEditorSelectedIds.has(String(quote.id)) ? ' checked' : '';
+        return '<label class="portal-job-document-option">' +
+          '<input class="form-check-input" type="checkbox" value="' + escapeHtml(quote.id) + '"' + checked + ' onchange="updatePortalJobFolderDocumentSelection(this)">' +
+          '<span>' +
+            '<span class="fw-bold d-block">' + escapeHtml(portalDocumentTitle(quote)) + '</span>' +
+            '<span class="text-muted small d-block">' + escapeHtml(numberLine || docType.label) + ' - ' + total + '</span>' +
+          '</span>' +
+        '</label>';
+      }).join('');
+    }
+
+    function closeOpenPortalJobsMenus() {
+      document.querySelectorAll('.portal-job-folders.is-open').forEach(function(openRoot) {
+        openRoot.classList.remove('is-open');
+        const toggle = openRoot.querySelector('.portal-jobs-toggle');
+        if (toggle) toggle.setAttribute('aria-expanded', 'false');
+      });
+    }
+
+    function openPortalJobFolderDashboard(folderId) {
+      if (!portalIsAdminView) return;
+      if (!getPortalJobFolder(folderId)) return;
+      activePortalJobFolderId = folderId;
+      closeOpenPortalJobsMenus();
+      renderPortalDocuments();
+      setTimeout(function() {
+        document.getElementById('portalJobDashboard')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 50);
+    }
+
+    function closePortalJobFolderDashboard() {
+      activePortalJobFolderId = '';
+      renderPortalDocuments();
+    }
+
+    function updatePortalJobDashboard() {
+      const dashboard = document.getElementById('portalJobDashboard');
+      if (!dashboard) return;
+      const folder = getPortalJobFolder(activePortalJobFolderId);
+      if (!folder || !portalIsAdminView) {
+        dashboard.classList.remove('is-visible');
+        return;
+      }
+      const docs = portalDocumentsForJobFolder(folder.id);
+      const title = document.getElementById('portalJobDashboardTitle');
+      const meta = document.getElementById('portalJobDashboardMeta');
+      const notes = document.getElementById('portalJobFolderNotesDisplay');
+      if (title) title.textContent = folder.name;
+      if (meta) meta.textContent = docs.length + ' ' + (docs.length === 1 ? 'document' : 'documents') + ' in this job folder';
+      if (notes) notes.textContent = folder.notes || 'No notes added yet.';
+      renderPortalJobAssets(folder);
+      dashboard.classList.add('is-visible');
+    }
+
+    function renderPortalJobAssets(folder) {
+      const assets = normalizePortalJobAssets(folder?.assets);
+      function renderList(kind, items) {
+        const list = document.getElementById(kind === 'photo' ? 'portalJobFolderPhotoList' : 'portalJobFolderFileList');
+        const empty = document.getElementById(kind === 'photo' ? 'portalJobPhotoEmpty' : 'portalJobFileEmpty');
+        if (!list) return;
+        list.innerHTML = items.map(function(item) {
+          const icon = kind === 'photo' ? 'fa-image' : 'fa-file-lines';
+          return '<div class="portal-job-asset-item">' +
+            '<a href="' + escapeHtml(item.url) + '" target="_blank" rel="noopener"><i class="fas ' + icon + ' me-1"></i>' + escapeHtml(item.title) + '</a>' +
+            (portalIsAdminView ? '<button type="button" class="btn btn-outline-danger btn-sm" onclick="removePortalJobAsset(' + escapeHtml(JSON.stringify(kind)) + ', ' + escapeHtml(JSON.stringify(item.id)) + ')"><i class="fas fa-xmark"></i></button>' : '') +
+          '</div>';
+        }).join('');
+        if (empty) empty.style.display = items.length ? 'none' : '';
+      }
+      renderList('photo', assets.photos);
+      renderList('file', assets.files);
     }
 
     function togglePortalJobsMenu(trigger) {
@@ -2905,33 +3298,44 @@
 
     function openPortalJobFolderModal() {
       if (!portalIsAdminView) return;
+      openPortalJobFolderEditor('');
+    }
+
+    function editPortalJobFolder(folderId) {
+      if (!portalIsAdminView) return;
+      openPortalJobFolderEditor(folderId || activePortalJobFolderId);
+    }
+
+    function openPortalJobFolderEditor(folderId) {
+      if (!portalIsAdminView) return;
+      const folder = folderId ? getPortalJobFolder(folderId) : null;
+      const isEdit = !!folder;
+      const modeInput = document.getElementById('portalJobFolderMode');
+      const idInput = document.getElementById('portalJobFolderId');
       const nameInput = document.getElementById('portalJobFolderName');
-      const docsEl = document.getElementById('portalJobFolderDocuments');
+      const notesInput = document.getElementById('portalJobFolderNotes');
+      const searchInput = document.getElementById('portalJobFolderSearch');
       const statusEl = document.getElementById('portalJobFolderStatus');
-      if (nameInput) nameInput.value = '';
+      const deleteBtn = document.getElementById('portalJobFolderDeleteBtn');
+      const saveBtn = document.getElementById('portalJobFolderSaveBtn');
+      const modalTitle = document.querySelector('#portalJobFolderModal .modal-title');
+      if (modeInput) modeInput.value = isEdit ? 'edit' : 'create';
+      if (idInput) idInput.value = folder?.id || '';
+      if (nameInput) nameInput.value = folder?.name || '';
+      if (notesInput) notesInput.value = folder?.notes || '';
+      if (searchInput) searchInput.value = '';
+      portalJobFolderEditorSelectedIds = new Set((folder?.documentIds || []).map(String));
+      if (deleteBtn) deleteBtn.classList.toggle('d-none', !isEdit);
+      if (saveBtn) saveBtn.innerHTML = '<i class="fas fa-save me-1"></i>' + (isEdit ? 'Save Folder' : 'Save Job Folder');
+      if (modalTitle) modalTitle.innerHTML = '<i class="fas ' + (isEdit ? 'fa-folder-gear' : 'fa-folder-plus') + ' me-2"></i>' + (isEdit ? 'Edit Job Folder' : 'Create Job Folder');
       if (statusEl) {
-        statusEl.textContent = 'Select the documents that belong inside this job folder. They will still stay visible on the main portal screen.';
+        statusEl.textContent = isEdit
+          ? 'Update the folder name, notes, and the documents grouped inside it.'
+          : 'Select the documents that belong inside this job folder. They will still stay visible on the main portal screen.';
         statusEl.className = 'small mt-3 text-muted';
       }
 
-      const docs = portalJobFolderSourceRows(portalQuotesCache);
-      if (docsEl) {
-        docsEl.innerHTML = docs.length ? docs.map(function(quote) {
-          const docType = getDocumentType(quote);
-          const total = new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: quote.data?.currency || 'CAD'
-          }).format(quote.total || 0);
-          const numberLine = portalDocumentNumberLine(quote, docType);
-          return '<label class="portal-job-document-option">' +
-            '<input class="form-check-input" type="checkbox" value="' + escapeHtml(quote.id) + '">' +
-            '<span>' +
-              '<span class="fw-bold d-block">' + escapeHtml(portalDocumentTitle(quote)) + '</span>' +
-              '<span class="text-muted small d-block">' + escapeHtml(numberLine || docType.label) + ' - ' + total + '</span>' +
-            '</span>' +
-          '</label>';
-        }).join('') : '<div class="text-muted p-3">No documents available yet.</div>';
-      }
+      renderPortalJobFolderDocumentOptions();
 
       const modalEl = document.getElementById('portalJobFolderModal');
       if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).show();
@@ -2960,13 +3364,17 @@
 
     async function savePortalJobFolder() {
       if (!portalIsAdminView) return;
+      const mode = document.getElementById('portalJobFolderMode')?.value || 'create';
+      const folderId = document.getElementById('portalJobFolderId')?.value || '';
+      const existing = folderId ? getPortalJobFolder(folderId) : null;
       const nameInput = document.getElementById('portalJobFolderName');
+      const notesInput = document.getElementById('portalJobFolderNotes');
       const statusEl = document.getElementById('portalJobFolderStatus');
       const saveBtn = document.getElementById('portalJobFolderSaveBtn');
       const name = String(nameInput?.value || '').trim();
-      const selectedIds = Array.from(document.querySelectorAll('#portalJobFolderDocuments input[type="checkbox"]:checked')).map(function(input) {
-        return input.value;
-      });
+      const notes = String(notesInput?.value || '').trim();
+      syncPortalJobFolderDocumentSelection();
+      const selectedIds = Array.from(portalJobFolderEditorSelectedIds);
 
       function setStatus(message, className) {
         if (!statusEl) return;
@@ -2985,17 +3393,25 @@
       }
 
       const folder = {
-        id: (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'job-' + Date.now().toString(36),
+        id: existing?.id || ((window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'job-' + Date.now().toString(36)),
         name: name,
         documentIds: Array.from(new Set(selectedIds)),
-        createdAt: new Date().toISOString()
+        notes: notes,
+        assets: existing?.assets || { photos: [], files: [] },
+        createdAt: existing?.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       };
 
       try {
         if (saveBtn) saveBtn.disabled = true;
-        setStatus('Saving job folder...', 'text-muted');
-        await persistPortalJobFolders(portalJobFolders.concat(folder));
-        setStatus('Saved. This folder now appears under Jobs, and the documents still remain on the main screen.', 'text-success fw-bold');
+        setStatus(mode === 'edit' ? 'Updating job folder...' : 'Saving job folder...', 'text-muted');
+        const nextFolders = existing
+          ? portalJobFolders.map(function(item) { return item.id === existing.id ? folder : item; })
+          : portalJobFolders.concat(folder);
+        await persistPortalJobFolders(nextFolders);
+        activePortalJobFolderId = folder.id;
+        setStatus('Saved. This folder dashboard is ready, and documents still remain on the main screen.', 'text-success fw-bold');
+        renderPortalDocuments();
         const modalEl = document.getElementById('portalJobFolderModal');
         setTimeout(function() {
           if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).hide();
@@ -3006,6 +3422,100 @@
       } finally {
         if (saveBtn) saveBtn.disabled = false;
       }
+    }
+
+    async function deletePortalJobFolder() {
+      if (!portalIsAdminView) return;
+      const folderId = document.getElementById('portalJobFolderId')?.value || activePortalJobFolderId;
+      const folder = getPortalJobFolder(folderId);
+      if (!folder) return;
+      if (!confirm('Delete this job folder? The quotes and invoices will stay in the portal.')) return;
+      try {
+        await persistPortalJobFolders(portalJobFolders.filter(function(item) {
+          return item.id !== folder.id;
+        }));
+        if (activePortalJobFolderId === folder.id) activePortalJobFolderId = '';
+        const modalEl = document.getElementById('portalJobFolderModal');
+        if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+        renderPortalDocuments();
+      } catch (error) {
+        console.error('Error deleting portal job folder:', error);
+        const statusEl = document.getElementById('portalJobFolderStatus');
+        if (statusEl) {
+          statusEl.textContent = error.message || 'Could not delete this job folder.';
+          statusEl.className = 'small mt-3 text-danger';
+        }
+      }
+    }
+
+    function togglePortalJobAssetForm(kind) {
+      if (!portalIsAdminView) return;
+      const form = document.getElementById(kind === 'photo' ? 'portalJobPhotoForm' : 'portalJobFileForm');
+      if (form) form.classList.toggle('is-visible');
+    }
+
+    function safePortalJobAssetUrl(value, type) {
+      const raw = String(value || '').trim();
+      if (!raw) return '';
+      if (type === 'photo' && /^data:image\//i.test(raw)) return raw;
+      try {
+        const parsed = new URL(raw, window.location.origin);
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return parsed.href;
+      } catch (error) {}
+      return '';
+    }
+
+    async function updatePortalJobFolder(folder) {
+      const clean = sanitizePortalJobFolder(folder);
+      if (!clean) throw new Error('Could not save this job folder.');
+      const nextFolders = portalJobFolders.map(function(item) {
+        return item.id === clean.id ? clean : item;
+      });
+      await persistPortalJobFolders(nextFolders);
+      activePortalJobFolderId = clean.id;
+      renderPortalDocuments();
+    }
+
+    async function addPortalJobAsset(kind) {
+      if (!portalIsAdminView) return;
+      const folder = getPortalJobFolder(activePortalJobFolderId);
+      if (!folder) return;
+      const assets = normalizePortalJobAssets(folder.assets);
+      const isPhoto = kind === 'photo';
+      const urlInput = document.getElementById(isPhoto ? 'portalJobPhotoUrl' : 'portalJobFileUrl');
+      const nameInput = document.getElementById('portalJobFileName');
+      const url = safePortalJobAssetUrl(urlInput?.value || '', kind);
+      if (!url) {
+        urlInput?.focus();
+        return;
+      }
+      const item = {
+        id: (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'asset-' + Date.now().toString(36),
+        title: isPhoto ? 'Project photo' : String(nameInput?.value || 'Project file').trim(),
+        url: url,
+        createdAt: new Date().toISOString()
+      };
+      if (isPhoto) {
+        assets.photos.push(item);
+      } else {
+        assets.files.push(item);
+      }
+      if (urlInput) urlInput.value = '';
+      if (nameInput) nameInput.value = '';
+      await updatePortalJobFolder(Object.assign({}, folder, { assets: assets, updatedAt: new Date().toISOString() }));
+    }
+
+    async function removePortalJobAsset(kind, assetId) {
+      if (!portalIsAdminView) return;
+      const folder = getPortalJobFolder(activePortalJobFolderId);
+      if (!folder) return;
+      const assets = normalizePortalJobAssets(folder.assets);
+      if (kind === 'photo') {
+        assets.photos = assets.photos.filter(function(item) { return item.id !== assetId; });
+      } else {
+        assets.files = assets.files.filter(function(item) { return item.id !== assetId; });
+      }
+      await updatePortalJobFolder(Object.assign({}, folder, { assets: assets, updatedAt: new Date().toISOString() }));
     }
 
     function getFilteredSortedQuotes(quotes) {
