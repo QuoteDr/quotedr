@@ -903,11 +903,15 @@ if (location.search.includes('debug')) {
                 <div class="total-status">Client-ready total</div>
             </div>
             <div class="total-row">
-                <span>Base quote</span>
-                <strong id="originalTotalDisplay">$0.00</strong>
+                <span>Subtotal</span>
+                <strong id="quoteSubtotalDisplay">$0.00</strong>
             </div>
             <div class="total-row" id="upgradesTotalDisplay" style="display:none;"></div>
             <div class="total-row" id="quoteAdjustmentTotalDisplay" style="display:none;"></div>
+            <div class="total-row">
+                <span id="quoteTaxLabel">HST (13%)</span>
+                <strong id="quoteTaxDisplay">$0.00</strong>
+            </div>
             <div class="deposit-summary" id="depositSummary">
                 <div class="total-row py-0">
                     <span id="depositLabel">Deposit</span>
@@ -1929,7 +1933,7 @@ if (location.search.includes('debug')) {
 
             // Show original total
             const originalTotal = quoteData.grandTotal || 0;
-            document.getElementById('originalTotalDisplay').textContent = viewerMoney(originalTotal);
+            document.getElementById('quoteSubtotalDisplay').textContent = viewerMoney(originalTotal);
             document.getElementById('newGrandTotal').textContent = viewerMoney(originalTotal);
             var heroTotal = document.getElementById('heroGrandTotal');
             if (heroTotal) heroTotal.textContent = viewerMoney(originalTotal);
@@ -1994,7 +1998,7 @@ if (location.search.includes('debug')) {
                     '<div class="co-price-row co-price-final"><span>Updated project total if approved</span><strong>' + money(projectedTotal, false) + '</strong></div>' +
                     '</div>' +
                     '</div>';
-                document.getElementById('originalTotalDisplay').textContent = viewerMoney(parentTotal);
+                document.getElementById('quoteSubtotalDisplay').textContent = viewerMoney(parentTotal);
                 document.getElementById('newGrandTotal').textContent = viewerMoney(projectedTotal);
                 if (heroTotal) heroTotal.textContent = viewerMoney(netChange, { forceSign: true });
             }
@@ -2266,6 +2270,22 @@ if (location.search.includes('debug')) {
             updateTotal();
         }
 
+        function updateQuoteTotalBreakdown(subtotal, tax, total, taxLabel, taxRate) {
+            var subtotalEl = document.getElementById('quoteSubtotalDisplay');
+            var taxEl = document.getElementById('quoteTaxDisplay');
+            var taxLabelEl = document.getElementById('quoteTaxLabel');
+            var totalEl = document.getElementById('newGrandTotal');
+            var safeRate = parseFloat(taxRate);
+            var rateLabel = isFinite(safeRate)
+                ? (safeRate * 100).toFixed(1).replace(/\.0$/, '')
+                : '13';
+
+            if (subtotalEl) subtotalEl.textContent = viewerMoney(subtotal || 0);
+            if (taxEl) taxEl.textContent = viewerMoney(tax || 0);
+            if (taxLabelEl) taxLabelEl.textContent = (taxLabel || 'HST') + ' (' + rateLabel + '%)';
+            if (totalEl) totalEl.textContent = viewerMoney(total || 0);
+        }
+
         function updateTotal() {
             var co = window.QuoteDrChangeOrders;
             var isChangeOrder = !!(co && co.isChangeOrder(quoteData));
@@ -2286,13 +2306,13 @@ if (location.search.includes('debug')) {
             }
             var _vqp = {}; try { _vqp = JSON.parse(localStorage.getItem('ald_quote_prefs')||'{}'); } catch(e) {}
             var _vTaxRate = (_vqp.taxRate !== undefined && _vqp.taxRate !== '') ? parseFloat(_vqp.taxRate)/100 : (quoteData.taxRate || 0.13);
+            if (!isFinite(_vTaxRate) || _vTaxRate < 0) _vTaxRate = quoteData.taxRate || 0.13;
+            var _vTaxLabel = quoteData.taxLabel || _vqp.taxLabel || 'HST';
             const adjustmentAmount = calculateViewerQuoteAdjustmentAmount(subtotal);
             const taxableSubtotal = subtotal + adjustmentAmount;
             const tax = taxableSubtotal * _vTaxRate;
             const total = taxableSubtotal + tax;
-
-            var baseEl = document.getElementById('originalTotalDisplay');
-            if (baseEl && !isChangeOrder) baseEl.textContent = viewerMoney(quoteData.grandTotal || quoteData.total || total);
+            updateQuoteTotalBreakdown(subtotal, tax, total, _vTaxLabel, _vTaxRate);
 
             var upgradesEl = document.getElementById('upgradesTotalDisplay');
             if (upgradesEl) {
@@ -2337,8 +2357,6 @@ if (location.search.includes('debug')) {
                 var previousApproved = parseFloat(ctx.previousApprovedTotal || quoteData.changeOrderPreviousApprovedTotal || 0) || 0;
                 var projectedTotal = parentTotal + previousApproved + total;
                 var summary = quoteData.changeOrderPriceSummary || {};
-                var baseElCo = document.getElementById('originalTotalDisplay');
-                if (baseElCo) baseElCo.textContent = viewerMoney(parentTotal);
                 var upgradesElCo = document.getElementById('upgradesTotalDisplay');
                 if (upgradesElCo) {
                     upgradesElCo.style.display = 'flex';
@@ -2351,12 +2369,17 @@ if (location.search.includes('debug')) {
                         updatedTotal: projectedTotal
                     });
                 }
-                document.getElementById('newGrandTotal').textContent = viewerMoney(projectedTotal);
+                updateQuoteTotalBreakdown(
+                    parentTotal + previousApproved + subtotal,
+                    summary.tax || tax,
+                    projectedTotal,
+                    summary.taxLabel || _vTaxLabel,
+                    summary.taxRate || _vTaxRate
+                );
                 var heroTotal = document.getElementById('heroGrandTotal');
                 if (heroTotal) heroTotal.textContent = viewerMoney(total, { forceSign: true });
                 return;
             }
-            document.getElementById('newGrandTotal').textContent = viewerMoney(total);
             var heroTotal = document.getElementById('heroGrandTotal');
             if (heroTotal) heroTotal.textContent = viewerMoney(total);
         }
