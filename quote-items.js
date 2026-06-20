@@ -4,6 +4,8 @@
     'use strict';
 
         var CREATE_NEW_CATEGORY_VALUE = '__quote_dr_create_new_category__';
+        var MANAGE_CUSTOM_UNIT_VALUE = '__quote_dr_custom_unit__';
+        var MANAGE_CUSTOM_UNITS_KEY = 'ald_manage_custom_unit_types';
         var MANAGE_CATEGORY_STATE_KEY = 'ald_manage_items_category_state';
         var MANAGE_CATEGORY_RENAMES_KEY = 'ald_manage_items_category_renames';
         var manageItemsFilter = 'all';
@@ -20,6 +22,142 @@
 
         function manageItemsAttr(value) {
             return manageItemsEscape(value).replace(/`/g, '&#96;');
+        }
+
+        function getManageBaseUnitTypes() {
+            return ['sq ft', 'sqft', 'LF', 'linear foot', 'linear ft', 'm\u00b2', 'm', 'each', 'Flatrate', 'hourly', 'sheet', 'minimum'];
+        }
+
+        function addManageUniqueUnit(units, unit) {
+            const clean = String(unit || '').trim();
+            if (!clean || clean === MANAGE_CUSTOM_UNIT_VALUE) return;
+            if (!units.some(function(existing) { return existing.toLowerCase() === clean.toLowerCase(); })) {
+                units.push(clean);
+            }
+        }
+
+        function getRememberedManageUnitTypes() {
+            try {
+                const stored = JSON.parse(localStorage.getItem(MANAGE_CUSTOM_UNITS_KEY) || '[]');
+                return Array.isArray(stored) ? stored.filter(function(unit) { return String(unit || '').trim(); }) : [];
+            } catch(e) {
+                return [];
+            }
+        }
+
+        function collectSavedManageUnitTypes() {
+            const units = [];
+            [pricingDatabase, customItems].forEach(function(source) {
+                Object.keys(source || {}).forEach(function(category) {
+                    const items = source[category];
+                    if (category.indexOf('__') === 0 || !Array.isArray(items)) return;
+                    items.forEach(function(item) {
+                        addManageUniqueUnit(units, item && item.unitType);
+                        addManageUniqueUnit(units, item && item.upgrade && item.upgrade.unitType);
+                    });
+                });
+            });
+            return units;
+        }
+
+        function getManageKnownUnitTypes(currentValue) {
+            const units = [];
+            getManageBaseUnitTypes().forEach(function(unit) { addManageUniqueUnit(units, unit); });
+            getRememberedManageUnitTypes().forEach(function(unit) { addManageUniqueUnit(units, unit); });
+            collectSavedManageUnitTypes().forEach(function(unit) { addManageUniqueUnit(units, unit); });
+            addManageUniqueUnit(units, currentValue);
+            return units;
+        }
+
+        function ensureManageUnitOption(selectEl, unit) {
+            const clean = String(unit || '').trim();
+            if (!selectEl || !clean) return;
+            const exists = Array.from(selectEl.options).some(function(option) {
+                return option.value.toLowerCase() === clean.toLowerCase();
+            });
+            if (exists) return;
+            const option = new Option(clean, clean);
+            const sentinelOption = Array.from(selectEl.options).find(function(opt) {
+                return opt.value === MANAGE_CUSTOM_UNIT_VALUE;
+            });
+            selectEl.add(option, sentinelOption || null);
+        }
+
+        function syncManageUnitTypeOptions() {
+            const units = getManageKnownUnitTypes();
+            const datalist = document.getElementById('unitTypeOptions');
+            if (datalist) {
+                units.forEach(function(unit) {
+                    if (![...datalist.children].some(function(opt) { return opt.value.toLowerCase() === unit.toLowerCase(); })) {
+                        const opt = document.createElement('option');
+                        opt.value = unit;
+                        datalist.appendChild(opt);
+                    }
+                });
+            }
+            document.querySelectorAll('.item-unit-type-input').forEach(function(selectEl) {
+                units.forEach(function(unit) { ensureManageUnitOption(selectEl, unit); });
+            });
+        }
+
+        function rememberManageUnitType(unit) {
+            const clean = String(unit || '').trim();
+            if (!clean || clean === MANAGE_CUSTOM_UNIT_VALUE) return false;
+            const remembered = getRememberedManageUnitTypes();
+            const alreadyRemembered = remembered.some(function(existing) {
+                return existing.toLowerCase() === clean.toLowerCase();
+            });
+            const isBaseUnit = getManageBaseUnitTypes().some(function(existing) {
+                return existing.toLowerCase() === clean.toLowerCase();
+            });
+            if (!alreadyRemembered && !isBaseUnit) {
+                remembered.push(clean);
+                remembered.sort(function(a, b) { return a.localeCompare(b); });
+                localStorage.setItem(MANAGE_CUSTOM_UNITS_KEY, JSON.stringify(remembered));
+            }
+            syncManageUnitTypeOptions();
+            return true;
+        }
+
+        function renderManageUnitSelect(currentValue) {
+            const current = String(currentValue || '').trim();
+            const units = getManageKnownUnitTypes(current);
+            const options = ['<option value="" ' + (!current ? 'selected' : '') + '>Select unit...</option>'].concat(units.map(function(unit) {
+                return '<option value="' + manageItemsAttr(unit) + '" ' + (unit === current ? 'selected' : '') + '>' + manageItemsEscape(unit) + '</option>';
+            }));
+            options.push('<option value="' + MANAGE_CUSTOM_UNIT_VALUE + '">New...</option>');
+            return '<select class="form-select form-select-sm item-unit-type-input" aria-label="Unit type" data-current-unit="' + manageItemsAttr(current) + '" onchange="handleManageUnitTypeChange(this)">' + options.join('') + '</select>';
+        }
+
+        async function handleManageUnitTypeChange(selectEl) {
+            if (!selectEl) return;
+
+            if (selectEl.value !== MANAGE_CUSTOM_UNIT_VALUE) {
+                selectEl.dataset.currentUnit = selectEl.value || '';
+                markPricingDirty(selectEl);
+                return;
+            }
+
+            const previousUnit = selectEl.dataset.currentUnit || '';
+            const customUnit = (await qdPrompt('Enter new unit type:', '', {
+                title: 'New Unit Type'
+            }) || '').trim();
+
+            if (!customUnit) {
+                selectEl.value = previousUnit;
+                return;
+            }
+
+            const existingOption = Array.from(selectEl.options).find(function(option) {
+                return option.value.toLowerCase() === customUnit.toLowerCase();
+            });
+
+            rememberManageUnitType(customUnit);
+            ensureManageUnitOption(selectEl, customUnit);
+            selectEl.value = existingOption ? existingOption.value : customUnit;
+            selectEl.dataset.currentUnit = selectEl.value;
+
+            markPricingDirty(selectEl);
         }
 
         function manageItemsRowKey(cat, name) {
@@ -287,6 +425,7 @@
             }
             applyManageCategoryRenames();
             loadItemOverrides();
+            syncManageUnitTypeOptions();
         }
 
         function saveCustomItems(showToast) {
@@ -363,9 +502,7 @@
             if (!newUnit || newUnit.length === 0) return;
             const datalist = document.getElementById('unitTypeOptions');
             if ([...datalist.children].find(opt => opt.value === newUnit)) { qdAlert('Unit type already exists!'); return; }
-            const opt = document.createElement('option');
-            opt.value = newUnit;
-            datalist.appendChild(opt);
+            rememberManageUnitType(newUnit);
             // Also set it in the input
             document.getElementById('newItemUnit').value = newUnit;
         }
@@ -759,13 +896,13 @@
             // Read all field values from the row
             const newName     = row.querySelector('input.item-name-input')?.value.trim() || name;
             const inputs      = row.querySelectorAll('input.item-input');
-            const unitType    = inputs[0]?.value.trim() || '';
-            const rate        = parseFloat(inputs[1]?.value) || 0;
+            const unitType    = row.querySelector('.item-unit-type-input')?.value.trim() || '';
+            const rate        = parseFloat(inputs[0]?.value) || 0;
             const detailsRow  = document.getElementById('details_' + safeId);
             const detailMaterialInput = detailsRow?.querySelector('.item-detail-material-cost');
             const detailSupplierInput = detailsRow?.querySelector('.item-detail-supplier-url');
-            const matCost     = parseFloat(detailMaterialInput?.value || inputs[2]?.value) || 0;
-            const supplierUrl = (detailSupplierInput?.value || inputs[3]?.value || '').trim();
+            const matCost     = parseFloat(detailMaterialInput?.value || inputs[1]?.value) || 0;
+            const supplierUrl = (detailSupplierInput?.value || inputs[2]?.value || '').trim();
             const itemDescription = detailsRow?.querySelector('.item-description-textarea')?.value.trim() || '';
             const laborMode = detailsRow?.querySelector('.item-labor-mode')?.value || '';
             const laborTime = {
@@ -825,6 +962,8 @@
             } else if (hasUpgradeEditor) {
                 delete ci.upgrade;
             }
+            rememberManageUnitType(unitType);
+            if (upgrade && upgrade.unitType) rememberManageUnitType(upgrade.unitType);
             // Preserve item photo from previous state
             if (!ci.photo) {
                 var oldPhoto = pricingDatabase[cat]?.find(function(i){return i.name===name||i.name===newName;})?.photo;
@@ -1218,11 +1357,11 @@
             const row = rowKey ? getManageRowByKey(rowKey) : null;
             if (!row) return;
             const rowInputs = row.querySelectorAll('input.item-input');
-            if (inputEl.classList.contains('item-detail-material-cost') && rowInputs[2]) {
-                rowInputs[2].value = inputEl.value;
+            if (inputEl.classList.contains('item-detail-material-cost') && rowInputs[1]) {
+                rowInputs[1].value = inputEl.value;
             }
-            if (inputEl.classList.contains('item-detail-supplier-url') && rowInputs[3]) {
-                rowInputs[3].value = inputEl.value;
+            if (inputEl.classList.contains('item-detail-supplier-url') && rowInputs[2]) {
+                rowInputs[2].value = inputEl.value;
             }
         }
 
@@ -1297,7 +1436,7 @@
                             </div>
                             <div class="mt-1 d-flex flex-wrap gap-1">${renderManageMarginPill(rate, matCost)} ${renderManageLaborPill(laborTime, item.unitType || '')}</div>
                         </td>
-                        <td data-label="Unit"><input type="text" class="form-control form-control-sm item-input" value="${manageItemsAttr(item.unitType || '')}" oninput="markPricingDirty(this)"></td>
+                        <td data-label="Unit">${renderManageUnitSelect(item.unitType || '')}</td>
                         <td data-label="Rate"><input type="number" class="form-control form-control-sm item-input" value="${rate}" step="0.01" min="0" oninput="markPricingDirty(this)"></td>
                         <td data-label="Mat. Cost"><input type="number" class="form-control form-control-sm item-input" value="${matCost}" step="0.01" min="0" oninput="markPricingDirty(this)"></td>
                         <td data-label="Supplier">
@@ -1510,6 +1649,7 @@
             }
             if (ci) {
                 ci[field] = value;
+                if (field === 'unitType') rememberManageUnitType(value);
                 saveCustomItems();
                 // Also update live pricingDatabase
                 const pi = pricingDatabase[category]?.find(i => i.name === name);
@@ -1554,6 +1694,7 @@
 
             const newItem = { name, unitType, rate, materialCost, supplierUrl, itemDescription, laborTime };
             customItems[category].push(newItem);
+            rememberManageUnitType(unitType);
             saveCustomItems();
 
             if (!pricingDatabase[category]) pricingDatabase[category] = [];
@@ -2394,6 +2535,7 @@
         window.filterItemsList = filterItemsList;
         window.renderAllItemsList = renderAllItemsList;
         window.saveItemFieldEdit = saveItemFieldEdit;
+        window.handleManageUnitTypeChange = handleManageUnitTypeChange;
         window.syncManageDetailBaseField = syncManageDetailBaseField;
         window.addCustomItem = addCustomItem;
         window.openChoiceGroupHelpModal = openChoiceGroupHelpModal;
