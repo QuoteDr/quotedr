@@ -1794,10 +1794,28 @@
             }
         }
 
+        async function confirmRemoveDocumentFromPortal(quote) {
+            var title = quote ? getQuoteDisplayTitle(quote) : 'this document';
+            var message = 'Are you sure you want to remove this document from the client portal? If you add it back later, the portal will show the new date it was added.';
+            if (title) message += '\n\nDocument: ' + title;
+            if (typeof qdConfirm === 'function') {
+                return await qdConfirm(message, {
+                    title: 'Remove From Client Portal?',
+                    okText: 'Remove From Portal',
+                    okClass: 'btn-danger',
+                    cancelText: 'Cancel',
+                    type: 'warning'
+                });
+            }
+            return window.confirm(message);
+        }
+
         async function removeQuoteFromPortal() {
             var quoteId = window._portalAssignQuoteId || '';
             var target = (allQuotes || []).find(function(q) { return q.id === quoteId; });
             if (!target) return;
+            var confirmed = await confirmRemoveDocumentFromPortal(target);
+            if (!confirmed) return;
             var data = clearPortalAssignmentForEdit(target.data || {});
             try {
                 var result = await _supabase.from('quotes').update({ data: data }).eq('id', quoteId);

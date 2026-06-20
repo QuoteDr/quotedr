@@ -907,6 +907,7 @@ if (location.search.includes('debug')) {
                 <strong id="originalTotalDisplay">$0.00</strong>
             </div>
             <div class="total-row" id="upgradesTotalDisplay" style="display:none;"></div>
+            <div class="total-row" id="quoteAdjustmentTotalDisplay" style="display:none;"></div>
             <div class="deposit-summary" id="depositSummary">
                 <div class="total-row py-0">
                     <span id="depositLabel">Deposit</span>
@@ -1668,6 +1669,33 @@ if (location.search.includes('debug')) {
             });
         }
 
+        function getViewerQuoteAdjustment() {
+            var adjustment = quoteData && (quoteData.quoteAdjustment || quoteData.clientAdjustment);
+            adjustment = adjustment || {};
+            var type = adjustment.type === 'markup' ? 'markup' : 'discount';
+            var basis = adjustment.basis === 'amount' || adjustment.mode === 'amount' || (adjustment.amount && !adjustment.percent) ? 'amount' : 'percent';
+            var percent = viewerNumber(adjustment.percent);
+            if (percent <= 0) percent = 0;
+            var amount = viewerNumber(adjustment.amount || adjustment.value);
+            if (amount <= 0) amount = 0;
+            return {
+                name: String(adjustment.name || (type === 'markup' ? 'Markup' : 'Discount')).trim(),
+                type: type,
+                basis: basis,
+                percent: percent,
+                amount: amount
+            };
+        }
+
+        function calculateViewerQuoteAdjustmentAmount(subtotal) {
+            var adjustment = getViewerQuoteAdjustment();
+            var amount = adjustment.basis === 'amount'
+                ? adjustment.amount
+                : viewerNumber(subtotal) * adjustment.percent / 100;
+            if (!amount) return 0;
+            return adjustment.type === 'discount' ? -amount : amount;
+        }
+
         function viewerHasExplicitTotal(item) {
             return !!item && item.total !== undefined && item.total !== null && item.total !== '' && isFinite(parseFloat(item.total));
         }
@@ -2258,8 +2286,10 @@ if (location.search.includes('debug')) {
             }
             var _vqp = {}; try { _vqp = JSON.parse(localStorage.getItem('ald_quote_prefs')||'{}'); } catch(e) {}
             var _vTaxRate = (_vqp.taxRate !== undefined && _vqp.taxRate !== '') ? parseFloat(_vqp.taxRate)/100 : (quoteData.taxRate || 0.13);
-            const tax = subtotal * _vTaxRate;
-            const total = subtotal + tax;
+            const adjustmentAmount = calculateViewerQuoteAdjustmentAmount(subtotal);
+            const taxableSubtotal = subtotal + adjustmentAmount;
+            const tax = taxableSubtotal * _vTaxRate;
+            const total = taxableSubtotal + tax;
 
             var baseEl = document.getElementById('originalTotalDisplay');
             if (baseEl && !isChangeOrder) baseEl.textContent = viewerMoney(quoteData.grandTotal || quoteData.total || total);
@@ -2271,6 +2301,15 @@ if (location.search.includes('debug')) {
                 upgradesEl.innerHTML = upgradesTotal > 0
                     ? `<span>Selected upgrades${selectedChoices.length ? ' and options' : ''}</span><strong>${viewerMoney(upgradesTotal, { forceSign: true })}</strong>`
                     : (selectedChoices.length ? `<span>Selected options</span><strong>${selectedChoices.length}</strong>` : '');
+            }
+            var adjustmentEl = document.getElementById('quoteAdjustmentTotalDisplay');
+            if (adjustmentEl) {
+                var adjustment = getViewerQuoteAdjustment();
+                var showAdjustment = Math.abs(adjustmentAmount) > 0.0001;
+                adjustmentEl.style.display = showAdjustment ? 'flex' : 'none';
+                adjustmentEl.innerHTML = showAdjustment
+                    ? `<span>${escapeHtml(adjustment.name)}</span><strong>${viewerMoney(adjustmentAmount, { forceSign: true })}</strong>`
+                    : '';
             }
 
             var depositSummary = document.getElementById('depositSummary');

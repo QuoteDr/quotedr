@@ -172,6 +172,7 @@
                 rooms: JSON.parse(JSON.stringify(rooms)),
                 categoryStyles: JSON.parse(JSON.stringify(categoryStyles || {})),
                 roomCounter: roomCounter,
+                quoteAdjustment: getQuoteClientAdjustment(),
                 grandTotal: grandTotal,
                 total: grandTotal,
                 supabaseId: supabaseId,
@@ -223,6 +224,7 @@
                 try { localStorage.setItem('ald_category_styles', JSON.stringify(categoryStyles)); } catch(e) {}
             }
             roomCounter = data.roomCounter || rooms.length;
+            setQuoteClientAdjustment(data.quoteAdjustment || data.clientAdjustment || null);
             window._quoteDocumentType = data.type || data.documentType || 'quote';
             window._parentQuoteId = data.parentQuoteId || data.parent_quote_id || '';
             window._parentQuoteNumber = data.parentQuoteNumber || '';

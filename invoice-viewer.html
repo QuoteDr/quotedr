@@ -589,6 +589,10 @@ if (location.search.includes('debug')) {
                 <span>Subtotal</span>
                 <span id="subtotalDisplay">$0.00</span>
             </div>
+            <div class="total-row" id="invoiceAdjustmentRow" style="display:none;">
+                <span id="invoiceAdjustmentLabel">Adjustment</span>
+                <span id="invoiceAdjustmentDisplay">$0.00</span>
+            </div>
             <div class="total-row">
                 <span>HST (13%)</span>
                 <span id="taxDisplay">$0.00</span>
@@ -762,6 +766,38 @@ if (location.search.includes('debug')) {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
             });
+        }
+
+        function formatSignedMoney(amount, currency) {
+            var value = Number(amount || 0);
+            return (value > 0 ? '+' : '') + formatMoney(value, currency);
+        }
+
+        function getInvoiceQuoteAdjustment() {
+            var adjustment = invoiceData && (invoiceData.quoteAdjustment || invoiceData.clientAdjustment);
+            adjustment = adjustment || {};
+            var type = adjustment.type === 'markup' ? 'markup' : 'discount';
+            var basis = adjustment.basis === 'amount' || adjustment.mode === 'amount' || (adjustment.amount && !adjustment.percent) ? 'amount' : 'percent';
+            var percent = parseFloat(adjustment.percent);
+            if (!isFinite(percent) || percent <= 0) percent = 0;
+            var amount = parseFloat(adjustment.amount || adjustment.value);
+            if (!isFinite(amount) || amount <= 0) amount = 0;
+            return {
+                name: String(adjustment.name || (type === 'markup' ? 'Markup' : 'Discount')).trim(),
+                type: type,
+                basis: basis,
+                percent: percent,
+                amount: amount
+            };
+        }
+
+        function calculateInvoiceQuoteAdjustmentAmount(subtotal) {
+            var adjustment = getInvoiceQuoteAdjustment();
+            var amount = adjustment.basis === 'amount'
+                ? adjustment.amount
+                : (parseFloat(subtotal) || 0) * adjustment.percent / 100;
+            if (!amount) return 0;
+            return adjustment.type === 'discount' ? -amount : amount;
         }
 
         function escapeHtml(value) {
@@ -1384,9 +1420,18 @@ if (location.search.includes('debug')) {
             if (!isFinite(_iTaxRate) || _iTaxRate < 0) _iTaxRate = 0.13;
             var _iTaxLabel = invoiceData.taxLabel || _iqp.taxLabel || 'HST';
             var _iCurrency = invoiceData.currency || _iqp.currency || 'CAD';
-            const tax = subtotal * _iTaxRate;
-            const total = subtotal + tax;
+            const adjustmentAmount = calculateInvoiceQuoteAdjustmentAmount(subtotal);
+            const taxableSubtotal = subtotal + adjustmentAmount;
+            const tax = taxableSubtotal * _iTaxRate;
+            const total = taxableSubtotal + tax;
             document.getElementById('subtotalDisplay').textContent = formatMoney(subtotal, _iCurrency);
+            var adjustment = getInvoiceQuoteAdjustment();
+            var adjustmentRow = document.getElementById('invoiceAdjustmentRow');
+            if (adjustmentRow) adjustmentRow.style.display = Math.abs(adjustmentAmount) > 0.0001 ? 'flex' : 'none';
+            var adjustmentLabel = document.getElementById('invoiceAdjustmentLabel');
+            if (adjustmentLabel) adjustmentLabel.textContent = adjustment.name || (adjustment.type === 'markup' ? 'Markup' : 'Discount');
+            var adjustmentDisplay = document.getElementById('invoiceAdjustmentDisplay');
+            if (adjustmentDisplay) adjustmentDisplay.textContent = formatSignedMoney(adjustmentAmount, _iCurrency);
             document.getElementById('taxDisplay').textContent = formatMoney(tax, _iCurrency);
             document.getElementById('grandTotalDisplay').textContent = formatMoney(total, _iCurrency);
             var taxLabelRow = document.querySelector('.totals-section .total-row:nth-child(2) span:first-child');

@@ -175,6 +175,11 @@
         .icon-picker-wrap .icon-opt.active { background:#1a56a0; color:#fff; border-color:#1a56a0; }
         .icon-picker-wrap .icon-auto-actions { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:10px; }
         .icon-picker-wrap .icon-auto-actions button { border-radius:8px; font-weight:700; font-size:0.78rem; padding:7px 8px; }
+        .icon-picker-wrap .icon-auto-detect-results { border:1px solid #bfd5f2; background:#f4f8ff; border-radius:10px; padding:9px; margin-bottom:10px; }
+        .icon-picker-wrap .icon-auto-choice-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:6px; margin-top:7px; }
+        .icon-picker-wrap .icon-auto-choice { display:flex; align-items:center; gap:7px; width:100%; border:1px solid #c9d7e8; background:#fff; color:#0f3460; border-radius:8px; padding:7px 8px; font-size:0.78rem; font-weight:800; text-align:left; }
+        .icon-picker-wrap .icon-auto-choice:hover { border-color:#1a56a0; background:#eaf3ff; }
+        .icon-picker-wrap .icon-auto-choice i { width:18px; text-align:center; font-size:1rem; }
         .line-item {
             background: white;
             border-left: 4px solid #1a56a0;
@@ -244,6 +249,19 @@
             color: #111827;
             font-weight: 700;
             font-variant-numeric: tabular-nums;
+        }
+        .quote-adjustment-panel {
+            border: 1px solid #d8e2ee;
+            background: #f8fbff;
+            border-radius: 8px;
+            padding: 0.75rem;
+            margin: 0.75rem 0;
+        }
+        .quote-adjustment-panel .form-label {
+            font-size: 0.76rem;
+            font-weight: 800;
+            color: #42526b;
+            margin-bottom: 0.2rem;
         }
         .quote-total-final {
             display: flex;
@@ -1925,10 +1943,46 @@ if (location.search.includes('debug')) {
                         <h4 class="quote-total-title"><i class="fas fa-calculator"></i> Quote Total</h4>
                         <div class="quote-total-status">Client-ready estimate</div>
                     </div>
+                    <div class="quote-adjustment-panel">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-4">
+                                <label class="form-label" for="quoteAdjustmentName">Client-visible adjustment</label>
+                                <input type="text" class="form-control form-control-sm" id="quoteAdjustmentName" placeholder="e.g., Family discount 10%" oninput="updateQuoteAdjustmentFromInputs()">
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <label class="form-label" for="quoteAdjustmentType">Type</label>
+                                <select class="form-select form-select-sm" id="quoteAdjustmentType" onchange="updateQuoteAdjustmentFromInputs()">
+                                    <option value="discount">Discount</option>
+                                    <option value="markup">Markup</option>
+                                </select>
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <label class="form-label" for="quoteAdjustmentBasis">Mode</label>
+                                <select class="form-select form-select-sm" id="quoteAdjustmentBasis" onchange="updateQuoteAdjustmentBasisUI(); updateQuoteAdjustmentFromInputs()">
+                                    <option value="percent">Percent</option>
+                                    <option value="amount">Amount</option>
+                                </select>
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <label class="form-label" for="quoteAdjustmentPercent" id="quoteAdjustmentValueLabel">Percent</label>
+                                <div class="input-group input-group-sm">
+                                    <input type="number" class="form-control" id="quoteAdjustmentPercent" min="0" step="0.01" placeholder="0" oninput="updateQuoteAdjustmentFromInputs()" onkeyup="if(event.key === 'Enter') this.blur();">
+                                    <span class="input-group-text" id="quoteAdjustmentUnit">%</span>
+                                </div>
+                            </div>
+                            <div class="col-md-2 d-grid">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearQuoteAdjustment()"><i class="fas fa-times me-1"></i>Clear</button>
+                            </div>
+                        </div>
+                    </div>
                     <div class="quote-total-breakdown">
                         <div class="quote-total-row">
                             <span>Subtotal</span>
                             <span id="subtotalDisplay">$0.00</span>
+                        </div>
+                        <div class="quote-total-row" id="quoteAdjustmentRow" style="display:none;">
+                            <span id="quoteAdjustmentLabelDisplay">Adjustment</span>
+                            <span id="quoteAdjustmentDisplay">$0.00</span>
                         </div>
                         <div class="quote-total-row">
                             <span id="taxLabelDisplay">HST (13%)</span>
@@ -4194,17 +4248,49 @@ Example:
             { pattern: /\b(deck|patio|porch|outdoor|balcony)\b/, icon: 'fa-campground' },
             { pattern: /\b(yard|garden|landscape|landscaping)\b/, icon: 'fa-tree' },
             { pattern: /\b(basement|mechanical|utility)\b/, icon: 'fa-industry' },
+            { pattern: /\b(main floor|second floor|2nd floor|third floor|3rd floor|upper floor|lower floor|floor|level)\b/, icon: 'fa-building' },
+            { pattern: /\b(main floor|whole floor|floor|level)\b/, icon: 'fa-home' },
+            { pattern: /\b(second floor|2nd floor|third floor|3rd floor|upper floor|lower floor)\b/, icon: 'fa-layer-group' },
             { pattern: /\b(home|house|main floor|whole house)\b/, icon: 'fa-home' },
         ];
 
-        function detectRoomIconForName(roomName) {
-            var name = String(roomName || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
-            for (var i = 0; i < ROOM_ICON_AUTO_DETECT_RULES.length; i++) {
-                if (ROOM_ICON_AUTO_DETECT_RULES[i].pattern.test(name)) {
-                    return ROOM_ICON_AUTO_DETECT_RULES[i].icon;
+        function getRoomIconLabel(iconClass) {
+            for (var i = 0; i < ROOM_ICONS.length; i++) {
+                for (var j = 0; j < ROOM_ICONS[i].icons.length; j++) {
+                    if (ROOM_ICONS[i].icons[j].fa === iconClass) {
+                        return ROOM_ICONS[i].icons[j].label;
+                    }
                 }
             }
-            return 'fa-door-open';
+            return String(iconClass || '').replace(/^fa-/, '').replace(/-/g, ' ');
+        }
+
+        function detectRoomIconCandidatesForName(roomName) {
+            var name = String(roomName || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
+            var seen = {};
+            var candidates = [];
+            for (var i = 0; i < ROOM_ICON_AUTO_DETECT_RULES.length; i++) {
+                var rule = ROOM_ICON_AUTO_DETECT_RULES[i];
+                if (rule.pattern.test(name) && !seen[rule.icon]) {
+                    seen[rule.icon] = true;
+                    candidates.push({
+                        icon: rule.icon,
+                        label: getRoomIconLabel(rule.icon)
+                    });
+                }
+            }
+            if (!candidates.length) {
+                candidates.push({
+                    icon: 'fa-door-open',
+                    label: getRoomIconLabel('fa-door-open')
+                });
+            }
+            return candidates;
+        }
+
+        function detectRoomIconForName(roomName) {
+            var candidates = detectRoomIconCandidatesForName(roomName);
+            return candidates[0] ? candidates[0].icon : 'fa-door-open';
         }
 
         function _iconPickerHTML(roomId, currentIcon) {
@@ -4226,11 +4312,35 @@ Example:
             return html;
         }
 
+        function showRoomIconAutoDetectChoices(roomId, candidates) {
+            var picker = document.getElementById('roomIconPicker') || document.getElementById('roomIconPickerSheet');
+            if (!picker || !candidates || !candidates.length) return;
+            var existing = picker.querySelector('.icon-auto-detect-results');
+            if (existing) existing.remove();
+            var actions = picker.querySelector('.icon-auto-actions');
+            if (!actions) return;
+
+            var html = '<div class="icon-auto-detect-results">' +
+                '<div class="fw-bold small">Detected icon options</div>' +
+                '<div class="text-muted small">Click the icon that fits this room best.</div>' +
+                '<div class="icon-auto-choice-grid">';
+            candidates.forEach(function(candidate) {
+                html += '<button type="button" class="icon-auto-choice" onclick="selectRoomIcon(' + JSON.stringify(roomId) + ', \'' + candidate.icon + '\')">' +
+                    '<i class="fas ' + candidate.icon + '"></i><span>' + candidate.label + '</span></button>';
+            });
+            html += '</div></div>';
+            actions.insertAdjacentHTML('afterend', html);
+        }
+
         function autoDetectRoomIcon(roomId) {
-            var room = rooms.find(function(r) { return r.id === roomId; });
+            var room = rooms.find(function(r) { return String(r.id) === String(roomId); });
             if (!room) return;
-            var detectedIcon = detectRoomIconForName(room.name);
-            selectRoomIcon(roomId, detectedIcon);
+            var candidates = detectRoomIconCandidatesForName(room.name);
+            if (candidates.length > 1) {
+                showRoomIconAutoDetectChoices(roomId, candidates);
+                return;
+            }
+            selectRoomIcon(roomId, candidates[0] ? candidates[0].icon : 'fa-door-open');
         }
 
         async function autoDetectAllRoomIcons() {
@@ -7538,6 +7648,92 @@ Example:
             }
         }
 
+        function getQuoteClientAdjustment() {
+            var nameEl = document.getElementById('quoteAdjustmentName');
+            var typeEl = document.getElementById('quoteAdjustmentType');
+            var basisEl = document.getElementById('quoteAdjustmentBasis');
+            var percentEl = document.getElementById('quoteAdjustmentPercent');
+            var type = typeEl && typeEl.value === 'markup' ? 'markup' : 'discount';
+            var basis = basisEl && basisEl.value === 'amount' ? 'amount' : 'percent';
+            var value = parseFloat(percentEl && percentEl.value);
+            if (!isFinite(value) || value <= 0) value = 0;
+            return {
+                name: (nameEl && nameEl.value ? nameEl.value.trim() : '') || (type === 'markup' ? 'Markup' : 'Discount'),
+                type: type,
+                basis: basis,
+                percent: basis === 'percent' ? value : 0,
+                amount: basis === 'amount' ? value : 0
+            };
+        }
+
+        function setQuoteClientAdjustment(adjustment) {
+            var nameEl = document.getElementById('quoteAdjustmentName');
+            var typeEl = document.getElementById('quoteAdjustmentType');
+            var basisEl = document.getElementById('quoteAdjustmentBasis');
+            var percentEl = document.getElementById('quoteAdjustmentPercent');
+            adjustment = adjustment || {};
+            var basis = adjustment.basis === 'amount' || adjustment.mode === 'amount' || (adjustment.amount && !adjustment.percent) ? 'amount' : 'percent';
+            if (nameEl) nameEl.value = adjustment.name || '';
+            if (typeEl) typeEl.value = adjustment.type === 'markup' ? 'markup' : 'discount';
+            if (basisEl) basisEl.value = basis;
+            if (percentEl) percentEl.value = parseFloat(basis === 'amount' ? (adjustment.amount || adjustment.value || 0) : (adjustment.percent || 0)) || '';
+            updateQuoteAdjustmentBasisUI();
+            calculateTotals();
+        }
+
+        function getQuoteAdjustmentCurrencySymbol() {
+            try {
+                var prefs = JSON.parse(localStorage.getItem('ald_quote_prefs') || '{}');
+                var currency = prefs.currency || 'CAD';
+                var symbols = { CAD:'$', USD:'$', GBP:'\u00a3', EUR:'\u20ac', AUD:'$', NZD:'$' };
+                return symbols[currency] || '$';
+            } catch(e) {
+                return '$';
+            }
+        }
+
+        function updateQuoteAdjustmentBasisUI() {
+            var basisEl = document.getElementById('quoteAdjustmentBasis');
+            var labelEl = document.getElementById('quoteAdjustmentValueLabel');
+            var unitEl = document.getElementById('quoteAdjustmentUnit');
+            var inputEl = document.getElementById('quoteAdjustmentPercent');
+            var basis = basisEl && basisEl.value === 'amount' ? 'amount' : 'percent';
+            if (labelEl) labelEl.textContent = basis === 'amount' ? 'Amount' : 'Percent';
+            if (unitEl) unitEl.textContent = basis === 'amount' ? getQuoteAdjustmentCurrencySymbol() : '%';
+            if (inputEl) inputEl.placeholder = basis === 'amount' ? '0.00' : '0';
+        }
+
+        function calculateQuoteAdjustmentAmount(subtotal) {
+            var adjustment = getQuoteClientAdjustment();
+            var amount = adjustment.basis === 'amount'
+                ? (parseFloat(adjustment.amount) || 0)
+                : (parseFloat(subtotal) || 0) * (parseFloat(adjustment.percent) || 0) / 100;
+            if (!amount) return 0;
+            return adjustment.type === 'discount' ? -amount : amount;
+        }
+
+        function updateQuoteAdjustmentDisplay(adjustmentAmount, symbol) {
+            var adjustment = getQuoteClientAdjustment();
+            var row = document.getElementById('quoteAdjustmentRow');
+            var label = document.getElementById('quoteAdjustmentLabelDisplay');
+            var value = document.getElementById('quoteAdjustmentDisplay');
+            var show = Math.abs(adjustmentAmount) > 0.0001;
+            if (row) row.style.display = show ? 'flex' : 'none';
+            if (label) label.textContent = adjustment.name || (adjustment.type === 'markup' ? 'Markup' : 'Discount');
+            if (value) value.textContent = qdFormatMoney(adjustmentAmount, symbol, { showSign: true });
+        }
+
+        function updateQuoteAdjustmentFromInputs() {
+            updateQuoteAdjustmentBasisUI();
+            calculateTotals();
+            if (typeof markUnsaved === 'function') markUnsaved();
+        }
+
+        function clearQuoteAdjustment() {
+            setQuoteClientAdjustment({ name: '', type: 'discount', basis: 'percent', percent: 0, amount: 0 });
+            if (typeof markUnsaved === 'function') markUnsaved();
+        }
+
         function calculateTotals() {
             refreshChoiceGroupTotals();
             let subtotal = 0;
@@ -7566,14 +7762,17 @@ Example:
             var _currency = _qprefs.currency || 'CAD';
             var _currencySymbols = { CAD:'$', USD:'$', GBP:'\u00a3', EUR:'\u20ac', AUD:'$', NZD:'$' };
             var _sym = _currencySymbols[_currency] || '$';
-            const tax = subtotal * _taxRate;
-            const total = subtotal + tax;
+            const adjustmentAmount = calculateQuoteAdjustmentAmount(subtotal);
+            const taxableSubtotal = subtotal + adjustmentAmount;
+            const tax = taxableSubtotal * _taxRate;
+            const total = taxableSubtotal + tax;
 
             document.getElementById('subtotalDisplay').textContent = window._quoteDocumentType === 'change_order'
                 ? coMoney(subtotal, _sym, true)
                 : qdFormatMoney(subtotal, _sym);
             var taxLabelEl = document.getElementById('taxLabelDisplay');
             if (taxLabelEl) taxLabelEl.textContent = _taxLabel + ' (' + (_taxRate*100).toFixed(1).replace(/\.0$/,'') + '%)';
+            updateQuoteAdjustmentDisplay(adjustmentAmount, _sym);
             document.getElementById('taxDisplay').textContent = window._quoteDocumentType === 'change_order'
                 ? coMoney(tax, _sym, true)
                 : qdFormatMoney(tax, _sym);
@@ -9479,6 +9678,7 @@ Example:
                 quoteNumber: document.getElementById('quoteNumber')?.value || '',
                 rooms: JSON.parse(JSON.stringify(rooms || [])),
                 categoryStyles: JSON.parse(JSON.stringify(categoryStyles || {})),
+                quoteAdjustment: getQuoteClientAdjustment(),
                 grandTotal: parseFloat(document.getElementById('grandTotalDisplay')?.textContent.replace(/[^0-9.]/g, '')) || 0,
                 terms: getSelectedTerms(),
                 taxRate: taxPrefs.rate,
@@ -10148,6 +10348,7 @@ Example:
                 email: document.getElementById('clientEmail')?.value || '',
                 phone: document.getElementById('clientPhone')?.value || '',
                 rooms: JSON.parse(JSON.stringify(rooms)),
+                quoteAdjustment: getQuoteClientAdjustment(),
                 grandTotal: parseFloat(document.getElementById('grandTotalDisplay').textContent.replace(/[^0-9.]/g, '')) || 0,
                 total: parseFloat(document.getElementById('grandTotalDisplay').textContent.replace(/[^0-9.]/g, '')) || 0,
                 status: 'draft',
@@ -10251,6 +10452,7 @@ Example:
                 };
                 rooms.push(newRoom);
             });
+            setQuoteClientAdjustment(quote.quoteAdjustment || quote.clientAdjustment || null);
 
             renderRooms();
             updateChangeOrderModeUI();
@@ -10285,6 +10487,7 @@ Example:
                 };
                 rooms.push(newRoom);
             });
+            setQuoteClientAdjustment(quote.quoteAdjustment || quote.clientAdjustment || null);
 
             renderRooms();
             return true;
@@ -10302,6 +10505,7 @@ Example:
                 email: document.getElementById('clientEmail')?.value || '',
                 phone: document.getElementById('clientPhone')?.value || '',
                 rooms: JSON.parse(JSON.stringify(rooms)), // Deep copy
+                quoteAdjustment: getQuoteClientAdjustment(),
                 grandTotal: parseFloat(document.getElementById('grandTotalDisplay').textContent.replace(/[^0-9.]/g, '')) || 0,
                 savedAt: new Date().toISOString()
             };
@@ -11198,6 +11402,56 @@ Example:
             return quoteData;
         }
 
+        async function confirmQuotePortalLockBeforePublish(quoteData) {
+            if (quoteData && quoteData.portal_visible === true) return true;
+            var message = 'You will not be able to edit this file once it is in the portal. You will need to remove it from the portal and add it back again to edit, or create a copy.';
+            if (typeof qdConfirm === 'function') {
+                return await qdConfirm(message, {
+                    title: 'Add Quote to Portal?',
+                    okText: 'Continue',
+                    cancelText: 'Cancel',
+                    okClass: 'btn-warning',
+                    type: 'warning'
+                });
+            }
+            return window.confirm(message);
+        }
+
+        function quotePortalLockModalStillOpen() {
+            return !!document.querySelector('#interactiveLinkModal.show, #quotePortalAssignModal.show');
+        }
+
+        function redirectPortalLockedQuoteBuilderAfterModal() {
+            if (!window._quoteLockedAfterPortalPublish) return;
+            if (quotePortalLockModalStillOpen()) return;
+            window._quoteLockedAfterPortalPublish = false;
+            var lockedData = window._quoteLockedAfterPortalData || window._currentQuoteData || {};
+            if (typeof handlePortalLockedBuilderLoad === 'function') {
+                handlePortalLockedBuilderLoad({ data: lockedData });
+            } else {
+                window.location.href = 'dashboard.html';
+            }
+        }
+
+        function bindQuotePortalLockModalRedirect(modalId) {
+            var modalEl = document.getElementById(modalId);
+            if (!modalEl || modalEl.dataset.portalLockRedirectBound === 'true') return;
+            modalEl.dataset.portalLockRedirectBound = 'true';
+            modalEl.addEventListener('hidden.bs.modal', function() {
+                setTimeout(redirectPortalLockedQuoteBuilderAfterModal, 75);
+            });
+        }
+
+        function armQuotePortalLockRedirect(quoteData) {
+            window._quoteLockedAfterPortalPublish = true;
+            window._quoteLockedAfterPortalData = Object.assign({}, quoteData || {});
+            setTimeout(function() {
+                bindQuotePortalLockModalRedirect('quotePortalAssignModal');
+                bindQuotePortalLockModalRedirect('interactiveLinkModal');
+                redirectPortalLockedQuoteBuilderAfterModal();
+            }, 0);
+        }
+
         function updateQuotePortalButton(inPortal) {
             var btn = document.getElementById('addQuoteToPortalBtn');
             if (!btn) return;
@@ -11328,6 +11582,11 @@ Example:
                 };
             }
             if (!portal || !portal.id) throw new Error('Choose which client portal this quote belongs in.');
+            var quoteWillBecomePortalLocked = quoteData.portal_visible !== true;
+            if (quoteWillBecomePortalLocked) {
+                var confirmed = await confirmQuotePortalLockBeforePublish(quoteData);
+                if (!confirmed) throw new Error('Quote was not added to the portal.');
+            }
             quoteData = markQuoteForPortal(quoteData, portal);
             if (!quoteData.supabaseId) throw new Error('Save or generate the quote link before adding it to a portal.');
             if (statusEl) statusEl.innerHTML = '<span class="text-muted"><i class="fas fa-spinner fa-spin me-1"></i>Adding quote to client portal...</span>';
@@ -11339,6 +11598,8 @@ Example:
                 window._supabaseQuoteId = saved.data.id;
             }
             window._currentQuoteData = quoteData;
+            window._loadedQuoteData = Object.assign({}, window._loadedQuoteData || {}, quoteData);
+            if (quoteWillBecomePortalLocked) armQuotePortalLockRedirect(quoteData);
             var share = await createSecureClientShareLink(quoteData.supabaseId, getClientPortalBaseUrl(), { mode: 'portal' });
             if (!share || !share.url || share.url.indexOf('token=') < 0) throw new Error('Could not create the client portal link.');
             setQuoteUrlFromSecureShare(quoteData, share);

@@ -9,6 +9,16 @@ assert(
 );
 
 assert(
+  builder.includes('function detectRoomIconCandidatesForName(roomName)'),
+  'Quote builder should expose multiple room-name icon candidates for ambiguous names'
+);
+
+assert(
+  builder.includes('function showRoomIconAutoDetectChoices(roomId, candidates)'),
+  'Room icon picker should show selectable options when auto detect finds multiple matches'
+);
+
+assert(
   builder.includes('function autoDetectRoomIcon(roomId)'),
   'Room icon picker should support auto detecting one room icon'
 );
@@ -47,8 +57,26 @@ assert(
 );
 
 assert(
-  builder.includes('selectRoomIcon(roomId, detectedIcon)'),
-  'Single-room auto detect should reuse the normal room icon selection path'
+  builder.includes('2nd floor') &&
+  builder.includes("icon: 'fa-building'"),
+  'Detector should provide floor-level icon suggestions for names like 2nd floor'
+);
+
+assert(
+  builder.includes('var candidates = detectRoomIconCandidatesForName(room.name);') &&
+  builder.includes('showRoomIconAutoDetectChoices(roomId, candidates);'),
+  'Single-room auto detect should show choices instead of silently selecting a fallback when several icons match'
+);
+
+assert(
+  builder.includes('Detected icon options') &&
+  builder.includes('Click the icon that fits this room best.'),
+  'Auto detect choices should explain that the user can pick the best detected icon'
+);
+
+assert(
+  builder.includes("String(r.id) === String(roomId)"),
+  'Auto detect should find rooms even if room ids are stringified by the UI'
 );
 
 assert(
