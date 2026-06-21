@@ -981,6 +981,41 @@
             return data;
         }
 
+        function findPortalStableShare(rows) {
+            var match = (rows || []).find(function(row) {
+                var data = row && row.data || {};
+                return String(data.portal_share_token || '').trim() && String(data.portal_share_anchor_id || '').trim();
+            });
+            var data = match && match.data || {};
+            return {
+                token: String(data.portal_share_token || '').trim(),
+                anchorId: String(data.portal_share_anchor_id || '').trim(),
+                createdAt: String(data.portal_share_created_at || '').trim()
+            };
+        }
+
+        function applyPortalStableShareToData(data, share) {
+            data = Object.assign({}, data || {});
+            if (share && share.token && share.anchorId) {
+                data.portal_share_token = share.token;
+                data.portal_share_anchor_id = share.anchorId;
+                data.portal_share_created_at = share.createdAt || data.portal_share_created_at || new Date().toISOString();
+            }
+            return data;
+        }
+
+        async function persistPortalStableShare(rows, share) {
+            if (!share || !share.token || !share.anchorId) return;
+            for (var i = 0; i < (rows || []).length; i++) {
+                var row = rows[i];
+                if (!row || !row.id) continue;
+                var data = applyPortalStableShareToData(row.data || {}, share);
+                row.data = data;
+                var result = await _supabase.from('quotes').update({ data: data }).eq('id', row.id);
+                if (result.error) throw result.error;
+            }
+        }
+
         function clearPortalAssignmentForEdit(data) {
             data = Object.assign({}, data || {});
             data.portal_visible = false;
@@ -992,6 +1027,9 @@
             delete data.portal_added_at;
             delete data.portal_placeholder;
             delete data.portal_theme;
+            delete data.portal_share_token;
+            delete data.portal_share_anchor_id;
+            delete data.portal_share_created_at;
             return data;
         }
 
@@ -1046,6 +1084,9 @@
                         clientName: clientName,
                         clientEmail: clientEmail,
                         pin: d.portal_pin || '',
+                        secureToken: String(d.portal_share_token || '').trim(),
+                        secureAnchorId: String(d.portal_share_anchor_id || '').trim(),
+                        secureCreatedAt: String(d.portal_share_created_at || '').trim(),
                         quoteIds: [],
                         quotes: []
                     };
@@ -1053,6 +1094,9 @@
                 map[key].quoteIds.push(q.id);
                 map[key].quotes.push(q);
                 if (!map[key].pin && d.portal_pin) map[key].pin = d.portal_pin;
+                if (!map[key].secureToken && d.portal_share_token) map[key].secureToken = String(d.portal_share_token).trim();
+                if (!map[key].secureAnchorId && d.portal_share_anchor_id) map[key].secureAnchorId = String(d.portal_share_anchor_id).trim();
+                if (!map[key].secureCreatedAt && d.portal_share_created_at) map[key].secureCreatedAt = String(d.portal_share_created_at).trim();
             });
             return Object.values(map).sort(function(a, b) {
                 return a.name.localeCompare(b.name) || a.clientName.localeCompare(b.clientName);
@@ -1625,6 +1669,9 @@
             var targetPin = targetPortal.pin || Math.floor(1000 + Math.random() * 9000).toString();
             var targetTheme = portalThemeForDashboard(targetPortal);
             var hasTargetTheme = !!(targetTheme.headerColor || targetTheme.bgColor || targetTheme.bgColor2 || targetTheme.textColor || targetTheme.bgStyle || targetTheme.bgStrength !== undefined || targetTheme.portalLogo || targetTheme.layoutStyle);
+            var targetShare = findPortalStableShare(selectedPortals.reduce(function(rows, portal) {
+                return rows.concat(portal.quotes || []);
+            }, []));
             var rowsById = {};
             selectedPortals.forEach(function(portal) {
                 portal.quotes.forEach(function(row) {
@@ -1648,6 +1695,7 @@
                     });
                     if (data.portal_visible) {
                         stampPortalAddedAt(data);
+                        data = applyPortalStableShareToData(data, targetShare);
                     } else {
                         data = clearPortalAssignmentForEdit(data);
                     }
@@ -1678,6 +1726,7 @@
             var pin = portal.pin || Math.floor(1000 + Math.random() * 9000).toString();
             var portalTheme = portalThemeForDashboard(portal);
             var hasPortalTheme = !!(portalTheme.headerColor || portalTheme.bgColor || portalTheme.bgColor2 || portalTheme.textColor || portalTheme.bgStyle || portalTheme.bgStrength !== undefined || portalTheme.portalLogo || portalTheme.layoutStyle);
+            var portalShare = findPortalStableShare(portal.quotes || []);
             var duplicateInPortal = findPortalInvoiceDuplicate(target, portal);
             var idsToUpdate = portal.quoteIds.slice();
             if (duplicateInPortal) idsToUpdate = idsToUpdate.filter(function(id) { return id !== duplicateInPortal.id; });
@@ -1708,6 +1757,7 @@
                         portal_pin: pin
                     });
                     stampPortalAddedAt(data);
+                    data = applyPortalStableShareToData(data, portalShare);
                     if (hasPortalTheme) {
                         data.portal_theme = portalTheme;
                     } else {
@@ -1875,6 +1925,13 @@
             params.push('contractor=' + encodeURIComponent(portal.contractorId || ''));
             if (portal.id && !String(portal.id).startsWith('legacy-')) params.push('portal=' + encodeURIComponent(portal.id));
             if (quoteId) params.push('quote=' + encodeURIComponent(quoteId));
+            var secureAnchorId = String(portal.secureAnchorId || '').trim();
+            var secureToken = String(portal.secureToken || '').trim();
+            if (secureAnchorId && secureToken) {
+                params.push('id=' + encodeURIComponent(secureAnchorId));
+                params.push('token=' + encodeURIComponent(secureToken));
+                params.push('portal_anchor=' + encodeURIComponent(secureAnchorId));
+            }
             if (options && options.admin) params.push('admin=1');
             return getClientPortalBaseUrl() + '?' + params.join('&');
         }
@@ -2040,6 +2097,7 @@
                             portal_client_email: selectedEmail
                         });
                         await _supabase.from('quotes').update({ data: newData }).eq('id', quotes[j].id);
+                        quotes[j].data = newData;
                     }
                 }
 
@@ -2052,18 +2110,41 @@
                         break;
                     }
                 }
-                var portalParams = [];
-                if (clientEmail) portalParams.push('email=' + encodeURIComponent(clientEmail));
-                portalParams.push('client=' + encodeURIComponent(selectedName || clientName || clientEmail || 'Client'));
-                portalParams.push('contractor=' + encodeURIComponent(userId));
-                if (selectedPortalId) portalParams.push('portal=' + encodeURIComponent(selectedPortalId));
-                if (quoteId) portalParams.push('quote=' + encodeURIComponent(quoteId));
-                var url = getClientPortalBaseUrl() + '?' + portalParams.join('&');
-                if (quoteId && typeof createSecureClientShareLink === 'function') {
-                    var share = await createSecureClientShareLink(quoteId, url, { mode: 'portal' });
-                    if (share && share.url) url = share.url;
+                var stableShare = findPortalStableShare(quotes);
+                var portalForUrl = {
+                    id: selectedPortalId,
+                    name: selectedPortalName,
+                    clientName: selectedName || clientName || clientEmail || 'Client',
+                    clientEmail: clientEmail,
+                    contractorId: userId,
+                    secureToken: stableShare.token,
+                    secureAnchorId: stableShare.anchorId
+                };
+                var url = portalUrlForDashboard(portalForUrl, quoteId || '');
+                if (!stableShare.token && quoteId && typeof createSecureClientShareLink === 'function') {
+                    var unsignedUrl = portalUrlForDashboard(Object.assign({}, portalForUrl, {
+                        secureToken: '',
+                        secureAnchorId: ''
+                    }), quoteId || '');
+                    var share = await createSecureClientShareLink(quoteId, unsignedUrl, { mode: 'portal' });
+                    if (share && share.token) {
+                        stableShare = {
+                            token: share.token,
+                            anchorId: share.portalAnchorId || share.id || quoteId,
+                            createdAt: new Date().toISOString()
+                        };
+                        await persistPortalStableShare(quotes, stableShare);
+                        portalForUrl.secureToken = stableShare.token;
+                        portalForUrl.secureAnchorId = stableShare.anchorId;
+                        url = portalUrlForDashboard(portalForUrl, quoteId || '');
+                    } else if (share && share.url) {
+                        url = share.url;
+                    }
                 }
-                var adminUrl = url + '&admin=1';
+                var adminUrl = portalUrlForDashboard(Object.assign({}, portalForUrl, {
+                    secureToken: stableShare.token,
+                    secureAnchorId: stableShare.anchorId
+                }), quoteId || '', { admin: true });
                 document.getElementById('portalUrlDisplay').value = url;
                 adminUrlEl = document.getElementById('portalAdminUrlDisplay');
                 if (adminUrlEl) adminUrlEl.value = adminUrl;
