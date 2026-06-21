@@ -1020,6 +1020,7 @@ if (location.search.includes('debug')) {
             <div class="sig-modal">
                 <h5 class="mb-2"><i class="fas fa-pen-nib text-primary"></i> Accept Quote</h5>
                 <p class="signature-help mb-3">Enter your full name, draw your signature, and confirm the terms to approve this quote.</p>
+                <div class="alert alert-warning py-2 mb-3" id="signatureApprovalMessage" style="display:none;" role="alert"></div>
 
                 <div class="mb-3">
                     <label class="form-label fw-bold">Your Full Name <span class="text-danger">*</span></label>
@@ -1044,7 +1045,7 @@ if (location.search.includes('debug')) {
                 </div>
 
                 <div class="d-flex gap-2 flex-wrap">
-                    <button type="button" class="btn btn-warning flex-grow-1" onclick="confirmApproval()">
+                    <button type="button" class="btn btn-warning flex-grow-1" id="signApproveBtn" onclick="confirmApproval()">
                         <i class="fas fa-check-circle"></i> Sign &amp; Approve
                     </button>
                     <button type="button" class="btn btn-outline-secondary" onclick="closeSignatureModal()">Cancel</button>
@@ -2492,6 +2493,14 @@ if (location.search.includes('debug')) {
         function closeSignatureModal() {
             document.getElementById('sigModalOverlay').classList.remove('active');
         }
+        function showSignatureApprovalMessage(message, type) {
+            var el = document.getElementById('signatureApprovalMessage');
+            if (!el) return;
+            var alertType = type || 'warning';
+            el.className = 'alert alert-' + alertType + ' py-2 mb-3';
+            el.textContent = message;
+            el.style.display = message ? 'block' : 'none';
+        }
         function initSignaturePad() {
             sigCanvas = document.getElementById('signatureCanvas');
             sigCtx = sigCanvas.getContext('2d');
@@ -2599,119 +2608,137 @@ if (location.search.includes('debug')) {
 
         async function confirmApproval() {
             const name = document.getElementById('signerName').value.trim();
-            if (!name) { qdAlert('Please enter your full name.'); return; }
-            if (!sigHasStrokes) { qdAlert('Please draw your signature.'); return; }
-            if (!document.getElementById('termsCheck').checked) { qdAlert('Please agree to the terms and conditions.'); return; }
+            if (!name) { showSignatureApprovalMessage('Please enter your full name.'); return; }
+            if (!sigHasStrokes) { showSignatureApprovalMessage('Please draw your signature.'); return; }
+            if (!document.getElementById('termsCheck').checked) { showSignatureApprovalMessage('Please agree to the terms and conditions.'); return; }
 
-            const sigDataUrl = sigCanvas.toDataURL('image/png');
-            const now = new Date();
-            const dateStr = now.toLocaleDateString('en-CA', { year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit' });
-
-            const urlParams = new URLSearchParams(window.location.search);
-            const quoteId = urlParams.get('id');
-            const shareToken = urlParams.get('token') || '';
-            const portalAnchorId = urlParams.get('portal_anchor') || '';
-    
-            let signatureUrl = null;
-            if (quoteId) {
-                signatureUrl = await saveSignatureToSupabase(quoteId, sigDataUrl, name);
+            var approveBtn = document.getElementById('signApproveBtn');
+            var originalApproveHtml = approveBtn ? approveBtn.innerHTML : '';
+            if (approveBtn) {
+                approveBtn.disabled = true;
+                approveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Approving...';
             }
+            showSignatureApprovalMessage('', 'warning');
 
-            document.getElementById('clientSignature').value = sigDataUrl;
-            document.getElementById('approvedBy').value = name;
-            document.getElementById('approvedAt').value = now.toISOString();
+            try {
+                const sigDataUrl = sigCanvas.toDataURL('image/png');
+                const now = new Date();
+                const dateStr = now.toLocaleDateString('en-CA', { year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit' });
 
-            document.getElementById('approvalSigPreview').src = sigDataUrl;
-            document.getElementById('approvalMeta').textContent = 'Signed by ' + name + ' on ' + dateStr;
-            document.getElementById('approvalBanner').classList.add('visible');
+                const urlParams = new URLSearchParams(window.location.search);
+                const quoteId = urlParams.get('id');
+                const shareToken = urlParams.get('token') || '';
+                const portalAnchorId = urlParams.get('portal_anchor') || '';
 
-            if (quoteId) {
-                const existingData = quoteData || {};
-                // Snapshot original rooms BEFORE overwriting
-                var originalRoomsSnapshot = JSON.parse(JSON.stringify(quoteData.rooms || []));
+                let signatureUrl = null;
+                if (quoteId) {
+                    signatureUrl = await saveSignatureToSupabase(quoteId, sigDataUrl, name);
+                }
 
-                // Build updated rooms with client upgrades/removals applied permanently
-                var choiceAppliedRooms = applyClientChoiceGroupsToRooms(quoteData.rooms || []);
-                var updatedRooms = choiceAppliedRooms.map(function(room) {
-                    return Object.assign({}, room, {
-                        items: (room.items || []).filter(function(item) { return !item._removed; }).map(function(item) {
-                            if (item.upgraded && item.upgrade) {
-                                return Object.assign({}, item, {
-                                    description: item.upgrade.name,
-                                    rate: item.upgrade.rate,
-                                    total: viewerItemActiveTotal(item),
-                                    upgraded: false,
-                                    upgrade: null,
-                                    _baseRate: null,
-                                    _baseTotal: null
-                                });
-                            }
-                            return item;
-                        })
+                document.getElementById('clientSignature').value = sigDataUrl;
+                document.getElementById('approvedBy').value = name;
+                document.getElementById('approvedAt').value = now.toISOString();
+
+                document.getElementById('approvalSigPreview').src = sigDataUrl;
+                document.getElementById('approvalMeta').textContent = 'Signed by ' + name + ' on ' + dateStr;
+                document.getElementById('approvalBanner').classList.add('visible');
+
+                if (quoteId) {
+                    const existingData = quoteData || {};
+                    // Snapshot original rooms BEFORE overwriting
+                    var originalRoomsSnapshot = JSON.parse(JSON.stringify(quoteData.rooms || []));
+
+                    // Build updated rooms with client upgrades/removals applied permanently
+                    var choiceAppliedRooms = applyClientChoiceGroupsToRooms(quoteData.rooms || []);
+                    var updatedRooms = choiceAppliedRooms.map(function(room) {
+                        return Object.assign({}, room, {
+                            items: (room.items || []).filter(function(item) { return !item._removed; }).map(function(item) {
+                                if (item.upgraded && item.upgrade) {
+                                    return Object.assign({}, item, {
+                                        description: item.upgrade.name,
+                                        rate: item.upgrade.rate,
+                                        total: viewerItemActiveTotal(item),
+                                        upgraded: false,
+                                        upgrade: null,
+                                        _baseRate: null,
+                                        _baseTotal: null
+                                    });
+                                }
+                                return item;
+                            })
+                        });
                     });
-                });
 
-                var _hasUpgrades = hasClientUpgrades();
-                var _hasRemovals = (quoteData.rooms || []).some(function(room) {
-                    return (room.items || []).some(function(item) { return item._removed; });
-                });
-                var _clientChoiceGroups = collectClientChoiceGroups();
-                var _hasChoiceGroups = _clientChoiceGroups.length > 0;
+                    var _hasUpgrades = hasClientUpgrades();
+                    var _hasRemovals = (quoteData.rooms || []).some(function(room) {
+                        return (room.items || []).some(function(item) { return item._removed; });
+                    });
+                    var _clientChoiceGroups = collectClientChoiceGroups();
+                    var _hasChoiceGroups = _clientChoiceGroups.length > 0;
 
-                var isChangeOrder = !!(window.QuoteDrChangeOrders && QuoteDrChangeOrders.isChangeOrder(quoteData));
-                const updateData = {
-                    status: isChangeOrder ? 'approved' : 'accepted',
-                    client_name: existingData.clientName || quoteData.clientName || name,
-                    data: Object.assign({}, existingData, {
+                    var isChangeOrder = !!(window.QuoteDrChangeOrders && QuoteDrChangeOrders.isChangeOrder(quoteData));
+                    const updateData = {
                         status: isChangeOrder ? 'approved' : 'accepted',
-                        rooms: updatedRooms,
-                        signature_url: signatureUrl,
-                        signature_data_url: signatureUrl ? undefined : sigDataUrl,
-                        signed_by: name,
-                        signed_at: now.toISOString(),
-                        approved_by: name,
-                        approved_at: now.toISOString(),
-                        client_upgraded: _hasUpgrades || _hasRemovals || _hasChoiceGroups,
-                        client_upgraded_at: (_hasUpgrades || _hasRemovals || _hasChoiceGroups) ? now.toISOString() : undefined,
-                        original_rooms: (_hasUpgrades || _hasRemovals || _hasChoiceGroups) ? originalRoomsSnapshot : undefined,
-                        _clientChoiceGroups: _clientChoiceGroups
-                    })
-                };
+                        client_name: existingData.clientName || quoteData.clientName || name,
+                        data: Object.assign({}, existingData, {
+                            status: isChangeOrder ? 'approved' : 'accepted',
+                            rooms: updatedRooms,
+                            signature_url: signatureUrl,
+                            signature_data_url: signatureUrl ? undefined : sigDataUrl,
+                            signed_by: name,
+                            signed_at: now.toISOString(),
+                            approved_by: name,
+                            approved_at: now.toISOString(),
+                            client_upgraded: _hasUpgrades || _hasRemovals || _hasChoiceGroups,
+                            client_upgraded_at: (_hasUpgrades || _hasRemovals || _hasChoiceGroups) ? now.toISOString() : undefined,
+                            original_rooms: (_hasUpgrades || _hasRemovals || _hasChoiceGroups) ? originalRoomsSnapshot : undefined,
+                            _clientChoiceGroups: _clientChoiceGroups
+                        })
+                    };
 
-                if (!shareToken || typeof updateSecureClientDocument !== 'function') {
-                    throw new Error('This quote link is missing its secure access token. Please ask the contractor to resend it.');
+                    if (!shareToken || typeof updateSecureClientDocument !== 'function') {
+                        throw new Error('This quote link is missing its secure access token. Please ask the contractor to resend it.');
+                    }
+                    var secureUpdate = await updateSecureClientDocument(quoteId, shareToken, 'client_update', {
+                        topLevel: { status: updateData.status, client_name: updateData.client_name, accepted_at: now.toISOString(), accepted_by: name },
+                        dataPatch: updateData.data
+                    }, portalAnchorId);
+                    if (secureUpdate && secureUpdate.error) throw secureUpdate.error;
+                    quoteData = Object.assign({}, quoteData, updateData.data, { status: updateData.status });
+                    if (typeof qdCaptureEvent === 'function') {
+                    qdCaptureEvent('quote_signed', {
+                        quote_id: quoteId,
+                        document_type: isChangeOrder ? 'change_order' : 'quote',
+                            had_client_changes: _hasUpgrades || _hasRemovals || _hasChoiceGroups,
+                            room_count: Array.isArray(updatedRooms) ? updatedRooms.length : 0
+                        });
+                    }
                 }
-                var secureUpdate = await updateSecureClientDocument(quoteId, shareToken, 'client_update', {
-                    topLevel: { status: updateData.status, client_name: updateData.client_name, accepted_at: now.toISOString(), accepted_by: name },
-                    dataPatch: updateData.data
-                }, portalAnchorId);
-                if (secureUpdate && secureUpdate.error) throw secureUpdate.error;
-                quoteData = Object.assign({}, quoteData, updateData.data, { status: updateData.status });
-                if (typeof qdCaptureEvent === 'function') {
-                qdCaptureEvent('quote_signed', {
-                    quote_id: quoteId,
-                    document_type: isChangeOrder ? 'change_order' : 'quote',
-                        had_client_changes: _hasUpgrades || _hasRemovals || _hasChoiceGroups,
-                        room_count: Array.isArray(updatedRooms) ? updatedRooms.length : 0
-                    });
-                }
-            }
 
-            document.getElementById('approveSection').style.display = 'block';
-            document.getElementById('approveSection').innerHTML = '<div class="alert alert-success mb-0"><i class="fas fa-check-circle me-1"></i>This quote has been accepted and signed.</div>';
-            var stickyActions = document.getElementById('stickyClientActions');
-            if (stickyActions) stickyActions.style.display = 'none';
-            closeSignatureModal();
-    
-            var depSection = document.getElementById('stripeDepositSection');
-            if (depSection && _paymentSettings && _paymentSettings.stripe_enabled && _paymentSettings.accept_deposit) {
-                depSection.style.display = 'block';
+                document.getElementById('approveSection').style.display = 'block';
+                document.getElementById('approveSection').innerHTML = '<div class="alert alert-success mb-0"><i class="fas fa-check-circle me-1"></i>This quote has been accepted and signed.</div>';
+                var stickyActions = document.getElementById('stickyClientActions');
+                if (stickyActions) stickyActions.style.display = 'none';
+                closeSignatureModal();
+
+                var depSection = document.getElementById('stripeDepositSection');
+                if (depSection && _paymentSettings && _paymentSettings.stripe_enabled && _paymentSettings.accept_deposit) {
+                    depSection.style.display = 'block';
+                }
+
+                if (signatureUrl) {
+                    qdToast({ title: 'Quote Accepted', message: 'Signature saved securely.', type: 'success' });
+                }
+                scrollToPostApprovalActions();
+            } catch (error) {
+                console.error('Quote approval failed:', error);
+                showSignatureApprovalMessage('Could not approve this quote: ' + (error && error.message ? error.message : 'Please try again.'), 'danger');
+            } finally {
+                if (approveBtn) {
+                    approveBtn.disabled = false;
+                    approveBtn.innerHTML = originalApproveHtml;
+                }
             }
-    
-            if (signatureUrl) {
-                qdToast({ title: 'Quote Accepted', message: 'Signature saved securely.', type: 'success' });
-            }
-            scrollToPostApprovalActions();
         }
 
         function submitUpgrades(event) {
