@@ -1217,7 +1217,7 @@
                 '<div><strong><i class="fas fa-key me-1"></i>Portal PIN</strong><div class="small text-muted">Clients use this PIN to unlock this portal.</div></div>' +
                 '<div class="px-3 py-2 rounded text-center" style="background:#fff;border:1px solid #d8e0ea;min-width:120px;font-size:1.5rem;font-weight:800;letter-spacing:0.35rem;color:#1a2940;">' + escapeHtml(pinText) + '</div>' +
                 '</div>' +
-                '<div class="input-group input-group-sm mb-2"><span class="input-group-text">Client link</span><input class="form-control" value="' + escapeHtml(portalClientUrl) + '" readonly><button class="btn btn-outline-secondary" type="button" onclick="copyPortalPinBundle(' + jsAttr(portal.id) + ')"><i class="fas fa-copy me-1"></i>Copy Link + PIN</button></div>' +
+                '<div class="input-group input-group-sm mb-2"><span class="input-group-text">Client link</span><input class="form-control" value="' + escapeHtml(portalClientUrl) + '" readonly><button class="btn btn-outline-secondary" type="button" onclick="copyPortalPinBundle(' + jsAttr(portal.id) + ')"><i class="fas fa-copy me-1"></i>Copy Link</button></div>' +
                 '<button type="button" class="btn btn-outline-warning btn-sm" onclick="changePortalPin(' + jsAttr(portal.id) + ')"><i class="fas fa-rotate me-1"></i>Generate New PIN</button>' +
                 '</div>';
         }
@@ -1232,12 +1232,11 @@
             if (!portal) return;
             var contractor = (portal.quotes && portal.quotes[0] && portal.quotes[0].user_id) || (window.currentUser && window.currentUser.id) || '';
             var url = portalUrlForDashboard(Object.assign({}, portal, { contractorId: contractor }), window._portalAssignQuoteId || '');
-            var pin = portal.pin || 'Not set';
-            await navigator.clipboard.writeText('Client Portal: ' + url + '\nPIN: ' + pin).catch(function(){});
+            await navigator.clipboard.writeText(url).catch(function(){});
             var btn = event.target.closest('button');
             if (btn) {
                 var orig = btn.innerHTML;
-                btn.innerHTML = '<i class="fas fa-check me-1"></i>Copied';
+                btn.innerHTML = '<i class="fas fa-check me-1"></i>Link Copied';
                 setTimeout(function(){ btn.innerHTML = orig; }, 1500);
             }
         }
@@ -1897,10 +1896,8 @@
             }
             try {
                 var viewerPath = dashboardIsInvoiceDocument(quote) ? '/invoice-viewer.html' : '/interactive-quote-viewer.html';
-                var share = await createSecureClientShareLink(quoteId, window.location.origin + viewerPath, { mode: 'document' });
-                var viewerUrl = share && share.url ? share.url : '';
-                if (!viewerUrl) throw new Error('Could not create the client view link.');
-                var url = new URL(viewerUrl, window.location.origin);
+                var url = new URL(window.location.origin + viewerPath);
+                url.searchParams.set('id', quoteId);
                 url.searchParams.set('preview', '1');
                 url.searchParams.set('admin_preview', '1');
                 window.location.href = url.toString();
@@ -2111,10 +2108,9 @@
 
         function copyPortalBoth() {
             var url = document.getElementById('portalUrlDisplay').value;
-            var pin = document.getElementById('portalPinDisplay').textContent;
-            navigator.clipboard.writeText('Client Portal: ' + url + '\nPIN: ' + pin).catch(function(){});
+            navigator.clipboard.writeText(url).catch(function(){});
             var btn = event.target.closest('button');
-            if (btn) { var orig = btn.innerHTML; btn.innerHTML = '<i class="fas fa-check me-1"></i>Copied!'; setTimeout(function(){ btn.innerHTML = orig; }, 1500); }
+            if (btn) { var orig = btn.innerHTML; btn.innerHTML = '<i class="fas fa-check me-1"></i>Link Copied!'; setTimeout(function(){ btn.innerHTML = orig; }, 1500); }
         }
 
         async function resetPortalPin() {
@@ -3995,7 +3991,7 @@ function renderBusinessInsights(quotes) {
           <div id="portalPinDisplay" style="font-size:2.5rem; font-weight:bold; letter-spacing:0.5rem; color:#1a2940; background:#f8f9fa; border-radius:8px; padding:12px 24px; display:inline-block;"></div>
         </div>
         <div class="d-grid gap-2">
-          <button class="btn btn-primary" onclick="copyPortalBoth()"><i class="fas fa-copy me-1"></i>Copy Link + PIN</button>
+          <button class="btn btn-primary" onclick="copyPortalBoth()"><i class="fas fa-copy me-1"></i>Copy Link</button>
           <button class="btn btn-outline-secondary btn-sm" onclick="resetPortalPin()"><i class="fas fa-sync me-1"></i>Reset PIN (generate new)</button>
         </div>
       </div>

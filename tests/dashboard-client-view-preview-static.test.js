@@ -22,9 +22,15 @@ assert(
 
 assert(
   dashboard.includes("'/invoice-viewer.html'") &&
-    dashboard.includes("'/interactive-quote-viewer.html'") &&
-    dashboard.includes("mode: 'document'"),
-  'Client View should open the document viewer through the existing secure document share flow'
+    dashboard.includes("'/interactive-quote-viewer.html'"),
+  'Client View should open the correct document viewer'
+);
+
+assert(
+  !clientViewHelper.includes('createSecureClientShareLink') &&
+    !clientViewHelper.includes("mode: 'document'") &&
+    clientViewHelper.includes("url.searchParams.set('id', quoteId)"),
+  'Dashboard Client View should not mint a new public share token because that can invalidate existing portal links'
 );
 
 assert(
