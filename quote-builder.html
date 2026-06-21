@@ -5430,6 +5430,7 @@ Example:
         }
 
         function addLine(roomId) {
+            resetLineItemEditState();
             document.getElementById('currentRoomId').value = roomId;
             // Re-inject custom items into pricingDatabase in case Supabase load was async
             if (typeof customItems === 'object' && typeof _injectItemsIntoPricingDB === 'function') {
@@ -6365,6 +6366,18 @@ Example:
         // Global variable to track if we're editing an existing item
         let editingItemIndex = null;
 
+        function resetLineItemEditState() {
+            editingItemIndex = null;
+            const modalTitle = document.querySelector('#addLineModal .modal-title');
+            if (modalTitle) {
+                modalTitle.textContent = 'Add Line Item';
+            }
+            const saveBtn = document.getElementById('addLineItemBtn') || document.querySelector('#addLineModal button[onclick="confirmAddLine()"]');
+            if (saveBtn) {
+                saveBtn.textContent = 'Add Line Item';
+            }
+        }
+
         // Auto-save on beforeunload
         window.addEventListener('beforeunload', function() {
             if (typeof collectQuoteData === 'function' && typeof saveSessionQuote === 'function') {
@@ -6523,16 +6536,7 @@ Example:
                     }
                 }
 
-                // Reset editing state
-                editingItemIndex = null;
-                const modalTitle = document.querySelector('#addLineModal .modal-title');
-                if (modalTitle) {
-                    modalTitle.textContent = 'Add Line Item';
-                }
-                const saveBtn = document.querySelector('#addLineModal button[onclick="confirmAddLine()"]');
-                if (saveBtn) {
-                    saveBtn.textContent = 'Add Line Item';
-                }
+                resetLineItemEditState();
 
                 renderRooms();
                 if (typeof window.notifyBuilderGuideLineItemAdded === 'function') {
@@ -14202,6 +14206,10 @@ Example:
                 profitReportEl.addEventListener('hidden.bs.collapse', function() {
                     syncLineProfitDetailsVisibility(false);
                 });
+            }
+            var addLineModalEl = document.getElementById('addLineModal');
+            if (addLineModalEl) {
+                addLineModalEl.addEventListener('hidden.bs.modal', resetLineItemEditState);
             }
             // Event delegation for Manage Items modal buttons (handles dynamically rendered form + rows)
             var manageItemsRoot = document.getElementById('manageItemsModal') || document.getElementById('customItemsList');
