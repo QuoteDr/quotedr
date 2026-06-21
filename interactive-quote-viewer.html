@@ -810,7 +810,16 @@
             }
         }
         @media print {
-            .quote-sticky-nav { display: none !important; }
+            .hero-actions,
+            .sticky-client-actions,
+            .quote-sticky-nav,
+            .mobile-jump-control,
+            .upgrade-action-btn,
+            .item-desc-toggle,
+            [id^="roomNoteToggle_"],
+            [id^="roomNoteBox_"] {
+                display: none !important;
+            }
         }
     </style>
 
@@ -880,6 +889,9 @@ if (location.search.includes('debug')) {
                     <div class="hero-actions">
                         <button type="button" class="btn btn-warning btn-lg" onclick="handleMainAction()">
                             <i class="fas fa-signature me-2"></i>Accept & Sign
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="downloadQuotePdfBtn" onclick="downloadQuotePdf()">
+                            <i class="fas fa-file-pdf me-2"></i>Download PDF
                         </button>
                         <button type="button" class="btn btn-outline-primary" onclick="document.getElementById('quoteContainer').scrollIntoView({behavior:'smooth'});">
                             <i class="fas fa-list-check me-2"></i>Review Scope
@@ -2414,6 +2426,19 @@ if (location.search.includes('debug')) {
             }
             var heroTotal = document.getElementById('heroGrandTotal');
             if (heroTotal) heroTotal.textContent = viewerMoney(total);
+        }
+
+        function downloadQuotePdf() {
+            updateTotal();
+            try {
+                if (window.QuoteDrAndroid && typeof window.QuoteDrAndroid.printCurrentPage === 'function') {
+                    window.QuoteDrAndroid.printCurrentPage();
+                    return;
+                }
+            } catch (e) {
+                console.warn('Native Android print bridge failed, falling back to browser print.', e);
+            }
+            window.print();
         }
 
         function hasClientNotes() {
