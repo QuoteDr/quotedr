@@ -2489,6 +2489,7 @@ Example:
                 </div>
                 <div class="modal-body">
                     <input type="hidden" id="currentRoomId">
+                    <div id="addLineItemValidation" class="alert alert-warning py-2 px-3 mb-3" style="display:none;" role="alert"></div>
 
                     <!-- New item or quick search across all items -->
                     <div class="mb-3 position-relative">
@@ -2521,7 +2522,7 @@ Example:
                     </div>
 
                     <label><strong>Item Name:</strong></label>
-                    <input type="text" id="lineDescription" class="form-control mb-2" placeholder="e.g., 2x4 Wall Framing, Drywall Hang & Finish" spellcheck="true" oninput="checkIfNewItem()">
+                    <input type="text" id="lineDescription" class="form-control mb-2" placeholder="e.g., 2x4 Wall Framing, Drywall Hang & Finish" spellcheck="true" oninput="clearAddLineItemValidationField('lineDescription'); checkIfNewItem()">
 
                     <label><strong>Reusable Item Description (Optional):</strong></label>
                     <textarea id="lineItemDescription" class="form-control mb-3" rows="2" placeholder="Describe the reusable scope shown to clients. This saves with the item database, unlike the job note below." spellcheck="true"></textarea>
@@ -2529,7 +2530,9 @@ Example:
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label><strong>Unit Type:</strong></label>
-                            <input type="text" id="lineUnitType" class="form-control" list="unitTypeOptions" placeholder="LF, sq ft, each, Flatrate">
+                            <select id="lineUnitType" class="form-select" onchange="handleLineUnitTypeChange()">
+                                <!-- Populated dynamically from saved unit types -->
+                            </select>
                         </div>
                     </div>
 
@@ -5406,6 +5409,7 @@ Example:
             const cats = Object.keys(pricingDatabase);
             const hiddenCategories = JSON.parse(localStorage.getItem('ald_hidden_categories') || '[]');
             sel.innerHTML = '';
+            delete sel.dataset.oneTimeCategory;
             // Blank default option first
             const blankCatOpt = document.createElement('option');
             blankCatOpt.value = ''; blankCatOpt.text = '- Select a category -'; blankCatOpt.disabled = true;
@@ -5428,6 +5432,284 @@ Example:
                     sel.appendChild(opt);
                 });
             }
+            if (selectedCat && !Array.from(sel.options).some(function(opt) { return opt.value === selectedCat; })) {
+                const quoteOnlyOpt = document.createElement('option');
+                quoteOnlyOpt.value = selectedCat;
+                quoteOnlyOpt.text = selectedCat + ' (quote only)';
+                quoteOnlyOpt.dataset.oneTimeCategory = '1';
+                quoteOnlyOpt.selected = true;
+                sel.appendChild(quoteOnlyOpt);
+                sel.dataset.oneTimeCategory = selectedCat;
+            }
+        }
+
+        function clearAddLineItemValidationField(fieldId) {
+            const field = document.getElementById(fieldId);
+            if (field) field.classList.remove('is-invalid');
+            const category = document.getElementById('lineCategory');
+            const description = document.getElementById('lineDescription');
+            const alert = document.getElementById('addLineItemValidation');
+            if (alert && (!category || !category.classList.contains('is-invalid')) && (!description || !description.classList.contains('is-invalid'))) {
+                alert.style.display = 'none';
+                alert.textContent = '';
+            }
+        }
+
+        function clearAddLineItemValidation() {
+            ['lineCategory', 'lineDescription'].forEach(clearAddLineItemValidationField);
+            const alert = document.getElementById('addLineItemValidation');
+            if (alert) {
+                alert.style.display = 'none';
+                alert.textContent = '';
+            }
+        }
+
+        function normalizeLineItemCategoryValue(categorySelect) {
+            categorySelect = categorySelect || document.getElementById('lineCategory');
+            if (!categorySelect) return '';
+            if (categorySelect.value === '__add_new_category__') return '';
+            return (categorySelect.dataset.oneTimeCategory || categorySelect.value || '').trim();
+        }
+
+        function isLineItemOneTimeCategory() {
+            const categorySelect = document.getElementById('lineCategory');
+            return !!(categorySelect && categorySelect.dataset.oneTimeCategory);
+        }
+
+        function validateAddLineItemRequiredFields() {
+            const categorySelect = document.getElementById('lineCategory');
+            const descriptionInput = document.getElementById('lineDescription');
+            const alert = document.getElementById('addLineItemValidation');
+            const missing = [];
+            if (!normalizeLineItemCategoryValue(categorySelect)) {
+                missing.push('Choose a category');
+                if (categorySelect) categorySelect.classList.add('is-invalid');
+            } else if (categorySelect) {
+                categorySelect.classList.remove('is-invalid');
+            }
+            if (!descriptionInput || !descriptionInput.value.trim()) {
+                missing.push('Enter an item name');
+                if (descriptionInput) descriptionInput.classList.add('is-invalid');
+            } else {
+                descriptionInput.classList.remove('is-invalid');
+            }
+            if (missing.length) {
+                if (alert) {
+                    alert.textContent = 'Please finish this line item first: ' + missing.join(' and ') + '.';
+                    alert.style.display = '';
+                }
+                (categorySelect && categorySelect.classList.contains('is-invalid') ? categorySelect : descriptionInput)?.focus();
+                return false;
+            }
+            if (alert) {
+                alert.style.display = 'none';
+                alert.textContent = '';
+            }
+            return true;
+        }
+
+        function setOneTimeLineItemCategory(categoryName) {
+            const sel = document.getElementById('lineCategory');
+            if (!sel) return;
+            const cleanName = String(categoryName || '').trim();
+            if (!cleanName) return;
+            Array.from(sel.options).forEach(function(opt) {
+                if (opt.dataset && opt.dataset.oneTimeCategory === '1') opt.remove();
+            });
+            const opt = document.createElement('option');
+            opt.value = cleanName;
+            opt.text = cleanName + ' (use once)';
+            opt.dataset.oneTimeCategory = '1';
+            sel.appendChild(opt);
+            sel.value = cleanName;
+            sel.dataset.oneTimeCategory = cleanName;
+            clearAddLineItemValidationField('lineCategory');
+            const saveNewItemBtn = document.getElementById('saveNewItemBtn');
+            if (saveNewItemBtn) saveNewItemBtn.style.display = 'none';
+        }
+
+        function handleNewCategoryPromptResult(result) {
+            if (result && typeof result === 'object' && result.action === 'use_once') {
+                const oneTimeName = String(result.value || '').trim();
+                if (!oneTimeName) return false;
+                setOneTimeLineItemCategory(oneTimeName);
+                updatePricingOptions();
+                return true;
+            }
+            const newCat = String(result || '').trim();
+            if (!newCat) return false;
+            if (!pricingDatabase[newCat]) pricingDatabase[newCat] = [];
+            const items = JSON.parse(localStorage.getItem('ald_custom_items') || '{}');
+            if (!items[newCat]) items[newCat] = [];
+            localStorage.setItem('ald_custom_items', JSON.stringify(items));
+            populateCategoryDropdown(newCat);
+            updatePricingOptions();
+            clearAddLineItemValidationField('lineCategory');
+            return true;
+        }
+
+        const LINE_CUSTOM_UNIT_VALUE = '__quote_dr_line_custom_unit__';
+        const LINE_CUSTOM_UNITS_KEY = 'ald_manage_custom_unit_types';
+
+        function addUniqueLineUnit(units, unit) {
+            const clean = String(unit || '').trim();
+            if (!clean || clean === LINE_CUSTOM_UNIT_VALUE) return;
+            if (!units.some(function(existing) { return existing.toLowerCase() === clean.toLowerCase(); })) {
+                units.push(clean);
+            }
+        }
+
+        function getLineBaseUnitTypes() {
+            return ['sq ft', 'sqft', 'LF', 'linear foot', 'linear ft', 'm\u00b2', 'm', 'each', 'Flatrate', 'hourly', 'sheet', 'minimum'];
+        }
+
+        function getRememberedLineUnitTypes() {
+            try {
+                const stored = JSON.parse(localStorage.getItem(LINE_CUSTOM_UNITS_KEY) || '[]');
+                return Array.isArray(stored) ? stored.filter(function(unit) { return String(unit || '').trim(); }) : [];
+            } catch(e) {
+                return [];
+            }
+        }
+
+        function rememberLineUnitType(unitName) {
+            const clean = String(unitName || '').trim();
+            if (!clean || clean === LINE_CUSTOM_UNIT_VALUE) return false;
+            const remembered = getRememberedLineUnitTypes();
+            const isRemembered = remembered.some(function(unit) { return unit.toLowerCase() === clean.toLowerCase(); });
+            const isBase = getLineBaseUnitTypes().some(function(unit) { return unit.toLowerCase() === clean.toLowerCase(); });
+            if (!isRemembered && !isBase) {
+                remembered.push(clean);
+                remembered.sort(function(a, b) { return a.localeCompare(b); });
+                localStorage.setItem(LINE_CUSTOM_UNITS_KEY, JSON.stringify(remembered));
+            }
+            return true;
+        }
+
+        function collectLineSavedUnitTypes() {
+            const units = [];
+            [pricingDatabase, customItems].forEach(function(source) {
+                Object.keys(source || {}).forEach(function(category) {
+                    const items = source[category];
+                    if (category.indexOf('__') === 0 || !Array.isArray(items)) return;
+                    items.forEach(function(item) {
+                        addUniqueLineUnit(units, item && item.unitType);
+                        addUniqueLineUnit(units, item && item.upgrade && item.upgrade.unitType);
+                    });
+                });
+            });
+            return units;
+        }
+
+        function getLineKnownUnitTypes(currentValue) {
+            const units = [];
+            getLineBaseUnitTypes().forEach(function(unit) { addUniqueLineUnit(units, unit); });
+            getRememberedLineUnitTypes().forEach(function(unit) { addUniqueLineUnit(units, unit); });
+            collectLineSavedUnitTypes().forEach(function(unit) { addUniqueLineUnit(units, unit); });
+            return units;
+        }
+
+        function normalizeLineUnitTypeValue(unitSelect) {
+            unitSelect = unitSelect || document.getElementById('lineUnitType');
+            if (!unitSelect) return '';
+            if (unitSelect.value === LINE_CUSTOM_UNIT_VALUE) return '';
+            return (unitSelect.dataset.oneTimeUnit || unitSelect.value || '').trim();
+        }
+
+        function populateLineUnitTypeDropdown(selectedUnit) {
+            const sel = document.getElementById('lineUnitType');
+            if (!sel) return;
+            const current = String(selectedUnit || '').trim();
+            const units = getLineKnownUnitTypes(current);
+            sel.innerHTML = '';
+            delete sel.dataset.oneTimeUnit;
+            const blank = document.createElement('option');
+            blank.value = '';
+            blank.textContent = 'Select unit...';
+            blank.selected = !current;
+            sel.appendChild(blank);
+            units.forEach(function(unit) {
+                const opt = document.createElement('option');
+                opt.value = unit;
+                opt.textContent = unit;
+                if (unit === current) opt.selected = true;
+                sel.appendChild(opt);
+            });
+            const customOpt = document.createElement('option');
+            customOpt.value = LINE_CUSTOM_UNIT_VALUE;
+            customOpt.textContent = 'New...';
+            sel.appendChild(customOpt);
+            if (current && !Array.from(sel.options).some(function(opt) { return opt.value === current; })) {
+                const quoteOnlyOpt = document.createElement('option');
+                quoteOnlyOpt.value = current;
+                quoteOnlyOpt.textContent = current + ' (quote only)';
+                quoteOnlyOpt.dataset.oneTimeUnit = '1';
+                quoteOnlyOpt.selected = true;
+                sel.appendChild(quoteOnlyOpt);
+                sel.dataset.oneTimeUnit = current;
+            }
+            sel.dataset.currentUnit = normalizeLineUnitTypeValue(sel);
+        }
+
+        function setOneTimeLineUnitType(unitName) {
+            const sel = document.getElementById('lineUnitType');
+            if (!sel) return;
+            const clean = String(unitName || '').trim();
+            if (!clean) return;
+            Array.from(sel.options).forEach(function(opt) {
+                if (opt.dataset && opt.dataset.oneTimeUnit === '1') opt.remove();
+            });
+            const opt = document.createElement('option');
+            opt.value = clean;
+            opt.textContent = clean + ' (use once)';
+            opt.dataset.oneTimeUnit = '1';
+            sel.appendChild(opt);
+            sel.value = clean;
+            sel.dataset.oneTimeUnit = clean;
+            sel.dataset.currentUnit = clean;
+        }
+
+        function handleNewLineUnitPromptResult(result, previousUnit) {
+            if (result && typeof result === 'object' && result.action === 'use_once') {
+                const oneTimeUnit = String(result.value || '').trim();
+                if (!oneTimeUnit) {
+                    populateLineUnitTypeDropdown(previousUnit || '');
+                    return false;
+                }
+                setOneTimeLineUnitType(oneTimeUnit);
+                return true;
+            }
+            const unitName = String(result || '').trim();
+            if (!unitName) {
+                populateLineUnitTypeDropdown(previousUnit || '');
+                return false;
+            }
+            rememberLineUnitType(unitName);
+            populateLineUnitTypeDropdown(unitName);
+            return true;
+        }
+
+        async function handleLineUnitTypeChange() {
+            const sel = document.getElementById('lineUnitType');
+            if (!sel) return;
+            const previousUnit = sel.dataset.currentUnit || sel.dataset.oneTimeUnit || '';
+            if (sel.dataset.oneTimeUnit && sel.value !== sel.dataset.oneTimeUnit) {
+                delete sel.dataset.oneTimeUnit;
+            }
+            if (sel.value !== LINE_CUSTOM_UNIT_VALUE) {
+                sel.dataset.currentUnit = sel.value || '';
+                return;
+            }
+            const newUnit = await qdPrompt('Enter new unit type (e.g., "bundle", "bag", "gallon"):', '', {
+                title: 'New Unit Type',
+                okText: 'Save',
+                secondaryText: 'Use Once',
+                secondaryValue: 'use_once',
+                secondaryPromptValue: true,
+                secondaryClass: 'btn-outline-primary',
+                helpText: 'Save keeps this unit type in your item database so it can be reused. Use Once applies it only to this line item and does not save it for future use.'
+            });
+            handleNewLineUnitPromptResult(newUnit, previousUnit);
         }
 
         function addLine(roomId) {
@@ -5442,6 +5724,7 @@ Example:
             // Reset form fields
             document.getElementById('lineDescription').value = '';
             document.getElementById('lineItemDescription').value = '';
+            populateLineUnitTypeDropdown('');
             document.getElementById('lineQuantity').value = '1';
             document.getElementById('lineRate').value = '0';
             document.getElementById('lineNotes').value = '';
@@ -5457,6 +5740,7 @@ Example:
 
             // Populate category dropdown dynamically - no pre-selection so placeholder shows
             populateCategoryDropdown(null);
+            clearAddLineItemValidation();
             // Don't call updatePricingOptions() here - let user pick category first
 
             modal.show();
@@ -5467,17 +5751,25 @@ Example:
 
         async function handleLineCategoryChange() {
             const sel = document.getElementById('lineCategory');
+            if (sel.dataset.oneTimeCategory && sel.value !== sel.dataset.oneTimeCategory) {
+                delete sel.dataset.oneTimeCategory;
+            }
+            clearAddLineItemValidationField('lineCategory');
             if (sel.value === '__add_new_category__') {
-                const newCat = await qdPrompt('Enter new category name:', '', { title: 'New Category' });
-                if (newCat && newCat.trim()) {
-                    if (!pricingDatabase[newCat.trim()]) pricingDatabase[newCat.trim()] = [];
-                    const items = JSON.parse(localStorage.getItem('ald_custom_items') || '{}');
-                    if (!items[newCat.trim()]) items[newCat.trim()] = [];
-                    localStorage.setItem('ald_custom_items', JSON.stringify(items));
-                    populateCategoryDropdown(newCat.trim());
-                } else {
-                    sel.selectedIndex = 1;
+                const newCat = await qdPrompt('Enter new category name:', '', {
+                    title: 'New Category',
+                    okText: 'Save',
+                    secondaryText: 'Use Once',
+                    secondaryValue: 'use_once',
+                    secondaryPromptValue: true,
+                    secondaryClass: 'btn-outline-primary',
+                    helpText: 'Save keeps this category in your item database so you can reuse it later. Use Once applies it only to this line item and does not save it for future use.'
+                });
+                if (!handleNewCategoryPromptResult(newCat)) {
+                    sel.value = '';
+                    updatePricingOptions();
                 }
+                return;
             }
             updatePricingOptions();
         }
@@ -5555,7 +5847,7 @@ Example:
             const selectedOption = serviceSelect.options[serviceSelect.selectedIndex];
 
             if (selectedOption && selectedOption.dataset.unitType) {
-                document.getElementById('lineUnitType').value = selectedOption.dataset.unitType;
+                populateLineUnitTypeDropdown(selectedOption.dataset.unitType);
                 document.getElementById('lineRate').value = selectedOption.dataset.rate;
                 if (selectedOption.value !== 'custom') {
                     document.getElementById('lineDescription').value = selectedOption.text;
@@ -6408,7 +6700,7 @@ Example:
                 }
             }
 
-            document.getElementById('lineUnitType').value = item.unitType;
+            populateLineUnitTypeDropdown(item.unitType);
             document.getElementById('lineQuantity').value = item.quantity;
             document.getElementById('lineRate').value = item.rate;
             document.getElementById('lineNotes').value = item.notes || '';
@@ -6421,6 +6713,7 @@ Example:
             } else if (linkBtn) {
                 linkBtn.style.display = 'none';
             }
+            clearAddLineItemValidation();
 
             // Change modal title and button text
             const modalTitle = document.querySelector('#addLineModal .modal-title');
@@ -6452,21 +6745,19 @@ Example:
 
         async function confirmAddLine() {
             const roomId = parseInt(document.getElementById('currentRoomId').value);
+            if (!validateAddLineItemRequiredFields()) return;
             const description = document.getElementById('lineDescription').value.trim();
             const itemDescription = document.getElementById('lineItemDescription').value.trim();
-            const category = document.getElementById('lineCategory').value;
-            const unitType = document.getElementById('lineUnitType').value.trim();
+            const category = normalizeLineItemCategoryValue(document.getElementById('lineCategory'));
+            const unitType = normalizeLineUnitTypeValue(document.getElementById('lineUnitType'));
             const quantity = parseFloat(document.getElementById('lineQuantity').value) || 0;
             const rate = parseFloat(document.getElementById('lineRate').value) || 0;
             const notes = document.getElementById('lineNotes').value.trim();
             const materialCost = parseFloat(document.getElementById('lineMaterialCost').value) || 0;
-
-            if (!description) return;
-
             const roomIndex = rooms.findIndex(r => r.id === roomId);
             if (roomIndex !== -1) {
                 const savNewItemBtn = document.getElementById('saveNewItemBtn');
-                const shouldAskToSaveNewItem = editingItemIndex === null && savNewItemBtn && savNewItemBtn.style.display !== 'none';
+                const shouldAskToSaveNewItem = editingItemIndex === null && !isLineItemOneTimeCategory() && savNewItemBtn && savNewItemBtn.style.display !== 'none';
                 if (shouldAskToSaveNewItem) {
                     const saveChoice = await qdConfirm('Save "' + description + '" to your item database for next time?', {
                         title: 'Save New Item',
@@ -6571,10 +6862,18 @@ Example:
         }
 
         function saveLineItemToDatabase() {
+            if (!validateAddLineItemRequiredFields()) return;
+            if (isLineItemOneTimeCategory()) {
+                qdAlert('Use Once categories are not saved to your item database. To save this item for reuse, choose Save in the New Category prompt or select a saved category first.', {
+                    title: 'Use Once Category',
+                    type: 'info'
+                });
+                return;
+            }
             const desc = document.getElementById('lineDescription').value.trim();
             const itemDescription = document.getElementById('lineItemDescription').value.trim();
-            const category = document.getElementById('lineCategory').value || 'Custom';
-            const unitType = document.getElementById('lineUnitType').value.trim();
+            const category = normalizeLineItemCategoryValue(document.getElementById('lineCategory'));
+            const unitType = normalizeLineUnitTypeValue(document.getElementById('lineUnitType'));
             const rate = parseFloat(document.getElementById('lineRate').value) || 0;
             const materialCost = parseFloat(document.getElementById('lineMaterialCost').value) || 0;
             const supplierLinkBtn = document.getElementById('supplierLinkBtn');

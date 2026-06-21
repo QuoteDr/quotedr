@@ -423,8 +423,9 @@ Rules:
 - Extract every valid billable item. Do not summarize and do not return only a sample.
 - Preserve room or section headings such as 2ND FLOOR, MAIN FLOOR, KITCHEN, BASEMENT BATHROOM, EXTERIOR, etc.
 - If an item has quantity, unit, rate, and total, preserve them as numbers.
-- If an item only has a total, set quantity to 1, unit and unitType to "ls", rate to that total, and total to that total.
-- Preserve long item descriptions in notes. Keep description as the short item/service name.
+- If an item has no quantity or unit but does have pricing, set quantity to 1, unit and unitType to "ea", rate to that total, and total to that total.
+- Preserve long imported item descriptions in itemDescription/displayDescription. Keep description as the short item/service name.
+- Leave job-specific notes blank during import. Do not duplicate imported descriptions into notes; notes are reserved for contractor-added job notes later.
 - Ignore document headers, footers, dates, page numbers, bill-to labels, terms, disclaimers, subtotals, taxes, total rows, balance due rows, payment rows, and repeated table headers as billable items.
 - Ignore TBD, to-be-determined, included-only, blank, or zero-price rows as billable line items unless they are clearly a priced line item.
 - Detect sourceTotals from subtotal, tax/HST/GST, and final total rows, but do not include those as room items.

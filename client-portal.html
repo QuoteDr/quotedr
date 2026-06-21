@@ -3555,8 +3555,12 @@
       return raw.replace(/(?:-INV)+$/i, '-INV');
     }
 
+    function portalPreviewQuerySuffix() {
+      return requestedAdminView ? '&preview=1&admin_preview=1' : '';
+    }
+
     function portalDocumentPrimaryHref(quote) {
-      const secureParams = portalToken ? '&token=' + encodeURIComponent(portalToken) + '&portal_anchor=' + encodeURIComponent(portalAnchorId || quote.id) : '';
+      const secureParams = (portalToken ? '&token=' + encodeURIComponent(portalToken) + '&portal_anchor=' + encodeURIComponent(portalAnchorId || quote.id) : '') + portalPreviewQuerySuffix();
       return isInvoiceDocument(quote)
         ? 'invoice-viewer.html?id=' + encodeURIComponent(quote.id) + secureParams
         : 'interactive-quote-viewer.html?id=' + encodeURIComponent(quote.id) + secureParams;
@@ -3936,7 +3940,7 @@
       const sign = amount >= 0 ? '+' : '-';
       const status = quoteStatus(row);
       const portalAdded = portalAddedDateLabel(row);
-      const href = 'interactive-quote-viewer.html?id=' + encodeURIComponent(row.id) + (portalToken ? '&token=' + encodeURIComponent(portalToken) + '&portal_anchor=' + encodeURIComponent(portalAnchorId || row.id) : '');
+      const href = 'interactive-quote-viewer.html?id=' + encodeURIComponent(row.id) + (portalToken ? '&token=' + encodeURIComponent(portalToken) + '&portal_anchor=' + encodeURIComponent(portalAnchorId || row.id) : '') + portalPreviewQuerySuffix();
       return '<div class="card quote-card portal-open-card mb-2" role="link" tabindex="0" aria-label="Review Change Order" data-open-href="' + escapeHtml(href) + '" onclick="handlePortalCardOpen(event)" onkeydown="handlePortalCardKeyOpen(event)">' +
         '<div class="card-body py-3">' +
         '<div class="d-flex justify-content-between gap-2 flex-wrap">' +

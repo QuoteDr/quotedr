@@ -1902,6 +1902,7 @@
                 if (!viewerUrl) throw new Error('Could not create the client view link.');
                 var url = new URL(viewerUrl, window.location.origin);
                 url.searchParams.set('preview', '1');
+                url.searchParams.set('admin_preview', '1');
                 window.location.href = url.toString();
             } catch(err) {
                 qdAlert('Could not open client view: ' + err.message);
@@ -3628,6 +3629,7 @@ function renderBusinessInsights(quotes) {
             document.getElementById('newQuoteClientEmail').value = '';
             document.getElementById('newQuoteClientPhone').value = '';
             document.getElementById('newQuoteNumber').value = '';
+            document.getElementById('newQuoteFileName').value = '';
             document.getElementById('newQuoteError').textContent = '';
             window._newQuoteSelectedClient = null;
             populateNewQuoteClientSuggestions();
@@ -3646,6 +3648,7 @@ function renderBusinessInsights(quotes) {
             var clientEmail = clientDraft.email;
             var clientPhone = clientDraft.phone;
             var quoteNum = document.getElementById('newQuoteNumber').value.trim();
+            var quoteTitle = document.getElementById('newQuoteFileName').value.trim();
             var errEl = document.getElementById('newQuoteError');
             var btn = document.getElementById('newQuoteCreateBtn');
             var savedClient = findNewQuoteClientByName(clientName) || findDashboardClientByEmail(clientEmail) || window._newQuoteSelectedClient || null;
@@ -3692,10 +3695,12 @@ function renderBusinessInsights(quotes) {
                     clientPhone: clientPhone,
                     projectAddress: address,
                     quoteNumber: quoteNum,
+                    quoteTitle: quoteTitle,
+                    title: quoteTitle,
                     rooms: [],
                     grandTotal: 0,
                     status: 'draft',
-                    data: { clientName: clientName, clientEmail: clientEmail, clientPhone: clientPhone, projectAddress: address, quoteNumber: quoteNum, rooms: [] }
+                    data: { clientName: clientName, clientEmail: clientEmail, clientPhone: clientPhone, projectAddress: address, quoteNumber: quoteNum, quoteTitle: quoteTitle, title: quoteTitle, rooms: [] }
                 });
 
                 if (result.error) throw new Error(result.error.message || 'Save failed');
@@ -3716,7 +3721,7 @@ function renderBusinessInsights(quotes) {
 
         // Allow Enter key to submit
         document.addEventListener('DOMContentLoaded', function() {
-            ['newQuoteClientName','newQuoteAddress','newQuoteClientEmail','newQuoteClientPhone','newQuoteNumber'].forEach(function(id) {
+            ['newQuoteClientName','newQuoteAddress','newQuoteClientEmail','newQuoteClientPhone','newQuoteNumber','newQuoteFileName'].forEach(function(id) {
                 var el = document.getElementById(id);
                 if (el) el.addEventListener('keydown', function(e) {
                     if (e.key === 'Enter') createAndOpenQuote();
@@ -4014,6 +4019,10 @@ function renderBusinessInsights(quotes) {
             <input type="text" id="newQuoteClientName" class="form-control" placeholder="e.g. John Smith" autocomplete="off" autofocus>
             <div id="newQuoteClientDropdown" class="portal-client-dropdown"></div>
           </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">File Name <span class="text-muted fw-normal">(optional)</span></label>
+          <input type="text" id="newQuoteFileName" class="form-control" placeholder="e.g. Michelle Bathroom">
         </div>
         <div class="mb-3">
           <label class="form-label fw-semibold">Project Address <span class="text-muted fw-normal">(optional)</span></label>

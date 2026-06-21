@@ -69,6 +69,11 @@
         return text;
     }
 
+    function normalizeImportedUnit(unit) {
+        var text = String(unit || '').trim();
+        return text ? normalizeUnit(text) : 'ea';
+    }
+
     function looksLikeSkipRow(item) {
         var description = String(item && (item.description || item.name || item.serviceName || item.actualDescription) || '').trim();
         var category = String(item && item.category || '').trim();
@@ -83,23 +88,22 @@
     function normalizeImportedItem(item) {
         if (!item || typeof item !== 'object' || looksLikeSkipRow(item)) return null;
         var description = String(item.description || item.name || item.serviceName || item.actualDescription || '').trim();
-        var notes = String(item.notes || item.itemDescription || item.displayDescription || '').trim();
+        var importedDescription = String(item.notes || item.itemDescription || item.displayDescription || '').trim();
         var quantity = parseQuantity(item.quantity);
         var rate = parseMoney(item.rate || item.unitPrice || item.unit_price);
         var total = parseMoney(item.total || item.amount || item.lineTotal || item.line_total);
-        var unitType = normalizeUnit(item.unitType || item.unit || item.units);
+        var unitType = normalizeImportedUnit(item.unitType || item.unit || item.units);
 
         if (total === null && quantity !== null && rate !== null) total = Math.round(quantity * rate * 100) / 100;
         if (quantity === null && total !== null && rate !== null && rate !== 0) quantity = Math.round((total / rate) * 100) / 100;
         if (quantity === null) quantity = 1;
         if (rate === null && total !== null) {
             rate = total;
-            unitType = 'ls';
         }
         if (rate === null) rate = 0;
         if (total === null) total = Math.round(quantity * rate * 100) / 100;
 
-        if (!description || (!total && !rate && !notes)) return null;
+        if (!description || (!total && !rate && !importedDescription)) return null;
 
         return {
             category: String(item.category || 'Imported Quote').trim() || 'Imported Quote',
@@ -111,8 +115,8 @@
             rate: rate,
             materialCost: parseMoney(item.materialCost || item.material_cost) || 0,
             total: total,
-            itemDescription: notes,
-            notes: notes,
+            itemDescription: importedDescription,
+            notes: '',
             displayDescription: String(item.displayDescription || description).trim(),
             optional: false,
             upgrade: false
@@ -227,29 +231,34 @@
         var parts = raw.split('|').map(function(part) { return part.trim(); }).filter(Boolean);
         if (parts.length < 2) return null;
         var description = parts[0];
-        var quantity = parts.length >= 4 ? parseQuantity(parts[1]) : null;
-        var rate = parts.length >= 4 ? parseMoney(parts[2]) : null;
-        var unitType = '';
+        var quantity = null;
+        var rate = null;
+        var unitType = 'ea';
+        if (parts.length >= 5) {
+            quantity = parseQuantity(parts[1]);
+            unitType = normalizeImportedUnit(parts[2]);
+            rate = parseMoney(parts[3]);
+        } else if (parts.length >= 4) {
+            quantity = parseQuantity(parts[1]);
+            rate = parseMoney(parts[2]);
+        }
 
         var suffix = description.match(/^(.*?)\s+(\d+(?:\.\d+)?)\s+(square\s+feet|square\s+foot|linear\s+feet|linear\s+foot|cubic\s+feet|cubic\s+foot|each|sheets?|boxes?|bags?)$/i);
         if (suffix) {
             description = suffix[1].trim();
             if (quantity === null) quantity = parseQuantity(suffix[2]);
-            unitType = normalizeUnit(suffix[3]);
+            unitType = normalizeImportedUnit(suffix[3]);
         }
 
         if (quantity === null || rate === null) {
             quantity = 1;
             rate = total;
-            unitType = 'ls';
-        } else if (!unitType) {
-            unitType = 'ls';
         }
 
         if (!description || sourceLineLooksLikeTotal(description)) return null;
-        var notes = String(nextLine || '').trim();
-        if (notes && (notes.indexOf('$') !== -1 || lineLooksLikeRoomHeading(notes) || /^description\s*\|/i.test(notes))) {
-            notes = '';
+        var importedDescription = String(nextLine || '').trim();
+        if (importedDescription && (importedDescription.indexOf('$') !== -1 || lineLooksLikeRoomHeading(importedDescription) || /^description\s*\|/i.test(importedDescription))) {
+            importedDescription = '';
         }
 
         return {
@@ -264,8 +273,8 @@
                 rate: Math.round(rate * 100) / 100,
                 materialCost: 0,
                 total: Math.round(total * 100) / 100,
-                itemDescription: notes,
-                notes: notes,
+                itemDescription: importedDescription,
+                notes: '',
                 displayDescription: description,
                 optional: false,
                 upgrade: false,
@@ -789,7 +798,8 @@
             html += '<tr class="table-primary"><th colspan="5">' + escapeHtml(room.name) + '</th></tr>';
             html += '<tr class="small text-muted"><th>Description</th><th>Qty</th><th>Unit</th><th>Rate</th><th>Total</th></tr>';
             room.items.forEach(function(item) {
-                html += '<tr><td><div class="fw-semibold">' + escapeHtml(item.description) + '</div>' + (item.notes ? '<div class="small text-muted">' + escapeHtml(item.notes) + '</div>' : '') + '</td><td>' + escapeHtml(item.quantity) + '</td><td>' + escapeHtml(item.unitType) + '</td><td>$' + (parseMoney(item.rate) || 0).toFixed(2) + '</td><td>$' + (parseMoney(item.total) || 0).toFixed(2) + '</td></tr>';
+                var previewDescription = item.itemDescription || item.notes || '';
+                html += '<tr><td><div class="fw-semibold">' + escapeHtml(item.description) + '</div>' + (previewDescription ? '<div class="small text-muted">' + escapeHtml(previewDescription) + '</div>' : '') + '</td><td>' + escapeHtml(item.quantity) + '</td><td>' + escapeHtml(item.unitType) + '</td><td>$' + (parseMoney(item.rate) || 0).toFixed(2) + '</td><td>$' + (parseMoney(item.total) || 0).toFixed(2) + '</td></tr>';
             });
         });
         html += '</table></div>';

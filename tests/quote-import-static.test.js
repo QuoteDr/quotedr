@@ -28,6 +28,8 @@ assert(edgeSource.includes('splitLegacyQuoteText'), 'quote-import edge function 
 assert(edgeSource.includes('mergeImportedQuotePayloads'), 'quote-import edge function should merge chunked quote import results');
 assert(edgeSource.includes('clientChunkIndex'), 'quote-import edge function should understand client-side chunk metadata');
 assert(edgeSource.includes('finish_reason'), 'quote-import edge function should detect truncated AI output');
+assert(edgeSource.includes('Leave job-specific notes blank during import'), 'quote-import prompt should keep imported descriptions out of job notes');
+assert(edgeSource.includes('If an item has no quantity or unit'), 'quote-import prompt should ask missing quantity/unit items to default to each');
 
 const source = fs.readFileSync(importerPath, 'utf8');
 assert(source.includes('This may take a few minutes depending on quote size'), 'import loading state should set expectations for large quotes');
@@ -152,7 +154,8 @@ assert(recoveredDrywall.quantity === 492, 'recovered item should preserve source
 assert(recoveredDrywall.unitType === 'sq ft', 'recovered item should infer source unit');
 assert(recoveredDrywall.rate === 6.4, 'recovered item should preserve source rate');
 assert(recoveredDrywall.total === 3148.8, 'recovered item should preserve source total');
-assert(recoveredDrywall.notes.includes('492 square feet'), 'recovered item should preserve the following source description as notes');
+assert(recoveredDrywall.itemDescription.includes('492 square feet'), 'recovered item should preserve the following source description as reusable description');
+assert(recoveredDrywall.notes === '', 'recovered item should not duplicate source descriptions into job notes');
 assert(recovered.warnings.some((warning) => /Recovered 1 priced source row/.test(warning)), 'recovery should warn the user that deterministic rows were added');
 
 const rebuiltPageText = importer.buildPdfPageTextFromItems([
@@ -230,11 +233,13 @@ assert(drywall.quantity === 3793, 'quantity should be numeric');
 assert(drywall.unitType === 'sq ft', 'square feet should normalize to sq ft');
 assert(drywall.rate === 6.4, 'rate should parse currency');
 assert(drywall.total === 24275.2, 'total should parse currency');
-assert(drywall.notes.includes('Paint ready'), 'long descriptions should survive as notes');
+assert(drywall.itemDescription.includes('Paint ready'), 'long imported descriptions should become reusable item descriptions');
+assert(drywall.notes === '', 'imported descriptions should not be duplicated into job notes');
 
 const toilet = parsed.quote.rooms[1].items[0];
 assert(toilet.quantity === 1, 'total-only item should use quantity 1');
-assert(toilet.unitType === 'ls', 'total-only item should use lump sum');
+assert(toilet.unitType === 'ea', 'missing unit item should default to each');
+assert(toilet.unit === 'ea', 'missing unit item should use ea for display');
 assert(toilet.rate === 150, 'total-only item should use total as rate');
 assert(toilet.total === 150, 'total-only item should preserve total');
 

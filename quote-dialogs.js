@@ -12,6 +12,9 @@
             '.qd-dialog-modal .modal-title{font-weight:750;letter-spacing:0;}',
             '.qd-dialog-modal .btn-close{filter:invert(1) grayscale(100%);}',
             '.qd-dialog-icon{width:34px;height:34px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;background:rgba(242,122,26,.16);color:var(--qd-orange,#f27a1a);}',
+            '.qd-dialog-help-btn{border-color:rgba(255,255,255,.65);color:#fff;border-radius:999px;font-weight:700;line-height:1;padding:.18rem .5rem;}',
+            '.qd-dialog-help-btn:hover,.qd-dialog-help-btn:focus{background:rgba(255,255,255,.16);color:#fff;border-color:#fff;}',
+            '.qd-dialog-help-text{background:#eaf6ff;border:1px solid #b8ddff;color:#0f3460;border-radius:8px;padding:.65rem .8rem;font-size:.92rem;line-height:1.35;}',
             '.qd-toast-container{position:fixed;right:18px;bottom:18px;z-index:1095;display:flex;flex-direction:column;gap:10px;max-width:min(380px,calc(100vw - 32px));}',
             '.qd-toast{background:#fff;border:1px solid var(--qd-border,#d7e2ef);border-left:4px solid var(--qd-blue,#1a56a0);border-radius:8px;box-shadow:0 12px 30px rgba(15,52,96,.16);padding:11px 14px;display:flex;gap:10px;align-items:flex-start;}',
             '.qd-toast.qd-toast-success{border-left-color:var(--qd-success,#198754);}',
@@ -36,11 +39,13 @@
                 '<div class="modal-content">' +
                     '<div class="modal-header">' +
                         '<h5 class="modal-title d-flex align-items-center gap-2"><span class="qd-dialog-icon"><i class="fas fa-info"></i></span><span id="qdDialogTitle">Quote Dr</span></h5>' +
+                        '<button type="button" class="btn btn-sm qd-dialog-help-btn ms-auto me-2" id="qdDialogHelp" style="display:none;" aria-expanded="false" aria-controls="qdDialogHelpText">?</button>' +
                         '<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>' +
                     '</div>' +
                     '<div class="modal-body">' +
                         '<div id="qdDialogMessage" class="mb-0"></div>' +
                         '<div id="qdDialogInputWrap" class="mt-3" style="display:none;"><input type="text" class="form-control" id="qdDialogInput"></div>' +
+                        '<div id="qdDialogHelpText" class="qd-dialog-help-text mt-3" style="display:none;"></div>' +
                     '</div>' +
                     '<div class="modal-footer">' +
                         '<button type="button" class="btn btn-outline-secondary" id="qdDialogCancel">Cancel</button>' +
@@ -107,6 +112,8 @@
             var ok = el.querySelector('#qdDialogOk');
             var cancel = el.querySelector('#qdDialogCancel');
             var secondary = el.querySelector('#qdDialogSecondary');
+            var help = el.querySelector('#qdDialogHelp');
+            var helpText = el.querySelector('#qdDialogHelpText');
             var settled = false;
 
             setIcon(opts.type || (opts.prompt ? 'prompt' : 'info'));
@@ -121,6 +128,18 @@
             secondary.className = 'btn ' + (opts.secondaryClass || 'btn-outline-primary');
             ok.textContent = opts.okText || 'OK';
             ok.className = 'btn ' + (opts.okClass || (opts.type === 'danger' ? 'btn-danger' : 'btn-primary'));
+            if (help && helpText) {
+                var hasHelp = !!opts.helpText;
+                help.style.display = hasHelp ? '' : 'none';
+                help.setAttribute('aria-expanded', 'false');
+                helpText.style.display = 'none';
+                helpText.textContent = opts.helpText || '';
+                help.onclick = hasHelp ? function() {
+                    var nextVisible = helpText.style.display === 'none';
+                    helpText.style.display = nextVisible ? '' : 'none';
+                    help.setAttribute('aria-expanded', nextVisible ? 'true' : 'false');
+                } : null;
+            }
 
             function cleanup(value, hideFirst) {
                 if (settled) return;
@@ -128,6 +147,7 @@
                 ok.onclick = null;
                 cancel.onclick = null;
                 secondary.onclick = null;
+                if (help) help.onclick = null;
                 el.removeEventListener('keydown', onEnterSubmit);
                 var finish = function() {
                     el.removeEventListener('hidden.bs.modal', onHidden);
@@ -162,6 +182,13 @@
                 cleanup(opts.prompt ? null : false, true);
             };
             secondary.onclick = function() {
+                if (opts.prompt && opts.secondaryPromptValue) {
+                    cleanup({
+                        action: opts.secondaryValue !== undefined ? opts.secondaryValue : 'secondary',
+                        value: input.value
+                    }, true);
+                    return;
+                }
                 cleanup(opts.secondaryValue !== undefined ? opts.secondaryValue : 'secondary', true);
             };
             el.addEventListener('hidden.bs.modal', onHidden, { once: true });
