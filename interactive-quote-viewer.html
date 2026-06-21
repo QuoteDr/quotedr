@@ -286,6 +286,12 @@
             border-radius: 8px;
             box-shadow: 0 10px 30px rgba(15,52,96,0.08);
         }
+        .viewer-line-item-highlighted {
+            background: var(--viewer-line-highlight-bg, rgba(255, 216, 77, 0.16)) !important;
+            border-left: 4px solid var(--viewer-line-highlight-border, #f2c94c);
+            padding-left: 8px;
+            border-radius: 6px;
+        }
 
         /* Warranty Badge */
         .warranty-section {
@@ -1674,6 +1680,20 @@ if (location.search.includes('debug')) {
             });
         }
 
+        const VIEWER_LINE_ITEM_HIGHLIGHTS = {
+            yellow: { label: 'Yellow', background: 'rgba(255, 216, 77, 0.16)', border: '#f2c94c' },
+            green: { label: 'Green', background: 'rgba(59, 178, 115, 0.13)', border: '#3bb273' },
+            blue: { label: 'Blue', background: 'rgba(79, 141, 247, 0.13)', border: '#4f8df7' },
+            pink: { label: 'Pink', background: 'rgba(231, 90, 156, 0.13)', border: '#e75a9c' },
+            orange: { label: 'Orange', background: 'rgba(245, 158, 11, 0.14)', border: '#f59e0b' },
+            purple: { label: 'Purple', background: 'rgba(139, 92, 246, 0.13)', border: '#8b5cf6' }
+        };
+
+        function getViewerLineItemHighlight(item) {
+            if (!item || !item.highlightColor) return null;
+            return VIEWER_LINE_ITEM_HIGHLIGHTS[item.highlightColor] || null;
+        }
+
         function getViewerQuoteAdjustment() {
             var adjustment = quoteData && (quoteData.quoteAdjustment || quoteData.clientAdjustment);
             adjustment = adjustment || {};
@@ -2097,6 +2117,7 @@ if (location.search.includes('debug')) {
                     const visibleNotes = viewerVisibleNotes(item, displayDesc);
                     const isOptional = !!item.optional;
                     const isRemoved = !!item._removed;
+                    const lineItemHighlight = getViewerLineItemHighlight(item);
 
                     // Find original item for diff (match by description)
                     const origRoom = origRoomsForDiff[roomIdx] || {};
@@ -2130,8 +2151,18 @@ if (location.search.includes('debug')) {
                             </div>`;
                         }
                     } else {
+                        const itemClasses = ['py-2', 'border-bottom'];
+                        const itemStyles = [];
+                        if (lineItemHighlight) {
+                            itemClasses.push('viewer-line-item-highlighted');
+                            itemStyles.push('--viewer-line-highlight-bg: ' + lineItemHighlight.background);
+                            itemStyles.push('--viewer-line-highlight-border: ' + lineItemHighlight.border);
+                        } else if (isOptional && !isSignedDiff) {
+                            itemStyles.push('border-left:3px dashed #0dcaf0');
+                            itemStyles.push('padding-left:8px');
+                        }
                         html += `
-                        <div class="py-2 border-bottom" id="item_${roomIdx}_${itemIndex}" ${isOptional && !isSignedDiff ? 'style="border-left:3px dashed #0dcaf0; padding-left:8px;"' : ''}>
+                        <div class="${itemClasses.join(' ')}" id="item_${roomIdx}_${itemIndex}" ${itemStyles.length ? `style="${itemStyles.join('; ')}"` : ''}>
                             <div class="d-flex justify-content-between align-items-baseline mb-1">
                                 <div style="flex:1;">
                                     <strong>${item.description || item.name || 'Item'}</strong>

@@ -1377,6 +1377,26 @@
         .quote-item-actions-cell .quote-item-actions {
             justify-content: flex-end;
         }
+        .quote-items-table tr.quote-item-highlighted > td {
+            background: var(--line-highlight-bg, rgba(255, 216, 77, 0.18)) !important;
+        }
+        .quote-items-table tr.quote-item-highlighted > td:first-child {
+            border-left: 4px solid var(--line-highlight-border, #f2c94c);
+        }
+        .quote-item-highlight-btn {
+            min-width: 2rem;
+        }
+        .quote-item-highlight-swatch {
+            display: inline-block;
+            width: 0.9rem;
+            height: 0.9rem;
+            border-radius: 4px;
+            border: 1px solid rgba(15, 23, 42, 0.25);
+            vertical-align: -0.12rem;
+        }
+        .quote-item-highlight-menu {
+            min-width: 12rem;
+        }
     @media (max-width: 768px) {
             .container-fluid { padding-left: 8px !important; padding-right: 8px !important; }
             .btn-sm { font-size: 0.75rem; padding: 4px 7px; }
@@ -6959,6 +6979,53 @@ Example:
             renderRooms();
         }
 
+        const LINE_ITEM_HIGHLIGHTS = {
+            yellow: { label: 'Yellow', background: 'rgba(255, 216, 77, 0.18)', swatch: '#fff7bf', border: '#f2c94c' },
+            green: { label: 'Green', background: 'rgba(59, 178, 115, 0.14)', swatch: '#dff7df', border: '#3bb273' },
+            blue: { label: 'Blue', background: 'rgba(79, 141, 247, 0.14)', swatch: '#ddecff', border: '#4f8df7' },
+            pink: { label: 'Pink', background: 'rgba(231, 90, 156, 0.14)', swatch: '#ffe1ef', border: '#e75a9c' },
+            orange: { label: 'Orange', background: 'rgba(245, 158, 11, 0.16)', swatch: '#ffe7c2', border: '#f59e0b' },
+            purple: { label: 'Purple', background: 'rgba(139, 92, 246, 0.14)', swatch: '#eee3ff', border: '#8b5cf6' }
+        };
+
+        function getLineItemHighlight(item) {
+            if (!item || !item.highlightColor) return null;
+            return LINE_ITEM_HIGHLIGHTS[item.highlightColor] || null;
+        }
+
+        function setLineItemHighlight(roomId, itemIndex, colorKey) {
+            const room = rooms.find(r => r.id === roomId);
+            if (!room || !room.items[itemIndex]) return;
+            if (colorKey && LINE_ITEM_HIGHLIGHTS[colorKey]) {
+                room.items[itemIndex].highlightColor = colorKey;
+            } else {
+                delete room.items[itemIndex].highlightColor;
+            }
+            renderRooms();
+            if (typeof saveSessionQuote === 'function') saveSessionQuote();
+            if (typeof markUnsaved === 'function') markUnsaved();
+        }
+
+        function renderLineItemHighlightButton(roomId, itemIndex, item) {
+            const activeHighlight = getLineItemHighlight(item);
+            let html = '<div class="dropdown">';
+            html += '<button type="button" class="btn btn-sm ' + (activeHighlight ? 'btn-warning' : 'btn-outline-secondary') + ' quote-item-highlight-btn" data-bs-toggle="dropdown" data-bs-auto-close="true" onclick="event.stopPropagation()" title="' + (activeHighlight ? 'Highlighted: ' + qdTemplateEscapeHtml(activeHighlight.label) : 'Highlight line item') + '"><i class="fas fa-highlighter"></i></button>';
+            html += '<div class="dropdown-menu dropdown-menu-end quote-item-highlight-menu p-2" onclick="event.stopPropagation()">';
+            html += '<div class="small text-muted fw-semibold px-1 mb-1">Highlight item</div>';
+            Object.keys(LINE_ITEM_HIGHLIGHTS).forEach(function(key) {
+                const highlight = LINE_ITEM_HIGHLIGHTS[key];
+                const isActive = item && item.highlightColor === key;
+                html += '<button type="button" class="dropdown-item d-flex align-items-center gap-2 rounded ' + (isActive ? 'active' : '') + '" onclick="setLineItemHighlight(' + roomId + ', ' + itemIndex + ', \'' + key + '\')">';
+                html += '<span class="quote-item-highlight-swatch" style="background:' + (highlight.swatch || highlight.background) + '; border-color:' + highlight.border + ';"></span>';
+                html += '<span>' + qdTemplateEscapeHtml(highlight.label) + '</span>';
+                html += '</button>';
+            });
+            html += '<div class="dropdown-divider"></div>';
+            html += '<button type="button" class="dropdown-item text-muted rounded" onclick="setLineItemHighlight(' + roomId + ', ' + itemIndex + ', \'\')"><i class="fas fa-ban me-2"></i>Clear highlight</button>';
+            html += '</div></div>';
+            return html;
+        }
+
         async function openProFeature(feature, label, callback) {
             if (typeof requireFeature === 'function') {
                 var allowed = await requireFeature(feature, label);
@@ -9488,8 +9555,19 @@ Example:
                                 ? (item.upgrade.description || item.upgrade.itemDescription || item.upgrade.item_description || item.upgrade.notes || '')
                                 : (item.itemDescription || '');
                             var coStatus = window._quoteDocumentType === 'change_order' ? (item._coChangeStatus || 'added') : '';
-                            var rowClass = coStatus ? ' class="co-item-' + coStatus + '"' : '';
-                            const rowStyle = isOptional && !coStatus ? ' style="border-left:3px dashed #0dcaf0;"' : '';
+                            const highlight = getLineItemHighlight(item);
+                            var rowClassNames = [];
+                            if (coStatus) rowClassNames.push('co-item-' + coStatus);
+                            if (highlight) rowClassNames.push('quote-item-highlighted');
+                            var rowClass = rowClassNames.length ? ' class="' + rowClassNames.join(' ') + '"' : '';
+                            var rowStyles = [];
+                            if (highlight) {
+                                rowStyles.push('--line-highlight-bg: ' + highlight.background);
+                                rowStyles.push('--line-highlight-border: ' + highlight.border);
+                            } else if (isOptional && !coStatus) {
+                                rowStyles.push('border-left:3px dashed #0dcaf0');
+                            }
+                            const rowStyle = rowStyles.length ? ' style="' + rowStyles.join(';') + ';"' : '';
                             html += '<tr' + rowClass + rowStyle + '>';
                             html += '<td>' + displayNum + (isOptional ? ' <span class="badge bg-info" style="font-size:0.6em;">opt</span>' : '') + '</td>';
                             html += '<td><input type="checkbox" class="form-check-input choice-group-select" data-room-id="' + room.id + '" data-item-index="' + origIndex + '" title="Select for option group"></td>';
@@ -9548,8 +9626,9 @@ Example:
                             }
                             const optionalBtn = hasChoiceGroup ? '' : '<button onclick="toggleItemOptional(' + room.id + ', ' + origIndex + ')" class="btn btn-sm ' + (isOptional ? 'btn-info' : 'btn-outline-secondary') + '" title="' + (isOptional ? 'Client can remove this item' : 'Mark as removable by client') + '"><i class="fas fa-' + (isOptional ? 'toggle-on' : 'toggle-off') + '"></i> Optional</button>';
                             const noteBtn = '<button onclick="editLineItemNote(' + room.id + ', ' + origIndex + ')" class="btn btn-sm ' + (item.notes ? 'btn-info' : 'btn-outline-secondary') + '" title="' + (item.notes ? 'Edit job note' : 'Add job note') + '"><i class="fas fa-sticky-note"></i></button>';
+                            const highlightBtn = renderLineItemHighlightButton(room.id, origIndex, item);
                             var deleteTitle = (window._quoteDocumentType === 'change_order' && item._coOriginal) ? 'Mark as removed from this change order' : 'Delete';
-                            html += '<td class="quote-item-actions-cell"><div class="d-flex gap-1 flex-wrap quote-item-actions" style="justify-content:flex-end">' + upgradeBtn + optionalBtn + noteBtn + '<button onclick="editLineItem(' + room.id + ', ' + origIndex + ')" class="btn btn-sm btn-outline-primary" title="Edit"><i class="fas fa-edit"></i></button><button onclick="deleteItem(' + room.id + ', ' + origIndex + ')" class="btn btn-sm btn-danger" title="' + deleteTitle + '"><i class="fas fa-trash"></i></button></div></td>';
+                            html += '<td class="quote-item-actions-cell"><div class="d-flex gap-1 flex-wrap quote-item-actions" style="justify-content:flex-end">' + upgradeBtn + optionalBtn + noteBtn + highlightBtn + '<button onclick="editLineItem(' + room.id + ', ' + origIndex + ')" class="btn btn-sm btn-outline-primary" title="Edit"><i class="fas fa-edit"></i></button><button onclick="deleteItem(' + room.id + ', ' + origIndex + ')" class="btn btn-sm btn-danger" title="' + deleteTitle + '"><i class="fas fa-trash"></i></button></div></td>';
                             html += '</tr>';
                             displayNum++;
                         });
