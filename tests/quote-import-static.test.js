@@ -60,6 +60,7 @@ assert(typeof importer.buildImportedQuoteCsv === 'function', 'frontend should bu
 assert(typeof importer.buildQuoteImportDebugPayload === 'function', 'frontend should build an import debug export bundle');
 assert(typeof importer.getQuoteImportDebugPayload === 'function', 'frontend should expose the current debug payload for troubleshooting');
 assert(typeof importer.recoverMissingSourceRows === 'function', 'frontend should recover clean source rows the AI missed');
+assert(typeof importer.prepareRoomsForBuilder === 'function', 'frontend should expose final import room preparation for regression testing');
 assert(source.includes('clientChunkIndex'), 'frontend should send chunk position metadata to the Edge Function');
 assert(source.includes('clientChunkTotal'), 'frontend should send chunk total metadata to the Edge Function');
 assert(source.includes('clipboard.writeText'), 'debug export should copy JSON to clipboard as a fallback');
@@ -157,6 +158,32 @@ assert(recoveredDrywall.total === 3148.8, 'recovered item should preserve source
 assert(recoveredDrywall.itemDescription.includes('492 square feet'), 'recovered item should preserve the following source description as reusable description');
 assert(recoveredDrywall.notes === '', 'recovered item should not duplicate source descriptions into job notes');
 assert(recovered.warnings.some((warning) => /Recovered 1 priced source row/.test(warning)), 'recovery should warn the user that deterministic rows were added');
+
+const builderReadyRooms = importer.prepareRoomsForBuilder([{
+  name: 'LOFT',
+  items: [{
+    category: 'Flooring',
+    description: 'Flooring - Floating Vinyl 265 Square Feet',
+    quantity: 265,
+    unitType: 'sq ft',
+    rate: 2.2,
+    total: 583,
+    itemDescription: 'Includes labour to install 265 square feet of vinyl floating flooring. Flooring not included, labour to install only.',
+    notes: 'Includes labour to install 265 square feet of vinyl floating flooring. Flooring not included, labour to install only.'
+  }, {
+    category: 'Fan Replacement',
+    description: 'Fan Replacement',
+    quantity: 1,
+    unitType: 'ls',
+    rate: 165,
+    total: 165,
+    notes: 'Includes removal and installation of a replacement fan.'
+  }]
+}], 0);
+assert(builderReadyRooms[0].items[0].itemDescription.includes('Flooring not included'), 'builder prep should preserve imported description text');
+assert(builderReadyRooms[0].items[0].notes === '', 'builder prep should remove duplicated imported descriptions from job notes');
+assert(builderReadyRooms[0].items[1].itemDescription.includes('replacement fan'), 'builder prep should move import-provided notes into reusable descriptions when needed');
+assert(builderReadyRooms[0].items[1].notes === '', 'builder prep should keep imported job notes blank even when AI returned a notes field');
 
 const rebuiltPageText = importer.buildPdfPageTextFromItems([
   { str: '$1,593.00', transform: [1, 0, 0, 1, 520, 700], width: 55 },

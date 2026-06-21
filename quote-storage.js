@@ -138,6 +138,28 @@
             return true;
         }
 
+        function qdQuoteStorageTextKey(value) {
+            return String(value || '')
+                .toLowerCase()
+                .replace(/\s+/g, ' ')
+                .replace(/[^\w\s]/g, '')
+                .trim();
+        }
+
+        function sanitizeQuoteRoomsForSave(sourceRooms) {
+            var clonedRooms = JSON.parse(JSON.stringify(sourceRooms || []));
+            clonedRooms.forEach(function(room) {
+                (room.items || []).forEach(function(item) {
+                    var note = String(item && item.notes || '').trim();
+                    var description = String(item && item.itemDescription || '').trim();
+                    if (note && description && qdQuoteStorageTextKey(note) === qdQuoteStorageTextKey(description)) {
+                        item.notes = '';
+                    }
+                });
+            });
+            return clonedRooms;
+        }
+
         function collectQuoteData() {
             var grandTotal = parseQuoteMoney(document.getElementById('grandTotalDisplay')?.textContent || '0');
             var isChangeOrder = window._quoteDocumentType === 'change_order';
@@ -169,7 +191,7 @@
                 clientPhone:    document.getElementById('clientPhone')?.value    || '',
                 clientEmail:    document.getElementById('clientEmail')?.value    || '',
                 terms: getSelectedTerms(),
-                rooms: JSON.parse(JSON.stringify(rooms)),
+                rooms: sanitizeQuoteRoomsForSave(rooms),
                 categoryStyles: JSON.parse(JSON.stringify(categoryStyles || {})),
                 roomCounter: roomCounter,
                 quoteAdjustment: getQuoteClientAdjustment(),

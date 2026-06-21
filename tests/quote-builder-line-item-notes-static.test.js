@@ -25,7 +25,14 @@ assert(
 );
 
 assert(
-  source.includes('qdTemplateEscapeHtml(item.notes ||') || source.includes('qdTemplateEscapeHtml(item.notes)'),
+  source.includes('function getVisibleLineItemNote') &&
+    source.includes('qdLineItemTextKey(note) === qdLineItemTextKey(description)') &&
+    source.includes('const visibleJobNote = getVisibleLineItemNote(item, displayItemDescription);'),
+  'Quote builder should suppress exact duplicate imported descriptions from job-note display'
+);
+
+assert(
+  source.includes('qdTemplateEscapeHtml(visibleJobNote)'),
   'Line item notes should be escaped when rendered'
 );
 

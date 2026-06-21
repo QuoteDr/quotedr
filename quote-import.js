@@ -74,6 +74,37 @@
         return text ? normalizeUnit(text) : 'ea';
     }
 
+    function normalizeImportDescriptionKey(value) {
+        return String(value || '')
+            .toLowerCase()
+            .replace(/\s+/g, ' ')
+            .replace(/[^\w\s]/g, '')
+            .trim();
+    }
+
+    function mergeImportedDescriptionText(primary, secondary) {
+        var first = String(primary || '').trim();
+        var second = String(secondary || '').trim();
+        if (!first) return second;
+        if (!second) return first;
+        var firstKey = normalizeImportDescriptionKey(first);
+        var secondKey = normalizeImportDescriptionKey(second);
+        if (!secondKey || firstKey === secondKey || firstKey.indexOf(secondKey) !== -1) return first;
+        if (secondKey.indexOf(firstKey) !== -1) return second;
+        return first + '\n' + second;
+    }
+
+    function scrubImportedItemForBuilder(item) {
+        if (!item || typeof item !== 'object') return item;
+        var importedDescription = mergeImportedDescriptionText(
+            item.itemDescription || item.displayDescription || '',
+            item.notes || ''
+        );
+        item.itemDescription = importedDescription;
+        item.notes = '';
+        return item;
+    }
+
     function looksLikeSkipRow(item) {
         var description = String(item && (item.description || item.name || item.serviceName || item.actualDescription) || '').trim();
         var category = String(item && item.category || '').trim();
@@ -758,7 +789,7 @@
             cloned.id = nextId;
             cloned.colorIndex = (nextId - 1) % ((global.ROOM_COLORS && global.ROOM_COLORS.length) || 8);
             cloned.markup = parseMoney(cloned.markup) || 0;
-            cloned.items = asArray(cloned.items);
+            cloned.items = asArray(cloned.items).map(scrubImportedItemForBuilder);
             return cloned;
         });
     }
@@ -1200,6 +1231,7 @@
         buildQuoteImportDebugPayload: buildQuoteImportDebugPayload,
         getQuoteImportDebugPayload: getQuoteImportDebugPayload,
         recoverMissingSourceRows: recoverMissingSourceRows,
+        prepareRoomsForBuilder: prepareRoomsForBuilder,
         normalizeImportedQuote: normalizeImportedQuote,
         extractSavedItemCandidates: extractSavedItemCandidates,
         extractFileText: extractFileText

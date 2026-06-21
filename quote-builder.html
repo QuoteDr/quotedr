@@ -9400,6 +9400,22 @@ Example:
             if (typeof showToast === 'function') showToast('Rooms reordered.', 'success');
         }
 
+        function qdLineItemTextKey(value) {
+            return String(value || '')
+                .toLowerCase()
+                .replace(/\s+/g, ' ')
+                .replace(/[^\w\s]/g, '')
+                .trim();
+        }
+
+        function getVisibleLineItemNote(item, displayDescription) {
+            var note = String(item && item.notes || '').trim();
+            if (!note) return '';
+            var description = String(displayDescription || item.itemDescription || '').trim();
+            if (description && qdLineItemTextKey(note) === qdLineItemTextKey(description)) return '';
+            return note;
+        }
+
         function renderRooms() {
             const container = document.getElementById('roomsContainer');
             ensureUniqueRoomIds();
@@ -9571,7 +9587,8 @@ Example:
                             html += '<tr' + rowClass + rowStyle + '>';
                             html += '<td>' + displayNum + (isOptional ? ' <span class="badge bg-info" style="font-size:0.6em;">opt</span>' : '') + '</td>';
                             html += '<td><input type="checkbox" class="form-check-input choice-group-select" data-room-id="' + room.id + '" data-item-index="' + origIndex + '" title="Select for option group"></td>';
-                            var _hasDesc = !!(displayItemDescription || item.notes);
+                            const visibleJobNote = getVisibleLineItemNote(item, displayItemDescription);
+                            var _hasDesc = !!(displayItemDescription || visibleJobNote);
                             var _descId = 'itemdesc_' + room.id + '_' + origIndex;
                             html += '<td class="quote-item-desc-cell" style="cursor:' + (_hasDesc ? 'pointer' : 'default') + ';" ' + (_hasDesc ? 'onclick="toggleItemDesc(\''+_descId+'\')" title="Click to expand description"' : '') + '>';
                             html += '<strong>' + displayItemName + '</strong>';
@@ -9599,7 +9616,7 @@ Example:
                             }
                             if (_hasDesc) html += ' <small class="text-muted" id="' + _descId + '_icon">&#9660;</small>';
                             if (displayItemDescription) html += '<div id="' + _descId + '" class="quote-item-description" style="display:none;"><small class="text-muted fst-italic">' + qdTemplateEscapeHtml(displayItemDescription) + '</small></div>';
-                            if (item.notes) html += '<div id="' + _descId + '_notes" class="quote-item-job-note" style="display:none;"><small><i class="fas fa-sticky-note me-1"></i><strong>Job note:</strong> ' + qdTemplateEscapeHtml(item.notes || '') + '</small></div>';
+                            if (visibleJobNote) html += '<div id="' + _descId + '_notes" class="quote-item-job-note" style="display:none;"><small><i class="fas fa-sticky-note me-1"></i><strong>Job note:</strong> ' + qdTemplateEscapeHtml(visibleJobNote) + '</small></div>';
                             html += '</td>';
                             html += '<td class="quote-item-qty-cell">' + formatQuoteQuantityDisplay(item.quantity, item.unitType || item.unit || '') + '</td>';
                             var displayRateText = qdFormatMoney(displayRate);
@@ -12548,7 +12565,7 @@ Example:
         // Manage Items behavior lives in quote-items.js.
     </script>
     <script src="quote-items.js?v=1781395200"></script>
-    <script src="quote-import.js?v=1778200000"></script>
+    <script src="quote-import.js?v=1780019801"></script>
     <script>
         // Load templates from localStorage on startup
         let templates = JSON.parse(localStorage.getItem('ald_quote_templates') || '{}');
