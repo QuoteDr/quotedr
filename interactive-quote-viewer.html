@@ -930,6 +930,7 @@ if (location.search.includes('debug')) {
                 <span id="quoteTaxLabel">HST (13%)</span>
                 <strong id="quoteTaxDisplay">$0.00</strong>
             </div>
+            <div class="total-row" id="quotePaymentTotalDisplay" style="display:none;"></div>
             <div class="deposit-summary" id="depositSummary">
                 <div class="total-row py-0">
                     <span id="depositLabel">Deposit</span>
@@ -942,8 +943,8 @@ if (location.search.includes('debug')) {
             </div>
             <div class="total-final">
                 <div>
-                    <div class="total-final-label">Total</div>
-                    <div class="text-muted small">Includes tax and selected upgrades</div>
+                    <div class="total-final-label" id="viewerTotalFinalLabel">Total</div>
+                    <div class="text-muted small" id="viewerTotalFinalSubLabel">Includes tax and selected upgrades</div>
                 </div>
                 <div class="grand-total" id="newGrandTotal">$0.00</div>
             </div>
@@ -1733,6 +1734,23 @@ if (location.search.includes('debug')) {
             return adjustment.type === 'discount' ? -amount : amount;
         }
 
+        function getViewerPaymentsReceived() {
+            var payment = quoteData && (quoteData.paymentsReceived || quoteData.paymentReceived);
+            payment = payment || {};
+            var amount = viewerNumber(payment.amount || payment.value);
+            if (amount <= 0) amount = 0;
+            return {
+                name: String(payment.name || payment.label || 'Deposit paid').trim(),
+                amount: amount
+            };
+        }
+
+        function calculateViewerPaymentsReceivedAmount(total) {
+            var payment = getViewerPaymentsReceived();
+            if (!payment.amount) return 0;
+            return Math.min(payment.amount, Math.max(viewerNumber(total), 0));
+        }
+
         function viewerHasExplicitTotal(item) {
             return !!item && item.total !== undefined && item.total !== null && item.total !== '' && isFinite(parseFloat(item.total));
         }
@@ -2314,20 +2332,34 @@ if (location.search.includes('debug')) {
             updateTotal();
         }
 
-        function updateQuoteTotalBreakdown(subtotal, tax, total, taxLabel, taxRate) {
+        function updateQuoteTotalBreakdown(subtotal, tax, total, taxLabel, taxRate, paymentReceivedAmount) {
             var subtotalEl = document.getElementById('quoteSubtotalDisplay');
             var taxEl = document.getElementById('quoteTaxDisplay');
             var taxLabelEl = document.getElementById('quoteTaxLabel');
             var totalEl = document.getElementById('newGrandTotal');
+            var paymentEl = document.getElementById('quotePaymentTotalDisplay');
+            var finalLabelEl = document.getElementById('viewerTotalFinalLabel');
+            var finalSubLabelEl = document.getElementById('viewerTotalFinalSubLabel');
             var safeRate = parseFloat(taxRate);
             var rateLabel = isFinite(safeRate)
                 ? (safeRate * 100).toFixed(1).replace(/\.0$/, '')
                 : '13';
+            var paymentAmount = parseFloat(paymentReceivedAmount || 0) || 0;
+            var balanceDue = Math.max((parseFloat(total) || 0) - paymentAmount, 0);
 
             if (subtotalEl) subtotalEl.textContent = viewerMoney(subtotal || 0);
             if (taxEl) taxEl.textContent = viewerMoney(tax || 0);
             if (taxLabelEl) taxLabelEl.textContent = (taxLabel || 'HST') + ' (' + rateLabel + '%)';
-            if (totalEl) totalEl.textContent = viewerMoney(total || 0);
+            if (paymentEl) {
+                var payment = getViewerPaymentsReceived();
+                paymentEl.style.display = paymentAmount > 0 ? 'flex' : 'none';
+                paymentEl.innerHTML = paymentAmount > 0
+                    ? `<span>${escapeHtml(payment.name || 'Deposit paid')}</span><strong>${viewerMoney(-paymentAmount, { forceSign: true })}</strong>`
+                    : '';
+            }
+            if (finalLabelEl) finalLabelEl.textContent = paymentAmount > 0 ? 'Balance Due' : 'Total';
+            if (finalSubLabelEl) finalSubLabelEl.textContent = paymentAmount > 0 ? 'After payments received' : 'Includes tax and selected upgrades';
+            if (totalEl) totalEl.textContent = paymentAmount > 0 ? viewerMoney(balanceDue) : viewerMoney(total);
         }
 
         function updateTotal() {
@@ -2356,7 +2388,9 @@ if (location.search.includes('debug')) {
             const taxableSubtotal = subtotal + adjustmentAmount;
             const tax = taxableSubtotal * _vTaxRate;
             const total = taxableSubtotal + tax;
-            updateQuoteTotalBreakdown(subtotal, tax, total, _vTaxLabel, _vTaxRate);
+            const paymentReceivedAmount = calculateViewerPaymentsReceivedAmount(total);
+            const balanceDue = Math.max(total - paymentReceivedAmount, 0);
+            updateQuoteTotalBreakdown(subtotal, tax, total, _vTaxLabel, _vTaxRate, paymentReceivedAmount);
 
             var upgradesEl = document.getElementById('upgradesTotalDisplay');
             if (upgradesEl) {
@@ -2385,8 +2419,9 @@ if (location.search.includes('debug')) {
                 var showDeposit = depositMode === 'show';
                 depositSummary.style.display = showDeposit ? 'block' : 'none';
                 if (showDeposit) {
-                    var depositAmt = total * depositPct / 100;
-                    var remaining = Math.max(total - depositAmt, 0);
+                    var depositBasis = balanceDue;
+                    var depositAmt = depositBasis * depositPct / 100;
+                    var remaining = Math.max(depositBasis - depositAmt, 0);
                     var labelEl = document.getElementById('depositLabel');
                     var amountEl = document.getElementById('depositAmountDisplay');
                     var remainingEl = document.getElementById('remainingBalanceDisplay');
@@ -2425,7 +2460,7 @@ if (location.search.includes('debug')) {
                 return;
             }
             var heroTotal = document.getElementById('heroGrandTotal');
-            if (heroTotal) heroTotal.textContent = viewerMoney(total);
+            if (heroTotal) heroTotal.textContent = viewerMoney(balanceDue);
         }
 
         function downloadQuotePdf() {

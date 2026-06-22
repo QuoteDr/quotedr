@@ -594,11 +594,15 @@ if (location.search.includes('debug')) {
                 <span id="invoiceAdjustmentDisplay">$0.00</span>
             </div>
             <div class="total-row">
-                <span>HST (13%)</span>
+                <span id="invoiceTaxLabel">HST (13%)</span>
                 <span id="taxDisplay">$0.00</span>
             </div>
+            <div class="total-row" id="invoicePaymentReceivedRow" style="display:none;">
+                <span id="invoicePaymentReceivedLabel">Deposit paid</span>
+                <span id="invoicePaymentReceivedDisplay">-$0.00</span>
+            </div>
             <div class="total-row grand">
-                <span>Total Due</span>
+                <span id="invoiceBalanceLabel">Total Due</span>
                 <span id="grandTotalDisplay">$0.00</span>
             </div>
         </div>
@@ -798,6 +802,23 @@ if (location.search.includes('debug')) {
                 : (parseFloat(subtotal) || 0) * adjustment.percent / 100;
             if (!amount) return 0;
             return adjustment.type === 'discount' ? -amount : amount;
+        }
+
+        function getInvoicePaymentsReceived() {
+            var payment = invoiceData && (invoiceData.paymentsReceived || invoiceData.paymentReceived);
+            payment = payment || {};
+            var amount = parseFloat(payment.amount || payment.value);
+            if (!isFinite(amount) || amount <= 0) amount = 0;
+            return {
+                name: String(payment.name || payment.label || 'Deposit paid').trim(),
+                amount: amount
+            };
+        }
+
+        function calculateInvoicePaymentsReceivedAmount(total) {
+            var payment = getInvoicePaymentsReceived();
+            if (!payment.amount) return 0;
+            return Math.min(payment.amount, Math.max(parseFloat(total) || 0, 0));
         }
 
         function escapeHtml(value) {
@@ -1424,6 +1445,8 @@ if (location.search.includes('debug')) {
             const taxableSubtotal = subtotal + adjustmentAmount;
             const tax = taxableSubtotal * _iTaxRate;
             const total = taxableSubtotal + tax;
+            const paymentReceivedAmount = calculateInvoicePaymentsReceivedAmount(total);
+            const balanceDue = Math.max(total - paymentReceivedAmount, 0);
             document.getElementById('subtotalDisplay').textContent = formatMoney(subtotal, _iCurrency);
             var adjustment = getInvoiceQuoteAdjustment();
             var adjustmentRow = document.getElementById('invoiceAdjustmentRow');
@@ -1433,8 +1456,17 @@ if (location.search.includes('debug')) {
             var adjustmentDisplay = document.getElementById('invoiceAdjustmentDisplay');
             if (adjustmentDisplay) adjustmentDisplay.textContent = formatSignedMoney(adjustmentAmount, _iCurrency);
             document.getElementById('taxDisplay').textContent = formatMoney(tax, _iCurrency);
-            document.getElementById('grandTotalDisplay').textContent = formatMoney(total, _iCurrency);
-            var taxLabelRow = document.querySelector('.totals-section .total-row:nth-child(2) span:first-child');
+            var payment = getInvoicePaymentsReceived();
+            var paymentRow = document.getElementById('invoicePaymentReceivedRow');
+            if (paymentRow) paymentRow.style.display = paymentReceivedAmount > 0.0001 ? 'flex' : 'none';
+            var paymentLabel = document.getElementById('invoicePaymentReceivedLabel');
+            if (paymentLabel) paymentLabel.textContent = payment.name || 'Deposit paid';
+            var paymentDisplay = document.getElementById('invoicePaymentReceivedDisplay');
+            if (paymentDisplay) paymentDisplay.textContent = formatSignedMoney(-paymentReceivedAmount, _iCurrency);
+            var balanceLabel = document.getElementById('invoiceBalanceLabel');
+            if (balanceLabel) balanceLabel.textContent = paymentReceivedAmount > 0 ? 'Balance Due' : 'Total Due';
+            document.getElementById('grandTotalDisplay').textContent = formatMoney(balanceDue, _iCurrency);
+            var taxLabelRow = document.getElementById('invoiceTaxLabel');
             if (taxLabelRow) taxLabelRow.textContent = _iTaxLabel + ' (' + (_iTaxRate * 100).toFixed(1).replace(/\.0$/, '') + '%)';
             var noteSection = document.getElementById('invoiceNoteSection');
             var noteEl = document.getElementById('invoiceNoteDisplay');
@@ -1444,7 +1476,7 @@ if (location.search.includes('debug')) {
             if (noteEl) noteEl.textContent = settings.note || '';
             if (termsEl) termsEl.textContent = settings.paymentTerms ? 'Payment terms: ' + settings.paymentTerms : '';
             // Store total for payment helpers
-            window._invoiceTotal = total;
+            window._invoiceTotal = balanceDue;
             var depBtn = document.getElementById('depositRequestBtn');
             if (depBtn) depBtn.style.display = 'none';
         }

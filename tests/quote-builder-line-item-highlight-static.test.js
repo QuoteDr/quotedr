@@ -27,6 +27,26 @@ assert(
 );
 
 assert(
+  source.includes('id="lineItemHighlightModal"') &&
+    source.includes('function openLineItemHighlightModal(') &&
+    source.includes('function renderLineItemHighlightModalOptions(') &&
+    source.includes('data-room-id') &&
+    source.includes('data-item-index'),
+  'Line item highlight picker should open in a modal with a durable selected item context'
+);
+
+const highlightButtonSource = source.slice(
+  source.indexOf('function renderLineItemHighlightButton('),
+  source.indexOf('async function openProFeature(')
+);
+
+assert(
+  !source.includes('quote-item-highlight-menu') &&
+    !highlightButtonSource.includes('data-bs-toggle="dropdown"'),
+  'Line item highlight picker should not use a table-cell dropdown that can be clipped behind rows'
+);
+
+assert(
   source.includes('.quote-items-table tr.quote-item-highlighted > td') &&
     source.includes('--line-highlight-bg') &&
     source.includes('--line-highlight-border'),

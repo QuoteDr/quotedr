@@ -1394,8 +1394,22 @@
             border: 1px solid rgba(15, 23, 42, 0.25);
             vertical-align: -0.12rem;
         }
-        .quote-item-highlight-menu {
-            min-width: 12rem;
+        .line-item-highlight-option {
+            border: 1px solid #d8e2ee;
+            border-radius: 8px;
+            padding: 0.75rem;
+            background: #fff;
+            text-align: left;
+            min-height: 4.4rem;
+        }
+        .line-item-highlight-option.active {
+            border-color: #1a56a0;
+            box-shadow: 0 0 0 2px rgba(26, 86, 160, 0.18);
+        }
+        .line-item-highlight-option .quote-item-highlight-swatch {
+            width: 1.4rem;
+            height: 1.4rem;
+            border-radius: 6px;
         }
     @media (max-width: 768px) {
             .container-fluid { padding-left: 8px !important; padding-right: 8px !important; }
@@ -1995,6 +2009,24 @@ if (location.search.includes('debug')) {
                             </div>
                         </div>
                     </div>
+                    <div class="quote-adjustment-panel">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-7">
+                                <label class="form-label" for="quotePaymentName">Payment received</label>
+                                <input type="text" class="form-control form-control-sm" id="quotePaymentName" placeholder="Deposit paid" oninput="updateQuotePaymentsReceivedFromInputs()">
+                            </div>
+                            <div class="col-8 col-md-3">
+                                <label class="form-label" for="quotePaymentAmount">Amount</label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text" id="quotePaymentUnit">$</span>
+                                    <input type="number" class="form-control" id="quotePaymentAmount" min="0" step="0.01" placeholder="0.00" oninput="updateQuotePaymentsReceivedFromInputs()" onkeyup="if(event.key === 'Enter') this.blur();">
+                                </div>
+                            </div>
+                            <div class="col-4 col-md-2 d-grid">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearQuotePaymentsReceived()"><i class="fas fa-times me-1"></i>Clear</button>
+                            </div>
+                        </div>
+                    </div>
                     <div class="quote-total-breakdown">
                         <div class="quote-total-row">
                             <span>Subtotal</span>
@@ -2007,6 +2039,10 @@ if (location.search.includes('debug')) {
                         <div class="quote-total-row">
                             <span id="taxLabelDisplay">HST (13%)</span>
                             <span id="taxDisplay">$0.00</span>
+                        </div>
+                        <div class="quote-total-row" id="quotePaymentRow" style="display:none;">
+                            <span id="quotePaymentLabelDisplay">Deposit paid</span>
+                            <span id="quotePaymentDisplay">-$0.00</span>
                         </div>
                     </div>
                     <div id="changeOrderPriceSummary" class="change-order-price-summary" aria-live="polite"></div>
@@ -2027,8 +2063,8 @@ if (location.search.includes('debug')) {
 
                     <div class="quote-total-final">
                         <div>
-                            <div class="quote-total-final-label">Total</div>
-                            <small class="text-muted">Includes tax</small>
+                            <div class="quote-total-final-label" id="quoteTotalFinalLabel">Total</div>
+                            <small class="text-muted" id="quoteTotalFinalSubLabel">Includes tax</small>
                         </div>
                         <div id="grandTotalDisplay">$0.00</div>
                     </div>
@@ -2068,6 +2104,28 @@ if (location.search.includes('debug')) {
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Line Item Highlight Modal -->
+    <div class="modal fade" id="lineItemHighlightModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-sm modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="fas fa-highlighter me-2"></i>Highlight Item</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="small text-muted mb-2">Choose a faint highlight colour for this line item.</div>
+                    <div id="lineItemHighlightOptions" class="row g-2" data-room-id="" data-item-index=""></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" onclick="setActiveLineItemHighlight('')">
+                        <i class="fas fa-ban me-1"></i>Clear
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 </div>
             </div>
         </div>
@@ -7006,24 +7064,54 @@ Example:
             if (typeof markUnsaved === 'function') markUnsaved();
         }
 
-        function renderLineItemHighlightButton(roomId, itemIndex, item) {
-            const activeHighlight = getLineItemHighlight(item);
-            let html = '<div class="dropdown">';
-            html += '<button type="button" class="btn btn-sm ' + (activeHighlight ? 'btn-warning' : 'btn-outline-secondary') + ' quote-item-highlight-btn" data-bs-toggle="dropdown" data-bs-auto-close="true" onclick="event.stopPropagation()" title="' + (activeHighlight ? 'Highlighted: ' + qdTemplateEscapeHtml(activeHighlight.label) : 'Highlight line item') + '"><i class="fas fa-highlighter"></i></button>';
-            html += '<div class="dropdown-menu dropdown-menu-end quote-item-highlight-menu p-2" onclick="event.stopPropagation()">';
-            html += '<div class="small text-muted fw-semibold px-1 mb-1">Highlight item</div>';
+        function renderLineItemHighlightModalOptions(roomId, itemIndex) {
+            const room = rooms.find(r => r.id === roomId);
+            const item = room && room.items[itemIndex];
+            const optionsEl = document.getElementById('lineItemHighlightOptions');
+            if (!optionsEl || !item) return;
+            optionsEl.setAttribute('data-room-id', String(roomId));
+            optionsEl.setAttribute('data-item-index', String(itemIndex));
+            let html = '';
             Object.keys(LINE_ITEM_HIGHLIGHTS).forEach(function(key) {
                 const highlight = LINE_ITEM_HIGHLIGHTS[key];
-                const isActive = item && item.highlightColor === key;
-                html += '<button type="button" class="dropdown-item d-flex align-items-center gap-2 rounded ' + (isActive ? 'active' : '') + '" onclick="setLineItemHighlight(' + roomId + ', ' + itemIndex + ', \'' + key + '\')">';
+                const isActive = item.highlightColor === key;
+                html += '<div class="col-6">';
+                html += '<button type="button" class="line-item-highlight-option w-100 ' + (isActive ? 'active' : '') + '" onclick="setActiveLineItemHighlight(\'' + key + '\')">';
+                html += '<span class="d-flex align-items-center gap-2">';
                 html += '<span class="quote-item-highlight-swatch" style="background:' + (highlight.swatch || highlight.background) + '; border-color:' + highlight.border + ';"></span>';
-                html += '<span>' + qdTemplateEscapeHtml(highlight.label) + '</span>';
+                html += '<span class="fw-semibold">' + qdTemplateEscapeHtml(highlight.label) + '</span>';
+                html += '</span>';
                 html += '</button>';
+                html += '</div>';
             });
-            html += '<div class="dropdown-divider"></div>';
-            html += '<button type="button" class="dropdown-item text-muted rounded" onclick="setLineItemHighlight(' + roomId + ', ' + itemIndex + ', \'\')"><i class="fas fa-ban me-2"></i>Clear highlight</button>';
-            html += '</div></div>';
-            return html;
+            optionsEl.innerHTML = html;
+        }
+
+        function openLineItemHighlightModal(roomId, itemIndex) {
+            const room = rooms.find(r => r.id === roomId);
+            if (!room || !room.items[itemIndex]) return;
+            renderLineItemHighlightModalOptions(roomId, itemIndex);
+            const modalEl = document.getElementById('lineItemHighlightModal');
+            if (!modalEl || !window.bootstrap) return;
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
+
+        function setActiveLineItemHighlight(colorKey) {
+            const optionsEl = document.getElementById('lineItemHighlightOptions');
+            const roomId = parseInt(optionsEl && optionsEl.getAttribute('data-room-id'), 10);
+            const itemIndex = parseInt(optionsEl && optionsEl.getAttribute('data-item-index'), 10);
+            if (!Number.isFinite(roomId) || !Number.isFinite(itemIndex)) return;
+            setLineItemHighlight(roomId, itemIndex, colorKey);
+            const modalEl = document.getElementById('lineItemHighlightModal');
+            if (modalEl && window.bootstrap) {
+                const instance = bootstrap.Modal.getInstance(modalEl);
+                if (instance) instance.hide();
+            }
+        }
+
+        function renderLineItemHighlightButton(roomId, itemIndex, item) {
+            const activeHighlight = getLineItemHighlight(item);
+            return '<button type="button" class="btn btn-sm ' + (activeHighlight ? 'btn-warning' : 'btn-outline-secondary') + ' quote-item-highlight-btn" onclick="event.stopPropagation(); openLineItemHighlightModal(' + roomId + ', ' + itemIndex + ')" title="' + (activeHighlight ? 'Highlighted: ' + qdTemplateEscapeHtml(activeHighlight.label) : 'Highlight line item') + '"><i class="fas fa-highlighter"></i></button>';
         }
 
         async function openProFeature(feature, label, callback) {
@@ -8108,6 +8196,63 @@ Example:
             if (typeof markUnsaved === 'function') markUnsaved();
         }
 
+        function getQuotePaymentsReceived() {
+            var nameEl = document.getElementById('quotePaymentName');
+            var amountEl = document.getElementById('quotePaymentAmount');
+            var amount = parseFloat(amountEl && amountEl.value);
+            if (!isFinite(amount) || amount <= 0) amount = 0;
+            return {
+                name: (nameEl && nameEl.value ? nameEl.value.trim() : '') || 'Deposit paid',
+                amount: amount
+            };
+        }
+
+        function setQuotePaymentsReceived(payment) {
+            var nameEl = document.getElementById('quotePaymentName');
+            var amountEl = document.getElementById('quotePaymentAmount');
+            payment = payment || {};
+            var amount = parseFloat(payment.amount || payment.value || 0);
+            if (!isFinite(amount) || amount <= 0) amount = 0;
+            if (nameEl) nameEl.value = payment.name || payment.label || '';
+            if (amountEl) amountEl.value = amount || '';
+            updateQuotePaymentCurrencyUI();
+            calculateTotals();
+        }
+
+        function updateQuotePaymentCurrencyUI() {
+            var unitEl = document.getElementById('quotePaymentUnit');
+            if (unitEl) unitEl.textContent = getQuoteAdjustmentCurrencySymbol();
+        }
+
+        function calculateQuotePaymentsReceivedAmount(total) {
+            var payment = getQuotePaymentsReceived();
+            var amount = parseFloat(payment.amount) || 0;
+            if (!amount) return 0;
+            return Math.min(amount, Math.max(parseFloat(total) || 0, 0));
+        }
+
+        function updateQuotePaymentsReceivedDisplay(paymentReceivedAmount, symbol) {
+            var payment = getQuotePaymentsReceived();
+            var row = document.getElementById('quotePaymentRow');
+            var label = document.getElementById('quotePaymentLabelDisplay');
+            var value = document.getElementById('quotePaymentDisplay');
+            var show = paymentReceivedAmount > 0.0001;
+            if (row) row.style.display = show ? 'flex' : 'none';
+            if (label) label.textContent = payment.name || 'Deposit paid';
+            if (value) value.textContent = qdFormatMoney(-paymentReceivedAmount, symbol);
+        }
+
+        function updateQuotePaymentsReceivedFromInputs() {
+            updateQuotePaymentCurrencyUI();
+            calculateTotals();
+            if (typeof markUnsaved === 'function') markUnsaved();
+        }
+
+        function clearQuotePaymentsReceived() {
+            setQuotePaymentsReceived({ name: '', amount: 0 });
+            if (typeof markUnsaved === 'function') markUnsaved();
+        }
+
         function calculateTotals() {
             refreshChoiceGroupTotals();
             let subtotal = 0;
@@ -8140,6 +8285,8 @@ Example:
             const taxableSubtotal = subtotal + adjustmentAmount;
             const tax = taxableSubtotal * _taxRate;
             const total = taxableSubtotal + tax;
+            const paymentReceivedAmount = calculateQuotePaymentsReceivedAmount(total);
+            const balanceDue = Math.max(total - paymentReceivedAmount, 0);
 
             document.getElementById('subtotalDisplay').textContent = window._quoteDocumentType === 'change_order'
                 ? coMoney(subtotal, _sym, true)
@@ -8147,20 +8294,26 @@ Example:
             var taxLabelEl = document.getElementById('taxLabelDisplay');
             if (taxLabelEl) taxLabelEl.textContent = _taxLabel + ' (' + (_taxRate*100).toFixed(1).replace(/\.0$/,'') + '%)';
             updateQuoteAdjustmentDisplay(adjustmentAmount, _sym);
+            updateQuotePaymentCurrencyUI();
             document.getElementById('taxDisplay').textContent = window._quoteDocumentType === 'change_order'
                 ? coMoney(tax, _sym, true)
                 : qdFormatMoney(tax, _sym);
+            updateQuotePaymentsReceivedDisplay(paymentReceivedAmount, _sym);
+            var finalLabelEl = document.getElementById('quoteTotalFinalLabel');
+            var finalSubLabelEl = document.getElementById('quoteTotalFinalSubLabel');
+            if (finalLabelEl) finalLabelEl.textContent = paymentReceivedAmount > 0 ? 'Balance Due' : 'Total';
+            if (finalSubLabelEl) finalSubLabelEl.textContent = paymentReceivedAmount > 0 ? 'After payments received' : 'Includes tax';
             document.getElementById('grandTotalDisplay').textContent = window._quoteDocumentType === 'change_order'
-                ? coMoney(total, _sym, true)
-                : qdFormatMoney(total, _sym);
+                ? coMoney(balanceDue, _sym, true)
+                : qdFormatMoney(balanceDue, _sym);
 
             // Keep sticky total bar in sync
             const stickyAmt = document.getElementById('stickyTotalAmount');
             const stickySub = document.getElementById('stickySubtotal');
             const stickyTax = document.getElementById('stickyTax');
             if (stickyAmt) stickyAmt.textContent = window._quoteDocumentType === 'change_order'
-                ? coMoney(total, _sym, true)
-                : qdFormatMoney(total, _sym);
+                ? coMoney(balanceDue, _sym, true)
+                : qdFormatMoney(balanceDue, _sym);
             if (stickySub) stickySub.textContent = 'Subtotal: ' + (window._quoteDocumentType === 'change_order' ? coMoney(subtotal, _sym, true) : qdFormatMoney(subtotal, _sym));
             if (stickyTax) stickyTax.textContent = _taxLabel + ': ' + (window._quoteDocumentType === 'change_order' ? coMoney(tax, _sym, true) : qdFormatMoney(tax, _sym));
             updateChangeOrderPriceSummary({
@@ -8176,9 +8329,9 @@ Example:
 
             // Update deposit calculator
             const depositBtn = document.getElementById('depositToggleBtn');
-            if (depositBtn) depositBtn.style.display = total > 0 ? 'inline-block' : 'none';
-            const depositAmt = total * (depositPercentage / 100);
-            const remaining = total - depositAmt;
+            if (depositBtn) depositBtn.style.display = balanceDue > 0 ? 'inline-block' : 'none';
+            const depositAmt = balanceDue * (depositPercentage / 100);
+            const remaining = balanceDue - depositAmt;
             const depositAmtEl = document.getElementById('depositAmountDisplay');
             const remainingEl = document.getElementById('remainingBalanceDisplay');
             if (depositAmtEl) depositAmtEl.textContent = qdFormatMoney(depositAmt, '').trim();
@@ -10082,6 +10235,7 @@ Example:
                 rooms: JSON.parse(JSON.stringify(rooms || [])),
                 categoryStyles: JSON.parse(JSON.stringify(categoryStyles || {})),
                 quoteAdjustment: getQuoteClientAdjustment(),
+                paymentsReceived: getQuotePaymentsReceived(),
                 grandTotal: parseFloat(document.getElementById('grandTotalDisplay')?.textContent.replace(/[^0-9.]/g, '')) || 0,
                 terms: getSelectedTerms(),
                 taxRate: taxPrefs.rate,
@@ -10752,6 +10906,7 @@ Example:
                 phone: document.getElementById('clientPhone')?.value || '',
                 rooms: JSON.parse(JSON.stringify(rooms)),
                 quoteAdjustment: getQuoteClientAdjustment(),
+                paymentsReceived: getQuotePaymentsReceived(),
                 grandTotal: parseFloat(document.getElementById('grandTotalDisplay').textContent.replace(/[^0-9.]/g, '')) || 0,
                 total: parseFloat(document.getElementById('grandTotalDisplay').textContent.replace(/[^0-9.]/g, '')) || 0,
                 status: 'draft',
@@ -10856,6 +11011,7 @@ Example:
                 rooms.push(newRoom);
             });
             setQuoteClientAdjustment(quote.quoteAdjustment || quote.clientAdjustment || null);
+            setQuotePaymentsReceived(quote.paymentsReceived || quote.paymentReceived || null);
 
             renderRooms();
             updateChangeOrderModeUI();
@@ -10891,6 +11047,7 @@ Example:
                 rooms.push(newRoom);
             });
             setQuoteClientAdjustment(quote.quoteAdjustment || quote.clientAdjustment || null);
+            setQuotePaymentsReceived(quote.paymentsReceived || quote.paymentReceived || null);
 
             renderRooms();
             return true;
@@ -10909,6 +11066,7 @@ Example:
                 phone: document.getElementById('clientPhone')?.value || '',
                 rooms: JSON.parse(JSON.stringify(rooms)), // Deep copy
                 quoteAdjustment: getQuoteClientAdjustment(),
+                paymentsReceived: getQuotePaymentsReceived(),
                 grandTotal: parseFloat(document.getElementById('grandTotalDisplay').textContent.replace(/[^0-9.]/g, '')) || 0,
                 savedAt: new Date().toISOString()
             };

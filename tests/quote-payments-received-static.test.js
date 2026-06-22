@@ -1,0 +1,59 @@
+const fs = require('fs');
+const assert = require('assert');
+
+const builder = fs.readFileSync('quote-builder.html', 'utf8');
+const storage = fs.readFileSync('quote-storage.js', 'utf8');
+const viewer = fs.readFileSync('interactive-quote-viewer.html', 'utf8');
+const invoice = fs.readFileSync('invoice-viewer.html', 'utf8');
+
+assert(
+  builder.includes('id="quotePaymentName"') &&
+  builder.includes('id="quotePaymentAmount"') &&
+  builder.includes('id="quotePaymentRow"') &&
+  builder.includes('id="quotePaymentDisplay"') &&
+  builder.includes('id="quoteTotalFinalLabel"'),
+  'Builder should include client-visible payment received controls, row, and balance label'
+);
+
+assert(
+  builder.includes('function getQuotePaymentsReceived()') &&
+  builder.includes('function setQuotePaymentsReceived(payment)') &&
+  builder.includes('function calculateQuotePaymentsReceivedAmount(total)') &&
+  builder.includes('function updateQuotePaymentsReceivedFromInputs()'),
+  'Builder should collect, hydrate, calculate, and update payments received'
+);
+
+assert(
+  builder.includes('const paymentReceivedAmount = calculateQuotePaymentsReceivedAmount(total);') &&
+  builder.includes('const balanceDue = Math.max(total - paymentReceivedAmount, 0);') &&
+  builder.includes("finalLabelEl.textContent = paymentReceivedAmount > 0 ? 'Balance Due' : 'Total';"),
+  'Builder should subtract payments after tax and relabel the final total as Balance Due'
+);
+
+assert(
+  storage.includes('paymentsReceived: getQuotePaymentsReceived()') &&
+  storage.includes('setQuotePaymentsReceived(data.paymentsReceived || data.paymentReceived || null);'),
+  'Quote storage should persist and hydrate payments received'
+);
+
+assert(
+  builder.includes('paymentsReceived: getQuotePaymentsReceived()'),
+  'Generated quote and invoice data should include payments received'
+);
+
+assert(
+  viewer.includes('function getViewerPaymentsReceived()') &&
+  viewer.includes('id="quotePaymentTotalDisplay"') &&
+  viewer.includes('const paymentReceivedAmount = calculateViewerPaymentsReceivedAmount(total);') &&
+  viewer.includes('const balanceDue = Math.max(total - paymentReceivedAmount, 0);'),
+  'Interactive quote viewer should render payments received and show balance due'
+);
+
+assert(
+  invoice.includes('function getInvoicePaymentsReceived()') &&
+  invoice.includes('id="invoicePaymentReceivedRow"') &&
+  invoice.includes('id="invoiceBalanceLabel"') &&
+  invoice.includes('const paymentReceivedAmount = calculateInvoicePaymentsReceivedAmount(total);') &&
+  invoice.includes('const balanceDue = Math.max(total - paymentReceivedAmount, 0);'),
+  'Invoice viewer should render payments received and use balance due for final/payment helpers'
+);
