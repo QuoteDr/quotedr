@@ -175,6 +175,18 @@
         }
         @media print {
             .invoice-sticky-nav { display: none !important; }
+            .item-desc-toggle { display: none !important; }
+            .item-desc-wrap.is-collapsed .item-desc-collapsible {
+                max-height: none !important;
+                overflow: visible !important;
+            }
+            .item-desc-wrap.is-collapsed .item-desc-collapsible::after {
+                display: none !important;
+            }
+            .invoice-line-items tr.invoice-line-item-highlighted > td {
+                print-color-adjust: exact;
+                -webkit-print-color-adjust: exact;
+            }
         }
 
         .item-row {
@@ -211,6 +223,12 @@
         .invoice-line-items {
             table-layout: fixed;
             width: 100%;
+        }
+        .invoice-line-items tr.invoice-line-item-highlighted > td {
+            background: var(--invoice-line-highlight-bg, rgba(255, 216, 77, 0.16)) !important;
+        }
+        .invoice-line-items tr.invoice-line-item-highlighted > td:first-child {
+            border-left: 4px solid var(--invoice-line-highlight-border, #f2c94c);
         }
         .invoice-line-items th,
         .invoice-line-items td {
@@ -775,6 +793,20 @@ if (location.search.includes('debug')) {
         function formatSignedMoney(amount, currency) {
             var value = Number(amount || 0);
             return (value > 0 ? '+' : '') + formatMoney(value, currency);
+        }
+
+        const INVOICE_LINE_ITEM_HIGHLIGHTS = {
+            yellow: { label: 'Yellow', background: 'rgba(255, 216, 77, 0.16)', border: '#f2c94c' },
+            green: { label: 'Green', background: 'rgba(59, 178, 115, 0.13)', border: '#3bb273' },
+            blue: { label: 'Blue', background: 'rgba(79, 141, 247, 0.13)', border: '#4f8df7' },
+            pink: { label: 'Pink', background: 'rgba(231, 90, 156, 0.13)', border: '#e75a9c' },
+            orange: { label: 'Orange', background: 'rgba(245, 158, 11, 0.14)', border: '#f59e0b' },
+            purple: { label: 'Purple', background: 'rgba(139, 92, 246, 0.13)', border: '#8b5cf6' }
+        };
+
+        function getInvoiceLineItemHighlight(item) {
+            if (!item || !item.highlightColor) return null;
+            return INVOICE_LINE_ITEM_HIGHLIGHTS[item.highlightColor] || null;
         }
 
         function getInvoiceQuoteAdjustment() {
@@ -1399,12 +1431,20 @@ if (location.search.includes('debug')) {
                     const displayName = isUpgraded && item.upgrade ? item.upgrade.name : (item.description || item.name || 'Item');
                     const displayDesc = getInvoiceItemDescription(item, originalUpgradeItem, isUpgraded);
                     const choiceGroupSelection = item.choiceGroupSelection || null;
+                    const lineItemHighlight = getInvoiceLineItemHighlight(item);
+                    const rowClassNames = [];
+                    const rowStyles = [];
+                    if (lineItemHighlight) {
+                        rowClassNames.push('invoice-line-item-highlighted');
+                        rowStyles.push('--invoice-line-highlight-bg: ' + lineItemHighlight.background);
+                        rowStyles.push('--invoice-line-highlight-border: ' + lineItemHighlight.border);
+                    }
                     const descHtml = settings.showDescriptions !== false
                         ? (renderCollapsibleDescription(displayDesc) + renderCollapsibleDescription(item.notes, '<i class="fas fa-info-circle"></i> '))
                         : '';
 
                     html += `
-                            <tr>
+                            <tr${rowClassNames.length ? ` class="${rowClassNames.join(' ')}"` : ''}${rowStyles.length ? ` style="${rowStyles.join('; ')}"` : ''}>
                                 <td>
                                     <span class="item-name">${escapeHtml(displayName)}</span>
                                     ${item.photo ? `<div class="mt-1"><img src="${item.photo}" style="max-width:100px;max-height:70px;border-radius:4px;" alt=""></div>` : ''}
