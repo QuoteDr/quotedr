@@ -3,6 +3,7 @@ const assert = require('assert');
 
 const builder = fs.readFileSync('quote-builder.html', 'utf8');
 const storage = fs.readFileSync('quote-storage.js', 'utf8');
+const supabaseV2 = fs.readFileSync('supabase-v2.js', 'utf8');
 const viewer = fs.readFileSync('interactive-quote-viewer.html', 'utf8');
 const invoice = fs.readFileSync('invoice-viewer.html', 'utf8');
 
@@ -24,7 +25,7 @@ assert(
 );
 
 assert(
-  builder.includes('const paymentReceivedAmount = calculateQuotePaymentsReceivedAmount(total);') &&
+  builder.includes('paymentReceivedAmount = calculateQuotePaymentsReceivedAmount(total);') &&
   builder.includes('const balanceDue = Math.max(total - paymentReceivedAmount, 0);') &&
   builder.includes("finalLabelEl.textContent = paymentReceivedAmount > 0 ? 'Balance Due' : 'Total';"),
   'Builder should subtract payments after tax and relabel the final total as Balance Due'
@@ -34,6 +35,18 @@ assert(
   storage.includes('paymentsReceived: getQuotePaymentsReceived()') &&
   storage.includes('setQuotePaymentsReceived(data.paymentsReceived || data.paymentReceived || null);'),
   'Quote storage should persist and hydrate payments received'
+);
+
+assert(
+  supabaseV2.includes('paymentsReceived: quoteData.paymentsReceived || quoteData.paymentReceived || null'),
+  'Supabase quote save payload should preserve payments received inside quote data'
+);
+
+assert(
+  storage.includes('qData._paymentBalanceDueFallback = data.total;') &&
+  builder.includes('window._quotePaymentFallbackBalanceDue') &&
+  builder.includes("name: 'Deposit paid'"),
+  'Builder should infer missing payment metadata from a lower saved cloud balance for quotes saved before this field existed'
 );
 
 assert(

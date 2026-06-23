@@ -8285,7 +8285,18 @@ Example:
             const taxableSubtotal = subtotal + adjustmentAmount;
             const tax = taxableSubtotal * _taxRate;
             const total = taxableSubtotal + tax;
-            const paymentReceivedAmount = calculateQuotePaymentsReceivedAmount(total);
+            var paymentReceivedAmount = calculateQuotePaymentsReceivedAmount(total);
+            if (paymentReceivedAmount <= 0.0001 && window._quotePaymentFallbackBalanceDue !== null && window._quotePaymentFallbackBalanceDue !== undefined) {
+                var fallbackBalanceDue = parseFloat(window._quotePaymentFallbackBalanceDue) || 0;
+                window._quotePaymentFallbackBalanceDue = null;
+                if (fallbackBalanceDue >= 0 && fallbackBalanceDue < total - 0.005) {
+                    setQuotePaymentsReceived({
+                        name: 'Deposit paid',
+                        amount: Math.round((total - fallbackBalanceDue) * 100) / 100
+                    });
+                    paymentReceivedAmount = calculateQuotePaymentsReceivedAmount(total);
+                }
+            }
             const balanceDue = Math.max(total - paymentReceivedAmount, 0);
 
             document.getElementById('subtotalDisplay').textContent = window._quoteDocumentType === 'change_order'

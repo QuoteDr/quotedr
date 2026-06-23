@@ -4,6 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "https://axmoffknvblluibuitrq.supabase.co";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -125,6 +126,194 @@ function quoteEmail(row: QuoteRow) {
 function quoteName(row: QuoteRow) {
   const data = rowData(row);
   return String(data.portal_client_name || row.client_name || data.clientName || data.client_name || "").trim().toLowerCase();
+}
+
+function displayQuoteName(row: QuoteRow) {
+  const data = rowData(row);
+  return String(data.portal_client_name || row.client_name || data.clientName || data.client_name || "Client").trim();
+}
+
+function quoteTitle(row: QuoteRow) {
+  const data = rowData(row);
+  return String(data.quoteTitle || data.title || row.client_name || row.quote_number || "Untitled document").trim();
+}
+
+function documentTypeLabel(row: QuoteRow) {
+  const data = rowData(row);
+  const raw = String(row.type || data.documentType || data.type || "quote").toLowerCase();
+  if (raw.includes("invoice")) return "invoice";
+  if (raw.includes("change")) return "change order";
+  return "quote";
+}
+
+function eventLabel(eventType: string) {
+  if (eventType === "viewed") return "opened";
+  if (eventType === "declined") return "declined";
+  if (eventType === "note_added") return "left a note on";
+  if (eventType === "payment_paid") return "made a payment on";
+  return "accepted";
+}
+
+function prefKeyForEvent(eventType: string) {
+  if (eventType === "viewed") return "email_on_viewed";
+  if (eventType === "declined") return "email_on_declined";
+  if (eventType === "note_added") return "email_on_note";
+  return "email_on_accepted";
+}
+
+function defaultPrefs() {
+  return {
+    email_on_viewed: false,
+    email_on_accepted: true,
+    email_on_declined: true,
+    email_on_note: true,
+    email_to: "",
+  };
+}
+
+function escapeHtml(value: unknown) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function clientNoteSummary(dataPatch: Record<string, unknown>) {
+  const roomNotes = dataPatch._roomNotes;
+  if (!roomNotes || typeof roomNotes !== "object" || Array.isArray(roomNotes)) return "";
+  const snippets = Object.values(roomNotes as Record<string, unknown>)
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+  if (!snippets.length) return "";
+  const joined = snippets.join(" | ");
+  return joined.length > 240 ? joined.slice(0, 237) + "..." : joined;
+}
+
+function detectClientNoteActivity(dataPatch: unknown) {
+  if (!dataPatch || typeof dataPatch !== "object" || Array.isArray(dataPatch)) return "";
+  return clientNoteSummary(dataPatch as Record<string, unknown>);
+}
+
+async function maybeSendClientActivityEmail(
+  supabase: ReturnType<typeof adminClient>,
+  eventRow: Record<string, unknown>,
+  row: QuoteRow,
+  prefs: Record<string, unknown>,
+) {
+  if (!RESEND_API_KEY) return { sent: false, error: "RESEND_API_KEY is not configured" };
+  const eventType = String(eventRow.event_type || "");
+  const enabled = prefs[prefKeyForEvent(eventType)] === true;
+  if (!enabled) return { sent: false };
+
+  let recipient = String(prefs.email_to || "").trim();
+  if (!recipient) {
+    const { data, error } = await supabase.auth.admin.getUserById(row.user_id);
+    if (error) return { sent: false, error: error.message };
+    recipient = String(data?.user?.email || "").trim();
+  }
+  if (!recipient) return { sent: false, error: "No alert email recipient configured" };
+
+  const client = String(eventRow.client_name || "Client");
+  const docType = String(eventRow.document_type || documentTypeLabel(row)).replace(/_/g, " ");
+  const quoteNumber = String(eventRow.quote_number || "").trim();
+  const action = eventLabel(eventType);
+  const message = String(eventRow.message || "");
+  const subject = `QuoteDr alert: ${client} ${action} your ${docType}${quoteNumber ? " #" + quoteNumber : ""}`;
+  const html = `
+    <div style="font-family:Arial,sans-serif;line-height:1.5;color:#102033;">
+      <h2 style="margin:0 0 12px;">QuoteDr client activity</h2>
+      <p><strong>${escapeHtml(client)}</strong> ${escapeHtml(action)} your ${escapeHtml(docType)}.</p>
+      ${quoteNumber ? `<p><strong>Document:</strong> ${escapeHtml(quoteNumber)}</p>` : ""}
+      <p><strong>File:</strong> ${escapeHtml(eventRow.document_title || "")}</p>
+      ${message ? `<p><strong>Note:</strong> ${escapeHtml(message)}</p>` : ""}
+      <p style="color:#64748b;font-size:13px;">You can adjust these alerts from QuoteDr dashboard alerts.</p>
+    </div>
+  `;
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: "QuoteDr Alerts <quotes@quotedr.io>",
+      to: [recipient],
+      subject,
+      html,
+    }),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) return { sent: false, error: String(result?.message || "Email alert failed") };
+  return { sent: true };
+}
+
+async function recordClientActivity(
+  supabase: ReturnType<typeof adminClient>,
+  row: QuoteRow,
+  eventType: string,
+  details: Record<string, unknown> = {},
+) {
+  try {
+    if (eventType === "viewed") {
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data: recent } = await supabase
+        .from("client_activity_events")
+        .select("id")
+        .eq("document_id", row.id)
+        .eq("event_type", "viewed")
+        .gte("created_at", since)
+        .limit(1);
+      if (recent && recent.length) return null;
+    }
+
+    const message = String(details.message || "");
+    const eventRow = {
+      user_id: row.user_id,
+      document_id: row.id,
+      document_type: documentTypeLabel(row).replace(" ", "_"),
+      event_type: eventType,
+      client_name: displayQuoteName(row),
+      client_email: quoteEmail(row),
+      quote_number: row.quote_number || "",
+      document_title: quoteTitle(row),
+      message,
+      metadata: details.metadata && typeof details.metadata === "object" ? details.metadata : {},
+    };
+
+    const { data: inserted, error } = await supabase
+      .from("client_activity_events")
+      .insert(eventRow)
+      .select("*")
+      .maybeSingle();
+    if (error) throw error;
+    if (!inserted) return null;
+
+    const { data: prefRow } = await supabase
+      .from("client_notification_preferences")
+      .select("*")
+      .eq("user_id", row.user_id)
+      .maybeSingle();
+    const prefs = { ...defaultPrefs(), ...(prefRow || {}) };
+    const email = await maybeSendClientActivityEmail(supabase, inserted as Record<string, unknown>, row, prefs);
+    if (email.sent) {
+      await supabase
+        .from("client_activity_events")
+        .update({ email_sent_at: new Date().toISOString(), email_error: null })
+        .eq("id", (inserted as Record<string, unknown>).id);
+    } else if (email.error && prefs[prefKeyForEvent(eventType)] === true) {
+      await supabase
+        .from("client_activity_events")
+        .update({ email_error: email.error })
+        .eq("id", (inserted as Record<string, unknown>).id);
+    }
+    return inserted;
+  } catch (error) {
+    console.error("client activity record failed:", error);
+    return null;
+  }
 }
 
 function portalId(row: QuoteRow) {
@@ -520,7 +709,31 @@ async function updateDocument(req: Request, body: Record<string, unknown>) {
     .select("*")
     .maybeSingle();
   if (error) throw error;
-  return json({ document: sanitizeQuoteRow(data as QuoteRow) });
+  const updatedRow = data as QuoteRow;
+
+  if (action === "mark_viewed") {
+    await recordClientActivity(supabase, updatedRow, "viewed", { metadata: { viewed_at: now } });
+  } else if (action === "client_update") {
+    const topLevel = body.topLevel && typeof body.topLevel === "object" ? body.topLevel as Record<string, unknown> : {};
+    const patch = body.dataPatch && typeof body.dataPatch === "object" ? body.dataPatch as Record<string, unknown> : {};
+    const status = String(topLevel.status || patch.status || "").toLowerCase();
+    if (status === "accepted" || status === "approved") {
+      await recordClientActivity(supabase, updatedRow, status === "approved" ? "approved" : "accepted", {
+        metadata: { signed_at: now, accepted_by: topLevel.accepted_by || "" },
+      });
+    }
+    const noteMessage = detectClientNoteActivity(body.dataPatch);
+    if (noteMessage) {
+      await recordClientActivity(supabase, updatedRow, "note_added", {
+        message: noteMessage,
+        metadata: { submitted_at: now },
+      });
+    }
+  } else if (action === "decline_change_order") {
+    await recordClientActivity(supabase, updatedRow, "declined", { metadata: { declined_at: now } });
+  }
+
+  return json({ document: sanitizeQuoteRow(updatedRow) });
 }
 
 serve(async (req) => {

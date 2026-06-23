@@ -1341,6 +1341,22 @@ if (location.search.includes('debug')) {
             document.getElementById('photoLightbox').style.display = 'flex';
         }
 
+        function isInvoiceContractorPreviewView(params) {
+            params = params || new URLSearchParams(window.location.search);
+            return params.get('preview') === '1' || params.get('admin_preview') === '1' || params.get('adminPreview') === '1';
+        }
+
+        async function markInvoiceViewed(invoiceId) {
+            try {
+                const params = new URLSearchParams(window.location.search);
+                if (isInvoiceContractorPreviewView(params)) return;
+                const token = params.get('token') || '';
+                const portalAnchorId = params.get('portal_anchor') || '';
+                if (!invoiceId || !token || typeof updateSecureClientDocument !== 'function') return;
+                await updateSecureClientDocument(invoiceId, token, 'mark_viewed', {}, portalAnchorId);
+            } catch(e) { console.warn('Could not mark invoice viewed:', e); }
+        }
+
         function loadInvoice() {
             const params = new URLSearchParams(window.location.search);
             const supabaseId = params.get('id');
@@ -1398,6 +1414,7 @@ if (location.search.includes('debug')) {
                     var contractorId = row.user_id;
                     var invTotal = invoiceData.grandTotal || invoiceData.total || 0;
                     if (contractorId && invTotal) initInvoicePaymentSection(contractorId, invTotal, supabaseId);
+                    markInvoiceViewed(supabaseId);
                 }).catch(function(e) {
                     console.error('Supabase invoice load error:', e);
                     if (!tryLocalStorageFallback()) {

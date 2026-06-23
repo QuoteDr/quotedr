@@ -249,6 +249,10 @@
             roomCounter = data.roomCounter || rooms.length;
             setQuoteClientAdjustment(data.quoteAdjustment || data.clientAdjustment || null);
             setQuotePaymentsReceived(data.paymentsReceived || data.paymentReceived || null);
+            window._quotePaymentFallbackBalanceDue = null;
+            if (!data.paymentsReceived && !data.paymentReceived && data._paymentBalanceDueFallback !== undefined && data._paymentBalanceDueFallback !== null && data._paymentBalanceDueFallback !== '') {
+                window._quotePaymentFallbackBalanceDue = parseQuoteMoney(data._paymentBalanceDueFallback);
+            }
             window._quoteDocumentType = data.type || data.documentType || 'quote';
             window._parentQuoteId = data.parentQuoteId || data.parent_quote_id || '';
             window._parentQuoteNumber = data.parentQuoteNumber || '';
@@ -848,6 +852,9 @@ async function saveQuote() {
                         qData.documentType = qData.type;
                         qData.parentQuoteId = data.parent_quote_id || qData.parentQuoteId || '';
                         qData.changeOrderNumber = data.change_order_number || qData.changeOrderNumber || null;
+                        if (!qData.paymentsReceived && !qData.paymentReceived && data.total !== undefined && data.total !== null) {
+                            qData._paymentBalanceDueFallback = data.total;
+                        }
                         if (!qData.projectAddress) qData.projectAddress = qData.project_address || '';
                         if (!qData.clientEmail) qData.clientEmail = qData.email || '';
                         if (!qData.clientPhone) qData.clientPhone = qData.phone || '';

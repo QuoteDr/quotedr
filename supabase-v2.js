@@ -185,6 +185,96 @@ async function loadSecureClientPortal(documentId, token) {
     }
 }
 
+const CLIENT_ACTIVITY_DEFAULT_PREFS = {
+    email_on_viewed: false,
+    email_on_accepted: true,
+    email_on_declined: true,
+    email_on_note: true,
+    email_to: ''
+};
+
+function clientActivityDefaultPreferences() {
+    return Object.assign({}, CLIENT_ACTIVITY_DEFAULT_PREFS);
+}
+
+async function loadClientNotificationPreferences() {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    try {
+        const { data, error } = await _supabase
+            .from('client_notification_preferences')
+            .select('*')
+            .eq('user_id', user.id)
+            .maybeSingle();
+        if (error) throw error;
+        return { data: Object.assign(clientActivityDefaultPreferences(), data || {}) };
+    } catch (error) {
+        return { error: error };
+    }
+}
+
+async function saveClientNotificationPreferences(preferences) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    const prefs = Object.assign(clientActivityDefaultPreferences(), preferences || {});
+    const payload = {
+        user_id: user.id,
+        email_on_viewed: prefs.email_on_viewed === true,
+        email_on_accepted: prefs.email_on_accepted !== false,
+        email_on_declined: prefs.email_on_declined !== false,
+        email_on_note: prefs.email_on_note !== false,
+        email_to: String(prefs.email_to || '').trim(),
+        updated_at: new Date().toISOString()
+    };
+    try {
+        const { data, error } = await _supabase
+            .from('client_notification_preferences')
+            .upsert(payload, { onConflict: 'user_id' })
+            .select('*')
+            .maybeSingle();
+        if (error) throw error;
+        return { data: Object.assign(clientActivityDefaultPreferences(), data || payload) };
+    } catch (error) {
+        return { error: error };
+    }
+}
+
+async function loadClientActivityEvents(limit) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    try {
+        const { data, error } = await _supabase
+            .from('client_activity_events')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(Math.max(1, Math.min(parseInt(limit || 25, 10) || 25, 100)));
+        if (error) throw error;
+        return { data: data || [] };
+    } catch (error) {
+        return { error: error };
+    }
+}
+
+async function markClientActivityEventsRead(ids) {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    const eventIds = Array.isArray(ids) ? ids.filter(Boolean) : [];
+    if (!eventIds.length) return { data: [] };
+    try {
+        const { data, error } = await _supabase
+            .from('client_activity_events')
+            .update({ read_at: new Date().toISOString() })
+            .eq('user_id', user.id)
+            .in('id', eventIds)
+            .select('*');
+        if (error) throw error;
+        return { data: data || [] };
+    } catch (error) {
+        return { error: error };
+    }
+}
+
 // Sign in with email and password
 async function signInWithEmail(email, password) {
     const { data, error } = await _supabase.auth.signInWithPassword({
@@ -516,6 +606,8 @@ async function saveQuote(quoteData) {
             style: quoteData.style || {},
             notes: quoteData.notes || '',
             currency: quoteData.currency || 'CAD',
+            quoteAdjustment: quoteData.quoteAdjustment || quoteData.clientAdjustment || null,
+            paymentsReceived: quoteData.paymentsReceived || quoteData.paymentReceived || null,
             paymentSettings: quoteData.paymentSettings || null,
             businessProfile: quoteData.businessProfile || null,
             hiddenProfileFields: quoteData.hiddenProfileFields || [],
