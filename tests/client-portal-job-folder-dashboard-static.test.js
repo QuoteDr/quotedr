@@ -2,6 +2,8 @@ const fs = require('fs');
 const assert = require('assert');
 
 const portal = fs.readFileSync('client-portal.html', 'utf8');
+const invoiceViewer = fs.readFileSync('invoice-viewer.html', 'utf8');
+const quoteViewer = fs.readFileSync('interactive-quote-viewer.html', 'utf8');
 
 assert(
   portal.includes('id="portalJobDashboard"'),
@@ -29,6 +31,17 @@ assert(
 );
 
 assert(
+  portal.includes('.portal-layout-client-os .portal-job-folders') &&
+    !portal.includes('.portal-layout-client-os.admin-mode .portal-job-folders'),
+  'Client OS job folders should be visible to clients when folders exist, not only in admin mode'
+);
+
+assert(
+  portal.includes('portal-job-create-btn admin-only'),
+  'Clients should not see job folder creation controls'
+);
+
+assert(
   portal.includes('portalJobFolderMode') && portal.includes('portalJobFolderId'),
   'Job folder modal should track create vs edit state'
 );
@@ -36,6 +49,13 @@ assert(
 assert(
   portal.includes('portalJobFolderPhotoList') && portal.includes('portalJobFolderFileList'),
   'Job folder dashboard should expose photos and files sections'
+);
+
+assert(
+  portal.includes('portalJobFolderVideoList') &&
+    portal.includes('portalJobVideoForm') &&
+    portal.includes('Google Photos, Drive, YouTube, Vimeo, or Loom'),
+  'Job folder dashboard should support video links instead of direct video uploads'
 );
 
 assert(
@@ -58,4 +78,65 @@ assert(
 assert(
   portal.includes('portal_job_folders') && portal.includes('assets'),
   'Saved folder metadata should include room for future photos/files/notes'
+);
+
+assert(
+  portal.includes('id="portalJobPhotoUpload"') &&
+    portal.includes('id="portalJobFileUpload"') &&
+    portal.includes('uploadPortalJobAsset('),
+  'Job folder assets should support real local photo/file uploads'
+);
+
+assert(
+  portal.includes('compressPortalJobPhoto(') &&
+    portal.includes('PORTAL_JOB_PHOTO_MAX_BYTES') &&
+    portal.includes('PORTAL_JOB_FILE_MAX_BYTES'),
+  'Photo uploads should be compressed and file uploads should enforce conservative size limits'
+);
+
+assert(
+  portal.includes('PORTAL_JOB_FOLDER_SOFT_WARNING_BYTES') &&
+    portal.includes('PORTAL_JOB_ACCOUNT_SOFT_WARNING_BYTES') &&
+    portal.includes('PORTAL_JOB_ACCOUNT_HARD_LIMIT_BYTES'),
+  'Job folder uploads should include folder and account storage guardrails'
+);
+
+assert(
+  portal.includes('function portalJobFileIsVideo(') &&
+    portal.includes('Video files are not stored in QuoteDr yet') &&
+    portal.includes('Video link - hosted outside QuoteDr'),
+  'Video files should be rejected while video links remain supported'
+);
+
+assert(
+  portal.includes('loadPortalJobAssets(') &&
+    portal.includes('getPortalJobAssetUrl(') &&
+    portal.includes('togglePortalJobAssetVisibility('),
+  'Job folder assets should load from storage metadata, use signed URLs, and support visibility toggles'
+);
+
+assert(
+  portal.includes('Share PDF') &&
+    portal.includes('function showPortalPdfShareModal(') &&
+    portal.includes('function portalDocumentPdfHref('),
+  'Client portal document cards should offer a safe Share PDF flow instead of sharing live action links'
+);
+
+assert(
+  portal.includes('Shared PDFs cannot approve, reject, sign, or change payment status') &&
+    portal.includes('print=1'),
+  'Share PDF flow should explain the safer PDF behavior and open viewers in print/save mode'
+);
+
+assert(
+  invoiceViewer.includes('function printInvoiceIfRequested(') &&
+    invoiceViewer.includes("params.get('print') === '1'"),
+  'Invoice viewer should support print=1 for portal PDF sharing'
+);
+
+assert(
+  quoteViewer.includes('Print / Save as PDF') &&
+    quoteViewer.includes('function printQuoteIfRequested(') &&
+    quoteViewer.includes("params.get('print') === '1'"),
+  'Quote viewer should offer and support the same Print / Save as PDF flow'
 );

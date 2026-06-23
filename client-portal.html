@@ -206,6 +206,78 @@
       background-color: var(--portal-surface-bg, #ffffff);
     }
 
+    .portal-document-activity {
+      border-top: 1px solid rgba(15, 52, 96, 0.12);
+      margin-top: 0.85rem;
+      padding-top: 0.85rem;
+    }
+
+    .portal-activity-summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 0.65rem;
+      margin-bottom: 0.85rem;
+    }
+
+    .portal-activity-stat {
+      background: rgba(26, 86, 160, 0.06);
+      border: 1px solid rgba(26, 86, 160, 0.1);
+      border-radius: 8px;
+      padding: 0.65rem 0.75rem;
+    }
+
+    .portal-activity-stat strong {
+      display: block;
+      color: var(--portal-card-text, #10233d);
+      font-size: 1.05rem;
+      line-height: 1.15;
+    }
+
+    .portal-activity-stat span {
+      color: var(--portal-muted-text, #26364d);
+      font-size: 0.78rem;
+    }
+
+    .portal-activity-timeline {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 0.45rem;
+      max-height: 260px;
+      overflow: auto;
+    }
+
+    .portal-activity-timeline li {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.55rem;
+      color: var(--portal-muted-text, #26364d);
+      font-size: 0.86rem;
+    }
+
+    .portal-activity-timeline i {
+      width: 1.35rem;
+      height: 1.35rem;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(26, 86, 160, 0.1);
+      color: var(--portal-accent-color, #12579c);
+      flex: 0 0 auto;
+      font-size: 0.72rem;
+      margin-top: 0.1rem;
+    }
+
+    .portal-access-log-note {
+      color: var(--portal-muted-text, #26364d);
+      font-size: 0.78rem;
+      text-align: center;
+      padding: 1rem;
+      opacity: 0.72;
+    }
+
     .quote-card.portal-open-card {
       cursor: pointer;
       transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
@@ -717,8 +789,8 @@
       box-shadow: 0 14px 30px rgba(15, 52, 96, 0.08);
     }
 
-    .portal-layout-premium-hub.admin-mode .portal-controls .portal-job-folders,
-    .portal-layout-quote-viewer.admin-mode .portal-controls .portal-job-folders {
+    .portal-layout-premium-hub .portal-controls .portal-job-folders,
+    .portal-layout-quote-viewer .portal-controls .portal-job-folders {
       display: block;
       position: relative;
     }
@@ -1341,19 +1413,19 @@
       box-shadow: 0 8px 18px rgba(15, 79, 148, 0.16);
     }
 
-    .portal-layout-client-os.admin-mode .portal-job-folders {
+    .portal-layout-client-os .portal-job-folders {
       display: block;
       position: relative;
     }
 
-    .portal-layout-client-os.admin-mode .portal-jobs-toggle {
+    .portal-layout-client-os .portal-jobs-toggle {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 0.5rem;
     }
 
-    .portal-layout-client-os.admin-mode .portal-jobs-menu {
+    .portal-layout-client-os .portal-jobs-menu {
       display: none;
       margin-top: 0.5rem;
       padding: 0.7rem;
@@ -1363,7 +1435,7 @@
       box-shadow: 0 12px 28px rgba(15, 35, 60, 0.12);
     }
 
-    .portal-layout-client-os.admin-mode .portal-job-folders.is-open .portal-jobs-menu {
+    .portal-layout-client-os .portal-job-folders.is-open .portal-jobs-menu {
       display: block;
     }
 
@@ -1497,7 +1569,7 @@
 
     .portal-job-dashboard-grid {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       gap: 0.85rem;
     }
 
@@ -1547,10 +1619,77 @@
       font-size: 0.86rem;
     }
 
+    .portal-job-asset-item.is-photo {
+      align-items: flex-start;
+    }
+
+    .portal-job-asset-main {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .portal-job-asset-thumb {
+      width: 74px;
+      height: 56px;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 1px solid #dce7f3;
+      background: #f4f8fc;
+      margin-right: 0.5rem;
+    }
+
     .portal-job-asset-item a {
       color: var(--portal-accent-color, #12579c);
       font-weight: 800;
       text-decoration: none;
+    }
+
+    .portal-job-asset-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .portal-job-asset-meta {
+      color: var(--portal-muted-text, #26364d);
+      font-size: 0.76rem;
+      margin-top: 0.15rem;
+    }
+
+    .portal-job-upload-zone {
+      display: grid;
+      gap: 0.45rem;
+      padding: 0.65rem;
+      border: 1px dashed rgba(18, 87, 156, 0.45);
+      border-radius: 10px;
+      background: rgba(18, 87, 156, 0.04);
+      margin-bottom: 0.6rem;
+    }
+
+    .portal-job-upload-status {
+      color: var(--portal-muted-text, #26364d);
+      font-size: 0.8rem;
+      min-height: 1rem;
+    }
+
+    .portal-job-storage-total {
+      color: var(--portal-muted-text, #26364d);
+      font-size: 0.78rem;
+      margin-bottom: 0.55rem;
+    }
+
+    .portal-job-storage-total.is-warning {
+      color: #9a4b00;
+      font-weight: 800;
+    }
+
+    .portal-job-video-tip {
+      color: var(--portal-muted-text, #26364d);
+      font-size: 0.78rem;
+      line-height: 1.35;
+      margin-top: 0.5rem;
     }
 
     .portal-job-asset-form {
@@ -2135,7 +2274,7 @@
             <i class="fas fa-chevron-down"></i>
           </button>
           <div class="portal-jobs-menu" id="portalJobsMenuSide">
-            <button type="button" class="portal-job-create-btn" onclick="openPortalJobFolderModal()">
+            <button type="button" class="portal-job-create-btn admin-only" onclick="openPortalJobFolderModal()">
               <i class="fas fa-plus me-2"></i>Create Job Folder
             </button>
             <div class="portal-job-folder-list">
@@ -2199,7 +2338,7 @@
                 <i class="fas fa-chevron-down"></i>
               </button>
               <div class="portal-jobs-menu" id="portalJobsMenu">
-                <button type="button" class="portal-job-create-btn" onclick="openPortalJobFolderModal()">
+                <button type="button" class="portal-job-create-btn admin-only" onclick="openPortalJobFolderModal()">
                   <i class="fas fa-plus me-2"></i>Create Job Folder
                 </button>
                 <div id="portalJobFolderList" class="portal-job-folder-list">
@@ -2234,8 +2373,16 @@
               <h3><i class="fas fa-images me-1"></i>Photos</h3>
               <div id="portalJobFolderPhotoList" class="portal-job-asset-list"></div>
               <div id="portalJobPhotoEmpty" class="portal-job-empty-panel">No photos added yet.</div>
+              <div id="portalJobPhotoStorageTotal" class="portal-job-storage-total"></div>
               <div class="admin-only">
-                <button type="button" class="btn btn-outline-primary btn-sm" onclick="togglePortalJobAssetForm('photo')"><i class="fas fa-plus me-1"></i>Add photo link</button>
+                <div class="portal-job-upload-zone">
+                  <input type="file" class="d-none" id="portalJobPhotoUpload" accept="image/*" multiple onchange="uploadPortalJobAsset('photo', this.files)">
+                  <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('portalJobPhotoUpload')?.click()">
+                    <i class="fas fa-cloud-arrow-up me-1"></i>Upload photos
+                  </button>
+                  <div id="portalJobPhotoStatus" class="portal-job-upload-status">Photos are compressed before upload.</div>
+                </div>
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="togglePortalJobAssetForm('photo')"><i class="fas fa-link me-1"></i>Add photo link</button>
                 <div id="portalJobPhotoForm" class="portal-job-asset-form">
                   <input type="url" class="form-control form-control-sm" id="portalJobPhotoUrl" placeholder="Photo URL">
                   <button type="button" class="btn btn-primary btn-sm" onclick="addPortalJobAsset('photo')">Save photo</button>
@@ -2246,12 +2393,36 @@
               <h3><i class="fas fa-paperclip me-1"></i>Files</h3>
               <div id="portalJobFolderFileList" class="portal-job-asset-list"></div>
               <div id="portalJobFileEmpty" class="portal-job-empty-panel">No files added yet.</div>
+              <div id="portalJobFileStorageTotal" class="portal-job-storage-total"></div>
               <div class="admin-only">
-                <button type="button" class="btn btn-outline-primary btn-sm" onclick="togglePortalJobAssetForm('file')"><i class="fas fa-plus me-1"></i>Add file link</button>
+                <div class="portal-job-upload-zone">
+                  <input type="file" class="d-none" id="portalJobFileUpload" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.rtf,.png,.jpg,.jpeg,.webp,.heic,.heif,image/*,application/pdf,text/plain,text/csv,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onchange="uploadPortalJobAsset('file', this.files)">
+                  <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('portalJobFileUpload')?.click()">
+                    <i class="fas fa-cloud-arrow-up me-1"></i>Upload files
+                  </button>
+                  <div id="portalJobFileStatus" class="portal-job-upload-status">PDFs, images, spreadsheets, docs, and text files up to 25 MB.</div>
+                </div>
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="togglePortalJobAssetForm('file')"><i class="fas fa-link me-1"></i>Add file link</button>
                 <div id="portalJobFileForm" class="portal-job-asset-form">
                   <input type="text" class="form-control form-control-sm" id="portalJobFileName" placeholder="File name">
                   <input type="url" class="form-control form-control-sm" id="portalJobFileUrl" placeholder="File URL">
                   <button type="button" class="btn btn-primary btn-sm" onclick="addPortalJobAsset('file')">Save file</button>
+                </div>
+              </div>
+            </div>
+            <div class="portal-job-panel">
+              <h3><i class="fas fa-video me-1"></i>Videos</h3>
+              <div id="portalJobFolderVideoList" class="portal-job-asset-list"></div>
+              <div id="portalJobVideoEmpty" class="portal-job-empty-panel">No video links added yet.</div>
+              <div class="admin-only">
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="togglePortalJobAssetForm('video')"><i class="fas fa-link me-1"></i>Add video link</button>
+                <div id="portalJobVideoForm" class="portal-job-asset-form">
+                  <input type="text" class="form-control form-control-sm" id="portalJobVideoName" placeholder="Video title">
+                  <input type="url" class="form-control form-control-sm" id="portalJobVideoUrl" placeholder="Google Photos, Drive, YouTube, Vimeo, or Loom URL">
+                  <button type="button" class="btn btn-primary btn-sm" onclick="addPortalJobAsset('video')">Save video</button>
+                </div>
+                <div class="portal-job-video-tip">
+                  For videos, share from Google Photos/Drive or an unlisted video host, paste the share link here, and keep large files out of QuoteDr storage.
                 </div>
               </div>
             </div>
@@ -2267,6 +2438,9 @@
       </div>
     </div>
   </main>
+  <div class="portal-access-log-note">
+    <i class="fas fa-shield-halved me-1"></i>For security and service quality, document access may be logged.
+  </div>
 </div>
 
   <!-- Signature Lightbox -->
@@ -2279,6 +2453,31 @@
         </div>
         <div class="modal-body text-center">
           <img id="lightbox-image" src="" alt="Signature" class="img-fluid rounded">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Safe PDF Share Modal -->
+  <div id="portalPdfShareModal" class="modal fade" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="fas fa-file-pdf me-2"></i>Share a PDF copy</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-2">Open <strong id="portalPdfShareTitle">this document</strong> in the document viewer, then use <strong>Print / Save as PDF</strong> to create a safe copy you can share.</p>
+          <div class="alert alert-warning small mb-0">
+            <i class="fas fa-shield-alt me-1"></i>
+            Shared PDFs cannot approve, reject, sign, or change payment status. This keeps your portal private while still letting you send the document to someone else.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <a id="portalPdfShareOpenBtn" href="#" target="_blank" rel="noopener" class="btn btn-primary">
+            <i class="fas fa-print me-1"></i>Open Print / Save PDF
+          </a>
         </div>
       </div>
     </div>
@@ -2372,6 +2571,35 @@
     const jobsCompletedLabelEl = document.getElementById('jobs-completed-label');
     let portalQuotesCache = [];
     let portalJobFolders = [];
+    const PORTAL_JOB_ASSET_BUCKET = 'portal-job-assets';
+    const PORTAL_JOB_PHOTO_MAX_BYTES = 15 * 1024 * 1024;
+    const PORTAL_JOB_FILE_MAX_BYTES = 25 * 1024 * 1024;
+    const PORTAL_JOB_PHOTO_MAX_EDGE = 2048;
+    const PORTAL_JOB_THUMB_MAX_EDGE = 480;
+    const PORTAL_JOB_PHOTO_QUALITY = 0.78;
+    const PORTAL_JOB_PHOTO_LARGE_WARNING_BYTES = 3 * 1024 * 1024;
+    const PORTAL_JOB_FOLDER_SOFT_WARNING_BYTES = 500 * 1024 * 1024;
+    const PORTAL_JOB_ACCOUNT_SOFT_WARNING_BYTES = 5 * 1024 * 1024 * 1024;
+    const PORTAL_JOB_ACCOUNT_HARD_LIMIT_BYTES = 10 * 1024 * 1024 * 1024;
+    const PORTAL_JOB_ALLOWED_FILE_TYPES = new Set([
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/plain',
+      'text/csv',
+      'application/rtf',
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'image/heic',
+      'image/heif'
+    ]);
+    let portalJobAssetCache = {};
+    let portalJobAssetUrlCache = {};
+    let portalAccountAssetBytes = 0;
+    let portalDocumentActivityCache = {};
 
     // Initialize page
     async function init() {
@@ -2400,12 +2628,18 @@
     }
 
     async function secureClientDocumentRequest(body) {
+      let bearer = supabaseKey;
+      try {
+        const sessionResult = await _sbClient.auth.getSession();
+        const accessToken = sessionResult?.data?.session?.access_token || '';
+        if (accessToken) bearer = accessToken;
+      } catch (error) {}
       const resp = await fetch(supabaseUrl + '/functions/v1/client-document', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'apikey': supabaseKey,
-          'Authorization': 'Bearer ' + supabaseKey
+          'Authorization': 'Bearer ' + bearer
         },
         body: JSON.stringify(body || {})
       });
@@ -2922,6 +3156,7 @@
           }
           portalQuotesCache = quotes;
           refreshPortalJobFolders();
+          await loadPortalJobAssets();
           applyPortalTheme(mergePortalTheme(portalDefaultTheme, portalThemeOverrideFromQuotes(quotes)));
           processQuotes(getFilteredSortedQuotes(quotes));
           updateSummaryCards(quotes);
@@ -2997,6 +3232,7 @@
         // Process and display quotes
         portalQuotesCache = quotes;
         refreshPortalJobFolders();
+        await loadPortalJobAssets();
         applyPortalTheme(mergePortalTheme(portalDefaultTheme, portalThemeOverrideFromQuotes(quotes)));
         renderPortalDocuments();
 
@@ -3047,7 +3283,7 @@
           if (!url) return null;
           return {
             id: String(item.id || ('asset-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7))),
-            title: String(item.title || item.name || (type === 'photo' ? 'Project photo' : 'Project file')).trim(),
+            title: String(item.title || item.name || (type === 'photo' ? 'Project photo' : type === 'video' ? 'Project video' : 'Project file')).trim(),
             url: url,
             createdAt: item.createdAt || new Date().toISOString()
           };
@@ -3055,7 +3291,8 @@
       }
       return {
         photos: normalizeItems(cleanAssets.photos, 'photo'),
-        files: normalizeItems(cleanAssets.files, 'file')
+        files: normalizeItems(cleanAssets.files, 'file'),
+        videos: normalizeItems(cleanAssets.videos, 'video')
       };
     }
 
@@ -3113,13 +3350,7 @@
 
       folderRoots.forEach(function(folderRoot) {
         const list = folderRoot.querySelector('.portal-job-folder-list');
-        folderRoot.style.display = portalIsAdminView ? '' : 'none';
-        if (!portalIsAdminView) {
-          folderRoot.classList.remove('is-open');
-          const toggle = folderRoot.querySelector('.portal-jobs-toggle');
-          if (toggle) toggle.setAttribute('aria-expanded', 'false');
-          return;
-        }
+        folderRoot.style.display = portalJobFolders.length || portalIsAdminView ? '' : 'none';
         if (list) list.innerHTML = listMarkup;
       });
     }
@@ -3227,7 +3458,6 @@
     }
 
     function openPortalJobFolderDashboard(folderId) {
-      if (!portalIsAdminView) return;
       if (!getPortalJobFolder(folderId)) return;
       activePortalJobFolderId = folderId;
       closeOpenPortalJobsMenus();
@@ -3246,7 +3476,7 @@
       const dashboard = document.getElementById('portalJobDashboard');
       if (!dashboard) return;
       const folder = getPortalJobFolder(activePortalJobFolderId);
-      if (!folder || !portalIsAdminView) {
+      if (!folder) {
         dashboard.classList.remove('is-visible');
         return;
       }
@@ -3261,27 +3491,189 @@
       dashboard.classList.add('is-visible');
     }
 
+    function currentPortalAssetsId() {
+      if (portalId) return portalId;
+      const source = portalJobFolderSourceRows(portalQuotesCache);
+      const withPortal = source.find(function(row) { return row?.data?.portal_id; });
+      return String(withPortal?.data?.portal_id || '');
+    }
+
+    function formatPortalBytes(bytes) {
+      const value = Number(bytes || 0);
+      if (!value) return '0 B';
+      const units = ['B', 'KB', 'MB', 'GB'];
+      const index = Math.min(Math.floor(Math.log(value) / Math.log(1024)), units.length - 1);
+      return (value / Math.pow(1024, index)).toFixed(index ? 1 : 0).replace(/\.0$/, '') + ' ' + units[index];
+    }
+
+    function cachePortalJobAssets(items) {
+      portalJobAssetCache = {};
+      (items || []).forEach(function(asset) {
+        const folderId = String(asset.job_folder_id || '');
+        if (!folderId) return;
+        if (!portalJobAssetCache[folderId]) portalJobAssetCache[folderId] = { photos: [], files: [] };
+        const kindKey = asset.kind === 'photo' ? 'photos' : 'files';
+        portalJobAssetCache[folderId][kindKey].push(asset);
+        if (asset.signed_url) portalJobAssetUrlCache[asset.id + ':full'] = asset.signed_url;
+        if (asset.thumbnail_signed_url) portalJobAssetUrlCache[asset.id + ':thumb'] = asset.thumbnail_signed_url;
+      });
+    }
+
+    async function signedUrlForPortalStoragePath(path, expiresIn) {
+      if (!path) return '';
+      const cacheKey = 'path:' + path;
+      if (portalJobAssetUrlCache[cacheKey]) return portalJobAssetUrlCache[cacheKey];
+      const { data, error } = await _sbClient.storage
+        .from(PORTAL_JOB_ASSET_BUCKET)
+        .createSignedUrl(path, expiresIn || 3600);
+      if (error) throw error;
+      portalJobAssetUrlCache[cacheKey] = data?.signedUrl || '';
+      return portalJobAssetUrlCache[cacheKey];
+    }
+
+    async function loadPortalJobAssets() {
+      portalJobAssetCache = {};
+      portalAccountAssetBytes = 0;
+      const currentPortalId = currentPortalAssetsId();
+      if (!currentPortalId || portalThemeStudioMode) return;
+
+      try {
+        if (portalIsAdminView) {
+          const { data, error } = await _sbClient
+            .from('portal_job_assets')
+            .select('*')
+            .eq('user_id', contractorId)
+            .eq('portal_id', currentPortalId)
+            .order('created_at', { ascending: false });
+          if (error) throw error;
+          const assetsWithUrls = await Promise.all((data || []).map(async function(asset) {
+            const signedUrl = await signedUrlForPortalStoragePath(asset.storage_path);
+            const thumbUrl = await signedUrlForPortalStoragePath(asset.thumbnail_path);
+            return Object.assign({}, asset, {
+              signed_url: signedUrl,
+              thumbnail_signed_url: thumbUrl
+            });
+          }));
+          cachePortalJobAssets(assetsWithUrls);
+          try {
+            const { data: usageRows, error: usageError } = await _sbClient
+              .from('portal_job_assets')
+              .select('size_bytes')
+              .eq('user_id', contractorId);
+            if (!usageError) {
+              portalAccountAssetBytes = (usageRows || []).reduce(function(sum, asset) {
+                return sum + (Number(asset.size_bytes || 0) || 0);
+              }, 0);
+            }
+          } catch (usageError) {
+            portalAccountAssetBytes = assetsWithUrls.reduce(function(sum, asset) {
+              return sum + (Number(asset.size_bytes || 0) || 0);
+            }, 0);
+          }
+          return;
+        }
+
+        if (portalToken && portalAnchorId) {
+          const result = await secureClientDocumentRequest({
+            action: 'portal_assets',
+            documentId: portalAnchorId,
+            token: portalToken
+          });
+          cachePortalJobAssets(result.assets || []);
+          portalAccountAssetBytes = (result.assets || []).reduce(function(sum, asset) {
+            return sum + (Number(asset.size_bytes || 0) || 0);
+          }, 0);
+        }
+      } catch (error) {
+        console.warn('Could not load portal job assets:', error);
+      }
+    }
+
+    async function getPortalJobAssetUrl(asset, preferThumbnail) {
+      if (!asset) return '';
+      const key = asset.id + ':' + (preferThumbnail ? 'thumb' : 'full');
+      if (portalJobAssetUrlCache[key]) return portalJobAssetUrlCache[key];
+      if (preferThumbnail && asset.thumbnail_signed_url) return asset.thumbnail_signed_url;
+      if (!preferThumbnail && asset.signed_url) return asset.signed_url;
+      if (portalIsAdminView) {
+        const path = preferThumbnail && asset.thumbnail_path ? asset.thumbnail_path : asset.storage_path;
+        const url = await signedUrlForPortalStoragePath(path);
+        portalJobAssetUrlCache[key] = url;
+        return url;
+      }
+      if (portalToken && portalAnchorId) {
+        const result = await secureClientDocumentRequest({
+          action: 'portal_asset_url',
+          documentId: portalAnchorId,
+          token: portalToken,
+          assetId: asset.id,
+          thumbnail: !!preferThumbnail
+        });
+        portalJobAssetUrlCache[key] = result.url || '';
+        return portalJobAssetUrlCache[key];
+      }
+      return '';
+    }
+
+    function folderDbAssets(folderId) {
+      return portalJobAssetCache[String(folderId || '')] || { photos: [], files: [] };
+    }
+
     function renderPortalJobAssets(folder) {
-      const assets = normalizePortalJobAssets(folder?.assets);
+      const legacyAssets = normalizePortalJobAssets(folder?.assets);
+      const dbAssets = folderDbAssets(folder?.id);
       function renderList(kind, items) {
-        const list = document.getElementById(kind === 'photo' ? 'portalJobFolderPhotoList' : 'portalJobFolderFileList');
-        const empty = document.getElementById(kind === 'photo' ? 'portalJobPhotoEmpty' : 'portalJobFileEmpty');
+        const isPhoto = kind === 'photo';
+        const isVideo = kind === 'video';
+        const list = document.getElementById(isPhoto ? 'portalJobFolderPhotoList' : isVideo ? 'portalJobFolderVideoList' : 'portalJobFolderFileList');
+        const empty = document.getElementById(isPhoto ? 'portalJobPhotoEmpty' : isVideo ? 'portalJobVideoEmpty' : 'portalJobFileEmpty');
+        const total = document.getElementById(isPhoto ? 'portalJobPhotoStorageTotal' : isVideo ? '' : 'portalJobFileStorageTotal');
         if (!list) return;
         list.innerHTML = items.map(function(item) {
-          const icon = kind === 'photo' ? 'fa-image' : 'fa-file-lines';
-          return '<div class="portal-job-asset-item">' +
-            '<a href="' + escapeHtml(item.url) + '" target="_blank" rel="noopener"><i class="fas ' + icon + ' me-1"></i>' + escapeHtml(item.title) + '</a>' +
-            (portalIsAdminView ? '<button type="button" class="btn btn-outline-danger btn-sm" onclick="removePortalJobAsset(' + escapeHtml(JSON.stringify(kind)) + ', ' + escapeHtml(JSON.stringify(item.id)) + ')"><i class="fas fa-xmark"></i></button>' : '') +
+          const icon = isPhoto ? 'fa-image' : isVideo ? 'fa-circle-play' : 'fa-file-lines';
+          const isDbAsset = !!item.storage_path;
+          const fullUrl = item.signed_url || item.url || '';
+          const thumbUrl = item.thumbnail_signed_url || fullUrl;
+          const meta = isDbAsset
+            ? [item.mime_type || '', item.size_bytes ? formatPortalBytes(item.size_bytes) : '', item.visible_to_client === false ? 'hidden from client' : 'visible to client'].filter(Boolean).join(' - ')
+            : isVideo ? 'Video link - hosted outside QuoteDr' : 'External link';
+          const preview = isPhoto
+            ? '<img class="portal-job-asset-thumb" src="' + escapeHtml(thumbUrl) + '" alt="' + escapeHtml(item.title || 'Project photo') + '">'
+            : '<i class="fas ' + icon + ' me-1"></i>';
+          const actionButtons = portalIsAdminView
+            ? '<div class="portal-job-asset-actions">' +
+                (isDbAsset ? '<button type="button" class="btn btn-outline-secondary btn-sm" onclick="renamePortalJobAsset(' + escapeHtml(JSON.stringify(item.id)) + ')"><i class="fas fa-pen"></i></button>' : '') +
+                (isDbAsset ? '<button type="button" class="btn btn-outline-secondary btn-sm" onclick="togglePortalJobAssetVisibility(' + escapeHtml(JSON.stringify(item.id)) + ', ' + (item.visible_to_client === false ? 'true' : 'false') + ')">' + (item.visible_to_client === false ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>') + '</button>' : '') +
+                '<button type="button" class="btn btn-outline-danger btn-sm" onclick="removePortalJobAsset(' + escapeHtml(JSON.stringify(kind)) + ', ' + escapeHtml(JSON.stringify(item.id)) + ')"><i class="fas fa-xmark"></i></button>' +
+              '</div>'
+            : '';
+          return '<div class="portal-job-asset-item ' + (isPhoto ? 'is-photo' : '') + '">' +
+            (isPhoto ? preview : '') +
+            '<div class="portal-job-asset-main">' +
+              '<a href="' + escapeHtml(fullUrl) + '" target="_blank" rel="noopener">' + (isPhoto ? '' : preview) + escapeHtml(item.title) + '</a>' +
+              '<div class="portal-job-asset-meta">' + escapeHtml(meta) + '</div>' +
+            '</div>' +
+            actionButtons +
           '</div>';
         }).join('');
         if (empty) empty.style.display = items.length ? 'none' : '';
+        if (total) {
+          const storageBytes = items.reduce(function(sum, item) {
+            return sum + (Number(item.size_bytes || 0) || 0);
+          }, 0);
+          total.classList.toggle('is-warning', storageBytes >= PORTAL_JOB_FOLDER_SOFT_WARNING_BYTES);
+          total.textContent = storageBytes
+            ? 'Stored in this folder: ' + formatPortalBytes(storageBytes) + (storageBytes >= PORTAL_JOB_FOLDER_SOFT_WARNING_BYTES ? ' - consider using links for large media.' : '')
+            : '';
+        }
       }
-      renderList('photo', assets.photos);
-      renderList('file', assets.files);
+      renderList('photo', dbAssets.photos.concat(legacyAssets.photos));
+      renderList('file', dbAssets.files.concat(legacyAssets.files));
+      renderList('video', legacyAssets.videos);
     }
 
     function togglePortalJobsMenu(trigger) {
-      if (!portalIsAdminView) return;
+      if (!portalIsAdminView && !portalJobFolders.length) return;
       const root = trigger?.closest?.('.portal-job-folders') || document.getElementById('portalJobFolders') || document.getElementById('portalJobFoldersSide');
       const toggle = root?.querySelector('.portal-jobs-toggle');
       if (!root) return;
@@ -3431,6 +3823,22 @@
       if (!folder) return;
       if (!confirm('Delete this job folder? The quotes and invoices will stay in the portal.')) return;
       try {
+        const cachedAssets = folderDbAssets(folder.id);
+        const paths = (cachedAssets.photos || []).concat(cachedAssets.files || []).flatMap(function(asset) {
+          return [asset.storage_path, asset.thumbnail_path].filter(Boolean);
+        });
+        if (paths.length) {
+          const removeResult = await _sbClient.storage.from(PORTAL_JOB_ASSET_BUCKET).remove(paths);
+          if (removeResult.error) throw removeResult.error;
+        }
+        if ((cachedAssets.photos || []).length || (cachedAssets.files || []).length) {
+          await _sbClient
+            .from('portal_job_assets')
+            .delete()
+            .eq('user_id', contractorId)
+            .eq('portal_id', currentPortalAssetsId())
+            .eq('job_folder_id', folder.id);
+        }
         await persistPortalJobFolders(portalJobFolders.filter(function(item) {
           return item.id !== folder.id;
         }));
@@ -3450,7 +3858,7 @@
 
     function togglePortalJobAssetForm(kind) {
       if (!portalIsAdminView) return;
-      const form = document.getElementById(kind === 'photo' ? 'portalJobPhotoForm' : 'portalJobFileForm');
+      const form = document.getElementById(kind === 'photo' ? 'portalJobPhotoForm' : kind === 'video' ? 'portalJobVideoForm' : 'portalJobFileForm');
       if (form) form.classList.toggle('is-visible');
     }
 
@@ -3482,21 +3890,25 @@
       if (!folder) return;
       const assets = normalizePortalJobAssets(folder.assets);
       const isPhoto = kind === 'photo';
-      const urlInput = document.getElementById(isPhoto ? 'portalJobPhotoUrl' : 'portalJobFileUrl');
-      const nameInput = document.getElementById('portalJobFileName');
+      const isVideo = kind === 'video';
+      const urlInput = document.getElementById(isPhoto ? 'portalJobPhotoUrl' : isVideo ? 'portalJobVideoUrl' : 'portalJobFileUrl');
+      const nameInput = document.getElementById(isVideo ? 'portalJobVideoName' : 'portalJobFileName');
       const url = safePortalJobAssetUrl(urlInput?.value || '', kind);
       if (!url) {
         urlInput?.focus();
         return;
       }
+      const defaultTitle = isPhoto ? 'Project photo' : isVideo ? 'Project video' : 'Project file';
       const item = {
         id: (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'asset-' + Date.now().toString(36),
-        title: isPhoto ? 'Project photo' : String(nameInput?.value || 'Project file').trim(),
+        title: isPhoto ? defaultTitle : String(nameInput?.value || defaultTitle).trim(),
         url: url,
         createdAt: new Date().toISOString()
       };
       if (isPhoto) {
         assets.photos.push(item);
+      } else if (isVideo) {
+        assets.videos.push(item);
       } else {
         assets.files.push(item);
       }
@@ -3505,13 +3917,326 @@
       await updatePortalJobFolder(Object.assign({}, folder, { assets: assets, updatedAt: new Date().toISOString() }));
     }
 
+    function portalJobAssetStatus(kind, message, className) {
+      const status = document.getElementById(kind === 'photo' ? 'portalJobPhotoStatus' : 'portalJobFileStatus');
+      if (!status) return;
+      status.textContent = message || '';
+      status.className = 'portal-job-upload-status ' + (className || '');
+    }
+
+    function sanitizePortalStorageName(name) {
+      return String(name || 'upload')
+        .replace(/\.[^.]+$/, '')
+        .trim()
+        .replace(/[^a-z0-9_-]+/gi, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 72) || 'upload';
+    }
+
+    function portalFileExtension(file, fallback) {
+      const nameMatch = String(file?.name || '').match(/\.([a-z0-9]{1,8})$/i);
+      if (nameMatch) return nameMatch[1].toLowerCase();
+      if (file?.type === 'image/webp') return 'webp';
+      if (file?.type === 'image/png') return 'png';
+      if (file?.type === 'image/jpeg') return 'jpg';
+      if (file?.type === 'application/pdf') return 'pdf';
+      return fallback || 'bin';
+    }
+
+    function portalJobFileIsVideo(file) {
+      const ext = portalFileExtension(file);
+      return !!(file?.type && file.type.startsWith('video/')) || ['mp4', 'mov', 'm4v', 'avi', 'mkv', 'webm'].includes(ext);
+    }
+
+    function portalJobFileAllowed(file) {
+      const ext = portalFileExtension(file);
+      const safeExtensions = new Set(['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt', 'rtf', 'jpg', 'jpeg', 'png', 'webp', 'heic', 'heif']);
+      if (portalJobFileIsVideo(file)) return false;
+      if (file?.type && (PORTAL_JOB_ALLOWED_FILE_TYPES.has(file.type) || file.type.startsWith('image/'))) return true;
+      return safeExtensions.has(ext);
+    }
+
+    function canvasToPortalBlob(canvas, type, quality) {
+      return new Promise(function(resolve, reject) {
+        canvas.toBlob(function(blob) {
+          if (blob) resolve(blob);
+          else reject(new Error('Could not compress this image.'));
+        }, type, quality);
+      });
+    }
+
+    async function loadImageForPortalCompression(file) {
+      if (window.createImageBitmap) {
+        try {
+          return await createImageBitmap(file);
+        } catch (error) {}
+      }
+      return await new Promise(function(resolve, reject) {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = function() {
+          URL.revokeObjectURL(url);
+          resolve(img);
+        };
+        img.onerror = function() {
+          URL.revokeObjectURL(url);
+          reject(new Error('Could not read this image. Try JPG, PNG, or WebP.'));
+        };
+        img.src = url;
+      });
+    }
+
+    async function compressPortalJobPhoto(file, maxEdge, quality) {
+      if (!file || !file.type.startsWith('image/')) throw new Error('Choose an image file.');
+      if (file.size > PORTAL_JOB_PHOTO_MAX_BYTES) throw new Error(file.name + ' is larger than the 15 MB photo limit.');
+      const source = await loadImageForPortalCompression(file);
+      const width = source.width || source.naturalWidth;
+      const height = source.height || source.naturalHeight;
+      if (!width || !height) throw new Error('Could not read this image size.');
+      const scale = Math.min(1, maxEdge / Math.max(width, height));
+      const targetWidth = Math.max(1, Math.round(width * scale));
+      const targetHeight = Math.max(1, Math.round(height * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+      const ctx = canvas.getContext('2d', { alpha: false });
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, targetWidth, targetHeight);
+      ctx.drawImage(source, 0, 0, targetWidth, targetHeight);
+      const preferredType = canvas.toDataURL('image/webp').startsWith('data:image/webp') ? 'image/webp' : 'image/jpeg';
+      const blob = await canvasToPortalBlob(canvas, preferredType, quality);
+      if (source.close) source.close();
+      return {
+        blob: blob,
+        mimeType: preferredType,
+        width: targetWidth,
+        height: targetHeight,
+        originalSize: file.size,
+        size: blob.size
+      };
+    }
+
+    async function compressPortalJobPhotoThumbnail(file) {
+      return compressPortalJobPhoto(file, PORTAL_JOB_THUMB_MAX_EDGE, 0.72);
+    }
+
+    function findPortalDbAsset(assetId) {
+      const id = String(assetId || '');
+      for (const folderAssets of Object.values(portalJobAssetCache || {})) {
+        const found = (folderAssets.photos || []).concat(folderAssets.files || []).find(function(asset) {
+          return String(asset.id) === id;
+        });
+        if (found) return found;
+      }
+      return null;
+    }
+
+    async function uploadPortalJobAsset(kind, fileList) {
+      if (!portalIsAdminView) return;
+      if (kind === 'video') {
+        portalJobAssetStatus('file', 'Video uploads are disabled for storage safety. Add a Google Photos, Drive, YouTube, Vimeo, or Loom link instead.', 'text-warning fw-bold');
+        return;
+      }
+      const folder = getPortalJobFolder(activePortalJobFolderId);
+      const currentPortalId = currentPortalAssetsId();
+      const files = Array.from(fileList || []);
+      const input = document.getElementById(kind === 'photo' ? 'portalJobPhotoUpload' : 'portalJobFileUpload');
+      if (input) input.value = '';
+      if (!folder || !currentPortalId || !files.length) return;
+
+      const conservativeIncomingBytes = files.reduce(function(sum, file) {
+        return sum + (Number(file.size || 0) || 0);
+      }, 0);
+      if (portalAccountAssetBytes + conservativeIncomingBytes > PORTAL_JOB_ACCOUNT_HARD_LIMIT_BYTES) {
+        portalJobAssetStatus(kind, 'This account is at the 10 GB QuoteDr storage safety limit. Use file/video links or delete older uploads before adding more.', 'text-danger fw-bold');
+        return;
+      }
+      if (portalAccountAssetBytes + conservativeIncomingBytes >= PORTAL_JOB_ACCOUNT_SOFT_WARNING_BYTES) {
+        portalJobAssetStatus(kind, 'Storage is over 5 GB. Uploading is allowed, but links are recommended for large media.', 'text-warning fw-bold');
+      }
+
+      const session = await _sbClient.auth.getSession();
+      const userId = session?.data?.session?.user?.id || '';
+      if (!userId || userId !== contractorId) {
+        portalJobAssetStatus(kind, 'Sign in as the contractor to upload files.', 'text-danger');
+        return;
+      }
+
+      let uploadedCount = 0;
+      let uploadedBytes = 0;
+      let largePhotoWarnings = 0;
+      try {
+        for (let index = 0; index < files.length; index++) {
+          const file = files[index];
+          portalJobAssetStatus(kind, 'Uploading ' + (index + 1) + ' of ' + files.length + ': ' + file.name, 'text-muted');
+          const assetId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'asset-' + Date.now().toString(36) + '-' + index;
+          const safeName = sanitizePortalStorageName(file.name);
+          const quoteId = (folder.documentIds || [])[0] || null;
+          let storagePath = '';
+          let thumbnailPath = '';
+          let uploadedPaths = [];
+          let uploadMime = file.type || 'application/octet-stream';
+          let uploadSize = file.size;
+          let originalSize = file.size;
+          let metadata = {};
+
+          if (kind === 'photo') {
+            const display = await compressPortalJobPhoto(file, PORTAL_JOB_PHOTO_MAX_EDGE, PORTAL_JOB_PHOTO_QUALITY);
+            const thumb = await compressPortalJobPhotoThumbnail(file);
+            const extension = display.mimeType === 'image/webp' ? 'webp' : 'jpg';
+            storagePath = [userId, currentPortalId, folder.id, assetId, 'display.' + extension].join('/');
+            thumbnailPath = [userId, currentPortalId, folder.id, assetId, 'thumbnail.' + extension].join('/');
+
+            const displayUpload = await _sbClient.storage
+              .from(PORTAL_JOB_ASSET_BUCKET)
+              .upload(storagePath, display.blob, { contentType: display.mimeType, upsert: false });
+            if (displayUpload.error) throw displayUpload.error;
+            uploadedPaths.push(storagePath);
+
+            const thumbUpload = await _sbClient.storage
+              .from(PORTAL_JOB_ASSET_BUCKET)
+              .upload(thumbnailPath, thumb.blob, { contentType: thumb.mimeType, upsert: false });
+            if (thumbUpload.error) throw thumbUpload.error;
+            uploadedPaths.push(thumbnailPath);
+
+            uploadMime = display.mimeType;
+            uploadSize = display.size + thumb.size;
+            originalSize = display.originalSize;
+            if (display.size >= PORTAL_JOB_PHOTO_LARGE_WARNING_BYTES) largePhotoWarnings++;
+            metadata = {
+              original_filename: file.name,
+              width: display.width,
+              height: display.height,
+              compressed_image_bytes: display.size,
+              thumbnail_bytes: thumb.size,
+              compression_savings_bytes: Math.max(0, display.originalSize - display.size)
+            };
+          } else {
+            if (file.size > PORTAL_JOB_FILE_MAX_BYTES) throw new Error(file.name + ' is larger than the 25 MB file limit.');
+            if (portalJobFileIsVideo(file)) throw new Error('Video files are not stored in QuoteDr yet. Add a video link from Google Photos, Drive, YouTube, Vimeo, or Loom instead.');
+            if (!portalJobFileAllowed(file)) throw new Error(file.name + ' is not an allowed project file type.');
+            const extension = portalFileExtension(file, 'bin');
+            storagePath = [userId, currentPortalId, folder.id, assetId, safeName + '.' + extension].join('/');
+            const fileUpload = await _sbClient.storage
+              .from(PORTAL_JOB_ASSET_BUCKET)
+              .upload(storagePath, file, { contentType: uploadMime, upsert: false });
+            if (fileUpload.error) throw fileUpload.error;
+            uploadedPaths.push(storagePath);
+            metadata = { original_filename: file.name };
+          }
+
+          const { error: insertError } = await _sbClient
+            .from('portal_job_assets')
+            .insert({
+              id: assetId,
+              user_id: userId,
+              portal_id: currentPortalId,
+              job_folder_id: folder.id,
+              quote_id: quoteId,
+              kind: kind,
+              title: file.name.replace(/\.[^.]+$/, '') || (kind === 'photo' ? 'Project photo' : 'Project file'),
+              storage_path: storagePath,
+              thumbnail_path: thumbnailPath || null,
+              mime_type: uploadMime,
+              size_bytes: uploadSize,
+              original_size_bytes: originalSize,
+              visible_to_client: true,
+              metadata: metadata
+            });
+          if (insertError) {
+            if (uploadedPaths.length) await _sbClient.storage.from(PORTAL_JOB_ASSET_BUCKET).remove(uploadedPaths);
+            throw insertError;
+          }
+          uploadedCount++;
+          uploadedBytes += uploadSize;
+        }
+
+        await loadPortalJobAssets();
+        updatePortalJobDashboard();
+        let successMessage = 'Uploaded ' + uploadedCount + ' ' + (kind === 'photo' ? 'photo' : 'file') + (uploadedCount === 1 ? '' : 's') + ' (' + formatPortalBytes(uploadedBytes) + ').';
+        if (largePhotoWarnings) successMessage += ' ' + largePhotoWarnings + ' photo' + (largePhotoWarnings === 1 ? ' is' : 's are') + ' still over 3 MB after compression.';
+        if (portalAccountAssetBytes >= PORTAL_JOB_ACCOUNT_SOFT_WARNING_BYTES) successMessage += ' Account storage is over 5 GB; use links for larger media when possible.';
+        portalJobAssetStatus(kind, successMessage, largePhotoWarnings ? 'text-warning fw-bold' : 'text-success fw-bold');
+      } catch (error) {
+        console.error('Portal job asset upload failed:', error);
+        portalJobAssetStatus(kind, error.message || 'Upload failed. Please try again.', 'text-danger');
+      }
+    }
+
+    async function renamePortalJobAsset(assetId) {
+      if (!portalIsAdminView) return;
+      const asset = findPortalDbAsset(assetId);
+      if (!asset) return;
+      const title = prompt('Rename this ' + asset.kind + ':', asset.title || '');
+      if (title === null) return;
+      const cleanTitle = String(title || '').trim();
+      if (!cleanTitle) return;
+      try {
+        const { error } = await _sbClient
+          .from('portal_job_assets')
+          .update({ title: cleanTitle, updated_at: new Date().toISOString() })
+          .eq('id', asset.id)
+          .eq('user_id', contractorId);
+        if (error) throw error;
+        await loadPortalJobAssets();
+        updatePortalJobDashboard();
+      } catch (error) {
+        console.error('Could not rename portal job asset:', error);
+        alert(error.message || 'Could not rename this upload.');
+      }
+    }
+
+    async function togglePortalJobAssetVisibility(assetId, visible) {
+      if (!portalIsAdminView) return;
+      const asset = findPortalDbAsset(assetId);
+      if (!asset) return;
+      try {
+        const { error } = await _sbClient
+          .from('portal_job_assets')
+          .update({ visible_to_client: !!visible, updated_at: new Date().toISOString() })
+          .eq('id', asset.id)
+          .eq('user_id', contractorId);
+        if (error) throw error;
+        await loadPortalJobAssets();
+        updatePortalJobDashboard();
+      } catch (error) {
+        console.error('Could not update portal job asset visibility:', error);
+        alert(error.message || 'Could not update visibility.');
+      }
+    }
+
     async function removePortalJobAsset(kind, assetId) {
       if (!portalIsAdminView) return;
+      const dbAsset = findPortalDbAsset(assetId);
+      if (dbAsset) {
+        if (!confirm('Delete this uploaded ' + dbAsset.kind + '? This removes it from storage.')) return;
+        try {
+          const paths = [dbAsset.storage_path, dbAsset.thumbnail_path].filter(Boolean);
+          if (paths.length) {
+            const removeResult = await _sbClient.storage.from(PORTAL_JOB_ASSET_BUCKET).remove(paths);
+            if (removeResult.error) throw removeResult.error;
+          }
+          const { error } = await _sbClient
+            .from('portal_job_assets')
+            .delete()
+            .eq('id', dbAsset.id)
+            .eq('user_id', contractorId);
+          if (error) throw error;
+          await loadPortalJobAssets();
+          updatePortalJobDashboard();
+        } catch (error) {
+          console.error('Could not delete portal job asset:', error);
+          alert(error.message || 'Could not delete this upload.');
+        }
+        return;
+      }
       const folder = getPortalJobFolder(activePortalJobFolderId);
       if (!folder) return;
       const assets = normalizePortalJobAssets(folder.assets);
       if (kind === 'photo') {
         assets.photos = assets.photos.filter(function(item) { return item.id !== assetId; });
+      } else if (kind === 'video') {
+        assets.videos = assets.videos.filter(function(item) { return item.id !== assetId; });
       } else {
         assets.files = assets.files.filter(function(item) { return item.id !== assetId; });
       }
@@ -3564,6 +4289,170 @@
       return isInvoiceDocument(quote)
         ? 'invoice-viewer.html?id=' + encodeURIComponent(quote.id) + secureParams
         : 'interactive-quote-viewer.html?id=' + encodeURIComponent(quote.id) + secureParams;
+    }
+
+    function portalDocumentPdfHref(quote) {
+      const href = portalDocumentPrimaryHref(quote);
+      return href + (href.indexOf('?') >= 0 ? '&' : '?') + 'print=1';
+    }
+
+    function getPortalActivitySessionId(documentId) {
+      const key = 'portal_activity_session_' + (documentId || portalQuoteId || 'portal');
+      try {
+        let sessionId = sessionStorage.getItem(key) || '';
+        if (!sessionId) {
+          sessionId = 'qd-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+          sessionStorage.setItem(key, sessionId);
+        }
+        return sessionId;
+      } catch (error) {
+        return 'qd-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+      }
+    }
+
+    function logPortalPdfActivity(documentId) {
+      if (portalIsAdminView || !documentId || !portalToken || typeof logSecureClientDocumentEvent !== 'function') return;
+      logSecureClientDocumentEvent(documentId, portalToken, 'pdf_opened', {
+        sessionId: getPortalActivitySessionId(documentId),
+        metadata: { source: 'client_portal', action: 'safe_pdf_share' }
+      }, portalAnchorId || documentId).then(function(result) {
+        if (result && result.error) console.warn('Could not log PDF activity:', result.error);
+      });
+    }
+
+    function showPortalPdfShareModal(event, href, title, documentId) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      const modalEl = document.getElementById('portalPdfShareModal');
+      const titleEl = document.getElementById('portalPdfShareTitle');
+      const openBtn = document.getElementById('portalPdfShareOpenBtn');
+      if (titleEl) titleEl.textContent = title || 'this document';
+      if (openBtn) {
+        openBtn.href = href || '#';
+        openBtn.onclick = function() {
+          logPortalPdfActivity(documentId || '');
+          return true;
+        };
+      }
+      if (modalEl && window.bootstrap) {
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+      } else if (href) {
+        logPortalPdfActivity(documentId || '');
+        window.open(href, '_blank', 'noopener');
+      }
+    }
+
+    function portalActivityEventLabel(event) {
+      const type = event?.event_type || '';
+      const duration = parseInt(event?.duration_seconds || 0, 10) || 0;
+      const labels = {
+        document_opened: 'Opened the document',
+        document_view_duration: duration ? 'Viewed for ' + formatPortalActivityDuration(duration) : 'Viewed the document',
+        pdf_opened: 'Opened Print / Save PDF',
+        payment_clicked: 'Clicked a payment button',
+        signature_started: 'Started signing',
+        document_signed: 'Signed the document',
+        document_rejected: 'Rejected or declined the document'
+      };
+      return labels[type] || type.replace(/_/g, ' ');
+    }
+
+    function portalActivityEventIcon(event) {
+      const icons = {
+        document_opened: 'fa-eye',
+        document_view_duration: 'fa-clock',
+        pdf_opened: 'fa-file-pdf',
+        payment_clicked: 'fa-credit-card',
+        signature_started: 'fa-signature',
+        document_signed: 'fa-circle-check',
+        document_rejected: 'fa-circle-xmark'
+      };
+      return icons[event?.event_type] || 'fa-circle-info';
+    }
+
+    function formatPortalActivityDuration(seconds) {
+      seconds = Math.max(0, parseInt(seconds || 0, 10) || 0);
+      const minutes = Math.floor(seconds / 60);
+      const remainder = seconds % 60;
+      if (minutes < 1) return seconds + 's';
+      if (minutes < 60) return minutes + 'm ' + remainder + 's';
+      const hours = Math.floor(minutes / 60);
+      return hours + 'h ' + (minutes % 60) + 'm';
+    }
+
+    function formatPortalActivityDate(value) {
+      if (!value) return 'Never';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return 'Unknown';
+      return date.toLocaleString('en-CA', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+    }
+
+    function portalDocumentActivitySummary(events) {
+      events = Array.isArray(events) ? events : [];
+      const openEvents = events.filter(function(event) { return event.event_type === 'document_opened'; });
+      const pdfEvents = events.filter(function(event) { return event.event_type === 'pdf_opened'; });
+      const totalSeconds = events.reduce(function(sum, event) {
+        return sum + (event.event_type === 'document_view_duration' ? (parseInt(event.duration_seconds || 0, 10) || 0) : 0);
+      }, 0);
+      return {
+        lastOpened: openEvents[0]?.created_at || '',
+        opens: openEvents.length,
+        totalSeconds: totalSeconds,
+        lastPdf: pdfEvents[0]?.created_at || ''
+      };
+    }
+
+    async function loadPortalDocumentActivity(documentId) {
+      if (!portalIsAdminView || !documentId) return [];
+      if (portalDocumentActivityCache[documentId]) return portalDocumentActivityCache[documentId];
+      let events = [];
+      if (typeof loadSecureClientDocumentActivity === 'function') {
+        const result = await loadSecureClientDocumentActivity(documentId);
+        if (result && result.error) throw result.error;
+        events = result?.data || [];
+      } else {
+        const result = await secureClientDocumentRequest({ action: 'document_activity', documentId: documentId });
+        events = result.events || [];
+      }
+      portalDocumentActivityCache[documentId] = events;
+      return events;
+    }
+
+    function renderPortalDocumentActivityPanel(documentId, events) {
+      const panel = document.getElementById('portalActivityPanel-' + documentId);
+      if (!panel) return;
+      const summary = portalDocumentActivitySummary(events);
+      const timeline = (events || []).slice(0, 40).map(function(event) {
+        return '<li><i class="fas ' + portalActivityEventIcon(event) + '"></i><div><strong>' + escapeHtml(portalActivityEventLabel(event)) + '</strong><div class="text-muted">' + escapeHtml(formatPortalActivityDate(event.created_at)) + '</div></div></li>';
+      }).join('');
+      panel.innerHTML = '<div class="portal-activity-summary">' +
+        '<div class="portal-activity-stat"><strong>' + escapeHtml(formatPortalActivityDate(summary.lastOpened)) + '</strong><span>Last opened</span></div>' +
+        '<div class="portal-activity-stat"><strong>' + summary.opens + '</strong><span>Total opens</span></div>' +
+        '<div class="portal-activity-stat"><strong>' + escapeHtml(formatPortalActivityDuration(summary.totalSeconds)) + '</strong><span>Active viewing time</span></div>' +
+        '<div class="portal-activity-stat"><strong>' + escapeHtml(formatPortalActivityDate(summary.lastPdf)) + '</strong><span>Last PDF action</span></div>' +
+        '</div>' +
+        (timeline ? '<ul class="portal-activity-timeline">' + timeline + '</ul>' : '<div class="text-muted small"><i class="fas fa-circle-info me-1"></i>No client activity has been logged for this document yet.</div>');
+    }
+
+    async function togglePortalDocumentActivity(event, documentId) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      const panel = document.getElementById('portalActivityPanel-' + documentId);
+      if (!panel) return;
+      const shouldOpen = panel.classList.contains('d-none');
+      panel.classList.toggle('d-none', !shouldOpen);
+      if (!shouldOpen) return;
+      panel.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm me-1"></span>Loading document activity...</div>';
+      try {
+        const events = await loadPortalDocumentActivity(documentId);
+        renderPortalDocumentActivityPanel(documentId, events);
+      } catch (error) {
+        panel.innerHTML = '<div class="alert alert-warning small mb-0">Could not load activity: ' + escapeHtml(error.message || String(error)) + '</div>';
+      }
     }
 
     function updatePortalAttention(quotes) {
@@ -3876,6 +4765,17 @@
         style: 'currency',
         currency: quote.data?.currency || 'CAD'
       }).format(quote.total);
+      const adminActivityMarkup = portalIsAdminView
+        ? `<button type="button" class="btn btn-outline-primary btn-sm" onclick="togglePortalDocumentActivity(event, '${escapeHtml(quote.id)}')">
+              <i class="fas fa-chart-line me-1"></i> Activity
+            </button>
+            <a href="dashboard.html" class="btn btn-outline-dark btn-sm">
+              <i class="fas fa-shield-halved me-1"></i> Manage in Dashboard
+            </a>`
+        : '';
+      const activityPanelMarkup = portalIsAdminView
+        ? `<div id="portalActivityPanel-${escapeHtml(quote.id)}" class="portal-document-activity d-none"></div>`
+        : '';
 
       card.innerHTML = `
         <div class="card-body">
@@ -3905,13 +4805,14 @@
               <a href="${primaryHref}" class="btn btn-outline-primary btn-sm">
                 <i class="fas ${docType.actionIcon} me-1 portal-action-icon"></i><span class="portal-action-full">${docType.actionLabel}</span><span class="portal-action-short">Open</span>
               </a>
-              ${portalIsAdminView ?
-                `<a href="dashboard.html" class="btn btn-outline-dark btn-sm">
-                  <i class="fas fa-shield-halved me-1"></i> Manage in Dashboard
-                </a>` : ''}
+              <button type="button" class="btn btn-outline-secondary btn-sm portal-share-pdf-btn" data-pdf-href="${escapeHtml(portalDocumentPdfHref(quote))}" data-pdf-title="${escapeHtml(portalDocumentTitle(quote))}" data-document-id="${escapeHtml(quote.id)}" onclick="showPortalPdfShareModal(event, this.dataset.pdfHref, this.dataset.pdfTitle, this.dataset.documentId)">
+                <i class="fas fa-file-pdf me-1 portal-action-icon"></i><span class="portal-action-full">Share PDF</span><span class="portal-action-short">PDF</span>
+              </button>
+              ${adminActivityMarkup}
               </div>
             </div>
           </div>
+          ${activityPanelMarkup}
         </div>
       `;
 

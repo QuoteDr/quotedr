@@ -27,6 +27,48 @@ type QuoteRow = {
   public_share_token_hash?: string | null;
 };
 
+type PortalJobAssetRow = {
+  id: string;
+  user_id: string;
+  portal_id: string;
+  job_folder_id: string;
+  quote_id?: string | null;
+  kind: "photo" | "file";
+  title: string;
+  storage_path: string;
+  thumbnail_path?: string | null;
+  mime_type?: string | null;
+  size_bytes?: number | null;
+  original_size_bytes?: number | null;
+  visible_to_client?: boolean | null;
+  metadata?: Record<string, unknown> | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+type PortalDocumentEventRow = {
+  id: string;
+  user_id: string;
+  portal_id?: string | null;
+  document_id: string;
+  portal_anchor_id?: string | null;
+  event_type: string;
+  session_id: string;
+  duration_seconds?: number | null;
+  metadata?: Record<string, unknown> | null;
+  created_at?: string | null;
+};
+
+const ALLOWED_DOCUMENT_EVENT_TYPES = new Set([
+  "document_opened",
+  "document_view_duration",
+  "pdf_opened",
+  "payment_clicked",
+  "signature_started",
+  "document_signed",
+  "document_rejected",
+]);
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -123,6 +165,68 @@ function sanitizeQuoteRow(row: QuoteRow) {
     created_at: row.created_at || null,
     updated_at: row.updated_at || null,
   };
+}
+
+function sanitizePortalJobAssetRow(row: PortalJobAssetRow, urls: Record<string, string>) {
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    portal_id: row.portal_id,
+    job_folder_id: row.job_folder_id,
+    quote_id: row.quote_id || null,
+    kind: row.kind,
+    title: row.title || (row.kind === "photo" ? "Project photo" : "Project file"),
+    mime_type: row.mime_type || "",
+    size_bytes: row.size_bytes || 0,
+    original_size_bytes: row.original_size_bytes || 0,
+    visible_to_client: row.visible_to_client !== false,
+    metadata: row.metadata || {},
+    created_at: row.created_at || null,
+    updated_at: row.updated_at || null,
+    signed_url: urls.storage_path || "",
+    thumbnail_signed_url: urls.thumbnail_path || "",
+  };
+}
+
+function sanitizePortalDocumentEventRow(row: PortalDocumentEventRow) {
+  return {
+    id: row.id,
+    portal_id: row.portal_id || null,
+    document_id: row.document_id,
+    portal_anchor_id: row.portal_anchor_id || null,
+    event_type: row.event_type,
+    session_id: row.session_id,
+    duration_seconds: row.duration_seconds || 0,
+    metadata: row.metadata || {},
+    created_at: row.created_at || null,
+  };
+}
+
+function sanitizeSessionId(value: unknown) {
+  return String(value || "")
+    .replace(/[^a-zA-Z0-9._:-]/g, "")
+    .slice(0, 120);
+}
+
+function sanitizeDurationSeconds(value: unknown) {
+  if (value === null || typeof value === "undefined" || value === "") return null;
+  const parsed = Math.round(Number(value));
+  if (!Number.isFinite(parsed)) return null;
+  return Math.max(0, Math.min(parsed, 24 * 60 * 60));
+}
+
+function sanitizeEventMetadata(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const result: Record<string, unknown> = {};
+  Object.entries(value as Record<string, unknown>).slice(0, 20).forEach(([key, raw]) => {
+    const cleanKey = key.replace(/[^a-zA-Z0-9_.:-]/g, "").slice(0, 50);
+    if (!cleanKey) return;
+    if (typeof raw === "string") result[cleanKey] = raw.slice(0, 500);
+    else if (typeof raw === "number" && Number.isFinite(raw)) result[cleanKey] = raw;
+    else if (typeof raw === "boolean") result[cleanKey] = raw;
+    else if (raw === null) result[cleanKey] = null;
+  });
+  return result;
 }
 
 async function fetchQuoteById(id: string) {
@@ -226,6 +330,140 @@ async function portalDocuments(body: Record<string, unknown>) {
   return json({ anchor: sanitizeQuoteRow(anchor), documents: docs });
 }
 
+async function signedStorageUrl(path: string | null | undefined) {
+  if (!path) return "";
+  const supabase = adminClient();
+  const { data, error } = await supabase.storage
+    .from("portal-job-assets")
+    .createSignedUrl(path, 60 * 60);
+  if (error) throw error;
+  return data?.signedUrl || "";
+}
+
+async function isOwnerRequest(req: Request, userId: string) {
+  const signedInUser = await userFromAuthHeader(req);
+  return !!signedInUser?.id && signedInUser.id === userId;
+}
+
+async function portalAssets(req: Request, body: Record<string, unknown>) {
+  const documentId = normalizeId(body.documentId || body.id);
+  const token = String(body.token || "").trim();
+  const { target: anchor } = await assertTokenAccess(documentId, token, documentId);
+  const anchorPortalId = portalId(anchor);
+  if (!anchorPortalId) return json({ assets: [] });
+
+  const includePrivate = await isOwnerRequest(req, anchor.user_id);
+  const supabase = adminClient();
+  let query = supabase
+    .from("portal_job_assets")
+    .select("*")
+    .eq("user_id", anchor.user_id)
+    .eq("portal_id", anchorPortalId)
+    .order("created_at", { ascending: false });
+
+  if (!includePrivate) query = query.eq("visible_to_client", true);
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  const assets = await Promise.all((data as PortalJobAssetRow[] || []).map(async (row) => {
+    const [storageUrl, thumbnailUrl] = await Promise.all([
+      signedStorageUrl(row.storage_path),
+      signedStorageUrl(row.thumbnail_path),
+    ]);
+    return sanitizePortalJobAssetRow(row, {
+      storage_path: storageUrl,
+      thumbnail_path: thumbnailUrl,
+    });
+  }));
+
+  return json({ assets, expiresIn: 60 * 60 });
+}
+
+async function portalAssetUrl(req: Request, body: Record<string, unknown>) {
+  const documentId = normalizeId(body.documentId || body.id);
+  const token = String(body.token || "").trim();
+  const assetId = normalizeId(body.assetId || body.asset_id);
+  const preferThumbnail = body.thumbnail === true;
+  if (!assetId) return json({ error: "Missing asset id" }, 400);
+
+  const { target: anchor } = await assertTokenAccess(documentId, token, documentId);
+  const includePrivate = await isOwnerRequest(req, anchor.user_id);
+  const supabase = adminClient();
+  const { data, error } = await supabase
+    .from("portal_job_assets")
+    .select("*")
+    .eq("id", assetId)
+    .eq("user_id", anchor.user_id)
+    .eq("portal_id", portalId(anchor))
+    .maybeSingle();
+  if (error) throw error;
+  const asset = data as PortalJobAssetRow | null;
+  if (!asset || (!includePrivate && asset.visible_to_client === false)) {
+    return json({ error: "Asset not found" }, 404);
+  }
+
+  const url = await signedStorageUrl(preferThumbnail && asset.thumbnail_path ? asset.thumbnail_path : asset.storage_path);
+  return json({ url, expiresIn: 60 * 60 });
+}
+
+async function logDocumentEvent(req: Request, body: Record<string, unknown>) {
+  const documentId = normalizeId(body.documentId || body.id);
+  const token = String(body.token || "").trim();
+  const portalAnchorId = normalizeId(body.portalAnchorId || body.portal_anchor);
+  const eventType = String(body.eventType || body.event_type || "").trim();
+  if (!ALLOWED_DOCUMENT_EVENT_TYPES.has(eventType)) return json({ error: "Unsupported document activity event" }, 400);
+
+  const { target, anchor } = await assertTokenAccess(documentId, token, portalAnchorId);
+  const signedInUser = await userFromAuthHeader(req);
+  if (signedInUser?.id && signedInUser.id === target.user_id) {
+    return json({ document: sanitizeQuoteRow(target), event: null, skipped: "owner_activity" });
+  }
+
+  const sessionId = sanitizeSessionId(body.sessionId || body.session_id);
+  if (!sessionId) return json({ error: "Missing activity session id" }, 400);
+
+  const activePortalId = portalId(anchor || target) || portalId(target) || null;
+  const supabase = adminClient();
+  const { data, error } = await supabase
+    .from("portal_document_events")
+    .insert({
+      user_id: target.user_id,
+      portal_id: activePortalId || null,
+      document_id: target.id,
+      portal_anchor_id: normalizeId(anchor?.id || portalAnchorId) || null,
+      event_type: eventType,
+      session_id: sessionId,
+      duration_seconds: sanitizeDurationSeconds(body.durationSeconds || body.duration_seconds),
+      metadata: sanitizeEventMetadata(body.metadata),
+    })
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  return json({ event: sanitizePortalDocumentEventRow(data as PortalDocumentEventRow), document: sanitizeQuoteRow(target) });
+}
+
+async function documentActivity(req: Request, body: Record<string, unknown>) {
+  const user = await userFromAuthHeader(req);
+  if (!user) return json({ error: "Authentication required" }, 401);
+
+  const documentId = normalizeId(body.documentId || body.id);
+  if (!documentId) return json({ error: "Missing document id" }, 400);
+  const row = await fetchQuoteById(documentId);
+  if (!row || row.user_id !== user.id) return json({ error: "Document not found" }, 404);
+
+  const supabase = adminClient();
+  const { data, error } = await supabase
+    .from("portal_document_events")
+    .select("*")
+    .eq("user_id", user.id)
+    .eq("document_id", documentId)
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (error) throw error;
+  return json({ events: ((data as PortalDocumentEventRow[]) || []).map(sanitizePortalDocumentEventRow) });
+}
+
 function mergeSafeData(existing: Record<string, unknown>, patch: unknown) {
   if (!patch || typeof patch !== "object" || Array.isArray(patch)) return existing;
   return { ...existing, ...(patch as Record<string, unknown>) };
@@ -295,6 +533,10 @@ serve(async (req) => {
     if (action === "create_link") return await createLink(req, body);
     if (action === "view") return await viewDocument(body);
     if (action === "portal") return await portalDocuments(body);
+    if (action === "portal_assets") return await portalAssets(req, body);
+    if (action === "portal_asset_url") return await portalAssetUrl(req, body);
+    if (action === "log_event") return await logDocumentEvent(req, body);
+    if (action === "document_activity") return await documentActivity(req, body);
     if (action === "update") return await updateDocument(req, body);
     return json({ error: "Unknown action" }, 400);
   } catch (error) {

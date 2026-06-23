@@ -953,7 +953,87 @@ if (location.search.includes('debug')) {
             btn.textContent = collapsed ? 'Show more' : 'Show less';
         }
 
+        var portalActivityStarted = false;
+        var portalActivitySessionId = '';
+        var portalActivityContext = null;
+        var portalActivityActiveSince = 0;
+        var portalActivityPendingSeconds = 0;
+        var portalActivityTimer = null;
+
+        function isContractorPreviewView(params) {
+            params = params || new URLSearchParams(window.location.search);
+            return params.get('preview') === '1' || params.get('admin_preview') === '1' || params.get('adminPreview') === '1';
+        }
+
+        function getPortalActivitySessionId() {
+            if (portalActivitySessionId) return portalActivitySessionId;
+            try {
+                var key = 'portal_activity_session_' + (new URLSearchParams(window.location.search).get('id') || 'invoice');
+                portalActivitySessionId = sessionStorage.getItem(key) || '';
+                if (!portalActivitySessionId) {
+                    portalActivitySessionId = 'qd-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+                    sessionStorage.setItem(key, portalActivitySessionId);
+                }
+            } catch(e) {
+                portalActivitySessionId = portalActivitySessionId || ('qd-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10));
+            }
+            return portalActivitySessionId;
+        }
+
+        function logPortalDocumentActivity(eventType, options) {
+            options = options || {};
+            if (!portalActivityContext || !portalActivityContext.documentId || !portalActivityContext.token || typeof logSecureClientDocumentEvent !== 'function') return;
+            logSecureClientDocumentEvent(portalActivityContext.documentId, portalActivityContext.token, eventType, {
+                sessionId: getPortalActivitySessionId(),
+                durationSeconds: options.durationSeconds,
+                metadata: Object.assign({
+                    source: 'invoice_viewer',
+                    document_type: 'invoice'
+                }, options.metadata || {}),
+                keepalive: options.keepalive === true
+            }, portalActivityContext.portalAnchorId).then(function(result) {
+                if (result && result.error) console.warn('Could not log document activity:', result.error);
+            });
+        }
+
+        function flushPortalActivityDuration(keepalive) {
+            if (!portalActivityContext) return;
+            if (portalActivityActiveSince) {
+                portalActivityPendingSeconds += Math.max(0, Math.round((Date.now() - portalActivityActiveSince) / 1000));
+                portalActivityActiveSince = Date.now();
+            }
+            if (portalActivityPendingSeconds < 1) return;
+            var seconds = portalActivityPendingSeconds;
+            portalActivityPendingSeconds = 0;
+            logPortalDocumentActivity('document_view_duration', { durationSeconds: seconds, keepalive: keepalive === true });
+        }
+
+        function updatePortalActivityVisibility() {
+            if (!portalActivityContext) return;
+            if (document.hidden) {
+                flushPortalActivityDuration(true);
+                portalActivityActiveSince = 0;
+            } else if (!portalActivityActiveSince) {
+                portalActivityActiveSince = Date.now();
+            }
+        }
+
+        function initPortalDocumentActivityTracking(documentId, token, portalAnchorId) {
+            if (portalActivityStarted || !documentId || !token) return;
+            var params = new URLSearchParams(window.location.search);
+            if (isContractorPreviewView(params)) return;
+            portalActivityStarted = true;
+            portalActivityContext = { documentId: documentId, token: token, portalAnchorId: portalAnchorId || '' };
+            getPortalActivitySessionId();
+            logPortalDocumentActivity('document_opened');
+            portalActivityActiveSince = document.hidden ? 0 : Date.now();
+            document.addEventListener('visibilitychange', updatePortalActivityVisibility);
+            window.addEventListener('pagehide', function() { flushPortalActivityDuration(true); });
+            portalActivityTimer = setInterval(function() { flushPortalActivityDuration(false); }, 30000);
+        }
+
         function printInvoice() {
+            logPortalDocumentActivity('pdf_opened', { metadata: { action: 'print_save_pdf' } });
             try {
                 if (window.QuoteDrAndroid && typeof window.QuoteDrAndroid.printCurrentPage === 'function') {
                     window.QuoteDrAndroid.printCurrentPage();
@@ -963,6 +1043,13 @@ if (location.search.includes('debug')) {
                 console.warn('Native Android print bridge failed, falling back to browser print.', e);
             }
             window.print();
+        }
+
+        function printInvoiceIfRequested() {
+            var params = new URLSearchParams(window.location.search);
+            if (params.get('print') === '1') {
+                setTimeout(printInvoice, 1200);
+            }
         }
 
         function invoiceRoomAnchorId(roomIndex) {
@@ -1203,6 +1290,7 @@ if (location.search.includes('debug')) {
             }
             loadInvoice();
             showPaymentReturnNotice();
+            printInvoiceIfRequested();
         });
 
         function showPaymentReturnNotice() {
@@ -1306,6 +1394,7 @@ if (location.search.includes('debug')) {
                     }
                     renderInvoice();
                     renderTerms();
+                    initPortalDocumentActivityTracking(supabaseId, shareToken, portalAnchorId);
                     var contractorId = row.user_id;
                     var invTotal = invoiceData.grandTotal || invoiceData.total || 0;
                     if (contractorId && invTotal) initInvoicePaymentSection(contractorId, invTotal, supabaseId);
@@ -1738,6 +1827,7 @@ if (location.search.includes('debug')) {
                 alert('This invoice needs to be saved before card payment is available. Please use the shared invoice link.');
                 return;
             }
+            logPortalDocumentActivity('payment_clicked', { metadata: { payment_type: paymentType || 'invoice_full' } });
             var btns = document.querySelectorAll('#clientPaymentButtons button');
             btns.forEach(function(b) {
                 b.disabled = true;
@@ -1850,5 +1940,8 @@ if (location.search.includes('debug')) {
         });
         // === End QuickBooks ===
     </script>
+    <div class="text-center text-muted small py-3 d-print-none">
+        <i class="fas fa-shield-halved me-1"></i>For security and service quality, document access may be logged.
+    </div>
 </body>
 </html>

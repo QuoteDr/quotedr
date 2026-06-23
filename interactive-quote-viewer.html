@@ -950,6 +950,9 @@ if (location.search.includes('debug')) {
                         <button type="button" class="btn btn-outline-primary" onclick="document.getElementById('quoteContainer').scrollIntoView({behavior:'smooth'});">
                             <i class="fas fa-list-check me-2"></i>Review Scope
                         </button>
+                        <button type="button" class="btn btn-outline-secondary d-print-none" onclick="printQuote()">
+                            <i class="fas fa-print me-2"></i>Print / Save as PDF
+                        </button>
                     </div>
                 </aside>
             </div>
@@ -1268,6 +1271,100 @@ if (location.search.includes('debug')) {
             });
         }
 
+        var portalActivityStarted = false;
+        var portalActivitySessionId = '';
+        var portalActivityContext = null;
+        var portalActivityActiveSince = 0;
+        var portalActivityPendingSeconds = 0;
+        var portalActivityTimer = null;
+
+        function getPortalActivitySessionId() {
+            if (portalActivitySessionId) return portalActivitySessionId;
+            try {
+                var key = 'portal_activity_session_' + (new URLSearchParams(window.location.search).get('id') || 'document');
+                portalActivitySessionId = sessionStorage.getItem(key) || '';
+                if (!portalActivitySessionId) {
+                    portalActivitySessionId = 'qd-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+                    sessionStorage.setItem(key, portalActivitySessionId);
+                }
+            } catch(e) {
+                portalActivitySessionId = portalActivitySessionId || ('qd-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10));
+            }
+            return portalActivitySessionId;
+        }
+
+        function logPortalDocumentActivity(eventType, options) {
+            options = options || {};
+            if (!portalActivityContext || !portalActivityContext.documentId || !portalActivityContext.token || typeof logSecureClientDocumentEvent !== 'function') return;
+            logSecureClientDocumentEvent(portalActivityContext.documentId, portalActivityContext.token, eventType, {
+                sessionId: getPortalActivitySessionId(),
+                durationSeconds: options.durationSeconds,
+                metadata: Object.assign({
+                    source: 'interactive_quote_viewer',
+                    document_type: window.QuoteDrChangeOrders && QuoteDrChangeOrders.isChangeOrder(quoteData) ? 'change_order' : 'quote'
+                }, options.metadata || {}),
+                keepalive: options.keepalive === true
+            }, portalActivityContext.portalAnchorId).then(function(result) {
+                if (result && result.error) console.warn('Could not log document activity:', result.error);
+            });
+        }
+
+        function flushPortalActivityDuration(keepalive) {
+            if (!portalActivityContext) return;
+            if (portalActivityActiveSince) {
+                portalActivityPendingSeconds += Math.max(0, Math.round((Date.now() - portalActivityActiveSince) / 1000));
+                portalActivityActiveSince = Date.now();
+            }
+            if (portalActivityPendingSeconds < 1) return;
+            var seconds = portalActivityPendingSeconds;
+            portalActivityPendingSeconds = 0;
+            logPortalDocumentActivity('document_view_duration', { durationSeconds: seconds, keepalive: keepalive === true });
+        }
+
+        function updatePortalActivityVisibility() {
+            if (!portalActivityContext) return;
+            if (document.hidden) {
+                flushPortalActivityDuration(true);
+                portalActivityActiveSince = 0;
+            } else if (!portalActivityActiveSince) {
+                portalActivityActiveSince = Date.now();
+            }
+        }
+
+        function initPortalDocumentActivityTracking(documentId, token, portalAnchorId) {
+            if (portalActivityStarted || !documentId || !token) return;
+            var params = new URLSearchParams(window.location.search);
+            if (isContractorPreviewView(params)) return;
+            portalActivityStarted = true;
+            portalActivityContext = { documentId: documentId, token: token, portalAnchorId: portalAnchorId || '' };
+            getPortalActivitySessionId();
+            logPortalDocumentActivity('document_opened');
+            portalActivityActiveSince = document.hidden ? 0 : Date.now();
+            document.addEventListener('visibilitychange', updatePortalActivityVisibility);
+            window.addEventListener('pagehide', function() { flushPortalActivityDuration(true); });
+            portalActivityTimer = setInterval(function() { flushPortalActivityDuration(false); }, 30000);
+        }
+
+        function printQuote() {
+            logPortalDocumentActivity('pdf_opened', { metadata: { action: 'print_save_pdf' } });
+            try {
+                if (window.QuoteDrAndroid && typeof window.QuoteDrAndroid.printCurrentPage === 'function') {
+                    window.QuoteDrAndroid.printCurrentPage();
+                    return;
+                }
+            } catch(e) {
+                console.warn('Native Android print bridge failed, falling back to browser print.', e);
+            }
+            window.print();
+        }
+
+        function printQuoteIfRequested() {
+            var params = new URLSearchParams(window.location.search);
+            if (params.get('print') === '1') {
+                setTimeout(printQuote, 1200);
+            }
+        }
+
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', async function() {
             // Load user's uploaded logo (check both key names, then try Supabase)
@@ -1348,6 +1445,7 @@ if (location.search.includes('debug')) {
             applyQuoteCompletionState();
             showPaymentReturnNotice();
             setupMobileJumpVisibility();
+            printQuoteIfRequested();
         });
 
         async function showPaymentReturnNotice() {
@@ -1418,6 +1516,7 @@ if (location.search.includes('debug')) {
                     var contractorId = result.data.user_id;
                     var quoteTotal = quoteData.grandTotal || quoteData.total || 0;
                     await markQuoteViewed(supabaseId);
+                    initPortalDocumentActivityTracking(supabaseId, shareToken, portalAnchorId);
                     await reconcileQuotePaymentState(supabaseId);
                     if (contractorId && quoteTotal && quoteData.style?.depositMode !== 'hide') initPaymentSection(contractorId, quoteTotal);
                     return;
@@ -2843,6 +2942,7 @@ if (location.search.includes('debug')) {
         }
 
         async function confirmApproval() {
+            logPortalDocumentActivity('signature_started', { metadata: { action: 'confirm_approval' } });
             const name = document.getElementById('signerName').value.trim();
             if (!name) { showSignatureApprovalMessage('Please enter your full name.'); return; }
             if (!sigHasStrokes) { showSignatureApprovalMessage('Please draw your signature.'); return; }
@@ -2940,6 +3040,7 @@ if (location.search.includes('debug')) {
                         dataPatch: updateData.data
                     }, portalAnchorId);
                     if (secureUpdate && secureUpdate.error) throw secureUpdate.error;
+                    logPortalDocumentActivity('document_signed', { metadata: { signer_name_present: !!name } });
                     quoteData = Object.assign({}, quoteData, updateData.data, { status: updateData.status });
                     if (typeof qdCaptureEvent === 'function') {
                     qdCaptureEvent('quote_signed', {
@@ -3037,6 +3138,7 @@ if (location.search.includes('debug')) {
                     dataPatch: merged
                 }, portalAnchorId);
                 if (result && result.error) throw result.error;
+                logPortalDocumentActivity('document_rejected', { metadata: { document_type: 'change_order' } });
                 quoteData = merged;
                 document.getElementById('approveSection').innerHTML = '<div class="alert alert-danger mb-0"><i class="fas fa-times-circle me-1"></i>Change order declined. Your contractor can revise it or create a new one.</div>';
                 var stickyActions = document.getElementById('stickyClientActions');
@@ -3100,6 +3202,7 @@ if (location.search.includes('debug')) {
 
         async function handleDepositPayment() {
             if (!_paymentSettings || !_quoteTotal) return;
+            logPortalDocumentActivity('payment_clicked', { metadata: { payment_type: 'deposit' } });
             var pct = _paymentSettings.deposit_default_pct || 50;
             var depositAmt = Math.round(_quoteTotal * pct / 100 * 100); // cents
             var urlParams = new URLSearchParams(window.location.search);
@@ -3146,5 +3249,8 @@ if (location.search.includes('debug')) {
             lb.style.display = 'flex';
         }
     </script>
+    <div class="text-center text-muted small py-3 d-print-none">
+        <i class="fas fa-shield-halved me-1"></i>For security and service quality, document access may be logged.
+    </div>
 </body>
 </html>

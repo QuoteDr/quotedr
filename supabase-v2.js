@@ -131,6 +131,46 @@ async function updateSecureClientDocument(documentId, token, updateAction, paylo
     }
 }
 
+async function logSecureClientDocumentEvent(documentId, token, eventType, payload, portalAnchorId) {
+    payload = payload || {};
+    if (!documentId || !token || !eventType) return { error: 'Missing secure activity details' };
+    try {
+        const response = await fetch(CLIENT_DOCUMENT_FUNCTION_URL, {
+            method: 'POST',
+            headers: payload.headers || getSupabaseAnonFunctionHeaders(),
+            keepalive: payload.keepalive === true,
+            body: JSON.stringify({
+                action: 'log_event',
+                documentId: documentId,
+                token: token,
+                portalAnchorId: portalAnchorId || '',
+                eventType: eventType,
+                sessionId: payload.sessionId || '',
+                durationSeconds: payload.durationSeconds,
+                metadata: payload.metadata || {}
+            })
+        });
+        const data = await response.json().catch(function() { return {}; });
+        if (!response.ok || data.error) throw new Error(data.error || 'Secure client activity request failed');
+        return { data: data.event, skipped: data.skipped };
+    } catch (error) {
+        return { error: error };
+    }
+}
+
+async function loadSecureClientDocumentActivity(documentId) {
+    if (!documentId) return { error: 'Missing document id for activity log' };
+    try {
+        const data = await callClientDocumentFunction({
+            action: 'document_activity',
+            documentId: documentId
+        }, true);
+        return { data: data.events || [] };
+    } catch (error) {
+        return { error: error };
+    }
+}
+
 async function loadSecureClientPortal(documentId, token) {
     if (!documentId || !token) return { error: 'Missing secure client portal token' };
     try {
