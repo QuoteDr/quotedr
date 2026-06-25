@@ -186,7 +186,7 @@ async function loadSecureClientPortal(documentId, token) {
 }
 
 const CLIENT_ACTIVITY_DEFAULT_PREFS = {
-    email_on_viewed: false,
+    email_on_viewed: true,
     email_on_accepted: true,
     email_on_declined: true,
     email_on_note: true,

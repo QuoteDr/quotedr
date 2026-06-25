@@ -163,7 +163,7 @@ function prefKeyForEvent(eventType: string) {
 
 function defaultPrefs() {
   return {
-    email_on_viewed: false,
+    email_on_viewed: true,
     email_on_accepted: true,
     email_on_declined: true,
     email_on_note: true,
@@ -629,7 +629,20 @@ async function logDocumentEvent(req: Request, body: Record<string, unknown>) {
     .select("*")
     .maybeSingle();
   if (error) throw error;
-  return json({ event: sanitizePortalDocumentEventRow(data as PortalDocumentEventRow), document: sanitizeQuoteRow(target) });
+  const loggedEvent = data as PortalDocumentEventRow;
+  if (eventType === "document_opened") {
+    await recordClientActivity(supabase, target, "viewed", {
+      metadata: {
+        viewed_at: loggedEvent.created_at || new Date().toISOString(),
+        source: "portal_document_event",
+        portal_event_id: loggedEvent.id || "",
+        session_id: sessionId,
+        portal_id: activePortalId || "",
+        portal_anchor_id: normalizeId(anchor?.id || portalAnchorId) || "",
+      },
+    });
+  }
+  return json({ event: sanitizePortalDocumentEventRow(loggedEvent), document: sanitizeQuoteRow(target) });
 }
 
 async function documentActivity(req: Request, body: Record<string, unknown>) {
@@ -699,6 +712,15 @@ async function updateDocument(req: Request, body: Record<string, unknown>) {
   }
 
   if (!Object.prototype.hasOwnProperty.call(update, "data")) {
+    if (action === "mark_viewed") {
+      await recordClientActivity(supabase, target, "viewed", {
+        metadata: {
+          viewed_at: now,
+          unchanged: true,
+          unchanged_status: String(target.status || ""),
+        },
+      });
+    }
     return json({ document: sanitizeQuoteRow(target), unchanged: true });
   }
 

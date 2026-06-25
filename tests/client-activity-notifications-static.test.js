@@ -29,6 +29,24 @@ assert(
 );
 
 assert(
+  clientDocument.includes('recordClientActivity(supabase, target, "viewed"') &&
+  clientDocument.includes('source: "portal_document_event"'),
+  'Portal document_opened activity should feed the viewed email alert stream'
+);
+
+assert(
+  clientDocument.includes('unchanged_status') &&
+  clientDocument.includes('recordClientActivity(supabase, target, "viewed"'),
+  'mark_viewed should still record a deduped viewed alert when the quote status is already past sent'
+);
+
+assert(
+  clientDocument.includes('email_on_viewed: true') &&
+  supabaseV2.includes('email_on_viewed: true'),
+  'Client open email alerts should default on when no preference row exists'
+);
+
+assert(
   clientDocument.includes('detectClientNoteActivity') &&
   clientDocument.includes('recordClientActivity(supabase, updatedRow, "note_added"'),
   'Secure client-document function should record client note activity'
