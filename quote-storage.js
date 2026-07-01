@@ -196,6 +196,9 @@
                 roomCounter: roomCounter,
                 quoteAdjustment: getQuoteClientAdjustment(),
                 paymentsReceived: getQuotePaymentsReceived(),
+                taxEnabled: (typeof getQuoteTaxEnabled === 'function') ? getQuoteTaxEnabled() : true,
+                taxRate: (function(){ try { var p = JSON.parse(localStorage.getItem('ald_quote_prefs')||'{}'); return p.taxRate !== undefined && p.taxRate !== '' ? parseFloat(p.taxRate) / 100 : 0.13; } catch(e){ return 0.13; } })(),
+                taxLabel: (function(){ try { return JSON.parse(localStorage.getItem('ald_quote_prefs')||'{}').taxLabel || 'HST'; } catch(e){ return 'HST'; } })(),
                 grandTotal: grandTotal,
                 total: grandTotal,
                 supabaseId: supabaseId,
@@ -235,12 +238,7 @@
             if (document.getElementById('projectAddress')) document.getElementById('projectAddress').value = data.projectAddress || data.project_address || '';
             if (document.getElementById('clientPhone'))    document.getElementById('clientPhone').value    = data.clientPhone || data.phone || '';
             if (document.getElementById('clientEmail'))    document.getElementById('clientEmail').value    = data.clientEmail || data.email || '';
-            renderTermsCheckboxes();
-            if (data.terms && Array.isArray(data.terms)) {
-                document.querySelectorAll('#termsCheckboxes input[type="checkbox"]').forEach(function(cb) {
-                    cb.checked = data.terms.includes(cb.dataset.text);
-                });
-            }
+            renderTermsCheckboxes(data.terms);
             rooms = data.rooms || [];
             if (data.categoryStyles && typeof categoryStyles !== 'undefined') {
                 Object.assign(categoryStyles, data.categoryStyles || {});
@@ -249,6 +247,7 @@
             roomCounter = data.roomCounter || rooms.length;
             setQuoteClientAdjustment(data.quoteAdjustment || data.clientAdjustment || null);
             setQuotePaymentsReceived(data.paymentsReceived || data.paymentReceived || null);
+            if (typeof setQuoteTaxEnabled === 'function') setQuoteTaxEnabled(data.taxEnabled !== false);
             window._quotePaymentFallbackBalanceDue = null;
             if (!data.paymentsReceived && !data.paymentReceived && data._paymentBalanceDueFallback !== undefined && data._paymentBalanceDueFallback !== null && data._paymentBalanceDueFallback !== '') {
                 window._quotePaymentFallbackBalanceDue = parseQuoteMoney(data._paymentBalanceDueFallback);
@@ -911,12 +910,7 @@ async function saveQuote() {
             cleanupModalBackdrop();
             applyQuoteData(session);
             if (session.quoteNumber) document.getElementById('quoteNumber').value = session.quoteNumber;
-            renderTermsCheckboxes();
-            if (session.terms && Array.isArray(session.terms)) {
-                document.querySelectorAll('#termsCheckboxes input[type="checkbox"]').forEach(function(cb) {
-                    cb.checked = session.terms.includes(cb.dataset.text);
-                });
-            }
+            renderTermsCheckboxes(session.terms);
             // Cancel any autosave triggered during restore - we just loaded, nothing is actually unsaved
             unsavedChanges = false;
             clearTimeout(_autoSaveTimer);
@@ -965,12 +959,7 @@ async function saveQuote() {
                 bootstrap.Modal.getInstance(document.getElementById('startupModal')).hide(); cleanupModalBackdrop();
                 applyQuoteData(draft);
                 if (draft.quoteNumber) document.getElementById('quoteNumber').value = draft.quoteNumber;
-                renderTermsCheckboxes();
-                if (draft.terms && Array.isArray(draft.terms)) {
-                    document.querySelectorAll('#termsCheckboxes input[type="checkbox"]').forEach(function(cb) {
-                        cb.checked = draft.terms.includes(cb.dataset.text);
-                    });
-                }
+                renderTermsCheckboxes(draft.terms);
                 var el = document.getElementById('saveStatus');
                 if (el) el.innerHTML = '<span style="color:#fd7e14;"><i class="fas fa-history"></i> Draft recovered - save to file to keep it safe</span>';
                 updateDraftWarning();
@@ -1129,12 +1118,7 @@ async function saveQuote() {
                                 localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
                                 applyQuoteData(qData);
                                 if (qData.quoteNumber) document.getElementById('quoteNumber').value = qData.quoteNumber;
-                                renderTermsCheckboxes();
-                                if (qData.terms && Array.isArray(qData.terms)) {
-                                    document.querySelectorAll('#termsCheckboxes input[type="checkbox"]').forEach(function(cb) {
-                                        cb.checked = qData.terms.includes(cb.dataset.text);
-                                    });
-                                }
+                                renderTermsCheckboxes(qData.terms);
                                 var el = document.getElementById('saveStatus');
                                 if (el) el.innerHTML = '<span style="color:#1a56a0;"><i class="fas fa-cloud"></i> Loaded from cloud</span>';
                                 updateDraftWarning();
@@ -1188,12 +1172,7 @@ async function saveQuote() {
                                 localStorage.setItem("ald_active_quote_id", result.data.id);
                                 applyQuoteData(qData);
                                 if (qData.quoteNumber) document.getElementById("quoteNumber").value = qData.quoteNumber || "";
-                                renderTermsCheckboxes();
-                                if (qData.terms && Array.isArray(qData.terms)) {
-                                    document.querySelectorAll("#termsCheckboxes input[type=checkbox]").forEach(function(cb) {
-                                        cb.checked = qData.terms.includes(cb.dataset.text);
-                                    });
-                                }
+                                renderTermsCheckboxes(qData.terms);
                                 unsavedChanges = false;
                                 clearTimeout(_autoSaveTimer);
                                 var el = document.getElementById("saveStatus");

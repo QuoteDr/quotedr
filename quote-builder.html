@@ -2037,7 +2037,10 @@ if (location.search.includes('debug')) {
                             <span id="quoteAdjustmentDisplay">$0.00</span>
                         </div>
                         <div class="quote-total-row">
-                            <span id="taxLabelDisplay">HST (13%)</span>
+                            <span class="d-flex align-items-center gap-2">
+                                <input class="form-check-input mt-0" type="checkbox" id="quoteTaxEnabledToggle" checked onchange="updateQuoteTaxEnabledFromToggle()">
+                                <label class="mb-0" for="quoteTaxEnabledToggle" id="taxLabelDisplay">HST (13%)</label>
+                            </span>
                             <span id="taxDisplay">$0.00</span>
                         </div>
                         <div class="quote-total-row" id="quotePaymentRow" style="display:none;">
@@ -8253,7 +8256,40 @@ Example:
             if (typeof markUnsaved === 'function') markUnsaved();
         }
 
+        function getQuoteTaxEnabledDefault() {
+            var prefs = {};
+            try { prefs = JSON.parse(localStorage.getItem('ald_quote_prefs') || '{}'); } catch(e) { prefs = {}; }
+            return prefs.taxEnabledDefault !== false;
+        }
+
+        function getQuoteTaxEnabled() {
+            var el = document.getElementById('quoteTaxEnabledToggle');
+            if (!el) return getQuoteTaxEnabledDefault();
+            return el.checked !== false;
+        }
+
+        function initializeQuoteTaxToggleFromDefault() {
+            if (window._quoteTaxInitialized) return;
+            var el = document.getElementById('quoteTaxEnabledToggle');
+            if (el) el.checked = getQuoteTaxEnabledDefault();
+            window._quoteTaxInitialized = true;
+        }
+
+        function setQuoteTaxEnabled(enabled) {
+            window._quoteTaxInitialized = true;
+            var el = document.getElementById('quoteTaxEnabledToggle');
+            if (el) el.checked = enabled !== false;
+            calculateTotals();
+        }
+
+        function updateQuoteTaxEnabledFromToggle() {
+            window._quoteTaxInitialized = true;
+            calculateTotals();
+            if (typeof markUnsaved === 'function') markUnsaved();
+        }
+
         function calculateTotals() {
+            initializeQuoteTaxToggleFromDefault();
             refreshChoiceGroupTotals();
             let subtotal = 0;
             let coAddedSubtotal = 0;
@@ -8281,9 +8317,10 @@ Example:
             var _currency = _qprefs.currency || 'CAD';
             var _currencySymbols = { CAD:'$', USD:'$', GBP:'\u00a3', EUR:'\u20ac', AUD:'$', NZD:'$' };
             var _sym = _currencySymbols[_currency] || '$';
+            var taxEnabled = getQuoteTaxEnabled();
             const adjustmentAmount = calculateQuoteAdjustmentAmount(subtotal);
             const taxableSubtotal = subtotal + adjustmentAmount;
-            const tax = taxableSubtotal * _taxRate;
+            const tax = taxEnabled ? taxableSubtotal * _taxRate : 0;
             const total = taxableSubtotal + tax;
             var paymentReceivedAmount = calculateQuotePaymentsReceivedAmount(total);
             if (paymentReceivedAmount <= 0.0001 && window._quotePaymentFallbackBalanceDue !== null && window._quotePaymentFallbackBalanceDue !== undefined) {
@@ -8303,7 +8340,11 @@ Example:
                 ? coMoney(subtotal, _sym, true)
                 : qdFormatMoney(subtotal, _sym);
             var taxLabelEl = document.getElementById('taxLabelDisplay');
-            if (taxLabelEl) taxLabelEl.textContent = _taxLabel + ' (' + (_taxRate*100).toFixed(1).replace(/\.0$/,'') + '%)';
+            if (taxLabelEl) {
+                taxLabelEl.textContent = taxEnabled
+                    ? _taxLabel + ' (' + (_taxRate*100).toFixed(1).replace(/\.0$/,'') + '%)'
+                    : _taxLabel + ' not applied';
+            }
             updateQuoteAdjustmentDisplay(adjustmentAmount, _sym);
             updateQuotePaymentCurrencyUI();
             document.getElementById('taxDisplay').textContent = window._quoteDocumentType === 'change_order'
@@ -8313,7 +8354,7 @@ Example:
             var finalLabelEl = document.getElementById('quoteTotalFinalLabel');
             var finalSubLabelEl = document.getElementById('quoteTotalFinalSubLabel');
             if (finalLabelEl) finalLabelEl.textContent = paymentReceivedAmount > 0 ? 'Balance Due' : 'Total';
-            if (finalSubLabelEl) finalSubLabelEl.textContent = paymentReceivedAmount > 0 ? 'After payments received' : 'Includes tax';
+            if (finalSubLabelEl) finalSubLabelEl.textContent = paymentReceivedAmount > 0 ? 'After payments received' : (taxEnabled ? 'Includes tax' : 'Tax not applied');
             document.getElementById('grandTotalDisplay').textContent = window._quoteDocumentType === 'change_order'
                 ? coMoney(balanceDue, _sym, true)
                 : qdFormatMoney(balanceDue, _sym);
@@ -8326,7 +8367,7 @@ Example:
                 ? coMoney(balanceDue, _sym, true)
                 : qdFormatMoney(balanceDue, _sym);
             if (stickySub) stickySub.textContent = 'Subtotal: ' + (window._quoteDocumentType === 'change_order' ? coMoney(subtotal, _sym, true) : qdFormatMoney(subtotal, _sym));
-            if (stickyTax) stickyTax.textContent = _taxLabel + ': ' + (window._quoteDocumentType === 'change_order' ? coMoney(tax, _sym, true) : qdFormatMoney(tax, _sym));
+            if (stickyTax) stickyTax.textContent = (taxEnabled ? _taxLabel : _taxLabel + ' off') + ': ' + (window._quoteDocumentType === 'change_order' ? coMoney(tax, _sym, true) : qdFormatMoney(tax, _sym));
             updateChangeOrderPriceSummary({
                 addedSubtotal: coAddedSubtotal,
                 creditSubtotal: coCreditSubtotal,
@@ -8335,6 +8376,7 @@ Example:
                 total: total,
                 taxLabel: _taxLabel,
                 taxRate: _taxRate,
+                taxEnabled: taxEnabled,
                 symbol: _sym
             });
 
@@ -8386,6 +8428,9 @@ Example:
             var updatedTotal = originalTotal + previousApproved + netChange;
             var taxLabel = summary.taxLabel || 'Tax';
             var taxPct = ((parseFloat(summary.taxRate) || 0) * 100).toFixed(1).replace(/\.0$/, '');
+            var taxLineLabel = summary.taxEnabled === false
+                ? taxLabel + ' not applied'
+                : taxLabel + ' on this change' + (taxPct ? ' (' + taxPct + '%)' : '');
             window._changeOrderPreviousApprovedTotal = previousApproved;
             window._changeOrderPriceSummary = {
                 originalTotal: originalTotal,
@@ -8404,7 +8449,7 @@ Example:
                 '<div class="co-summary-row"><span>Added work</span><strong class="co-positive">' + coMoney(summary.addedSubtotal || 0, symbol, true) + '</strong></div>' +
                 '<div class="co-summary-row"><span>Credits / deductions</span><strong class="co-negative">' + qdFormatMoney(-Math.abs(parseFloat(summary.creditSubtotal || 0) || 0), symbol) + '</strong></div>' +
                 '<div class="co-summary-row"><span>Net change before tax</span><strong>' + coMoney(summary.subtotal || 0, symbol, true) + '</strong></div>' +
-                '<div class="co-summary-row"><span>' + qdTemplateEscapeHtml(taxLabel) + ' on this change' + (taxPct ? ' (' + taxPct + '%)' : '') + '</span><strong>' + coMoney(summary.tax || 0, symbol, true) + '</strong></div>' +
+                '<div class="co-summary-row"><span>' + qdTemplateEscapeHtml(taxLineLabel) + '</span><strong>' + coMoney(summary.tax || 0, symbol, true) + '</strong></div>' +
                 '<div class="co-summary-row"><span>This change order total</span><strong>' + coMoney(netChange, symbol, true) + '</strong></div>' +
                 '<div class="co-summary-row co-summary-final"><span>Updated project total if approved</span><strong>' + coMoney(updatedTotal, symbol, false) + '</strong></div>';
             el.classList.add('visible');
@@ -10057,7 +10102,7 @@ Example:
             return terms;
         }
 
-        function renderTermsCheckboxes() {
+        function renderTermsCheckboxes(appliedTerms) {
             var container = document.getElementById('termsCheckboxes');
             if (!container) return;
             var defaultTerms = [
@@ -10077,9 +10122,11 @@ Example:
             var savedTerms = null;
             try { savedTerms = JSON.parse(localStorage.getItem('ald_custom_terms') || 'null'); } catch(e) { savedTerms = null; }
             var terms = (Array.isArray(savedTerms) && savedTerms.length) ? savedTerms : defaultTerms;
+            var appliedTermSet = Array.isArray(appliedTerms) ? new Set(appliedTerms) : null;
             container.innerHTML = terms.map(function(t) {
+                var isChecked = appliedTermSet ? appliedTermSet.has(t.text) : !!t.defaultOn;
                 return '<div class="form-check mb-1">' +
-                    '<input class="form-check-input" type="checkbox" id="term_' + t.id + '" data-text="' + t.text.replace(/"/g, '&quot;') + '"' + (t.defaultOn ? ' checked' : '') + ' onchange="updateTermsCount()">' +
+                    '<input class="form-check-input" type="checkbox" id="term_' + t.id + '" data-text="' + t.text.replace(/"/g, '&quot;') + '"' + (isChecked ? ' checked' : '') + ' onchange="updateTermsCount()">' +
                     '<label class="form-check-label" for="term_' + t.id + '">' + t.label + '</label>' +
                     '</div>';
             }).join('');
@@ -10194,7 +10241,8 @@ Example:
             return {
                 rate: rate,
                 label: prefs.taxLabel || 'HST',
-                currency: prefs.currency || 'CAD'
+                currency: prefs.currency || 'CAD',
+                enabledDefault: prefs.taxEnabledDefault !== false
             };
         }
 
@@ -10249,6 +10297,7 @@ Example:
                 paymentsReceived: getQuotePaymentsReceived(),
                 grandTotal: parseFloat(document.getElementById('grandTotalDisplay')?.textContent.replace(/[^0-9.]/g, '')) || 0,
                 terms: getSelectedTerms(),
+                taxEnabled: getQuoteTaxEnabled(),
                 taxRate: taxPrefs.rate,
                 taxLabel: taxPrefs.label,
                 currency: taxPrefs.currency,
@@ -10918,6 +10967,7 @@ Example:
                 rooms: JSON.parse(JSON.stringify(rooms)),
                 quoteAdjustment: getQuoteClientAdjustment(),
                 paymentsReceived: getQuotePaymentsReceived(),
+                taxEnabled: getQuoteTaxEnabled(),
                 grandTotal: parseFloat(document.getElementById('grandTotalDisplay').textContent.replace(/[^0-9.]/g, '')) || 0,
                 total: parseFloat(document.getElementById('grandTotalDisplay').textContent.replace(/[^0-9.]/g, '')) || 0,
                 status: 'draft',
@@ -11023,6 +11073,7 @@ Example:
             });
             setQuoteClientAdjustment(quote.quoteAdjustment || quote.clientAdjustment || null);
             setQuotePaymentsReceived(quote.paymentsReceived || quote.paymentReceived || null);
+            setQuoteTaxEnabled(quote.taxEnabled !== false);
 
             renderRooms();
             updateChangeOrderModeUI();
@@ -11059,6 +11110,7 @@ Example:
             });
             setQuoteClientAdjustment(quote.quoteAdjustment || quote.clientAdjustment || null);
             setQuotePaymentsReceived(quote.paymentsReceived || quote.paymentReceived || null);
+            setQuoteTaxEnabled(quote.taxEnabled !== false);
 
             renderRooms();
             return true;
@@ -11078,6 +11130,7 @@ Example:
                 rooms: JSON.parse(JSON.stringify(rooms)), // Deep copy
                 quoteAdjustment: getQuoteClientAdjustment(),
                 paymentsReceived: getQuotePaymentsReceived(),
+                taxEnabled: getQuoteTaxEnabled(),
                 grandTotal: parseFloat(document.getElementById('grandTotalDisplay').textContent.replace(/[^0-9.]/g, '')) || 0,
                 savedAt: new Date().toISOString()
             };

@@ -580,12 +580,19 @@ if (location.search.includes('debug')) {
 							<input type="number" class="form-control" id="taxRate" min="0" max="100" step="0.1" value="13" placeholder="13">
 							<span class="input-group-text">%</span>
 						</div>
-						<div class="form-text">HST/GST/VAT rate. Set to 0 to disable.</div>
+						<div class="form-text">HST/GST/VAT rate. Use the quote total toggle to apply or skip tax per quote.</div>
 					</div>
 					<div class="col-sm-6">
 						<label class="form-label fw-bold">Tax Label<button type="button" class="qd-inline-help-btn" title="Help with tax settings" aria-label="Help with tax settings" onclick="QuoteDrModalHelp.openInline('taxRate'); return false;"><i class="fas fa-question"></i></button></label>
 						<input type="text" class="form-control" id="taxLabel" placeholder="HST" value="HST" style="max-width:200px;">
 						<div class="form-text">e.g. HST, GST, VAT, Sales Tax</div>
+					</div>
+					<div class="col-12">
+						<div class="form-check form-switch">
+							<input class="form-check-input" type="checkbox" id="taxEnabledDefault" checked>
+							<label class="form-check-label fw-bold" for="taxEnabledDefault">Apply tax by default on new quotes</label>
+						</div>
+						<div class="form-text">You can still turn tax on or off for each quote in the Quote Total card.</div>
 					</div>
 					<div class="col-sm-6">
 						<label class="form-label fw-bold">Currency</label>
@@ -2303,6 +2310,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			if (document.getElementById('showPrefix') && savedPrefs.showPrefix === false) document.getElementById('showPrefix').checked = false;
 			if (document.getElementById('taxRate') && savedPrefs.taxRate !== undefined) document.getElementById('taxRate').value = savedPrefs.taxRate;
 			if (document.getElementById('taxLabel') && savedPrefs.taxLabel) document.getElementById('taxLabel').value = savedPrefs.taxLabel;
+			if (document.getElementById('taxEnabledDefault')) document.getElementById('taxEnabledDefault').checked = savedPrefs.taxEnabledDefault !== false;
 			if (document.getElementById('currencySetting') && savedPrefs.currency) document.getElementById('currencySetting').value = savedPrefs.currency;
 			if (document.getElementById('measurementSystemSetting')) document.getElementById('measurementSystemSetting').value = savedPrefs.measurementSystem === 'metric' ? 'metric' : 'imperial';
 			loadEmailTemplate();
@@ -2699,6 +2707,7 @@ Sarah Jones, 905-555-5678"></textarea>
 				showPrefix: document.getElementById('showPrefix').checked,
 				taxRate: document.getElementById('taxRate') ? document.getElementById('taxRate').value : '13',
 				taxLabel: document.getElementById('taxLabel') ? document.getElementById('taxLabel').value.trim() || 'HST' : 'HST',
+				taxEnabledDefault: document.getElementById('taxEnabledDefault') ? document.getElementById('taxEnabledDefault').checked : true,
 				currency: document.getElementById('currencySetting') ? document.getElementById('currencySetting').value : 'CAD',
 				measurementSystem: document.getElementById('measurementSystemSetting') ? document.getElementById('measurementSystemSetting').value : 'imperial'
 			};

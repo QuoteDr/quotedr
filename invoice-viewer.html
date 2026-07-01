@@ -1587,9 +1587,10 @@ if (location.search.includes('debug')) {
             if (!isFinite(_iTaxRate) || _iTaxRate < 0) _iTaxRate = 0.13;
             var _iTaxLabel = invoiceData.taxLabel || _iqp.taxLabel || 'HST';
             var _iCurrency = invoiceData.currency || _iqp.currency || 'CAD';
+            var _iTaxEnabled = invoiceData.taxEnabled !== false;
             const adjustmentAmount = calculateInvoiceQuoteAdjustmentAmount(subtotal);
             const taxableSubtotal = subtotal + adjustmentAmount;
-            const tax = taxableSubtotal * _iTaxRate;
+            const tax = _iTaxEnabled ? taxableSubtotal * _iTaxRate : 0;
             const total = taxableSubtotal + tax;
             const paymentReceivedAmount = calculateInvoicePaymentsReceivedAmount(total);
             const balanceDue = Math.max(total - paymentReceivedAmount, 0);
@@ -1613,7 +1614,9 @@ if (location.search.includes('debug')) {
             if (balanceLabel) balanceLabel.textContent = paymentReceivedAmount > 0 ? 'Balance Due' : 'Total Due';
             document.getElementById('grandTotalDisplay').textContent = formatMoney(balanceDue, _iCurrency);
             var taxLabelRow = document.getElementById('invoiceTaxLabel');
-            if (taxLabelRow) taxLabelRow.textContent = _iTaxLabel + ' (' + (_iTaxRate * 100).toFixed(1).replace(/\.0$/, '') + '%)';
+            if (taxLabelRow) taxLabelRow.textContent = _iTaxEnabled
+                ? _iTaxLabel + ' (' + (_iTaxRate * 100).toFixed(1).replace(/\.0$/, '') + '%)'
+                : _iTaxLabel + ' not applied';
             var noteSection = document.getElementById('invoiceNoteSection');
             var noteEl = document.getElementById('invoiceNoteDisplay');
             var termsEl = document.getElementById('invoicePaymentTermsDisplay');

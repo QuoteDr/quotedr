@@ -2519,7 +2519,7 @@ if (location.search.includes('debug')) {
             updateTotal();
         }
 
-        function updateQuoteTotalBreakdown(subtotal, tax, total, taxLabel, taxRate, paymentReceivedAmount) {
+        function updateQuoteTotalBreakdown(subtotal, tax, total, taxLabel, taxRate, paymentReceivedAmount, taxEnabled) {
             var subtotalEl = document.getElementById('quoteSubtotalDisplay');
             var taxEl = document.getElementById('quoteTaxDisplay');
             var taxLabelEl = document.getElementById('quoteTaxLabel');
@@ -2536,7 +2536,9 @@ if (location.search.includes('debug')) {
 
             if (subtotalEl) subtotalEl.textContent = viewerMoney(subtotal || 0);
             if (taxEl) taxEl.textContent = viewerMoney(tax || 0);
-            if (taxLabelEl) taxLabelEl.textContent = (taxLabel || 'HST') + ' (' + rateLabel + '%)';
+            if (taxLabelEl) taxLabelEl.textContent = taxEnabled === false
+                ? (taxLabel || 'HST') + ' not applied'
+                : (taxLabel || 'HST') + ' (' + rateLabel + '%)';
             if (paymentEl) {
                 var payment = getViewerPaymentsReceived();
                 paymentEl.style.display = paymentAmount > 0 ? 'flex' : 'none';
@@ -2545,7 +2547,7 @@ if (location.search.includes('debug')) {
                     : '';
             }
             if (finalLabelEl) finalLabelEl.textContent = paymentAmount > 0 ? 'Balance Due' : 'Total';
-            if (finalSubLabelEl) finalSubLabelEl.textContent = paymentAmount > 0 ? 'After payments received' : 'Includes tax and selected upgrades';
+            if (finalSubLabelEl) finalSubLabelEl.textContent = paymentAmount > 0 ? 'After payments received' : (taxEnabled === false ? 'Tax not applied' : 'Includes tax and selected upgrades');
             if (totalEl) totalEl.textContent = paymentAmount > 0 ? viewerMoney(balanceDue) : viewerMoney(total);
         }
 
@@ -2571,13 +2573,14 @@ if (location.search.includes('debug')) {
             var _vTaxRate = (_vqp.taxRate !== undefined && _vqp.taxRate !== '') ? parseFloat(_vqp.taxRate)/100 : (quoteData.taxRate || 0.13);
             if (!isFinite(_vTaxRate) || _vTaxRate < 0) _vTaxRate = quoteData.taxRate || 0.13;
             var _vTaxLabel = quoteData.taxLabel || _vqp.taxLabel || 'HST';
+            var _vTaxEnabled = quoteData.taxEnabled !== false;
             const adjustmentAmount = calculateViewerQuoteAdjustmentAmount(subtotal);
             const taxableSubtotal = subtotal + adjustmentAmount;
-            const tax = taxableSubtotal * _vTaxRate;
+            const tax = _vTaxEnabled ? taxableSubtotal * _vTaxRate : 0;
             const total = taxableSubtotal + tax;
             const paymentReceivedAmount = calculateViewerPaymentsReceivedAmount(total);
             const balanceDue = Math.max(total - paymentReceivedAmount, 0);
-            updateQuoteTotalBreakdown(subtotal, tax, total, _vTaxLabel, _vTaxRate, paymentReceivedAmount);
+            updateQuoteTotalBreakdown(subtotal, tax, total, _vTaxLabel, _vTaxRate, paymentReceivedAmount, _vTaxEnabled);
 
             var upgradesEl = document.getElementById('upgradesTotalDisplay');
             if (upgradesEl) {
@@ -2637,10 +2640,12 @@ if (location.search.includes('debug')) {
                 }
                 updateQuoteTotalBreakdown(
                     parentTotal + previousApproved + subtotal,
-                    summary.tax || tax,
+                    summary.tax !== undefined ? summary.tax : tax,
                     projectedTotal,
                     summary.taxLabel || _vTaxLabel,
-                    summary.taxRate || _vTaxRate
+                    summary.taxRate || _vTaxRate,
+                    paymentReceivedAmount,
+                    summary.taxEnabled !== false && _vTaxEnabled
                 );
                 var heroTotal = document.getElementById('heroGrandTotal');
                 if (heroTotal) heroTotal.textContent = viewerMoney(total, { forceSign: true });
