@@ -63,6 +63,33 @@ assert(
 );
 
 assert(
+  builder.includes("{ label: 'Landscape / Outdoor', icons: [") &&
+    builder.includes("{ fa: 'fa-person-digging', label: 'Excavation / Shovel' }") &&
+    builder.includes("{ fa: 'fa-mountain',        label: 'Gravel / Rocks' }") &&
+    builder.includes("{ fa: 'fa-seedling',        label: 'Sod / Planting' }") &&
+    builder.includes("{ fa: 'fa-truck-pickup',    label: 'Pickup / Hauling' }"),
+  'Room icon picker should include landscape and outdoor room icons'
+);
+
+assert(
+  builder.includes("pattern: /\\b(site prep|site preparation|prep work|excavation|digging|trenching|grading|earthwork)\\b/") &&
+    builder.includes("icon: 'fa-person-digging'"),
+  'Detector should map site preparation and excavation names to the digging icon'
+);
+
+assert(
+  builder.includes("pattern: /\\b(gravel|rock|rocks|stone|boulder|boulders|aggregate|crusher run|clear stone)\\b/") &&
+    builder.includes("icon: 'fa-mountain'"),
+  'Detector should map gravel and rock names to the rocks icon'
+);
+
+assert(
+  builder.includes("pattern: /\\b(tree removal|tree|trees|shrub|shrubs|brush|planting|sod|seed|seeding|garden|landscape|landscaping)\\b/") &&
+    builder.includes("icon: 'fa-tree'"),
+  'Detector should map tree and landscaping names to outdoor plant icons'
+);
+
+assert(
   builder.includes('var candidates = detectRoomIconCandidatesForName(room.name);') &&
   builder.includes('showRoomIconAutoDetectChoices(roomId, candidates);'),
   'Single-room auto detect should show choices instead of silently selecting a fallback when several icons match'

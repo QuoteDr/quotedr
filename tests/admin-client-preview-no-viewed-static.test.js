@@ -20,13 +20,19 @@ assert(
 assert(
   /function isContractorPreviewView\s*\([^)]*\)/.test(viewer) &&
     viewer.includes("params.get('preview') === '1'") &&
-    viewer.includes("params.get('admin_preview') === '1'"),
+    viewer.includes("params.get('admin_preview') === '1'") &&
+    viewer.includes("params.get('admin') === '1'"),
   'Interactive quote viewer should recognize contractor preview flags'
 );
 
 assert(
   /async function markQuoteViewed[\s\S]*var isPreview = isContractorPreviewView\(params\);[\s\S]*if\s*\(isPreview\)\s*return;/.test(viewer),
   'Interactive quote viewer should skip mark_viewed for contractor previews'
+);
+
+assert(
+  /function logPortalDocumentActivity[\s\S]*if\s*\(isContractorPreviewView\(new URLSearchParams\(window\.location\.search\)\)\)\s*return;/.test(viewer),
+  'Interactive quote viewer should skip activity alerts for contractor previews'
 );
 
 assert(

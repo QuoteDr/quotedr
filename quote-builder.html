@@ -4279,6 +4279,17 @@ Example:
                 { fa: 'fa-tools',           label: 'Workshop' },
                 { fa: 'fa-industry',        label: 'Basement / Industrial' },
             ]},
+            { label: 'Landscape / Outdoor', icons: [
+                { fa: 'fa-person-digging', label: 'Excavation / Shovel' },
+                { fa: 'fa-mountain',        label: 'Gravel / Rocks' },
+                { fa: 'fa-tree',            label: 'Tree / Yard' },
+                { fa: 'fa-seedling',        label: 'Sod / Planting' },
+                { fa: 'fa-leaf',            label: 'Landscape / Plants' },
+                { fa: 'fa-road',            label: 'Driveway / Asphalt' },
+                { fa: 'fa-campground',      label: 'Deck / Patio' },
+                { fa: 'fa-truck-pickup',    label: 'Pickup / Hauling' },
+                { fa: 'fa-sun',             label: 'Exterior' },
+            ]},
             { label: 'Trades', icons: [
                 { fa: 'fa-paint-roller',    label: 'Painting' },
                 { fa: 'fa-hammer',          label: 'Carpentry' },
@@ -4296,6 +4307,11 @@ Example:
                 { fa: 'fa-lightbulb',       label: 'Lighting' },
                 { fa: 'fa-solar-panel',     label: 'Solar' },
                 { fa: 'fa-wifi',            label: 'Smart Home' },
+                { fa: 'fa-trash-alt',       label: 'Demolition' },
+                { fa: 'fa-truck',           label: 'Delivery' },
+                { fa: 'fa-house-damage',    label: 'Roofing / Repairs' },
+                { fa: 'fa-cubes',           label: 'Masonry / Blocks' },
+                { fa: 'fa-broom',           label: 'Cleaning' },
             ]},
             { label: 'Other', icons: [
                 { fa: 'fa-star',            label: 'Star' },
@@ -4333,8 +4349,17 @@ Example:
             { pattern: /\b(store|retail|commercial|showroom)\b/, icon: 'fa-store' },
             { pattern: /\b(hallway|hall|corridor|foyer|entry|entrance)\b/, icon: 'fa-archway' },
             { pattern: /\b(stair|stairs|stairwell)\b/, icon: 'fa-stairs' },
+            { pattern: /\b(site prep|site preparation|prep work|excavation|digging|trenching|grading|earthwork)\b/, icon: 'fa-person-digging' },
+            { pattern: /\b(gravel|rock|rocks|stone|boulder|boulders|aggregate|crusher run|clear stone)\b/, icon: 'fa-mountain' },
+            { pattern: /\b(tree removal|tree|trees|shrub|shrubs|brush|planting|sod|seed|seeding|garden|landscape|landscaping)\b/, icon: 'fa-tree' },
+            { pattern: /\b(driveway|asphalt|paving|concrete|walkway|sidewalk)\b/, icon: 'fa-road' },
+            { pattern: /\b(fence|fencing|gate|privacy fence)\b/, icon: 'fa-warehouse' },
             { pattern: /\b(deck|patio|porch|outdoor|balcony)\b/, icon: 'fa-campground' },
-            { pattern: /\b(yard|garden|landscape|landscaping)\b/, icon: 'fa-tree' },
+            { pattern: /\b(yard|lawn|outdoor|exterior)\b/, icon: 'fa-sun' },
+            { pattern: /\b(delivery|pickup|hauling|haul|dump run)\b/, icon: 'fa-truck-pickup' },
+            { pattern: /\b(demo|demolition|tear out|tearout|removal)\b/, icon: 'fa-trash-alt' },
+            { pattern: /\b(roof|roofing|shingle|shingles|gutter|eavestrough)\b/, icon: 'fa-house-damage' },
+            { pattern: /\b(cleaning|cleanup|clean up|site cleanup)\b/, icon: 'fa-broom' },
             { pattern: /\b(basement|mechanical|utility)\b/, icon: 'fa-industry' },
             { pattern: /\b(main floor|second floor|2nd floor|third floor|3rd floor|upper floor|lower floor|floor|level)\b/, icon: 'fa-building' },
             { pattern: /\b(main floor|whole floor|floor|level)\b/, icon: 'fa-home' },
@@ -5110,14 +5135,18 @@ Example:
 
         const COMMON_ROOM_SPELLCHECK_WORDS = [
             'addition', 'area', 'attic', 'backyard', 'balcony', 'bar', 'baseboard', 'basement', 'bath',
-            'bathroom', 'bedroom', 'bonus', 'breakfast', 'cabana', 'cabinet', 'closet', 'crawlspace',
-            'deck', 'den', 'dining', 'door', 'driveway', 'electrical', 'ensuite', 'entry', 'entryway',
-            'exterior', 'family', 'floor', 'foyer', 'front', 'garage', 'garden', 'guest', 'hall',
-            'hallway', 'home', 'interior', 'kitchen', 'landing', 'laundry', 'living', 'loft', 'main',
-            'master', 'mudroom', 'nursery', 'office', 'outdoor', 'pantry', 'patio', 'plumbing',
-            'porch', 'powder', 'primary', 'rec', 'recreation', 'roof', 'room', 'shop', 'side',
-            'stair', 'stairs', 'storage', 'suite', 'sunroom', 'theatre', 'trim', 'upper', 'utility',
-            'vestibule', 'walkway', 'washroom', 'window', 'workshop', 'yard'
+            'bathroom', 'beams', 'bedroom', 'bonus', 'breakfast', 'cabana', 'cabinet', 'cleanup',
+            'closet', 'concrete', 'crawlspace', 'deck', 'decking', 'delivery', 'demolition', 'den',
+            'dining', 'disposal', 'door', 'driveway', 'electrical', 'ensuite', 'entry', 'entryway',
+            'excavation', 'exterior', 'family', 'floor', 'footing', 'footings', 'foyer', 'framing',
+            'front', 'garage', 'garden', 'grading', 'gravel', 'guest', 'hall', 'hallway', 'home',
+            'installation', 'interior', 'joist', 'joists', 'kitchen', 'landing', 'laundry', 'layout',
+            'ledger', 'living', 'loft', 'main', 'materials', 'master', 'mudroom', 'nursery', 'office',
+            'outdoor', 'pantry', 'patio', 'permits', 'plumbing', 'porch', 'post', 'posts', 'powder',
+            'preparation', 'prep', 'primary', 'railing', 'railings', 'rec', 'recreation', 'roof',
+            'room', 'shop', 'side', 'site', 'stair', 'stairs', 'storage', 'structure', 'suite',
+            'sunroom', 'theatre', 'trim', 'upper', 'utility', 'vestibule', 'walkway', 'washroom',
+            'window', 'workshop', 'yard'
         ];
 
         const COMMON_ROOM_SPELLCHECK_LABELS = {
@@ -5131,40 +5160,59 @@ Example:
             basement: 'Basement',
             bath: 'Bath',
             bathroom: 'Bathroom',
+            beams: 'Beams',
             bedroom: 'Bedroom',
             bonus: 'Bonus',
             breakfast: 'Breakfast',
             cabana: 'Cabana',
             cabinet: 'Cabinet',
+            cleanup: 'Cleanup',
             closet: 'Closet',
+            concrete: 'Concrete',
             crawlspace: 'Crawlspace',
             deck: 'Deck',
+            decking: 'Decking',
+            delivery: 'Delivery',
+            demolition: 'Demolition',
             den: 'Den',
             dining: 'Dining',
+            disposal: 'Disposal',
             door: 'Door',
             driveway: 'Driveway',
             electrical: 'Electrical',
             ensuite: 'Ensuite',
             entry: 'Entry',
             entryway: 'Entryway',
+            excavation: 'Excavation',
             exterior: 'Exterior',
             family: 'Family',
             floor: 'Floor',
+            footing: 'Footing',
+            footings: 'Footings',
             foyer: 'Foyer',
+            framing: 'Framing',
             front: 'Front',
             garage: 'Garage',
             garden: 'Garden',
+            grading: 'Grading',
+            gravel: 'Gravel',
             guest: 'Guest',
             hall: 'Hall',
             hallway: 'Hallway',
             home: 'Home',
+            installation: 'Installation',
             interior: 'Interior',
+            joist: 'Joist',
+            joists: 'Joists',
             kitchen: 'Kitchen',
             landing: 'Landing',
             laundry: 'Laundry',
+            layout: 'Layout',
+            ledger: 'Ledger',
             living: 'Living',
             loft: 'Loft',
             main: 'Main',
+            materials: 'Materials',
             master: 'Master',
             mudroom: 'Mudroom',
             nursery: 'Nursery',
@@ -5172,19 +5220,28 @@ Example:
             outdoor: 'Outdoor',
             pantry: 'Pantry',
             patio: 'Patio',
+            permits: 'Permits',
             plumbing: 'Plumbing',
             porch: 'Porch',
+            post: 'Post',
+            posts: 'Posts',
             powder: 'Powder',
+            preparation: 'Preparation',
+            prep: 'Prep',
             primary: 'Primary',
+            railing: 'Railing',
+            railings: 'Railings',
             rec: 'Rec',
             recreation: 'Recreation',
             roof: 'Roof',
             room: 'Room',
             shop: 'Shop',
             side: 'Side',
+            site: 'Site',
             stair: 'Stair',
             stairs: 'Stairs',
             storage: 'Storage',
+            structure: 'Structure',
             suite: 'Suite',
             sunroom: 'Sunroom',
             theatre: 'Theatre',
@@ -6824,6 +6881,166 @@ Example:
             }, 200);
         }
 
+        function getLineItemSupplierUrlFromForm() {
+            const supplierLinkBtn = document.getElementById('supplierLinkBtn');
+            return (supplierLinkBtn && supplierLinkBtn.style.display !== 'none' && supplierLinkBtn.href !== '#') ? supplierLinkBtn.href : '';
+        }
+
+        function findSavedItemForQuoteEdit(itemOrSource) {
+            const source = itemOrSource && itemOrSource.savedItemSource ? itemOrSource.savedItemSource : itemOrSource;
+            const fallbackCategory = itemOrSource && !itemOrSource.savedItemSource ? itemOrSource.category : '';
+            const fallbackName = itemOrSource && !itemOrSource.savedItemSource ? (itemOrSource.serviceName || itemOrSource.description) : '';
+            const category = (source && source.category) || fallbackCategory || '';
+            const name = (source && source.name) || fallbackName || '';
+            const key = (source && source.key) || savedItemQuoteSyncKey(category, name);
+            if (!category && !name && !key) return null;
+
+            try {
+                if (!customItems || typeof customItems !== 'object') {
+                    customItems = JSON.parse(localStorage.getItem('ald_custom_items') || '{}');
+                }
+            } catch(e) {
+                if (!customItems || typeof customItems !== 'object') customItems = {};
+            }
+
+            const customCategories = category && customItems[category] ? [category] : Object.keys(customItems || {});
+            for (const cat of customCategories) {
+                const list = Array.isArray(customItems[cat]) ? customItems[cat] : [];
+                const index = list.findIndex(function(saved) {
+                    if (!saved) return false;
+                    return savedItemQuoteSyncKey(cat, saved.name || saved.description || '') === key ||
+                        (category === cat && normalizeSavedItemQuoteSyncText(saved.name || saved.description || '') === normalizeSavedItemQuoteSyncText(name));
+                });
+                if (index >= 0) {
+                    return { category: cat, item: list[index], index: index, source: 'customItems' };
+                }
+            }
+
+            const pricingCategories = category && pricingDatabase[category] ? [category] : Object.keys(pricingDatabase || {});
+            for (const cat of pricingCategories) {
+                const list = Array.isArray(pricingDatabase[cat]) ? pricingDatabase[cat] : [];
+                const index = list.findIndex(function(saved) {
+                    if (!saved) return false;
+                    return savedItemQuoteSyncKey(cat, saved.name || saved.description || '') === key ||
+                        (category === cat && normalizeSavedItemQuoteSyncText(saved.name || saved.description || '') === normalizeSavedItemQuoteSyncText(name));
+                });
+                if (index >= 0) {
+                    return { category: cat, item: list[index], index: index, source: 'pricingDatabase' };
+                }
+            }
+            return null;
+        }
+
+        function buildSavedItemFromEditedLineItem(existingItem) {
+            const desc = document.getElementById('lineDescription').value.trim();
+            const itemDescription = document.getElementById('lineItemDescription').value.trim();
+            const category = normalizeLineItemCategoryValue(document.getElementById('lineCategory'));
+            const unitType = normalizeLineUnitTypeValue(document.getElementById('lineUnitType'));
+            const rate = parseFloat(document.getElementById('lineRate').value) || 0;
+            const materialCost = parseFloat(document.getElementById('lineMaterialCost').value) || 0;
+            const existingSavedItem = findSavedItemForQuoteEdit(existingItem)?.item || {};
+            const savedItem = {
+                name: desc,
+                unitType: unitType,
+                rate: rate,
+                materialCost: materialCost,
+                supplierUrl: getLineItemSupplierUrlFromForm(),
+                itemDescription: itemDescription
+            };
+            if (existingSavedItem.photo || existingItem?.photo) savedItem.photo = existingSavedItem.photo || existingItem.photo;
+            if (existingSavedItem.laborTime || existingItem?.laborTime) savedItem.laborTime = normalizeLaborTime(existingSavedItem.laborTime || existingItem.laborTime);
+            if (existingSavedItem.upgrade || existingItem?.upgrade) savedItem.upgrade = cloneSavedItemForQuoteSync(existingSavedItem.upgrade || existingItem.upgrade);
+            if (category) savedItem.category = category;
+            return savedItem;
+        }
+
+        async function maybeConfirmSavedItemDatabaseUpdate(item, editedSavedItemData) {
+            if (!item || !editedSavedItemData || isLineItemOneTimeCategory()) return 'quote_only';
+            const savedMatch = findSavedItemForQuoteEdit(item);
+            if (!savedMatch || !savedMatch.item) return 'quote_only';
+            const beforeFingerprint = getSavedItemFingerprintForQuoteSync(savedMatch.item);
+            const afterFingerprint = getSavedItemFingerprintForQuoteSync(Object.assign({}, savedMatch.item, editedSavedItemData));
+            if (beforeFingerprint === afterFingerprint) return 'quote_only';
+            const choice = await qdConfirm('Apply these reusable item changes to the saved item database too? Your current quote will update either way. Job-specific notes stay only on this quote.', {
+                title: 'Update Saved Item?',
+                okText: 'Update Saved Item',
+                secondaryText: 'Current Quote Only',
+                secondaryValue: 'quote_only',
+                cancelText: 'Cancel',
+                okClass: 'btn-primary',
+                type: 'warning'
+            });
+            if (choice === false) return false;
+            return choice === true ? 'update_saved_item' : 'quote_only';
+        }
+
+        async function saveEditedLineItemToDatabase(previousSavedItemSource, editedSavedItemData) {
+            if (!previousSavedItemSource || !editedSavedItemData || !editedSavedItemData.name || !editedSavedItemData.category) return null;
+            try {
+                if (!customItems || typeof customItems !== 'object') {
+                    customItems = JSON.parse(localStorage.getItem('ald_custom_items') || '{}');
+                }
+            } catch(e) {
+                if (!customItems || typeof customItems !== 'object') customItems = {};
+            }
+
+            const savedMatch = findSavedItemForQuoteEdit(previousSavedItemSource);
+            if (!savedMatch || !savedMatch.item) return null;
+            const previousCategory = savedMatch.category || previousSavedItemSource.category || editedSavedItemData.category;
+            const previousName = savedMatch.item.name || previousSavedItemSource.name || editedSavedItemData.name;
+            const beforeItem = cloneSavedItemForQuoteSync(savedMatch.item);
+            const nextCategory = editedSavedItemData.category;
+            const nextItem = Object.assign({}, cloneSavedItemForQuoteSync(savedMatch.item), editedSavedItemData);
+            delete nextItem.category;
+            delete nextItem.notes;
+            delete nextItem.quantity;
+            delete nextItem.total;
+
+            if (!customItems[nextCategory]) customItems[nextCategory] = [];
+            if (previousCategory !== nextCategory && Array.isArray(customItems[previousCategory])) {
+                customItems[previousCategory] = customItems[previousCategory].filter(function(saved) {
+                    return savedItemQuoteSyncKey(previousCategory, saved && (saved.name || saved.description || '')) !== savedItemQuoteSyncKey(previousCategory, previousName);
+                });
+            }
+
+            let targetIndex = customItems[nextCategory].findIndex(function(saved) {
+                return savedItemQuoteSyncKey(nextCategory, saved && (saved.name || saved.description || '')) === savedItemQuoteSyncKey(nextCategory, previousName) ||
+                    savedItemQuoteSyncKey(nextCategory, saved && (saved.name || saved.description || '')) === savedItemQuoteSyncKey(nextCategory, nextItem.name);
+            });
+            if (targetIndex >= 0) {
+                customItems[nextCategory][targetIndex] = Object.assign({}, customItems[nextCategory][targetIndex], nextItem);
+            } else {
+                customItems[nextCategory].push(nextItem);
+            }
+
+            if (previousCategory !== nextCategory && Array.isArray(pricingDatabase[previousCategory])) {
+                pricingDatabase[previousCategory] = pricingDatabase[previousCategory].filter(function(saved) {
+                    return !(saved && saved._custom && savedItemQuoteSyncKey(previousCategory, saved.name || saved.description || '') === savedItemQuoteSyncKey(previousCategory, previousName));
+                });
+            }
+            if (!pricingDatabase[nextCategory]) pricingDatabase[nextCategory] = [];
+            let pricingIndex = pricingDatabase[nextCategory].findIndex(function(saved) {
+                return savedItemQuoteSyncKey(nextCategory, saved && (saved.name || saved.description || '')) === savedItemQuoteSyncKey(nextCategory, previousName) ||
+                    savedItemQuoteSyncKey(nextCategory, saved && (saved.name || saved.description || '')) === savedItemQuoteSyncKey(nextCategory, nextItem.name);
+            });
+            if (pricingIndex >= 0) {
+                Object.assign(pricingDatabase[nextCategory][pricingIndex], nextItem, { _custom: true });
+            } else {
+                pricingDatabase[nextCategory].push(Object.assign({}, nextItem, { _custom: true }));
+            }
+
+            localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
+            if (typeof recordSavedItemQuoteChange === 'function') {
+                recordSavedItemQuoteChange(previousSavedItemSource.category || previousCategory, previousSavedItemSource.name || previousName, beforeItem, nextItem);
+            }
+            if (typeof _doBackupItemsToCloud === 'function') {
+                _doBackupItemsToCloud(customItems).catch(function(){});
+            } else if (typeof backupItemsToCloud === 'function') {
+                backupItemsToCloud(customItems).catch(function(){});
+            }
+            return { category: nextCategory, item: nextItem };
+        }
+
         async function confirmAddLine() {
             const roomId = parseInt(document.getElementById('currentRoomId').value);
             if (!validateAddLineItemRequiredFields()) return;
@@ -6837,6 +7054,16 @@ Example:
             const materialCost = parseFloat(document.getElementById('lineMaterialCost').value) || 0;
             const roomIndex = rooms.findIndex(r => r.id === roomId);
             if (roomIndex !== -1) {
+                let savedDbChoice = 'quote_only';
+                let previousSavedItemSource = null;
+                let editedSavedItemData = null;
+                if (editingItemIndex !== null && rooms[roomIndex].items[editingItemIndex]) {
+                    const item = rooms[roomIndex].items[editingItemIndex];
+                    editedSavedItemData = buildSavedItemFromEditedLineItem(item);
+                    previousSavedItemSource = cloneSavedItemForQuoteSync(item.savedItemSource || savedItemQuoteSource(item.category, { name: item.serviceName || item.description, unitType: item.unitType, rate: item.rate, materialCost: item.materialCost, supplierUrl: item.supplierUrl, itemDescription: item.itemDescription, photo: item.photo, laborTime: item.laborTime, upgrade: item.upgrade }));
+                    savedDbChoice = await maybeConfirmSavedItemDatabaseUpdate(item, editedSavedItemData);
+                    if (savedDbChoice === false) return;
+                }
                 const savNewItemBtn = document.getElementById('saveNewItemBtn');
                 const shouldAskToSaveNewItem = editingItemIndex === null && !isLineItemOneTimeCategory() && savNewItemBtn && savNewItemBtn.style.display !== 'none';
                 if (shouldAskToSaveNewItem) {
@@ -6867,9 +7094,16 @@ Example:
                     item.notes = notes;
                     item.itemDescription = itemDescription;
                     item.materialCost = materialCost;
-                    item.supplierUrl = document.getElementById('supplierLinkBtn')?.href !== '#' ? document.getElementById('supplierLinkBtn')?.href : '';
+                    item.supplierUrl = getLineItemSupplierUrlFromForm();
                     item.laborTime = normalizeLaborTime(item.laborTime);
-                    if (savedItemForEdit) {
+                    if (savedDbChoice === 'update_saved_item') {
+                        const savedUpdateResult = await saveEditedLineItemToDatabase(previousSavedItemSource, editedSavedItemData);
+                        if (savedUpdateResult && savedUpdateResult.item) {
+                            item.serviceName = savedUpdateResult.item.name || item.serviceName;
+                            item.savedItemSource = savedItemQuoteSource(savedUpdateResult.category, savedUpdateResult.item);
+                            item.savedItemFingerprint = getSavedItemFingerprintForQuoteSync(savedUpdateResult.item);
+                        }
+                    } else if (savedItemForEdit) {
                         item.savedItemSource = savedItemQuoteSource(category, savedItemForEdit);
                         item.savedItemFingerprint = getSavedItemFingerprintForQuoteSync(savedItemForEdit);
                     }
@@ -6879,8 +7113,7 @@ Example:
                     // Carry upgrade option from pricing database if available
                     const svcName = document.getElementById('lineService').value;
                     const dbItem = pricingDatabase[category]?.find(i => i.name === svcName);
-                    const sLinkBtn = document.getElementById('supplierLinkBtn');
-                    const supplierUrl = (sLinkBtn && sLinkBtn.style.display !== 'none' && sLinkBtn.href !== '#') ? sLinkBtn.href : '';
+                    const supplierUrl = getLineItemSupplierUrlFromForm();
                     const newItem = {
                         description,
                         category,

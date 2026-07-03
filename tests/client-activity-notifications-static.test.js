@@ -73,14 +73,24 @@ assert(
 assert(
   viewer.includes('isContractorPreviewView(params)') &&
   viewer.includes('if (isPreview) return;') &&
+  viewer.includes("params.get('admin') === '1'") &&
+  /function logPortalDocumentActivity[\s\S]*isContractorPreviewView\(new URLSearchParams\(window\.location\.search\)\)/.test(viewer) &&
   viewer.includes("updateSecureClientDocument(quoteId, token, 'mark_viewed'"),
-  'Client viewer should not mark contractor previews as viewed'
+  'Client viewer should not mark or alert contractor previews as viewed'
 );
 
 assert(
   invoiceViewer.includes('function markInvoiceViewed') &&
   invoiceViewer.includes('isInvoiceContractorPreviewView(params)') &&
+  invoiceViewer.includes("params.get('admin') === '1'") &&
+  /function logPortalDocumentActivity[\s\S]*isContractorPreviewView\(new URLSearchParams\(window\.location\.search\)\)/.test(invoiceViewer) &&
   invoiceViewer.includes("updateSecureClientDocument(invoiceId, token, 'mark_viewed'") &&
   invoiceViewer.includes('markInvoiceViewed(supabaseId);'),
-  'Invoice viewer should mark real client invoice opens without counting contractor previews'
+  'Invoice viewer should mark real client invoice opens without counting or alerting contractor previews'
+);
+
+assert(
+  clientDocument.includes('isAdminPreviewActivityRequest') &&
+    clientDocument.includes('skipped: "admin_preview_activity"'),
+  'Secure client-document function should skip admin preview activity before writing or emailing'
 );

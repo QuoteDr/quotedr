@@ -1295,6 +1295,7 @@ if (location.search.includes('debug')) {
 
         function logPortalDocumentActivity(eventType, options) {
             options = options || {};
+            if (isContractorPreviewView(new URLSearchParams(window.location.search))) return;
             if (!portalActivityContext || !portalActivityContext.documentId || !portalActivityContext.token || typeof logSecureClientDocumentEvent !== 'function') return;
             logSecureClientDocumentEvent(portalActivityContext.documentId, portalActivityContext.token, eventType, {
                 sessionId: getPortalActivitySessionId(),
@@ -2884,7 +2885,7 @@ if (location.search.includes('debug')) {
 
         function isContractorPreviewView(params) {
             params = params || new URLSearchParams(window.location.search);
-            return params.get('preview') === '1' || params.get('admin_preview') === '1' || params.get('adminPreview') === '1';
+            return params.get('preview') === '1' || params.get('admin_preview') === '1' || params.get('adminPreview') === '1' || params.get('admin') === '1';
         }
 
         async function markQuoteViewed(quoteId) {

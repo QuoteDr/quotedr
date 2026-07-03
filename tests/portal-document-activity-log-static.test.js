@@ -28,6 +28,7 @@ assert(edgeSource.includes('documentActivity'), 'client-document function should
 assert(edgeSource.includes('action === "log_event"'), 'client-document function should route log_event');
 assert(edgeSource.includes('action === "document_activity"'), 'client-document function should route document_activity');
 assert(edgeSource.includes('skipped: "owner_activity"'), 'owner/admin previews should not count as client activity');
+assert(edgeSource.includes('isAdminPreviewActivityRequest') && edgeSource.includes('skipped: "admin_preview_activity"'), 'admin preview activity requests should not create portal events');
 assert(edgeSource.includes('.from("portal_document_events")'), 'client-document function should write/read portal_document_events');
 assert(edgeSource.includes('document_opened') && edgeSource.includes('pdf_opened') && edgeSource.includes('payment_clicked'), 'activity event allowlist should include core client events');
 
@@ -37,12 +38,14 @@ assert(supabaseSource.includes('keepalive'), 'activity logging should support pa
 
 assert(quoteViewerSource.includes('initPortalDocumentActivityTracking'), 'quote viewer should initialize activity tracking');
 assert(quoteViewerSource.includes('document_opened'), 'quote viewer should log document_opened');
+assert(/function logPortalDocumentActivity[\s\S]*isContractorPreviewView\(new URLSearchParams\(window\.location\.search\)\)/.test(quoteViewerSource), 'quote viewer should not log activity in admin preview mode');
 assert(quoteViewerSource.includes('document_view_duration'), 'quote viewer should log active viewing duration');
 assert(quoteViewerSource.includes('visibilitychange') && quoteViewerSource.includes('pagehide'), 'quote viewer should pause/flush active-time tracking');
 assert(quoteViewerSource.includes('signature_started') && quoteViewerSource.includes('document_signed'), 'quote viewer should log signature events');
 
 assert(invoiceViewerSource.includes('initPortalDocumentActivityTracking'), 'invoice viewer should initialize activity tracking');
 assert(invoiceViewerSource.includes('document_opened'), 'invoice viewer should log document_opened');
+assert(/function logPortalDocumentActivity[\s\S]*isContractorPreviewView\(new URLSearchParams\(window\.location\.search\)\)/.test(invoiceViewerSource), 'invoice viewer should not log activity in admin preview mode');
 assert(invoiceViewerSource.includes('payment_clicked'), 'invoice viewer should log payment clicks');
 assert(invoiceViewerSource.includes('pdf_opened'), 'invoice viewer should log PDF/print opens');
 

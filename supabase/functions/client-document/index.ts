@@ -418,6 +418,28 @@ function sanitizeEventMetadata(value: unknown) {
   return result;
 }
 
+function isTruthyFlag(value: unknown) {
+  if (value === true || value === 1) return true;
+  if (typeof value !== "string") return false;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
+}
+
+function isAdminPreviewActivityRequest(body: Record<string, unknown>) {
+  const rawMetadata = body.metadata;
+  const metadata = rawMetadata && typeof rawMetadata === "object" && !Array.isArray(rawMetadata)
+    ? rawMetadata as Record<string, unknown>
+    : {};
+  return isTruthyFlag(body.adminPreview)
+    || isTruthyFlag(body.admin_preview)
+    || isTruthyFlag(body.preview)
+    || isTruthyFlag(body.admin)
+    || isTruthyFlag(metadata.adminPreview)
+    || isTruthyFlag(metadata.admin_preview)
+    || isTruthyFlag(metadata.preview)
+    || isTruthyFlag(metadata.admin);
+}
+
 async function fetchQuoteById(id: string) {
   const supabase = adminClient();
   const { data, error } = await supabase
@@ -604,6 +626,10 @@ async function logDocumentEvent(req: Request, body: Record<string, unknown>) {
   if (!ALLOWED_DOCUMENT_EVENT_TYPES.has(eventType)) return json({ error: "Unsupported document activity event" }, 400);
 
   const { target, anchor } = await assertTokenAccess(documentId, token, portalAnchorId);
+  if (isAdminPreviewActivityRequest(body)) {
+    return json({ document: sanitizeQuoteRow(target), event: null, skipped: "admin_preview_activity" });
+  }
+
   const signedInUser = await userFromAuthHeader(req);
   if (signedInUser?.id && signedInUser.id === target.user_id) {
     return json({ document: sanitizeQuoteRow(target), event: null, skipped: "owner_activity" });
