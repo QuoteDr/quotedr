@@ -66,9 +66,13 @@ assert(
   builder.includes("{ label: 'Landscape / Outdoor', icons: [") &&
     builder.includes("{ fa: 'fa-person-digging', label: 'Excavation / Shovel' }") &&
     builder.includes("{ fa: 'fa-mountain',        label: 'Gravel / Rocks' }") &&
+    builder.includes("{ fa: 'fa-border-all',      label: 'Deck' }") &&
+    builder.includes("{ fa: 'fa-grip-lines-vertical', label: 'Fence' }") &&
+    builder.includes("{ fa: 'fa-vector-square',   label: 'Patio / Pavers' }") &&
+    builder.includes("{ fa: 'fa-road',            label: 'Walkway / Driveway' }") &&
     builder.includes("{ fa: 'fa-seedling',        label: 'Sod / Planting' }") &&
     builder.includes("{ fa: 'fa-truck-pickup',    label: 'Pickup / Hauling' }"),
-  'Room icon picker should include landscape and outdoor room icons'
+  'Room icon picker should include landscape, deck, fence, patio, and outdoor room icons'
 );
 
 assert(
@@ -87,6 +91,30 @@ assert(
   builder.includes("pattern: /\\b(tree removal|tree|trees|shrub|shrubs|brush|planting|sod|seed|seeding|garden|landscape|landscaping)\\b/") &&
     builder.includes("icon: 'fa-tree'"),
   'Detector should map tree and landscaping names to outdoor plant icons'
+);
+
+assert(
+  builder.includes("pattern: /\\b(deck|decking|deck board|deck boards|railing|railings|pergola|balcony)\\b/") &&
+    builder.includes("icon: 'fa-border-all'"),
+  'Detector should map deck and railing names to the deck icon'
+);
+
+assert(
+  builder.includes("pattern: /\\b(fence|fencing|gate|privacy fence|fence panel|fence panels)\\b/") &&
+    builder.includes("icon: 'fa-grip-lines-vertical'"),
+  'Detector should map fence and gate names to the fence icon'
+);
+
+assert(
+  builder.includes("pattern: /\\b(patio|paver|pavers|interlock|hardscape|stone patio|slab patio)\\b/") &&
+    builder.includes("icon: 'fa-vector-square'"),
+  'Detector should map patio and hardscape names to the paver icon'
+);
+
+assert(
+  builder.includes("pattern: /\\b(walkway|sidewalk|path|pathway|driveway|asphalt|paving|concrete)\\b/") &&
+    builder.includes("icon: 'fa-road'"),
+  'Detector should map walkway and driveway names to the road icon'
 );
 
 assert(

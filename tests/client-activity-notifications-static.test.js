@@ -65,9 +65,18 @@ assert(
   dashboard.includes('id="clientActivityModal"') &&
   dashboard.includes('function openClientActivityAlerts') &&
   dashboard.includes('function renderClientActivityEvents') &&
+  dashboard.includes('function toggleClientActivityRead') &&
+  dashboard.includes('Mark alert as read') &&
+  dashboard.includes('Mark alert as unread') &&
   dashboard.includes('function saveClientActivityPrefs') &&
   dashboard.includes('refreshClientActivityAlerts();'),
-  'Dashboard should include an activity alert center with preferences'
+  'Dashboard should include an activity alert center with preferences and per-alert read toggles'
+);
+
+assert(
+  supabaseV2.includes('async function markClientActivityEventsRead(ids, read)') &&
+  supabaseV2.includes("read === false ? null : new Date().toISOString()"),
+  'Supabase browser helper should allow alerts to be marked read or unread'
 );
 
 assert(

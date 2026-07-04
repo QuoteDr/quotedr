@@ -113,6 +113,20 @@
             padding: 0.35rem 0.5rem;
             font-size: 0.82rem;
         }
+        .dashboard-brand {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: #0f3460;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            pointer-events: none;
+        }
+        @media (orientation: landscape) and (max-height: 520px) and (max-width: 1100px) {
+            .dashboard-brand {
+                display: none;
+            }
+        }
         @media (max-width: 768px) {
             .quote-card {
                 padding: 0.75rem;
@@ -143,7 +157,7 @@
         </a>
 
         <!-- Center: Logo -->
-        <span class="navbar-brand mx-auto mb-0" style="font-weight:700; font-size:1.1rem; color:#0f3460; position:absolute; left:50%; transform:translateX(-50%); pointer-events:none;">QuoteDr.io</span>
+        <span class="navbar-brand mx-auto mb-0 dashboard-brand">QuoteDr.io</span>
 
         <!-- Right: Nav menu -->
         <div class="d-flex align-items-center gap-2 ms-auto">
@@ -293,6 +307,7 @@
                     <div class="btn-group btn-group-sm" id="viewToggle">
                         <button class="btn btn-primary" id="listViewBtn" onclick="setView('list')"><i class="fas fa-list me-1"></i>List</button>
                         <button class="btn btn-outline-primary" id="kanbanViewBtn" onclick="setView('kanban')"><i class="fas fa-columns me-1"></i>Board</button>
+                        <button class="btn btn-outline-primary" id="clientFilesViewBtn" onclick="openClientFilesPicker()" title="Show files for one client"><i class="fas fa-users me-1"></i>Clients</button>
                     </div>
                     <button class="btn btn-sm btn-outline-secondary" id="dashboardDefaultViewBtn" onclick="setDefaultDashboardView()" title="Open the dashboard in the current view by default">
                         <i class="fas fa-star me-1"></i>Set Default
@@ -301,6 +316,7 @@
                         <i class="fas fa-arrows-alt-h me-1"></i>Reorder
                     </button>
                     <span id="dashboardDefaultViewLabel" class="text-muted small"></span>
+                    <span id="clientFilesFilterBadge" class="badge rounded-pill text-bg-info align-items-center gap-1" style="display:none;"></span>
                 </div>
             </div>
 
@@ -369,6 +385,30 @@
         </div>
     </div>
 
+    <div class="modal fade" id="clientFilesModal" tabindex="-1" aria-labelledby="clientFilesModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-md modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="clientFilesModalLabel"><i class="fas fa-users me-2"></i>Choose Client</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="input-group mb-3">
+                        <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
+                        <input type="text" class="form-control" id="clientFilesSearch" placeholder="Search clients..." oninput="renderClientFilesPicker()">
+                    </div>
+                    <div id="clientFilesList" class="list-group">
+                        <div class="text-muted text-center py-4">Loading clients...</div>
+                    </div>
+                </div>
+                <div class="modal-footer d-flex justify-content-between">
+                    <button type="button" class="btn btn-outline-secondary" onclick="clearClientFilesFilter()"><i class="fas fa-times me-1"></i>Show All Clients</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="quote-dialogs.js?v=1777660407"></script>
     <script src="help-content.js?v=1777741200"></script>
@@ -381,6 +421,7 @@
         // DASHBOARD FUNCTIONS
 
         let allQuotes = []; // Store all quotes for client-side filtering
+        var selectedClientFilesFilter = null;
         let junkQuotes = []; // Recently deleted quotes/invoices, retained temporarily
         const JUNK_RETENTION_DAYS = 30;
         const JUNK_RETENTION_MS = JUNK_RETENTION_DAYS * 24 * 60 * 60 * 1000;
@@ -435,6 +476,10 @@
             });
         }
 
+        function refreshClientActivityBadgeFromEvents() {
+            updateClientActivityBadge(clientActivityEvents.filter(function(event) { return !event.read_at; }).length);
+        }
+
         async function refreshClientActivityAlerts() {
             if (typeof loadClientActivityEvents !== 'function') return;
             var result = await loadClientActivityEvents(30);
@@ -466,6 +511,10 @@
                 var meta = [event.quote_number, event.document_title].filter(Boolean).join(' - ');
                 return '<div class="border rounded p-3 ' + (unread ? 'bg-light border-primary' : 'bg-white') + '">' +
                     '<div class="d-flex gap-3 align-items-start">' +
+                        '<div class="pt-1 form-check mb-0">' +
+                            '<input class="form-check-input" type="checkbox" data-activity-id="' + escapeHtml(event.id || '') + '" ' + (unread ? '' : 'checked ') +
+                                'aria-label="' + (unread ? 'Mark alert as read' : 'Mark alert as unread') + '" onchange="toggleClientActivityRead(this)">' +
+                        '</div>' +
                         '<div class="pt-1"><i class="fas ' + clientActivityIcon(event.event_type) + '"></i></div>' +
                         '<div class="flex-grow-1">' +
                             '<div class="fw-semibold">' + escapeHtml(title) + (unread ? ' <span class="badge bg-primary ms-1">New</span>' : '') + '</div>' +
@@ -475,6 +524,32 @@
                     '</div>' +
                 '</div>';
             }).join('');
+        }
+
+        async function toggleClientActivityRead(checkbox) {
+            var eventId = checkbox && checkbox.getAttribute('data-activity-id');
+            if (!eventId) return;
+            var event = clientActivityEvents.find(function(item) { return String(item.id) === String(eventId); });
+            if (!event) return;
+            var oldReadAt = event.read_at;
+            var markRead = checkbox.checked;
+            event.read_at = markRead ? new Date().toISOString() : null;
+            refreshClientActivityBadgeFromEvents();
+            renderClientActivityEvents();
+
+            var result = await markClientActivityEventsRead([eventId], markRead);
+            if (result.error) {
+                event.read_at = oldReadAt;
+                refreshClientActivityBadgeFromEvents();
+                renderClientActivityEvents();
+                if (typeof qdAlert === 'function') qdAlert('Could not update alert: ' + (result.error.message || result.error));
+                return;
+            }
+            if (result.data && result.data[0]) {
+                event.read_at = result.data[0].read_at;
+                refreshClientActivityBadgeFromEvents();
+                renderClientActivityEvents();
+            }
         }
 
         async function openClientActivityAlerts() {
@@ -610,7 +685,7 @@
                         const retry = await listQuotesFromSupabase();
                         if (!retry.error) {
                             await setDashboardQuotesFromCloud(retry.data || []);
-                            renderQuotes(allQuotes);
+                            renderDashboardResults();
                             updateStats(allQuotes);
                             applyDashboardDefaultView();
                         } else {
@@ -621,7 +696,7 @@
                 }
                 if (error) throw error;
                 await setDashboardQuotesFromCloud(data || []);
-                renderQuotes(allQuotes);
+                renderDashboardResults();
                 updateStats(allQuotes);
                 applyDashboardDefaultView();
             } catch (err) {
@@ -783,11 +858,33 @@
                     (quote.client_name && quote.client_name.toLowerCase().includes(searchTerm)) ||
                     (quote.quote_number && quote.quote_number.toLowerCase().includes(searchTerm));
                 const matchesStatus = statusFilter === 'all' || quote.status === statusFilter;
-                return matchesSearch && matchesStatus;
+                return matchesSearch && matchesStatus && quoteMatchesSelectedClient(quote);
             });
 
             renderQuotes(filtered);
-            document.getElementById('filteredCount').textContent = filtered.length > 0 ? `${filtered.length} quote${filtered.length !== 1 ? 's' : ''} found` : '';
+            updateClientFilesFilterBadge(filtered.length);
+            document.getElementById('filteredCount').textContent = hasActiveDashboardFilters()
+                ? `${filtered.length} quote${filtered.length !== 1 ? 's' : ''} found`
+                : '';
+        }
+
+        function hasActiveDashboardFilters() {
+            var searchInput = document.getElementById('searchInput');
+            var statusInput = document.getElementById('statusFilter');
+            var searchTerm = searchInput ? searchInput.value.trim() : '';
+            var statusFilter = statusInput ? statusInput.value : 'all';
+            return !!selectedClientFilesFilter || !!searchTerm || statusFilter !== 'all';
+        }
+
+        function renderDashboardResults() {
+            if (hasActiveDashboardFilters()) {
+                filterQuotes();
+                return;
+            }
+            renderQuotes(allQuotes);
+            updateClientFilesFilterBadge((allQuotes || []).length);
+            var filteredCount = document.getElementById('filteredCount');
+            if (filteredCount) filteredCount.textContent = '';
         }
 
         function getQuoteTitle(quote) {
@@ -796,6 +893,153 @@
 
         function getQuoteDisplayTitle(quote) {
             return getQuoteTitle(quote) || (quote && quote.client_name) || 'Unnamed Client';
+        }
+
+        function getQuoteClientName(quote) {
+            var data = quoteData(quote);
+            var name = quote && quote.client_name || data.clientName || data.client_name || data.client || '';
+            if (data.client && typeof data.client === 'object') name = data.client.name || data.client.fullName || name;
+            name = String(name || '').trim();
+            return name || 'Unnamed Client';
+        }
+
+        function getQuoteClientEmail(quote) {
+            var data = quoteData(quote);
+            var email = quote && quote.client_email || data.clientEmail || data.client_email || data.email || '';
+            if (data.client && typeof data.client === 'object') email = data.client.email || email;
+            return String(email || '').trim();
+        }
+
+        function getClientFilesKey(name) {
+            return String(name || 'Unnamed Client').trim().toLowerCase().replace(/\s+/g, ' ');
+        }
+
+        function quoteMatchesSelectedClient(quote) {
+            if (!selectedClientFilesFilter) return true;
+            return getClientFilesKey(getQuoteClientName(quote)) === selectedClientFilesFilter.key;
+        }
+
+        function getClientFileGroups() {
+            var groups = {};
+            (allQuotes || []).forEach(function(quote) {
+                var clientName = getQuoteClientName(quote);
+                var key = getClientFilesKey(clientName);
+                var email = getQuoteClientEmail(quote);
+                var savedAt = quoteData(quote).savedAt || quote.updated_at || quote.created_at || '';
+                if (!groups[key]) {
+                    groups[key] = {
+                        key: key,
+                        name: clientName,
+                        emails: [],
+                        quoteNumbers: [],
+                        titles: [],
+                        count: 0,
+                        total: 0,
+                        latestDate: savedAt
+                    };
+                }
+                groups[key].count += 1;
+                groups[key].total += parseFloat(quote.total || 0) || 0;
+                if (email && groups[key].emails.indexOf(email) === -1) groups[key].emails.push(email);
+                if (quote.quote_number && groups[key].quoteNumbers.indexOf(quote.quote_number) === -1) groups[key].quoteNumbers.push(quote.quote_number);
+                var title = getQuoteTitle(quote);
+                if (title && groups[key].titles.indexOf(title) === -1) groups[key].titles.push(title);
+                if (savedAt && (!groups[key].latestDate || new Date(savedAt) > new Date(groups[key].latestDate))) {
+                    groups[key].latestDate = savedAt;
+                }
+            });
+            return Object.keys(groups).map(function(key) { return groups[key]; }).sort(function(a, b) {
+                return a.name.localeCompare(b.name);
+            });
+        }
+
+        function openClientFilesPicker() {
+            renderClientFilesPicker();
+            var modalEl = document.getElementById('clientFilesModal');
+            var search = document.getElementById('clientFilesSearch');
+            var modal = new bootstrap.Modal(modalEl);
+            modalEl.addEventListener('shown.bs.modal', function focusClientFilesSearch() {
+                modalEl.removeEventListener('shown.bs.modal', focusClientFilesSearch);
+                if (search) { search.focus(); search.select(); }
+            });
+            modal.show();
+        }
+
+        function renderClientFilesPicker() {
+            var list = document.getElementById('clientFilesList');
+            if (!list) return;
+            var search = (document.getElementById('clientFilesSearch') || {}).value || '';
+            var term = search.trim().toLowerCase();
+            var groups = getClientFileGroups().filter(function(group) {
+                if (!term) return true;
+                return group.name.toLowerCase().includes(term) ||
+                    group.emails.join(' ').toLowerCase().includes(term) ||
+                    group.quoteNumbers.join(' ').toLowerCase().includes(term) ||
+                    group.titles.join(' ').toLowerCase().includes(term);
+            });
+            if (!groups.length) {
+                list.innerHTML = '<div class="text-center text-muted py-4"><i class="fas fa-user-slash fa-2x mb-2"></i><div>No matching clients.</div></div>';
+                return;
+            }
+            list.innerHTML = groups.map(function(group) {
+                var isActive = selectedClientFilesFilter && selectedClientFilesFilter.key === group.key;
+                var emailLine = group.emails.length ? '<div class="small text-muted">' + escapeHtml(group.emails.slice(0, 2).join(', ')) + '</div>' : '';
+                var latest = group.latestDate ? '<div class="small text-muted">Latest: ' + escapeHtml(formatDate(group.latestDate)) + '</div>' : '';
+                return '<button type="button" class="list-group-item list-group-item-action ' + (isActive ? 'active' : '') + '" onclick="selectClientFilesFilter(' + jsAttr(group.key) + ')">' +
+                    '<div class="d-flex justify-content-between gap-3 align-items-start">' +
+                        '<div class="text-start">' +
+                            '<div class="fw-semibold">' + escapeHtml(group.name) + '</div>' +
+                            emailLine +
+                            latest +
+                        '</div>' +
+                        '<div class="text-end flex-shrink-0">' +
+                            '<span class="badge ' + (isActive ? 'bg-light text-primary' : 'bg-primary') + '">' + group.count + ' file' + (group.count === 1 ? '' : 's') + '</span>' +
+                            '<div class="small mt-1 ' + (isActive ? 'text-white-50' : 'text-muted') + '">$' + group.total.toFixed(2) + '</div>' +
+                        '</div>' +
+                    '</div>' +
+                '</button>';
+            }).join('');
+        }
+
+        function selectClientFilesFilter(clientKey) {
+            var group = getClientFileGroups().find(function(item) { return item.key === clientKey; });
+            if (!group) return;
+            selectedClientFilesFilter = { key: group.key, name: group.name };
+            var modal = bootstrap.Modal.getInstance(document.getElementById('clientFilesModal'));
+            if (modal) modal.hide();
+            renderDashboardResults();
+        }
+
+        function clearClientFilesFilter() {
+            selectedClientFilesFilter = null;
+            var search = document.getElementById('clientFilesSearch');
+            if (search) search.value = '';
+            var modal = bootstrap.Modal.getInstance(document.getElementById('clientFilesModal'));
+            if (modal) modal.hide();
+            renderDashboardResults();
+        }
+
+        function updateClientFilesFilterBadge(filteredCount) {
+            var badge = document.getElementById('clientFilesFilterBadge');
+            var btn = document.getElementById('clientFilesViewBtn');
+            if (!badge) return;
+            if (!selectedClientFilesFilter) {
+                badge.style.display = 'none';
+                badge.innerHTML = '';
+                if (btn) {
+                    btn.classList.remove('btn-primary');
+                    btn.classList.add('btn-outline-primary');
+                }
+                return;
+            }
+            badge.style.display = 'inline-flex';
+            badge.innerHTML = '<i class="fas fa-user me-1"></i>' + escapeHtml(selectedClientFilesFilter.name) +
+                ' <span class="opacity-75">(' + filteredCount + ')</span>' +
+                ' <button type="button" class="btn btn-link btn-sm p-0 ms-1 text-white text-decoration-none" onclick="clearClientFilesFilter()" title="Clear client filter" aria-label="Clear client filter"><i class="fas fa-times"></i></button>';
+            if (btn) {
+                btn.classList.add('btn-primary');
+                btn.classList.remove('btn-outline-primary');
+            }
         }
 
         function dashboardIsInvoiceDocument(quote) {
@@ -1117,7 +1361,7 @@
                 var row = (allQuotes || []).find(function(q) { return q.id === quoteId; });
                 if (row) row.data = updatedData;
                 cancelEditTitle(quoteId);
-                renderQuotes(allQuotes);
+                renderDashboardResults();
             } catch(err) {
                 qdAlert('Could not save title: ' + err.message);
             }
@@ -2481,7 +2725,7 @@
                 var update = await _supabase.from('quotes').update({ data: updatedData, updated_at: now }).eq('id', quoteId);
                 if (update.error) throw update.error;
                 quote.data = updatedData;
-                renderQuotes(allQuotes);
+                renderDashboardResults();
                 if (typeof qdAlert === 'function') qdAlert('Google review request sent.');
             } catch(e) {
                 qdAlert('Failed to send review request: ' + e.message);
@@ -2501,7 +2745,7 @@
                 var update = await _supabase.from('quotes').update({ data: updatedData, updated_at: now }).eq('id', quoteId);
                 if (update.error) throw update.error;
                 quote.data = updatedData;
-                renderQuotes(allQuotes);
+                renderDashboardResults();
             } catch(e) {
                 qdAlert('Could not dismiss this review reminder: ' + e.message);
             }
@@ -2519,7 +2763,7 @@
             const quote = allQuotes.find(q => q.id === quoteId);
             if (quote) {
                 quote.status = newStatus;
-                renderQuotes(allQuotes);
+                renderDashboardResults();
                 updateStats(allQuotes);
             }
             try {
@@ -2560,7 +2804,7 @@
             quote.data = data;
             junkQuotes.unshift(quote);
             allQuotes = allQuotes.filter(function(q) { return q.id !== quoteId; });
-            renderQuotes(allQuotes);
+            renderDashboardResults();
             updateStats(allQuotes);
             updateJunkBadge();
             qdAlert('Moved to Junk. You can restore it within ' + JUNK_RETENTION_DAYS + ' days.');
@@ -2615,7 +2859,7 @@
             junkQuotes = junkQuotes.filter(function(q) { return q.id !== quoteId; });
             allQuotes.unshift(quote);
             renderJunkBox();
-            renderQuotes(allQuotes);
+            renderDashboardResults();
             updateStats(allQuotes);
             updateJunkBadge();
         }
@@ -2675,7 +2919,7 @@
                     setTimeout(loadWithRetry, 800 * attempts);
                 } else if (!result.error) {
                     await setDashboardQuotesFromCloud(result.data || []);
-                    renderQuotes(allQuotes);
+                    renderDashboardResults();
                     updateStats(allQuotes);
                     applyDashboardDefaultView();
                 } else {

@@ -256,7 +256,7 @@ async function loadClientActivityEvents(limit) {
     }
 }
 
-async function markClientActivityEventsRead(ids) {
+async function markClientActivityEventsRead(ids, read) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
     const eventIds = Array.isArray(ids) ? ids.filter(Boolean) : [];
@@ -264,7 +264,7 @@ async function markClientActivityEventsRead(ids) {
     try {
         const { data, error } = await _supabase
             .from('client_activity_events')
-            .update({ read_at: new Date().toISOString() })
+            .update({ read_at: read === false ? null : new Date().toISOString() })
             .eq('user_id', user.id)
             .in('id', eventIds)
             .select('*');
