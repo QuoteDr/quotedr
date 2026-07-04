@@ -12879,6 +12879,16 @@ Example:
             window._changeOrderPreviousApprovedTotal = previousApprovedTotal;
             window._changeOrderNumber = nextNumber;
             window._supabaseQuoteId = null;
+            window._loadedQuoteData = Object.assign({}, window._loadedQuoteData || {}, {
+                portal_visible: false,
+                portal_id: '',
+                portal_name: '',
+                portal_client_name: '',
+                portal_client_email: '',
+                portal_pin: '',
+                portal_added_at: null,
+                portal_theme: null
+            });
             window._changeOrderDraftInProgress = true;
             window._quoteFullyLoaded = true;
             if (typeof _autoSaveTimer !== 'undefined') clearTimeout(_autoSaveTimer);

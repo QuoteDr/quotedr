@@ -93,6 +93,10 @@
             return !!(row && row.data && row.data.portal_visible === true);
         }
 
+        function quoteBuilderIsStartingChangeOrder() {
+            return window.location.hash === "#change-order";
+        }
+
         function quoteDataIsPortalLockedForBuilder(data) {
             return !!(data && (data.portal_visible === true || (data.data && data.data.portal_visible === true)));
         }
@@ -206,14 +210,14 @@
                 paymentSettings: (typeof getLocalPaymentSettingsSnapshot === 'function') ? getLocalPaymentSettingsSnapshot() : null,
                 businessProfile: (typeof getLocalBusinessProfileSnapshot === 'function') ? getLocalBusinessProfileSnapshot() : {},
                 hiddenProfileFields: (typeof getLocalHiddenProfileFieldsSnapshot === 'function') ? getLocalHiddenProfileFieldsSnapshot() : [],
-                portal_visible: loadedData.portal_visible === true,
-                portal_id: loadedData.portal_id || '',
-                portal_name: loadedData.portal_name || '',
-                portal_client_name: loadedData.portal_client_name || loadedData.clientName || '',
-                portal_client_email: loadedData.portal_client_email || loadedData.clientEmail || loadedData.email || '',
-                portal_pin: loadedData.portal_pin || '',
-                portal_added_at: loadedData.portal_added_at || null,
-                portal_theme: loadedData.portal_theme || null
+                portal_visible: isChangeOrder ? false : loadedData.portal_visible === true,
+                portal_id: isChangeOrder ? '' : loadedData.portal_id || '',
+                portal_name: isChangeOrder ? '' : loadedData.portal_name || '',
+                portal_client_name: isChangeOrder ? '' : loadedData.portal_client_name || loadedData.clientName || '',
+                portal_client_email: isChangeOrder ? '' : loadedData.portal_client_email || loadedData.clientEmail || loadedData.email || '',
+                portal_pin: isChangeOrder ? '' : loadedData.portal_pin || '',
+                portal_added_at: isChangeOrder ? null : loadedData.portal_added_at || null,
+                portal_theme: isChangeOrder ? null : loadedData.portal_theme || null
             };
         }
 
@@ -667,7 +671,7 @@ async function saveQuote() {
                 var result = await loadQuoteFromSupabase(quoteId);
                 if (result.error) throw new Error(result.error.message || result.error);
                 var q = result.data;
-                if (quoteIsPortalLockedForBuilder(q)) {
+                if (quoteIsPortalLockedForBuilder(q) && !quoteBuilderIsStartingChangeOrder()) {
                     await handlePortalLockedBuilderLoad(q);
                     return;
                 }
@@ -838,7 +842,7 @@ async function saveQuote() {
                         console.warn('Could not load quote from cloud:', error.message);
                     } else if (data) {
                         const q = data;
-                        if (quoteIsPortalLockedForBuilder(q)) {
+                        if (quoteIsPortalLockedForBuilder(q) && !quoteBuilderIsStartingChangeOrder()) {
                             await handlePortalLockedBuilderLoad(q);
                             return;
                         }

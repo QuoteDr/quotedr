@@ -23,10 +23,11 @@ assert(
 );
 
 assert(
-  storage.includes('portal_visible: loadedData.portal_visible === true') &&
-    storage.includes('portal_added_at: loadedData.portal_added_at || null') &&
-    storage.includes('portal_theme: loadedData.portal_theme || null'),
-  'collectQuoteData should preserve portal metadata from the loaded quote'
+  storage.includes('portal_visible: isChangeOrder ? false : loadedData.portal_visible === true') &&
+    storage.includes("portal_id: isChangeOrder ? '' : loadedData.portal_id || ''") &&
+    storage.includes('portal_added_at: isChangeOrder ? null : loadedData.portal_added_at || null') &&
+    storage.includes('portal_theme: isChangeOrder ? null : loadedData.portal_theme || null'),
+  'collectQuoteData should preserve portal metadata for normal quotes and strip it for change-order copies'
 );
 
 assert(
