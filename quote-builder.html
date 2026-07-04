@@ -8667,7 +8667,8 @@ Example:
             var netChange = parseFloat(summary.total || 0) || 0;
             var updatedTotal = originalTotal + previousApproved + netChange;
             var taxLabel = summary.taxLabel || 'Tax';
-            var taxPct = ((parseFloat(summary.taxRate) || 0) * 100).toFixed(1).replace(/\.0$/, '');
+            var taxRate = parseFloat(summary.taxRate) || 0;
+            var taxPct = (taxRate * 100).toFixed(1).replace(/\.0$/, '');
             var taxLineLabel = summary.taxEnabled === false
                 ? taxLabel + ' not applied'
                 : taxLabel + ' on this change' + (taxPct ? ' (' + taxPct + '%)' : '');
@@ -8679,6 +8680,10 @@ Example:
                 creditSubtotal: parseFloat(summary.creditSubtotal || 0) || 0,
                 netSubtotal: parseFloat(summary.subtotal || 0) || 0,
                 tax: parseFloat(summary.tax || 0) || 0,
+                taxLabel: taxLabel,
+                taxRate: taxRate,
+                taxEnabled: summary.taxEnabled !== false,
+                symbol: symbol,
                 netChange: netChange,
                 updatedTotal: updatedTotal
             };

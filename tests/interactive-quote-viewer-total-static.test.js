@@ -12,7 +12,10 @@ assert(source.includes('viewerMoney(total)'), 'updated quote totals should use c
 assert(!source.includes("heroTotal.textContent = '$' + originalTotal.toFixed(2)"), 'hero total should not render ungrouped fixed decimals');
 assert(!source.includes("document.getElementById('newGrandTotal').textContent = `$${total.toFixed(2)}`"), 'bottom total should not render ungrouped fixed decimals');
 assert(source.includes('height: clamp(185px, 18vw, 250px)'), 'proposal logo should be larger on desktop');
-assert(source.includes('room.items.reduce((sum, item) => item._removed ? sum : sum + viewerItemActiveTotal(item), 0)'), 'room totals should use saved item totals and skip removed items');
+assert(
+  source.includes('room.items.reduce((sum, item) => item._removed ? sum : sum + (isChangeOrder ? viewerChangeOrderLineDisplayTotal(item, room) : viewerItemActiveTotal(item)), 0)'),
+  'room totals should use saved item totals, change-order display totals, and skip removed items'
+);
 assert(source.includes('function viewerVisibleNotes'), 'interactive viewer should centralize note visibility so duplicate descriptions can be suppressed');
 assert(source.includes('viewerVisibleNotes(item, displayDesc)'), 'item rendering should hide notes that duplicate the displayed description');
 assert(!source.includes('let subtotal = 0;\n            let upgradesTotal = 0;\n            if (quoteData.rooms) {\n                quoteData.rooms.forEach(room => {\n                    room.items.forEach(item => {\n                        applyViewerChoiceGroupToItem(item);\n                        if (item._removed) return; // skip removed items\n                        const activeRate = (item.upgraded && item.upgrade) ? item.upgrade.rate : (item._baseRate || item.rate);\n                        const baseTotal = item.quantity * (item._baseRate || item.rate);\n                        const activeTotal = item.quantity * activeRate;'), 'viewer updateTotal should not recalculate imported legacy quote totals from quantity times rate');

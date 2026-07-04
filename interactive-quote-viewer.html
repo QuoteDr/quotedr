@@ -149,6 +149,54 @@
             line-height: 1;
             margin-top: 5px;
         }
+        .viewer-change-order-item-changed,
+        .viewer-change-order-item-added,
+        .viewer-change-order-item-removed {
+            border-left: 4px solid #f59e0b;
+            padding-left: 10px;
+            border-radius: 6px;
+        }
+        .viewer-change-order-item-changed {
+            background: #fff7ed;
+            border-left-color: #f59e0b;
+        }
+        .viewer-change-order-item-added {
+            background: #ecfdf5;
+            border-left-color: #198754;
+        }
+        .viewer-change-order-item-removed {
+            background: #fff1f2;
+            border-left-color: #dc3545;
+        }
+        .viewer-change-order-total-btn {
+            appearance: none;
+            border: 0;
+            background: transparent;
+            color: #0f3460;
+            font-weight: 850;
+            padding: 0;
+            text-align: right;
+            text-decoration: underline;
+            text-decoration-style: dotted;
+            text-underline-offset: 3px;
+        }
+        .viewer-change-order-total-btn:hover,
+        .viewer-change-order-total-btn:focus {
+            color: var(--quote-accent, #1a56a0);
+        }
+        .viewer-change-order-note {
+            display: none;
+            margin-top: 8px;
+            padding: 9px 11px;
+            background: #fff;
+            border: 1px solid #fed7aa;
+            border-radius: 8px;
+            color: #526276;
+            font-size: 0.88rem;
+        }
+        .viewer-change-order-note.visible {
+            display: block;
+        }
         .hero-actions {
             display: grid;
             gap: 10px;
@@ -1052,7 +1100,7 @@ if (location.search.includes('debug')) {
                 <aside class="hero-total-panel">
                     <div>
                         <div class="hero-status-pill"><i class="fas fa-shield-alt"></i> Ready for review</div>
-                        <div class="hero-total-label">Current Total</div>
+                        <div class="hero-total-label" id="heroTotalLabel">Current Total</div>
                         <div class="hero-total" id="heroGrandTotal">$0.00</div>
                         <div class="text-muted mt-2">Includes selected options and applicable tax.</div>
                         <div class="room-locator" id="roomLocatorWrap" style="display:none;">
@@ -2144,6 +2192,135 @@ if (location.search.includes('debug')) {
             return viewerItemBaseTotal(item);
         }
 
+        function viewerChangeOrderOriginalTotal(item) {
+            var original = item && item._coOriginal;
+            if (!original) return 0;
+            if (original.total !== undefined && original.total !== null && original.total !== '') return viewerNumber(original.total);
+            return viewerNumber(original.quantity) * viewerNumber(original.rate);
+        }
+
+        function viewerChangeOrderCurrentRawTotal(item) {
+            if (!item) return 0;
+            if (item._coRemoved) return 0;
+            if (item._coOriginal) return viewerItemQuantity(item) * viewerItemActiveRate(item);
+            return viewerItemActiveTotal(item);
+        }
+
+        function viewerChangeOrderRoomMarkupFactor(room) {
+            var markup = parseFloat(room && room.markup);
+            return 1 + ((isFinite(markup) ? markup : 0) / 100);
+        }
+
+        function viewerChangeOrderLineDelta(item, room) {
+            if (!item) return 0;
+            var rawDelta = 0;
+            if (item._coOriginal) {
+                if (item._coRemoved) {
+                    rawDelta = -Math.abs(viewerChangeOrderOriginalTotal(item));
+                } else if ((item._coChangeStatus || '') === 'unchanged') {
+                    rawDelta = 0;
+                } else if (viewerHasExplicitTotal(item)) {
+                    rawDelta = viewerNumber(item.total);
+                } else {
+                    rawDelta = viewerChangeOrderCurrentRawTotal(item) - viewerChangeOrderOriginalTotal(item);
+                }
+            } else {
+                rawDelta = viewerItemActiveTotal(item);
+            }
+            return rawDelta * viewerChangeOrderRoomMarkupFactor(room);
+        }
+
+        function viewerChangeOrderLineDisplayTotal(item, room) {
+            var displayTotal = item && item._coRemoved ? 0 : viewerChangeOrderCurrentRawTotal(item);
+            return displayTotal * viewerChangeOrderRoomMarkupFactor(room);
+        }
+
+        function viewerChangeOrderStatus(item, room) {
+            if (!item) return 'unchanged';
+            if (item._coRemoved || item._coChangeStatus === 'removed') return 'removed';
+            if (!item._coOriginal) return 'added';
+            if (item._coChangeStatus === 'changed') return 'changed';
+            return Math.abs(viewerChangeOrderLineDelta(item, room)) > 0.005 ? 'changed' : 'unchanged';
+        }
+
+        function viewerChangeOrderTaxSettings(summary) {
+            var prefs = {};
+            try { prefs = JSON.parse(localStorage.getItem('ald_quote_prefs') || '{}'); } catch(e) {}
+            var rateSource = quoteData.taxRate;
+            if (rateSource === undefined || rateSource === null || rateSource === '') rateSource = summary && summary.taxRate;
+            if (rateSource === undefined || rateSource === null || rateSource === '') rateSource = prefs.taxRate !== undefined && prefs.taxRate !== '' ? parseFloat(prefs.taxRate) / 100 : 0.13;
+            var rate = parseFloat(rateSource);
+            if (!isFinite(rate) || rate < 0) rate = 0.13;
+            if (rate > 1) rate = rate / 100;
+            return {
+                taxRate: rate,
+                taxLabel: quoteData.taxLabel || (summary && summary.taxLabel) || prefs.taxLabel || 'HST',
+                taxEnabled: quoteData.taxEnabled !== false && !(summary && summary.taxEnabled === false),
+                symbol: (summary && summary.symbol) || '$'
+            };
+        }
+
+        function computeViewerChangeOrderTotals() {
+            var ctx = quoteData.changeOrderContext || {};
+            var saved = quoteData.changeOrderPriceSummary || {};
+            var parentTotal = parseFloat(quoteData.parentQuoteTotal || ctx.parentTotal || saved.originalTotal || 0) || 0;
+            var previousApproved = parseFloat(ctx.previousApprovedTotal || quoteData.changeOrderPreviousApprovedTotal || saved.previousApprovedTotal || 0) || 0;
+            var addedSubtotal = 0;
+            var creditSubtotal = 0;
+            (quoteData.rooms || []).forEach(function(room) {
+                (room.items || []).forEach(function(item) {
+                    var delta = viewerChangeOrderLineDelta(item, room);
+                    if (delta > 0) addedSubtotal += delta;
+                    if (delta < 0) creditSubtotal += Math.abs(delta);
+                });
+            });
+            var itemNetSubtotal = addedSubtotal - creditSubtotal;
+            var adjustmentAmount = calculateViewerQuoteAdjustmentAmount(itemNetSubtotal);
+            var netSubtotal = itemNetSubtotal + adjustmentAmount;
+            var taxSettings = viewerChangeOrderTaxSettings(saved);
+            var tax = taxSettings.taxEnabled ? netSubtotal * taxSettings.taxRate : 0;
+            var netChange = netSubtotal + tax;
+            var updatedTotal = parentTotal + previousApproved + netChange;
+            return {
+                originalTotal: parentTotal,
+                previousApprovedTotal: previousApproved,
+                addedSubtotal: addedSubtotal,
+                creditSubtotal: creditSubtotal,
+                netSubtotal: netSubtotal,
+                tax: tax,
+                netChange: netChange,
+                updatedTotal: updatedTotal,
+                taxLabel: taxSettings.taxLabel,
+                taxRate: taxSettings.taxRate,
+                taxEnabled: taxSettings.taxEnabled,
+                symbol: taxSettings.symbol
+            };
+        }
+
+        function viewerChangeOrderExplanation(item, room) {
+            if (!item) return '';
+            if (item.changeOrderNote) return item.changeOrderNote;
+            var name = item.description || item.name || 'This item';
+            var unit = item.unitType || item.unit || (item._coOriginal && item._coOriginal.unitType) || '';
+            var delta = viewerChangeOrderLineDelta(item, room);
+            var original = item._coOriginal || null;
+            if (!original) {
+                return 'Added ' + name + ', ' + viewerItemQuantity(item) + (unit ? ' ' + unit : '') + ' @ ' + viewerMoney(viewerItemActiveRate(item)) + ' each. Net adjustment: ' + viewerMoney(delta, { forceSign: true }) + '.';
+            }
+            if (item._coRemoved) {
+                return 'Removed ' + name + ', crediting ' + viewerNumber(original.quantity) + (original.unitType ? ' ' + original.unitType : '') + ' @ ' + viewerMoney(original.rate) + ' each. Net adjustment: ' + viewerMoney(delta, { forceSign: true }) + '.';
+            }
+            var qtyDelta = viewerItemQuantity(item) - viewerNumber(original.quantity);
+            var verb = qtyDelta > 0 ? 'Increased ' : (qtyDelta < 0 ? 'Reduced ' : 'Changed ');
+            return verb + name + ' from ' + viewerNumber(original.quantity) + (original.unitType ? ' ' + original.unitType : '') + ' to ' + viewerItemQuantity(item) + (unit ? ' ' + unit : '') + ' @ ' + viewerMoney(viewerItemActiveRate(item)) + ' each. Net adjustment: ' + viewerMoney(delta, { forceSign: true }) + '.';
+        }
+
+        function toggleViewerChangeOrderExplanation(roomIdx, itemIdx) {
+            var el = document.getElementById('co_note_' + roomIdx + '_' + itemIdx);
+            if (!el) return;
+            el.classList.toggle('visible');
+        }
+
         function renderViewerChoiceGroup(roomIdx, itemIndex, item, isSignedDiff) {
             var group = item.choiceGroup;
             if (!group || !Array.isArray(group.options)) return '';
@@ -2360,6 +2537,10 @@ if (location.search.includes('debug')) {
                 return viewerMoney(value, { forceSign: !!showSign });
             }
 
+            const coTotals = isChangeOrder ? computeViewerChangeOrderTotals() : null;
+            var heroLabel = document.getElementById('heroTotalLabel');
+            if (heroLabel) heroLabel.textContent = isChangeOrder ? 'Current Adjustments' : 'Current Total';
+
             if (sendStyle.clientMessage) {
                 html += '<div class="alert mb-4" style="background:#f8fbff;border:1px solid #cfe2ff;border-left:4px solid ' + (sendStyle.accent || '#1a56a0') + ';border-radius:10px;">' +
                     '<div class="fw-semibold mb-1"><i class="fas fa-message me-2"></i>Message from your contractor</div>' +
@@ -2368,48 +2549,24 @@ if (location.search.includes('debug')) {
             }
 
             if (isChangeOrder) {
-                var ctx = quoteData.changeOrderContext || {};
-                var parentTotal = parseFloat(quoteData.parentQuoteTotal || ctx.parentTotal || 0) || 0;
-                var previousApproved = parseFloat(ctx.previousApprovedTotal || quoteData.changeOrderPreviousApprovedTotal || 0) || 0;
-                var netChange = parseFloat(quoteData.grandTotal || quoteData.total || 0) || 0;
-                var projectedTotal = parentTotal + previousApproved + netChange;
-                var coSummary = quoteData.changeOrderPriceSummary || {};
-                if (!coSummary.addedSubtotal && !coSummary.creditSubtotal) {
-                    var addedFallback = 0;
-                    var creditFallback = 0;
-                    (quoteData.rooms || []).forEach(function(room) {
-                        (room.items || []).forEach(function(item) {
-                            var line = parseFloat(item.total) || 0;
-                            if (line > 0) addedFallback += line;
-                            if (line < 0) creditFallback += Math.abs(line);
-                        });
-                    });
-                    var netSubtotalFallback = addedFallback - creditFallback;
-                    coSummary = Object.assign({}, coSummary, {
-                        addedSubtotal: addedFallback,
-                        creditSubtotal: creditFallback,
-                        netSubtotal: netSubtotalFallback,
-                        tax: netChange - netSubtotalFallback
-                    });
-                }
                 html += '<div class="change-order-summary">' +
                     '<div class="fw-bold mb-1"><i class="fas fa-file-circle-plus me-2"></i>Change Order #' + escapeHtml(quoteData.changeOrderNumber || '') + ' for Quote #' + escapeHtml(quoteData.parentQuoteNumber || '') + '</div>' +
                     '<div class="text-muted mb-2">' + escapeHtml(quoteData.changeReason || 'Scope change submitted for approval.') + '</div>' +
                     '<div class="change-order-price-card">' +
                     '<div class="fw-bold mb-2"><i class="fas fa-file-invoice-dollar me-1"></i>Price breakdown</div>' +
-                    '<div class="co-price-row"><span>Original accepted quote</span><strong>' + money(parentTotal, false) + '</strong></div>' +
-                    '<div class="co-price-row"><span>Approved previous change orders</span><strong>' + money(previousApproved, previousApproved !== 0) + '</strong></div>' +
-                    '<div class="co-price-row"><span>Added work</span><strong class="co-positive">' + money(coSummary.addedSubtotal || 0, true) + '</strong></div>' +
-                    '<div class="co-price-row"><span>Credits / deductions</span><strong class="co-negative">-' + viewerMoney(Math.abs(viewerNumber(coSummary.creditSubtotal || 0))) + '</strong></div>' +
-                    '<div class="co-price-row"><span>Net change before tax</span><strong>' + money(coSummary.netSubtotal || 0, true) + '</strong></div>' +
-                    '<div class="co-price-row"><span>Tax on this change</span><strong>' + money(coSummary.tax || 0, true) + '</strong></div>' +
-                    '<div class="co-price-row"><span>This change order total</span><strong>' + money(netChange, true) + '</strong></div>' +
-                    '<div class="co-price-row co-price-final"><span>Updated project total if approved</span><strong>' + money(projectedTotal, false) + '</strong></div>' +
+                    '<div class="co-price-row"><span>Original accepted quote</span><strong>' + money(coTotals.originalTotal, false) + '</strong></div>' +
+                    '<div class="co-price-row"><span>Approved previous change orders</span><strong>' + money(coTotals.previousApprovedTotal, coTotals.previousApprovedTotal !== 0) + '</strong></div>' +
+                    '<div class="co-price-row"><span>Added work</span><strong class="co-positive">' + money(coTotals.addedSubtotal, true) + '</strong></div>' +
+                    '<div class="co-price-row"><span>Credits / deductions</span><strong class="co-negative">-' + viewerMoney(Math.abs(viewerNumber(coTotals.creditSubtotal))) + '</strong></div>' +
+                    '<div class="co-price-row"><span>Net change before tax</span><strong>' + money(coTotals.netSubtotal, true) + '</strong></div>' +
+                    '<div class="co-price-row"><span>Tax on this change</span><strong>' + money(coTotals.tax, true) + '</strong></div>' +
+                    '<div class="co-price-row"><span>This change order total</span><strong>' + money(coTotals.netChange, true) + '</strong></div>' +
+                    '<div class="co-price-row co-price-final"><span>Updated project total if approved</span><strong>' + money(coTotals.updatedTotal, false) + '</strong></div>' +
                     '</div>' +
                     '</div>';
-                document.getElementById('quoteSubtotalDisplay').textContent = viewerMoney(parentTotal);
-                document.getElementById('newGrandTotal').textContent = viewerMoney(projectedTotal);
-                if (heroTotal) heroTotal.textContent = viewerMoney(netChange, { forceSign: true });
+                document.getElementById('quoteSubtotalDisplay').textContent = viewerMoney(coTotals.originalTotal);
+                document.getElementById('newGrandTotal').textContent = viewerMoney(coTotals.updatedTotal);
+                if (heroTotal) heroTotal.textContent = viewerMoney(coTotals.netChange, { forceSign: true });
             }
 
             // Show upgrade diff banner if quote was modified by client when signing
@@ -2439,7 +2596,7 @@ if (location.search.includes('debug')) {
 
             quoteData.rooms.forEach((room, roomIdx) => {
                 (room.items || []).forEach(function(item) { applyViewerChoiceGroupToItem(item); });
-                const roomTotal = room.items.reduce((sum, item) => item._removed ? sum : sum + viewerItemActiveTotal(item), 0);
+                const roomTotal = room.items.reduce((sum, item) => item._removed ? sum : sum + (isChangeOrder ? viewerChangeOrderLineDisplayTotal(item, room) : viewerItemActiveTotal(item)), 0);
                 const headerBg = roomHeaderBackground(room, ROOM_COLORS[room.colorIndex ?? 0] || ROOM_COLORS[0]);
 
                 html += `
@@ -2479,7 +2636,7 @@ if (location.search.includes('debug')) {
                     html += `<div class="text-uppercase fw-bold mt-3 mb-1" style="font-size:0.72rem; letter-spacing:0.8px; color:#6c757d; border-bottom:1px solid #dee2e6; padding-bottom:3px;"><i class="fas fa-tag me-1"></i>${catDisplay}</div>`;
 
                     if (pricingMode === 'category') {
-                        const catSubtotal = catEntries.reduce((sum, entry) => entry.item._removed ? sum : sum + viewerItemActiveTotal(entry.item), 0);
+                        const catSubtotal = catEntries.reduce((sum, entry) => entry.item._removed ? sum : sum + (isChangeOrder ? viewerChangeOrderLineDisplayTotal(entry.item, room) : viewerItemActiveTotal(entry.item)), 0);
                         html += `<div class="d-flex justify-content-between py-2 border-bottom"><span>${catEntries.length} item${catEntries.length === 1 ? '' : 's'}</span><strong>${viewerMoney(catSubtotal)}</strong></div>`;
                         return;
                     }
@@ -2494,7 +2651,11 @@ if (location.search.includes('debug')) {
 
                     const isUpgraded = !!item.upgraded;
                     const activeRate = viewerItemActiveRate(item);
-                    const itemTotal = viewerItemActiveTotal(item);
+                    const itemDisplayTotal = isChangeOrder ? viewerChangeOrderLineDisplayTotal(item, room) : viewerItemActiveTotal(item);
+                    const itemTotal = itemDisplayTotal;
+                    const coStatus = isChangeOrder ? viewerChangeOrderStatus(item, room) : '';
+                    const coCanExplain = isChangeOrder && coStatus !== 'unchanged';
+                    const coExplanation = coCanExplain ? viewerChangeOrderExplanation(item, room) : '';
                     const hasUpgrade = showUpgrades && !!(item.upgrade && item.upgrade.name);
                     const upgradeDiff = hasUpgrade ? ((viewerItemQuantity(item) * viewerNumber(item.upgrade.rate)) - viewerItemBaseTotal(item)) : 0;
                     item._itemDescription = item.itemDescription || '';
@@ -2545,6 +2706,12 @@ if (location.search.includes('debug')) {
                             itemClasses.push('viewer-line-item-highlighted');
                             itemStyles.push('--viewer-line-highlight-bg: ' + lineItemHighlight.background);
                             itemStyles.push('--viewer-line-highlight-border: ' + lineItemHighlight.border);
+                        } else if (isChangeOrder && coStatus === 'changed') {
+                            itemClasses.push('viewer-change-order-item-changed');
+                        } else if (isChangeOrder && coStatus === 'added') {
+                            itemClasses.push('viewer-change-order-item-added');
+                        } else if (isChangeOrder && coStatus === 'removed') {
+                            itemClasses.push('viewer-change-order-item-removed');
                         } else if (isOptional && !isSignedDiff) {
                             itemStyles.push('border-left:3px dashed #0dcaf0');
                             itemStyles.push('padding-left:8px');
@@ -2554,14 +2721,18 @@ if (location.search.includes('debug')) {
                             <div class="d-flex justify-content-between align-items-baseline mb-1">
                                 <div style="flex:1;">
                                     <strong>${item.description || item.name || 'Item'}</strong>
+                                    ${isChangeOrder && coStatus === 'changed' ? '<span class="badge bg-warning text-dark ms-2">Changed</span>' : ''}
+                                    ${isChangeOrder && coStatus === 'added' ? '<span class="badge bg-success ms-2">Added</span>' : ''}
+                                    ${isChangeOrder && coStatus === 'removed' ? '<span class="badge bg-danger ms-2">Removed</span>' : ''}
                                     ${item.photo && !isSignedDiff ? `<div class="mt-1"><button class="btn btn-sm btn-outline-secondary" onclick="openPhotoLightbox('${item.photo}')" style="font-size:0.7rem;"><i class="fas fa-expand me-1"></i>View Photo</button></div>` : ''}
                                     ${isOptional && !isSignedDiff ? '<span class="badge bg-info ms-2" style="font-size:0.65em;">Optional</span>' : ''}
                                 </div>
                                 <div style="text-align:right; min-width:140px; padding-left:16px;">
-                                    <div><strong>${viewerMoney(itemTotal)}</strong></div>
+                                    <div>${coCanExplain ? `<button type="button" class="viewer-change-order-total-btn" onclick="toggleViewerChangeOrderExplanation(${roomIdx}, ${itemIndex})">${viewerMoney(itemTotal)}</button>` : `<strong>${viewerMoney(itemTotal)}</strong>`}</div>
                                     <small class="text-muted">${typeof qdFormatQuantity === 'function' ? qdFormatQuantity(item.quantity, item.unitType || item.unit || '') : (item.quantity + ' ' + (item.unitType || ''))} @ ${viewerMoney(activeRate)}</small>
                                 </div>
                             </div>
+                            ${coCanExplain ? `<div class="viewer-change-order-note" id="co_note_${roomIdx}_${itemIndex}"><i class="fas fa-circle-info me-1"></i>${escapeHtml(coExplanation)}</div>` : ''}
                             ${renderExpandableDescription(displayDesc, `itemdesc_${roomIdx}_${itemIndex}`)}
                             ${visibleNotes ? `<div class="text-muted mb-1"><small><i class="fas fa-info-circle"></i> ${visibleNotes}</small></div>` : ''}
                             ${isSignedDiff ? `
@@ -2725,6 +2896,8 @@ if (location.search.includes('debug')) {
         function updateTotal() {
             var co = window.QuoteDrChangeOrders;
             var isChangeOrder = !!(co && co.isChangeOrder(quoteData));
+            var heroLabel = document.getElementById('heroTotalLabel');
+            if (heroLabel) heroLabel.textContent = isChangeOrder ? 'Current Adjustments' : 'Current Total';
             // Recalculate from live quoteData (respects upgrades)
             let subtotal = 0;
             let upgradesTotal = 0;
@@ -2792,34 +2965,28 @@ if (location.search.includes('debug')) {
                 }
             }
             if (isChangeOrder) {
-                var ctx = quoteData.changeOrderContext || {};
-                var parentTotal = parseFloat(quoteData.parentQuoteTotal || ctx.parentTotal || 0) || 0;
-                var previousApproved = parseFloat(ctx.previousApprovedTotal || quoteData.changeOrderPreviousApprovedTotal || 0) || 0;
-                var projectedTotal = parentTotal + previousApproved + total;
-                var summary = quoteData.changeOrderPriceSummary || {};
+                var coTotals = computeViewerChangeOrderTotals();
                 var upgradesElCo = document.getElementById('upgradesTotalDisplay');
                 if (upgradesElCo) {
                     upgradesElCo.style.display = 'flex';
-                    upgradesElCo.innerHTML = `<span>This change order</span><strong>${viewerMoney(total, { forceSign: true })}</strong>`;
+                    upgradesElCo.innerHTML = `<span>Current adjustments</span><strong>${viewerMoney(coTotals.netChange, { forceSign: true })}</strong>`;
                 }
-                if (quoteData.changeOrderPriceSummary) {
-                    quoteData.changeOrderPriceSummary = Object.assign({}, summary, {
-                        previousApprovedTotal: previousApproved,
-                        netChange: total,
-                        updatedTotal: projectedTotal
-                    });
-                }
+                quoteData.changeOrderPriceSummary = Object.assign({}, quoteData.changeOrderPriceSummary || {}, coTotals);
                 updateQuoteTotalBreakdown(
-                    parentTotal + previousApproved + subtotal,
-                    summary.tax !== undefined ? summary.tax : tax,
-                    projectedTotal,
-                    summary.taxLabel || _vTaxLabel,
-                    summary.taxRate || _vTaxRate,
+                    coTotals.originalTotal + coTotals.previousApprovedTotal + coTotals.netSubtotal,
+                    coTotals.tax,
+                    coTotals.updatedTotal,
+                    coTotals.taxLabel,
+                    coTotals.taxRate,
                     paymentReceivedAmount,
-                    summary.taxEnabled !== false && _vTaxEnabled
+                    coTotals.taxEnabled
                 );
+                var finalLabelElCo = document.getElementById('viewerTotalFinalLabel');
+                var finalSubLabelElCo = document.getElementById('viewerTotalFinalSubLabel');
+                if (finalLabelElCo) finalLabelElCo.textContent = 'Updated Project Total';
+                if (finalSubLabelElCo) finalSubLabelElCo.textContent = 'Includes this change order if approved';
                 var heroTotal = document.getElementById('heroGrandTotal');
-                if (heroTotal) heroTotal.textContent = viewerMoney(total, { forceSign: true });
+                if (heroTotal) heroTotal.textContent = viewerMoney(coTotals.netChange, { forceSign: true });
                 return;
             }
             var heroTotal = document.getElementById('heroGrandTotal');
