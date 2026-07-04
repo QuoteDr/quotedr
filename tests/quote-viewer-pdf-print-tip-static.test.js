@@ -25,6 +25,13 @@ assert(
 );
 
 assert(
+  source.includes('var waitingForHidden = false;') &&
+    /function onContinue\(\)[\s\S]*waitingForHidden = true;[\s\S]*modal\.hide\(\);/.test(source) &&
+    /function onHidden\(\)[\s\S]*finish\(waitingForHidden\);/.test(source),
+  'PDF tip should wait for the modal to fully hide before printing so the backdrop is not captured'
+);
+
+assert(
   source.includes('quotePdfPrintTipContinueBtn') &&
     source.includes('Continue to Print'),
   'PDF tip should include an explicit continue-to-print action'

@@ -135,8 +135,8 @@ assert(
 );
 
 assert(
-  quoteViewer.includes('Print / Save as PDF') &&
-    quoteViewer.includes('function printQuoteIfRequested(') &&
-    quoteViewer.includes("params.get('print') === '1'"),
-  'Quote viewer should offer and support the same Print / Save as PDF flow'
+  quoteViewer.includes('Download / Print PDF') &&
+  quoteViewer.includes('function printQuoteIfRequested(') &&
+  quoteViewer.includes("params.get('print') === '1'"),
+  'Quote viewer should offer and support the same Download / Print PDF flow'
 );

@@ -625,6 +625,128 @@
             font-size: 0.88rem;
             line-height: 1.45;
         }
+        @keyframes termsAgreementShake {
+            0%, 100% { transform: translateX(0); }
+            16% { transform: translateX(-8px); }
+            32% { transform: translateX(8px); }
+            48% { transform: translateX(-6px); }
+            64% { transform: translateX(6px); }
+            80% { transform: translateX(-3px); }
+        }
+        .terms-agreement-wrap {
+            border: 2px solid transparent;
+            border-radius: 10px;
+            padding: 0.65rem 0.75rem 0.65rem 2.25rem;
+            margin-left: -0.75rem;
+            transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .terms-agreement-wrap.terms-check-attention {
+            animation: termsAgreementShake 0.62s ease-in-out;
+            background: #fff3cd;
+            border-color: #f59f00;
+            box-shadow: 0 0 0 4px rgba(245, 159, 0, 0.16);
+        }
+        .signer-name-wrap {
+            border: 2px solid transparent;
+            border-radius: 10px;
+            padding: 0.65rem 0.75rem;
+            margin-left: -0.75rem;
+            margin-right: -0.75rem;
+            transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .signer-name-wrap.signer-name-attention {
+            animation: termsAgreementShake 0.62s ease-in-out;
+            background: #fff3cd;
+            border-color: #f59f00;
+            box-shadow: 0 0 0 4px rgba(245, 159, 0, 0.16);
+        }
+        .terms-required-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 10030;
+            background: rgba(15, 23, 42, 0.55);
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+        .terms-required-overlay.active { display: flex; }
+        .terms-required-modal {
+            width: 100%;
+            max-width: 430px;
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 24px 70px rgba(15, 23, 42, 0.34);
+            border: 1px solid #fed7aa;
+            overflow: hidden;
+        }
+        .terms-required-modal-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: #fff7ed;
+            border-bottom: 1px solid #fed7aa;
+            padding: 1rem 1.15rem;
+            color: #7c2d12;
+            font-weight: 800;
+        }
+        .terms-required-modal-body {
+            padding: 1rem 1.15rem 0.75rem;
+            color: #334155;
+            font-weight: 600;
+        }
+        .terms-required-modal-footer {
+            padding: 0 1.15rem 1.15rem;
+            display: flex;
+            justify-content: flex-end;
+        }
+        .signing-terms-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 10040;
+            background: rgba(15, 23, 42, 0.58);
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+        .signing-terms-overlay.active { display: flex; }
+        .signing-terms-modal {
+            width: 100%;
+            max-width: 620px;
+            max-height: min(76vh, 720px);
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 24px 70px rgba(15, 23, 42, 0.36);
+            border: 1px solid #dbe4ef;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .signing-terms-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 1rem 1.15rem;
+            border-bottom: 1px solid #e5edf5;
+            background: #f8fbff;
+        }
+        .signing-terms-modal-body {
+            padding: 1rem 1.15rem;
+            overflow-y: auto;
+        }
+        .signing-terms-modal-body .list-group-item {
+            padding-left: 0;
+            padding-right: 0;
+            line-height: 1.45;
+        }
+        .signing-terms-modal-footer {
+            padding: 0.9rem 1.15rem 1.15rem;
+            border-top: 1px solid #e5edf5;
+            display: flex;
+            justify-content: flex-end;
+        }
         .approval-banner {
             display: none;
             background: linear-gradient(135deg, #d4edda, #c3e6cb);
@@ -945,13 +1067,10 @@ if (location.search.includes('debug')) {
                             <i class="fas fa-signature me-2"></i>Accept & Sign
                         </button>
                         <button type="button" class="btn btn-outline-secondary" id="downloadQuotePdfBtn" onclick="downloadQuotePdf()">
-                            <i class="fas fa-file-pdf me-2"></i>Download PDF
+                            <i class="fas fa-file-pdf me-2"></i>Download / Print PDF
                         </button>
                         <button type="button" class="btn btn-outline-primary" onclick="document.getElementById('quoteContainer').scrollIntoView({behavior:'smooth'});">
                             <i class="fas fa-list-check me-2"></i>Review Scope
-                        </button>
-                        <button type="button" class="btn btn-outline-secondary d-print-none" onclick="printQuote()">
-                            <i class="fas fa-print me-2"></i>Print / Save as PDF
                         </button>
                     </div>
                 </aside>
@@ -1098,7 +1217,7 @@ if (location.search.includes('debug')) {
                 <p class="signature-help mb-3">Enter your full name, draw your signature, and confirm the terms to approve this quote.</p>
                 <div class="alert alert-warning py-2 mb-3" id="signatureApprovalMessage" style="display:none;" role="alert"></div>
 
-                <div class="mb-3">
+                <div class="mb-3 signer-name-wrap" id="signerNameWrap">
                     <label class="form-label fw-bold">Your Full Name <span class="text-danger">*</span></label>
                     <input type="text" id="signerName" class="form-control" placeholder="e.g. Jane Smith">
                 </div>
@@ -1113,11 +1232,14 @@ if (location.search.includes('debug')) {
                     </div>
                 </div>
 
-                <div class="form-check mb-3">
+                <div class="form-check mb-3 terms-agreement-wrap" id="termsAgreementWrap">
                     <input class="form-check-input" type="checkbox" id="termsCheck">
                     <label class="form-check-label" for="termsCheck">
                         I have read and agree to the terms and conditions outlined in this quote.
                     </label>
+                    <button type="button" class="btn btn-link btn-sm p-0 ms-1 align-baseline fw-bold" id="viewSigningTermsBtn" onclick="openSigningTermsModal()">
+                        View Terms
+                    </button>
                 </div>
 
                 <div class="d-flex gap-2 flex-wrap">
@@ -1125,6 +1247,54 @@ if (location.search.includes('debug')) {
                         <i class="fas fa-check-circle"></i> Sign &amp; Approve
                     </button>
                     <button type="button" class="btn btn-outline-secondary" onclick="closeSignatureModal()">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="terms-required-overlay" id="signerNameRequiredModal" role="dialog" aria-modal="true" aria-labelledby="signerNameRequiredTitle" aria-hidden="true">
+            <div class="terms-required-modal">
+                <div class="terms-required-modal-header">
+                    <i class="fas fa-triangle-exclamation"></i>
+                    <div id="signerNameRequiredTitle">Full name required</div>
+                </div>
+                <div class="terms-required-modal-body">
+                    Please type your full name before signing and approving this quote.
+                </div>
+                <div class="terms-required-modal-footer">
+                    <button type="button" class="btn btn-warning" id="signerNameRequiredOkBtn">OK</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="terms-required-overlay" id="termsApprovalRequiredModal" role="dialog" aria-modal="true" aria-labelledby="termsApprovalRequiredTitle" aria-hidden="true">
+            <div class="terms-required-modal">
+                <div class="terms-required-modal-header">
+                    <i class="fas fa-triangle-exclamation"></i>
+                    <div id="termsApprovalRequiredTitle">Terms agreement required</div>
+                </div>
+                <div class="terms-required-modal-body">
+                    You must accept the quote terms and conditions before signing and approving this quote.
+                </div>
+                <div class="terms-required-modal-footer">
+                    <button type="button" class="btn btn-warning" id="termsApprovalRequiredOkBtn">OK</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="signing-terms-overlay" id="signingTermsModal" role="dialog" aria-modal="true" aria-labelledby="signingTermsModalTitle" aria-hidden="true">
+            <div class="signing-terms-modal">
+                <div class="signing-terms-modal-header">
+                    <div>
+                        <h5 class="mb-0" id="signingTermsModalTitle"><i class="fas fa-file-contract text-primary me-1"></i> Quote Terms &amp; Conditions</h5>
+                        <div class="text-muted small">Review the terms included with this quote before signing.</div>
+                    </div>
+                    <button type="button" class="btn-close" aria-label="Close terms" onclick="closeSigningTermsModal()"></button>
+                </div>
+                <div class="signing-terms-modal-body" id="signingTermsModalBody">
+                    <p class="text-muted mb-0">No specific terms included in this quote.</p>
+                </div>
+                <div class="signing-terms-modal-footer">
+                    <button type="button" class="btn btn-primary" id="closeSigningTermsBtn" onclick="closeSigningTermsModal()">Close</button>
                 </div>
             </div>
         </div>
@@ -2669,6 +2839,7 @@ if (location.search.includes('debug')) {
                     ? bootstrap.Modal.getOrCreateInstance(el)
                     : new bootstrap.Modal(el);
                 var settled = false;
+                var waitingForHidden = false;
 
                 function cleanup() {
                     continueBtn.removeEventListener('click', onContinue);
@@ -2678,14 +2849,15 @@ if (location.search.includes('debug')) {
                     if (settled) return;
                     settled = true;
                     cleanup();
-                    if (value) modal.hide();
                     resolve(value);
                 }
                 function onContinue() {
-                    finish(true);
+                    if (settled || waitingForHidden) return;
+                    waitingForHidden = true;
+                    modal.hide();
                 }
                 function onHidden() {
-                    finish(false);
+                    finish(waitingForHidden);
                 }
 
                 continueBtn.addEventListener('click', onContinue);
@@ -2837,6 +3009,111 @@ if (location.search.includes('debug')) {
             el.textContent = message;
             el.style.display = message ? 'block' : 'none';
         }
+        function showSignerNameRequiredModal() {
+            return new Promise(function(resolve) {
+                var modal = document.getElementById('signerNameRequiredModal');
+                var okBtn = document.getElementById('signerNameRequiredOkBtn');
+                if (!modal || !okBtn) {
+                    resolve();
+                    return;
+                }
+                var resolved = false;
+                function close() {
+                    if (resolved) return;
+                    resolved = true;
+                    okBtn.removeEventListener('click', close);
+                    modal.classList.remove('active');
+                    modal.setAttribute('aria-hidden', 'true');
+                    resolve();
+                }
+                okBtn.addEventListener('click', close);
+                modal.classList.add('active');
+                modal.setAttribute('aria-hidden', 'false');
+                setTimeout(function() { okBtn.focus(); }, 0);
+            });
+        }
+        function showTermsApprovalRequiredModal() {
+            return new Promise(function(resolve) {
+                var modal = document.getElementById('termsApprovalRequiredModal');
+                var okBtn = document.getElementById('termsApprovalRequiredOkBtn');
+                if (!modal || !okBtn) {
+                    resolve();
+                    return;
+                }
+                var resolved = false;
+                function close() {
+                    if (resolved) return;
+                    resolved = true;
+                    okBtn.removeEventListener('click', close);
+                    modal.classList.remove('active');
+                    modal.setAttribute('aria-hidden', 'true');
+                    resolve();
+                }
+                okBtn.addEventListener('click', close);
+                modal.classList.add('active');
+                modal.setAttribute('aria-hidden', 'false');
+                setTimeout(function() { okBtn.focus(); }, 0);
+            });
+        }
+        function renderSigningTermsModal() {
+            var terms = Array.isArray(quoteData.terms) ? quoteData.terms.filter(function(term) {
+                return String(term || '').trim();
+            }) : [];
+            var body = document.getElementById('signingTermsModalBody');
+            if (!body) return;
+            if (!terms.length) {
+                body.innerHTML = '<p class="text-muted mb-0">No specific terms included in this quote.</p>';
+                return;
+            }
+            body.innerHTML = '<ul class="list-group list-group-flush">' + terms.map(function(term) {
+                return '<li class="list-group-item"><i class="fas fa-check-circle text-success me-1"></i>' + escapeHtml(term) + '</li>';
+            }).join('') + '</ul>';
+        }
+        function openSigningTermsModal() {
+            var modal = document.getElementById('signingTermsModal');
+            var closeBtn = document.getElementById('closeSigningTermsBtn');
+            if (!modal) return;
+            renderSigningTermsModal();
+            modal.classList.add('active');
+            modal.setAttribute('aria-hidden', 'false');
+            setTimeout(function() {
+                if (closeBtn) closeBtn.focus();
+            }, 0);
+        }
+        function closeSigningTermsModal() {
+            var modal = document.getElementById('signingTermsModal');
+            var termsBtn = document.getElementById('viewSigningTermsBtn');
+            if (!modal) return;
+            modal.classList.remove('active');
+            modal.setAttribute('aria-hidden', 'true');
+            if (termsBtn) termsBtn.focus({ preventScroll: true });
+        }
+        function emphasizeTermsAgreement() {
+            var wrap = document.getElementById('termsAgreementWrap');
+            var checkbox = document.getElementById('termsCheck');
+            if (!wrap) return;
+            wrap.classList.remove('terms-check-attention');
+            void wrap.offsetWidth;
+            wrap.classList.add('terms-check-attention');
+            wrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (checkbox) checkbox.focus({ preventScroll: true });
+            setTimeout(function() {
+                wrap.classList.remove('terms-check-attention');
+            }, 1400);
+        }
+        function emphasizeSignerName() {
+            var wrap = document.getElementById('signerNameWrap');
+            var input = document.getElementById('signerName');
+            if (!wrap) return;
+            wrap.classList.remove('signer-name-attention');
+            void wrap.offsetWidth;
+            wrap.classList.add('signer-name-attention');
+            wrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (input) input.focus({ preventScroll: true });
+            setTimeout(function() {
+                wrap.classList.remove('signer-name-attention');
+            }, 1400);
+        }
         function initSignaturePad() {
             sigCanvas = document.getElementById('signatureCanvas');
             sigCtx = sigCanvas.getContext('2d');
@@ -2950,9 +3227,17 @@ if (location.search.includes('debug')) {
         async function confirmApproval() {
             logPortalDocumentActivity('signature_started', { metadata: { action: 'confirm_approval' } });
             const name = document.getElementById('signerName').value.trim();
-            if (!name) { showSignatureApprovalMessage('Please enter your full name.'); return; }
+            if (!name) {
+                showSignatureApprovalMessage('Please enter your full name.');
+                showSignerNameRequiredModal().then(emphasizeSignerName);
+                return;
+            }
             if (!sigHasStrokes) { showSignatureApprovalMessage('Please draw your signature.'); return; }
-            if (!document.getElementById('termsCheck').checked) { showSignatureApprovalMessage('Please agree to the terms and conditions.'); return; }
+            if (!document.getElementById('termsCheck').checked) {
+                showSignatureApprovalMessage('Please agree to the terms and conditions.');
+                showTermsApprovalRequiredModal().then(emphasizeTermsAgreement);
+                return;
+            }
 
             var approveBtn = document.getElementById('signApproveBtn');
             var originalApproveHtml = approveBtn ? approveBtn.innerHTML : '';
