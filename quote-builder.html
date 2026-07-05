@@ -7771,6 +7771,7 @@ Example:
                 photo: item.photo || '',
                 itemDescription: item.itemDescription || item.description || '',
                 laborTime: normalizeLaborTime(item.laborTime),
+                upgrade: item.upgrade ? cloneSavedItemForQuoteSync(item.upgrade) : null,
                 upgradeGroups: normalizeQuoteItemUpgradeGroups(item),
                 quantityMode: item.quantityMode || 'inherit',
                 quantityOverride: item.quantityOverride || ''

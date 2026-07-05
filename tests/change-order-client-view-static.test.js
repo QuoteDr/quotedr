@@ -15,7 +15,9 @@ assert(
   'function viewerChangeOrderLineDelta',
   'function viewerChangeOrderLineDisplayTotal',
   'function viewerChangeOrderExplanation',
-  'function toggleViewerChangeOrderExplanation'
+  'function toggleViewerChangeOrderExplanation',
+  'function showChangeOrderExplainer',
+  'function openChangeOrderExplainer'
 ].forEach((needle) => {
   assert(viewer.includes(needle), `${needle} should exist in interactive quote viewer`);
 });
@@ -39,6 +41,14 @@ assert(
     viewer.includes('onclick="toggleViewerChangeOrderExplanation(') &&
     viewer.includes('viewer-change-order-note'),
   'changed change-order line totals should be clickable and reveal an inline explanation'
+);
+
+assert(
+  viewer.includes('changeOrderExplainerModal') &&
+    viewer.includes('Highlighted items show what changed') &&
+    viewer.includes('Click any underlined price to see what changed') &&
+    viewer.includes('openChangeOrderExplainer()'),
+  'change order client view should explain highlighted rows and clickable price details'
 );
 
 assert(

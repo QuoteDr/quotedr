@@ -2295,6 +2295,7 @@
                         photo: item.photo || '',
                         itemDescription: item.itemDescription || item.description || '',
                         laborTime: normalizeManageLaborTime(item.laborTime),
+                        upgrade: item.upgrade ? JSON.parse(JSON.stringify(item.upgrade)) : null,
                         quantityMode: 'inherit',
                         quantityOverride: ''
                     });

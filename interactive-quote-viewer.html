@@ -480,6 +480,68 @@
             font-weight: 850;
             font-size: 1.08rem;
         }
+        .change-order-explainer-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-top: 12px;
+            padding: 12px 14px;
+            background: #fff7ed;
+            border: 1px solid #fed7aa;
+            border-radius: 10px;
+            color: #533112;
+        }
+        .change-order-explainer-card strong {
+            color: #1f2937;
+        }
+        .change-order-explainer-card .btn {
+            white-space: nowrap;
+        }
+        .change-order-explainer-list {
+            display: grid;
+            gap: 12px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+        .change-order-explainer-list li {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+        }
+        .change-order-explainer-list i {
+            color: var(--quote-accent, #1a56a0);
+            margin-top: 3px;
+            width: 18px;
+            text-align: center;
+        }
+        .change-order-highlight-samples {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .change-order-highlight-samples span {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            border-radius: 999px;
+            padding: 4px 9px;
+            font-size: 0.8rem;
+            font-weight: 800;
+        }
+        .co-sample-changed { background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; }
+        .co-sample-added { background: #ecfdf5; color: #047857; border: 1px solid #bbf7d0; }
+        .co-sample-removed { background: #fff1f2; color: #be123c; border: 1px solid #fecdd3; }
+        @media (max-width: 640px) {
+            .change-order-explainer-card {
+                align-items: stretch;
+                flex-direction: column;
+            }
+            .change-order-explainer-card .btn {
+                width: 100%;
+            }
+        }
         .co-positive { color: #198754; }
         .co-negative { color: #dc3545; }
         .total-header {
@@ -878,6 +940,25 @@
         }
         .choice-option-btn.choice-option-selected .opacity-75 {
             opacity: 0.9 !important;
+        }
+        .choice-option-upgrades-wrap {
+            clear: both;
+            display: grid;
+            gap: 10px;
+            margin-top: 14px;
+            padding-top: 12px;
+            border-top: 1px solid #e5edf5;
+        }
+        .choice-option-upgrade {
+            position: relative;
+            z-index: 1;
+            background: #fff8e1;
+            border: 1px solid #f0d98c;
+            border-left: 4px solid #f0ad4e;
+            border-radius: 8px;
+            padding: 10px 12px;
+            color: #334155;
+            line-height: 1.45;
         }
         .deposit-card {
             border: 1px solid #dbeafe;
@@ -1664,6 +1745,7 @@ if (location.search.includes('debug')) {
             applyQuoteCompletionState();
             showPaymentReturnNotice();
             setupMobileJumpVisibility();
+            showChangeOrderExplainer(false);
             printQuoteIfRequested();
         });
 
@@ -2360,7 +2442,7 @@ if (location.search.includes('debug')) {
             clearInvalidViewerItemUpgradeSelections(item);
             if (!item.upgradeGroups.length) return '';
             var selectedIds = getViewerSelectedItemUpgradeIds(item);
-            var html = '<div class="mt-2 p-2 border rounded bg-light">';
+            var html = '<div class="choice-option-upgrades-wrap"><div class="choice-option-upgrade">';
             html += '<div class="small fw-bold text-warning mb-1"><i class="fas fa-arrow-up me-1"></i>Upgrade options</div>';
             item.upgradeGroups.forEach(function(group) {
                 var compatible = (group.options || []).filter(function(option) {
@@ -2379,7 +2461,7 @@ if (location.search.includes('debug')) {
                 });
                 html += '</div></div>';
             });
-            html += '</div>';
+            html += '</div></div>';
             return html;
         }
 
@@ -2656,12 +2738,83 @@ if (location.search.includes('debug')) {
             el.classList.toggle('visible');
         }
 
+        function changeOrderExplainerStorageKey() {
+            var params = new URLSearchParams(window.location.search || '');
+            var docId = params.get('id') || quoteData.supabaseId || quoteData.id || quoteData.quoteNumber || quoteData.parentQuoteNumber || 'current';
+            return 'quotedr_change_order_explainer_seen_' + docId;
+        }
+
+        function ensureChangeOrderExplainerModal() {
+            if (document.getElementById('changeOrderExplainerModal')) return;
+            document.body.insertAdjacentHTML('beforeend', `
+                <div class="modal fade" id="changeOrderExplainerModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header bg-primary text-white">
+                                <h5 class="modal-title"><i class="fas fa-file-circle-plus me-2"></i>How to review this change order</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <ul class="change-order-explainer-list">
+                                    <li>
+                                        <i class="fas fa-highlighter"></i>
+                                        <div>
+                                            <strong>Highlighted items show what changed.</strong>
+                                            <div class="text-muted small mt-1">Look for coloured rows as you review the scope.</div>
+                                            <div class="change-order-highlight-samples mt-2">
+                                                <span class="co-sample-changed"><i class="fas fa-pen"></i>Changed</span>
+                                                <span class="co-sample-added"><i class="fas fa-plus"></i>Added</span>
+                                                <span class="co-sample-removed"><i class="fas fa-minus"></i>Removed</span>
+                                            </div>
+                                        </div>
+                                    </li>
+                                    <li>
+                                        <i class="fas fa-hand-pointer"></i>
+                                        <div><strong>Click any underlined price to see what changed.</strong><div class="text-muted small mt-1">The detail will explain the original quantity or price, the new value, and the net adjustment.</div></div>
+                                    </li>
+                                    <li>
+                                        <i class="fas fa-calculator"></i>
+                                        <div><strong>Review the updated project total.</strong><div class="text-muted small mt-1">The summary shows the original quote, previous approved change orders, this change, tax, and the new total if approved.</div></div>
+                                    </li>
+                                    <li>
+                                        <i class="fas fa-signature"></i>
+                                        <div><strong>Approve only when everything looks right.</strong><div class="text-muted small mt-1">You can approve and sign, or decline the change order if something needs another look.</div></div>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-primary w-100" data-bs-dismiss="modal"><i class="fas fa-check me-1"></i>Got it</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `);
+        }
+
+        function openChangeOrderExplainer() {
+            ensureChangeOrderExplainerModal();
+            var modalEl = document.getElementById('changeOrderExplainerModal');
+            if (!modalEl || typeof bootstrap === 'undefined') return;
+            var modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+            modal.show();
+        }
+
+        function showChangeOrderExplainer(force) {
+            var co = window.QuoteDrChangeOrders;
+            if (!(co && co.isChangeOrder(quoteData))) return;
+            var key = changeOrderExplainerStorageKey();
+            if (!force && sessionStorage.getItem(key) === '1') return;
+            sessionStorage.setItem(key, '1');
+            window.setTimeout(openChangeOrderExplainer, 350);
+        }
+
         function renderViewerChoiceGroup(roomIdx, itemIndex, item, isSignedDiff) {
             var group = item.choiceGroup;
             if (!group || !Array.isArray(group.options)) return '';
             applyViewerChoiceGroupToItem(item);
             var selectedIds = getViewerChoiceSelectedOptions(group).map(function(option) { return option.id; });
             var typeLabel = group.type === 'multiple' ? 'Choose any that apply' : 'Choose one option';
+            var groupNote = viewerVisibleNotes(item, '');
             var html = '<div class="choice-group-card py-3 border-bottom" id="item_' + roomIdx + '_' + itemIndex + '">';
             html += '<div class="d-flex justify-content-between gap-3 mb-2"><div><strong>' + escapeHtml(group.name || item.description || 'Options') + '</strong><div class="text-muted small"><i class="fas fa-layer-group me-1"></i>' + typeLabel + '</div></div>';
             html += '<div class="text-end small text-muted">' + (group.required ? 'Required' : 'Optional') + '</div></div>';
@@ -2680,6 +2833,9 @@ if (location.search.includes('debug')) {
             html += '</div>';
             html += renderViewerChoiceGroupEnhancements(roomIdx, itemIndex, item, isSignedDiff);
             html += renderViewerItemUpgradeGroups(roomIdx, itemIndex, item, isSignedDiff);
+            if (groupNote) {
+                html += '<div class="choice-group-note text-muted mt-2"><small><i class="fas fa-info-circle"></i> ' + escapeHtml(groupNote) + '</small></div>';
+            }
             html += '</div>';
             return html;
         }
@@ -3031,6 +3187,10 @@ if (location.search.includes('debug')) {
                     '<div class="co-price-row"><span>Tax on this change</span><strong>' + money(coTotals.tax, true) + '</strong></div>' +
                     '<div class="co-price-row"><span>This change order total</span><strong>' + money(coTotals.netChange, true) + '</strong></div>' +
                     '<div class="co-price-row co-price-final"><span>Updated project total if approved</span><strong>' + money(coTotals.updatedTotal, false) + '</strong></div>' +
+                    '</div>' +
+                    '<div class="change-order-explainer-card">' +
+                    '<div><strong>Highlighted items show what changed.</strong><div class="small">Click any underlined price to see what changed on that line.</div></div>' +
+                    '<button type="button" class="btn btn-sm btn-outline-primary" onclick="openChangeOrderExplainer()"><i class="fas fa-circle-question me-1"></i>What changed?</button>' +
                     '</div>' +
                     '</div>';
                 document.getElementById('quoteSubtotalDisplay').textContent = viewerMoney(coTotals.originalTotal);

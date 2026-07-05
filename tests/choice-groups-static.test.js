@@ -135,8 +135,16 @@ assert(!suggestBlock.includes('qdPrompt('), 'suggested choice groups should not 
 
 assert(viewer.includes('renderViewerChoiceGroup'), 'client viewer should render choice group cards');
 assert(viewer.includes('toggleViewerChoiceOption'), 'client viewer should let clients select choice options');
+assert(viewer.includes('renderViewerItemUpgradeGroups'), 'client viewer should render upgrade controls for the selected choice option');
+assert(viewer.includes('toggleViewerItemUpgradeOption'), 'client viewer should let clients toggle upgrades on selected choice options');
+assert(viewer.includes('applyViewerItemUpgradeGroups(item)'), 'client viewer choice group totals should use upgraded option pricing when selected');
+assert(viewer.includes('choice-option-upgrades-wrap'), 'client viewer should render selected choice upgrades in a full-width block below choice cards');
+assert(viewer.includes('choice-group-note'), 'client viewer should show visible notes attached to grouped choice items');
 assert(viewer.includes('_clientChoiceGroups'), 'client viewer should save selected choice group summaries');
 assert(viewer.includes('applyClientChoiceGroupsToRooms'), 'client viewer should apply selected choices on submit or accept');
+assert(builder.includes('upgrade: item.upgrade ? cloneSavedItemForQuoteSync(item.upgrade) : null'), 'quote-level choice groups should preserve upgrade data from grouped line items');
+assert(items.includes('upgrade: item.upgrade ? JSON.parse(JSON.stringify(item.upgrade)) : null'), 'saved choice group templates should preserve upgrade data from saved items');
+assert(read('quote-storage.js').includes('hydrateChoiceGroupOptionsForSave'), 'quote storage should hydrate missing choice option upgrades before sharing/saving');
 
 assert(dashboard.includes('_clientChoiceGroups'), 'dashboard review should show client selected choice groups');
 assert(invoice.includes('choiceGroupSelection'), 'invoice should preserve/display accepted choice-group selections');

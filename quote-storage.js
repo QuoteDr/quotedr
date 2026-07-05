@@ -150,10 +150,48 @@
                 .trim();
         }
 
+        function cloneQuoteStorageValue(value) {
+            try {
+                return JSON.parse(JSON.stringify(value || null));
+            } catch(e) {
+                return value || null;
+            }
+        }
+
+        function findSavedItemForChoiceOption(option, fallbackCategory) {
+            if (!option || typeof pricingDatabase !== 'object' || !pricingDatabase) return null;
+            var optionName = qdQuoteStorageTextKey(option.name || option.description || option.serviceName || '');
+            var optionCategory = option.category || fallbackCategory || '';
+            var categories = optionCategory && pricingDatabase[optionCategory]
+                ? [optionCategory]
+                : Object.keys(pricingDatabase || {});
+            for (var c = 0; c < categories.length; c++) {
+                var items = Array.isArray(pricingDatabase[categories[c]]) ? pricingDatabase[categories[c]] : [];
+                for (var i = 0; i < items.length; i++) {
+                    var saved = items[i] || {};
+                    var savedName = qdQuoteStorageTextKey(saved.name || saved.description || saved.serviceName || '');
+                    if (savedName && savedName === optionName) return saved;
+                }
+            }
+            return null;
+        }
+
+        function hydrateChoiceGroupOptionsForSave(item) {
+            if (!item || !item.choiceGroup || !Array.isArray(item.choiceGroup.options)) return;
+            item.choiceGroup.options.forEach(function(option) {
+                if (!option || (option.upgrade && option.upgrade.name)) return;
+                var saved = findSavedItemForChoiceOption(option, item.category);
+                if (saved && saved.upgrade && saved.upgrade.name) {
+                    option.upgrade = cloneQuoteStorageValue(saved.upgrade);
+                }
+            });
+        }
+
         function sanitizeQuoteRoomsForSave(sourceRooms) {
             var clonedRooms = JSON.parse(JSON.stringify(sourceRooms || []));
             clonedRooms.forEach(function(room) {
                 (room.items || []).forEach(function(item) {
+                    hydrateChoiceGroupOptionsForSave(item);
                     var note = String(item && item.notes || '').trim();
                     var description = String(item && item.itemDescription || '').trim();
                     if (note && description && qdQuoteStorageTextKey(note) === qdQuoteStorageTextKey(description)) {
