@@ -1290,6 +1290,26 @@
             background: rgba(255,255,255,0.75);
             color: #1f2d3d;
         }
+        #manageItemsModal .manage-category-drag-handle {
+            width: 28px;
+            height: 28px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            background: rgba(255,255,255,0.75);
+            color: #64748b;
+            cursor: grab;
+            touch-action: none;
+        }
+        #manageItemsModal .manage-category-drag-handle:active {
+            cursor: grabbing;
+        }
+        #manageItemsModal .sortable-ghost .manage-items-category-header {
+            opacity: 0.65;
+            outline: 2px dashed #1a56a0;
+        }
         #manageItemsModal .manage-items-category-count {
             font-size: 0.72rem;
             font-weight: 800;
@@ -2751,6 +2771,50 @@ Example:
                             </button>
                         </div>
                     </div>
+                    <div class="mb-3">
+                        <button type="button" id="toggleNewItemUpgradeBtn" class="btn btn-sm btn-outline-primary" onclick="toggleNewItemUpgradePanel()">
+                            <i class="fas fa-arrow-up"></i> Add Upgrade
+                        </button>
+                    </div>
+                    <div id="newItemUpgradePanel" class="border rounded p-2 mb-3 bg-white" style="display:none;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div class="small fw-bold text-primary"><i class="fas fa-arrow-up me-1"></i>Upgrade Option <span class="text-muted fw-normal">(optional)</span></div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleNewItemUpgradePanel(false)">Remove</button>
+                        </div>
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-4">
+                                <label class="form-label small mb-1">Upgrade name</label>
+                                <input type="text" id="newItemUpgradeName" class="form-control form-control-sm" placeholder="e.g., 5-1/4 MDF Baseboard" spellcheck="true">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small mb-1">Unit</label>
+                                <input type="text" id="newItemUpgradeUnit" class="form-control form-control-sm" list="unitTypeOptions" placeholder="same as item">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small mb-1">Rate ($)</label>
+                                <input type="number" id="newItemUpgradeRate" class="form-control form-control-sm" step="0.01" min="0" placeholder="0.00">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small mb-1">Mat. Cost ($)</label>
+                                <input type="number" id="newItemUpgradeMaterialCost" class="form-control form-control-sm" step="0.01" min="0" placeholder="0.00">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small mb-1">Supplier URL</label>
+                                <input type="url" id="newItemUpgradeSupplierUrl" class="form-control form-control-sm" placeholder="https://...">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small mb-1">Upgrade type</label>
+                                <select id="newItemUpgradeType" class="form-select form-select-sm" title="Replacement swaps the base item. Add-on adds to the base item.">
+                                    <option value="replacement" selected>Replacement</option>
+                                    <option value="add_on">Add-on</option>
+                                </select>
+                            </div>
+                            <div class="col-md-9">
+                                <label class="form-label small mb-1">Upgrade description</label>
+                                <textarea id="newItemUpgradeDescription" class="form-control form-control-sm" rows="2" placeholder="Optional client-facing description for this upgrade..." spellcheck="true"></textarea>
+                            </div>
+                        </div>
+                    </div>
                     <div class="border rounded p-2 mb-3 bg-light">
                         <div class="small fw-bold text-primary mb-2"><i class="fas fa-clock me-1"></i>Labor Time <span class="text-muted fw-normal">(optional - used for Timeline Report)</span></div>
                         <div class="row g-2 align-items-end">
@@ -2795,6 +2859,7 @@ Example:
                         <div class="d-flex align-items-center gap-2 flex-wrap">
                             <span id="pricingUnsavedIndicator" class="badge bg-warning text-dark" style="display:none;">Unsaved changes</span>
                             <button onclick="openChoiceGroupTemplateModal()" class="btn btn-sm btn-outline-primary"><i class="fas fa-layer-group"></i> Choice Group</button>
+                            <button id="manageCategoryOrganizeBtn" onclick="openManageCategoryOrganizeMenu()" class="btn btn-sm btn-outline-primary" title="Choose alphabetical or custom category order"><i class="fas fa-sort"></i> Organize <span id="manage-category-order-mode-badge" class="badge text-bg-light ms-1">A-Z</span></button>
                             <button onclick="suggestChoiceGroupTemplates()" class="btn btn-sm btn-outline-secondary"><i class="fas fa-wand-magic-sparkles"></i> Suggest Groups</button>
                             <button onclick="saveChangedPricingRows()" class="btn btn-sm btn-success"><i class="fas fa-save"></i> Save Changed</button>
                             <button onclick="saveAllPricingRows()" class="btn btn-sm btn-outline-success"><i class="fas fa-database"></i> Save All</button>
@@ -2918,7 +2983,7 @@ Example:
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="quote-dialogs.js?v=1777660407"></script>
+    <script src="quote-dialogs.js?v=1783218459"></script>
     <script src="app-broadcasts.js?v=1779131000"></script>
     <script src="quote-template-files.js?v=1778012600"></script>
     <script>window.initMeasureMap = window.initMeasureMap || function(){ window._mapInited = true; };</script>
@@ -2971,6 +3036,245 @@ Example:
                 fixedHours: parseFloat(source.fixedHours || source.fixed_hours || 0) || 0,
                 crewSize: Math.max(1, parseFloat(source.crewSize || source.crew_size || 1) || 1)
             };
+        }
+
+        function normalizeQuoteUpgradeType(value) {
+            var clean = String(value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+            return clean === 'add_on' || clean === 'addon' ? 'add_on' : 'replacement';
+        }
+
+        function getQuoteUpgradeDescription(upgrade) {
+            upgrade = upgrade || {};
+            return upgrade.description || upgrade.itemDescription || upgrade.item_description || upgrade.notes || '';
+        }
+
+        function getQuoteDisplayItemDescription(item, isUpgraded, hasUpgrade) {
+            item = item || {};
+            if (!isUpgraded || !hasUpgrade) return item.itemDescription || '';
+            var upgradeDescription = getQuoteUpgradeDescription(item.upgrade);
+            if (normalizeQuoteUpgradeType(item.upgrade && (item.upgrade.type || item.upgrade.upgradeType || item.upgrade.mode)) === 'add_on') {
+                var baseDescription = item._baseItemDescription !== undefined ? item._baseItemDescription : (item.itemDescription || '');
+                return [baseDescription, upgradeDescription].filter(function(part) {
+                    return String(part || '').trim();
+                }).join('\n\n');
+            }
+            return upgradeDescription;
+        }
+
+        function normalizeQuoteItemUpgradeOption(option, fallbackId) {
+            option = option || {};
+            return {
+                id: option.id || fallbackId || choiceGroupId(),
+                name: option.name || option.sourceItemName || option.description || 'Upgrade',
+                category: option.category || '',
+                sourceItemName: option.sourceItemName || option.name || '',
+                unitType: option.unitType || option.unit || '',
+                rate: parseFloat(option.rate || 0) || 0,
+                materialCost: parseFloat(option.materialCost || option.material_cost || 0) || 0,
+                supplierUrl: option.supplierUrl || '',
+                description: option.description || option.itemDescription || '',
+                itemDescription: option.itemDescription || option.description || '',
+                laborTime: normalizeLaborTime(option.laborTime),
+                upgradeType: normalizeQuoteUpgradeType(option.upgradeType || option.type || option.mode),
+                availableAfterOptionIds: Array.isArray(option.availableAfterOptionIds) ? option.availableAfterOptionIds.filter(Boolean) : [],
+                blockedByOptionIds: Array.isArray(option.blockedByOptionIds) ? option.blockedByOptionIds.filter(Boolean) : []
+            };
+        }
+
+        function normalizeQuoteItemUpgradeGroups(itemOrGroups) {
+            var item = Array.isArray(itemOrGroups) ? { upgradeGroups: itemOrGroups } : (itemOrGroups || {});
+            var groups = Array.isArray(item.upgradeGroups) ? item.upgradeGroups : [];
+            var normalized = groups.map(function(group, groupIndex) {
+                group = group || {};
+                var options = Array.isArray(group.options) ? group.options.map(function(option, optionIndex) {
+                    return normalizeQuoteItemUpgradeOption(option, 'item_upo_' + groupIndex + '_' + optionIndex);
+                }).filter(function(option) { return option.name; }) : [];
+                return {
+                    id: group.id || ('item_upg_' + groupIndex),
+                    name: group.name || 'Upgrade Options',
+                    type: group.type === 'multiple' ? 'multiple' : 'single_optional',
+                    selectedOptionIds: Array.isArray(group.selectedOptionIds) ? group.selectedOptionIds.filter(Boolean) : [],
+                    options: options
+                };
+            }).filter(function(group) { return group.options.length; });
+            if (!normalized.length && item.upgrade && item.upgrade.name) {
+                normalized.push({
+                    id: 'legacy_upgrade',
+                    name: 'Upgrade Options',
+                    type: 'single_optional',
+                    selectedOptionIds: item.upgraded ? ['legacy_upgrade_option'] : [],
+                    options: [normalizeQuoteItemUpgradeOption(Object.assign({}, item.upgrade, {
+                        id: 'legacy_upgrade_option',
+                        upgradeType: item.upgrade.upgradeType || item.upgrade.type || item.upgrade.mode || 'replacement'
+                    }))]
+                });
+            }
+            return normalized;
+        }
+
+        function getAllSelectedItemUpgradeOptionIds(item) {
+            return normalizeQuoteItemUpgradeGroups(item).reduce(function(ids, group) {
+                return ids.concat(Array.isArray(group.selectedOptionIds) ? group.selectedOptionIds : []);
+            }, []);
+        }
+
+        function isItemUpgradeOptionCompatible(option, selectedIds) {
+            selectedIds = Array.isArray(selectedIds) ? selectedIds : [];
+            var required = Array.isArray(option.availableAfterOptionIds) ? option.availableAfterOptionIds : [];
+            var blocked = Array.isArray(option.blockedByOptionIds) ? option.blockedByOptionIds : [];
+            if (required.length && !required.some(function(id) { return selectedIds.indexOf(id) !== -1; })) return false;
+            return !blocked.some(function(id) { return selectedIds.indexOf(id) !== -1; });
+        }
+
+        function clearInvalidItemUpgradeSelections(item) {
+            if (!item) return;
+            item.upgradeGroups = normalizeQuoteItemUpgradeGroups(item);
+            var changed = true;
+            while (changed) {
+                changed = false;
+                var selectedIds = getAllSelectedItemUpgradeOptionIds(item);
+                item.upgradeGroups.forEach(function(group) {
+                    var next = (group.selectedOptionIds || []).filter(function(optionId) {
+                        var option = (group.options || []).find(function(candidate) { return candidate.id === optionId; });
+                        if (!option) return false;
+                        return isItemUpgradeOptionCompatible(option, selectedIds.filter(function(id) { return id !== optionId; }));
+                    });
+                    if (group.type === 'single_optional') next = next.slice(0, 1);
+                    if (next.length !== (group.selectedOptionIds || []).length) {
+                        group.selectedOptionIds = next;
+                        changed = true;
+                    }
+                });
+            }
+            item.selectedUpgradeOptionIds = getAllSelectedItemUpgradeOptionIds(item);
+        }
+
+        function getSelectedItemUpgradeOptions(item) {
+            var selectedIds = getAllSelectedItemUpgradeOptionIds(item);
+            return normalizeQuoteItemUpgradeGroups(item).reduce(function(options, group) {
+                return options.concat((group.options || []).filter(function(option) {
+                    return selectedIds.indexOf(option.id) !== -1;
+                }));
+            }, []);
+        }
+
+        function ensureItemUpgradeBaseState(item) {
+            if (!item || item._itemUpgradeBaseCaptured) return;
+            item._baseRate = parseFloat(item.rate || 0) || 0;
+            item._baseMaterialCost = parseFloat(item.materialCost || 0) || 0;
+            item._baseUnitType = item.unitType || item.unit || '';
+            item._baseSupplierUrl = item.supplierUrl || '';
+            item._baseItemDescription = item.itemDescription || '';
+            item._baseDescription = item.description || item.name || '';
+            item._baseLaborTime = normalizeLaborTime(item.laborTime);
+            item._itemUpgradeBaseCaptured = true;
+        }
+
+        function applyItemUpgradeGroupsToItem(item) {
+            if (!item) return item;
+            item.upgradeGroups = normalizeQuoteItemUpgradeGroups(item);
+            if (!item.upgradeGroups.length) return item;
+            ensureItemUpgradeBaseState(item);
+            clearInvalidItemUpgradeSelections(item);
+            var quantity = parseFloat(item.quantity || 0) || 0;
+            var baseRate = parseFloat(item._baseRate || 0) || 0;
+            var baseCost = parseFloat(item._baseMaterialCost || 0) || 0;
+            var rate = baseRate;
+            var materialCost = baseCost;
+            var unitType = item._baseUnitType || item.unitType || '';
+            var supplierUrl = item._baseSupplierUrl || '';
+            var itemDescription = item._baseItemDescription || '';
+            var description = item._baseDescription || item.description || '';
+            var laborTime = normalizeLaborTime(item._baseLaborTime || item.laborTime);
+            var selectedOptions = getSelectedItemUpgradeOptions(item);
+            selectedOptions.forEach(function(option) {
+                var optionRate = parseFloat(option.rate || 0) || 0;
+                var optionCost = parseFloat(option.materialCost || 0) || 0;
+                if (option.upgradeType === 'replacement') {
+                    rate = optionRate;
+                    materialCost = optionCost;
+                    unitType = option.unitType || unitType;
+                    supplierUrl = option.supplierUrl || supplierUrl;
+                    itemDescription = option.itemDescription || option.description || itemDescription;
+                    description = option.name || description;
+                    if (option.laborTime && option.laborTime.mode) laborTime = normalizeLaborTime(option.laborTime);
+                } else {
+                    rate += optionRate;
+                    materialCost += optionCost;
+                    if (option.description || option.itemDescription) {
+                        itemDescription = [itemDescription, option.itemDescription || option.description].filter(function(part) { return String(part || '').trim(); }).join('\n\n');
+                    }
+                }
+            });
+            item.rate = rate;
+            item.materialCost = materialCost;
+            item.unitType = unitType;
+            item.unit = unitType;
+            item.supplierUrl = supplierUrl;
+            item.itemDescription = itemDescription;
+            item.description = description;
+            item.laborTime = laborTime;
+            item.upgraded = selectedOptions.length > 0;
+            item.selectedUpgradeOptionIds = selectedOptions.map(function(option) { return option.id; });
+            item.total = quantity * rate;
+            return item;
+        }
+
+        function renderItemUpgradeGroups(roomId, itemIndex, item) {
+            if (!item) return '';
+            item.upgradeGroups = normalizeQuoteItemUpgradeGroups(item);
+            clearInvalidItemUpgradeSelections(item);
+            if (!item.upgradeGroups.length) return '';
+            var selectedIds = getAllSelectedItemUpgradeOptionIds(item);
+            var html = '<div class="item-upgrade-groups mt-2 border rounded p-2 bg-light">';
+            html += '<div class="small fw-bold text-warning mb-1"><i class="fas fa-arrow-up me-1"></i>Upgrade options</div>';
+            item.upgradeGroups.forEach(function(group) {
+                var compatible = (group.options || []).filter(function(option) {
+                    return isItemUpgradeOptionCompatible(option, selectedIds.filter(function(id) { return id !== option.id; }));
+                });
+                if (!compatible.length) return;
+                html += '<div class="small mb-2"><span class="fw-semibold">' + qdTemplateEscapeHtml(group.name || 'Upgrade Options') + '</span> ';
+                html += '<span class="text-muted">(' + (group.type === 'multiple' ? 'pick multiple' : 'optional pick one') + ')</span>';
+                html += '<div class="d-flex flex-wrap gap-1 mt-1">';
+                compatible.forEach(function(option) {
+                    var selected = (group.selectedOptionIds || []).indexOf(option.id) !== -1;
+                    var optionTotal = (parseFloat(item.quantity) || 0) * (parseFloat(option.rate) || 0);
+                    var groupArg = JSON.stringify(group.id || '').replace(/"/g, '&quot;');
+                    var optionArg = JSON.stringify(option.id || '').replace(/"/g, '&quot;');
+                    html += '<button type="button" class="btn btn-sm ' + (selected ? 'btn-warning' : 'btn-outline-warning') + ' py-0" onclick="event.stopPropagation(); toggleItemUpgradeOption(' + roomId + ', ' + itemIndex + ', ' + groupArg + ', ' + optionArg + ')" title="' + qdTemplateEscapeHtml(option.upgradeType === 'replacement' ? 'Replacement' : 'Add-on') + '">' +
+                        '<i class="fas ' + (selected ? 'fa-check-circle' : 'fa-circle') + ' me-1"></i>' + qdTemplateEscapeHtml(option.name || 'Upgrade') + ' <span class="opacity-75">' + qdFormatMoney(optionTotal, '$', { showSign: option.upgradeType !== 'replacement' }) + '</span>' +
+                        '</button>';
+                });
+                html += '</div></div>';
+            });
+            html += '</div>';
+            return html;
+        }
+
+        function toggleItemUpgradeOption(roomId, itemIndex, upgradeGroupId, optionId) {
+            var room = rooms.find(function(r) { return r.id === roomId; });
+            if (!room || !room.items || !room.items[itemIndex]) return;
+            var item = room.items[itemIndex];
+            item.upgradeGroups = normalizeQuoteItemUpgradeGroups(item);
+            var group = item.upgradeGroups.find(function(candidate) { return candidate.id === upgradeGroupId; });
+            if (!group) return;
+            var option = (group.options || []).find(function(candidate) { return candidate.id === optionId; });
+            if (!option || !isItemUpgradeOptionCompatible(option, getAllSelectedItemUpgradeOptionIds(item).filter(function(id) { return id !== optionId; }))) return;
+            _pushUndo();
+            var selected = Array.isArray(group.selectedOptionIds) ? group.selectedOptionIds.slice() : [];
+            if (group.type === 'multiple') {
+                selected = selected.indexOf(optionId) === -1
+                    ? selected.concat([optionId])
+                    : selected.filter(function(id) { return id !== optionId; });
+            } else {
+                selected = selected.indexOf(optionId) === -1 ? [optionId] : [];
+            }
+            group.selectedOptionIds = selected;
+            item.selectedUpgradeOptionIds = getAllSelectedItemUpgradeOptionIds(item);
+            applyItemUpgradeGroupsToItem(item);
+            renderRooms();
+            calculateTotals();
+            markUnsaved();
         }
 
         function estimateItemLaborHours(item) {
@@ -6042,8 +6346,32 @@ Example:
                 materialCost: parseFloat(item.upgrade.materialCost !== undefined ? item.upgrade.materialCost : item.upgrade.material_cost) || 0,
                 supplierUrl: item.upgrade.supplierUrl || '',
                 description: item.upgrade.description || item.upgrade.itemDescription || item.upgrade.notes || '',
+                type: normalizeQuoteUpgradeType(item.upgrade.type || item.upgrade.upgradeType || item.upgrade.mode),
                 laborTime: normalizeLaborTime(item.upgrade.laborTime)
             } : null;
+            var upgradeGroups = normalizeQuoteItemUpgradeGroups(item).map(function(group) {
+                return {
+                    id: group.id || '',
+                    name: group.name || '',
+                    type: group.type || 'single_optional',
+                    options: (group.options || []).map(function(option) {
+                        return {
+                            id: option.id || '',
+                            name: option.name || '',
+                            category: option.category || '',
+                            sourceItemName: option.sourceItemName || '',
+                            unitType: option.unitType || '',
+                            rate: parseFloat(option.rate) || 0,
+                            materialCost: parseFloat(option.materialCost) || 0,
+                            supplierUrl: option.supplierUrl || '',
+                            description: option.description || option.itemDescription || '',
+                            upgradeType: normalizeQuoteUpgradeType(option.upgradeType || option.type || option.mode),
+                            availableAfterOptionIds: Array.isArray(option.availableAfterOptionIds) ? option.availableAfterOptionIds.slice().sort() : [],
+                            blockedByOptionIds: Array.isArray(option.blockedByOptionIds) ? option.blockedByOptionIds.slice().sort() : []
+                        };
+                    })
+                };
+            });
             return JSON.stringify({
                 name: item.name || item.description || '',
                 unitType: item.unitType || item.unit || '',
@@ -6053,7 +6381,8 @@ Example:
                 itemDescription: item.itemDescription || item.displayDescription || '',
                 photo: item.photo || '',
                 laborTime: normalizeLaborTime(item.laborTime),
-                upgrade: upgrade
+                upgrade: upgrade,
+                upgradeGroups: upgradeGroups
             });
         }
 
@@ -7107,10 +7436,16 @@ Example:
                         const savedUpdateResult = await saveEditedLineItemToDatabase(previousSavedItemSource, editedSavedItemData);
                         if (savedUpdateResult && savedUpdateResult.item) {
                             item.serviceName = savedUpdateResult.item.name || item.serviceName;
+                            item.upgrade = savedUpdateResult.item.upgrade || null;
+                            item.upgradeGroups = normalizeQuoteItemUpgradeGroups(savedUpdateResult.item);
+                            item.selectedUpgradeOptionIds = [];
                             item.savedItemSource = savedItemQuoteSource(savedUpdateResult.category, savedUpdateResult.item);
                             item.savedItemFingerprint = getSavedItemFingerprintForQuoteSync(savedUpdateResult.item);
                         }
                     } else if (savedItemForEdit) {
+                        item.upgrade = savedItemForEdit.upgrade || null;
+                        item.upgradeGroups = normalizeQuoteItemUpgradeGroups(savedItemForEdit);
+                        item.selectedUpgradeOptionIds = [];
                         item.savedItemSource = savedItemQuoteSource(category, savedItemForEdit);
                         item.savedItemFingerprint = getSavedItemFingerprintForQuoteSync(savedItemForEdit);
                     }
@@ -7132,6 +7467,8 @@ Example:
                         materialCost,
                         supplierUrl,
                         upgrade: dbItem?.upgrade || null,
+                        upgradeGroups: normalizeQuoteItemUpgradeGroups(dbItem || {}),
+                        selectedUpgradeOptionIds: [],
                         upgraded: false,
                         optional: false,
                         itemDescription: itemDescription || dbItem?.itemDescription || '',
@@ -7375,27 +7712,43 @@ Example:
             const item = room.items[itemIndex];
             if (!item.upgrade || !item.upgrade.name) return;
             item.upgraded = !item.upgraded;
-            // Swap rate and material cost so profit/margin reflect the selected option.
+            var upgradeType = normalizeQuoteUpgradeType(item.upgrade.type || item.upgrade.upgradeType || item.upgrade.mode);
+            // Replacement upgrades swap the base item. Add-on upgrades add to the base item.
             if (item.upgraded) {
                 item._baseRate = item.rate;
                 item._baseMaterialCost = parseFloat(item.materialCost) || 0;
                 item._baseUnitType = item.unitType;
                 item._baseSupplierUrl = item.supplierUrl;
-                item.rate = item.upgrade.rate;
-                if (item.upgrade.unitType || item.upgrade.unit) item.unitType = item.upgrade.unitType || item.upgrade.unit;
-                if (item.upgrade.supplierUrl) item.supplierUrl = item.upgrade.supplierUrl;
-                if (item.upgrade.laborTime) item.laborTime = normalizeLaborTime(item.upgrade.laborTime);
+                item._baseItemDescription = item.itemDescription || '';
+                item._baseLaborTime = normalizeLaborTime(item.laborTime);
+                var baseRate = parseFloat(item._baseRate) || 0;
+                var baseMaterialCost = parseFloat(item._baseMaterialCost) || 0;
+                var upgradeRate = parseFloat(item.upgrade.rate) || 0;
                 var upgradeMaterialCost = item.upgrade.materialCost !== undefined ? item.upgrade.materialCost : item.upgrade.material_cost;
-                if (upgradeMaterialCost !== undefined) {
-                    item.materialCost = parseFloat(upgradeMaterialCost) || 0;
+                upgradeMaterialCost = parseFloat(upgradeMaterialCost) || 0;
+                if (upgradeType === 'add_on') {
+                    item.rate = baseRate + upgradeRate;
+                    item.materialCost = baseMaterialCost + upgradeMaterialCost;
+                } else {
+                    item.rate = upgradeRate;
+                    if (item.upgrade.unitType || item.upgrade.unit) item.unitType = item.upgrade.unitType || item.upgrade.unit;
+                    if (item.upgrade.supplierUrl) item.supplierUrl = item.upgrade.supplierUrl;
+                    if (item.upgrade.laborTime) item.laborTime = normalizeLaborTime(item.upgrade.laborTime);
+                    item.materialCost = upgradeMaterialCost;
                 }
             } else {
                 item.rate = item._baseRate || item.rate;
                 if (item._baseMaterialCost !== undefined) item.materialCost = item._baseMaterialCost;
                 if (item._baseUnitType !== undefined) item.unitType = item._baseUnitType;
                 if (item._baseSupplierUrl !== undefined) item.supplierUrl = item._baseSupplierUrl;
+                if (item._baseItemDescription !== undefined) item.itemDescription = item._baseItemDescription;
+                if (item._baseLaborTime !== undefined) item.laborTime = normalizeLaborTime(item._baseLaborTime);
             }
-            item.laborTime = normalizeLaborTime(item.upgraded && item.upgrade && item.upgrade.laborTime ? item.upgrade.laborTime : item.laborTime);
+            if (item.upgraded && upgradeType !== 'add_on' && item.upgrade && item.upgrade.laborTime) {
+                item.laborTime = normalizeLaborTime(item.upgrade.laborTime);
+            } else {
+                item.laborTime = normalizeLaborTime(item.laborTime);
+            }
             item.total = item.quantity * item.rate;
             renderRooms();
             calculateTotals();
@@ -7418,6 +7771,7 @@ Example:
                 photo: item.photo || '',
                 itemDescription: item.itemDescription || item.description || '',
                 laborTime: normalizeLaborTime(item.laborTime),
+                upgradeGroups: normalizeQuoteItemUpgradeGroups(item),
                 quantityMode: item.quantityMode || 'inherit',
                 quantityOverride: item.quantityOverride || ''
             };
@@ -7434,35 +7788,193 @@ Example:
             });
         }
 
+        function normalizeChoiceGroupEnhancementOption(option, fallbackId) {
+            option = option || {};
+            return {
+                id: option.id || fallbackId || choiceGroupId(),
+                name: option.name || option.sourceItemName || option.description || 'Enhancement',
+                category: option.category || '',
+                sourceItemName: option.sourceItemName || option.name || '',
+                unitType: option.unitType || option.unit || '',
+                rate: parseFloat(option.rate) || 0,
+                materialCost: parseFloat(option.materialCost) || 0,
+                supplierUrl: option.supplierUrl || '',
+                description: option.description || option.itemDescription || option.name || '',
+                itemDescription: option.itemDescription || option.description || '',
+                laborTime: normalizeLaborTime(option.laborTime),
+                upgradeType: option.upgradeType === 'replacement' ? 'replacement' : 'add_on',
+                allowedBaseOptionIds: Array.isArray(option.allowedBaseOptionIds) ? option.allowedBaseOptionIds.filter(Boolean) : [],
+                blockedByEnhancementOptionIds: Array.isArray(option.blockedByEnhancementOptionIds) ? option.blockedByEnhancementOptionIds.filter(Boolean) : []
+            };
+        }
+
+        function normalizeChoiceGroupEnhancementGroups(groups) {
+            return Array.isArray(groups) ? groups.map(function(group, groupIndex) {
+                group = group || {};
+                return {
+                    id: group.id || choiceGroupId() + '_enh_' + groupIndex,
+                    name: group.name || 'Enhancements',
+                    type: group.type === 'multiple' ? 'multiple' : 'single_optional',
+                    selectedOptionIds: Array.isArray(group.selectedOptionIds) ? group.selectedOptionIds.filter(Boolean) : [],
+                    options: Array.isArray(group.options) ? group.options.map(function(option, optionIndex) {
+                        return normalizeChoiceGroupEnhancementOption(option, (group.id || 'enh') + '_opt_' + optionIndex);
+                    }) : []
+                };
+            }) : [];
+        }
+
+        function getChoiceGroupSelectedBaseOptionIds(choiceGroup) {
+            return getChoiceGroupSelectedOptions(choiceGroup).map(function(option) { return option.id; });
+        }
+
+        function getChoiceGroupAllSelectedEnhancementOptionIds(choiceGroup) {
+            var ids = [];
+            normalizeChoiceGroupEnhancementGroups(choiceGroup && choiceGroup.enhancementGroups).forEach(function(group) {
+                (group.selectedOptionIds || []).forEach(function(id) {
+                    if (ids.indexOf(id) === -1) ids.push(id);
+                });
+            });
+            return ids;
+        }
+
+        function isChoiceGroupEnhancementOptionCompatible(choiceGroup, option, selectedEnhancementIds) {
+            if (!choiceGroup || !option) return false;
+            var baseIds = getChoiceGroupSelectedBaseOptionIds(choiceGroup);
+            var allowed = Array.isArray(option.allowedBaseOptionIds) ? option.allowedBaseOptionIds : [];
+            if (allowed.length && !allowed.some(function(id) { return baseIds.indexOf(id) !== -1; })) return false;
+            var blockedBy = Array.isArray(option.blockedByEnhancementOptionIds) ? option.blockedByEnhancementOptionIds : [];
+            selectedEnhancementIds = selectedEnhancementIds || [];
+            return !blockedBy.some(function(id) { return selectedEnhancementIds.indexOf(id) !== -1; });
+        }
+
+        function clearInvalidChoiceGroupEnhancementSelections(choiceGroup) {
+            if (!choiceGroup) return choiceGroup;
+            choiceGroup.enhancementGroups = normalizeChoiceGroupEnhancementGroups(choiceGroup.enhancementGroups);
+            var selectedIds = getChoiceGroupAllSelectedEnhancementOptionIds(choiceGroup);
+            choiceGroup.enhancementGroups.forEach(function(group) {
+                var kept = [];
+                (group.selectedOptionIds || []).forEach(function(id) {
+                    var option = (group.options || []).find(function(candidate) { return candidate.id === id; });
+                    var selectedWithoutSelf = selectedIds.filter(function(selectedId) { return selectedId !== id; });
+                    if (option && isChoiceGroupEnhancementOptionCompatible(choiceGroup, option, selectedWithoutSelf)) kept.push(id);
+                });
+                group.selectedOptionIds = group.type === 'single_optional' ? kept.slice(0, 1) : kept;
+            });
+            return choiceGroup;
+        }
+
+        function getChoiceGroupSelectedEnhancementOptions(choiceGroup) {
+            clearInvalidChoiceGroupEnhancementSelections(choiceGroup);
+            var out = [];
+            (choiceGroup.enhancementGroups || []).forEach(function(group) {
+                (group.options || []).forEach(function(option) {
+                    if ((group.selectedOptionIds || []).indexOf(option.id) !== -1) {
+                        out.push(Object.assign({ enhancementGroupId: group.id, enhancementGroupName: group.name, enhancementGroupType: group.type }, option));
+                    }
+                });
+            });
+            return out;
+        }
+
+        function applyChoiceGroupEnhancementsToItem(item, baseState) {
+            if (!item || !item.choiceGroup) return baseState;
+            var baseQty = parseFloat(item.quantity) || 0;
+            var state = Object.assign({ total: 0, rate: 0, materialCost: 0 }, baseState || {});
+            var selectedEnhancements = getChoiceGroupSelectedEnhancementOptions(item.choiceGroup);
+            var replacementOptions = selectedEnhancements.filter(function(option) { return option.upgradeType === 'replacement'; });
+            var replacement = replacementOptions.length ? replacementOptions[replacementOptions.length - 1] : null;
+            if (replacement) {
+                var replacementQty = replacement.quantityMode === 'override' ? (parseFloat(replacement.quantityOverride) || 0) : baseQty;
+                var replacementRate = parseFloat(replacement.rate) || 0;
+                state.total = replacementQty * replacementRate;
+                state.rate = replacementRate;
+                state.materialCost = parseFloat(replacement.materialCost) || 0;
+                state.description = replacement.name || state.description;
+                state.unitType = replacement.unitType || state.unitType;
+                state.supplierUrl = replacement.supplierUrl || state.supplierUrl;
+                state.itemDescription = replacement.itemDescription || replacement.description || state.itemDescription;
+                state.laborTime = normalizeLaborTime(replacement.laborTime || state.laborTime);
+            }
+            selectedEnhancements.filter(function(option) { return option.upgradeType !== 'replacement'; }).forEach(function(option) {
+                var qty = option.quantityMode === 'override' ? (parseFloat(option.quantityOverride) || 0) : baseQty;
+                var rate = parseFloat(option.rate) || 0;
+                var materialCost = parseFloat(option.materialCost) || 0;
+                state.total += qty * rate;
+                state.rate += rate;
+                state.materialCost += materialCost;
+            });
+            return state;
+        }
+
         function applyChoiceGroupSelectionToItem(item) {
             if (!item || !item.choiceGroup) return item;
             var group = item.choiceGroup;
+            group.enhancementGroups = normalizeChoiceGroupEnhancementGroups(group.enhancementGroups);
             var selectedOptions = getChoiceGroupSelectedOptions(group);
             var baseQty = parseFloat(item.quantity) || 0;
             var selectedTotal = 0;
             var selectedRate = 0;
+            var baseState = {
+                total: 0,
+                rate: 0,
+                materialCost: parseFloat(item.materialCost) || 0,
+                description: group.name || item.description || 'Option Group',
+                unitType: item.unitType || item.unit || '',
+                supplierUrl: item.supplierUrl || '',
+                itemDescription: item.itemDescription || '',
+                laborTime: normalizeLaborTime(item.laborTime)
+            };
             selectedOptions.forEach(function(option) {
                 var qty = option.quantityMode === 'override' ? (parseFloat(option.quantityOverride) || 0) : baseQty;
                 var rate = parseFloat(option.rate) || 0;
                 selectedRate += rate;
                 selectedTotal += qty * rate;
             });
-            item.total = selectedTotal;
             if (group.type === 'single' && selectedOptions[0]) {
                 var option = selectedOptions[0];
-                item.description = option.name || group.name || item.description;
-                item.unitType = option.unitType || item.unitType || item.unit || '';
-                item.rate = parseFloat(option.rate) || 0;
-                item.materialCost = parseFloat(option.materialCost) || 0;
-                item.supplierUrl = option.supplierUrl || item.supplierUrl || '';
-                item.itemDescription = option.itemDescription || option.description || item.itemDescription || '';
-                item.laborTime = normalizeLaborTime(option.laborTime || item.laborTime);
+                baseState = {
+                    total: selectedTotal,
+                    rate: parseFloat(option.rate) || 0,
+                    materialCost: parseFloat(option.materialCost) || 0,
+                    description: option.name || group.name || item.description,
+                    unitType: option.unitType || item.unitType || item.unit || '',
+                    supplierUrl: option.supplierUrl || item.supplierUrl || '',
+                    itemDescription: option.itemDescription || option.description || item.itemDescription || '',
+                    laborTime: normalizeLaborTime(option.laborTime || item.laborTime)
+                };
             } else {
-                item.description = group.name || item.description || 'Option Group';
-                item.rate = selectedRate;
-                item.laborTime = normalizeLaborTime(item.laborTime);
+                baseState.total = selectedTotal;
+                baseState.rate = selectedRate;
             }
+            var finalState = applyChoiceGroupEnhancementsToItem(item, baseState);
+            item.total = finalState.total;
+            item.description = finalState.description;
+            item.unitType = finalState.unitType || item.unitType || item.unit || '';
+            item.rate = parseFloat(finalState.rate) || 0;
+            item.materialCost = parseFloat(finalState.materialCost) || 0;
+            item.supplierUrl = finalState.supplierUrl || item.supplierUrl || '';
+            item.itemDescription = finalState.itemDescription || item.itemDescription || '';
+            item.laborTime = normalizeLaborTime(finalState.laborTime || item.laborTime);
             item.choiceGroup.selectedOptionIds = selectedOptions.map(function(option) { return option.id; });
+            var priorUpgradeSelections = {};
+            normalizeQuoteItemUpgradeGroups(item).forEach(function(upgradeGroup) {
+                priorUpgradeSelections[upgradeGroup.id] = Array.isArray(upgradeGroup.selectedOptionIds)
+                    ? upgradeGroup.selectedOptionIds.slice()
+                    : [];
+            });
+            var selectedBaseOption = selectedOptions[0] || null;
+            var optionUpgradeGroups = selectedBaseOption ? normalizeQuoteItemUpgradeGroups(selectedBaseOption) : [];
+            optionUpgradeGroups.forEach(function(upgradeGroup) {
+                if (priorUpgradeSelections[upgradeGroup.id]) {
+                    upgradeGroup.selectedOptionIds = priorUpgradeSelections[upgradeGroup.id].filter(function(optionId) {
+                        return (upgradeGroup.options || []).some(function(option) { return option.id === optionId; });
+                    });
+                }
+            });
+            item.upgradeGroups = optionUpgradeGroups;
+            delete item._itemUpgradeBaseCaptured;
+            if (item.upgradeGroups.length) applyItemUpgradeGroupsToItem(item);
+            clearInvalidChoiceGroupEnhancementSelections(item.choiceGroup);
             return item;
         }
 
@@ -7631,6 +8143,7 @@ Example:
                 required: type === 'single',
                 defaultOptionId: defaultOption ? defaultOption.id : '',
                 selectedOptionIds: type === 'single' ? [defaultOption.id] : options.map(function(option) { return option.id; }),
+                enhancementGroups: [],
                 options: options
             };
             var baseItem = Object.assign({}, sourceItems[defaultIndex] || sourceItems[0]);
@@ -7775,6 +8288,7 @@ Example:
             var matchedOption = template.options && template.options[match.optionIndex] ? template.options[match.optionIndex] : match.option;
             var selectedId = matchedOption && matchedOption.id;
             template.id = choiceGroupId();
+            template.enhancementGroups = normalizeChoiceGroupEnhancementGroups(template.enhancementGroups);
             template.selectedOptionIds = selectedId ? [selectedId] : [];
             if (template.type === 'single') template.defaultOptionId = selectedId || template.defaultOptionId || '';
             var first = matchedOption || (template.options && template.options[0]) || {};
@@ -8121,6 +8635,8 @@ Example:
                 notes: groupedItem.notes || '',
                 optional: false,
                 upgrade: null,
+                upgradeGroups: normalizeQuoteItemUpgradeGroups(option),
+                selectedUpgradeOptionIds: [],
                 upgraded: false,
                 total: quantity * rate
             };
@@ -8219,6 +8735,66 @@ Example:
             showToast('Grouping turned off for this line item.', 'info');
         }
 
+        function renderChoiceGroupEnhancements(roomId, itemIndex, item) {
+            var group = item && item.choiceGroup;
+            if (!group) return '';
+            group.enhancementGroups = normalizeChoiceGroupEnhancementGroups(group.enhancementGroups);
+            clearInvalidChoiceGroupEnhancementSelections(group);
+            if (!group.enhancementGroups.length) return '';
+            var selectedIds = getChoiceGroupAllSelectedEnhancementOptionIds(group);
+            var html = '<div class="choice-group-enhancements mt-2 border rounded p-2 bg-light">';
+            html += '<div class="small fw-bold text-primary mb-1"><i class="fas fa-wand-magic-sparkles me-1"></i>Enhancements</div>';
+            group.enhancementGroups.forEach(function(enhGroup) {
+                var compatible = (enhGroup.options || []).filter(function(option) {
+                    return isChoiceGroupEnhancementOptionCompatible(group, option, selectedIds.filter(function(id) { return id !== option.id; }));
+                });
+                if (!compatible.length) return;
+                html += '<div class="small mb-2"><span class="fw-semibold">' + qdTemplateEscapeHtml(enhGroup.name || 'Enhancements') + '</span> ';
+                html += '<span class="text-muted">(' + (enhGroup.type === 'multiple' ? 'pick multiple' : 'optional pick one') + ')</span>';
+                html += '<div class="d-flex flex-wrap gap-1 mt-1">';
+                compatible.forEach(function(option) {
+                    var selected = (enhGroup.selectedOptionIds || []).indexOf(option.id) !== -1;
+                    var optionLabel = qdTemplateEscapeHtml(option.name || 'Enhancement');
+                    var optionPrice = qdFormatMoney((parseFloat(item.quantity) || 0) * (parseFloat(option.rate) || 0));
+                    var groupArg = JSON.stringify(enhGroup.id || '').replace(/"/g, '&quot;');
+                    var optionArg = JSON.stringify(option.id || '').replace(/"/g, '&quot;');
+                    html += '<button type="button" class="btn btn-sm ' + (selected ? 'btn-primary' : 'btn-outline-primary') + ' py-0" onclick="event.stopPropagation(); toggleChoiceGroupEnhancementOption(' + roomId + ', ' + itemIndex + ', ' + groupArg + ', ' + optionArg + ')" title="' + qdTemplateEscapeHtml(option.upgradeType === 'replacement' ? 'Replacement' : 'Add-on') + '">' +
+                        '<i class="fas ' + (selected ? 'fa-check-circle' : 'fa-circle') + ' me-1"></i>' + optionLabel + ' <span class="opacity-75">' + optionPrice + '</span>' +
+                        '</button>';
+                });
+                html += '</div></div>';
+            });
+            html += '</div>';
+            return html;
+        }
+
+        function toggleChoiceGroupEnhancementOption(roomId, itemIndex, enhancementGroupId, optionId) {
+            var room = rooms.find(function(r) { return r.id === roomId; });
+            if (!room || !room.items || !room.items[itemIndex] || !room.items[itemIndex].choiceGroup) return;
+            var item = room.items[itemIndex];
+            var group = item.choiceGroup;
+            group.enhancementGroups = normalizeChoiceGroupEnhancementGroups(group.enhancementGroups);
+            var enhancementGroup = group.enhancementGroups.find(function(candidate) { return candidate.id === enhancementGroupId; });
+            if (!enhancementGroup) return;
+            var option = (enhancementGroup.options || []).find(function(candidate) { return candidate.id === optionId; });
+            if (!option || !isChoiceGroupEnhancementOptionCompatible(group, option, getChoiceGroupAllSelectedEnhancementOptionIds(group).filter(function(id) { return id !== optionId; }))) return;
+            _pushUndo();
+            var selected = Array.isArray(enhancementGroup.selectedOptionIds) ? enhancementGroup.selectedOptionIds.slice() : [];
+            if (enhancementGroup.type === 'multiple') {
+                selected = selected.indexOf(optionId) === -1
+                    ? selected.concat([optionId])
+                    : selected.filter(function(id) { return id !== optionId; });
+            } else {
+                selected = selected.indexOf(optionId) === -1 ? [optionId] : [];
+            }
+            enhancementGroup.selectedOptionIds = selected;
+            clearInvalidChoiceGroupEnhancementSelections(group);
+            applyChoiceGroupSelectionToItem(item);
+            renderRooms();
+            calculateTotals();
+            markUnsaved();
+        }
+
         function openSavedChoiceGroupPicker(templates) {
             return new Promise(function(resolve) {
                 var existing = document.getElementById('savedChoiceGroupPickerModal');
@@ -8309,6 +8885,7 @@ Example:
             if (!template) return;
             var group = JSON.parse(JSON.stringify(template));
             group.id = choiceGroupId();
+            group.enhancementGroups = normalizeChoiceGroupEnhancementGroups(group.enhancementGroups);
             group.selectedOptionIds = group.type === 'single'
                 ? [group.defaultOptionId || (group.options[0] && group.options[0].id)].filter(Boolean)
                 : [];
@@ -10014,16 +10591,17 @@ Example:
                         entries.forEach(({ item, origIndex }) => {
                             applyChoiceGroupSelectionToItem(item);
                             const hasChoiceGroup = !!(item.choiceGroup && Array.isArray(item.choiceGroup.options));
+                            if (!hasChoiceGroup) applyItemUpgradeGroupsToItem(item);
                             const selectedChoiceOptions = hasChoiceGroup ? getChoiceGroupSelectedOptions(item.choiceGroup) : [];
+                            const itemUpgradeGroups = normalizeQuoteItemUpgradeGroups(item);
+                            const hasUpgradeGroups = itemUpgradeGroups.length > 0;
                             const displayRate = item.rate * markupFactor;
                             const displayTotal = (window._quoteDocumentType === 'change_order' ? coDisplayLineAmount(item) : item.total) * markupFactor;
-                            const hasUpgrade = !!(item.upgrade && item.upgrade.name);
+                            const hasUpgrade = !!(item.upgrade && item.upgrade.name) || hasUpgradeGroups;
                             const isUpgraded = !!item.upgraded;
                             const isOptional = !!item.optional;
-                            const displayItemName = isUpgraded && hasUpgrade ? item.upgrade.name : item.description;
-                            const displayItemDescription = isUpgraded && hasUpgrade
-                                ? (item.upgrade.description || item.upgrade.itemDescription || item.upgrade.item_description || item.upgrade.notes || '')
-                                : (item.itemDescription || '');
+                            const displayItemName = isUpgraded && item.upgrade && item.upgrade.name && !hasUpgradeGroups ? item.upgrade.name : item.description;
+                            const displayItemDescription = hasUpgradeGroups ? (item.itemDescription || '') : getQuoteDisplayItemDescription(item, isUpgraded, hasUpgrade);
                             var coStatus = window._quoteDocumentType === 'change_order' ? (item._coChangeStatus || 'added') : '';
                             const highlight = getLineItemHighlight(item);
                             var rowClassNames = [];
@@ -10057,6 +10635,10 @@ Example:
                                 if (selectedChoiceOptions.length) {
                                     html += '<div class="small text-success">Default selected: ' + selectedChoiceOptions.map(function(option) { return qdTemplateEscapeHtml(option.name); }).join(', ') + '</div>';
                                 }
+                                html += renderChoiceGroupEnhancements(room.id, origIndex, item);
+                            }
+                            if (hasUpgradeGroups) {
+                                html += renderItemUpgradeGroups(room.id, origIndex, item);
                             }
                             if (coStatus) {
                                 var badgeClass = coStatus === 'added' ? 'bg-success' : (coStatus === 'removed' ? 'bg-danger' : (coStatus === 'changed' ? 'bg-warning text-dark' : 'bg-secondary'));
@@ -10092,7 +10674,7 @@ Example:
                                 html += '<td class="quote-item-profit-cell"><strong class="' + (lineProfit >= 0 ? 'text-success' : 'text-danger') + '">' + lineProfitText + '</strong><div class="small text-muted">' + lineMargin.toFixed(0) + '% margin</div></td>';
                             }
                             let upgradeBtn = '';
-                            if (hasUpgrade && !hasChoiceGroup) {
+                            if (item.upgrade && item.upgrade.name && !hasUpgradeGroups && !hasChoiceGroup) {
                                 upgradeBtn = '<button onclick="toggleItemUpgrade(' + room.id + ', ' + origIndex + ')" class="btn btn-sm ' + (isUpgraded ? 'btn-warning' : 'btn-outline-warning') + '" title="' + (isUpgraded ? 'Upgraded: ' + item.upgrade.name : 'Upgrade: ' + item.upgrade.name) + '"><i class="fas fa-arrow-up"></i> ' + (isUpgraded ? 'Upgraded' : 'Upgrade') + '</button>';
                             }
                             const optionalBtn = hasChoiceGroup ? '' : '<button onclick="toggleItemOptional(' + room.id + ', ' + origIndex + ')" class="btn btn-sm ' + (isOptional ? 'btn-info' : 'btn-outline-secondary') + '" title="' + (isOptional ? 'Client can remove this item' : 'Mark as removable by client') + '"><i class="fas fa-' + (isOptional ? 'toggle-on' : 'toggle-off') + '"></i> Optional</button>';
@@ -15105,6 +15687,11 @@ Example:
                     var detailSectionToggle = e.target.closest('[data-detail-section-toggle]');
                     if (detailSectionToggle) {
                         syncManageDetailsSections(detailSectionToggle.dataset.target);
+                        return;
+                    }
+                    var upgradeGroupActionBtn = e.target.closest('[data-upgrade-group-action]');
+                    if (upgradeGroupActionBtn && typeof handleManageUpgradeGroupAction === 'function') {
+                        handleManageUpgradeGroupAction(upgradeGroupActionBtn);
                         return;
                     }
                     var detailsBtn = e.target.closest('.details-toggle-btn');

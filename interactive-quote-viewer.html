@@ -2060,9 +2060,92 @@ if (location.search.includes('debug')) {
             return choiceGroup.options.filter(function(option) { return selected.indexOf(option.id) !== -1; });
         }
 
+        function normalizeViewerChoiceGroupEnhancementGroups(groups) {
+            return Array.isArray(groups) ? groups.map(function(group, groupIndex) {
+                group = group || {};
+                return {
+                    id: group.id || ('viewer_enh_' + groupIndex),
+                    name: group.name || 'Enhancements',
+                    type: group.type === 'multiple' ? 'multiple' : 'single_optional',
+                    selectedOptionIds: Array.isArray(group.selectedOptionIds) ? group.selectedOptionIds.filter(Boolean) : [],
+                    options: Array.isArray(group.options) ? group.options.map(function(option, optionIndex) {
+                        option = option || {};
+                        return {
+                            id: option.id || ('viewer_enh_' + groupIndex + '_' + optionIndex),
+                            name: option.name || option.sourceItemName || option.description || 'Enhancement',
+                            category: option.category || '',
+                            sourceItemName: option.sourceItemName || option.name || '',
+                            unitType: option.unitType || option.unit || '',
+                            rate: viewerNumber(option.rate),
+                            materialCost: viewerNumber(option.materialCost),
+                            supplierUrl: option.supplierUrl || '',
+                            description: option.description || option.itemDescription || option.name || '',
+                            itemDescription: option.itemDescription || option.description || '',
+                            upgradeType: option.upgradeType === 'replacement' ? 'replacement' : 'add_on',
+                            allowedBaseOptionIds: Array.isArray(option.allowedBaseOptionIds) ? option.allowedBaseOptionIds.filter(Boolean) : [],
+                            blockedByEnhancementOptionIds: Array.isArray(option.blockedByEnhancementOptionIds) ? option.blockedByEnhancementOptionIds.filter(Boolean) : []
+                        };
+                    }) : []
+                };
+            }) : [];
+        }
+
+        function getViewerChoiceSelectedBaseOptionIds(choiceGroup) {
+            return getViewerChoiceSelectedOptions(choiceGroup).map(function(option) { return option.id; });
+        }
+
+        function getViewerSelectedEnhancementIds(choiceGroup) {
+            var ids = [];
+            normalizeViewerChoiceGroupEnhancementGroups(choiceGroup && choiceGroup.enhancementGroups).forEach(function(group) {
+                (group.selectedOptionIds || []).forEach(function(id) {
+                    if (ids.indexOf(id) === -1) ids.push(id);
+                });
+            });
+            return ids;
+        }
+
+        function isViewerChoiceGroupEnhancementCompatible(choiceGroup, option, selectedEnhancementIds) {
+            if (!choiceGroup || !option) return false;
+            var allowed = Array.isArray(option.allowedBaseOptionIds) ? option.allowedBaseOptionIds : [];
+            var baseIds = getViewerChoiceSelectedBaseOptionIds(choiceGroup);
+            if (allowed.length && !allowed.some(function(id) { return baseIds.indexOf(id) !== -1; })) return false;
+            var blockedBy = Array.isArray(option.blockedByEnhancementOptionIds) ? option.blockedByEnhancementOptionIds : [];
+            selectedEnhancementIds = selectedEnhancementIds || [];
+            return !blockedBy.some(function(id) { return selectedEnhancementIds.indexOf(id) !== -1; });
+        }
+
+        function clearInvalidViewerChoiceGroupEnhancementSelections(choiceGroup) {
+            if (!choiceGroup) return choiceGroup;
+            choiceGroup.enhancementGroups = normalizeViewerChoiceGroupEnhancementGroups(choiceGroup.enhancementGroups);
+            var selectedIds = getViewerSelectedEnhancementIds(choiceGroup);
+            choiceGroup.enhancementGroups.forEach(function(group) {
+                var kept = [];
+                (group.selectedOptionIds || []).forEach(function(id) {
+                    var option = (group.options || []).find(function(candidate) { return candidate.id === id; });
+                    if (option && isViewerChoiceGroupEnhancementCompatible(choiceGroup, option, selectedIds.filter(function(selectedId) { return selectedId !== id; }))) kept.push(id);
+                });
+                group.selectedOptionIds = group.type === 'single_optional' ? kept.slice(0, 1) : kept;
+            });
+            return choiceGroup;
+        }
+
+        function getViewerSelectedEnhancementOptions(choiceGroup) {
+            clearInvalidViewerChoiceGroupEnhancementSelections(choiceGroup);
+            var out = [];
+            (choiceGroup.enhancementGroups || []).forEach(function(group) {
+                (group.options || []).forEach(function(option) {
+                    if ((group.selectedOptionIds || []).indexOf(option.id) !== -1) {
+                        out.push(Object.assign({ enhancementGroupId: group.id, enhancementGroupName: group.name }, option));
+                    }
+                });
+            });
+            return out;
+        }
+
         function applyViewerChoiceGroupToItem(item) {
             if (!item || !item.choiceGroup) return item;
             var group = item.choiceGroup;
+            group.enhancementGroups = normalizeViewerChoiceGroupEnhancementGroups(group.enhancementGroups);
             var selected = getViewerChoiceSelectedOptions(group);
             var qty = parseFloat(item.quantity) || 0;
             var total = 0;
@@ -2073,10 +2156,254 @@ if (location.search.includes('debug')) {
                 rateSum += rate;
                 total += optionQty * rate;
             });
+            var selectedEnhancements = getViewerSelectedEnhancementOptions(group);
+            var replacementOptions = selectedEnhancements.filter(function(option) { return option.upgradeType === 'replacement'; });
+            var replacement = replacementOptions.length ? replacementOptions[replacementOptions.length - 1] : null;
+            if (replacement) {
+                var replacementQty = replacement.quantityMode === 'override' ? (parseFloat(replacement.quantityOverride) || 0) : qty;
+                rateSum = viewerNumber(replacement.rate);
+                total = replacementQty * rateSum;
+            }
+            selectedEnhancements.filter(function(option) { return option.upgradeType !== 'replacement'; }).forEach(function(option) {
+                var optionQty = option.quantityMode === 'override' ? (parseFloat(option.quantityOverride) || 0) : qty;
+                var rate = viewerNumber(option.rate);
+                rateSum += rate;
+                total += optionQty * rate;
+            });
             item.total = total;
             item.rate = group.type === 'single' && selected[0] ? (parseFloat(selected[0].rate) || 0) : rateSum;
+            if (selectedEnhancements.length) item.rate = rateSum;
             item.choiceGroup.selectedOptionIds = selected.map(function(option) { return option.id; });
+            var priorUpgradeSelections = {};
+            normalizeViewerItemUpgradeGroups(item).forEach(function(upgradeGroup) {
+                priorUpgradeSelections[upgradeGroup.id] = Array.isArray(upgradeGroup.selectedOptionIds)
+                    ? upgradeGroup.selectedOptionIds.slice()
+                    : [];
+            });
+            var selectedBaseOption = selected[0] || null;
+            item.upgradeGroups = selectedBaseOption ? normalizeViewerItemUpgradeGroups(selectedBaseOption) : [];
+            item.upgradeGroups.forEach(function(upgradeGroup) {
+                if (priorUpgradeSelections[upgradeGroup.id]) {
+                    upgradeGroup.selectedOptionIds = priorUpgradeSelections[upgradeGroup.id].filter(function(optionId) {
+                        return (upgradeGroup.options || []).some(function(option) { return option.id === optionId; });
+                    });
+                }
+            });
+            delete item._viewerItemUpgradeBaseCaptured;
+            if (item.upgradeGroups.length) applyViewerItemUpgradeGroups(item);
+            clearInvalidViewerChoiceGroupEnhancementSelections(group);
             return item;
+        }
+
+        function normalizeViewerItemUpgradeOption(option, fallbackId) {
+            option = option || {};
+            return {
+                id: option.id || fallbackId || ('viewer_upo_' + Math.random().toString(36).slice(2, 8)),
+                name: option.name || option.sourceItemName || option.description || 'Upgrade',
+                category: option.category || '',
+                sourceItemName: option.sourceItemName || option.name || '',
+                unitType: option.unitType || option.unit || '',
+                rate: viewerNumber(option.rate),
+                materialCost: viewerNumber(option.materialCost),
+                supplierUrl: option.supplierUrl || '',
+                description: option.description || option.itemDescription || '',
+                itemDescription: option.itemDescription || option.description || '',
+                upgradeType: option.upgradeType === 'replacement' || option.type === 'replacement' ? 'replacement' : 'add_on',
+                availableAfterOptionIds: Array.isArray(option.availableAfterOptionIds) ? option.availableAfterOptionIds.filter(Boolean) : [],
+                blockedByOptionIds: Array.isArray(option.blockedByOptionIds) ? option.blockedByOptionIds.filter(Boolean) : []
+            };
+        }
+
+        function normalizeViewerItemUpgradeGroups(itemOrGroups) {
+            var item = Array.isArray(itemOrGroups) ? { upgradeGroups: itemOrGroups } : (itemOrGroups || {});
+            var groups = Array.isArray(item.upgradeGroups) ? item.upgradeGroups : [];
+            var normalized = groups.map(function(group, groupIndex) {
+                group = group || {};
+                var options = Array.isArray(group.options) ? group.options.map(function(option, optionIndex) {
+                    return normalizeViewerItemUpgradeOption(option, 'viewer_upo_' + groupIndex + '_' + optionIndex);
+                }).filter(function(option) { return option.name; }) : [];
+                return {
+                    id: group.id || ('viewer_upg_' + groupIndex),
+                    name: group.name || 'Upgrade Options',
+                    type: group.type === 'multiple' ? 'multiple' : 'single_optional',
+                    selectedOptionIds: Array.isArray(group.selectedOptionIds) ? group.selectedOptionIds.filter(Boolean) : [],
+                    options: options
+                };
+            }).filter(function(group) { return group.options.length; });
+            if (!normalized.length && item.upgrade && item.upgrade.name) {
+                normalized.push({
+                    id: 'legacy_upgrade',
+                    name: 'Upgrade Options',
+                    type: 'single_optional',
+                    selectedOptionIds: item.upgraded ? ['legacy_upgrade_option'] : [],
+                    options: [normalizeViewerItemUpgradeOption(Object.assign({}, item.upgrade, {
+                        id: 'legacy_upgrade_option',
+                        upgradeType: item.upgrade.upgradeType || item.upgrade.type || 'replacement'
+                    }))]
+                });
+            }
+            return normalized;
+        }
+
+        function getViewerSelectedItemUpgradeIds(item) {
+            return normalizeViewerItemUpgradeGroups(item).reduce(function(ids, group) {
+                return ids.concat(Array.isArray(group.selectedOptionIds) ? group.selectedOptionIds : []);
+            }, []);
+        }
+
+        function isViewerItemUpgradeOptionCompatible(option, selectedIds) {
+            selectedIds = Array.isArray(selectedIds) ? selectedIds : [];
+            var required = Array.isArray(option.availableAfterOptionIds) ? option.availableAfterOptionIds : [];
+            var blocked = Array.isArray(option.blockedByOptionIds) ? option.blockedByOptionIds : [];
+            if (required.length && !required.some(function(id) { return selectedIds.indexOf(id) !== -1; })) return false;
+            return !blocked.some(function(id) { return selectedIds.indexOf(id) !== -1; });
+        }
+
+        function clearInvalidViewerItemUpgradeSelections(item) {
+            if (!item) return item;
+            item.upgradeGroups = normalizeViewerItemUpgradeGroups(item);
+            var changed = true;
+            while (changed) {
+                changed = false;
+                var selectedIds = getViewerSelectedItemUpgradeIds(item);
+                item.upgradeGroups.forEach(function(group) {
+                    var kept = (group.selectedOptionIds || []).filter(function(optionId) {
+                        var option = (group.options || []).find(function(candidate) { return candidate.id === optionId; });
+                        return option && isViewerItemUpgradeOptionCompatible(option, selectedIds.filter(function(id) { return id !== optionId; }));
+                    });
+                    if (group.type === 'single_optional') kept = kept.slice(0, 1);
+                    if (kept.length !== (group.selectedOptionIds || []).length) {
+                        group.selectedOptionIds = kept;
+                        changed = true;
+                    }
+                });
+            }
+            item.selectedUpgradeOptionIds = getViewerSelectedItemUpgradeIds(item);
+            return item;
+        }
+
+        function getViewerSelectedItemUpgradeOptions(item) {
+            clearInvalidViewerItemUpgradeSelections(item);
+            var selectedIds = getViewerSelectedItemUpgradeIds(item);
+            return normalizeViewerItemUpgradeGroups(item).reduce(function(options, group) {
+                return options.concat((group.options || []).filter(function(option) {
+                    return selectedIds.indexOf(option.id) !== -1;
+                }).map(function(option) {
+                    return Object.assign({ upgradeGroupId: group.id, upgradeGroupName: group.name }, option);
+                }));
+            }, []);
+        }
+
+        function ensureViewerItemUpgradeBaseState(item) {
+            if (!item || item._viewerItemUpgradeBaseCaptured) return;
+            item._baseRate = viewerNumber(item._baseRate !== undefined && item._baseRate !== null ? item._baseRate : item.rate);
+            item._baseMaterialCost = viewerNumber(item._baseMaterialCost !== undefined && item._baseMaterialCost !== null ? item._baseMaterialCost : item.materialCost);
+            item._baseUnitType = item._baseUnitType || item.unitType || item.unit || '';
+            item._baseDescription = item._baseDescription || item.description || item.name || '';
+            item._baseItemDescription = item._baseItemDescription || item.itemDescription || '';
+            item._viewerItemUpgradeBaseCaptured = true;
+        }
+
+        function applyViewerItemUpgradeGroups(item) {
+            if (!item) return item;
+            item.upgradeGroups = normalizeViewerItemUpgradeGroups(item);
+            if (!item.upgradeGroups.length) return item;
+            ensureViewerItemUpgradeBaseState(item);
+            clearInvalidViewerItemUpgradeSelections(item);
+            var rate = viewerNumber(item._baseRate);
+            var materialCost = viewerNumber(item._baseMaterialCost);
+            var unitType = item._baseUnitType || item.unitType || item.unit || '';
+            var description = item._baseDescription || item.description || item.name || '';
+            var itemDescription = item._baseItemDescription || item.itemDescription || '';
+            var selectedOptions = getViewerSelectedItemUpgradeOptions(item);
+            selectedOptions.forEach(function(option) {
+                if (option.upgradeType === 'replacement') {
+                    rate = viewerNumber(option.rate);
+                    materialCost = viewerNumber(option.materialCost);
+                    unitType = option.unitType || unitType;
+                    description = option.name || description;
+                    itemDescription = option.itemDescription || option.description || itemDescription;
+                } else {
+                    rate += viewerNumber(option.rate);
+                    materialCost += viewerNumber(option.materialCost);
+                    if (option.itemDescription || option.description) {
+                        itemDescription = [itemDescription, option.itemDescription || option.description].filter(function(part) { return String(part || '').trim(); }).join('\n\n');
+                    }
+                }
+            });
+            item.rate = rate;
+            item.materialCost = materialCost;
+            item.unitType = unitType;
+            item.unit = unitType;
+            item.description = description;
+            item.itemDescription = itemDescription;
+            item.upgraded = selectedOptions.length > 0;
+            item.total = viewerItemQuantity(item) * rate;
+            item.selectedUpgradeOptionIds = selectedOptions.map(function(option) { return option.id; });
+            return item;
+        }
+
+        function resetViewerItemUpgradeBaseState(item) {
+            if (!item) return item;
+            delete item._viewerItemUpgradeBaseCaptured;
+            delete item._baseRate;
+            delete item._baseMaterialCost;
+            delete item._baseUnitType;
+            delete item._baseDescription;
+            delete item._baseItemDescription;
+            return item;
+        }
+
+        function renderViewerItemUpgradeGroups(roomIdx, itemIndex, item, isSignedDiff) {
+            if (isSignedDiff || !item) return '';
+            item.upgradeGroups = normalizeViewerItemUpgradeGroups(item);
+            clearInvalidViewerItemUpgradeSelections(item);
+            if (!item.upgradeGroups.length) return '';
+            var selectedIds = getViewerSelectedItemUpgradeIds(item);
+            var html = '<div class="mt-2 p-2 border rounded bg-light">';
+            html += '<div class="small fw-bold text-warning mb-1"><i class="fas fa-arrow-up me-1"></i>Upgrade options</div>';
+            item.upgradeGroups.forEach(function(group) {
+                var compatible = (group.options || []).filter(function(option) {
+                    return isViewerItemUpgradeOptionCompatible(option, selectedIds.filter(function(id) { return id !== option.id; }));
+                });
+                if (!compatible.length) return;
+                html += '<div class="small mb-2"><span class="fw-semibold">' + escapeHtml(group.name || 'Upgrade Options') + '</span> ';
+                html += '<span class="text-muted">(' + (group.type === 'multiple' ? 'pick multiple' : 'optional pick one') + ')</span>';
+                html += '<div class="d-flex flex-wrap gap-1 mt-1">';
+                compatible.forEach(function(option) {
+                    var selected = (group.selectedOptionIds || []).indexOf(option.id) !== -1;
+                    var optionTotal = viewerItemQuantity(item) * viewerNumber(option.rate);
+                    html += '<button type="button" class="btn btn-sm ' + (selected ? 'btn-warning' : 'btn-outline-warning') + ' py-0" onclick="toggleViewerItemUpgradeOption(' + roomIdx + ', ' + itemIndex + ', \'' + escapeHtml(group.id || '') + '\', \'' + escapeHtml(option.id || '') + '\')">' +
+                        '<i class="fas ' + (selected ? 'fa-check-circle' : 'fa-circle') + ' me-1"></i>' + escapeHtml(option.name || 'Upgrade') + ' <span class="opacity-75">' + viewerMoney(optionTotal, { forceSign: option.upgradeType !== 'replacement' }) + '</span>' +
+                        '</button>';
+                });
+                html += '</div></div>';
+            });
+            html += '</div>';
+            return html;
+        }
+
+        function toggleViewerItemUpgradeOption(roomIdx, itemIndex, groupId, optionId) {
+            var item = quoteData.rooms && quoteData.rooms[roomIdx] && quoteData.rooms[roomIdx].items && quoteData.rooms[roomIdx].items[itemIndex];
+            if (!item) return;
+            item.upgradeGroups = normalizeViewerItemUpgradeGroups(item);
+            var group = item.upgradeGroups.find(function(candidate) { return candidate.id === groupId; });
+            if (!group) return;
+            var option = (group.options || []).find(function(candidate) { return candidate.id === optionId; });
+            if (!option || !isViewerItemUpgradeOptionCompatible(option, getViewerSelectedItemUpgradeIds(item).filter(function(id) { return id !== optionId; }))) return;
+            var selected = Array.isArray(group.selectedOptionIds) ? group.selectedOptionIds.slice() : [];
+            if (group.type === 'multiple') {
+                selected = selected.indexOf(optionId) === -1
+                    ? selected.concat([optionId])
+                    : selected.filter(function(id) { return id !== optionId; });
+            } else {
+                selected = selected.indexOf(optionId) === -1 ? [optionId] : [];
+            }
+            group.selectedOptionIds = selected;
+            item.selectedUpgradeOptionIds = getViewerSelectedItemUpgradeIds(item);
+            applyViewerItemUpgradeGroups(item);
+            renderQuote();
+            updateTotal();
         }
 
         function viewerNumber(value) {
@@ -2179,12 +2506,20 @@ if (location.search.includes('debug')) {
 
         function viewerItemActiveRate(item) {
             if (!item) return 0;
+            if (normalizeViewerItemUpgradeGroups(item).length) {
+                applyViewerItemUpgradeGroups(item);
+                return viewerNumber(item.rate);
+            }
             if (item.upgraded && item.upgrade) return viewerNumber(item.upgrade.rate);
             return viewerNumber(item.rate);
         }
 
         function viewerItemActiveTotal(item) {
             if (!item) return 0;
+            if (normalizeViewerItemUpgradeGroups(item).length) {
+                applyViewerItemUpgradeGroups(item);
+                return viewerNumber(item.total);
+            }
             if (item.upgraded && item.upgrade) {
                 if (item.upgrade.total !== undefined && item.upgrade.total !== null && item.upgrade.total !== '') return viewerNumber(item.upgrade.total);
                 return viewerItemQuantity(item) * viewerNumber(item.upgrade.rate);
@@ -2324,6 +2659,7 @@ if (location.search.includes('debug')) {
         function renderViewerChoiceGroup(roomIdx, itemIndex, item, isSignedDiff) {
             var group = item.choiceGroup;
             if (!group || !Array.isArray(group.options)) return '';
+            applyViewerChoiceGroupToItem(item);
             var selectedIds = getViewerChoiceSelectedOptions(group).map(function(option) { return option.id; });
             var typeLabel = group.type === 'multiple' ? 'Choose any that apply' : 'Choose one option';
             var html = '<div class="choice-group-card py-3 border-bottom" id="item_' + roomIdx + '_' + itemIndex + '">';
@@ -2341,7 +2677,42 @@ if (location.search.includes('debug')) {
                 html += '<div class="small opacity-75 mt-1">' + optionQty + ' ' + escapeHtml(option.unitType || item.unitType || '') + ' @ ' + viewerMoney(option.rate) + '</div>';
                 html += '</button></div>';
             });
-            html += '</div></div>';
+            html += '</div>';
+            html += renderViewerChoiceGroupEnhancements(roomIdx, itemIndex, item, isSignedDiff);
+            html += renderViewerItemUpgradeGroups(roomIdx, itemIndex, item, isSignedDiff);
+            html += '</div>';
+            return html;
+        }
+
+        function renderViewerChoiceGroupEnhancements(roomIdx, itemIndex, item, isSignedDiff) {
+            var group = item.choiceGroup;
+            if (!group) return '';
+            group.enhancementGroups = normalizeViewerChoiceGroupEnhancementGroups(group.enhancementGroups);
+            clearInvalidViewerChoiceGroupEnhancementSelections(group);
+            if (!group.enhancementGroups.length) return '';
+            var selectedIds = getViewerSelectedEnhancementIds(group);
+            var html = '<div class="mt-3 pt-3 border-top"><div class="fw-bold small mb-2"><i class="fas fa-wand-magic-sparkles me-1"></i>Enhancements</div>';
+            group.enhancementGroups.forEach(function(enhGroup) {
+                var compatible = (enhGroup.options || []).filter(function(option) {
+                    return isViewerChoiceGroupEnhancementCompatible(group, option, selectedIds.filter(function(id) { return id !== option.id; }));
+                });
+                if (!compatible.length) return;
+                html += '<div class="mb-2"><div class="small text-muted mb-1">' + escapeHtml(enhGroup.name || 'Enhancements') + ' - ' + (enhGroup.type === 'multiple' ? 'choose any that apply' : 'optional') + '</div><div class="row g-2">';
+                compatible.forEach(function(option) {
+                    var checked = (enhGroup.selectedOptionIds || []).indexOf(option.id) !== -1;
+                    var qty = parseFloat(item.quantity) || 0;
+                    var total = qty * viewerNumber(option.rate);
+                    var groupArg = JSON.stringify(enhGroup.id || '').replace(/"/g, '&quot;');
+                    var optionArg = JSON.stringify(option.id || '').replace(/"/g, '&quot;');
+                    html += '<div class="col-md-6"><button type="button" class="w-100 text-start btn choice-option-btn ' + (checked ? 'choice-option-selected' : '') + '" ' + (isSignedDiff ? 'disabled' : 'onclick="toggleViewerChoiceGroupEnhancement(' + roomIdx + ',' + itemIndex + ',' + groupArg + ',' + optionArg + ')"') + '>';
+                    html += '<div class="d-flex justify-content-between gap-2"><span><i class="fas ' + (checked ? 'fa-check-circle' : 'fa-circle') + ' me-1"></i>' + escapeHtml(option.name) + '</span><strong>' + viewerMoney(total, { forceSign: option.upgradeType !== 'replacement' }) + '</strong></div>';
+                    if (option.itemDescription || option.description) html += '<div class="small opacity-75 mt-1">' + escapeHtml(option.itemDescription || option.description) + '</div>';
+                    html += '<div class="small opacity-75 mt-1">' + escapeHtml(option.upgradeType === 'replacement' ? 'Replacement' : 'Add-on') + '</div>';
+                    html += '</button></div>';
+                });
+                html += '</div></div>';
+            });
+            html += '</div>';
             return html;
         }
 
@@ -2358,6 +2729,31 @@ if (location.search.includes('debug')) {
                 selected = [optionId];
             }
             group.selectedOptionIds = selected;
+            clearInvalidViewerChoiceGroupEnhancementSelections(group);
+            applyViewerChoiceGroupToItem(item);
+            renderQuote();
+            updateTotal();
+        }
+
+        function toggleViewerChoiceGroupEnhancement(roomIdx, itemIndex, enhancementGroupId, optionId) {
+            var item = quoteData.rooms[roomIdx]?.items[itemIndex];
+            if (!item || !item.choiceGroup) return;
+            var group = item.choiceGroup;
+            group.enhancementGroups = normalizeViewerChoiceGroupEnhancementGroups(group.enhancementGroups);
+            var enhGroup = group.enhancementGroups.find(function(candidate) { return candidate.id === enhancementGroupId; });
+            if (!enhGroup) return;
+            var option = (enhGroup.options || []).find(function(candidate) { return candidate.id === optionId; });
+            if (!option || !isViewerChoiceGroupEnhancementCompatible(group, option, getViewerSelectedEnhancementIds(group).filter(function(id) { return id !== optionId; }))) return;
+            var selected = Array.isArray(enhGroup.selectedOptionIds) ? enhGroup.selectedOptionIds.slice() : [];
+            if (enhGroup.type === 'multiple') {
+                selected = selected.indexOf(optionId) === -1
+                    ? selected.concat([optionId])
+                    : selected.filter(function(id) { return id !== optionId; });
+            } else {
+                selected = selected.indexOf(optionId) === -1 ? [optionId] : [];
+            }
+            enhGroup.selectedOptionIds = selected;
+            clearInvalidViewerChoiceGroupEnhancementSelections(group);
             applyViewerChoiceGroupToItem(item);
             renderQuote();
             updateTotal();
@@ -2383,17 +2779,90 @@ if (location.search.includes('debug')) {
             return choices;
         }
 
+        function collectClientEnhancements() {
+            var _clientEnhancements = [];
+            (quoteData.rooms || []).forEach(function(room) {
+                (room.items || []).forEach(function(item) {
+                    if (!item.choiceGroup) return;
+                    getViewerSelectedEnhancementOptions(item.choiceGroup).forEach(function(option) {
+                        _clientEnhancements.push({
+                            room: room.name,
+                            group: item.choiceGroup.name,
+                            enhancementGroup: option.enhancementGroupName,
+                            option: option.name,
+                            upgradeType: option.upgradeType,
+                            total: (parseFloat(item.quantity) || 0) * (parseFloat(option.rate) || 0)
+                        });
+                    });
+                });
+            });
+            return _clientEnhancements;
+        }
+
+        function collectClientItemUpgradeSelections() {
+            var _clientItemUpgradeSelections = [];
+            (quoteData.rooms || []).forEach(function(room) {
+                (room.items || []).forEach(function(item) {
+                    getViewerSelectedItemUpgradeOptions(item).forEach(function(option) {
+                        _clientItemUpgradeSelections.push({
+                            room: room.name,
+                            item: item._baseDescription || item.description || item.name,
+                            upgradeGroup: option.upgradeGroupName,
+                            option: option.name,
+                            upgradeType: option.upgradeType,
+                            total: viewerItemQuantity(item) * viewerNumber(option.rate)
+                        });
+                    });
+                });
+            });
+            return _clientItemUpgradeSelections;
+        }
+
         function applyClientChoiceGroupsToRooms(sourceRooms) {
             return (sourceRooms || []).map(function(room) {
                 var nextItems = [];
                 (room.items || []).forEach(function(item) {
                     if (!item.choiceGroup) {
-                        if (!item._removed) nextItems.push(item);
+                        if (!item._removed) {
+                            var normalItem = Object.assign({}, item);
+                            if (normalizeViewerItemUpgradeGroups(normalItem).length) applyViewerItemUpgradeGroups(normalItem);
+                            nextItems.push(normalItem);
+                        }
                         return;
                     }
                     if (item._removed) return;
                     var group = item.choiceGroup;
-                    getViewerChoiceSelectedOptions(group).forEach(function(option) {
+                    var selectedEnhancements = getViewerSelectedEnhancementOptions(group);
+                    var replacementEnhancements = selectedEnhancements.filter(function(option) { return option.upgradeType === 'replacement'; });
+                    var replacementEnhancement = replacementEnhancements.length ? replacementEnhancements[replacementEnhancements.length - 1] : null;
+                    var baseOptionsToApply = replacementEnhancement ? [replacementEnhancement] : getViewerChoiceSelectedOptions(group);
+                    baseOptionsToApply.forEach(function(option) {
+                        var qty = option.quantityMode === 'override' ? (parseFloat(option.quantityOverride) || 0) : (parseFloat(item.quantity) || 0);
+                        var nextItem = Object.assign({}, item, {
+                            description: option.name,
+                            serviceName: option.name,
+                            unitType: option.unitType || item.unitType || item.unit || '',
+                            rate: parseFloat(option.rate) || 0,
+                            materialCost: parseFloat(option.materialCost) || 0,
+                            supplierUrl: option.supplierUrl || '',
+                            itemDescription: option.itemDescription || option.description || '',
+                            quantity: qty,
+                            total: qty * (parseFloat(option.rate) || 0),
+                            choiceGroupSelection: replacementEnhancement
+                                ? { groupId: group.id, groupName: group.name, optionId: option.id, optionName: option.name, type: group.type, replacedByEnhancement: true }
+                                : { groupId: group.id, groupName: group.name, optionId: option.id, optionName: option.name, type: group.type },
+                            choiceGroupEnhancement: replacementEnhancement ? { groupId: group.id, groupName: group.name, enhancementGroupId: option.enhancementGroupId, enhancementGroupName: option.enhancementGroupName, optionId: option.id, optionName: option.name, upgradeType: option.upgradeType } : undefined,
+                            choiceGroup: group
+                        });
+                        if (normalizeViewerItemUpgradeGroups(item).length) {
+                            nextItem.upgradeGroups = normalizeViewerItemUpgradeGroups(item);
+                            nextItem.selectedUpgradeOptionIds = getViewerSelectedItemUpgradeIds(item);
+                            resetViewerItemUpgradeBaseState(nextItem);
+                            applyViewerItemUpgradeGroups(nextItem);
+                        }
+                        nextItems.push(nextItem);
+                    });
+                    selectedEnhancements.filter(function(option) { return option.upgradeType !== 'replacement'; }).forEach(function(option) {
                         var qty = option.quantityMode === 'override' ? (parseFloat(option.quantityOverride) || 0) : (parseFloat(item.quantity) || 0);
                         nextItems.push(Object.assign({}, item, {
                             description: option.name,
@@ -2405,7 +2874,7 @@ if (location.search.includes('debug')) {
                             itemDescription: option.itemDescription || option.description || '',
                             quantity: qty,
                             total: qty * (parseFloat(option.rate) || 0),
-                            choiceGroupSelection: { groupId: group.id, groupName: group.name, optionId: option.id, optionName: option.name, type: group.type },
+                            choiceGroupEnhancement: { groupId: group.id, groupName: group.name, enhancementGroupId: option.enhancementGroupId, enhancementGroupName: option.enhancementGroupName, optionId: option.id, optionName: option.name, upgradeType: option.upgradeType },
                             choiceGroup: group
                         }));
                     });
@@ -2649,6 +3118,9 @@ if (location.search.includes('debug')) {
                     // Ensure item has description field
                     if (!item.hasOwnProperty('itemDescription')) item.itemDescription = '';
 
+                    if (!item.choiceGroup) applyViewerItemUpgradeGroups(item);
+                    const itemUpgradeGroups = normalizeViewerItemUpgradeGroups(item);
+                    const hasUpgradeGroups = showUpgrades && itemUpgradeGroups.length > 0;
                     const isUpgraded = !!item.upgraded;
                     const activeRate = viewerItemActiveRate(item);
                     const itemDisplayTotal = isChangeOrder ? viewerChangeOrderLineDisplayTotal(item, room) : viewerItemActiveTotal(item);
@@ -2656,13 +3128,16 @@ if (location.search.includes('debug')) {
                     const coStatus = isChangeOrder ? viewerChangeOrderStatus(item, room) : '';
                     const coCanExplain = isChangeOrder && coStatus !== 'unchanged';
                     const coExplanation = coCanExplain ? viewerChangeOrderExplanation(item, room) : '';
-                    const hasUpgrade = showUpgrades && !!(item.upgrade && item.upgrade.name);
-                    const upgradeDiff = hasUpgrade ? ((viewerItemQuantity(item) * viewerNumber(item.upgrade.rate)) - viewerItemBaseTotal(item)) : 0;
+                    const hasLegacyUpgrade = showUpgrades && !!(item.upgrade && item.upgrade.name) && !hasUpgradeGroups;
+                    const hasUpgrade = hasLegacyUpgrade || hasUpgradeGroups;
+                    const upgradeDiff = hasLegacyUpgrade ? ((viewerItemQuantity(item) * viewerNumber(item.upgrade.rate)) - viewerItemBaseTotal(item)) : 0;
                     item._itemDescription = item.itemDescription || '';
 
-                    const displayDesc = isUpgraded && item.upgrade?.description
+                    const displayDesc = hasUpgradeGroups
+                        ? (item.itemDescription || '')
+                        : (isUpgraded && item.upgrade?.description
                         ? item.upgrade.description
-                        : (item.itemDescription || '');
+                        : (item.itemDescription || ''));
                     const visibleNotes = viewerVisibleNotes(item, displayDesc);
                     const isOptional = !!item.optional;
                     const isRemoved = !!item._removed;
@@ -2734,12 +3209,13 @@ if (location.search.includes('debug')) {
                             </div>
                             ${coCanExplain ? `<div class="viewer-change-order-note" id="co_note_${roomIdx}_${itemIndex}"><i class="fas fa-circle-info me-1"></i>${escapeHtml(coExplanation)}</div>` : ''}
                             ${renderExpandableDescription(displayDesc, `itemdesc_${roomIdx}_${itemIndex}`)}
+                            ${hasUpgradeGroups ? renderViewerItemUpgradeGroups(roomIdx, itemIndex, item, isSignedDiff) : ''}
                             ${visibleNotes ? `<div class="text-muted mb-1"><small><i class="fas fa-info-circle"></i> ${visibleNotes}</small></div>` : ''}
                             ${isSignedDiff ? `
                                 ${wasUpgraded && origItem ? `<div class="mt-1"><span class="badge bg-success me-1"><i class="fas fa-arrow-up me-1"></i>Upgraded by client</span><span class="text-muted small">was: ${origItem.description} @ ${viewerMoney(origItem.rate)} = ${viewerMoney(viewerItemBaseTotal(origItem))}</span></div>` : ''}
                             ` : `
                             <div class="d-flex gap-2 mt-1 flex-wrap">
-                                ${hasUpgrade ? `
+                                ${hasLegacyUpgrade ? `
                                 <div>
                                     ${!isUpgraded ? `<div class="text-muted mb-1" style="font-size:0.88rem;"><i class="fas fa-arrow-up" style="color:#f0ad4e;"></i> <strong>Upgrade available:</strong> ${item.upgrade.name}</div>` : ''}
                                     ${item.upgrade.photo ? `<div class="mb-2"><button class="btn btn-sm btn-outline-warning" onclick="openPhotoLightbox('${item.upgrade.photo}')" style="font-size:0.75rem;"><i class="fas fa-camera me-1"></i>View Upgrade Photo</button></div>` : ''}
@@ -3468,7 +3944,11 @@ if (location.search.includes('debug')) {
                         return (room.items || []).some(function(item) { return item._removed; });
                     });
                     var _clientChoiceGroups = collectClientChoiceGroups();
+                    var _clientEnhancements = collectClientEnhancements();
+                    var _clientItemUpgradeSelections = collectClientItemUpgradeSelections();
                     var _hasChoiceGroups = _clientChoiceGroups.length > 0;
+                    var _hasEnhancements = _clientEnhancements.length > 0;
+                    var _hasItemUpgradeSelections = _clientItemUpgradeSelections.length > 0;
 
                     var isChangeOrder = !!(window.QuoteDrChangeOrders && QuoteDrChangeOrders.isChangeOrder(quoteData));
                     const updateData = {
@@ -3483,10 +3963,12 @@ if (location.search.includes('debug')) {
                             signed_at: now.toISOString(),
                             approved_by: name,
                             approved_at: now.toISOString(),
-                            client_upgraded: _hasUpgrades || _hasRemovals || _hasChoiceGroups,
-                            client_upgraded_at: (_hasUpgrades || _hasRemovals || _hasChoiceGroups) ? now.toISOString() : undefined,
-                            original_rooms: (_hasUpgrades || _hasRemovals || _hasChoiceGroups) ? originalRoomsSnapshot : undefined,
-                            _clientChoiceGroups: _clientChoiceGroups
+                            client_upgraded: _hasUpgrades || _hasRemovals || _hasChoiceGroups || _hasEnhancements || _hasItemUpgradeSelections,
+                            client_upgraded_at: (_hasUpgrades || _hasRemovals || _hasChoiceGroups || _hasEnhancements || _hasItemUpgradeSelections) ? now.toISOString() : undefined,
+                            original_rooms: (_hasUpgrades || _hasRemovals || _hasChoiceGroups || _hasEnhancements || _hasItemUpgradeSelections) ? originalRoomsSnapshot : undefined,
+                            _clientChoiceGroups: _clientChoiceGroups,
+                            _clientEnhancements: _clientEnhancements,
+                            _clientItemUpgradeSelections: _clientItemUpgradeSelections
                         })
                     };
 
@@ -3541,6 +4023,8 @@ if (location.search.includes('debug')) {
             var _clientUpgrades = [];
             var _clientRemovals = [];
             var _clientChoiceGroups = collectClientChoiceGroups();
+            var _clientEnhancements = collectClientEnhancements();
+            var _clientItemUpgradeSelections = collectClientItemUpgradeSelections();
             (quoteData.rooms || []).forEach(function(room) {
                 (room.items || []).forEach(function(item) {
                     if (item.upgraded && item.upgrade) {
@@ -3565,6 +4049,8 @@ if (location.search.includes('debug')) {
                             _clientUpgrades: _clientUpgrades,
                             _clientRemovals: _clientRemovals,
                             _clientChoiceGroups: _clientChoiceGroups,
+                            _clientEnhancements: _clientEnhancements,
+                            _clientItemUpgradeSelections: _clientItemUpgradeSelections,
                             _clientRooms: JSON.parse(JSON.stringify(quoteData.rooms || [])),
                             _clientSubmittedAt: new Date().toISOString()
                         }

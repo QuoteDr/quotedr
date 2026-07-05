@@ -91,6 +91,29 @@
         return Object.assign({ message: String(message || '') }, options || {});
     }
 
+    function stackAboveOpenModal(el, hasOtherOpenModal) {
+        if (!el) return;
+        if (!hasOtherOpenModal) {
+            el.style.removeProperty('z-index');
+            return;
+        }
+        el.style.zIndex = '1105';
+        var backdrops = document.querySelectorAll('.modal-backdrop');
+        var latestBackdrop = backdrops[backdrops.length - 1];
+        if (latestBackdrop) {
+            latestBackdrop.style.zIndex = '1100';
+            latestBackdrop.setAttribute('data-qd-dialog-backdrop', 'true');
+        }
+    }
+
+    function resetDialogStacking(el) {
+        if (el) el.style.removeProperty('z-index');
+        document.querySelectorAll('[data-qd-dialog-backdrop="true"]').forEach(function(backdrop) {
+            backdrop.style.removeProperty('z-index');
+            backdrop.removeAttribute('data-qd-dialog-backdrop');
+        });
+    }
+
     function qdDialog(message, options) {
         var opts = asOptions(message, options);
         return new Promise(function(resolve) {
@@ -151,6 +174,7 @@
                 el.removeEventListener('keydown', onEnterSubmit);
                 var finish = function() {
                     el.removeEventListener('hidden.bs.modal', onHidden);
+                    resetDialogStacking(el);
                     resolve(value);
                 };
                 if (hideFirst) {
@@ -194,6 +218,7 @@
             el.addEventListener('hidden.bs.modal', onHidden, { once: true });
             el.addEventListener('keydown', onEnterSubmit);
             modal.show();
+            stackAboveOpenModal(el, hasOtherOpenModal);
             if (opts.prompt) setTimeout(function(){ input.focus(); input.select(); }, 180);
         });
     }

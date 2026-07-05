@@ -18,6 +18,14 @@ assert(
 );
 
 assert(
+  items.includes('function categoryNameExists(cat, ignoreCat)') &&
+    items.includes("categoryNameExists(nextName, oldCat)") &&
+    items.includes("String(existing || '').trim() === ignoredName") &&
+    items.includes('Choose a unique name so QuoteDr does not merge unrelated items.'),
+  'Category rename should allow case-only renames of the current category while still blocking true duplicate category names'
+);
+
+assert(
   items.includes('function renameSelectedCategory') &&
     items.includes('window.renameSelectedCategory = renameSelectedCategory'),
   'Manage Items should expose a selected-category rename helper'

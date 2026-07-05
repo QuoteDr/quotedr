@@ -19,3 +19,10 @@ assert(
   dialogs.includes('cleanup(value, true)'),
   'Dialog button actions should resolve only after the modal is fully hidden'
 );
+
+assert(
+  dialogs.includes("el.style.zIndex = '1105'") &&
+  dialogs.includes("latestBackdrop.style.zIndex = '1100'") &&
+  dialogs.includes("data-qd-dialog-backdrop"),
+  'Dialog prompts opened from nested modals should stack above the current modal'
+);

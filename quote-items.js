@@ -8,9 +8,14 @@
         var MANAGE_CUSTOM_UNITS_KEY = 'ald_manage_custom_unit_types';
         var MANAGE_CATEGORY_STATE_KEY = 'ald_manage_items_category_state';
         var MANAGE_CATEGORY_RENAMES_KEY = 'ald_manage_items_category_renames';
+        var MANAGE_CATEGORY_ORDER_MODE_KEY = 'ald_manage_items_category_order_mode';
+        var MANAGE_CATEGORY_CUSTOM_ORDER_KEY = 'ald_manage_items_category_custom_order';
         var manageItemsFilter = 'all';
         var manageItemsCategoryState = {};
         var manageCategoryRenames = {};
+        var manageItemsCategoryOrderMode = 'alphabetical';
+        var manageItemsCategoryCustomOrder = [];
+        var manageCategorySortable = null;
         var dirtyPricingRows = new Set();
         var pricingOtherDirty = false;
 
@@ -22,6 +27,284 @@
 
         function manageItemsAttr(value) {
             return manageItemsEscape(value).replace(/`/g, '&#96;');
+        }
+
+        function normalizeManageUpgradeType(value) {
+            const clean = String(value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+            return clean === 'add_on' || clean === 'addon' ? 'add_on' : 'replacement';
+        }
+
+        function manageUpgradeGroupId(prefix) {
+            return (prefix || 'upg') + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+        }
+
+        function normalizeManageUpgradeOption(option, fallbackId) {
+            option = option || {};
+            return {
+                id: option.id || fallbackId || manageUpgradeGroupId('upo'),
+                name: option.name || option.sourceItemName || '',
+                unitType: option.unitType || option.unit || '',
+                rate: parseFloat(option.rate || 0) || 0,
+                materialCost: parseFloat(option.materialCost || option.material_cost || 0) || 0,
+                supplierUrl: option.supplierUrl || '',
+                description: option.description || option.itemDescription || '',
+                itemDescription: option.itemDescription || option.description || '',
+                upgradeType: normalizeManageUpgradeType(option.upgradeType || option.type || option.mode),
+                sourceItemName: option.sourceItemName || '',
+                category: option.category || '',
+                availableAfterOptionIds: Array.isArray(option.availableAfterOptionIds) ? option.availableAfterOptionIds.filter(Boolean) : [],
+                blockedByOptionIds: Array.isArray(option.blockedByOptionIds) ? option.blockedByOptionIds.filter(Boolean) : []
+            };
+        }
+
+        function normalizeManageItemUpgradeGroups(item) {
+            item = item || {};
+            const groups = Array.isArray(item.upgradeGroups) ? item.upgradeGroups : [];
+            const normalized = groups.map(function(group, groupIndex) {
+                group = group || {};
+                const options = Array.isArray(group.options) ? group.options.map(function(option, optionIndex) {
+                    return normalizeManageUpgradeOption(option, 'upo_' + groupIndex + '_' + optionIndex);
+                }).filter(function(option) { return String(option.name || '').trim(); }) : [];
+                return {
+                    id: group.id || manageUpgradeGroupId('upg'),
+                    name: group.name || (groupIndex === 0 ? 'Upgrade Options' : 'Upgrade Group'),
+                    type: group.type === 'multiple' ? 'multiple' : 'single_optional',
+                    options: options
+                };
+            }).filter(function(group) { return group.options.length || group.name; });
+
+            if (!normalized.length && item.upgrade && item.upgrade.name) {
+                normalized.push({
+                    id: 'legacy_upgrade',
+                    name: 'Upgrade Options',
+                    type: 'single_optional',
+                    options: [normalizeManageUpgradeOption(Object.assign({}, item.upgrade, {
+                        id: item.upgrade.id || 'legacy_upgrade_option',
+                        upgradeType: item.upgrade.upgradeType || item.upgrade.type || item.upgrade.mode || 'replacement'
+                    }))]
+                });
+            }
+            return normalized;
+        }
+
+        function flattenManageUpgradeSourceItems() {
+            const items = [];
+            Object.keys(pricingDatabase || {}).forEach(function(category) {
+                const list = pricingDatabase[category];
+                if (category.indexOf('__') === 0 || !Array.isArray(list)) return;
+                list.forEach(function(item) {
+                    if (!item || !item.name) return;
+                    items.push({
+                        category: category,
+                        name: item.name,
+                        unitType: item.unitType || '',
+                        rate: parseFloat(item.rate || 0) || 0,
+                        materialCost: parseFloat(item.materialCost || 0) || 0,
+                        supplierUrl: item.supplierUrl || '',
+                        description: item.itemDescription || item.description || ''
+                    });
+                });
+            });
+            return items;
+        }
+
+        function renderManageUpgradeSourceSelect(selectedName, selectedCategory) {
+            const selectedKey = (selectedCategory || '') + '||' + (selectedName || '');
+            const options = ['<option value="">Type custom upgrade...</option>'];
+            flattenManageUpgradeSourceItems().forEach(function(item) {
+                const key = item.category + '||' + item.name;
+                options.push('<option value="' + manageItemsAttr(key) + '" ' +
+                    'data-category="' + manageItemsAttr(item.category) + '" ' +
+                    'data-name="' + manageItemsAttr(item.name) + '" ' +
+                    'data-unit="' + manageItemsAttr(item.unitType) + '" ' +
+                    'data-rate="' + manageItemsAttr(item.rate) + '" ' +
+                    'data-cost="' + manageItemsAttr(item.materialCost) + '" ' +
+                    'data-supplier="' + manageItemsAttr(item.supplierUrl) + '" ' +
+                    'data-description="' + manageItemsAttr(item.description) + '" ' +
+                    (key === selectedKey ? 'selected' : '') + '>' +
+                    manageItemsEscape(item.category + ' - ' + item.name) +
+                    '</option>');
+            });
+            return '<select class="form-select form-select-sm upgrade-source-item" onchange="fillManageUpgradeOptionFromSource(this); markPricingDirty(this)">' + options.join('') + '</select>';
+        }
+
+        function renderManageUpgradePathSelect(allOptions, selectedIds, selfId, className, label) {
+            selectedIds = Array.isArray(selectedIds) ? selectedIds : [];
+            const usable = (allOptions || []).filter(function(option) { return option.id !== selfId && option.name; });
+            if (!usable.length) return '<div class="small text-muted">' + label + ': add another option first.</div>';
+            return '<label class="form-label mb-1" style="font-size:0.75em">' + label + '</label>' +
+                '<select class="form-select form-select-sm ' + className + '" multiple size="' + Math.min(4, Math.max(2, usable.length)) + '" onchange="markPricingDirty(this)">' +
+                usable.map(function(option) {
+                    return '<option value="' + manageItemsAttr(option.id) + '" ' + (selectedIds.indexOf(option.id) !== -1 ? 'selected' : '') + '>' + manageItemsEscape(option.name) + '</option>';
+                }).join('') +
+                '</select>';
+        }
+
+        function renderManageItemUpgradeGroupsEditor(item, baseUnitType) {
+            const groups = normalizeManageItemUpgradeGroups(item);
+            const flatOptions = [];
+            groups.forEach(function(group) {
+                (group.options || []).forEach(function(option) { flatOptions.push(option); });
+            });
+            let html = '<div class="border rounded p-2 bg-light manage-upgrade-groups-editor">' +
+                '<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">' +
+                '<div><small class="text-warning fw-bold"><i class="fas fa-arrow-up"></i> Upgrade Groups</small>' +
+                '<div class="small text-muted">Create client-facing upgrade choices. Use <strong>Available after</strong> and <strong>Blocked by</strong> for simple upgrade paths.</div></div>' +
+                '<button type="button" class="btn btn-sm btn-outline-primary" data-upgrade-group-action="add-group"><i class="fas fa-plus me-1"></i>Add Upgrade Group</button>' +
+                '</div>';
+
+            if (!groups.length) {
+                html += '<div class="alert alert-info my-2 py-2">No upgrade groups yet. Add a group like <strong>Drink Rail</strong> or <strong>Post Caps</strong>, then add upgrade options.</div>';
+            }
+
+            groups.forEach(function(group, groupIndex) {
+                html += '<div class="manage-upgrade-group border rounded bg-white p-2 mt-2" data-upgrade-group-id="' + manageItemsAttr(group.id) + '">' +
+                    '<div class="row g-2 align-items-end">' +
+                    '<div class="col-md-5"><label class="form-label" style="font-size:0.75em">Group Name</label><input type="text" class="form-control form-control-sm upgrade-group-name" value="' + manageItemsAttr(group.name) + '" placeholder="e.g., Drink Rail" oninput="markPricingDirty(this)"></div>' +
+                    '<div class="col-md-4"><label class="form-label" style="font-size:0.75em">Selection Type</label><select class="form-select form-select-sm upgrade-group-type" onchange="markPricingDirty(this)"><option value="single_optional" ' + (group.type !== 'multiple' ? 'selected' : '') + '>Pick One Optional</option><option value="multiple" ' + (group.type === 'multiple' ? 'selected' : '') + '>Pick Multiple</option></select></div>' +
+                    '<div class="col-md-3 d-flex gap-1"><button type="button" class="btn btn-sm btn-outline-primary flex-fill" data-upgrade-group-action="add-option"><i class="fas fa-plus me-1"></i>Option</button><button type="button" class="btn btn-sm btn-outline-danger" data-upgrade-group-action="remove-group" title="Remove group"><i class="fas fa-trash"></i></button></div>' +
+                    '</div>';
+
+                if (!group.options.length) {
+                    html += '<div class="small text-muted mt-2">No options in this group yet.</div>';
+                }
+
+                group.options.forEach(function(option, optionIndex) {
+                    html += '<div class="manage-upgrade-option border rounded p-2 mt-2" data-upgrade-option-id="' + manageItemsAttr(option.id) + '">' +
+                        '<div class="row g-2 align-items-end">' +
+                        '<div class="col-md-4"><label class="form-label" style="font-size:0.75em">Copy From Saved Item</label>' + renderManageUpgradeSourceSelect(option.sourceItemName, option.category) + '</div>' +
+                        '<div class="col-md-4"><label class="form-label" style="font-size:0.75em">Upgrade Name</label><input type="text" class="form-control form-control-sm upgrade-name" value="' + manageItemsAttr(option.name) + '" placeholder="e.g., Post-to-post drink rail" oninput="markPricingDirty(this)"></div>' +
+                        '<div class="col-md-2"><label class="form-label" style="font-size:0.75em">Unit</label><input type="text" class="form-control form-control-sm upgrade-unit-type" value="' + manageItemsAttr(option.unitType || baseUnitType || '') + '" list="unitTypeOptions" oninput="markPricingDirty(this)"></div>' +
+                        '<div class="col-md-2"><label class="form-label" style="font-size:0.75em">Type</label><select class="form-select form-select-sm upgrade-type" onchange="markPricingDirty(this)"><option value="replacement" ' + (option.upgradeType === 'replacement' ? 'selected' : '') + '>Replacement</option><option value="add_on" ' + (option.upgradeType !== 'replacement' ? 'selected' : '') + '>Add-on</option></select></div>' +
+                        '<div class="col-md-2"><label class="form-label" style="font-size:0.75em">Rate</label><input type="number" class="form-control form-control-sm upgrade-rate" value="' + manageItemsAttr(option.rate.toFixed(2)) + '" step="0.01" min="0" oninput="markPricingDirty(this)"></div>' +
+                        '<div class="col-md-2"><label class="form-label" style="font-size:0.75em">Cost</label><input type="number" class="form-control form-control-sm upgrade-material-cost" value="' + manageItemsAttr(option.materialCost.toFixed(2)) + '" step="0.01" min="0" oninput="markPricingDirty(this)"></div>' +
+                        '<div class="col-md-8"><label class="form-label" style="font-size:0.75em">Supplier URL</label><input type="url" class="form-control form-control-sm upgrade-supplier-url" value="' + manageItemsAttr(option.supplierUrl) + '" placeholder="https://..." oninput="markPricingDirty(this)"></div>' +
+                        '<div class="col-12 description-refine-scope"><div class="d-flex justify-content-between align-items-center gap-2"><label class="form-label mb-0" style="font-size:0.75em">Upgrade Description</label><button type="button" class="btn btn-sm btn-outline-primary refine-desc-btn" style="font-size:0.75rem;padding:2px 8px;">AI Refine</button></div><input type="text" class="form-control form-control-sm upgrade-desc item-description-textarea mt-1" value="' + manageItemsAttr(option.description || '') + '" placeholder="e.g., Premium finishing upgrade" oninput="markPricingDirty(this)"></div>' +
+                        '<div class="col-md-6">' + renderManageUpgradePathSelect(flatOptions, option.availableAfterOptionIds, option.id, 'upgrade-available-after', 'Available after') + '</div>' +
+                        '<div class="col-md-5">' + renderManageUpgradePathSelect(flatOptions, option.blockedByOptionIds, option.id, 'upgrade-blocked-by', 'Blocked by') + '</div>' +
+                        '<div class="col-md-1 d-flex align-items-end"><button type="button" class="btn btn-sm btn-outline-danger w-100" data-upgrade-group-action="remove-option" title="Remove option"><i class="fas fa-trash"></i></button></div>' +
+                        '</div><div class="mt-2">' + renderManageMarginPill(option.rate, option.materialCost) + '</div>' +
+                        '</div>';
+                });
+                html += '</div>';
+            });
+            html += '</div>';
+            return html;
+        }
+
+        function collectManageItemUpgradeGroups(detailsRow, includeEmpty) {
+            if (!detailsRow) return [];
+            return Array.from(detailsRow.querySelectorAll('.manage-upgrade-group')).map(function(groupEl, groupIndex) {
+                const options = Array.from(groupEl.querySelectorAll('.manage-upgrade-option')).map(function(optionEl, optionIndex) {
+                    const sourceSelect = optionEl.querySelector('.upgrade-source-item');
+                    const selectedSource = sourceSelect ? sourceSelect.options[sourceSelect.selectedIndex] : null;
+                    const name = optionEl.querySelector('.upgrade-name')?.value.trim() || '';
+                    if (!name) return null;
+                    return {
+                        id: optionEl.dataset.upgradeOptionId || manageUpgradeGroupId('upo'),
+                        name: name,
+                        unitType: optionEl.querySelector('.upgrade-unit-type')?.value.trim() || '',
+                        rate: parseFloat(optionEl.querySelector('.upgrade-rate')?.value || 0) || 0,
+                        materialCost: parseFloat(optionEl.querySelector('.upgrade-material-cost')?.value || 0) || 0,
+                        supplierUrl: optionEl.querySelector('.upgrade-supplier-url')?.value.trim() || '',
+                        description: optionEl.querySelector('.upgrade-desc')?.value.trim() || '',
+                        upgradeType: normalizeManageUpgradeType(optionEl.querySelector('.upgrade-type')?.value),
+                        sourceItemName: selectedSource?.dataset.name || '',
+                        category: selectedSource?.dataset.category || '',
+                        availableAfterOptionIds: Array.from(optionEl.querySelector('.upgrade-available-after')?.selectedOptions || []).map(function(opt) { return opt.value; }).filter(Boolean),
+                        blockedByOptionIds: Array.from(optionEl.querySelector('.upgrade-blocked-by')?.selectedOptions || []).map(function(opt) { return opt.value; }).filter(Boolean)
+                    };
+                }).filter(Boolean);
+                if (!options.length && !includeEmpty) return null;
+                return {
+                    id: groupEl.dataset.upgradeGroupId || manageUpgradeGroupId('upg'),
+                    name: groupEl.querySelector('.upgrade-group-name')?.value.trim() || ('Upgrade Group ' + (groupIndex + 1)),
+                    type: groupEl.querySelector('.upgrade-group-type')?.value === 'multiple' ? 'multiple' : 'single_optional',
+                    options: options
+                };
+            }).filter(Boolean);
+        }
+
+        function refreshManageUpgradeGroupsEditor(detailsRow, groups) {
+            if (!detailsRow) return;
+            const editor = detailsRow.querySelector('.manage-upgrade-groups-editor');
+            if (!editor) return;
+            const rowKey = detailsRow.getAttribute('data-row-key') || '';
+            const row = rowKey ? getManageRowByKey(rowKey) : null;
+            const unitType = row?.querySelector('.item-unit-type-input')?.value || '';
+            editor.outerHTML = renderManageItemUpgradeGroupsEditor({ upgradeGroups: groups }, unitType);
+        }
+
+        function handleManageUpgradeGroupAction(button) {
+            if (!button) return;
+            const detailsRow = button.closest('.item-details-row');
+            if (!detailsRow) return;
+            const action = button.getAttribute('data-upgrade-group-action');
+            const groups = collectManageItemUpgradeGroups(detailsRow, true);
+            const groupEl = button.closest('.manage-upgrade-group');
+            const optionEl = button.closest('.manage-upgrade-option');
+            const groupId = groupEl?.dataset.upgradeGroupId || '';
+            const optionId = optionEl?.dataset.upgradeOptionId || '';
+
+            if (action === 'add-group') {
+                groups.push({ id: manageUpgradeGroupId('upg'), name: 'Upgrade Group', type: 'single_optional', options: [] });
+            } else if (action === 'remove-group') {
+                const index = groups.findIndex(function(group) { return group.id === groupId; });
+                if (index !== -1) groups.splice(index, 1);
+            } else if (action === 'add-option') {
+                const group = groups.find(function(group) { return group.id === groupId; });
+                if (group) {
+                    group.options = group.options || [];
+                    group.options.push({
+                        id: manageUpgradeGroupId('upo'),
+                        name: 'New Upgrade',
+                        unitType: rowUnitTypeForDetails(detailsRow),
+                        rate: 0,
+                        materialCost: 0,
+                        supplierUrl: '',
+                        description: '',
+                        upgradeType: 'add_on',
+                        availableAfterOptionIds: [],
+                        blockedByOptionIds: []
+                    });
+                }
+            } else if (action === 'remove-option') {
+                groups.forEach(function(group) {
+                    group.options = (group.options || []).filter(function(option) {
+                        return option.id !== optionId;
+                    }).map(function(option) {
+                        option.availableAfterOptionIds = (option.availableAfterOptionIds || []).filter(function(id) { return id !== optionId; });
+                        option.blockedByOptionIds = (option.blockedByOptionIds || []).filter(function(id) { return id !== optionId; });
+                        return option;
+                    });
+                });
+            }
+
+            refreshManageUpgradeGroupsEditor(detailsRow, groups);
+            markPricingDirty(detailsRow);
+        }
+
+        function rowUnitTypeForDetails(detailsRow) {
+            const rowKey = detailsRow ? detailsRow.getAttribute('data-row-key') : '';
+            const row = rowKey ? getManageRowByKey(rowKey) : null;
+            return row?.querySelector('.item-unit-type-input')?.value || '';
+        }
+
+        function fillManageUpgradeOptionFromSource(selectEl) {
+            if (!selectEl) return;
+            const optionEl = selectEl.closest('.manage-upgrade-option');
+            const selected = selectEl.options[selectEl.selectedIndex];
+            if (!optionEl || !selected || !selected.value) return;
+            const setValue = function(selector, value) {
+                const input = optionEl.querySelector(selector);
+                if (input) input.value = value || '';
+            };
+            setValue('.upgrade-name', selected.dataset.name || '');
+            setValue('.upgrade-unit-type', selected.dataset.unit || rowUnitTypeForDetails(selectEl.closest('.item-details-row')) || '');
+            setValue('.upgrade-rate', selected.dataset.rate || '0');
+            setValue('.upgrade-material-cost', selected.dataset.cost || '0');
+            setValue('.upgrade-supplier-url', selected.dataset.supplier || '');
+            setValue('.upgrade-desc', selected.dataset.description || '');
         }
 
         function getManageBaseUnitTypes() {
@@ -54,6 +337,11 @@
                     items.forEach(function(item) {
                         addManageUniqueUnit(units, item && item.unitType);
                         addManageUniqueUnit(units, item && item.upgrade && item.upgrade.unitType);
+                        normalizeManageItemUpgradeGroups(item).forEach(function(group) {
+                            (group.options || []).forEach(function(option) {
+                                addManageUniqueUnit(units, option && option.unitType);
+                            });
+                        });
                     });
                 });
             });
@@ -187,6 +475,154 @@
             return false;
         }
 
+        function loadManageCategoryOrderState() {
+            try {
+                manageItemsCategoryOrderMode = localStorage.getItem(MANAGE_CATEGORY_ORDER_MODE_KEY) === 'custom' ? 'custom' : 'alphabetical';
+            } catch(e) {
+                manageItemsCategoryOrderMode = 'alphabetical';
+            }
+            try {
+                var stored = JSON.parse(localStorage.getItem(MANAGE_CATEGORY_CUSTOM_ORDER_KEY) || '[]');
+                manageItemsCategoryCustomOrder = Array.isArray(stored) ? stored.filter(Boolean) : [];
+            } catch(e) {
+                manageItemsCategoryCustomOrder = [];
+            }
+        }
+
+        function getManageItemsCategoryOrderMode() {
+            return manageItemsCategoryOrderMode === 'custom' ? 'custom' : 'alphabetical';
+        }
+
+        function saveManageCategoryCustomOrder(order) {
+            var seen = new Set();
+            manageItemsCategoryCustomOrder = (Array.isArray(order) ? order : []).map(function(cat) {
+                return String(cat || '').trim();
+            }).filter(function(cat) {
+                var key = cat.toLowerCase();
+                if (!cat || seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            });
+            localStorage.setItem(MANAGE_CATEGORY_CUSTOM_ORDER_KEY, JSON.stringify(manageItemsCategoryCustomOrder));
+        }
+
+        function getManageCategoryNamesWithItems() {
+            return Object.keys(pricingDatabase || {}).filter(function(cat) {
+                return cat.indexOf('__') !== 0 && Array.isArray(pricingDatabase[cat]) && pricingDatabase[cat].length;
+            });
+        }
+
+        function getOrderedManageCategories() {
+            var categories = getManageCategoryNamesWithItems();
+            if (getManageItemsCategoryOrderMode() !== 'custom') {
+                return categories.sort(function(a, b) { return a.localeCompare(b); });
+            }
+
+            var categorySet = new Set(categories);
+            var customOrder = manageItemsCategoryCustomOrder.filter(function(cat) {
+                return categorySet.has(cat);
+            });
+            var orderedSet = new Set(customOrder);
+            var missingCategories = categories.filter(function(cat) {
+                return !orderedSet.has(cat);
+            }).sort(function(a, b) {
+                return a.localeCompare(b);
+            });
+            var normalizedOrder = customOrder.concat(missingCategories);
+            if (normalizedOrder.join('\u0001') !== manageItemsCategoryCustomOrder.join('\u0001')) {
+                saveManageCategoryCustomOrder(normalizedOrder);
+            }
+            return normalizedOrder;
+        }
+
+        function renameManageCategoryOrder(oldCat, newCat) {
+            if (!oldCat || !newCat) return;
+            var changed = false;
+            var mappedOrder = manageItemsCategoryCustomOrder.map(function(cat) {
+                if (cat === oldCat) {
+                    changed = true;
+                    return newCat;
+                }
+                return cat;
+            });
+            if (changed) saveManageCategoryCustomOrder(mappedOrder);
+        }
+
+        function updateManageCategoryOrderControls() {
+            var mode = getManageItemsCategoryOrderMode();
+            var badge = document.getElementById('manage-category-order-mode-badge');
+            if (badge) badge.textContent = mode === 'custom' ? 'Custom' : 'A-Z';
+            var button = document.getElementById('manageCategoryOrganizeBtn');
+            if (button) button.classList.toggle('btn-primary', mode === 'custom');
+            if (button) button.classList.toggle('btn-outline-primary', mode !== 'custom');
+            document.querySelectorAll('.manage-category-drag-handle').forEach(function(handle) {
+                handle.style.display = mode === 'custom' ? '' : 'none';
+            });
+        }
+
+        function saveManageCategoryOrderFromDom() {
+            var container = document.getElementById('customItemsList');
+            if (!container) return;
+            var order = Array.from(container.querySelectorAll('.manage-items-category')).map(function(section) {
+                return section.dataset.category || '';
+            }).filter(Boolean);
+            saveManageCategoryCustomOrder(order);
+            showManageItemsToast('Custom category order saved.', true);
+        }
+
+        function initManageCategorySortable() {
+            var container = document.getElementById('customItemsList');
+            if (manageCategorySortable && typeof manageCategorySortable.destroy === 'function') {
+                manageCategorySortable.destroy();
+                manageCategorySortable = null;
+            }
+            if (!container || getManageItemsCategoryOrderMode() !== 'custom' || typeof Sortable === 'undefined') {
+                updateManageCategoryOrderControls();
+                return;
+            }
+            manageCategorySortable = Sortable.create(container, {
+                animation: 150,
+                draggable: '.manage-items-category',
+                handle: '.manage-category-drag-handle',
+                filter: '#manageItemsEmptyFilter',
+                onEnd: saveManageCategoryOrderFromDom
+            });
+            updateManageCategoryOrderControls();
+        }
+
+        function showManageCategoryCustomOrderHelp() {
+            qdAlert('Drag categories up or down using the grip handle beside each category name. QuoteDr saves this custom order automatically, and it will still be remembered if you switch back to Alphabetical later.', {
+                title: 'Custom Category Order',
+                type: 'info',
+                okText: 'Got it'
+            });
+        }
+
+        async function setManageItemsCategoryOrderMode(mode) {
+            loadManageCategoryOrderState();
+            manageItemsCategoryOrderMode = mode === 'custom' ? 'custom' : 'alphabetical';
+            localStorage.setItem(MANAGE_CATEGORY_ORDER_MODE_KEY, manageItemsCategoryOrderMode);
+            if (manageItemsCategoryOrderMode === 'custom' && !manageItemsCategoryCustomOrder.length) {
+                saveManageCategoryCustomOrder(getManageCategoryNamesWithItems().sort(function(a, b) {
+                    return a.localeCompare(b);
+                }));
+            }
+            renderAllItemsList();
+            if (manageItemsCategoryOrderMode === 'custom') showManageCategoryCustomOrderHelp();
+        }
+
+        async function openManageCategoryOrganizeMenu() {
+            var choice = await qdConfirm('Choose how Manage Items should organize your categories. Custom lets you drag category rows into your preferred order; Alphabetical sorts them A to Z without erasing your saved custom order.', {
+                title: 'Organize Categories',
+                okText: 'Custom',
+                secondaryText: 'Alphabetical',
+                cancelText: 'Cancel',
+                type: 'info'
+            });
+            if (choice === true) return setManageItemsCategoryOrderMode('custom');
+            if (choice === 'secondary') return setManageItemsCategoryOrderMode('alphabetical');
+        }
+
         function loadManageCategoryRenames() {
             try {
                 manageCategoryRenames = JSON.parse(localStorage.getItem(MANAGE_CATEGORY_RENAMES_KEY) || '{}') || {};
@@ -264,6 +700,8 @@
                 delete manageItemsCategoryState[oldCat];
             }
 
+            renameManageCategoryOrder(oldCat, newCat);
+
             var templates = customItems && Array.isArray(customItems.__choiceGroupTemplates) ? customItems.__choiceGroupTemplates : [];
             templates.forEach(function(group) {
                 (group.options || []).forEach(function(option) {
@@ -291,6 +729,7 @@
         }
 
         function applyManageCategoryRenames() {
+            loadManageCategoryOrderState();
             loadManageCategoryRenames();
             Object.keys(manageCategoryRenames || {}).forEach(function(oldCat) {
                 var newCat = (manageCategoryRenames[oldCat] || '').trim();
@@ -299,12 +738,14 @@
             });
         }
 
-        function categoryNameExists(cat) {
+        function categoryNameExists(cat, ignoreCat) {
             var key = String(cat || '').trim().toLowerCase();
+            var ignoredName = String(ignoreCat || '').trim();
             if (!key) return false;
             return Object.keys(pricingDatabase || {}).concat(Object.keys(customItems || {}).filter(function(k) {
                 return k !== '__choiceGroupTemplates';
             })).some(function(existing) {
+                if (ignoredName && String(existing || '').trim() === ignoredName) return false;
                 return String(existing || '').trim().toLowerCase() === key;
             });
         }
@@ -316,7 +757,7 @@
                 title: 'Rename Category'
             }) || '').trim();
             if (!nextName || nextName === oldCat) return false;
-            if (categoryNameExists(nextName)) {
+            if (categoryNameExists(nextName, oldCat)) {
                 qdAlert('A category named "' + nextName + '" already exists. Choose a unique name so QuoteDr does not merge unrelated items.');
                 return false;
             }
@@ -583,6 +1024,7 @@
             document.getElementById('newItemRate').value = '';
             document.getElementById('newItemMaterialCost').value = '';
             document.getElementById('newItemSupplierUrl').value = '';
+            resetNewItemUpgradePanel();
             const addPanel = document.getElementById('manageNewItemPanel');
             const addIcon = document.getElementById('toggleAddItemPanelIcon');
             if (addPanel) addPanel.style.display = 'none';
@@ -615,6 +1057,42 @@
                     window.notifyBuilderGuideNewItemPanelOpened();
                 }
             }
+        }
+
+        function resetNewItemUpgradePanel() {
+            const panel = document.getElementById('newItemUpgradePanel');
+            const btn = document.getElementById('toggleNewItemUpgradeBtn');
+            if (panel) panel.style.display = 'none';
+            if (btn) btn.innerHTML = '<i class="fas fa-arrow-up"></i> Add Upgrade';
+            [
+                'newItemUpgradeName',
+                'newItemUpgradeUnit',
+                'newItemUpgradeRate',
+                'newItemUpgradeMaterialCost',
+                'newItemUpgradeSupplierUrl',
+                'newItemUpgradeDescription',
+                'newItemUpgradeType'
+            ].forEach(function(id) {
+                const el = document.getElementById(id);
+                if (el) el.value = id === 'newItemUpgradeType' ? 'replacement' : '';
+            });
+        }
+
+        function toggleNewItemUpgradePanel(forceOpen) {
+            const panel = document.getElementById('newItemUpgradePanel');
+            const btn = document.getElementById('toggleNewItemUpgradeBtn');
+            if (!panel) return;
+            const isOpen = panel.style.display !== 'none';
+            const open = forceOpen === true || (forceOpen !== false && !isOpen);
+            if (!open) {
+                resetNewItemUpgradePanel();
+                return;
+            }
+            panel.style.display = 'block';
+            if (btn) btn.innerHTML = '<i class="fas fa-times"></i> Remove Upgrade';
+            setTimeout(function() {
+                document.getElementById('newItemUpgradeName')?.focus();
+            }, 0);
         }
 
         function hideManageItemsModal() {
@@ -922,7 +1400,21 @@
                 const upgMaterialCost = parseFloat(collapseRow.querySelector('.upgrade-material-cost')?.value) || 0;
                 const upgSupplierUrl = collapseRow.querySelector('.upgrade-supplier-url')?.value.trim() || '';
                 const upgDesc = collapseRow.querySelector('.upgrade-desc')?.value.trim() || '';
-                if (upgName) upgrade = { name: upgName, unitType: upgUnitType, rate: upgRate, materialCost: upgMaterialCost, supplierUrl: upgSupplierUrl, description: upgDesc };
+                const upgType = normalizeManageUpgradeType(collapseRow.querySelector('.upgrade-type')?.value);
+                if (upgName) upgrade = { name: upgName, unitType: upgUnitType, rate: upgRate, materialCost: upgMaterialCost, supplierUrl: upgSupplierUrl, description: upgDesc, type: upgType };
+            }
+            const upgradeGroups = collectManageItemUpgradeGroups(detailsRow);
+            if (!upgrade && upgradeGroups.length && upgradeGroups[0].options[0]) {
+                const firstUpgradeOption = upgradeGroups[0].options[0];
+                upgrade = {
+                    name: firstUpgradeOption.name,
+                    unitType: firstUpgradeOption.unitType,
+                    rate: firstUpgradeOption.rate,
+                    materialCost: firstUpgradeOption.materialCost,
+                    supplierUrl: firstUpgradeOption.supplierUrl,
+                    description: firstUpgradeOption.description,
+                    type: firstUpgradeOption.upgradeType
+                };
             }
 
             // Ensure category exists in customItems
@@ -936,7 +1428,7 @@
                 const pi = pricingDatabase[cat]?.find(i => i.name === name);
                 if (pi) {
                     hadSavedItemForQuoteSync = true;
-                    ci = { name: pi.name, unitType: pi.unitType || '', rate: pi.rate || 0, materialCost: pi.materialCost || 0, supplierUrl: pi.supplierUrl || '', itemDescription: pi.itemDescription || '', laborTime: normalizeManageLaborTime(pi.laborTime) };
+                    ci = { name: pi.name, unitType: pi.unitType || '', rate: pi.rate || 0, materialCost: pi.materialCost || 0, supplierUrl: pi.supplierUrl || '', itemDescription: pi.itemDescription || '', laborTime: normalizeManageLaborTime(pi.laborTime), upgrade: pi.upgrade || undefined, upgradeGroups: normalizeManageItemUpgradeGroups(pi) };
                     customItems[cat].push(ci);
                 } else {
                     // Brand new item
@@ -954,6 +1446,11 @@
             ci.supplierUrl     = supplierUrl;
             ci.itemDescription = itemDescription;
             ci.laborTime       = normalizeManageLaborTime(laborTime);
+            if (upgradeGroups.length) {
+                ci.upgradeGroups = upgradeGroups;
+            } else if (hasUpgradeEditor) {
+                delete ci.upgradeGroups;
+            }
             if (upgrade !== null) {
                 // Preserve upgrade photo from previous state
                 var oldUpgPhoto = pricingDatabase[cat]?.find(function(i){return i.name===name||i.name===newName;})?.upgrade?.photo;
@@ -964,6 +1461,11 @@
             }
             rememberManageUnitType(unitType);
             if (upgrade && upgrade.unitType) rememberManageUnitType(upgrade.unitType);
+            upgradeGroups.forEach(function(group) {
+                (group.options || []).forEach(function(option) {
+                    if (option.unitType) rememberManageUnitType(option.unitType);
+                });
+            });
             // Preserve item photo from previous state
             if (!ci.photo) {
                 var oldPhoto = pricingDatabase[cat]?.find(function(i){return i.name===name||i.name===newName;})?.photo;
@@ -979,6 +1481,7 @@
             if (pi) {
                 Object.assign(pi, ci, { _custom: true });
                 if (hasUpgradeEditor && upgrade === null) delete pi.upgrade;
+                if (hasUpgradeEditor && !upgradeGroups.length) delete pi.upgradeGroups;
             }
 
             // Save to localStorage
@@ -994,6 +1497,8 @@
                 clearRowDirty(rowKey);
                 if (dirtyPricingRows.size === 0 && !pricingOtherDirty) updatePricingDirtyIndicator();
             }
+            updateManageRowMargin(row);
+            updateManageDetailMargin(detailsRow);
 
             // Save to cloud and show result
             if (options.backup !== false) _doBackupItemsToCloud(customItems).then(function(r) {
@@ -1329,6 +1834,41 @@
             return '<span class="manage-margin-pill manage-margin-good"><i class="fas fa-chart-line"></i> ' + pct + '% margin</span>';
         }
 
+        function updateManageDetailMargin(sourceEl) {
+            const detailsRow = sourceEl?.classList?.contains('item-details-row')
+                ? sourceEl
+                : sourceEl?.closest?.('.item-details-row');
+            if (!detailsRow) return;
+            const rowKey = detailsRow.getAttribute('data-row-key') || '';
+            const row = rowKey ? getManageRowByKey(rowKey) : null;
+            const rowInputs = row ? row.querySelectorAll('input.item-input') : [];
+            const rate = parseFloat(rowInputs[0]?.value || 0) || 0;
+            const material = parseFloat(detailsRow.querySelector('.item-detail-material-cost')?.value || rowInputs[1]?.value || 0) || 0;
+            const target = detailsRow.querySelector('.manage-detail-margin-target');
+            if (target) target.innerHTML = renderManageMarginPill(rate, material);
+            const rowTarget = row?.querySelector('.manage-row-margin-target');
+            if (rowTarget) rowTarget.innerHTML = renderManageMarginPill(rate, material);
+        }
+
+        function updateManageRowMargin(sourceEl) {
+            const row = sourceEl?.classList?.contains('manage-items-row')
+                ? sourceEl
+                : sourceEl?.closest?.('.manage-items-row');
+            if (!row) return;
+            const inputs = row.querySelectorAll('input.item-input');
+            const rate = parseFloat(inputs[0]?.value || 0) || 0;
+            const material = parseFloat(inputs[1]?.value || 0) || 0;
+            const target = row.querySelector('.manage-row-margin-target');
+            if (target) target.innerHTML = renderManageMarginPill(rate, material);
+            const detailsId = row.dataset.detailsId || '';
+            const detailsRow = detailsId ? document.getElementById(detailsId) : null;
+            if (detailsRow) {
+                const detailMaterialInput = detailsRow.querySelector('.item-detail-material-cost');
+                if (detailMaterialInput && sourceEl === inputs[1]) detailMaterialInput.value = inputs[1].value;
+                updateManageDetailMargin(detailsRow);
+            }
+        }
+
         function normalizeManageLaborTime(laborTime) {
             const source = laborTime || {};
             const mode = source.mode === 'fixed_hours' ? 'fixed_hours' : (source.mode === 'units_per_hour' ? 'units_per_hour' : '');
@@ -1369,7 +1909,9 @@
             const container = document.getElementById('customItemsList');
             let html = '';
 
-            Object.entries(pricingDatabase).forEach(([cat, items]) => {
+            const orderedCategories = getOrderedManageCategories();
+            orderedCategories.forEach((cat) => {
+                const items = pricingDatabase[cat] || [];
                 if (!items.length) return;
                 const catSty = categoryStyles[cat] || {};
                 const cIcon = catSty.icon || 'fa-tag';
@@ -1385,6 +1927,9 @@
                     <div class="manage-items-category-header" style="background:${manageItemsAttr(cColor)};">
                         <button type="button" class="manage-items-category-toggle" onclick="toggleManageItemsCategory(${catJs})" title="Collapse or expand ${manageItemsAttr(cat)}">
                             <i class="fas ${isOpen ? 'fa-chevron-down' : 'fa-chevron-right'}"></i>
+                        </button>
+                        <button type="button" class="manage-category-drag-handle" title="Drag to reorder category" style="${getManageItemsCategoryOrderMode() === 'custom' ? '' : 'display:none;'}">
+                            <i class="fas fa-grip-vertical"></i>
                         </button>
                         ${catIconMarkup}
                         <h6 class="fw-bold mb-0 text-primary" style="flex:1;">${manageItemsEscape(cat)}</h6>
@@ -1411,12 +1956,11 @@
                     const catE = manageItemsAttr(cat);
                     const nameE = manageItemsAttr(item.name);
                     const upg = item.upgrade || {};
-                    const upgName = manageItemsAttr(upg.name || '');
-                    const upgUnitType = manageItemsAttr(upg.unitType || upg.unit || '');
-                    const upgRate = parseFloat(upg.rate || 0).toFixed(2);
-                    const upgMaterialCost = parseFloat(upg.materialCost || 0).toFixed(2);
-                    const upgSupplierUrl = manageItemsAttr(upg.supplierUrl || '');
-                    const hasUpgrade = !!upg.name;
+                    const upgradeGroups = normalizeManageItemUpgradeGroups(item);
+                    const allUpgradeOptions = upgradeGroups.reduce(function(list, group) {
+                        return list.concat(group.options || []);
+                    }, []);
+                    const hasUpgrade = upgradeGroups.some(function(group) { return (group.options || []).length > 0; });
                     const noDescription = !(item.itemDescription || '').trim();
                     const missingMaterial = parseFloat(item.materialCost || 0) <= 0;
                     const detailsId = 'details_' + safeId;
@@ -1424,7 +1968,9 @@
                     const searchBlob = [
                         cat, item.name, item.unitType, item.supplierUrl, item.itemDescription,
                         laborTime.mode, laborTime.unitsPerHour, laborTime.fixedHours,
-                        upg.name, upg.unitType || upg.unit, upg.supplierUrl, upg.description
+                        allUpgradeOptions.map(function(option) {
+                            return [option.name, option.unitType, option.supplierUrl, option.description, option.sourceItemName, option.category].filter(Boolean).join(' ');
+                        }).join(' ')
                     ].filter(Boolean).join(' ').toLowerCase();
                     const rowMeta = `data-row-key="${manageItemsAttr(rowKey)}" data-details-id="${detailsId}" data-search="${manageItemsAttr(searchBlob)}" data-custom="${isCustom ? '1' : '0'}" data-has-upgrade="${hasUpgrade ? '1' : '0'}" data-missing-material="${missingMaterial ? '1' : '0'}" data-no-description="${noDescription ? '1' : '0'}"`;
 
@@ -1434,11 +1980,11 @@
                                 <span class="manage-dirty-dot" title="Unsaved row"></span>
                                 <input type="text" class="form-control form-control-sm item-name-input" value="${manageItemsAttr(item.name)}" placeholder="Item name" oninput="markPricingDirty(this)">
                             </div>
-                            <div class="mt-1 d-flex flex-wrap gap-1">${renderManageMarginPill(rate, matCost)} ${renderManageLaborPill(laborTime, item.unitType || '')}</div>
+                            <div class="mt-1 d-flex flex-wrap gap-1"><span class="manage-row-margin-target">${renderManageMarginPill(rate, matCost)}</span> ${renderManageLaborPill(laborTime, item.unitType || '')}</div>
                         </td>
                         <td data-label="Unit">${renderManageUnitSelect(item.unitType || '')}</td>
-                        <td data-label="Rate"><input type="number" class="form-control form-control-sm item-input" value="${rate}" step="0.01" min="0" oninput="markPricingDirty(this)"></td>
-                        <td data-label="Mat. Cost"><input type="number" class="form-control form-control-sm item-input" value="${matCost}" step="0.01" min="0" oninput="markPricingDirty(this)"></td>
+                        <td data-label="Rate"><input type="number" class="form-control form-control-sm item-input" value="${rate}" step="0.01" min="0" oninput="markPricingDirty(this); updateManageRowMargin(this)"></td>
+                        <td data-label="Mat. Cost"><input type="number" class="form-control form-control-sm item-input" value="${matCost}" step="0.01" min="0" oninput="markPricingDirty(this); updateManageRowMargin(this)"></td>
                         <td data-label="Supplier">
                             <div class="input-group input-group-sm">
                                 <input type="url" class="form-control item-input" value="${supplier}" placeholder="https://..." oninput="markPricingDirty(this)">
@@ -1452,7 +1998,7 @@
                                     <div class="dropdown-menu dropdown-menu-end p-2" style="min-width:210px;">
                                         <div class="small text-muted fw-bold px-1 mb-1">Show for this item</div>
                                         <label class="dropdown-item d-flex align-items-center gap-2"><input class="form-check-input m-0" type="checkbox" data-detail-section-toggle data-target="${detailsId}" data-section="description"> Description</label>
-                                        <label class="dropdown-item d-flex align-items-center gap-2"><input class="form-check-input m-0" type="checkbox" data-detail-section-toggle data-target="${detailsId}" data-section="upgrade"> Upgrade Option ${hasUpgrade ? '<span class="badge text-bg-warning ms-auto">set</span>' : ''}</label>
+                                        <label class="dropdown-item d-flex align-items-center gap-2"><input class="form-check-input m-0" type="checkbox" data-detail-section-toggle data-target="${detailsId}" data-section="upgrade"> Upgrade Options ${hasUpgrade ? '<span class="badge text-bg-warning ms-auto">set</span>' : ''}</label>
                                         <label class="dropdown-item d-flex align-items-center gap-2"><input class="form-check-input m-0" type="checkbox" data-detail-section-toggle data-target="${detailsId}" data-section="labor"> Labor Time ${laborTime.mode ? '<span class="badge text-bg-success ms-auto">set</span>' : ''}</label>
                                         <label class="dropdown-item d-flex align-items-center gap-2"><input class="form-check-input m-0" type="checkbox" data-detail-section-toggle data-target="${detailsId}" data-section="supplier-cost"> Supplier / Cost</label>
                                         <label class="dropdown-item d-flex align-items-center gap-2"><input class="form-check-input m-0" type="checkbox" data-detail-section-toggle data-target="${detailsId}" data-section="photos"> Photos ${(item.photo || upg.photo) ? '<span class="badge text-bg-secondary ms-auto">set</span>' : ''}</label>
@@ -1511,54 +2057,18 @@
                                             <div class="row g-2 mt-1 align-items-end">
                                                 <div class="col-md-3">
                                                     <label class="form-label" style="font-size:0.75em">Material Cost</label>
-                                                    <input type="number" class="form-control form-control-sm item-detail-material-cost" value="${matCost}" step="0.01" min="0" oninput="syncManageDetailBaseField(this); markPricingDirty(this)">
+                                                    <input type="number" class="form-control form-control-sm item-detail-material-cost" value="${matCost}" step="0.01" min="0" oninput="syncManageDetailBaseField(this); markPricingDirty(this); updateManageDetailMargin(this)">
                                                 </div>
                                                 <div class="col-md-9">
                                                     <label class="form-label" style="font-size:0.75em">Supplier URL</label>
                                                     <input type="url" class="form-control form-control-sm item-detail-supplier-url" value="${supplier}" placeholder="https://..." oninput="syncManageDetailBaseField(this); markPricingDirty(this)">
                                                 </div>
                                             </div>
-                                            <div class="mt-2">${renderManageMarginPill(rate, matCost)}</div>
+                                            <div class="mt-2 manage-detail-margin-target">${renderManageMarginPill(rate, matCost)}</div>
                                         </div>
                                     </div>
                                     <div class="col-12 manage-detail-section" data-detail-section="upgrade" style="display:none;">
-                                        <small class="text-warning fw-bold"><i class="fas fa-arrow-up"></i> Upgrade Option</small>
-                                        <div class="row g-2 mt-1 align-items-end">
-                                            <div class="col-md-5">
-                                                <label class="form-label" style="font-size:0.75em">Upgrade Name</label>
-                                                <input type="text" class="form-control form-control-sm upgrade-name" value="${upgName}" placeholder="e.g., Tall Baseboard 5.5&quot;" oninput="markPricingDirty(this)">
-                                            </div>
-                                            <div class="col-md-3">
-                                                <label class="form-label" style="font-size:0.75em">Unit</label>
-                                                <input type="text" class="form-control form-control-sm upgrade-unit-type" value="${upgUnitType}" list="unitTypeOptions" placeholder="LF" oninput="markPricingDirty(this)">
-                                            </div>
-                                            <div class="col-md-2">
-                                                <label class="form-label" style="font-size:0.75em">Rate</label>
-                                                <input type="number" class="form-control form-control-sm upgrade-rate" value="${upgRate}" step="0.01" min="0" oninput="markPricingDirty(this)">
-                                            </div>
-                                            <div class="col-md-2">
-                                                <label class="form-label" style="font-size:0.75em">Cost</label>
-                                                <input type="number" class="form-control form-control-sm upgrade-material-cost" value="${upgMaterialCost}" step="0.01" min="0" oninput="markPricingDirty(this)">
-                                            </div>
-                                            <div class="col-12">
-                                                <label class="form-label" style="font-size:0.75em">Supplier URL</label>
-                                                <input type="url" class="form-control form-control-sm upgrade-supplier-url" value="${upgSupplierUrl}" placeholder="https://..." oninput="markPricingDirty(this)">
-                                            </div>
-                                            <div class="col-12 description-refine-scope">
-                                                <div class="d-flex justify-content-between align-items-center gap-2">
-                                                    <label class="form-label mb-0" style="font-size:0.75em">Upgrade Description</label>
-                                                    <div class="d-flex align-items-center gap-1">
-                                                        <button type="button" class="btn btn-sm btn-outline-secondary undo-refine-desc-btn" onclick="toggleRefinedDescription(this)" title="Undo AI refined description" style="display:none;font-size:0.75rem;padding:2px 7px;"><i class="fas fa-undo"></i></button>
-                                                        <button type="button" class="btn btn-sm btn-outline-primary refine-desc-btn" style="font-size:0.75rem;padding:2px 8px;">AI Refine</button>
-                                                    </div>
-                                                </div>
-                                                <input type="text" class="form-control form-control-sm upgrade-desc item-description-textarea mt-1" value="${manageItemsAttr(upg.description || '')}" placeholder="e.g., Premium finishing upgrade" oninput="markPricingDirty(this)">
-                                            </div>
-                                        </div>
-                                        <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
-                                            <span>${renderManageMarginPill(upgRate, upgMaterialCost)}</span>
-                                        </div>
-                                        <small class="text-muted d-block mt-2">Leave upgrade name blank to remove the upgrade when this row is saved.</small>
+                                        ${renderManageItemUpgradeGroupsEditor(item, item.unitType || '')}
                                     </div>
                                     <div class="col-12 manage-detail-section" data-detail-section="photos" style="display:none;">
                                         <div class="border rounded p-2 bg-light">
@@ -1583,6 +2093,7 @@
 
             container.innerHTML = html || '<p class="text-muted">No items found.</p>';
             filterItemsList();
+            initManageCategorySortable();
         }
 
         function toggleManageItemsCategory(cat) {
@@ -1660,6 +2171,34 @@
             saveItemOverride(category, name, { [field]: value });
         }
 
+        function collectNewItemUpgrade(baseUnitType) {
+            const panel = document.getElementById('newItemUpgradePanel');
+            if (panel && panel.style.display === 'none') return null;
+            const name = document.getElementById('newItemUpgradeName')?.value.trim() || '';
+            if (!name) return null;
+            const unitType = document.getElementById('newItemUpgradeUnit')?.value.trim() || baseUnitType || '';
+            const rate = parseFloat(document.getElementById('newItemUpgradeRate')?.value || 0) || 0;
+            const materialCost = parseFloat(document.getElementById('newItemUpgradeMaterialCost')?.value || 0) || 0;
+            const supplierUrl = document.getElementById('newItemUpgradeSupplierUrl')?.value.trim() || '';
+            const description = document.getElementById('newItemUpgradeDescription')?.value.trim() || '';
+            const upgradeType = normalizeManageUpgradeType(document.getElementById('newItemUpgradeType')?.value);
+            return { name, unitType, rate, materialCost, supplierUrl, description, type: upgradeType };
+        }
+
+        function collectNewItemUpgradeGroups(baseUnitType) {
+            const upgrade = collectNewItemUpgrade(baseUnitType);
+            if (!upgrade) return [];
+            return [{
+                id: manageUpgradeGroupId('upg'),
+                name: 'Upgrade Options',
+                type: 'single_optional',
+                options: [normalizeManageUpgradeOption(Object.assign({}, upgrade, {
+                    id: manageUpgradeGroupId('upo'),
+                    upgradeType: upgrade.type
+                }))]
+            }];
+        }
+
         function addCustomItem() {
             const category = document.getElementById('newItemCategory').value;
             const name = document.getElementById('newItemName').value.trim();
@@ -1693,8 +2232,18 @@
             }
 
             const newItem = { name, unitType, rate, materialCost, supplierUrl, itemDescription, laborTime };
+            const upgrade = collectNewItemUpgrade(unitType);
+            const upgradeGroups = collectNewItemUpgradeGroups(unitType);
+            if (upgradeGroups.length) newItem.upgradeGroups = upgradeGroups;
+            if (upgrade) newItem.upgrade = upgrade;
             customItems[category].push(newItem);
             rememberManageUnitType(unitType);
+            if (upgrade && upgrade.unitType) rememberManageUnitType(upgrade.unitType);
+            upgradeGroups.forEach(function(group) {
+                (group.options || []).forEach(function(option) {
+                    if (option.unitType) rememberManageUnitType(option.unitType);
+                });
+            });
             saveCustomItems();
 
             if (!pricingDatabase[category]) pricingDatabase[category] = [];
@@ -1710,6 +2259,7 @@
             if (document.getElementById('newItemFixedHours')) document.getElementById('newItemFixedHours').value = '';
             if (document.getElementById('newItemCrewSize')) document.getElementById('newItemCrewSize').value = '1';
             if (document.getElementById('newItemDescription')) document.getElementById('newItemDescription').value = '';
+            resetNewItemUpgradePanel();
             const newItemUndoBtn = document.getElementById('newItemDescription')?.closest('.description-refine-scope')?.querySelector('.undo-refine-desc-btn');
             if (newItemUndoBtn) {
                 newItemUndoBtn.style.display = 'none';
@@ -1773,8 +2323,74 @@
             ].join(' ').toLowerCase();
         }
 
-        function openChoiceGroupItemPicker(candidates, initialQuery, initialSelectedIds, initialAutoGroup) {
+        function choiceGroupEnhancementId(prefix) {
+            return (prefix || 'cge') + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+        }
+
+        function normalizeChoiceGroupEnhancementOption(option, fallbackIndex) {
+            option = option || {};
+            return {
+                id: option.id || choiceGroupEnhancementId('cgeo_' + (fallbackIndex || 0)),
+                name: option.name || option.sourceItemName || option.description || 'Enhancement',
+                category: option.category || '',
+                sourceItemName: option.sourceItemName || option.name || '',
+                unitType: option.unitType || option.unit || '',
+                rate: parseFloat(option.rate) || 0,
+                materialCost: parseFloat(option.materialCost) || 0,
+                supplierUrl: option.supplierUrl || '',
+                description: option.description || option.itemDescription || option.name || '',
+                itemDescription: option.itemDescription || option.description || '',
+                laborTime: normalizeManageLaborTime(option.laborTime),
+                upgradeType: option.upgradeType === 'replacement' ? 'replacement' : 'add_on',
+                allowedBaseOptionIds: Array.isArray(option.allowedBaseOptionIds) ? option.allowedBaseOptionIds.filter(Boolean) : [],
+                blockedByEnhancementOptionIds: Array.isArray(option.blockedByEnhancementOptionIds) ? option.blockedByEnhancementOptionIds.filter(Boolean) : []
+            };
+        }
+
+        function normalizeChoiceGroupEnhancementGroup(group, fallbackIndex) {
+            group = group || {};
+            return {
+                id: group.id || choiceGroupEnhancementId('cgeg_' + (fallbackIndex || 0)),
+                name: group.name || 'Enhancements',
+                type: group.type === 'multiple' ? 'multiple' : 'single_optional',
+                selectedOptionIds: Array.isArray(group.selectedOptionIds) ? group.selectedOptionIds.filter(Boolean) : [],
+                options: Array.isArray(group.options) ? group.options.map(normalizeChoiceGroupEnhancementOption) : []
+            };
+        }
+
+        function normalizeChoiceGroupEnhancementGroups(groups) {
+            return Array.isArray(groups) ? groups.map(normalizeChoiceGroupEnhancementGroup).filter(function(group) {
+                return group && Array.isArray(group.options);
+            }) : [];
+        }
+
+        function savedItemToChoiceGroupEnhancementOption(item) {
+            item = item || {};
+            return normalizeChoiceGroupEnhancementOption({
+                id: choiceGroupEnhancementId('cgeo'),
+                name: item.name || item.description || 'Enhancement',
+                category: item.category || '',
+                sourceItemName: item.name || item.description || '',
+                unitType: item.unitType || item.unit || '',
+                rate: parseFloat(item.rate) || 0,
+                materialCost: parseFloat(item.materialCost) || 0,
+                supplierUrl: item.supplierUrl || '',
+                description: item.itemDescription || item.description || item.name || '',
+                itemDescription: item.itemDescription || item.description || '',
+                laborTime: normalizeManageLaborTime(item.laborTime),
+                upgradeType: 'add_on',
+                allowedBaseOptionIds: [],
+                blockedByEnhancementOptionIds: []
+            });
+        }
+
+        function openChoiceGroupItemPicker(candidates, initialQuery, initialSelectedIds, initialAutoGroup, pickerOptions) {
             return new Promise(function(resolve) {
+                pickerOptions = pickerOptions || {};
+                var minSelected = pickerOptions.minSelected || 2;
+                var showAutoGroup = pickerOptions.showAutoGroup !== false;
+                var useLabel = pickerOptions.useLabel || 'Use Selected Items';
+                var helperText = pickerOptions.helperText || 'Click saved items below to include them in this choice group.';
                 var existing = document.getElementById('choiceGroupItemPickerModal');
                 if (existing) existing.remove();
 
@@ -1790,19 +2406,19 @@
                     '<label class="form-label fw-bold" for="choiceGroupItemSearch">Search saved items</label>' +
                     '<input type="text" id="choiceGroupItemSearch" class="form-control mb-2" placeholder="Search by item, category, description, supplier, or unit...">' +
                     '<div class="d-flex justify-content-between align-items-center gap-2 mb-2 flex-wrap">' +
-                    '<div class="small text-muted">Click saved items below to include them in this choice group.</div>' +
+                    '<div class="small text-muted">' + itemHtmlEscape(helperText) + '</div>' +
                     '<span id="choiceGroupSelectedCount" class="badge bg-secondary">0 selected</span>' +
                     '</div>' +
-                    '<div class="form-check form-switch border rounded bg-light px-5 py-2 mb-2">' +
+                    (showAutoGroup ? '<div class="form-check form-switch border rounded bg-light px-5 py-2 mb-2">' +
                     '<input class="form-check-input" type="checkbox" id="choiceGroupAutoGroupCheckbox" checked>' +
                     '<label class="form-check-label fw-semibold" for="choiceGroupAutoGroupCheckbox">Always use grouping when any of these items are added to a quote</label>' +
                     '<div class="small text-muted">When this is on, QuoteDr automatically shows the full option group if one of these saved items lands on a quote.</div>' +
-                    '</div>' +
+                    '</div>' : '') +
                     '<div id="choiceGroupItemPickerList" style="max-height:55vh;overflow:auto;"></div>' +
                     '</div>' +
                     '<div class="modal-footer">' +
                     '<button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>' +
-                    '<button type="button" class="btn btn-primary" id="choiceGroupUseSelectedBtn" disabled><i class="fas fa-check me-1"></i>Use Selected Items</button>' +
+                    '<button type="button" class="btn btn-primary" id="choiceGroupUseSelectedBtn" disabled><i class="fas fa-check me-1"></i>' + itemHtmlEscape(useLabel) + '</button>' +
                     '</div>' +
                     '</div></div></div>';
 
@@ -1867,7 +2483,7 @@
                     listEl.innerHTML = html;
                     countEl.textContent = selected.size + ' selected';
                     countEl.className = 'badge ' + (selected.size >= 2 ? 'bg-success' : 'bg-secondary');
-                    useBtn.disabled = selected.size < 2;
+                    useBtn.disabled = selected.size < minSelected;
                 }
 
                 searchEl.value = initialQuery || '';
@@ -1890,7 +2506,7 @@
                     renderPicker();
                 });
                 useBtn.addEventListener('click', function() {
-                    if (selected.size < 2) return;
+                    if (selected.size < minSelected) return;
                     accepted = true;
                     bootstrap.Modal.getInstance(modalEl).hide();
                 });
@@ -2105,6 +2721,7 @@
                 defaultOptionId: defaultOption.id,
                 selectedOptionIds: type === 'single' ? [defaultOption.id] : [],
                 autoGroup: picked.autoGroup !== false,
+                enhancementGroups: [],
                 options: picked
             };
             pushUndoState();
@@ -2176,10 +2793,232 @@
                 defaultOptionId: defaultOption.id,
                 selectedOptionIds: type === 'single' ? [defaultOption.id] : [],
                 autoGroup: picked.autoGroup !== false,
+                enhancementGroups: normalizeChoiceGroupEnhancementGroups(group.enhancementGroups),
                 options: picked
             };
             saveCustomItems(true);
             renderAllItemsList();
+        }
+
+        function renderChoiceGroupEnhancementsEditor(modalEl, groupIndex) {
+            var store = getChoiceGroupTemplateStore();
+            var group = store[groupIndex];
+            if (!group) return;
+            group.enhancementGroups = normalizeChoiceGroupEnhancementGroups(group.enhancementGroups);
+            var baseOptions = Array.isArray(group.options) ? group.options : [];
+            var bodyEl = modalEl.querySelector('#choiceGroupEnhancementsBody');
+            if (!bodyEl) return;
+            var allEnhancementOptions = [];
+            group.enhancementGroups.forEach(function(enhGroup) {
+                (enhGroup.options || []).forEach(function(option) {
+                    allEnhancementOptions.push({
+                        groupId: enhGroup.id,
+                        optionId: option.id,
+                        label: (enhGroup.name || 'Enhancement') + ': ' + (option.name || 'Option')
+                    });
+                });
+            });
+
+            var html = '<div class="alert alert-light border mb-3">' +
+                '<div class="fw-bold mb-1">Base Options</div>' +
+                '<div class="small text-muted mb-2">Enhancements appear under these client choices on the quote.</div>' +
+                '<div class="d-flex gap-1 flex-wrap">' + baseOptions.map(function(option) {
+                    return '<span class="badge bg-light text-dark border">' + itemHtmlEscape(option.name || option.description || 'Option') + '</span>';
+                }).join('') + '</div>' +
+                '</div>';
+
+            if (!group.enhancementGroups.length) {
+                html += '<div class="alert alert-info">No enhancements yet. Add a group like <strong>Drink Rail</strong> or <strong>Post Caps</strong>, then choose saved items for its options.</div>';
+            }
+
+            group.enhancementGroups.forEach(function(enhGroup, groupIdx) {
+                html += '<section class="border rounded mb-3 overflow-hidden" data-enhancement-group="' + groupIdx + '">' +
+                    '<div class="d-flex align-items-center justify-content-between gap-2 p-3" style="background:#eef4ff;">' +
+                    '<div><div class="fw-bold"><i class="fas fa-wand-magic-sparkles me-1 text-primary"></i>' + itemHtmlEscape(enhGroup.name || 'Enhancements') + '</div>' +
+                    '<div class="small text-muted">' + (enhGroup.type === 'multiple' ? 'Pick Multiple' : 'Pick One Optional') + ' - ' + (enhGroup.options || []).length + ' options</div></div>' +
+                    '<div class="d-flex gap-1 flex-wrap">' +
+                    '<button type="button" class="btn btn-sm btn-outline-primary" data-enhancement-action="add-options" data-enhancement-group-index="' + groupIdx + '"><i class="fas fa-plus me-1"></i>Add Options</button>' +
+                    '<button type="button" class="btn btn-sm btn-outline-danger" data-enhancement-action="delete-group" data-enhancement-group-index="' + groupIdx + '"><i class="fas fa-trash me-1"></i>Delete</button>' +
+                    '</div>' +
+                    '</div>' +
+                    '<div class="p-3">';
+                if (!(enhGroup.options || []).length) {
+                    html += '<div class="small text-muted">No options in this enhancement group yet.</div>';
+                }
+                (enhGroup.options || []).forEach(function(option, optIdx) {
+                    var allowed = Array.isArray(option.allowedBaseOptionIds) ? option.allowedBaseOptionIds : [];
+                    var blocked = Array.isArray(option.blockedByEnhancementOptionIds) ? option.blockedByEnhancementOptionIds : [];
+                    html += '<div class="border rounded p-3 mb-2 bg-white" data-enhancement-option="' + optIdx + '">' +
+                        '<div class="d-flex justify-content-between gap-2 flex-wrap mb-2">' +
+                        '<div><div class="fw-bold">' + itemHtmlEscape(option.name || 'Enhancement') + '</div>' +
+                        '<div class="small text-muted">' + itemHtmlEscape(option.category || 'Saved Item') + ' - $' + (parseFloat(option.rate) || 0).toFixed(2) + '/' + itemHtmlEscape(option.unitType || 'unit') + '</div></div>' +
+                        '<button type="button" class="btn btn-sm btn-outline-danger" data-enhancement-action="delete-option" data-enhancement-group-index="' + groupIdx + '" data-enhancement-option-index="' + optIdx + '"><i class="fas fa-trash me-1"></i>Remove</button>' +
+                        '</div>' +
+                        '<div class="row g-2">' +
+                        '<div class="col-md-3"><label class="form-label small fw-bold">Upgrade Type</label>' +
+                        '<select class="form-select form-select-sm" data-enhancement-field="upgradeType" data-enhancement-group-index="' + groupIdx + '" data-enhancement-option-index="' + optIdx + '">' +
+                        '<option value="add_on"' + (option.upgradeType !== 'replacement' ? ' selected' : '') + '>Add-on</option>' +
+                        '<option value="replacement"' + (option.upgradeType === 'replacement' ? ' selected' : '') + '>Replacement</option>' +
+                        '</select></div>' +
+                        '<div class="col-md-4"><label class="form-label small fw-bold">Available With</label>' +
+                        '<div class="border rounded p-2" style="max-height:120px;overflow:auto;">' +
+                        '<label class="d-block small"><input type="checkbox" data-enhancement-all-base="' + groupIdx + '_' + optIdx + '"' + (!allowed.length ? ' checked' : '') + '> All base options</label>' +
+                        baseOptions.map(function(base) {
+                            var checked = allowed.indexOf(base.id) !== -1;
+                            return '<label class="d-block small"><input type="checkbox" data-enhancement-base-option="' + itemHtmlEscape(base.id) + '" data-enhancement-group-index="' + groupIdx + '" data-enhancement-option-index="' + optIdx + '"' + (checked ? ' checked' : '') + '> ' + itemHtmlEscape(base.name || base.description || 'Option') + '</label>';
+                        }).join('') +
+                        '</div></div>' +
+                        '<div class="col-md-5"><label class="form-label small fw-bold">Blocked By</label>' +
+                        '<div class="border rounded p-2" style="max-height:120px;overflow:auto;">' +
+                        (allEnhancementOptions.filter(function(other) { return other.optionId !== option.id; }).map(function(other) {
+                            var checked = blocked.indexOf(other.optionId) !== -1;
+                            return '<label class="d-block small"><input type="checkbox" data-enhancement-blocked-by="' + itemHtmlEscape(other.optionId) + '" data-enhancement-group-index="' + groupIdx + '" data-enhancement-option-index="' + optIdx + '"' + (checked ? ' checked' : '') + '> ' + itemHtmlEscape(other.label) + '</label>';
+                        }).join('') || '<div class="small text-muted">No other enhancement options yet.</div>') +
+                        '</div></div>' +
+                        '</div>' +
+                        '</div>';
+                });
+                html += '</div></section>';
+            });
+            bodyEl.innerHTML = html;
+        }
+
+        async function addChoiceGroupEnhancementGroup(groupIndex, modalEl) {
+            var store = getChoiceGroupTemplateStore();
+            var group = store[groupIndex];
+            if (!group) return;
+            var name = (await qdPrompt('Name this enhancement group:', 'Drink Rail', { title: 'New Enhancement Group' }) || '').trim();
+            if (!name) return;
+            var type = await qdConfirm('Can the client pick more than one enhancement in this group?', {
+                title: 'Enhancement Type',
+                okText: 'Pick Multiple',
+                cancelText: 'Pick One Optional'
+            }) ? 'multiple' : 'single_optional';
+            var picked = await openChoiceGroupItemPicker(flattenChoiceGroupCandidateItems(), name, [], false, {
+                minSelected: 1,
+                showAutoGroup: false,
+                useLabel: 'Use As Enhancements',
+                helperText: 'Choose saved items that should appear as optional enhancements for this group.'
+            });
+            if (!picked || !picked.length) return;
+            pushUndoState();
+            group.enhancementGroups = normalizeChoiceGroupEnhancementGroups(group.enhancementGroups);
+            group.enhancementGroups.push({
+                id: choiceGroupEnhancementId('cgeg'),
+                name: name,
+                type: type,
+                selectedOptionIds: [],
+                options: picked.map(savedItemToChoiceGroupEnhancementOption)
+            });
+            saveCustomItems(true);
+            renderChoiceGroupEnhancementsEditor(modalEl, groupIndex);
+        }
+
+        async function addOptionsToChoiceGroupEnhancement(groupIndex, enhancementGroupIndex, modalEl) {
+            var store = getChoiceGroupTemplateStore();
+            var group = store[groupIndex];
+            var enhancementGroup = group && group.enhancementGroups && group.enhancementGroups[enhancementGroupIndex];
+            if (!enhancementGroup) return;
+            var picked = await openChoiceGroupItemPicker(flattenChoiceGroupCandidateItems(), enhancementGroup.name || '', [], false, {
+                minSelected: 1,
+                showAutoGroup: false,
+                useLabel: 'Add Enhancement Options',
+                helperText: 'Choose saved items to add to this enhancement group.'
+            });
+            if (!picked || !picked.length) return;
+            pushUndoState();
+            enhancementGroup.options = (enhancementGroup.options || []).concat(picked.map(savedItemToChoiceGroupEnhancementOption));
+            group.enhancementGroups = normalizeChoiceGroupEnhancementGroups(group.enhancementGroups);
+            saveCustomItems(true);
+            renderChoiceGroupEnhancementsEditor(modalEl, groupIndex);
+        }
+
+        function openChoiceGroupEnhancementsModal(groupIndex) {
+            var store = getChoiceGroupTemplateStore();
+            var group = store[groupIndex];
+            if (!group) return;
+            var existing = document.getElementById('choiceGroupEnhancementsModal');
+            if (existing) existing.remove();
+            group.enhancementGroups = normalizeChoiceGroupEnhancementGroups(group.enhancementGroups);
+            var modalHtml = '' +
+                '<div class="modal fade" id="choiceGroupEnhancementsModal" tabindex="-1" aria-hidden="true">' +
+                '<div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">' +
+                '<div class="modal-content">' +
+                '<div class="modal-header bg-primary text-white">' +
+                '<h5 class="modal-title"><i class="fas fa-wand-magic-sparkles me-2"></i>Enhancements - ' + itemHtmlEscape(group.name || 'Choice Group') + '</h5>' +
+                '<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>' +
+                '</div>' +
+                '<div class="modal-body">' +
+                '<div class="d-flex justify-content-between align-items-center gap-2 mb-3 flex-wrap">' +
+                '<div class="text-muted">Add optional client upgrades that appear under this Choice Group. Use <strong>Available With</strong> and <strong>Blocked By</strong> to keep invalid combinations out of the quote.</div>' +
+                '<button type="button" class="btn btn-primary" id="newChoiceGroupEnhancementBtn"><i class="fas fa-plus me-1"></i>New Enhancement Group</button>' +
+                '</div>' +
+                '<div id="choiceGroupEnhancementsBody"></div>' +
+                '</div>' +
+                '<div class="modal-footer">' +
+                '<button type="button" class="btn btn-primary" data-bs-dismiss="modal">Done</button>' +
+                '</div>' +
+                '</div></div></div>';
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            var modalEl = document.getElementById('choiceGroupEnhancementsModal');
+            renderChoiceGroupEnhancementsEditor(modalEl, groupIndex);
+            document.getElementById('newChoiceGroupEnhancementBtn').addEventListener('click', function() {
+                addChoiceGroupEnhancementGroup(groupIndex, modalEl);
+            });
+            modalEl.addEventListener('click', function(e) {
+                var btn = e.target.closest('[data-enhancement-action]');
+                if (!btn) return;
+                var action = btn.getAttribute('data-enhancement-action');
+                var enhancementGroupIndex = parseInt(btn.getAttribute('data-enhancement-group-index'), 10);
+                var optionIndex = parseInt(btn.getAttribute('data-enhancement-option-index'), 10);
+                var currentGroup = getChoiceGroupTemplateStore()[groupIndex];
+                if (!currentGroup || !currentGroup.enhancementGroups) return;
+                if (action === 'add-options') {
+                    addOptionsToChoiceGroupEnhancement(groupIndex, enhancementGroupIndex, modalEl);
+                    return;
+                }
+                pushUndoState();
+                if (action === 'delete-group') {
+                    currentGroup.enhancementGroups.splice(enhancementGroupIndex, 1);
+                } else if (action === 'delete-option' && currentGroup.enhancementGroups[enhancementGroupIndex]) {
+                    currentGroup.enhancementGroups[enhancementGroupIndex].options.splice(optionIndex, 1);
+                }
+                currentGroup.enhancementGroups = normalizeChoiceGroupEnhancementGroups(currentGroup.enhancementGroups);
+                saveCustomItems(true);
+                renderChoiceGroupEnhancementsEditor(modalEl, groupIndex);
+            });
+            modalEl.addEventListener('change', function(e) {
+                var currentGroup = getChoiceGroupTemplateStore()[groupIndex];
+                if (!currentGroup || !currentGroup.enhancementGroups) return;
+                var groupIdx = parseInt(e.target.getAttribute('data-enhancement-group-index'), 10);
+                var optIdx = parseInt(e.target.getAttribute('data-enhancement-option-index'), 10);
+                var enhancementOption = currentGroup.enhancementGroups[groupIdx] && currentGroup.enhancementGroups[groupIdx].options[optIdx];
+                if (!enhancementOption) return;
+                pushUndoState();
+                if (e.target.matches('[data-enhancement-field="upgradeType"]')) {
+                    enhancementOption.upgradeType = e.target.value === 'replacement' ? 'replacement' : 'add_on';
+                } else if (e.target.matches('[data-enhancement-all-base]')) {
+                    enhancementOption.allowedBaseOptionIds = e.target.checked ? [] : (Array.isArray(currentGroup.options) && currentGroup.options[0] ? [currentGroup.options[0].id] : []);
+                } else if (e.target.matches('[data-enhancement-base-option]')) {
+                    var baseIds = Array.from(modalEl.querySelectorAll('[data-enhancement-base-option][data-enhancement-group-index="' + groupIdx + '"][data-enhancement-option-index="' + optIdx + '"]:checked')).map(function(input) {
+                        return input.getAttribute('data-enhancement-base-option');
+                    }).filter(Boolean);
+                    enhancementOption.allowedBaseOptionIds = baseIds;
+                } else if (e.target.matches('[data-enhancement-blocked-by]')) {
+                    var blockedIds = Array.from(modalEl.querySelectorAll('[data-enhancement-blocked-by][data-enhancement-group-index="' + groupIdx + '"][data-enhancement-option-index="' + optIdx + '"]:checked')).map(function(input) {
+                        return input.getAttribute('data-enhancement-blocked-by');
+                    }).filter(Boolean);
+                    enhancementOption.blockedByEnhancementOptionIds = blockedIds;
+                }
+                currentGroup.enhancementGroups = normalizeChoiceGroupEnhancementGroups(currentGroup.enhancementGroups);
+                saveCustomItems(true);
+                renderChoiceGroupEnhancementsEditor(modalEl, groupIndex);
+            });
+            modalEl.addEventListener('hidden.bs.modal', function() {
+                if (document.body.contains(modalEl)) modalEl.remove();
+                renderAllItemsList();
+            }, { once: true });
+            new bootstrap.Modal(modalEl).show();
         }
 
         function renderChoiceGroupTemplateManagerList(container) {
@@ -2191,15 +3030,20 @@
             container.innerHTML = store.map(function(group, index) {
                 var options = Array.isArray(group.options) ? group.options : [];
                 var optionNames = options.map(function(option) { return option.name; }).filter(Boolean).join(' / ');
+                var enhancementCount = normalizeChoiceGroupEnhancementGroups(group.enhancementGroups).reduce(function(total, enhGroup) {
+                    return total + (Array.isArray(enhGroup.options) ? enhGroup.options.length : 0);
+                }, 0);
                 return '<div class="border rounded p-3 mb-2 bg-white" data-choice-group-template="' + index + '">' +
                     '<div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">' +
                     '<div class="flex-grow-1">' +
                     '<div class="fw-bold"><i class="fas fa-layer-group me-1 text-primary"></i>' + itemHtmlEscape(group.name || 'Choice Group') + '</div>' +
                     '<div class="small text-muted">' + itemHtmlEscape(group.type === 'multiple' ? 'Pick Multiple' : 'Pick One') + ' - ' + options.length + ' options</div>' +
                     '<div class="small mt-1">' + itemHtmlEscape(optionNames || 'No options') + '</div>' +
+                    '<div class="small text-muted mt-1"><i class="fas fa-wand-magic-sparkles me-1"></i>' + enhancementCount + ' enhancements</div>' +
                     '</div>' +
                     '<div class="d-flex gap-1 flex-wrap">' +
                     '<button type="button" class="btn btn-sm btn-outline-primary" data-choice-group-template-action="edit" data-choice-group-template-index="' + index + '"><i class="fas fa-pen me-1"></i>Edit</button>' +
+                    '<button type="button" class="btn btn-sm btn-outline-primary" data-choice-group-template-action="enhancements" data-choice-group-template-index="' + index + '"><i class="fas fa-wand-magic-sparkles me-1"></i>Enhancements</button>' +
                     '<button type="button" class="btn btn-sm btn-outline-secondary" data-choice-group-template-action="rename" data-choice-group-template-index="' + index + '"><i class="fas fa-i-cursor me-1"></i>Rename</button>' +
                     '<button type="button" class="btn btn-sm btn-outline-danger" data-choice-group-template-action="delete" data-choice-group-template-index="' + index + '"><i class="fas fa-trash me-1"></i>Delete</button>' +
                     '</div>' +
@@ -2295,6 +3139,13 @@
                 var action = btn.getAttribute('data-choice-group-template-action');
                 var index = parseInt(btn.getAttribute('data-choice-group-template-index'), 10);
                 if (action === 'edit') runChoiceGroupManagerAction(modalEl, function() { return editChoiceGroupTemplate(index); });
+                if (action === 'enhancements') {
+                    modalEl.addEventListener('hidden.bs.modal', function() {
+                        modalEl.remove();
+                        openChoiceGroupEnhancementsModal(index);
+                    }, { once: true });
+                    bootstrap.Modal.getInstance(modalEl).hide();
+                }
                 if (action === 'rename') runChoiceGroupManagerAction(modalEl, function() { return renameChoiceGroupTemplate(index); });
                 if (action === 'delete') runChoiceGroupManagerAction(modalEl, function() { return deleteChoiceGroupTemplate(index); });
             });
@@ -2519,6 +3370,7 @@
         window.toggleManageItemsTopBar = toggleManageItemsTopBar;
         window.toggleManageItemsBottomBar = toggleManageItemsBottomBar;
         window.toggleManageNewItemPanel = toggleManageNewItemPanel;
+        window.toggleNewItemUpgradePanel = toggleNewItemUpgradePanel;
         window.toggleManageItemsCategory = toggleManageItemsCategory;
         window.initManageItemsFooterSwipe = initManageItemsFooterSwipe;
         window.markPricingDirty = markPricingDirty;
@@ -2532,14 +3384,24 @@
         window.saveChangedPricingRows = saveChangedPricingRows;
         window.whizzScroll = whizzScroll;
         window.setManageItemsFilter = setManageItemsFilter;
+        window.openManageCategoryOrganizeMenu = openManageCategoryOrganizeMenu;
+        window.setManageItemsCategoryOrderMode = setManageItemsCategoryOrderMode;
         window.filterItemsList = filterItemsList;
         window.renderAllItemsList = renderAllItemsList;
         window.saveItemFieldEdit = saveItemFieldEdit;
         window.handleManageUnitTypeChange = handleManageUnitTypeChange;
         window.syncManageDetailBaseField = syncManageDetailBaseField;
+        window.updateManageRowMargin = updateManageRowMargin;
+        window.updateManageDetailMargin = updateManageDetailMargin;
+        window.normalizeManageItemUpgradeGroups = normalizeManageItemUpgradeGroups;
+        window.renderManageItemUpgradeGroupsEditor = renderManageItemUpgradeGroupsEditor;
+        window.collectManageItemUpgradeGroups = collectManageItemUpgradeGroups;
+        window.handleManageUpgradeGroupAction = handleManageUpgradeGroupAction;
+        window.fillManageUpgradeOptionFromSource = fillManageUpgradeOptionFromSource;
         window.addCustomItem = addCustomItem;
         window.openChoiceGroupHelpModal = openChoiceGroupHelpModal;
         window.openChoiceGroupTemplateModal = openChoiceGroupTemplateModal;
+        window.openChoiceGroupEnhancementsModal = openChoiceGroupEnhancementsModal;
         window.openChoiceGroupDefaultOptionPicker = openChoiceGroupDefaultOptionPicker;
         window.openChoiceGroupTypePicker = openChoiceGroupTypePicker;
         window.suggestChoiceGroupTemplates = suggestChoiceGroupTemplates;
