@@ -25,7 +25,7 @@ assert(quoteStyle.includes("'quoteHeaderEffect'"), 'quote style modal should bin
 assert(quoteStyle.includes('quoteHeaderBackgroundForEffect(accent, _quoteStyle.headerStyle'), 'style preview should use the header effect background helper');
 
 assert(viewer.includes('function quoteHeaderBackgroundForEffect'), 'client quote viewer should include the header effect background helper');
-assert(viewer.includes("quoteData.style.headerEffect || 'soft-gradient'"), 'client quote viewer should read saved header effects with a soft-gradient fallback');
+assert(viewer.includes("viewerStyle.headerEffect || 'soft-gradient'"), 'client quote viewer should read saved header effects with a soft-gradient fallback');
 assert(viewer.includes('quoteHeaderBackgroundForEffect(accent, headerStyle'), 'client quote viewer should render the selected header effect');
 assert(viewer.includes('radial-gradient'), 'client quote viewer should support layered premium effects');
 

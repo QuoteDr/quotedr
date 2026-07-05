@@ -22,7 +22,7 @@ assert(quoteStyle.includes("_quoteStyle.optionAccent = sw.getAttribute('data-opt
 assert(viewer.includes('--quote-option-accent'), 'viewer should expose a CSS variable for option group colour');
 assert(viewer.includes('--quote-option-accent-soft'), 'viewer should expose a soft tint for unselected options');
 assert(viewer.includes('.choice-option-btn.choice-option-selected'), 'viewer should style selected choice options with semantic classes');
-assert(viewer.includes("quoteData.style.optionAccent || quoteData.style.accent"), 'viewer should read optionAccent with accent fallback');
+assert(viewer.includes("viewerStyle.optionAccent || viewerStyle.accent"), 'viewer should read optionAccent with accent fallback');
 assert(viewer.includes('choice-option-selected'), 'choice group renderer should use selected option classes');
 assert(!viewer.includes('border-left:4px solid #0d6efd'), 'choice group renderer should not hard-code blue borders');
 assert(!viewer.includes("checked ? 'btn-primary' : 'btn-outline-primary'"), 'choice group renderer should not hard-code Bootstrap blue button colours');

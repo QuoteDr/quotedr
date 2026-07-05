@@ -577,9 +577,26 @@
             });
         }
 
+        function getActiveQuoteStyleForSend() {
+            var docType = window._quoteDocumentType || window._currentQuoteData?.documentType || window._currentQuoteData?.type || window._loadedQuoteData?.documentType || window._loadedQuoteData?.type || '';
+            if (docType !== 'change_order') return {};
+            var candidates = [
+                window._currentQuoteData && window._currentQuoteData.style,
+                window._loadedQuoteData && window._loadedQuoteData.style
+            ];
+            for (var i = 0; i < candidates.length; i++) {
+                var style = candidates[i];
+                if (style && typeof style === 'object' && Object.keys(style).length) {
+                    try { return JSON.parse(JSON.stringify(style)); } catch(e) { return Object.assign({}, style); }
+                }
+            }
+            return {};
+        }
+
         async function initStyleModal() {
             var savedDefault = await loadQuoteStyleDefaults();
-            applyQuoteStyleToControls(savedDefault);
+            var activeStyle = getActiveQuoteStyleForSend();
+            applyQuoteStyleToControls(Object.assign({}, savedDefault, activeStyle));
             initCommitmentIconPickers();
 
             document.querySelectorAll('#stylePresets .quote-style-preset').forEach(function(btn) {

@@ -15,6 +15,12 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="brand-theme.css?v=1777661601">
     <style>
+        :root {
+            --change-order-accent: var(--qd-blue, #1a56a0);
+            --change-order-surface: rgba(26, 86, 160, 0.08);
+            --change-order-surface-strong: rgba(26, 86, 160, 0.12);
+            --change-order-border-soft: rgba(26, 86, 160, 0.24);
+        }
         body { background-color: #eef4fb; }
         .quote-actions-dropdown .quote-actions-menu {
             width: max-content !important;
@@ -299,9 +305,9 @@
             margin-top: 0.85rem;
         }
         .change-order-banner {
-            border: 1px solid #ffe08a;
-            border-left: 5px solid #f0ad4e;
-            background: #fff8e1;
+            border: 1px solid var(--change-order-border-soft, rgba(26, 86, 160, 0.24));
+            border-left: 5px solid var(--change-order-accent, var(--qd-blue, #1a56a0));
+            background: var(--change-order-surface, rgba(26, 86, 160, 0.08));
             border-radius: 8px;
             padding: 12px;
             margin-bottom: 12px;
@@ -349,11 +355,11 @@
             color: #344054;
         }
         body.change-order-mode #quoteNumber {
-            border-color: #f0ad4e;
-            background: #fff8e1;
+            border-color: var(--change-order-accent, var(--qd-blue, #1a56a0));
+            background: var(--change-order-surface, rgba(26, 86, 160, 0.08));
         }
         body.change-order-mode .quote-total-status {
-            color: #856404;
+            color: var(--change-order-accent, var(--qd-blue-dark, #0f3460));
         }
         body.change-order-mode .co-item-unchanged {
             opacity: 0.74;
@@ -364,8 +370,8 @@
             border-left: 4px solid #198754;
         }
         body.change-order-mode .co-item-changed {
-            background: #fff8e1;
-            border-left: 4px solid #f0ad4e;
+            background: var(--change-order-surface, rgba(26, 86, 160, 0.08));
+            border-left: 4px solid var(--change-order-accent, var(--qd-blue, #1a56a0));
         }
         body.change-order-mode .co-item-removed {
             background: #fff1f2;
@@ -374,7 +380,7 @@
         .co-change-note {
             margin-top: 4px;
             font-size: 0.78rem;
-            color: #856404;
+            color: var(--change-order-accent, var(--qd-blue-dark, #0f3460));
             font-weight: 600;
         }
         .co-original-summary {
@@ -387,9 +393,9 @@
             display: none;
             margin: 0.85rem 0 0;
             padding: 0.9rem 1rem;
-            background: #fff8e1;
-            border: 1px solid #f0d98c;
-            border-left: 5px solid #f0ad4e;
+            background: var(--change-order-surface-strong, rgba(26, 86, 160, 0.12));
+            border: 1px solid var(--change-order-border-soft, rgba(26, 86, 160, 0.24));
+            border-left: 5px solid var(--change-order-accent, var(--qd-blue, #1a56a0));
             border-radius: 8px;
         }
         .change-order-price-summary.visible {
@@ -397,7 +403,7 @@
         }
         .change-order-price-summary .co-summary-title {
             font-weight: 800;
-            color: #6b4e00;
+            color: var(--change-order-accent, var(--qd-blue-dark, #0f3460));
             margin-bottom: 0.45rem;
         }
         .change-order-price-summary .co-summary-row {
@@ -405,7 +411,7 @@
             justify-content: space-between;
             gap: 1rem;
             padding: 0.28rem 0;
-            border-bottom: 1px solid rgba(146, 64, 14, 0.1);
+            border-bottom: 1px solid var(--change-order-border-soft, rgba(26, 86, 160, 0.16));
         }
         .change-order-price-summary .co-summary-row:last-child {
             border-bottom: 0;
@@ -413,7 +419,7 @@
         .change-order-price-summary .co-summary-final {
             margin-top: 0.45rem;
             padding-top: 0.55rem;
-            border-top: 2px solid rgba(146, 64, 14, 0.22);
+            border-top: 2px solid var(--change-order-border-soft, rgba(26, 86, 160, 0.24));
             font-size: 1.05rem;
             font-weight: 850;
         }
@@ -13392,6 +13398,22 @@ Example:
             });
         }
 
+        function resolveChangeOrderParentStyle(parentData) {
+            var candidates = [
+                window._loadedQuoteData && window._loadedQuoteData.style,
+                window._currentQuoteData && window._currentQuoteData.style,
+                parentData && parentData.style,
+                window._quoteStyle
+            ];
+            for (var i = 0; i < candidates.length; i++) {
+                var style = candidates[i];
+                if (style && typeof style === 'object' && Object.keys(style).length) {
+                    try { return JSON.parse(JSON.stringify(style)); } catch(e) { return Object.assign({}, style); }
+                }
+            }
+            return null;
+        }
+
         function updateChangeOrderModeUI() {
             var isCo = window._quoteDocumentType === 'change_order';
             document.body.classList.toggle('change-order-mode', isCo);
@@ -13443,6 +13465,7 @@ Example:
             })) return;
 
             var parentData = collectQuoteData();
+            var parentStyle = resolveChangeOrderParentStyle(parentData);
             var parentId = window._supabaseQuoteId;
             var nextNumber = 1;
             var previousApprovedTotal = 0;
@@ -13475,8 +13498,23 @@ Example:
                 portal_client_email: '',
                 portal_pin: '',
                 portal_added_at: null,
-                portal_theme: null
+                portal_theme: null,
+                style: parentStyle
             });
+            window._currentQuoteData = Object.assign({}, parentData, {
+                type: 'change_order',
+                documentType: 'change_order',
+                parentQuoteId: parentId,
+                parentQuoteNumber: parentData.quoteNumber || '',
+                parentQuoteTotal: parentData.grandTotal || 0,
+                changeOrderNumber: nextNumber,
+                style: parentStyle
+            });
+            if (parentStyle && typeof applyQuoteStyleToControls === 'function') {
+                applyQuoteStyleToControls(parentStyle);
+            } else if (parentStyle) {
+                window._quoteStyle = Object.assign({}, window._quoteStyle || {}, parentStyle);
+            }
             window._changeOrderDraftInProgress = true;
             window._quoteFullyLoaded = true;
             if (typeof _autoSaveTimer !== 'undefined') clearTimeout(_autoSaveTimer);
