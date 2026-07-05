@@ -16,6 +16,8 @@
         var manageItemsCategoryOrderMode = 'alphabetical';
         var manageItemsCategoryCustomOrder = [];
         var manageCategorySortable = null;
+        var manageNewItemWizardUpgradeGroups = [];
+        var manageUpgradeWizardState = null;
         var dirtyPricingRows = new Set();
         var pricingOtherDirty = false;
 
@@ -87,6 +89,36 @@
             return normalized;
         }
 
+        function cloneManageUpgradeGroups(groups) {
+            try {
+                return JSON.parse(JSON.stringify(Array.isArray(groups) ? groups : []));
+            } catch(e) {
+                return [];
+            }
+        }
+
+        function cloneManageUpgradeGroup(group) {
+            const normalized = normalizeManageItemUpgradeGroups({ upgradeGroups: [group || {}] });
+            return normalized[0] ? cloneManageUpgradeGroups([normalized[0]])[0] : {
+                id: manageUpgradeGroupId('upg'),
+                name: 'Upgrade Options',
+                type: 'single_optional',
+                options: []
+            };
+        }
+
+        function inferManageUpgradeWizardSetupType(group) {
+            group = group || {};
+            const options = Array.isArray(group.options) ? group.options : [];
+            const hasPathRules = options.some(function(option) {
+                return (Array.isArray(option.availableAfterOptionIds) && option.availableAfterOptionIds.length) ||
+                    (Array.isArray(option.blockedByOptionIds) && option.blockedByOptionIds.length);
+            });
+            if (hasPathRules) return 'path';
+            if (group.type === 'multiple') return 'multiple';
+            return options.length <= 1 ? 'simple' : 'pick_one';
+        }
+
         function flattenManageUpgradeSourceItems() {
             const items = [];
             Object.keys(pricingDatabase || {}).forEach(function(category) {
@@ -128,16 +160,56 @@
             return '<select class="form-select form-select-sm upgrade-source-item" onchange="fillManageUpgradeOptionFromSource(this); markPricingDirty(this)">' + options.join('') + '</select>';
         }
 
+        const MANAGE_UPGRADE_ALWAYS_AVAILABLE_VALUE = '__always_available__';
+
+        function filterManageUpgradeRuleOptionIds(values) {
+            return Array.from(values || []).map(function(value) {
+                return String(value || '');
+            }).filter(function(value) {
+                return value && value !== MANAGE_UPGRADE_ALWAYS_AVAILABLE_VALUE;
+            });
+        }
+
+        function collectManageUpgradeRuleCheckboxIds(optionEl, className, fallback) {
+            const inputs = Array.from(optionEl?.querySelectorAll('input.' + className) || []);
+            if (!inputs.length) return Array.isArray(fallback) ? fallback.slice() : [];
+            return filterManageUpgradeRuleOptionIds(inputs.filter(function(input) {
+                return input.checked;
+            }).map(function(input) {
+                return input.value;
+            }));
+        }
+
+        function handleManageUpgradePathSelectChange(inputEl) {
+            if (!inputEl || !inputEl.classList.contains('upgrade-available-after')) return;
+            const groupEl = inputEl.closest('.manage-upgrade-rule-checkboxes');
+            if (!groupEl) return;
+            const checkboxes = Array.from(groupEl.querySelectorAll('input.upgrade-available-after'));
+            if (inputEl.value === MANAGE_UPGRADE_ALWAYS_AVAILABLE_VALUE && inputEl.checked) {
+                checkboxes.forEach(function(checkbox) {
+                    checkbox.checked = checkbox === inputEl;
+                });
+                return;
+            }
+            if (inputEl.value !== MANAGE_UPGRADE_ALWAYS_AVAILABLE_VALUE && inputEl.checked) {
+                checkboxes.forEach(function(checkbox) {
+                    if (checkbox.value === MANAGE_UPGRADE_ALWAYS_AVAILABLE_VALUE) checkbox.checked = false;
+                });
+            }
+        }
+
         function renderManageUpgradePathSelect(allOptions, selectedIds, selfId, className, label) {
             selectedIds = Array.isArray(selectedIds) ? selectedIds : [];
             const usable = (allOptions || []).filter(function(option) { return option.id !== selfId && option.name; });
             if (!usable.length) return '<div class="small text-muted">' + label + ': add another option first.</div>';
+            const isAvailableAfter = className === 'upgrade-available-after';
             return '<label class="form-label mb-1" style="font-size:0.75em">' + label + '</label>' +
-                '<select class="form-select form-select-sm ' + className + '" multiple size="' + Math.min(4, Math.max(2, usable.length)) + '" onchange="markPricingDirty(this)">' +
+                '<div class="manage-upgrade-rule-checkboxes border rounded bg-white p-2">' +
+                (isAvailableAfter ? '<label class="form-check small mb-1"><input type="checkbox" class="form-check-input ' + className + '" value="' + MANAGE_UPGRADE_ALWAYS_AVAILABLE_VALUE + '" ' + (!selectedIds.length ? 'checked' : '') + ' onchange="handleManageUpgradePathSelectChange(this); markPricingDirty(this)"> <span class="form-check-label">Always available</span></label>' : '') +
                 usable.map(function(option) {
-                    return '<option value="' + manageItemsAttr(option.id) + '" ' + (selectedIds.indexOf(option.id) !== -1 ? 'selected' : '') + '>' + manageItemsEscape(option.name) + '</option>';
+                    return '<label class="form-check small mb-1"><input type="checkbox" class="form-check-input ' + className + '" value="' + manageItemsAttr(option.id) + '" ' + (selectedIds.indexOf(option.id) !== -1 ? 'checked' : '') + ' onchange="handleManageUpgradePathSelectChange(this); markPricingDirty(this)"> <span class="form-check-label">' + manageItemsEscape(option.name) + '</span></label>';
                 }).join('') +
-                '</select>';
+                '</div>';
         }
 
         function renderManageItemUpgradeGroupsEditor(item, baseUnitType) {
@@ -150,7 +222,10 @@
                 '<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">' +
                 '<div><small class="text-warning fw-bold"><i class="fas fa-arrow-up"></i> Upgrade Groups</small>' +
                 '<div class="small text-muted">Create client-facing upgrade choices. Use <strong>Available after</strong> and <strong>Blocked by</strong> for simple upgrade paths.</div></div>' +
+                '<div class="d-flex gap-1 flex-wrap">' +
+                '<button type="button" class="btn btn-sm btn-primary" data-upgrade-wizard-action="open-new"><i class="fas fa-magic me-1"></i>Upgrade Wizard</button>' +
                 '<button type="button" class="btn btn-sm btn-outline-primary" data-upgrade-group-action="add-group"><i class="fas fa-plus me-1"></i>Add Upgrade Group</button>' +
+                '</div>' +
                 '</div>';
 
             if (!groups.length) {
@@ -162,7 +237,7 @@
                     '<div class="row g-2 align-items-end">' +
                     '<div class="col-md-5"><label class="form-label" style="font-size:0.75em">Group Name</label><input type="text" class="form-control form-control-sm upgrade-group-name" value="' + manageItemsAttr(group.name) + '" placeholder="e.g., Drink Rail" oninput="markPricingDirty(this)"></div>' +
                     '<div class="col-md-4"><label class="form-label" style="font-size:0.75em">Selection Type</label><select class="form-select form-select-sm upgrade-group-type" onchange="markPricingDirty(this)"><option value="single_optional" ' + (group.type !== 'multiple' ? 'selected' : '') + '>Pick One Optional</option><option value="multiple" ' + (group.type === 'multiple' ? 'selected' : '') + '>Pick Multiple</option></select></div>' +
-                    '<div class="col-md-3 d-flex gap-1"><button type="button" class="btn btn-sm btn-outline-primary flex-fill" data-upgrade-group-action="add-option"><i class="fas fa-plus me-1"></i>Option</button><button type="button" class="btn btn-sm btn-outline-danger" data-upgrade-group-action="remove-group" title="Remove group"><i class="fas fa-trash"></i></button></div>' +
+                    '<div class="col-md-3 d-flex gap-1"><button type="button" class="btn btn-sm btn-outline-primary flex-fill" data-upgrade-group-action="add-option"><i class="fas fa-plus me-1"></i>Option</button><button type="button" class="btn btn-sm btn-outline-secondary" data-upgrade-wizard-action="edit-existing" data-upgrade-group-id="' + manageItemsAttr(group.id) + '" title="Edit this group in the wizard"><i class="fas fa-magic"></i></button><button type="button" class="btn btn-sm btn-outline-danger" data-upgrade-group-action="remove-group" title="Remove group"><i class="fas fa-trash"></i></button></div>' +
                     '</div>';
 
                 if (!group.options.length) {
@@ -211,8 +286,8 @@
                         upgradeType: normalizeManageUpgradeType(optionEl.querySelector('.upgrade-type')?.value),
                         sourceItemName: selectedSource?.dataset.name || '',
                         category: selectedSource?.dataset.category || '',
-                        availableAfterOptionIds: Array.from(optionEl.querySelector('.upgrade-available-after')?.selectedOptions || []).map(function(opt) { return opt.value; }).filter(Boolean),
-                        blockedByOptionIds: Array.from(optionEl.querySelector('.upgrade-blocked-by')?.selectedOptions || []).map(function(opt) { return opt.value; }).filter(Boolean)
+                        availableAfterOptionIds: collectManageUpgradeRuleCheckboxIds(optionEl, 'upgrade-available-after'),
+                        blockedByOptionIds: collectManageUpgradeRuleCheckboxIds(optionEl, 'upgrade-blocked-by')
                     };
                 }).filter(Boolean);
                 if (!options.length && !includeEmpty) return null;
@@ -284,6 +359,454 @@
             markPricingDirty(detailsRow);
         }
 
+        function getManageDetailsRowByKey(rowKey) {
+            const row = getManageRowByKey(rowKey);
+            return row ? document.getElementById(row.dataset.detailsId || '') : null;
+        }
+
+        function manageUpgradeWizardAlert(message) {
+            if (typeof qdAlert === 'function') {
+                qdAlert(message);
+            } else {
+                alert(message);
+            }
+        }
+
+        function getManageUpgradeWizardOptionTemplate(baseUnitType, index) {
+            return {
+                id: manageUpgradeGroupId('upo'),
+                name: '',
+                unitType: baseUnitType || '',
+                rate: 0,
+                materialCost: 0,
+                supplierUrl: '',
+                description: '',
+                upgradeType: index === 0 ? 'replacement' : 'add_on',
+                sourceItemName: '',
+                category: '',
+                availableAfterOptionIds: [],
+                blockedByOptionIds: []
+            };
+        }
+
+        function buildManageUpgradeWizardGroup(setupType, baseUnitType) {
+            const group = {
+                id: manageUpgradeGroupId('upg'),
+                name: setupType === 'path' ? 'Upgrade Path' : (setupType === 'multiple' ? 'Add-on Options' : 'Upgrade Options'),
+                type: setupType === 'multiple' ? 'multiple' : 'single_optional',
+                options: []
+            };
+            const optionCount = setupType === 'simple' || setupType === 'multiple' ? 1 : 2;
+            for (let i = 0; i < optionCount; i++) {
+                group.options.push(getManageUpgradeWizardOptionTemplate(baseUnitType, i));
+            }
+            return group;
+        }
+
+        function hydrateManageUpgradeWizardFromGroup(group) {
+            return cloneManageUpgradeGroup(group);
+        }
+
+        function getManageUpgradeWizardContextFromButton(button) {
+            const detailsRow = button ? button.closest('.item-details-row') : null;
+            if (detailsRow) {
+                return {
+                    context: 'row',
+                    rowKey: detailsRow.getAttribute('data-row-key') || '',
+                    baseUnitType: rowUnitTypeForDetails(detailsRow),
+                    groups: collectManageItemUpgradeGroups(detailsRow, true)
+                };
+            }
+            return {
+                context: 'newItem',
+                rowKey: '',
+                baseUnitType: document.getElementById('newItemUnit')?.value.trim() || '',
+                groups: cloneManageUpgradeGroups(manageNewItemWizardUpgradeGroups)
+            };
+        }
+
+        function ensureManageUpgradeWizardModal() {
+            let modalEl = document.getElementById('manageUpgradeWizardModal');
+            if (modalEl) return modalEl;
+            modalEl = document.createElement('div');
+            modalEl.className = 'modal fade';
+            modalEl.id = 'manageUpgradeWizardModal';
+            modalEl.tabIndex = -1;
+            modalEl.setAttribute('aria-hidden', 'true');
+            document.body.appendChild(modalEl);
+            return modalEl;
+        }
+
+        function renderManageUpgradeWizardTypeCards() {
+            const cards = [
+                { id: 'simple', title: 'Simple Upgrade', icon: 'fa-arrow-up', text: 'One optional upgrade, like standard trim to premium trim.' },
+                { id: 'pick_one', title: 'Pick One Upgrade Set', icon: 'fa-list-check', text: 'Client can choose one upgrade or leave the base item as-is.' },
+                { id: 'multiple', title: 'Stackable Add-ons', icon: 'fa-layer-group', text: 'Client can select more than one add-on at the same time.' },
+                { id: 'path', title: 'Upgrade Path', icon: 'fa-code-branch', text: 'Use Available after and Blocked by rules for dependent upgrades.' }
+            ];
+            return '<div class="row g-2">' + cards.map(function(card) {
+                return '<div class="col-md-6"><button type="button" class="btn btn-outline-primary text-start w-100 h-100 p-3" data-upgrade-wizard-action="choose-type" data-setup-type="' + manageItemsAttr(card.id) + '">' +
+                    '<div class="fw-bold"><i class="fas ' + card.icon + ' me-2"></i>' + manageItemsEscape(card.title) + '</div>' +
+                    '<div class="small text-muted mt-1">' + manageItemsEscape(card.text) + '</div>' +
+                    '</button></div>';
+            }).join('') + '</div>';
+        }
+
+        function renderManageUpgradeWizardExistingGroups() {
+            const groups = manageUpgradeWizardState ? normalizeManageItemUpgradeGroups({ upgradeGroups: manageUpgradeWizardState.groups }) : [];
+            if (!groups.length) return '<div class="alert alert-light border small mb-3">No upgrade groups yet. Start with a setup type below.</div>';
+            return '<div class="mb-3">' +
+                '<div class="small fw-bold text-muted mb-2">Existing upgrade groups</div>' +
+                groups.map(function(group) {
+                    return '<div class="border rounded p-2 mb-2 d-flex justify-content-between align-items-center gap-2 flex-wrap">' +
+                        '<div><div class="fw-bold">' + manageItemsEscape(group.name || 'Upgrade Options') + '</div>' +
+                        '<div class="small text-muted">' + (group.type === 'multiple' ? 'Pick Multiple' : 'Pick One Optional') + ' - ' + (group.options || []).length + ' option' + ((group.options || []).length === 1 ? '' : 's') + '</div></div>' +
+                        '<button type="button" class="btn btn-sm btn-outline-primary" data-upgrade-wizard-action="edit-existing" data-upgrade-group-id="' + manageItemsAttr(group.id) + '"><i class="fas fa-magic me-1"></i>Edit in Wizard</button>' +
+                        '</div>';
+                }).join('') +
+                '</div>';
+        }
+
+        function renderManageUpgradeWizardStepNav(activeStep) {
+            const steps = [
+                ['setup', 'Setup'],
+                ['options', 'Options'],
+                ['rules', 'Rules'],
+                ['review', 'Review']
+            ];
+            return '<div class="d-flex flex-wrap gap-1 mb-3">' + steps.map(function(step) {
+                const active = step[0] === activeStep;
+                return '<span class="badge ' + (active ? 'bg-primary' : 'bg-light text-dark border') + '">' + manageItemsEscape(step[1]) + '</span>';
+            }).join('') + '</div>';
+        }
+
+        function renderManageUpgradeWizardOptionsStep() {
+            const state = manageUpgradeWizardState || {};
+            const group = state.group || buildManageUpgradeWizardGroup(state.setupType || 'simple', state.baseUnitType);
+            const options = Array.isArray(group.options) ? group.options : [];
+            return '<div data-upgrade-wizard-step="options">' +
+                renderManageUpgradeWizardStepNav('options') +
+                '<div class="row g-2 mb-3">' +
+                '<div class="col-md-7"><label class="form-label small fw-bold">Upgrade group name</label><input type="text" class="form-control form-control-sm upgrade-group-name" value="' + manageItemsAttr(group.name || '') + '" placeholder="e.g., Drink Rail"></div>' +
+                '<div class="col-md-5"><label class="form-label small fw-bold">Client selection</label><select class="form-select form-select-sm upgrade-group-type"><option value="single_optional" ' + (group.type !== 'multiple' ? 'selected' : '') + '>Pick One Optional</option><option value="multiple" ' + (group.type === 'multiple' ? 'selected' : '') + '>Pick Multiple</option></select></div>' +
+                '</div>' +
+                '<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2"><div class="small text-muted">Copy from saved items or type a custom upgrade.</div><button type="button" class="btn btn-sm btn-outline-primary" data-upgrade-wizard-action="add-option"><i class="fas fa-plus me-1"></i>Add Option</button></div>' +
+                options.map(function(option, optionIndex) {
+                    option = normalizeManageUpgradeOption(option, 'wizard_' + optionIndex);
+                    return '<div class="manage-upgrade-wizard-option border rounded p-2 mb-2" data-upgrade-option-id="' + manageItemsAttr(option.id) + '">' +
+                        '<div class="row g-2 align-items-end">' +
+                        '<div class="col-md-4"><label class="form-label small mb-1">Copy From Saved Item</label>' + renderManageUpgradeSourceSelect(option.sourceItemName, option.category) + '</div>' +
+                        '<div class="col-md-4"><label class="form-label small mb-1">Upgrade Name</label><input type="text" class="form-control form-control-sm upgrade-name" value="' + manageItemsAttr(option.name) + '" placeholder="e.g., Post-to-post drink rail"></div>' +
+                        '<div class="col-md-2"><label class="form-label small mb-1">Unit</label><input type="text" class="form-control form-control-sm upgrade-unit-type" value="' + manageItemsAttr(option.unitType || state.baseUnitType || '') + '" list="unitTypeOptions"></div>' +
+                        '<div class="col-md-2"><label class="form-label small mb-1">Type</label><select class="form-select form-select-sm upgrade-type"><option value="replacement" ' + (option.upgradeType === 'replacement' ? 'selected' : '') + '>Replacement</option><option value="add_on" ' + (option.upgradeType !== 'replacement' ? 'selected' : '') + '>Add-on</option></select></div>' +
+                        '<div class="col-md-2"><label class="form-label small mb-1">Rate</label><input type="number" class="form-control form-control-sm upgrade-rate" value="' + manageItemsAttr(option.rate.toFixed(2)) + '" step="0.01" min="0"></div>' +
+                        '<div class="col-md-2"><label class="form-label small mb-1">Cost</label><input type="number" class="form-control form-control-sm upgrade-material-cost" value="' + manageItemsAttr(option.materialCost.toFixed(2)) + '" step="0.01" min="0"></div>' +
+                        '<div class="col-md-7"><label class="form-label small mb-1">Supplier URL</label><input type="url" class="form-control form-control-sm upgrade-supplier-url" value="' + manageItemsAttr(option.supplierUrl || '') + '" placeholder="https://..."></div>' +
+                        '<div class="col-md-1 d-flex align-items-end"><button type="button" class="btn btn-sm btn-outline-danger w-100" data-upgrade-wizard-action="remove-option" title="Remove option"><i class="fas fa-trash"></i></button></div>' +
+                        '<div class="col-12"><label class="form-label small mb-1">Upgrade Description</label><input type="text" class="form-control form-control-sm upgrade-desc" value="' + manageItemsAttr(option.description || '') + '" placeholder="Optional client-facing description"></div>' +
+                        '</div>' +
+                        '</div>';
+                }).join('') +
+                '</div>';
+        }
+
+        function renderManageUpgradeWizardRulesStep() {
+            const group = manageUpgradeWizardState?.group || { options: [] };
+            const options = Array.isArray(group.options) ? group.options : [];
+            return '<div data-upgrade-wizard-step="rules">' +
+                renderManageUpgradeWizardStepNav('rules') +
+                '<div class="alert alert-light border small">Use rules only when an upgrade depends on another upgrade. Example: <strong>Lighted post caps</strong> can be Available after <strong>Post-to-post drink rail</strong> and Blocked by <strong>Continuous drink rail</strong>.</div>' +
+                options.map(function(option, optionIndex) {
+                    option = normalizeManageUpgradeOption(option, 'wizard_rule_' + optionIndex);
+                    return '<div class="manage-upgrade-wizard-option border rounded p-2 mb-2" data-upgrade-option-id="' + manageItemsAttr(option.id) + '">' +
+                        '<div class="fw-bold">' + manageItemsEscape(option.name || 'Unnamed upgrade') + '</div>' +
+                        '<div class="small text-muted mb-2">' + manageItemsEscape(option.upgradeType === 'replacement' ? 'Replacement' : 'Add-on') + ' - ' + manageItemsEscape(option.unitType || 'unit not set') + ' @ $' + (parseFloat(option.rate) || 0).toFixed(2) + '</div>' +
+                        '<div class="row g-2">' +
+                        '<div class="col-md-6">' + renderManageUpgradePathSelect(options, option.availableAfterOptionIds, option.id, 'upgrade-available-after', 'Available after') + '</div>' +
+                        '<div class="col-md-6">' + renderManageUpgradePathSelect(options, option.blockedByOptionIds, option.id, 'upgrade-blocked-by', 'Blocked by') + '</div>' +
+                        '</div>' +
+                        '</div>';
+                }).join('') +
+                '</div>';
+        }
+
+        function renderManageUpgradeWizardReviewStep() {
+            const group = manageUpgradeWizardState?.group || { options: [] };
+            const options = Array.isArray(group.options) ? group.options : [];
+            return '<div data-upgrade-wizard-step="review">' +
+                renderManageUpgradeWizardStepNav('review') +
+                '<div class="manage-upgrade-wizard-preview border rounded bg-light p-3">' +
+                '<div class="fw-bold mb-1">' + manageItemsEscape(group.name || 'Upgrade Options') + '</div>' +
+                '<div class="small text-muted mb-3">' + (group.type === 'multiple' ? 'Client can pick multiple upgrades.' : 'Client can pick one upgrade, or leave the base item unchanged.') + '</div>' +
+                (options.length ? options.map(function(option) {
+                    const rules = [];
+                    if ((option.availableAfterOptionIds || []).length) rules.push('Available after ' + option.availableAfterOptionIds.length + ' option(s)');
+                    if ((option.blockedByOptionIds || []).length) rules.push('Blocked by ' + option.blockedByOptionIds.length + ' option(s)');
+                    return '<div class="border rounded bg-white p-2 mb-2">' +
+                        '<div class="d-flex justify-content-between gap-2 flex-wrap"><strong>' + manageItemsEscape(option.name || 'Unnamed upgrade') + '</strong><span>' + manageItemsEscape(option.upgradeType === 'replacement' ? 'Replacement' : 'Add-on') + ' - $' + (parseFloat(option.rate) || 0).toFixed(2) + '/' + manageItemsEscape(option.unitType || 'unit') + '</span></div>' +
+                        (option.description ? '<div class="small text-muted mt-1">' + manageItemsEscape(option.description) + '</div>' : '') +
+                        (rules.length ? '<div class="small text-primary mt-1">' + manageItemsEscape(rules.join(' | ')) + '</div>' : '') +
+                        '</div>';
+                }).join('') : '<div class="text-muted">No named upgrade options yet.</div>') +
+                '</div>' +
+                '</div>';
+        }
+
+        function renderManageUpgradeWizardModal() {
+            const state = manageUpgradeWizardState || {};
+            const modalEl = ensureManageUpgradeWizardModal();
+            const step = state.step || 'setup';
+            let body = '';
+            let footer = '';
+            if (step === 'setup') {
+                body = '<div data-upgrade-wizard-step="setup">' +
+                    renderManageUpgradeWizardStepNav('setup') +
+                    renderManageUpgradeWizardExistingGroups() +
+                    '<div class="small fw-bold text-muted mb-2">Create a new guided setup</div>' +
+                    renderManageUpgradeWizardTypeCards() +
+                    '</div>';
+                footer = '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>';
+            } else if (step === 'options') {
+                body = renderManageUpgradeWizardOptionsStep();
+                footer = '<button type="button" class="btn btn-outline-secondary" data-upgrade-wizard-action="back">Back</button>' +
+                    '<button type="button" class="btn btn-primary" data-upgrade-wizard-action="' + (state.setupType === 'path' ? 'next-rules' : 'next-review') + '">Continue</button>';
+            } else if (step === 'rules') {
+                body = renderManageUpgradeWizardRulesStep();
+                footer = '<button type="button" class="btn btn-outline-secondary" data-upgrade-wizard-action="back">Back</button>' +
+                    '<button type="button" class="btn btn-primary" data-upgrade-wizard-action="next-review">Review</button>';
+            } else {
+                body = renderManageUpgradeWizardReviewStep();
+                footer = '<button type="button" class="btn btn-outline-secondary" data-upgrade-wizard-action="back">Back</button>' +
+                    '<button type="button" class="btn btn-primary" data-upgrade-wizard-action="save"><i class="fas fa-save me-1"></i>Save Upgrade Group</button>';
+            }
+            modalEl.innerHTML = '<div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">' +
+                '<div class="modal-content">' +
+                '<div class="modal-header bg-primary text-white">' +
+                '<h5 class="modal-title"><i class="fas fa-magic me-2"></i>Upgrade Wizard</h5>' +
+                '<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>' +
+                '</div>' +
+                '<div class="modal-body">' + body + '</div>' +
+                '<div class="modal-footer">' + footer + '</div>' +
+                '</div>' +
+                '</div>';
+        }
+
+        function collectManageUpgradeWizardForm() {
+            if (!manageUpgradeWizardState || !manageUpgradeWizardState.group) return;
+            const modalEl = document.getElementById('manageUpgradeWizardModal');
+            if (!modalEl) return;
+            const group = manageUpgradeWizardState.group;
+            const groupName = modalEl.querySelector('.upgrade-group-name');
+            const groupType = modalEl.querySelector('.upgrade-group-type');
+            if (groupName) group.name = groupName.value.trim();
+            if (groupType) group.type = groupType.value === 'multiple' ? 'multiple' : 'single_optional';
+            const optionEls = Array.from(modalEl.querySelectorAll('.manage-upgrade-wizard-option'));
+            if (!optionEls.length) return;
+            group.options = optionEls.map(function(optionEl, optionIndex) {
+                const optionId = optionEl.dataset.upgradeOptionId || manageUpgradeGroupId('upo');
+                const previous = (group.options || []).find(function(option) { return option.id === optionId; }) || {};
+                const sourceSelect = optionEl.querySelector('.upgrade-source-item');
+                const selectedSource = sourceSelect ? sourceSelect.options[sourceSelect.selectedIndex] : null;
+                const getValue = function(selector, fallback) {
+                    const input = optionEl.querySelector(selector);
+                    return input ? input.value.trim() : (fallback || '');
+                };
+                const getNumber = function(selector, fallback) {
+                    const input = optionEl.querySelector(selector);
+                    return input ? (parseFloat(input.value || 0) || 0) : (parseFloat(fallback || 0) || 0);
+                };
+                const selectedFrom = function(selector, fallback) {
+                    return collectManageUpgradeRuleCheckboxIds(optionEl, selector.replace(/^\./, ''), fallback);
+                };
+                return {
+                    id: optionId,
+                    name: getValue('.upgrade-name', previous.name),
+                    unitType: getValue('.upgrade-unit-type', previous.unitType || manageUpgradeWizardState.baseUnitType),
+                    rate: getNumber('.upgrade-rate', previous.rate),
+                    materialCost: getNumber('.upgrade-material-cost', previous.materialCost),
+                    supplierUrl: getValue('.upgrade-supplier-url', previous.supplierUrl),
+                    description: getValue('.upgrade-desc', previous.description),
+                    upgradeType: normalizeManageUpgradeType(optionEl.querySelector('.upgrade-type')?.value || previous.upgradeType),
+                    sourceItemName: selectedSource?.dataset.name || previous.sourceItemName || '',
+                    category: selectedSource?.dataset.category || previous.category || '',
+                    availableAfterOptionIds: selectedFrom('.upgrade-available-after', previous.availableAfterOptionIds),
+                    blockedByOptionIds: selectedFrom('.upgrade-blocked-by', previous.blockedByOptionIds)
+                };
+            });
+        }
+
+        function showManageUpgradeWizard() {
+            renderManageUpgradeWizardModal();
+            const modalEl = document.getElementById('manageUpgradeWizardModal');
+            if (modalEl && window.bootstrap && bootstrap.Modal) {
+                bootstrap.Modal.getOrCreateInstance(modalEl).show();
+            }
+        }
+
+        function openManageUpgradeWizard(button) {
+            const context = getManageUpgradeWizardContextFromButton(button);
+            manageUpgradeWizardState = {
+                context: context.context,
+                rowKey: context.rowKey,
+                baseUnitType: context.baseUnitType,
+                groups: cloneManageUpgradeGroups(context.groups),
+                editingGroupId: '',
+                setupType: '',
+                step: 'setup',
+                group: null
+            };
+            const action = button?.getAttribute('data-upgrade-wizard-action') || '';
+            const groupId = button?.getAttribute('data-upgrade-group-id') || '';
+            if (action === 'edit-existing' && groupId) {
+                startManageUpgradeWizardExistingGroup(groupId);
+                return;
+            }
+            showManageUpgradeWizard();
+        }
+
+        function openManageNewItemUpgradeWizard() {
+            manageUpgradeWizardState = {
+                context: 'newItem',
+                rowKey: '',
+                baseUnitType: document.getElementById('newItemUnit')?.value.trim() || '',
+                groups: cloneManageUpgradeGroups(manageNewItemWizardUpgradeGroups),
+                editingGroupId: '',
+                setupType: '',
+                step: 'setup',
+                group: null
+            };
+            showManageUpgradeWizard();
+        }
+
+        function startManageUpgradeWizardExistingGroup(groupId) {
+            if (!manageUpgradeWizardState) return;
+            const group = (manageUpgradeWizardState.groups || []).find(function(candidate) { return candidate.id === groupId; });
+            manageUpgradeWizardState.group = hydrateManageUpgradeWizardFromGroup(group);
+            manageUpgradeWizardState.editingGroupId = groupId;
+            manageUpgradeWizardState.setupType = inferManageUpgradeWizardSetupType(manageUpgradeWizardState.group);
+            manageUpgradeWizardState.step = 'options';
+            showManageUpgradeWizard();
+        }
+
+        function startManageUpgradeWizardNewGroup(setupType) {
+            if (!manageUpgradeWizardState) return;
+            manageUpgradeWizardState.setupType = setupType || 'simple';
+            manageUpgradeWizardState.group = buildManageUpgradeWizardGroup(manageUpgradeWizardState.setupType, manageUpgradeWizardState.baseUnitType);
+            manageUpgradeWizardState.editingGroupId = '';
+            manageUpgradeWizardState.step = 'options';
+            showManageUpgradeWizard();
+        }
+
+        function saveManageUpgradeWizard() {
+            collectManageUpgradeWizardForm();
+            if (!manageUpgradeWizardState || !manageUpgradeWizardState.group) return;
+            const group = cloneManageUpgradeGroup(manageUpgradeWizardState.group);
+            group.options = (group.options || []).filter(function(option) { return String(option.name || '').trim(); });
+            if (!group.name) {
+                manageUpgradeWizardAlert('Please name this upgrade group.');
+                return;
+            }
+            if (!group.options.length) {
+                manageUpgradeWizardAlert('Please add at least one named upgrade option.');
+                return;
+            }
+            let groups = cloneManageUpgradeGroups(manageUpgradeWizardState.groups);
+            const existingIndex = groups.findIndex(function(candidate) { return candidate.id === manageUpgradeWizardState.editingGroupId; });
+            if (existingIndex !== -1) {
+                groups[existingIndex] = group;
+            } else {
+                groups.push(group);
+            }
+            if (manageUpgradeWizardState.context === 'row') {
+                const detailsRow = getManageDetailsRowByKey(manageUpgradeWizardState.rowKey);
+                if (detailsRow) {
+                    refreshManageUpgradeGroupsEditor(detailsRow, groups);
+                    markPricingDirty(detailsRow);
+                }
+            } else {
+                manageNewItemWizardUpgradeGroups = normalizeManageItemUpgradeGroups({ upgradeGroups: groups });
+                syncNewItemUpgradeWizardSummary();
+            }
+            const modalEl = document.getElementById('manageUpgradeWizardModal');
+            if (modalEl && window.bootstrap && bootstrap.Modal) {
+                bootstrap.Modal.getInstance(modalEl)?.hide();
+            }
+            manageUpgradeWizardState = null;
+        }
+
+        function syncNewItemUpgradeWizardSummary() {
+            const target = document.getElementById('newItemUpgradeWizardSummary');
+            if (!target) return;
+            const groups = normalizeManageItemUpgradeGroups({ upgradeGroups: manageNewItemWizardUpgradeGroups });
+            target.style.display = groups.length ? 'block' : 'none';
+            target.innerHTML = groups.length ? '<div class="small fw-bold text-primary mb-1"><i class="fas fa-magic me-1"></i>Wizard Upgrade Groups</div>' +
+                groups.map(function(group) {
+                    return '<div class="small border rounded bg-light p-2 mb-1"><strong>' + manageItemsEscape(group.name || 'Upgrade Options') + '</strong> - ' +
+                        (group.type === 'multiple' ? 'Pick Multiple' : 'Pick One Optional') + ' - ' + (group.options || []).length + ' option' + ((group.options || []).length === 1 ? '' : 's') + '</div>';
+                }).join('') : '';
+        }
+
+        function handleManageUpgradeWizardAction(button) {
+            if (!button) return;
+            const action = button.getAttribute('data-upgrade-wizard-action') || '';
+            if (action === 'open-new') {
+                openManageUpgradeWizard(button);
+                return;
+            }
+            if (action === 'edit-existing') {
+                if (!manageUpgradeWizardState || !button.closest('#manageUpgradeWizardModal')) {
+                    openManageUpgradeWizard(button);
+                } else {
+                    startManageUpgradeWizardExistingGroup(button.getAttribute('data-upgrade-group-id') || '');
+                }
+                return;
+            }
+            if (!manageUpgradeWizardState) return;
+            if (action === 'choose-type') {
+                startManageUpgradeWizardNewGroup(button.getAttribute('data-setup-type') || 'simple');
+                return;
+            }
+            if (action === 'add-option') {
+                collectManageUpgradeWizardForm();
+                manageUpgradeWizardState.group.options.push(getManageUpgradeWizardOptionTemplate(manageUpgradeWizardState.baseUnitType, manageUpgradeWizardState.group.options.length));
+                showManageUpgradeWizard();
+                return;
+            }
+            if (action === 'remove-option') {
+                collectManageUpgradeWizardForm();
+                const optionId = button.closest('.manage-upgrade-wizard-option')?.dataset.upgradeOptionId || '';
+                manageUpgradeWizardState.group.options = (manageUpgradeWizardState.group.options || []).filter(function(option) { return option.id !== optionId; }).map(function(option) {
+                    option.availableAfterOptionIds = (option.availableAfterOptionIds || []).filter(function(id) { return id !== optionId; });
+                    option.blockedByOptionIds = (option.blockedByOptionIds || []).filter(function(id) { return id !== optionId; });
+                    return option;
+                });
+                showManageUpgradeWizard();
+                return;
+            }
+            if (action === 'next-rules' || action === 'next-review') {
+                collectManageUpgradeWizardForm();
+                manageUpgradeWizardState.step = action === 'next-rules' ? 'rules' : 'review';
+                showManageUpgradeWizard();
+                return;
+            }
+            if (action === 'back') {
+                collectManageUpgradeWizardForm();
+                if (manageUpgradeWizardState.step === 'review') {
+                    manageUpgradeWizardState.step = manageUpgradeWizardState.setupType === 'path' ? 'rules' : 'options';
+                } else if (manageUpgradeWizardState.step === 'rules') {
+                    manageUpgradeWizardState.step = 'options';
+                } else {
+                    manageUpgradeWizardState.step = 'setup';
+                    manageUpgradeWizardState.group = null;
+                }
+                showManageUpgradeWizard();
+                return;
+            }
+            if (action === 'save') {
+                saveManageUpgradeWizard();
+            }
+        }
+
         function rowUnitTypeForDetails(detailsRow) {
             const rowKey = detailsRow ? detailsRow.getAttribute('data-row-key') : '';
             const row = rowKey ? getManageRowByKey(rowKey) : null;
@@ -292,7 +815,7 @@
 
         function fillManageUpgradeOptionFromSource(selectEl) {
             if (!selectEl) return;
-            const optionEl = selectEl.closest('.manage-upgrade-option');
+            const optionEl = selectEl.closest('.manage-upgrade-option') || selectEl.closest('.manage-upgrade-wizard-option');
             const selected = selectEl.options[selectEl.selectedIndex];
             if (!optionEl || !selected || !selected.value) return;
             const setValue = function(selector, value) {
@@ -300,12 +823,18 @@
                 if (input) input.value = value || '';
             };
             setValue('.upgrade-name', selected.dataset.name || '');
-            setValue('.upgrade-unit-type', selected.dataset.unit || rowUnitTypeForDetails(selectEl.closest('.item-details-row')) || '');
+            setValue('.upgrade-unit-type', selected.dataset.unit || rowUnitTypeForDetails(selectEl.closest('.item-details-row')) || manageUpgradeWizardState?.baseUnitType || '');
             setValue('.upgrade-rate', selected.dataset.rate || '0');
             setValue('.upgrade-material-cost', selected.dataset.cost || '0');
             setValue('.upgrade-supplier-url', selected.dataset.supplier || '');
             setValue('.upgrade-desc', selected.dataset.description || '');
         }
+
+        document.addEventListener('click', function(event) {
+            const wizardButton = event.target.closest('[data-upgrade-wizard-action]');
+            if (!wizardButton) return;
+            handleManageUpgradeWizardAction(wizardButton);
+        });
 
         function getManageBaseUnitTypes() {
             return ['sq ft', 'sqft', 'LF', 'linear foot', 'linear ft', 'm\u00b2', 'm', 'each', 'Flatrate', 'hourly', 'sheet', 'minimum'];
@@ -1059,11 +1588,15 @@
             }
         }
 
-        function resetNewItemUpgradePanel() {
+        function resetNewItemUpgradePanel(clearWizard) {
             const panel = document.getElementById('newItemUpgradePanel');
             const btn = document.getElementById('toggleNewItemUpgradeBtn');
             if (panel) panel.style.display = 'none';
             if (btn) btn.innerHTML = '<i class="fas fa-arrow-up"></i> Add Upgrade';
+            if (clearWizard !== false) {
+                manageNewItemWizardUpgradeGroups = [];
+                syncNewItemUpgradeWizardSummary();
+            }
             [
                 'newItemUpgradeName',
                 'newItemUpgradeUnit',
@@ -1085,7 +1618,7 @@
             const isOpen = panel.style.display !== 'none';
             const open = forceOpen === true || (forceOpen !== false && !isOpen);
             if (!open) {
-                resetNewItemUpgradePanel();
+                resetNewItemUpgradePanel(false);
                 return;
             }
             panel.style.display = 'block';
@@ -2186,17 +2719,20 @@
         }
 
         function collectNewItemUpgradeGroups(baseUnitType) {
+            const groups = cloneManageUpgradeGroups(manageNewItemWizardUpgradeGroups || []);
             const upgrade = collectNewItemUpgrade(baseUnitType);
-            if (!upgrade) return [];
-            return [{
-                id: manageUpgradeGroupId('upg'),
-                name: 'Upgrade Options',
-                type: 'single_optional',
-                options: [normalizeManageUpgradeOption(Object.assign({}, upgrade, {
-                    id: manageUpgradeGroupId('upo'),
-                    upgradeType: upgrade.type
-                }))]
-            }];
+            if (upgrade) {
+                groups.push({
+                    id: manageUpgradeGroupId('upg'),
+                    name: 'Upgrade Options',
+                    type: 'single_optional',
+                    options: [normalizeManageUpgradeOption(Object.assign({}, upgrade, {
+                        id: manageUpgradeGroupId('upo'),
+                        upgradeType: upgrade.type
+                    }))]
+                });
+            }
+            return normalizeManageItemUpgradeGroups({ upgradeGroups: groups });
         }
 
         function addCustomItem() {
@@ -3398,6 +3934,13 @@
         window.renderManageItemUpgradeGroupsEditor = renderManageItemUpgradeGroupsEditor;
         window.collectManageItemUpgradeGroups = collectManageItemUpgradeGroups;
         window.handleManageUpgradeGroupAction = handleManageUpgradeGroupAction;
+        window.openManageUpgradeWizard = openManageUpgradeWizard;
+        window.openManageNewItemUpgradeWizard = openManageNewItemUpgradeWizard;
+        window.renderManageUpgradeWizardModal = renderManageUpgradeWizardModal;
+        window.hydrateManageUpgradeWizardFromGroup = hydrateManageUpgradeWizardFromGroup;
+        window.saveManageUpgradeWizard = saveManageUpgradeWizard;
+        window.handleManageUpgradeWizardAction = handleManageUpgradeWizardAction;
+        window.handleManageUpgradePathSelectChange = handleManageUpgradePathSelectChange;
         window.fillManageUpgradeOptionFromSource = fillManageUpgradeOptionFromSource;
         window.addCustomItem = addCustomItem;
         window.openChoiceGroupHelpModal = openChoiceGroupHelpModal;
