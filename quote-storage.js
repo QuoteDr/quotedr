@@ -158,19 +158,48 @@
             }
         }
 
+        function getQuoteStorageCustomItems() {
+            try {
+                if (typeof customItems === 'object' && customItems) return customItems;
+            } catch(e) {}
+            try {
+                return JSON.parse(localStorage.getItem('ald_custom_items') || '{}');
+            } catch(e) {
+                return {};
+            }
+        }
+
+        function quoteStorageSavedItemUpgradeGroups(saved) {
+            if (!saved) return [];
+            if (typeof normalizeQuoteItemUpgradeGroups === 'function') {
+                return normalizeQuoteItemUpgradeGroups(saved);
+            }
+            return Array.isArray(saved.upgradeGroups) ? cloneQuoteStorageValue(saved.upgradeGroups) : [];
+        }
+
         function findSavedItemForChoiceOption(option, fallbackCategory) {
-            if (!option || typeof pricingDatabase !== 'object' || !pricingDatabase) return null;
-            var optionName = qdQuoteStorageTextKey(option.name || option.description || option.serviceName || '');
+            if (!option) return null;
+            var optionName = qdQuoteStorageTextKey(option.sourceItemName || option.name || option.description || option.serviceName || '');
             var optionCategory = option.category || fallbackCategory || '';
-            var categories = optionCategory && pricingDatabase[optionCategory]
-                ? [optionCategory]
-                : Object.keys(pricingDatabase || {});
-            for (var c = 0; c < categories.length; c++) {
-                var items = Array.isArray(pricingDatabase[categories[c]]) ? pricingDatabase[categories[c]] : [];
-                for (var i = 0; i < items.length; i++) {
-                    var saved = items[i] || {};
-                    var savedName = qdQuoteStorageTextKey(saved.name || saved.description || saved.serviceName || '');
-                    if (savedName && savedName === optionName) return saved;
+            if (!optionName) return null;
+            var sources = [getQuoteStorageCustomItems()];
+            try {
+                if (typeof pricingDatabase === 'object' && pricingDatabase && sources.indexOf(pricingDatabase) === -1) sources.push(pricingDatabase);
+            } catch(e) {}
+            for (var s = 0; s < sources.length; s++) {
+                var source = sources[s] || {};
+                var preferredCategories = optionCategory && Array.isArray(source[optionCategory]) ? [optionCategory] : [];
+                var fallbackCategories = Object.keys(source || {}).filter(function(category) {
+                    return category.indexOf('__') !== 0 && Array.isArray(source[category]) && preferredCategories.indexOf(category) === -1;
+                });
+                var categories = preferredCategories.concat(fallbackCategories);
+                for (var c = 0; c < categories.length; c++) {
+                    var items = Array.isArray(source[categories[c]]) ? source[categories[c]] : [];
+                    for (var i = 0; i < items.length; i++) {
+                        var saved = items[i] || {};
+                        var savedName = qdQuoteStorageTextKey(saved.name || saved.description || saved.serviceName || '');
+                        if (savedName && savedName === optionName) return saved;
+                    }
                 }
             }
             return null;
@@ -179,10 +208,14 @@
         function hydrateChoiceGroupOptionsForSave(item) {
             if (!item || !item.choiceGroup || !Array.isArray(item.choiceGroup.options)) return;
             item.choiceGroup.options.forEach(function(option) {
-                if (!option || (option.upgrade && option.upgrade.name)) return;
+                if (!option) return;
                 var saved = findSavedItemForChoiceOption(option, item.category);
-                if (saved && saved.upgrade && saved.upgrade.name) {
+                if (saved && saved.upgrade && saved.upgrade.name && !(option.upgrade && option.upgrade.name)) {
                     option.upgrade = cloneQuoteStorageValue(saved.upgrade);
+                }
+                var savedUpgradeGroups = quoteStorageSavedItemUpgradeGroups(saved);
+                if (savedUpgradeGroups.length) {
+                    option.upgradeGroups = cloneQuoteStorageValue(savedUpgradeGroups);
                 }
             });
         }

@@ -33,7 +33,14 @@
 
         function normalizeManageUpgradeType(value) {
             const clean = String(value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+            if (clean === 'consultation' || clean === 'requires_consultation') return 'consultation';
             return clean === 'add_on' || clean === 'addon' ? 'add_on' : 'replacement';
+        }
+
+        function normalizeManageUpgradeGroupType(value) {
+            const clean = String(value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+            if (clean === 'consultation' || clean === 'requires_consultation') return 'consultation';
+            return clean === 'multiple' ? 'multiple' : 'single_optional';
         }
 
         function manageUpgradeGroupId(prefix) {
@@ -52,6 +59,7 @@
                 description: option.description || option.itemDescription || '',
                 itemDescription: option.itemDescription || option.description || '',
                 upgradeType: normalizeManageUpgradeType(option.upgradeType || option.type || option.mode),
+                requiresConsultation: option.requiresConsultation === true || normalizeManageUpgradeType(option.upgradeType || option.type || option.mode) === 'consultation',
                 sourceItemName: option.sourceItemName || '',
                 category: option.category || '',
                 availableAfterOptionIds: Array.isArray(option.availableAfterOptionIds) ? option.availableAfterOptionIds.filter(Boolean) : [],
@@ -70,7 +78,7 @@
                 return {
                     id: group.id || manageUpgradeGroupId('upg'),
                     name: group.name || (groupIndex === 0 ? 'Upgrade Options' : 'Upgrade Group'),
-                    type: group.type === 'multiple' ? 'multiple' : 'single_optional',
+                    type: normalizeManageUpgradeGroupType(group.type),
                     options: options
                 };
             }).filter(function(group) { return group.options.length || group.name; });
@@ -115,6 +123,7 @@
                     (Array.isArray(option.blockedByOptionIds) && option.blockedByOptionIds.length);
             });
             if (hasPathRules) return 'path';
+            if (group.type === 'consultation') return 'simple';
             if (group.type === 'multiple') return 'multiple';
             return options.length <= 1 ? 'simple' : 'pick_one';
         }
@@ -224,6 +233,7 @@
                 '<div class="small text-muted">Create client-facing upgrade choices. Use <strong>Available after</strong> and <strong>Blocked by</strong> for simple upgrade paths.</div></div>' +
                 '<div class="d-flex gap-1 flex-wrap">' +
                 '<button type="button" class="btn btn-sm btn-primary" data-upgrade-wizard-action="open-new"><i class="fas fa-magic me-1"></i>Upgrade Wizard</button>' +
+                '<button type="button" class="btn btn-sm btn-outline-primary" data-upgrade-group-action="add-single-upgrade"><i class="fas fa-arrow-up me-1"></i>Single Upgrade</button>' +
                 '<button type="button" class="btn btn-sm btn-outline-primary" data-upgrade-group-action="add-group"><i class="fas fa-plus me-1"></i>Add Upgrade Group</button>' +
                 '</div>' +
                 '</div>';
@@ -233,10 +243,11 @@
             }
 
             groups.forEach(function(group, groupIndex) {
+                const isConsultationGroup = group.type === 'consultation';
                 html += '<div class="manage-upgrade-group border rounded bg-white p-2 mt-2" data-upgrade-group-id="' + manageItemsAttr(group.id) + '">' +
                     '<div class="row g-2 align-items-end">' +
                     '<div class="col-md-5"><label class="form-label" style="font-size:0.75em">Group Name</label><input type="text" class="form-control form-control-sm upgrade-group-name" value="' + manageItemsAttr(group.name) + '" placeholder="e.g., Drink Rail" oninput="markPricingDirty(this)"></div>' +
-                    '<div class="col-md-4"><label class="form-label" style="font-size:0.75em">Selection Type</label><select class="form-select form-select-sm upgrade-group-type" onchange="markPricingDirty(this)"><option value="single_optional" ' + (group.type !== 'multiple' ? 'selected' : '') + '>Pick One Optional</option><option value="multiple" ' + (group.type === 'multiple' ? 'selected' : '') + '>Pick Multiple</option></select></div>' +
+                    '<div class="col-md-4"><label class="form-label" style="font-size:0.75em">Selection Type</label><select class="form-select form-select-sm upgrade-group-type" onchange="handleManageUpgradeGroupTypeChange(this); markPricingDirty(this)"><option value="single_optional" ' + (group.type === 'single_optional' ? 'selected' : '') + '>Pick One Optional</option><option value="multiple" ' + (group.type === 'multiple' ? 'selected' : '') + '>Pick Multiple</option><option value="consultation" ' + (group.type === 'consultation' ? 'selected' : '') + '>Requires consultation</option></select></div>' +
                     '<div class="col-md-3 d-flex gap-1"><button type="button" class="btn btn-sm btn-outline-primary flex-fill" data-upgrade-group-action="add-option"><i class="fas fa-plus me-1"></i>Option</button><button type="button" class="btn btn-sm btn-outline-secondary" data-upgrade-wizard-action="edit-existing" data-upgrade-group-id="' + manageItemsAttr(group.id) + '" title="Edit this group in the wizard"><i class="fas fa-magic"></i></button><button type="button" class="btn btn-sm btn-outline-danger" data-upgrade-group-action="remove-group" title="Remove group"><i class="fas fa-trash"></i></button></div>' +
                     '</div>';
 
@@ -245,14 +256,15 @@
                 }
 
                 group.options.forEach(function(option, optionIndex) {
+                    const optionRequiresConsultation = isConsultationGroup || option.upgradeType === 'consultation' || option.requiresConsultation === true;
                     html += '<div class="manage-upgrade-option border rounded p-2 mt-2" data-upgrade-option-id="' + manageItemsAttr(option.id) + '">' +
                         '<div class="row g-2 align-items-end">' +
                         '<div class="col-md-4"><label class="form-label" style="font-size:0.75em">Copy From Saved Item</label>' + renderManageUpgradeSourceSelect(option.sourceItemName, option.category) + '</div>' +
                         '<div class="col-md-4"><label class="form-label" style="font-size:0.75em">Upgrade Name</label><input type="text" class="form-control form-control-sm upgrade-name" value="' + manageItemsAttr(option.name) + '" placeholder="e.g., Post-to-post drink rail" oninput="markPricingDirty(this)"></div>' +
-                        '<div class="col-md-2"><label class="form-label" style="font-size:0.75em">Unit</label><input type="text" class="form-control form-control-sm upgrade-unit-type" value="' + manageItemsAttr(option.unitType || baseUnitType || '') + '" list="unitTypeOptions" oninput="markPricingDirty(this)"></div>' +
-                        '<div class="col-md-2"><label class="form-label" style="font-size:0.75em">Type</label><select class="form-select form-select-sm upgrade-type" onchange="markPricingDirty(this)"><option value="replacement" ' + (option.upgradeType === 'replacement' ? 'selected' : '') + '>Replacement</option><option value="add_on" ' + (option.upgradeType !== 'replacement' ? 'selected' : '') + '>Add-on</option></select></div>' +
-                        '<div class="col-md-2"><label class="form-label" style="font-size:0.75em">Rate</label><input type="number" class="form-control form-control-sm upgrade-rate" value="' + manageItemsAttr(option.rate.toFixed(2)) + '" step="0.01" min="0" oninput="markPricingDirty(this)"></div>' +
-                        '<div class="col-md-2"><label class="form-label" style="font-size:0.75em">Cost</label><input type="number" class="form-control form-control-sm upgrade-material-cost" value="' + manageItemsAttr(option.materialCost.toFixed(2)) + '" step="0.01" min="0" oninput="markPricingDirty(this)"></div>' +
+                        '<div class="col-md-2"><label class="form-label" style="font-size:0.75em">Unit</label>' + renderManageUnitSelect(option.unitType || baseUnitType || '', 'upgrade-unit-type') + '</div>' +
+                        '<div class="col-md-2"><label class="form-label" style="font-size:0.75em">Type</label><select class="form-select form-select-sm upgrade-type" onchange="markPricingDirty(this)" ' + (isConsultationGroup ? 'disabled' : '') + '><option value="replacement" ' + (option.upgradeType === 'replacement' ? 'selected' : '') + '>Replacement</option><option value="add_on" ' + (option.upgradeType === 'add_on' ? 'selected' : '') + '>Add-on</option><option value="consultation" ' + (optionRequiresConsultation ? 'selected' : '') + '>Requires consultation</option></select></div>' +
+                        '<div class="col-md-2"><label class="form-label" style="font-size:0.75em">Rate</label><input type="number" class="form-control form-control-sm upgrade-rate" value="' + manageItemsAttr(optionRequiresConsultation ? '0.00' : option.rate.toFixed(2)) + '" step="0.01" min="0" placeholder="' + (optionRequiresConsultation ? 'Not priced' : '0.00') + '" ' + (optionRequiresConsultation ? 'disabled' : '') + ' oninput="markPricingDirty(this)"></div>' +
+                        '<div class="col-md-2"><label class="form-label" style="font-size:0.75em">Cost</label><input type="number" class="form-control form-control-sm upgrade-material-cost" value="' + manageItemsAttr(optionRequiresConsultation ? '0.00' : option.materialCost.toFixed(2)) + '" step="0.01" min="0" placeholder="' + (optionRequiresConsultation ? 'Not priced' : '0.00') + '" ' + (optionRequiresConsultation ? 'disabled' : '') + ' oninput="markPricingDirty(this)"></div>' +
                         '<div class="col-md-8"><label class="form-label" style="font-size:0.75em">Supplier URL</label><input type="url" class="form-control form-control-sm upgrade-supplier-url" value="' + manageItemsAttr(option.supplierUrl) + '" placeholder="https://..." oninput="markPricingDirty(this)"></div>' +
                         '<div class="col-12 description-refine-scope"><div class="d-flex justify-content-between align-items-center gap-2"><label class="form-label mb-0" style="font-size:0.75em">Upgrade Description</label><button type="button" class="btn btn-sm btn-outline-primary refine-desc-btn" style="font-size:0.75rem;padding:2px 8px;">AI Refine</button></div><input type="text" class="form-control form-control-sm upgrade-desc item-description-textarea mt-1" value="' + manageItemsAttr(option.description || '') + '" placeholder="e.g., Premium finishing upgrade" oninput="markPricingDirty(this)"></div>' +
                         '<div class="col-md-6">' + renderManageUpgradePathSelect(flatOptions, option.availableAfterOptionIds, option.id, 'upgrade-available-after', 'Available after') + '</div>' +
@@ -270,20 +282,23 @@
         function collectManageItemUpgradeGroups(detailsRow, includeEmpty) {
             if (!detailsRow) return [];
             return Array.from(detailsRow.querySelectorAll('.manage-upgrade-group')).map(function(groupEl, groupIndex) {
+                const groupType = normalizeManageUpgradeGroupType(groupEl.querySelector('.upgrade-group-type')?.value);
                 const options = Array.from(groupEl.querySelectorAll('.manage-upgrade-option')).map(function(optionEl, optionIndex) {
                     const sourceSelect = optionEl.querySelector('.upgrade-source-item');
                     const selectedSource = sourceSelect ? sourceSelect.options[sourceSelect.selectedIndex] : null;
                     const name = optionEl.querySelector('.upgrade-name')?.value.trim() || '';
                     if (!name) return null;
+                    const requiresConsultation = groupType === 'consultation' || normalizeManageUpgradeType(optionEl.querySelector('.upgrade-type')?.value) === 'consultation';
                     return {
                         id: optionEl.dataset.upgradeOptionId || manageUpgradeGroupId('upo'),
                         name: name,
                         unitType: optionEl.querySelector('.upgrade-unit-type')?.value.trim() || '',
-                        rate: parseFloat(optionEl.querySelector('.upgrade-rate')?.value || 0) || 0,
-                        materialCost: parseFloat(optionEl.querySelector('.upgrade-material-cost')?.value || 0) || 0,
+                        rate: requiresConsultation ? 0 : (parseFloat(optionEl.querySelector('.upgrade-rate')?.value || 0) || 0),
+                        materialCost: requiresConsultation ? 0 : (parseFloat(optionEl.querySelector('.upgrade-material-cost')?.value || 0) || 0),
                         supplierUrl: optionEl.querySelector('.upgrade-supplier-url')?.value.trim() || '',
                         description: optionEl.querySelector('.upgrade-desc')?.value.trim() || '',
-                        upgradeType: normalizeManageUpgradeType(optionEl.querySelector('.upgrade-type')?.value),
+                        upgradeType: groupType === 'consultation' ? 'consultation' : normalizeManageUpgradeType(optionEl.querySelector('.upgrade-type')?.value),
+                        requiresConsultation: requiresConsultation,
                         sourceItemName: selectedSource?.dataset.name || '',
                         category: selectedSource?.dataset.category || '',
                         availableAfterOptionIds: collectManageUpgradeRuleCheckboxIds(optionEl, 'upgrade-available-after'),
@@ -294,10 +309,17 @@
                 return {
                     id: groupEl.dataset.upgradeGroupId || manageUpgradeGroupId('upg'),
                     name: groupEl.querySelector('.upgrade-group-name')?.value.trim() || ('Upgrade Group ' + (groupIndex + 1)),
-                    type: groupEl.querySelector('.upgrade-group-type')?.value === 'multiple' ? 'multiple' : 'single_optional',
+                    type: groupType,
                     options: options
                 };
             }).filter(Boolean);
+        }
+
+        function handleManageUpgradeGroupTypeChange(selectEl) {
+            const detailsRow = selectEl ? selectEl.closest('.item-details-row') : null;
+            if (!detailsRow) return;
+            const groups = collectManageItemUpgradeGroups(detailsRow, true);
+            refreshManageUpgradeGroupsEditor(detailsRow, groups);
         }
 
         function refreshManageUpgradeGroupsEditor(detailsRow, groups) {
@@ -323,6 +345,25 @@
 
             if (action === 'add-group') {
                 groups.push({ id: manageUpgradeGroupId('upg'), name: 'Upgrade Group', type: 'single_optional', options: [] });
+            } else if (action === 'add-single-upgrade') {
+                groups.push({
+                    id: manageUpgradeGroupId('upg'),
+                    name: 'Upgrade Options',
+                    type: 'single_optional',
+                    options: [{
+                        id: manageUpgradeGroupId('upo'),
+                        name: 'New Upgrade',
+                        unitType: rowUnitTypeForDetails(detailsRow),
+                        rate: 0,
+                        materialCost: 0,
+                        supplierUrl: '',
+                        description: '',
+                        upgradeType: 'add_on',
+                        requiresConsultation: false,
+                        availableAfterOptionIds: [],
+                        blockedByOptionIds: []
+                    }]
+                });
             } else if (action === 'remove-group') {
                 const index = groups.findIndex(function(group) { return group.id === groupId; });
                 if (index !== -1) groups.splice(index, 1);
@@ -339,6 +380,7 @@
                         supplierUrl: '',
                         description: '',
                         upgradeType: 'add_on',
+                        requiresConsultation: group.type === 'consultation',
                         availableAfterOptionIds: [],
                         blockedByOptionIds: []
                     });
@@ -382,6 +424,7 @@
                 supplierUrl: '',
                 description: '',
                 upgradeType: index === 0 ? 'replacement' : 'add_on',
+                requiresConsultation: false,
                 sourceItemName: '',
                 category: '',
                 availableAfterOptionIds: [],
@@ -392,8 +435,8 @@
         function buildManageUpgradeWizardGroup(setupType, baseUnitType) {
             const group = {
                 id: manageUpgradeGroupId('upg'),
-                name: setupType === 'path' ? 'Upgrade Path' : (setupType === 'multiple' ? 'Add-on Options' : 'Upgrade Options'),
-                type: setupType === 'multiple' ? 'multiple' : 'single_optional',
+                name: setupType === 'consultation' ? 'Consultation Options' : (setupType === 'path' ? 'Upgrade Path' : (setupType === 'multiple' ? 'Add-on Options' : 'Upgrade Options')),
+                type: setupType === 'consultation' ? 'consultation' : (setupType === 'multiple' ? 'multiple' : 'single_optional'),
                 options: []
             };
             const optionCount = setupType === 'simple' || setupType === 'multiple' ? 1 : 2;
@@ -442,6 +485,7 @@
                 { id: 'simple', title: 'Simple Upgrade', icon: 'fa-arrow-up', text: 'One optional upgrade, like standard trim to premium trim.' },
                 { id: 'pick_one', title: 'Pick One Upgrade Set', icon: 'fa-list-check', text: 'Client can choose one upgrade or leave the base item as-is.' },
                 { id: 'multiple', title: 'Stackable Add-ons', icon: 'fa-layer-group', text: 'Client can select more than one add-on at the same time.' },
+                { id: 'consultation', title: 'Requires Consultation', icon: 'fa-comments-dollar', text: 'Client can request this upgrade, then the quote returns to you for pricing.' },
                 { id: 'path', title: 'Upgrade Path', icon: 'fa-code-branch', text: 'Use Available after and Blocked by rules for dependent upgrades.' }
             ];
             return '<div class="row g-2">' + cards.map(function(card) {
@@ -460,7 +504,7 @@
                 groups.map(function(group) {
                     return '<div class="border rounded p-2 mb-2 d-flex justify-content-between align-items-center gap-2 flex-wrap">' +
                         '<div><div class="fw-bold">' + manageItemsEscape(group.name || 'Upgrade Options') + '</div>' +
-                        '<div class="small text-muted">' + (group.type === 'multiple' ? 'Pick Multiple' : 'Pick One Optional') + ' - ' + (group.options || []).length + ' option' + ((group.options || []).length === 1 ? '' : 's') + '</div></div>' +
+                        '<div class="small text-muted">' + (group.type === 'consultation' ? 'Requires Consultation' : (group.type === 'multiple' ? 'Pick Multiple' : 'Pick One Optional')) + ' - ' + (group.options || []).length + ' option' + ((group.options || []).length === 1 ? '' : 's') + '</div></div>' +
                         '<button type="button" class="btn btn-sm btn-outline-primary" data-upgrade-wizard-action="edit-existing" data-upgrade-group-id="' + manageItemsAttr(group.id) + '"><i class="fas fa-magic me-1"></i>Edit in Wizard</button>' +
                         '</div>';
                 }).join('') +
@@ -484,23 +528,25 @@
             const state = manageUpgradeWizardState || {};
             const group = state.group || buildManageUpgradeWizardGroup(state.setupType || 'simple', state.baseUnitType);
             const options = Array.isArray(group.options) ? group.options : [];
+            const isConsultationGroup = group.type === 'consultation';
             return '<div data-upgrade-wizard-step="options">' +
                 renderManageUpgradeWizardStepNav('options') +
                 '<div class="row g-2 mb-3">' +
                 '<div class="col-md-7"><label class="form-label small fw-bold">Upgrade group name</label><input type="text" class="form-control form-control-sm upgrade-group-name" value="' + manageItemsAttr(group.name || '') + '" placeholder="e.g., Drink Rail"></div>' +
-                '<div class="col-md-5"><label class="form-label small fw-bold">Client selection</label><select class="form-select form-select-sm upgrade-group-type"><option value="single_optional" ' + (group.type !== 'multiple' ? 'selected' : '') + '>Pick One Optional</option><option value="multiple" ' + (group.type === 'multiple' ? 'selected' : '') + '>Pick Multiple</option></select></div>' +
+                '<div class="col-md-5"><label class="form-label small fw-bold">Client selection</label><select class="form-select form-select-sm upgrade-group-type"><option value="single_optional" ' + (group.type === 'single_optional' ? 'selected' : '') + '>Pick One Optional</option><option value="multiple" ' + (group.type === 'multiple' ? 'selected' : '') + '>Pick Multiple</option><option value="consultation" ' + (group.type === 'consultation' ? 'selected' : '') + '>Requires consultation</option></select></div>' +
                 '</div>' +
                 '<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2"><div class="small text-muted">Copy from saved items or type a custom upgrade.</div><button type="button" class="btn btn-sm btn-outline-primary" data-upgrade-wizard-action="add-option"><i class="fas fa-plus me-1"></i>Add Option</button></div>' +
                 options.map(function(option, optionIndex) {
                     option = normalizeManageUpgradeOption(option, 'wizard_' + optionIndex);
-                    return '<div class="manage-upgrade-wizard-option border rounded p-2 mb-2" data-upgrade-option-id="' + manageItemsAttr(option.id) + '">' +
+                    const optionRequiresConsultation = isConsultationGroup || option.requiresConsultation === true || option.upgradeType === 'consultation';
+                    return '<div class="manage-upgrade-wizard-option manage-upgrade-wizard-option-card" data-upgrade-option-id="' + manageItemsAttr(option.id) + '">' +
                         '<div class="row g-2 align-items-end">' +
                         '<div class="col-md-4"><label class="form-label small mb-1">Copy From Saved Item</label>' + renderManageUpgradeSourceSelect(option.sourceItemName, option.category) + '</div>' +
                         '<div class="col-md-4"><label class="form-label small mb-1">Upgrade Name</label><input type="text" class="form-control form-control-sm upgrade-name" value="' + manageItemsAttr(option.name) + '" placeholder="e.g., Post-to-post drink rail"></div>' +
-                        '<div class="col-md-2"><label class="form-label small mb-1">Unit</label><input type="text" class="form-control form-control-sm upgrade-unit-type" value="' + manageItemsAttr(option.unitType || state.baseUnitType || '') + '" list="unitTypeOptions"></div>' +
-                        '<div class="col-md-2"><label class="form-label small mb-1">Type</label><select class="form-select form-select-sm upgrade-type"><option value="replacement" ' + (option.upgradeType === 'replacement' ? 'selected' : '') + '>Replacement</option><option value="add_on" ' + (option.upgradeType !== 'replacement' ? 'selected' : '') + '>Add-on</option></select></div>' +
-                        '<div class="col-md-2"><label class="form-label small mb-1">Rate</label><input type="number" class="form-control form-control-sm upgrade-rate" value="' + manageItemsAttr(option.rate.toFixed(2)) + '" step="0.01" min="0"></div>' +
-                        '<div class="col-md-2"><label class="form-label small mb-1">Cost</label><input type="number" class="form-control form-control-sm upgrade-material-cost" value="' + manageItemsAttr(option.materialCost.toFixed(2)) + '" step="0.01" min="0"></div>' +
+                        '<div class="col-md-2"><label class="form-label small mb-1">Unit</label>' + renderManageUnitSelect(option.unitType || state.baseUnitType || '', 'upgrade-unit-type') + '</div>' +
+                        '<div class="col-md-2"><label class="form-label small mb-1">Type</label><select class="form-select form-select-sm upgrade-type" ' + (isConsultationGroup ? 'disabled' : '') + '><option value="replacement" ' + (option.upgradeType === 'replacement' ? 'selected' : '') + '>Replacement</option><option value="add_on" ' + (option.upgradeType === 'add_on' ? 'selected' : '') + '>Add-on</option><option value="consultation" ' + (optionRequiresConsultation ? 'selected' : '') + '>Requires consultation</option></select></div>' +
+                        '<div class="col-md-2"><label class="form-label small mb-1">Rate</label><input type="number" class="form-control form-control-sm upgrade-rate" value="' + manageItemsAttr(optionRequiresConsultation ? '0.00' : option.rate.toFixed(2)) + '" step="0.01" min="0" ' + (optionRequiresConsultation ? 'disabled' : '') + '></div>' +
+                        '<div class="col-md-2"><label class="form-label small mb-1">Cost</label><input type="number" class="form-control form-control-sm upgrade-material-cost" value="' + manageItemsAttr(optionRequiresConsultation ? '0.00' : option.materialCost.toFixed(2)) + '" step="0.01" min="0" ' + (optionRequiresConsultation ? 'disabled' : '') + '></div>' +
                         '<div class="col-md-7"><label class="form-label small mb-1">Supplier URL</label><input type="url" class="form-control form-control-sm upgrade-supplier-url" value="' + manageItemsAttr(option.supplierUrl || '') + '" placeholder="https://..."></div>' +
                         '<div class="col-md-1 d-flex align-items-end"><button type="button" class="btn btn-sm btn-outline-danger w-100" data-upgrade-wizard-action="remove-option" title="Remove option"><i class="fas fa-trash"></i></button></div>' +
                         '<div class="col-12"><label class="form-label small mb-1">Upgrade Description</label><input type="text" class="form-control form-control-sm upgrade-desc" value="' + manageItemsAttr(option.description || '') + '" placeholder="Optional client-facing description"></div>' +
@@ -518,9 +564,9 @@
                 '<div class="alert alert-light border small">Use rules only when an upgrade depends on another upgrade. Example: <strong>Lighted post caps</strong> can be Available after <strong>Post-to-post drink rail</strong> and Blocked by <strong>Continuous drink rail</strong>.</div>' +
                 options.map(function(option, optionIndex) {
                     option = normalizeManageUpgradeOption(option, 'wizard_rule_' + optionIndex);
-                    return '<div class="manage-upgrade-wizard-option border rounded p-2 mb-2" data-upgrade-option-id="' + manageItemsAttr(option.id) + '">' +
+                    return '<div class="manage-upgrade-wizard-option manage-upgrade-wizard-option-card" data-upgrade-option-id="' + manageItemsAttr(option.id) + '">' +
                         '<div class="fw-bold">' + manageItemsEscape(option.name || 'Unnamed upgrade') + '</div>' +
-                        '<div class="small text-muted mb-2">' + manageItemsEscape(option.upgradeType === 'replacement' ? 'Replacement' : 'Add-on') + ' - ' + manageItemsEscape(option.unitType || 'unit not set') + ' @ $' + (parseFloat(option.rate) || 0).toFixed(2) + '</div>' +
+                        '<div class="small text-muted mb-2">' + manageItemsEscape(option.upgradeType === 'consultation' || option.requiresConsultation ? 'Requires consultation' : (option.upgradeType === 'replacement' ? 'Replacement' : 'Add-on')) + (option.requiresConsultation || option.upgradeType === 'consultation' ? '' : ' - ' + manageItemsEscape(option.unitType || 'unit not set') + ' @ $' + (parseFloat(option.rate) || 0).toFixed(2)) + '</div>' +
                         '<div class="row g-2">' +
                         '<div class="col-md-6">' + renderManageUpgradePathSelect(options, option.availableAfterOptionIds, option.id, 'upgrade-available-after', 'Available after') + '</div>' +
                         '<div class="col-md-6">' + renderManageUpgradePathSelect(options, option.blockedByOptionIds, option.id, 'upgrade-blocked-by', 'Blocked by') + '</div>' +
@@ -537,13 +583,13 @@
                 renderManageUpgradeWizardStepNav('review') +
                 '<div class="manage-upgrade-wizard-preview border rounded bg-light p-3">' +
                 '<div class="fw-bold mb-1">' + manageItemsEscape(group.name || 'Upgrade Options') + '</div>' +
-                '<div class="small text-muted mb-3">' + (group.type === 'multiple' ? 'Client can pick multiple upgrades.' : 'Client can pick one upgrade, or leave the base item unchanged.') + '</div>' +
+                '<div class="small text-muted mb-3">' + (group.type === 'consultation' ? 'Client can request this option and send the quote back for pricing.' : (group.type === 'multiple' ? 'Client can pick multiple upgrades.' : 'Client can pick one upgrade, or leave the base item unchanged.')) + '</div>' +
                 (options.length ? options.map(function(option) {
                     const rules = [];
                     if ((option.availableAfterOptionIds || []).length) rules.push('Available after ' + option.availableAfterOptionIds.length + ' option(s)');
                     if ((option.blockedByOptionIds || []).length) rules.push('Blocked by ' + option.blockedByOptionIds.length + ' option(s)');
                     return '<div class="border rounded bg-white p-2 mb-2">' +
-                        '<div class="d-flex justify-content-between gap-2 flex-wrap"><strong>' + manageItemsEscape(option.name || 'Unnamed upgrade') + '</strong><span>' + manageItemsEscape(option.upgradeType === 'replacement' ? 'Replacement' : 'Add-on') + ' - $' + (parseFloat(option.rate) || 0).toFixed(2) + '/' + manageItemsEscape(option.unitType || 'unit') + '</span></div>' +
+                        '<div class="d-flex justify-content-between gap-2 flex-wrap"><strong>' + manageItemsEscape(option.name || 'Unnamed upgrade') + '</strong><span>' + (option.requiresConsultation || option.upgradeType === 'consultation' ? 'Requires consultation' : (manageItemsEscape(option.upgradeType === 'replacement' ? 'Replacement' : 'Add-on') + ' - $' + (parseFloat(option.rate) || 0).toFixed(2) + '/' + manageItemsEscape(option.unitType || 'unit'))) + '</span></div>' +
                         (option.description ? '<div class="small text-muted mt-1">' + manageItemsEscape(option.description) + '</div>' : '') +
                         (rules.length ? '<div class="small text-primary mt-1">' + manageItemsEscape(rules.join(' | ')) + '</div>' : '') +
                         '</div>';
@@ -599,7 +645,7 @@
             const groupName = modalEl.querySelector('.upgrade-group-name');
             const groupType = modalEl.querySelector('.upgrade-group-type');
             if (groupName) group.name = groupName.value.trim();
-            if (groupType) group.type = groupType.value === 'multiple' ? 'multiple' : 'single_optional';
+            if (groupType) group.type = normalizeManageUpgradeGroupType(groupType.value);
             const optionEls = Array.from(modalEl.querySelectorAll('.manage-upgrade-wizard-option'));
             if (!optionEls.length) return;
             group.options = optionEls.map(function(optionEl, optionIndex) {
@@ -618,15 +664,18 @@
                 const selectedFrom = function(selector, fallback) {
                     return collectManageUpgradeRuleCheckboxIds(optionEl, selector.replace(/^\./, ''), fallback);
                 };
+                const optionType = normalizeManageUpgradeType(optionEl.querySelector('.upgrade-type')?.value || previous.upgradeType);
+                const requiresConsultation = group.type === 'consultation' || optionType === 'consultation' || previous.requiresConsultation === true;
                 return {
                     id: optionId,
                     name: getValue('.upgrade-name', previous.name),
                     unitType: getValue('.upgrade-unit-type', previous.unitType || manageUpgradeWizardState.baseUnitType),
-                    rate: getNumber('.upgrade-rate', previous.rate),
-                    materialCost: getNumber('.upgrade-material-cost', previous.materialCost),
+                    rate: requiresConsultation ? 0 : getNumber('.upgrade-rate', previous.rate),
+                    materialCost: requiresConsultation ? 0 : getNumber('.upgrade-material-cost', previous.materialCost),
                     supplierUrl: getValue('.upgrade-supplier-url', previous.supplierUrl),
                     description: getValue('.upgrade-desc', previous.description),
-                    upgradeType: normalizeManageUpgradeType(optionEl.querySelector('.upgrade-type')?.value || previous.upgradeType),
+                    upgradeType: group.type === 'consultation' ? 'consultation' : optionType,
+                    requiresConsultation: requiresConsultation,
                     sourceItemName: selectedSource?.dataset.name || previous.sourceItemName || '',
                     category: selectedSource?.dataset.category || previous.category || '',
                     availableAfterOptionIds: selectedFrom('.upgrade-available-after', previous.availableAfterOptionIds),
@@ -721,7 +770,9 @@
                 const detailsRow = getManageDetailsRowByKey(manageUpgradeWizardState.rowKey);
                 if (detailsRow) {
                     refreshManageUpgradeGroupsEditor(detailsRow, groups);
-                    markPricingDirty(detailsRow);
+                    if (!saveManageUpgradeWizardRow(detailsRow)) {
+                        markPricingDirty(detailsRow);
+                    }
                 }
             } else {
                 manageNewItemWizardUpgradeGroups = normalizeManageItemUpgradeGroups({ upgradeGroups: groups });
@@ -820,7 +871,14 @@
             if (!optionEl || !selected || !selected.value) return;
             const setValue = function(selector, value) {
                 const input = optionEl.querySelector(selector);
-                if (input) input.value = value || '';
+                if (!input) return;
+                if (input.tagName === 'SELECT') {
+                    ensureManageUnitOption(input, value || '');
+                }
+                input.value = value || '';
+                if (input.classList?.contains('item-unit-type-input')) {
+                    input.dataset.currentUnit = input.value || '';
+                }
             };
             setValue('.upgrade-name', selected.dataset.name || '');
             setValue('.upgrade-unit-type', selected.dataset.unit || rowUnitTypeForDetails(selectEl.closest('.item-details-row')) || manageUpgradeWizardState?.baseUnitType || '');
@@ -936,14 +994,18 @@
             return true;
         }
 
-        function renderManageUnitSelect(currentValue) {
+        function renderManageUnitSelect(currentValue, extraClass) {
             const current = String(currentValue || '').trim();
             const units = getManageKnownUnitTypes(current);
             const options = ['<option value="" ' + (!current ? 'selected' : '') + '>Select unit...</option>'].concat(units.map(function(unit) {
                 return '<option value="' + manageItemsAttr(unit) + '" ' + (unit === current ? 'selected' : '') + '>' + manageItemsEscape(unit) + '</option>';
             }));
+            const extraClassName = String(extraClass || '').split(/\s+/).filter(Boolean).join(' ');
             options.push('<option value="' + MANAGE_CUSTOM_UNIT_VALUE + '">New...</option>');
-            return '<select class="form-select form-select-sm item-unit-type-input" aria-label="Unit type" data-current-unit="' + manageItemsAttr(current) + '" onchange="handleManageUnitTypeChange(this)">' + options.join('') + '</select>';
+            if (!extraClassName) {
+                return '<select class="form-select form-select-sm item-unit-type-input" aria-label="Unit type" data-current-unit="' + manageItemsAttr(current) + '" onchange="handleManageUnitTypeChange(this)">' + options.join('') + '</select>';
+            }
+            return '<select class="form-select form-select-sm item-unit-type-input ' + manageItemsAttr(extraClassName) + '" aria-label="Unit type" data-current-unit="' + manageItemsAttr(current) + '" onchange="handleManageUnitTypeChange(this)">' + options.join('') + '</select>';
         }
 
         async function handleManageUnitTypeChange(selectEl) {
@@ -1567,6 +1629,9 @@
             toggleManageItemsBottomBar(false);
             initManageItemsFooterSwipe();
             bindManageItemsFooterButtons();
+            bindManageItemsCloseGuard();
+            manageItemsCloseConfirmed = false;
+            manageItemsClosePromptOpen = false;
             syncManageItemsUndoButtons();
 (bootstrap.Modal.getInstance(document.getElementById('manageItemsModal')) || new bootstrap.Modal(document.getElementById('manageItemsModal'))).show();
         }
@@ -1649,26 +1714,63 @@
                 document.body.style.removeProperty('overflow');
                 document.body.style.removeProperty('padding-right');
             }
+            manageItemsCloseConfirmed = false;
+            manageItemsClosePromptOpen = false;
+        }
+
+        function hasUnsavedManageItemsChanges() {
+            return !!(pricingDirty || pricingOtherDirty || dirtyPricingRows.size > 0);
+        }
+
+        async function confirmDiscardManageItemsChanges() {
+            return await qdConfirm('You have unsaved changes, are you sure you want to exit?', {
+                title: 'Unsaved Changes',
+                okText: 'Exit Without Saving',
+                cancelText: 'Keep Editing',
+                okClass: 'btn-warning',
+                type: 'warning'
+            });
+        }
+
+        function bindManageItemsCloseGuard() {
+            const modalEl = document.getElementById('manageItemsModal');
+            if (!modalEl || modalEl.dataset.manageCloseGuardBound === '1') return;
+            modalEl.dataset.manageCloseGuardBound = '1';
+            modalEl.addEventListener('hide.bs.modal', function(event) {
+                if (manageItemsCloseConfirmed || !hasUnsavedManageItemsChanges()) return;
+                event.preventDefault();
+                if (manageItemsClosePromptOpen) return;
+                manageItemsClosePromptOpen = true;
+                confirmDiscardManageItemsChanges().then(function(shouldExit) {
+                    manageItemsClosePromptOpen = false;
+                    if (!shouldExit) return;
+                    clearPricingDirty();
+                    manageItemsCloseConfirmed = true;
+                    hideManageItemsModal();
+                }).catch(function() {
+                    manageItemsClosePromptOpen = false;
+                });
+            });
+            modalEl.addEventListener('hidden.bs.modal', function() {
+                manageItemsCloseConfirmed = false;
+                manageItemsClosePromptOpen = false;
+            });
         }
 
         async function closeManageItemsModal() {
-            if (pricingDirty) {
-                const choice = await qdConfirm('You have unsaved pricing changes. Save all changes before closing?', {
-                    title: 'Unsaved Pricing Changes',
-                    okText: 'Save & Close',
-                    cancelText: 'Close Without Saving',
-                    okClass: 'btn-warning',
-                    type: 'warning'
-                });
-                if (choice) {
-                    saveAllPricingRows();
-                }
+            if (hasUnsavedManageItemsChanges()) {
+                const shouldExit = await confirmDiscardManageItemsChanges();
+                if (!shouldExit) return false;
+                clearPricingDirty();
             }
-            clearPricingDirty();
+            manageItemsCloseConfirmed = true;
             hideManageItemsModal();
+            return true;
         }
 
         let pricingDirty = false; // tracks unsaved changes in Manage Items modal
+        let manageItemsCloseConfirmed = false;
+        let manageItemsClosePromptOpen = false;
         let lastDeletedItem = null; // for undo functionality
         var undoStack = [];
         let manageItemsFooterSwipeInitialized = false;
@@ -2045,6 +2147,27 @@
             return true;
         }
 
+        function saveManageUpgradeWizardRow(detailsRow) {
+            const rowKey = detailsRow ? (detailsRow.getAttribute('data-row-key') || '') : '';
+            const row = getManageRowByKey(rowKey);
+            const saveBtn = row ? row.querySelector('.item-save-btn') : null;
+            if (!saveBtn?.dataset.cat || !saveBtn?.dataset.name) return false;
+            pushUndoState();
+            const saved = saveItemRowCore(saveBtn.dataset.cat, saveBtn.dataset.name, { backup: false, flash: false });
+            if (!saved) return false;
+            localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
+            _doBackupItemsToCloud(customItems).then(function(result) {
+                const ok = result && !result.error;
+                showManageItemsToast(ok ? 'Upgrade group saved.' : 'Saved locally - cloud sync failed.', ok);
+                filterItemsList();
+            }).catch(function() {
+                showManageItemsToast('Saved locally - cloud sync failed.', false);
+                filterItemsList();
+            });
+            if (manageItemsFilter === 'unsaved') filterItemsList();
+            return true;
+        }
+
         // Inline restore function
         async function _doRestoreItemsFromCloud() {
             const { data: { user }, error: authErr } = await _supabase.auth.getUser();
@@ -2312,7 +2435,7 @@
                                     </div>
                                     <div class="col-md-2">
                                         <label class="form-label" style="font-size:0.75em">Unit</label>
-                                        <input type="text" class="form-control form-control-sm upgrade-unit-type" value="${upgUnitType}" list="unitTypeOptions" placeholder="LF, sq ft, each, Flatrate" oninput="markPricingDirty()">
+                                        ${renderManageUnitSelect(upgUnitType, 'upgrade-unit-type')}
                                     </div>
                                     <div class="col-md-2">
                                         <label class="form-label" style="font-size:0.75em">Rate ($)</label>
@@ -2832,6 +2955,7 @@
                         itemDescription: item.itemDescription || item.description || '',
                         laborTime: normalizeManageLaborTime(item.laborTime),
                         upgrade: item.upgrade ? JSON.parse(JSON.stringify(item.upgrade)) : null,
+                        upgradeGroups: normalizeManageItemUpgradeGroups(item),
                         quantityMode: 'inherit',
                         quantityOverride: ''
                     });
@@ -3934,6 +4058,7 @@
         window.renderManageItemUpgradeGroupsEditor = renderManageItemUpgradeGroupsEditor;
         window.collectManageItemUpgradeGroups = collectManageItemUpgradeGroups;
         window.handleManageUpgradeGroupAction = handleManageUpgradeGroupAction;
+        window.handleManageUpgradeGroupTypeChange = handleManageUpgradeGroupTypeChange;
         window.openManageUpgradeWizard = openManageUpgradeWizard;
         window.openManageNewItemUpgradeWizard = openManageNewItemUpgradeWizard;
         window.renderManageUpgradeWizardModal = renderManageUpgradeWizardModal;

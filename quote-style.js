@@ -8,6 +8,8 @@
             preset: 'clean-blue',
             accent: '#1a56a0',
             optionAccent: '#1a56a0',
+            upgradeAccent: '#0d9488',
+            upgradeBg: '#f8fafc',
             bg: '#f7fbff',
             bgOpacity: 100,
             headerStyle: 'branded',
@@ -176,6 +178,25 @@
             else el.value = value || '';
         }
 
+        function bindStyleSwatchGroup(containerId, attrName, fieldId, styleKey) {
+            var container = document.getElementById(containerId);
+            if (!container || container.dataset.styleSwatchBound) return;
+            container.addEventListener('click', function(event) {
+                var swatch = event.target.closest('.style-swatch');
+                if (!swatch || !container.contains(swatch)) return;
+                var value = swatch.getAttribute(attrName);
+                if (!value) return;
+                event.preventDefault();
+                event.stopPropagation();
+                _quoteStyle.preset = 'custom';
+                _quoteStyle[styleKey] = value;
+                setFieldValue(fieldId, value);
+                syncQuoteStyleGlobal();
+                applyQuoteStyleToControls(_quoteStyle);
+            });
+            container.dataset.styleSwatchBound = '1';
+        }
+
         function formatDateInput(date) {
             var y = date.getFullYear();
             var m = String(date.getMonth() + 1).padStart(2, '0');
@@ -241,6 +262,8 @@
             style.bgOpacity = Math.max(0, Math.min(style.bgOpacity, 100));
             style.fontFeel = document.getElementById('quoteFontFeel')?.value || style.fontFeel;
             style.optionAccent = document.querySelector('#optionAccentSwatches .style-swatch.selected')?.getAttribute('data-option-accent') || document.getElementById('quoteOptionAccent')?.value || style.optionAccent || style.accent || '#1a56a0';
+            style.upgradeAccent = document.querySelector('#upgradeAccentSwatches .style-swatch.selected')?.getAttribute('data-upgrade-accent') || document.getElementById('quoteUpgradeAccent')?.value || style.upgradeAccent || '#0d9488';
+            style.upgradeBg = document.querySelector('#upgradeBgSwatches .style-swatch.selected')?.getAttribute('data-upgrade-bg') || document.getElementById('quoteUpgradeBg')?.value || style.upgradeBg || '#f8fafc';
             style.pricingMode = document.getElementById('quotePricingMode')?.value || style.pricingMode;
             style.depositMode = document.getElementById('quoteDepositMode')?.value || style.depositMode;
             style.depositPercent = parseFloat(document.getElementById('quoteDepositPercent')?.value || style.depositPercent || 50);
@@ -282,6 +305,8 @@
             updateBgOpacityLabel(_quoteStyle.bgOpacity);
             setFieldValue('quoteFontFeel', _quoteStyle.fontFeel);
             setFieldValue('quoteOptionAccent', _quoteStyle.optionAccent || _quoteStyle.accent || '#1a56a0');
+            setFieldValue('quoteUpgradeAccent', _quoteStyle.upgradeAccent || '#0d9488');
+            setFieldValue('quoteUpgradeBg', _quoteStyle.upgradeBg || '#f8fafc');
             setFieldValue('quotePricingMode', _quoteStyle.pricingMode);
             setFieldValue('quoteDepositMode', _quoteStyle.depositMode);
             setFieldValue('quoteDepositPercent', _quoteStyle.depositPercent || 50);
@@ -317,12 +342,20 @@
             document.querySelectorAll('#optionAccentSwatches .style-swatch').forEach(function(sw) {
                 sw.classList.toggle('selected', sw.getAttribute('data-option-accent') === (_quoteStyle.optionAccent || _quoteStyle.accent || '#1a56a0'));
             });
+            document.querySelectorAll('#upgradeAccentSwatches .style-swatch').forEach(function(sw) {
+                sw.classList.toggle('selected', sw.getAttribute('data-upgrade-accent') === (_quoteStyle.upgradeAccent || '#0d9488'));
+            });
+            document.querySelectorAll('#upgradeBgSwatches .style-swatch').forEach(function(sw) {
+                sw.classList.toggle('selected', sw.getAttribute('data-upgrade-bg') === (_quoteStyle.upgradeBg || '#f8fafc'));
+            });
+            applyQuoteUpgradeTheme(_quoteStyle);
             updateStylePreview();
         }
 
         function updateStylePreview() {
             _quoteStyle = readQuoteStyleFromControls();
             syncQuoteStyleGlobal();
+            applyQuoteUpgradeTheme(_quoteStyle);
             var prev = document.getElementById('stylePreview');
             var hdr = document.getElementById('previewHeader');
             var tot = document.getElementById('previewTotal');
@@ -377,6 +410,17 @@
             if (!rgb) return hex || '#1a56a0';
             var alpha = Math.max(20, Math.min(parseInt(opacityPercent || 100, 10), 100)) / 100;
             return 'rgba(' + rgb.r + ', ' + rgb.g + ', ' + rgb.b + ', ' + alpha.toFixed(2) + ')';
+        }
+
+        function applyQuoteUpgradeTheme(style) {
+            var root = document.documentElement;
+            if (!root) return;
+            var accent = (style && style.upgradeAccent) || '#0d9488';
+            var bg = (style && style.upgradeBg) || '#f8fafc';
+            root.style.setProperty('--quote-upgrade-accent', accent);
+            root.style.setProperty('--quote-upgrade-bg', bg);
+            root.style.setProperty('--quote-upgrade-accent-soft', colorWithOpacity(accent, 20));
+            root.style.setProperty('--quote-upgrade-border', colorWithOpacity(accent, 35));
         }
 
         function quoteHeaderBackgroundForEffect(accent, headerStyle, headerOpacity, effect) {
@@ -604,6 +648,8 @@
                     _quoteStyle.preset = btn.getAttribute('data-preset') || 'custom';
                     _quoteStyle.accent = btn.getAttribute('data-accent') || _quoteStyle.accent;
                     _quoteStyle.optionAccent = btn.getAttribute('data-option-accent') || _quoteStyle.accent;
+                    _quoteStyle.upgradeAccent = btn.getAttribute('data-upgrade-accent') || _quoteStyle.upgradeAccent || '#0d9488';
+                    _quoteStyle.upgradeBg = btn.getAttribute('data-upgrade-bg') || _quoteStyle.upgradeBg || '#f8fafc';
                     _quoteStyle.bg = btn.getAttribute('data-bg') || _quoteStyle.bg;
                     _quoteStyle.headerStyle = btn.getAttribute('data-header') || _quoteStyle.headerStyle;
                     _quoteStyle.fontFeel = btn.getAttribute('data-font') || _quoteStyle.fontFeel;
@@ -635,7 +681,9 @@
                     applyQuoteStyleToControls(_quoteStyle);
                 };
             });
-            ['quoteHeaderStyle','quoteHeaderEffect','quoteHeaderOpacity','quoteBgOpacity','quoteFontFeel','quoteOptionAccent','quotePricingMode','quoteDepositMode','quoteDepositPercent','quoteApprovalMode','quoteExpiryDate','quoteShowUpgrades','quoteShowScopeNotes','quoteShowCommitment','quoteSkipSettingsOnGenerate','commitmentTitleInput','commitmentIcon1','commitmentImage1','commitmentLabel1','commitmentText1','commitmentIcon2','commitmentImage2','commitmentLabel2','commitmentText2','commitmentIcon3','commitmentImage3','commitmentLabel3','commitmentText3','commitmentIcon4','commitmentImage4','commitmentLabel4','commitmentText4','quoteClientMessage'].forEach(function(id) {
+            bindStyleSwatchGroup('upgradeAccentSwatches', 'data-upgrade-accent', 'quoteUpgradeAccent', 'upgradeAccent');
+            bindStyleSwatchGroup('upgradeBgSwatches', 'data-upgrade-bg', 'quoteUpgradeBg', 'upgradeBg');
+            ['quoteHeaderStyle','quoteHeaderEffect','quoteHeaderOpacity','quoteBgOpacity','quoteFontFeel','quoteOptionAccent','quoteUpgradeAccent','quoteUpgradeBg','quotePricingMode','quoteDepositMode','quoteDepositPercent','quoteApprovalMode','quoteExpiryDate','quoteShowUpgrades','quoteShowScopeNotes','quoteShowCommitment','quoteSkipSettingsOnGenerate','commitmentTitleInput','commitmentIcon1','commitmentImage1','commitmentLabel1','commitmentText1','commitmentIcon2','commitmentImage2','commitmentLabel2','commitmentText2','commitmentIcon3','commitmentImage3','commitmentLabel3','commitmentText3','commitmentIcon4','commitmentImage4','commitmentLabel4','commitmentText4','quoteClientMessage'].forEach(function(id) {
                 var el = document.getElementById(id);
                 if (el && !el.dataset.styleBound) {
                     el.addEventListener('input', updateStylePreview);

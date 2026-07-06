@@ -20,6 +20,10 @@
             --change-order-surface: rgba(26, 86, 160, 0.08);
             --change-order-surface-strong: rgba(26, 86, 160, 0.12);
             --change-order-border-soft: rgba(26, 86, 160, 0.24);
+            --quote-upgrade-accent: #0d9488;
+            --quote-upgrade-bg: #f8fafc;
+            --quote-upgrade-accent-soft: rgba(13, 148, 136, 0.14);
+            --quote-upgrade-border: rgba(13, 148, 136, 0.35);
         }
         body { background-color: #eef4fb; }
         .quote-actions-dropdown .quote-actions-menu {
@@ -192,6 +196,57 @@
             padding: 1rem;
             margin-bottom: 0.5rem;
             border-radius: 4px;
+        }
+        .quote-upgrade-groups {
+            background: var(--quote-upgrade-bg, #f8fafc) !important;
+            border-color: var(--quote-upgrade-border, rgba(13, 148, 136, 0.35)) !important;
+            border-left: 4px solid var(--quote-upgrade-accent, #0d9488) !important;
+            color: #334155;
+        }
+        .quote-upgrade-title {
+            color: var(--quote-upgrade-accent, #0d9488);
+        }
+        .quote-upgrade-option-btn {
+            border: 1px solid var(--quote-upgrade-accent, #0d9488);
+            background: #ffffff;
+            color: var(--quote-upgrade-accent, #0d9488);
+            border-radius: 999px;
+            font-weight: 800;
+            transition: transform 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease, color 0.16s ease;
+        }
+        .quote-upgrade-option-btn:hover,
+        .quote-upgrade-option-btn:focus {
+            background: var(--quote-upgrade-accent-soft, rgba(13, 148, 136, 0.14));
+            border-color: var(--quote-upgrade-accent, #0d9488);
+            color: var(--quote-upgrade-accent, #0d9488);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 14px rgba(15, 23, 42, 0.12);
+        }
+        .quote-upgrade-option-btn.is-selected,
+        .quote-upgrade-option-btn.is-selected:hover,
+        .quote-upgrade-option-btn.is-selected:focus {
+            background: var(--quote-upgrade-accent, #0d9488);
+            border-color: var(--quote-upgrade-accent, #0d9488);
+            color: #ffffff;
+        }
+        .quote-upgrade-option-btn i {
+            transition: transform 0.15s ease;
+        }
+        .quote-upgrade-option-btn.is-selected i {
+            transform: scale(1.08);
+        }
+        .quote-upgrade-description-toggle:hover {
+            color: var(--quote-upgrade-accent, #0d9488) !important;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .quote-upgrade-option-btn,
+            .quote-upgrade-option-btn i {
+                transition: none;
+            }
+            .quote-upgrade-option-btn:hover,
+            .quote-upgrade-option-btn:focus {
+                transform: none;
+            }
         }
         .room-total {
             font-size: 1.2rem;
@@ -819,7 +874,7 @@
                 display: none !important;
             }
         }
-        .style-swatch { width:36px;height:36px;border-radius:50%;cursor:pointer;border:3px solid transparent;transition:all 0.15s; }
+        .style-swatch { width:36px;height:36px;border-radius:50%;cursor:pointer;border:3px solid transparent;transition:all 0.15s;padding:0;appearance:none; }
         .style-swatch.selected { border-color:#333;transform:scale(1.15); }
         .style-swatch:hover { transform:scale(1.1); }
         .quote-style-preset {
@@ -1348,6 +1403,19 @@
         }
         #manageItemsModal .item-details-row {
             background: #f8fbff;
+        }
+        #manageItemsModal .manage-upgrade-wizard-option-card,
+        #manageUpgradeWizardModal .manage-upgrade-wizard-option-card {
+            border: 2px solid #b8cbe6 !important;
+            border-radius: 8px;
+            background: #fbfdff;
+            box-shadow: 0 1px 0 rgba(15, 35, 55, 0.06);
+            padding: 0.75rem;
+            margin-bottom: 0.85rem;
+        }
+        #manageItemsModal .manage-upgrade-wizard-option-card + .manage-upgrade-wizard-option-card,
+        #manageUpgradeWizardModal .manage-upgrade-wizard-option-card + .manage-upgrade-wizard-option-card {
+            margin-top: 0.45rem;
         }
         #manageItemsModal .manage-margin-pill {
             display: inline-flex;
@@ -3050,6 +3118,7 @@ Example:
 
         function normalizeQuoteUpgradeType(value) {
             var clean = String(value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+            if (clean === 'consultation' || clean === 'requires_consultation') return 'consultation';
             return clean === 'add_on' || clean === 'addon' ? 'add_on' : 'replacement';
         }
 
@@ -3073,6 +3142,7 @@ Example:
 
         function normalizeQuoteItemUpgradeOption(option, fallbackId) {
             option = option || {};
+            var upgradeType = normalizeQuoteUpgradeType(option.upgradeType || option.type || option.mode);
             return {
                 id: option.id || fallbackId || choiceGroupId(),
                 name: option.name || option.sourceItemName || option.description || 'Upgrade',
@@ -3085,10 +3155,15 @@ Example:
                 description: option.description || option.itemDescription || '',
                 itemDescription: option.itemDescription || option.description || '',
                 laborTime: normalizeLaborTime(option.laborTime),
-                upgradeType: normalizeQuoteUpgradeType(option.upgradeType || option.type || option.mode),
+                upgradeType: upgradeType,
+                requiresConsultation: option.requiresConsultation === true || upgradeType === 'consultation',
                 availableAfterOptionIds: Array.isArray(option.availableAfterOptionIds) ? option.availableAfterOptionIds.filter(Boolean) : [],
                 blockedByOptionIds: Array.isArray(option.blockedByOptionIds) ? option.blockedByOptionIds.filter(Boolean) : []
             };
+        }
+
+        function isQuoteItemConsultationUpgradeOption(option) {
+            return !!option && (option.requiresConsultation === true || option.upgradeType === 'consultation' || option.type === 'consultation');
         }
 
         function normalizeQuoteItemUpgradeGroups(itemOrGroups) {
@@ -3102,7 +3177,7 @@ Example:
                 return {
                     id: group.id || ('item_upg_' + groupIndex),
                     name: group.name || 'Upgrade Options',
-                    type: group.type === 'multiple' ? 'multiple' : 'single_optional',
+                    type: group.type === 'consultation' ? 'consultation' : (group.type === 'multiple' ? 'multiple' : 'single_optional'),
                     selectedOptionIds: Array.isArray(group.selectedOptionIds) ? group.selectedOptionIds.filter(Boolean) : [],
                     options: options
                 };
@@ -3149,7 +3224,7 @@ Example:
                         if (!option) return false;
                         return isItemUpgradeOptionCompatible(option, selectedIds.filter(function(id) { return id !== optionId; }));
                     });
-                    if (group.type === 'single_optional') next = next.slice(0, 1);
+                    if (group.type !== 'multiple') next = next.slice(0, 1);
                     if (next.length !== (group.selectedOptionIds || []).length) {
                         group.selectedOptionIds = next;
                         changed = true;
@@ -3197,7 +3272,12 @@ Example:
             var description = item._baseDescription || item.description || '';
             var laborTime = normalizeLaborTime(item._baseLaborTime || item.laborTime);
             var selectedOptions = getSelectedItemUpgradeOptions(item);
+            var requiresConsultation = false;
             selectedOptions.forEach(function(option) {
+                if (isQuoteItemConsultationUpgradeOption(option)) {
+                    requiresConsultation = true;
+                    return;
+                }
                 var optionRate = parseFloat(option.rate || 0) || 0;
                 var optionCost = parseFloat(option.materialCost || 0) || 0;
                 if (option.upgradeType === 'replacement') {
@@ -3225,9 +3305,44 @@ Example:
             item.description = description;
             item.laborTime = laborTime;
             item.upgraded = selectedOptions.length > 0;
+            item.requiresConsultation = requiresConsultation;
             item.selectedUpgradeOptionIds = selectedOptions.map(function(option) { return option.id; });
             item.total = quantity * rate;
             return item;
+        }
+
+        function qdUpgradeDomIdPart(value) {
+            return String(value === undefined || value === null ? 'x' : value).replace(/[^a-zA-Z0-9_-]/g, '_') || 'x';
+        }
+
+        function getItemUpgradeOptionDescription(option) {
+            if (!option) return '';
+            return String(option.description || option.itemDescription || option.notes || option.user_note || '').trim();
+        }
+
+        function itemUpgradeDescriptionPanelId(roomId, itemIndex, groupId, optionId) {
+            return 'item-upgrade-desc-' + qdUpgradeDomIdPart(roomId) + '-' + qdUpgradeDomIdPart(itemIndex) + '-' + qdUpgradeDomIdPart(groupId) + '-' + qdUpgradeDomIdPart(optionId);
+        }
+
+        function toggleItemUpgradeDescription(event, roomId, itemIndex, groupId, optionId) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            var panel = document.getElementById(itemUpgradeDescriptionPanelId(roomId, itemIndex, groupId, optionId));
+            if (!panel) return;
+            var hidden = panel.classList.toggle('d-none');
+            var button = event && event.currentTarget;
+            if (button) {
+                button.setAttribute('aria-expanded', hidden ? 'false' : 'true');
+                var label = button.querySelector('[data-upgrade-desc-label]');
+                if (label) label.textContent = hidden ? 'Details' : 'Hide';
+                var icon = button.querySelector('i');
+                if (icon) {
+                    icon.classList.toggle('fa-chevron-down', hidden);
+                    icon.classList.toggle('fa-chevron-up', !hidden);
+                }
+            }
         }
 
         function renderItemUpgradeGroups(roomId, itemIndex, item) {
@@ -3236,24 +3351,37 @@ Example:
             clearInvalidItemUpgradeSelections(item);
             if (!item.upgradeGroups.length) return '';
             var selectedIds = getAllSelectedItemUpgradeOptionIds(item);
-            var html = '<div class="item-upgrade-groups mt-2 border rounded p-2 bg-light">';
-            html += '<div class="small fw-bold text-warning mb-1"><i class="fas fa-arrow-up me-1"></i>Upgrade options</div>';
+            var html = '<div class="item-upgrade-groups quote-upgrade-groups mt-2 border rounded p-2">';
+            html += '<div class="small fw-bold quote-upgrade-title mb-1"><i class="fas fa-arrow-up me-1"></i>Upgrade options</div>';
             item.upgradeGroups.forEach(function(group) {
                 var compatible = (group.options || []).filter(function(option) {
                     return isItemUpgradeOptionCompatible(option, selectedIds.filter(function(id) { return id !== option.id; }));
                 });
                 if (!compatible.length) return;
                 html += '<div class="small mb-2"><span class="fw-semibold">' + qdTemplateEscapeHtml(group.name || 'Upgrade Options') + '</span> ';
-                html += '<span class="text-muted">(' + (group.type === 'multiple' ? 'pick multiple' : 'optional pick one') + ')</span>';
+                html += '<span class="text-muted">(' + (group.type === 'consultation' ? 'requires consultation' : (group.type === 'multiple' ? 'pick multiple' : 'optional pick one')) + ')</span>';
                 html += '<div class="d-flex flex-wrap gap-1 mt-1">';
                 compatible.forEach(function(option) {
                     var selected = (group.selectedOptionIds || []).indexOf(option.id) !== -1;
+                    var requiresConsultation = isQuoteItemConsultationUpgradeOption(option);
                     var optionTotal = (parseFloat(item.quantity) || 0) * (parseFloat(option.rate) || 0);
                     var groupArg = JSON.stringify(group.id || '').replace(/"/g, '&quot;');
                     var optionArg = JSON.stringify(option.id || '').replace(/"/g, '&quot;');
-                    html += '<button type="button" class="btn btn-sm ' + (selected ? 'btn-warning' : 'btn-outline-warning') + ' py-0" onclick="event.stopPropagation(); toggleItemUpgradeOption(' + roomId + ', ' + itemIndex + ', ' + groupArg + ', ' + optionArg + ')" title="' + qdTemplateEscapeHtml(option.upgradeType === 'replacement' ? 'Replacement' : 'Add-on') + '">' +
-                        '<i class="fas ' + (selected ? 'fa-check-circle' : 'fa-circle') + ' me-1"></i>' + qdTemplateEscapeHtml(option.name || 'Upgrade') + ' <span class="opacity-75">' + qdFormatMoney(optionTotal, '$', { showSign: option.upgradeType !== 'replacement' }) + '</span>' +
+                    var description = getItemUpgradeOptionDescription(option);
+                    var panelId = itemUpgradeDescriptionPanelId(roomId, itemIndex, group.id || '', option.id || '');
+                    var checkedIcon = group.type === 'multiple' ? 'fa-square-check' : 'fa-circle-check';
+                    var uncheckedIcon = group.type === 'multiple' ? 'fa-square' : 'fa-circle';
+                    var optionTitle = requiresConsultation ? 'Consultation required' : (option.upgradeType === 'replacement' ? 'Replacement' : 'Add-on');
+                    var optionPriceHtml = requiresConsultation ? '<span class="opacity-75">Consultation required</span>' : '<span class="opacity-75">' + qdFormatMoney(optionTotal, '$', { showSign: option.upgradeType !== 'replacement' }) + '</span>';
+                    html += '<div class="item-upgrade-option-wrap d-inline-flex flex-column align-items-start gap-1">';
+                    html += '<button type="button" class="btn btn-sm quote-upgrade-option-btn ' + (selected ? 'is-selected' : '') + ' py-0" onclick="event.stopPropagation(); toggleItemUpgradeOption(' + roomId + ', ' + itemIndex + ', ' + groupArg + ', ' + optionArg + ')" title="' + qdTemplateEscapeHtml(optionTitle) + '">' +
+                        '<i class="fas ' + (selected ? checkedIcon : uncheckedIcon) + ' me-1"></i>' + qdTemplateEscapeHtml(option.name || 'Upgrade') + ' ' + optionPriceHtml +
                         '</button>';
+                    if (description) {
+                        html += '<button type="button" class="btn btn-link btn-sm text-muted p-0 item-upgrade-description-toggle quote-upgrade-description-toggle" aria-expanded="false" aria-controls="' + qdTemplateEscapeHtml(panelId) + '" onclick="toggleItemUpgradeDescription(event, ' + roomId + ', ' + itemIndex + ', ' + groupArg + ', ' + optionArg + ')"><i class="fas fa-chevron-down me-1"></i><span data-upgrade-desc-label>Details</span></button>';
+                        html += '<div id="' + qdTemplateEscapeHtml(panelId) + '" class="item-upgrade-option-description quote-upgrade-option-description d-none small text-muted border rounded bg-white px-2 py-1">' + qdTemplateEscapeHtml(description).replace(/\n/g, '<br>') + '</div>';
+                    }
+                    html += '</div>';
                 });
                 html += '</div></div>';
             });
@@ -7919,6 +8047,7 @@ Example:
 
         function applyChoiceGroupSelectionToItem(item) {
             if (!item || !item.choiceGroup) return item;
+            item.choiceGroup = hydrateChoiceGroupOptionsFromSavedItems(item.choiceGroup, item.category);
             var group = item.choiceGroup;
             group.enhancementGroups = normalizeChoiceGroupEnhancementGroups(group.enhancementGroups);
             var selectedOptions = getChoiceGroupSelectedOptions(group);
@@ -8184,6 +8313,69 @@ Example:
                     .trim()
                     .replace(/\s+/g, ' ');
             }).join('|');
+        }
+
+        function getChoiceGroupSavedItemSources() {
+            try {
+                if (!customItems || typeof customItems !== 'object') {
+                    customItems = JSON.parse(localStorage.getItem('ald_custom_items') || '{}');
+                }
+            } catch(e) {
+                if (!customItems || typeof customItems !== 'object') customItems = {};
+            }
+            return [customItems, pricingDatabase].filter(function(source, index, sources) {
+                return source && typeof source === 'object' && sources.indexOf(source) === index;
+            });
+        }
+
+        function findSavedItemForChoiceGroupOption(option, fallbackCategory) {
+            if (!option) return null;
+            var names = [option.sourceItemName, option.name, option.description, option.serviceName]
+                .filter(function(value, index, values) {
+                    return value && values.indexOf(value) === index;
+                });
+            if (!names.length) return null;
+            var preferredCategory = option.category || fallbackCategory || '';
+            var sources = getChoiceGroupSavedItemSources();
+            for (var s = 0; s < sources.length; s++) {
+                var source = sources[s] || {};
+                var preferredCategories = preferredCategory && Array.isArray(source[preferredCategory]) ? [preferredCategory] : [];
+                var fallbackCategories = Object.keys(source).filter(function(category) {
+                    return category.indexOf('__') !== 0 && Array.isArray(source[category]) && preferredCategories.indexOf(category) === -1;
+                });
+                var categories = preferredCategories.concat(fallbackCategories);
+                for (var c = 0; c < categories.length; c++) {
+                    var category = categories[c];
+                    var list = Array.isArray(source[category]) ? source[category] : [];
+                    for (var i = 0; i < list.length; i++) {
+                        var saved = list[i] || {};
+                        var savedName = saved.name || saved.description || saved.serviceName || '';
+                        for (var n = 0; n < names.length; n++) {
+                            if (choiceGroupMatchKey(category, savedName) === choiceGroupMatchKey(category, names[n])) {
+                                return { category: category, item: saved };
+                            }
+                        }
+                    }
+                }
+            }
+            return null;
+        }
+
+        function hydrateChoiceGroupOptionsFromSavedItems(choiceGroup, fallbackCategory) {
+            if (!choiceGroup || !Array.isArray(choiceGroup.options)) return choiceGroup;
+            choiceGroup.options = choiceGroup.options.map(function(option) {
+                if (!option) return option;
+                var next = Object.assign({}, option);
+                var savedMatch = findSavedItemForChoiceGroupOption(next, fallbackCategory);
+                if (!savedMatch || !savedMatch.item) return next;
+                var saved = savedMatch.item;
+                if (saved.upgrade && saved.upgrade.name) next.upgrade = cloneSavedItemForQuoteSync(saved.upgrade);
+                var savedUpgradeGroups = normalizeQuoteItemUpgradeGroups(saved);
+                if (savedUpgradeGroups.length) next.upgradeGroups = savedUpgradeGroups;
+                if (!next.category && savedMatch.category) next.category = savedMatch.category;
+                return next;
+            });
+            return choiceGroup;
         }
 
         function getQuoteItemChoiceGroupKeys(item) {
@@ -13551,7 +13743,7 @@ Example:
         // Save/load/session core moved to quote-storage.js
     </script>
     <script src="change-orders.js?v=1778152100"></script>
-    <script src="quote-storage.js?v=1779130000"></script>
+    <script src="quote-storage.js?v=1783269100"></script>
     <script>
         // -- End Save / Load ------------------------------------------------------
 
@@ -13666,7 +13858,7 @@ Example:
 
         // Manage Items behavior lives in quote-items.js.
     </script>
-    <script src="quote-items.js?v=1783262683"></script>
+    <script src="quote-items.js?v=1783269100"></script>
     <script src="quote-import.js?v=1780019801"></script>
     <script>
         // Load templates from localStorage on startup
@@ -15978,11 +16170,11 @@ Example:
                     <div class="tab-content">
                         <div class="tab-pane fade show active" id="quoteStyleTabStyle">
                             <div class="row g-3 mb-3" id="stylePresets">
-                                <div class="col-sm-6 col-lg-4"><button type="button" class="quote-style-preset w-100 selected" data-preset="clean-blue" data-accent="#1a56a0" data-bg="#f7fbff" data-header="branded" data-font="clean"><div class="preset-dots"><span class="preset-dot" style="background:#1a56a0"></span><span class="preset-dot" style="background:#f7fbff"></span></div><strong>Clean Blue</strong><div class="text-muted small">Professional and familiar</div></button></div>
-                                <div class="col-sm-6 col-lg-4"><button type="button" class="quote-style-preset w-100" data-preset="modern-charcoal" data-accent="#263445" data-bg="#f8fafc" data-header="dark" data-font="bold"><div class="preset-dots"><span class="preset-dot" style="background:#263445"></span><span class="preset-dot" style="background:#f8fafc"></span></div><strong>Modern Charcoal</strong><div class="text-muted small">Quiet, sharp, premium</div></button></div>
-                                <div class="col-sm-6 col-lg-4"><button type="button" class="quote-style-preset w-100" data-preset="warm-renovation" data-accent="#b87333" data-bg="#fff8ee" data-header="branded" data-font="clean"><div class="preset-dots"><span class="preset-dot" style="background:#b87333"></span><span class="preset-dot" style="background:#fff8ee"></span></div><strong>Warm Renovation</strong><div class="text-muted small">Friendly and residential</div></button></div>
-                                <div class="col-sm-6 col-lg-4"><button type="button" class="quote-style-preset w-100" data-preset="premium-gold" data-accent="#9a6a16" data-bg="#fffdf5" data-header="dark" data-font="premium"><div class="preset-dots"><span class="preset-dot" style="background:#9a6a16"></span><span class="preset-dot" style="background:#fffdf5"></span></div><strong>Premium Gold</strong><div class="text-muted small">High-end finish work</div></button></div>
-                                <div class="col-sm-6 col-lg-4"><button type="button" class="quote-style-preset w-100" data-preset="minimal-white" data-accent="#ffffff" data-bg="#ffffff" data-header="light" data-font="clean"><div class="preset-dots"><span class="preset-dot" style="background:#ffffff"></span><span class="preset-dot" style="background:#eef2f7"></span></div><strong>Minimal White</strong><div class="text-muted small">Simple and document-like</div></button></div>
+                                <div class="col-sm-6 col-lg-4"><button type="button" class="quote-style-preset w-100 selected" data-preset="clean-blue" data-accent="#1a56a0" data-bg="#f7fbff" data-upgrade-accent="#0d9488" data-upgrade-bg="#f8fafc" data-header="branded" data-font="clean"><div class="preset-dots"><span class="preset-dot" style="background:#1a56a0"></span><span class="preset-dot" style="background:#f7fbff"></span></div><strong>Clean Blue</strong><div class="text-muted small">Professional and familiar</div></button></div>
+                                <div class="col-sm-6 col-lg-4"><button type="button" class="quote-style-preset w-100" data-preset="modern-charcoal" data-accent="#263445" data-bg="#f8fafc" data-upgrade-accent="#0284c7" data-upgrade-bg="#f8fafc" data-header="dark" data-font="bold"><div class="preset-dots"><span class="preset-dot" style="background:#263445"></span><span class="preset-dot" style="background:#f8fafc"></span></div><strong>Modern Charcoal</strong><div class="text-muted small">Quiet, sharp, premium</div></button></div>
+                                <div class="col-sm-6 col-lg-4"><button type="button" class="quote-style-preset w-100" data-preset="warm-renovation" data-accent="#b87333" data-bg="#fff8ee" data-upgrade-accent="#15803d" data-upgrade-bg="#f0fdf4" data-header="branded" data-font="clean"><div class="preset-dots"><span class="preset-dot" style="background:#b87333"></span><span class="preset-dot" style="background:#fff8ee"></span></div><strong>Warm Renovation</strong><div class="text-muted small">Friendly and residential</div></button></div>
+                                <div class="col-sm-6 col-lg-4"><button type="button" class="quote-style-preset w-100" data-preset="premium-gold" data-accent="#9a6a16" data-bg="#fffdf5" data-upgrade-accent="#4f46e5" data-upgrade-bg="#eef2ff" data-header="dark" data-font="premium"><div class="preset-dots"><span class="preset-dot" style="background:#9a6a16"></span><span class="preset-dot" style="background:#fffdf5"></span></div><strong>Premium Gold</strong><div class="text-muted small">High-end finish work</div></button></div>
+                                <div class="col-sm-6 col-lg-4"><button type="button" class="quote-style-preset w-100" data-preset="minimal-white" data-accent="#ffffff" data-bg="#ffffff" data-upgrade-accent="#374151" data-upgrade-bg="#ffffff" data-header="light" data-font="clean"><div class="preset-dots"><span class="preset-dot" style="background:#ffffff"></span><span class="preset-dot" style="background:#eef2f7"></span></div><strong>Minimal White</strong><div class="text-muted small">Simple and document-like</div></button></div>
                             </div>
 
                             <div class="row g-3">
@@ -16014,6 +16206,40 @@ Example:
                                     </div>
                                     <input type="hidden" id="quoteOptionAccent" value="#1a56a0">
                                     <div class="text-muted small mt-2">Controls the colour of grouped choice cards in the client quote.</div>
+                                </div>
+                                <div class="col-12">
+                                    <div class="send-settings-card">
+                                        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                                            <div>
+                                                <label class="form-label fw-bold mb-1">Upgrades</label>
+                                                <div class="text-muted small">Controls optional upgrade panels and upgrade choice buttons in the client quote.</div>
+                                            </div>
+                                        </div>
+                                        <div class="row g-3 mt-1">
+                                            <div class="col-md-6">
+                                                <label class="form-label fw-semibold">Upgrade Options Colour</label>
+                                                <div class="d-flex flex-wrap gap-2" id="upgradeAccentSwatches">
+                                                    <button type="button" class="style-swatch upgrade-swatch selected" data-upgrade-accent="#0d9488" style="background:#0d9488;" title="Modern Teal" aria-label="Modern Teal"></button>
+                                                    <button type="button" class="style-swatch upgrade-swatch" data-upgrade-accent="#15803d" style="background:#15803d;" title="Sage Green" aria-label="Sage Green"></button>
+                                                    <button type="button" class="style-swatch upgrade-swatch" data-upgrade-accent="#4f46e5" style="background:#4f46e5;" title="Luxury Indigo" aria-label="Luxury Indigo"></button>
+                                                    <button type="button" class="style-swatch upgrade-swatch" data-upgrade-accent="#0284c7" style="background:#0284c7;" title="Deep Cyan" aria-label="Deep Cyan"></button>
+                                                    <button type="button" class="style-swatch upgrade-swatch" data-upgrade-accent="#374151" style="background:#374151;" title="Charcoal" aria-label="Charcoal"></button>
+                                                </div>
+                                                <input type="hidden" id="quoteUpgradeAccent" value="#0d9488">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label fw-semibold">Upgrade Card Background</label>
+                                                <div class="d-flex flex-wrap gap-2" id="upgradeBgSwatches">
+                                                    <button type="button" class="style-swatch upgrade-bg-swatch selected" data-upgrade-bg="#f8fafc" style="background:#f8fafc;" title="Light Slate" aria-label="Light Slate"></button>
+                                                    <button type="button" class="style-swatch upgrade-bg-swatch" data-upgrade-bg="#ecfdf5" style="background:#ecfdf5;" title="Soft Teal" aria-label="Soft Teal"></button>
+                                                    <button type="button" class="style-swatch upgrade-bg-swatch" data-upgrade-bg="#eef2ff" style="background:#eef2ff;" title="Soft Indigo" aria-label="Soft Indigo"></button>
+                                                    <button type="button" class="style-swatch upgrade-bg-swatch" data-upgrade-bg="#f0f9ff" style="background:#f0f9ff;" title="Soft Cyan" aria-label="Soft Cyan"></button>
+                                                    <button type="button" class="style-swatch upgrade-bg-swatch" data-upgrade-bg="#ffffff" style="background:#ffffff;border:1px solid #ddd;" title="White" aria-label="White"></button>
+                                                </div>
+                                                <input type="hidden" id="quoteUpgradeBg" value="#f8fafc">
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold">Background Tint</label>

@@ -14,6 +14,12 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="brand-theme.css?v=1777661601">
     <style>
+        :root {
+            --quote-upgrade-accent: #0d9488;
+            --quote-upgrade-bg: #f8fafc;
+            --quote-upgrade-accent-soft: rgba(13, 148, 136, 0.20);
+            --quote-upgrade-border: rgba(13, 148, 136, 0.35);
+        }
         body {
             background:
                 linear-gradient(180deg, rgba(26,86,160,0.08), rgba(255,255,255,0) 280px),
@@ -953,13 +959,58 @@
         .choice-option-upgrade {
             position: relative;
             z-index: 1;
-            background: #fff8e1;
-            border: 1px solid #f0d98c;
-            border-left: 4px solid #f0ad4e;
+            background: var(--quote-upgrade-bg, #f8fafc);
+            border: 1px solid var(--quote-upgrade-border, rgba(13, 148, 136, 0.35));
+            border-left: 4px solid var(--quote-upgrade-accent, #0d9488);
             border-radius: 8px;
             padding: 10px 12px;
             color: #334155;
             line-height: 1.45;
+        }
+        .quote-upgrade-title {
+            color: var(--quote-upgrade-accent, #0d9488);
+        }
+        .quote-upgrade-option-btn {
+            border: 1px solid var(--quote-upgrade-accent, #0d9488);
+            background: #ffffff;
+            color: var(--quote-upgrade-accent, #0d9488);
+            border-radius: 999px;
+            font-weight: 800;
+            transition: transform 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease, color 0.16s ease;
+        }
+        .quote-upgrade-option-btn:hover,
+        .quote-upgrade-option-btn:focus {
+            background: var(--quote-upgrade-accent-soft, rgba(13, 148, 136, 0.20));
+            border-color: var(--quote-upgrade-accent, #0d9488);
+            color: var(--quote-upgrade-accent, #0d9488);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 14px rgba(15, 23, 42, 0.12);
+        }
+        .quote-upgrade-option-btn.is-selected,
+        .quote-upgrade-option-btn.is-selected:hover,
+        .quote-upgrade-option-btn.is-selected:focus {
+            background: var(--quote-upgrade-accent, #0d9488);
+            border-color: var(--quote-upgrade-accent, #0d9488);
+            color: #ffffff;
+        }
+        .quote-upgrade-option-btn i {
+            transition: transform 0.15s ease;
+        }
+        .quote-upgrade-option-btn.is-selected i {
+            transform: scale(1.08);
+        }
+        .quote-upgrade-description-toggle:hover {
+            color: var(--quote-upgrade-accent, #0d9488) !important;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .quote-upgrade-option-btn,
+            .quote-upgrade-option-btn i {
+                transition: none;
+            }
+            .quote-upgrade-option-btn:hover,
+            .quote-upgrade-option-btn:focus {
+                transform: none;
+            }
         }
         .deposit-card {
             border: 1px solid #dbeafe;
@@ -1193,7 +1244,7 @@ if (location.search.includes('debug')) {
                         </div>
                     </div>
                     <div class="hero-actions">
-                        <button type="button" class="btn btn-warning btn-lg" onclick="handleMainAction()">
+                        <button type="button" class="btn btn-warning btn-lg client-main-action-btn" onclick="handleMainAction(event)">
                             <i class="fas fa-signature me-2"></i>Accept & Sign
                         </button>
                         <button type="button" class="btn btn-outline-secondary" id="downloadQuotePdfBtn" onclick="downloadQuotePdf()">
@@ -1316,13 +1367,13 @@ if (location.search.includes('debug')) {
             </div>
             <!-- Notice shown when client has notes -->
             <div class="changes-notice" id="changesNotice">
-                <i class="fas fa-info-circle"></i> <strong>You've added notes to this quote.</strong> Your contractor will review your requests and send you an updated version.
+                <i class="fas fa-info-circle"></i> <strong>You've added notes or consultation requests to this quote.</strong> Your contractor will review your requests and send you an updated version.
             </div>
 
             <!-- Single smart button - changes based on notes -->
             <button type="button" class="btn btn-warning btn-approve-pulse w-100" id="mainActionBtn"
                 style="font-size:1.15rem; font-weight:700; padding:1rem; border-radius:10px; letter-spacing:0.3px;"
-                onclick="handleMainAction()">
+                onclick="handleMainAction(event)">
                 <i class="fas fa-pen-nib"></i> Review &amp; Approve This Quote
             </button>
             <button type="button" class="btn btn-outline-danger w-100 mt-2" id="declineChangeOrderBtn" onclick="declineChangeOrder()" style="display:none;">
@@ -1491,7 +1542,7 @@ if (location.search.includes('debug')) {
     </div>
 
     <div class="sticky-client-actions" id="stickyClientActions">
-        <button type="button" class="btn btn-warning" onclick="handleMainAction()"><i class="fas fa-signature me-1"></i>Accept</button>
+        <button type="button" class="btn btn-warning client-main-action-btn" onclick="handleMainAction(event)"><i class="fas fa-signature me-1"></i>Accept</button>
         <button type="button" class="btn btn-outline-primary" onclick="document.getElementById('quoteContainer').scrollIntoView({behavior:'smooth'});"><i class="fas fa-list me-1"></i>Scope</button>
         <button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('termsDisplay').scrollIntoView({behavior:'smooth'});"><i class="fas fa-file-contract me-1"></i>Terms</button>
     </div>
@@ -1710,6 +1761,8 @@ if (location.search.includes('debug')) {
                 var accent = viewerStyle.accent || '#ffffff';
                 var optionAccent = viewerStyle.optionAccent || viewerStyle.accent || '#1a56a0';
                 if (optionAccent === '#ffffff') optionAccent = accent && accent !== '#ffffff' ? accent : '#1a56a0';
+                var upgradeAccent = viewerStyle.upgradeAccent || '#0d9488';
+                var upgradeBg = viewerStyle.upgradeBg || '#f8fafc';
                 var bg = viewerStyle.bg || '#ffffff';
                 var bgOpacity = parseInt(viewerStyle.bgOpacity, 10);
                 if (!isFinite(bgOpacity)) bgOpacity = 100;
@@ -1731,7 +1784,7 @@ if (location.search.includes('debug')) {
                     ? '.card-header.bg-light { background: ' + accent + ' !important; color: white !important; }' +
                       '.card-header.bg-light h6, .card-header.bg-light i { color: white !important; }'
                     : '';
-                styleTag.textContent = ':root { --quote-accent: ' + effectiveAccent + '; --quote-option-accent: ' + optionAccent + '; --quote-option-accent-soft: ' + colorWithOpacity(optionAccent, 20) + '; --quote-option-accent-hover: ' + colorWithOpacity(optionAccent, 30) + '; --change-order-accent: ' + effectiveAccent + '; --change-order-surface: ' + blendColorWithWhite(effectiveAccent, 8) + '; --change-order-surface-strong: ' + blendColorWithWhite(effectiveAccent, 14) + '; --change-order-border-soft: ' + colorWithOpacity(effectiveAccent, 24) + '; }' +
+                styleTag.textContent = ':root { --quote-accent: ' + effectiveAccent + '; --quote-option-accent: ' + optionAccent + '; --quote-option-accent-soft: ' + colorWithOpacity(optionAccent, 20) + '; --quote-option-accent-hover: ' + colorWithOpacity(optionAccent, 30) + '; --quote-upgrade-accent: ' + upgradeAccent + '; --quote-upgrade-bg: ' + upgradeBg + '; --quote-upgrade-accent-soft: ' + colorWithOpacity(upgradeAccent, 20) + '; --quote-upgrade-border: ' + colorWithOpacity(upgradeAccent, 35) + '; --change-order-accent: ' + effectiveAccent + '; --change-order-surface: ' + blendColorWithWhite(effectiveAccent, 8) + '; --change-order-surface-strong: ' + blendColorWithWhite(effectiveAccent, 14) + '; --change-order-border-soft: ' + colorWithOpacity(effectiveAccent, 24) + '; }' +
                     'body { background: ' + blendColorWithWhite(bg, bgOpacity) + ' !important; }' +
                     '.quote-header { background: ' + headerBg + ' !important; color: ' + headerColor + ' !important; }' +
                     '.quote-header .brand-lockup h1, .quote-header .brand-lockup h2, .quote-header .brand-lockup p { color: ' + headerColor + ' !important; }' +
@@ -2294,8 +2347,15 @@ if (location.search.includes('debug')) {
             return item;
         }
 
+        function normalizeViewerUpgradeType(value) {
+            var clean = String(value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+            if (clean === 'consultation' || clean === 'requires_consultation') return 'consultation';
+            return clean === 'replacement' ? 'replacement' : 'add_on';
+        }
+
         function normalizeViewerItemUpgradeOption(option, fallbackId) {
             option = option || {};
+            var upgradeType = normalizeViewerUpgradeType(option.upgradeType || option.type || option.mode);
             return {
                 id: option.id || fallbackId || ('viewer_upo_' + Math.random().toString(36).slice(2, 8)),
                 name: option.name || option.sourceItemName || option.description || 'Upgrade',
@@ -2307,10 +2367,15 @@ if (location.search.includes('debug')) {
                 supplierUrl: option.supplierUrl || '',
                 description: option.description || option.itemDescription || '',
                 itemDescription: option.itemDescription || option.description || '',
-                upgradeType: option.upgradeType === 'replacement' || option.type === 'replacement' ? 'replacement' : 'add_on',
+                upgradeType: upgradeType,
+                requiresConsultation: option.requiresConsultation === true || upgradeType === 'consultation',
                 availableAfterOptionIds: Array.isArray(option.availableAfterOptionIds) ? option.availableAfterOptionIds.filter(Boolean) : [],
                 blockedByOptionIds: Array.isArray(option.blockedByOptionIds) ? option.blockedByOptionIds.filter(Boolean) : []
             };
+        }
+
+        function isViewerConsultationUpgradeOption(option) {
+            return !!option && (option.requiresConsultation === true || option.upgradeType === 'consultation' || option.type === 'consultation');
         }
 
         function normalizeViewerItemUpgradeGroups(itemOrGroups) {
@@ -2324,7 +2389,7 @@ if (location.search.includes('debug')) {
                 return {
                     id: group.id || ('viewer_upg_' + groupIndex),
                     name: group.name || 'Upgrade Options',
-                    type: group.type === 'multiple' ? 'multiple' : 'single_optional',
+                    type: group.type === 'consultation' ? 'consultation' : (group.type === 'multiple' ? 'multiple' : 'single_optional'),
                     selectedOptionIds: Array.isArray(group.selectedOptionIds) ? group.selectedOptionIds.filter(Boolean) : [],
                     options: options
                 };
@@ -2370,7 +2435,7 @@ if (location.search.includes('debug')) {
                         var option = (group.options || []).find(function(candidate) { return candidate.id === optionId; });
                         return option && isViewerItemUpgradeOptionCompatible(option, selectedIds.filter(function(id) { return id !== optionId; }));
                     });
-                    if (group.type === 'single_optional') kept = kept.slice(0, 1);
+                    if (group.type !== 'multiple') kept = kept.slice(0, 1);
                     if (kept.length !== (group.selectedOptionIds || []).length) {
                         group.selectedOptionIds = kept;
                         changed = true;
@@ -2415,7 +2480,12 @@ if (location.search.includes('debug')) {
             var description = item._baseDescription || item.description || item.name || '';
             var itemDescription = item._baseItemDescription || item.itemDescription || '';
             var selectedOptions = getViewerSelectedItemUpgradeOptions(item);
+            var requiresConsultation = false;
             selectedOptions.forEach(function(option) {
+                if (isViewerConsultationUpgradeOption(option)) {
+                    requiresConsultation = true;
+                    return;
+                }
                 if (option.upgradeType === 'replacement') {
                     rate = viewerNumber(option.rate);
                     materialCost = viewerNumber(option.materialCost);
@@ -2437,6 +2507,7 @@ if (location.search.includes('debug')) {
             item.description = description;
             item.itemDescription = itemDescription;
             item.upgraded = selectedOptions.length > 0;
+            item.requiresConsultation = requiresConsultation;
             item.total = viewerItemQuantity(item) * rate;
             item.selectedUpgradeOptionIds = selectedOptions.map(function(option) { return option.id; });
             return item;
@@ -2453,6 +2524,40 @@ if (location.search.includes('debug')) {
             return item;
         }
 
+        function viewerUpgradeDomIdPart(value) {
+            return String(value === undefined || value === null ? 'x' : value).replace(/[^a-zA-Z0-9_-]/g, '_') || 'x';
+        }
+
+        function getViewerUpgradeOptionDescription(option) {
+            if (!option) return '';
+            return String(option.description || option.itemDescription || option.notes || option.user_note || '').trim();
+        }
+
+        function viewerUpgradeDescriptionPanelId(roomIdx, itemIndex, groupId, optionId) {
+            return 'viewer-upgrade-desc-' + viewerUpgradeDomIdPart(roomIdx) + '-' + viewerUpgradeDomIdPart(itemIndex) + '-' + viewerUpgradeDomIdPart(groupId) + '-' + viewerUpgradeDomIdPart(optionId);
+        }
+
+        function toggleViewerUpgradeDescription(event, roomIdx, itemIndex, groupId, optionId) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            var panel = document.getElementById(viewerUpgradeDescriptionPanelId(roomIdx, itemIndex, groupId, optionId));
+            if (!panel) return;
+            var hidden = panel.classList.toggle('d-none');
+            var button = event && event.currentTarget;
+            if (button) {
+                button.setAttribute('aria-expanded', hidden ? 'false' : 'true');
+                var label = button.querySelector('[data-upgrade-desc-label]');
+                if (label) label.textContent = hidden ? 'Details' : 'Hide';
+                var icon = button.querySelector('i');
+                if (icon) {
+                    icon.classList.toggle('fa-chevron-down', hidden);
+                    icon.classList.toggle('fa-chevron-up', !hidden);
+                }
+            }
+        }
+
         function renderViewerItemUpgradeGroups(roomIdx, itemIndex, item, isSignedDiff) {
             if (isSignedDiff || !item) return '';
             item.upgradeGroups = normalizeViewerItemUpgradeGroups(item);
@@ -2460,21 +2565,35 @@ if (location.search.includes('debug')) {
             if (!item.upgradeGroups.length) return '';
             var selectedIds = getViewerSelectedItemUpgradeIds(item);
             var html = '<div class="choice-option-upgrades-wrap"><div class="choice-option-upgrade">';
-            html += '<div class="small fw-bold text-warning mb-1"><i class="fas fa-arrow-up me-1"></i>Upgrade options</div>';
+            html += '<div class="small fw-bold quote-upgrade-title mb-1"><i class="fas fa-arrow-up me-1"></i>Upgrade options</div>';
             item.upgradeGroups.forEach(function(group) {
                 var compatible = (group.options || []).filter(function(option) {
                     return isViewerItemUpgradeOptionCompatible(option, selectedIds.filter(function(id) { return id !== option.id; }));
                 });
                 if (!compatible.length) return;
                 html += '<div class="small mb-2"><span class="fw-semibold">' + escapeHtml(group.name || 'Upgrade Options') + '</span> ';
-                html += '<span class="text-muted">(' + (group.type === 'multiple' ? 'pick multiple' : 'optional pick one') + ')</span>';
+                html += '<span class="text-muted">(' + (group.type === 'consultation' ? 'requires consultation' : (group.type === 'multiple' ? 'pick multiple' : 'optional pick one')) + ')</span>';
                 html += '<div class="d-flex flex-wrap gap-1 mt-1">';
                 compatible.forEach(function(option) {
                     var selected = (group.selectedOptionIds || []).indexOf(option.id) !== -1;
+                    var requiresConsultation = isViewerConsultationUpgradeOption(option);
                     var optionTotal = viewerItemQuantity(item) * viewerNumber(option.rate);
-                    html += '<button type="button" class="btn btn-sm ' + (selected ? 'btn-warning' : 'btn-outline-warning') + ' py-0" onclick="toggleViewerItemUpgradeOption(' + roomIdx + ', ' + itemIndex + ', \'' + escapeHtml(group.id || '') + '\', \'' + escapeHtml(option.id || '') + '\')">' +
-                        '<i class="fas ' + (selected ? 'fa-check-circle' : 'fa-circle') + ' me-1"></i>' + escapeHtml(option.name || 'Upgrade') + ' <span class="opacity-75">' + viewerMoney(optionTotal, { forceSign: option.upgradeType !== 'replacement' }) + '</span>' +
+                    var groupArg = JSON.stringify(group.id || '').replace(/"/g, '&quot;');
+                    var optionArg = JSON.stringify(option.id || '').replace(/"/g, '&quot;');
+                    var description = getViewerUpgradeOptionDescription(option);
+                    var panelId = viewerUpgradeDescriptionPanelId(roomIdx, itemIndex, group.id || '', option.id || '');
+                    var checkedIcon = group.type === 'multiple' ? 'fa-square-check' : 'fa-circle-check';
+                    var uncheckedIcon = group.type === 'multiple' ? 'fa-square' : 'fa-circle';
+                    var optionPriceHtml = requiresConsultation ? '<span class="opacity-75">Consultation required</span>' : '<span class="opacity-75">' + viewerMoney(optionTotal, { forceSign: option.upgradeType !== 'replacement' }) + '</span>';
+                    html += '<div class="viewer-upgrade-option-wrap d-inline-flex flex-column align-items-start gap-1">';
+                    html += '<button type="button" class="btn btn-sm quote-upgrade-option-btn ' + (selected ? 'is-selected' : '') + ' py-0" onclick="toggleViewerItemUpgradeOption(' + roomIdx + ', ' + itemIndex + ', ' + groupArg + ', ' + optionArg + ')">' +
+                        '<i class="fas ' + (selected ? checkedIcon : uncheckedIcon) + ' me-1"></i>' + escapeHtml(option.name || 'Upgrade') + ' ' + optionPriceHtml +
                         '</button>';
+                    if (description) {
+                        html += '<button type="button" class="btn btn-link btn-sm text-muted p-0 viewer-upgrade-description-toggle quote-upgrade-description-toggle" aria-expanded="false" aria-controls="' + escapeHtml(panelId) + '" onclick="toggleViewerUpgradeDescription(event, ' + roomIdx + ', ' + itemIndex + ', ' + groupArg + ', ' + optionArg + ')"><i class="fas fa-chevron-down me-1"></i><span data-upgrade-desc-label>Details</span></button>';
+                        html += '<div id="' + escapeHtml(panelId) + '" class="viewer-upgrade-option-description quote-upgrade-option-description d-none small text-muted border rounded bg-white px-2 py-1">' + formatDescriptionText(description) + '</div>';
+                    }
+                    html += '</div>';
                 });
                 html += '</div></div>';
             });
@@ -2503,6 +2622,7 @@ if (location.search.includes('debug')) {
             applyViewerItemUpgradeGroups(item);
             renderQuote();
             updateTotal();
+            updateActionButton();
         }
 
         function viewerNumber(value) {
@@ -2983,6 +3103,7 @@ if (location.search.includes('debug')) {
                             upgradeGroup: option.upgradeGroupName,
                             option: option.name,
                             upgradeType: option.upgradeType,
+                            requiresConsultation: isViewerConsultationUpgradeOption(option),
                             total: viewerItemQuantity(item) * viewerNumber(option.rate)
                         });
                     });
@@ -3702,9 +3823,41 @@ if (location.search.includes('debug')) {
             window.print();
         }
 
+        function hasConsultationUpgradeSelections() {
+            return (quoteData.rooms || []).some(function(room) {
+                return (room.items || []).some(function(item) {
+                    return normalizeViewerItemUpgradeGroups(item).some(function(group) {
+                        var selectedIds = Array.isArray(group.selectedOptionIds) ? group.selectedOptionIds : [];
+                        return selectedIds.some(function(optionId) {
+                            var option = (group.options || []).find(function(candidate) {
+                                return candidate && candidate.id === optionId;
+                            });
+                            return isViewerConsultationUpgradeOption(option);
+                        });
+                    });
+                });
+            });
+        }
+
         function hasClientNotes() {
-            if (!quoteData._roomNotes) return false;
-            return Object.values(quoteData._roomNotes).some(n => n && n.trim().length > 0);
+            var hasRoomNotes = quoteData._roomNotes
+                ? Object.values(quoteData._roomNotes).some(function(n) { return n && n.trim().length > 0; })
+                : false;
+            return hasRoomNotes || hasConsultationUpgradeSelections();
+        }
+
+        function updateAuxiliaryActionButtons(isChangeRequestMode) {
+            document.querySelectorAll('.client-main-action-btn').forEach(function(auxBtn) {
+                if (isChangeRequestMode) {
+                    auxBtn.innerHTML = '<i class="fas fa-paper-plane me-1"></i>Send for Approval';
+                    auxBtn.classList.remove('btn-success', 'btn-approve-pulse');
+                    auxBtn.classList.add('btn-warning');
+                } else {
+                    auxBtn.innerHTML = '<i class="fas fa-signature me-1"></i>Accept &amp; Sign';
+                    auxBtn.classList.remove('btn-success');
+                    auxBtn.classList.add('btn-warning');
+                }
+            });
         }
 
         function updateActionButton() {
@@ -3718,6 +3871,7 @@ if (location.search.includes('debug')) {
                 btn.classList.remove('btn-success', 'btn-approve-pulse');
                 btn.classList.add('btn-warning');
                 if (notice) notice.classList.add('visible');
+                updateAuxiliaryActionButtons(true);
                 return;
             }
             if (hasClientNotes()) {
@@ -3725,11 +3879,13 @@ if (location.search.includes('debug')) {
                 btn.classList.remove('btn-success', 'btn-approve-pulse');
                 btn.classList.add('btn-warning');
                 if (notice) notice.classList.add('visible');
+                updateAuxiliaryActionButtons(true);
             } else {
                 btn.innerHTML = '<i class="fas fa-pen-nib"></i> Review &amp; Approve This Quote';
                 btn.classList.remove('btn-success');
                 btn.classList.add('btn-warning', 'btn-approve-pulse');
                 if (notice) notice.classList.remove('visible');
+                updateAuxiliaryActionButtons(false);
             }
         }
 
@@ -3795,7 +3951,7 @@ if (location.search.includes('debug')) {
             qdAlert('You cannot sign this for the client. If you wish to see how this button functions, send yourself a fake quote and test it!');
         }
 
-        function handleMainAction() {
+        function handleMainAction(event) {
             if (quoteIsAccepted()) {
                 applyQuoteCompletionState();
                 scrollToPostApprovalActions();
@@ -3803,6 +3959,10 @@ if (location.search.includes('debug')) {
             }
             if (isContractorPreviewView()) {
                 showContractorPreviewSignBlockedMessage();
+                return;
+            }
+            if ((resolveViewerDocumentStyle().approvalMode || 'approve_or_changes') === 'review' || hasClientNotes()) {
+                submitUpgrades(event);
                 return;
             }
             openSignatureModal();
@@ -4203,6 +4363,9 @@ if (location.search.includes('debug')) {
             var _clientChoiceGroups = collectClientChoiceGroups();
             var _clientEnhancements = collectClientEnhancements();
             var _clientItemUpgradeSelections = collectClientItemUpgradeSelections();
+            var _clientConsultationRequests = _clientItemUpgradeSelections.filter(function(selection) {
+                return selection && selection.requiresConsultation;
+            });
             (quoteData.rooms || []).forEach(function(room) {
                 (room.items || []).forEach(function(item) {
                     if (item.upgraded && item.upgrade) {
@@ -4229,6 +4392,7 @@ if (location.search.includes('debug')) {
                             _clientChoiceGroups: _clientChoiceGroups,
                             _clientEnhancements: _clientEnhancements,
                             _clientItemUpgradeSelections: _clientItemUpgradeSelections,
+                            _clientConsultationRequests: _clientConsultationRequests,
                             _clientRooms: JSON.parse(JSON.stringify(quoteData.rooms || [])),
                             _clientSubmittedAt: new Date().toISOString()
                         }

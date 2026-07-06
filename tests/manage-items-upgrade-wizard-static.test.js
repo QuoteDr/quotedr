@@ -28,8 +28,15 @@ assert(items.includes("filterManageUpgradeRuleOptionIds"), 'Upgrade Wizard shoul
 assert(items.includes('manage-upgrade-rule-checkboxes'), 'Upgrade Wizard path rules should render checkbox groups instead of multi-select boxes');
 assert(items.includes('type="checkbox"'), 'Upgrade Wizard path rule options should be selectable with checkboxes');
 assert(items.includes('collectManageUpgradeRuleCheckboxIds'), 'Upgrade Wizard should collect multiple checked path rule options or none');
+assert(items.includes('saveManageUpgradeWizardRow(detailsRow)'), 'Upgrade Wizard Save should persist the edited Manage Items row immediately');
+assert(items.includes('function bindManageItemsCloseGuard'), 'Manage Items should guard every modal close path against unsaved changes');
+assert(items.includes('You have unsaved changes, are you sure you want to exit?'), 'Manage Items close warning should use the clear unsaved changes message');
+assert(items.includes("modalEl.addEventListener('hide.bs.modal'"), 'Manage Items close guard should catch header X, backdrop, and ESC closes');
 
 assert(html.includes('openManageNewItemUpgradeWizard'), 'New item form should include an Upgrade Wizard button');
 assert(html.includes('Upgrade Wizard'), 'Quote builder markup should contain the Upgrade Wizard label');
+assert(html.includes('#manageUpgradeWizardModal .manage-upgrade-wizard-option-card'), 'Upgrade Wizard option cards should have visible separation styling inside the wizard modal');
+assert(items.includes("renderManageUnitSelect(option.unitType || state.baseUnitType || '', 'upgrade-unit-type')"), 'Upgrade Wizard option units should use the shared Manage Items unit select');
+assert(items.includes("renderManageUnitSelect(option.unitType || baseUnitType || '', 'upgrade-unit-type')"), 'Manual upgrade group option units should use the shared Manage Items unit select');
 
 console.log('manage-items upgrade wizard static checks passed');

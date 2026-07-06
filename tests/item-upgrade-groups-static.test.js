@@ -20,6 +20,8 @@ assert(items.includes('data-detail-section="upgrade"'), 'Upgrade groups should r
 assert(builder.includes('normalizeQuoteItemUpgradeGroups'), 'Quote builder should normalize item-level upgradeGroups');
 assert(builder.includes('renderItemUpgradeGroups'), 'Quote builder should render item-level upgrade group choices');
 assert(builder.includes('toggleItemUpgradeOption'), 'Quote builder should toggle item upgrade options');
+assert(builder.includes('toggleItemUpgradeDescription'), 'Quote builder should let upgrade descriptions expand inline');
+assert(builder.includes('item-upgrade-option-description'), 'Quote builder should render upgrade descriptions in expandable panels');
 assert(builder.includes('clearInvalidItemUpgradeSelections'), 'Quote builder should clear blocked upgrade path selections');
 assert(builder.includes('applyItemUpgradeGroupsToItem'), 'Quote builder should apply selected upgrade groups to totals');
 assert(builder.includes('selectedUpgradeOptionIds'), 'Quote builder should track selected item upgrade option ids');
@@ -28,6 +30,8 @@ assert(builder.includes('upgradeGroups: normalizeQuoteItemUpgradeGroups'), 'Quot
 assert(viewer.includes('normalizeViewerItemUpgradeGroups'), 'Client viewer should normalize item-level upgradeGroups');
 assert(viewer.includes('renderViewerItemUpgradeGroups'), 'Client viewer should render client-facing item upgrade choices');
 assert(viewer.includes('toggleViewerItemUpgradeOption'), 'Client viewer should toggle item upgrade choices');
+assert(viewer.includes('toggleViewerUpgradeDescription'), 'Client viewer should let clients expand upgrade descriptions');
+assert(viewer.includes('viewer-upgrade-option-description'), 'Client viewer should render upgrade descriptions in expandable panels');
 assert(viewer.includes('clearInvalidViewerItemUpgradeSelections'), 'Client viewer should clear blocked upgrade path selections');
 assert(viewer.includes('_clientItemUpgradeSelections'), 'Approval payload should record selected item upgrade paths');
 

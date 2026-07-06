@@ -145,6 +145,9 @@ assert(viewer.includes('applyClientChoiceGroupsToRooms'), 'client viewer should 
 assert(builder.includes('upgrade: item.upgrade ? cloneSavedItemForQuoteSync(item.upgrade) : null'), 'quote-level choice groups should preserve upgrade data from grouped line items');
 assert(items.includes('upgrade: item.upgrade ? JSON.parse(JSON.stringify(item.upgrade)) : null'), 'saved choice group templates should preserve upgrade data from saved items');
 assert(read('quote-storage.js').includes('hydrateChoiceGroupOptionsForSave'), 'quote storage should hydrate missing choice option upgrades before sharing/saving');
+assert(items.includes('upgradeGroups: normalizeManageItemUpgradeGroups(item)'), 'saved choice group templates should preserve item-level upgrade groups from saved items');
+assert(builder.includes('hydrateChoiceGroupOptionsFromSavedItems'), 'quote builder should hydrate stale choice group options from saved item upgrade groups');
+assert(read('quote-storage.js').includes('quoteStorageSavedItemUpgradeGroups'), 'quote storage should hydrate choice option upgrade groups before sharing/saving');
 
 assert(dashboard.includes('_clientChoiceGroups'), 'dashboard review should show client selected choice groups');
 assert(invoice.includes('choiceGroupSelection'), 'invoice should preserve/display accepted choice-group selections');
