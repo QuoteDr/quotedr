@@ -18,6 +18,8 @@ assert(
 );
 assert(source.includes('function viewerVisibleNotes'), 'interactive viewer should centralize note visibility so duplicate descriptions can be suppressed');
 assert(source.includes('viewerVisibleNotes(item, displayDesc)'), 'item rendering should hide notes that duplicate the displayed description');
+assert(source.includes('viewer-undo-removed-btn'), 'removed optional items should use an obvious restore button style');
+assert(source.includes('Undo removal'), 'removed optional item restore action should use clearer undo copy');
 assert(!source.includes('let subtotal = 0;\n            let upgradesTotal = 0;\n            if (quoteData.rooms) {\n                quoteData.rooms.forEach(room => {\n                    room.items.forEach(item => {\n                        applyViewerChoiceGroupToItem(item);\n                        if (item._removed) return; // skip removed items\n                        const activeRate = (item.upgraded && item.upgrade) ? item.upgrade.rate : (item._baseRate || item.rate);\n                        const baseTotal = item.quantity * (item._baseRate || item.rate);\n                        const activeTotal = item.quantity * activeRate;'), 'viewer updateTotal should not recalculate imported legacy quote totals from quantity times rate');
 
 console.log('interactive quote viewer total static test passed');

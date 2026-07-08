@@ -10,6 +10,8 @@ assert(source.includes('function updateQuoteTotalBreakdown'), 'quote viewer shou
 assert(source.includes('updateQuoteTotalBreakdown(subtotal, tax, total'), 'regular quote totals should update subtotal, tax, and total together');
 assert(source.includes('quoteData.taxLabel || _vqp.taxLabel || \'HST\''), 'quote viewer should prefer the quote tax label and fall back to settings/default HST');
 assert(!source.includes('<span>Base quote</span>'), 'quote viewer bottom card should not show a single base quote row instead of subtotal and tax');
+assert(!source.includes('<span>Selected options</span>'), 'quote viewer bottom card should not show a selected options count row');
+assert(!source.includes("Selected upgrades${selectedChoices.length ? ' and options' : ''}"), 'quote viewer selected upgrades row should not append choice option count wording');
 
 const subtotalIndex = source.indexOf('id="quoteSubtotalDisplay"');
 const adjustmentIndex = source.indexOf('id="quoteAdjustmentTotalDisplay"');

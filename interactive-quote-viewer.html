@@ -348,6 +348,27 @@
             border-radius: 6px;
         }
 
+        .viewer-removed-item {
+            opacity: 0.78;
+            background: #fff7ed;
+            border-left: 4px solid #f59e0b;
+            padding-left: 8px;
+            border-radius: 6px;
+        }
+
+        .viewer-undo-removed-btn {
+            border-width: 2px;
+            font-weight: 800;
+            box-shadow: 0 6px 14px rgba(245, 158, 11, 0.22);
+            white-space: nowrap;
+        }
+
+        .viewer-undo-removed-btn:hover,
+        .viewer-undo-removed-btn:focus {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 18px rgba(245, 158, 11, 0.28);
+        }
+
         /* Warranty Badge */
         .warranty-section {
             margin-top: 2rem;
@@ -3463,11 +3484,11 @@ if (location.search.includes('debug')) {
                             </div>`;
                         } else {
                             html += `
-                            <div class="py-2 border-bottom" id="item_${roomIdx}_${itemIndex}" style="opacity:0.45; background:#f8f9fa;">
-                                <div class="d-flex justify-content-between align-items-center">
+                            <div class="py-2 border-bottom viewer-removed-item" id="item_${roomIdx}_${itemIndex}">
+                                <div class="d-flex justify-content-between align-items-center gap-3">
                                     <span class="text-muted"><s>${isUpgraded && item.upgrade ? item.upgrade.name : (item.description || item.name || 'Item')}</s> <small class="badge bg-secondary">Removed</small></span>
-                                    <button class="btn btn-sm btn-outline-secondary" onclick="restoreViewerItem(${roomIdx}, ${itemIndex})" style="font-size:0.8rem;">
-                                        <i class="fas fa-undo"></i> Undo
+                                    <button class="btn btn-sm btn-warning text-dark viewer-undo-removed-btn" onclick="restoreViewerItem(${roomIdx}, ${itemIndex})">
+                                        <i class="fas fa-undo"></i> Undo removal
                                     </button>
                                 </div>
                             </div>`;
@@ -3702,11 +3723,10 @@ if (location.search.includes('debug')) {
 
             var upgradesEl = document.getElementById('upgradesTotalDisplay');
             if (upgradesEl) {
-                var selectedChoices = collectClientChoiceGroups();
-                upgradesEl.style.display = (upgradesTotal > 0 || selectedChoices.length) ? 'flex' : 'none';
+                upgradesEl.style.display = upgradesTotal > 0 ? 'flex' : 'none';
                 upgradesEl.innerHTML = upgradesTotal > 0
-                    ? `<span>Selected upgrades${selectedChoices.length ? ' and options' : ''}</span><strong>${viewerMoney(upgradesTotal, { forceSign: true })}</strong>`
-                    : (selectedChoices.length ? `<span>Selected options</span><strong>${selectedChoices.length}</strong>` : '');
+                    ? `<span>Selected upgrades</span><strong>${viewerMoney(upgradesTotal, { forceSign: true })}</strong>`
+                    : '';
             }
             var adjustmentEl = document.getElementById('quoteAdjustmentTotalDisplay');
             if (adjustmentEl) {
