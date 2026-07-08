@@ -12,9 +12,11 @@ assert(source.includes('viewerMoney(total)'), 'updated quote totals should use c
 assert(!source.includes("heroTotal.textContent = '$' + originalTotal.toFixed(2)"), 'hero total should not render ungrouped fixed decimals');
 assert(!source.includes("document.getElementById('newGrandTotal').textContent = `$${total.toFixed(2)}`"), 'bottom total should not render ungrouped fixed decimals');
 assert(source.includes('height: clamp(185px, 18vw, 250px)'), 'proposal logo should be larger on desktop');
+assert(source.includes('function qvLineTotal'), 'interactive viewer should centralize discount-aware line totals');
+assert(source.includes('viewerItemActiveTotal(item)'), 'discount-aware line totals should preserve existing active total behavior');
 assert(
-  source.includes('room.items.reduce((sum, item) => item._removed ? sum : sum + (isChangeOrder ? viewerChangeOrderLineDisplayTotal(item, room) : viewerItemActiveTotal(item)), 0)'),
-  'room totals should use saved item totals, change-order display totals, and skip removed items'
+  source.includes('room.items.reduce((sum, item) => item._removed ? sum : sum + (isChangeOrder ? viewerChangeOrderLineDisplayTotal(item, room) : qvLineTotal(item)), 0)'),
+  'room totals should use discount-aware saved item totals, change-order display totals, and skip removed items'
 );
 assert(source.includes('function viewerVisibleNotes'), 'interactive viewer should centralize note visibility so duplicate descriptions can be suppressed');
 assert(source.includes('viewerVisibleNotes(item, displayDesc)'), 'item rendering should hide notes that duplicate the displayed description');

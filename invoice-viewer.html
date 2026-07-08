@@ -748,6 +748,7 @@ if (location.search.includes('debug')) {
     <script src="modal-help.js?v=1777741200"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-v2.js?v=1779130000"></script>
+    <script src="quote-discounts.js?v=1783218460"></script>
     <script>
         const ROOM_COLORS = [
             'linear-gradient(135deg,#2d2d2d 0%,#111111 100%)',
@@ -860,6 +861,35 @@ if (location.search.includes('debug')) {
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#39;');
+        }
+
+        function invDiscounts() {
+            return window.QuoteDrDiscounts || {
+                activeRate: function(item) { return parseFloat(item && item.rate) || 0; },
+                originalTotal: function(item) { return (parseFloat(item && item.quantity) || 0) * (parseFloat(item && item.rate) || 0); },
+                discountAmount: function() { return 0; },
+                chargedTotal: function(item) { return item && item.total !== undefined ? (parseFloat(item.total) || 0) : ((parseFloat(item && item.quantity) || 0) * (parseFloat(item && item.rate) || 0)); },
+                hasDiscount: function() { return false; },
+                discountLabel: function() { return 'Courtesy discount'; }
+            };
+        }
+
+        function invoiceLineRate(item) {
+            return invDiscounts().activeRate(item);
+        }
+
+        function invoiceLineTotal(item) {
+            return invDiscounts().chargedTotal(item);
+        }
+
+        function invoiceDiscountHtml(item, currency) {
+            var discounts = invDiscounts();
+            if (!discounts.hasDiscount(item)) return '';
+            var original = discounts.originalTotal(item);
+            var amount = discounts.discountAmount(item);
+            return '<div class="small text-muted"><span>Was </span><s>' + formatMoney(original, currency) + '</s></div>' +
+                '<div class="small text-success">' + escapeHtml(discounts.discountLabel(item)) + ' -' + formatMoney(amount, currency) + '</div>' +
+                '<div class="small text-muted">Now ' + formatMoney(discounts.chargedTotal(item), currency) + '</div>';
         }
 
         function invoiceRoomIconClass(room) {
@@ -1489,10 +1519,7 @@ if (location.search.includes('debug')) {
             invoiceData.rooms.forEach((room, roomIndex) => {
                 const headerBg = ROOM_COLORS[room.colorIndex ?? 0] || ROOM_COLORS[0];
                 const roomIconClass = invoiceRoomIconClass(room);
-                const roomTotal = room.items.reduce((sum, item) => {
-                    const rate = item.upgraded && item.upgrade ? item.upgrade.rate : item.rate;
-                    return sum + item.quantity * rate;
-                }, 0);
+                const roomTotal = room.items.reduce((sum, item) => sum + invoiceLineTotal(item), 0);
                 subtotal += roomTotal;
 
                 html += `
@@ -1533,8 +1560,8 @@ if (location.search.includes('debug')) {
                     catItems.forEach(item => {
                     const originalUpgradeItem = getOriginalUpgradeForInvoiceItem(room, item, roomIndex);
                     const isUpgraded = !!item.upgraded || !!originalUpgradeItem;
-                    const activeRate = isUpgraded && item.upgrade ? item.upgrade.rate : (item.rate || 0);
-                    const itemTotal = (item.quantity || 0) * activeRate;
+                    const activeRate = invoiceLineRate(item);
+                    const itemTotal = invoiceLineTotal(item);
                     const displayName = isUpgraded && item.upgrade ? item.upgrade.name : (item.description || item.name || 'Item');
                     const displayDesc = getInvoiceItemDescription(item, originalUpgradeItem, isUpgraded);
                     const choiceGroupSelection = item.choiceGroupSelection || null;
@@ -1561,7 +1588,7 @@ if (location.search.includes('debug')) {
                                 </td>
                                 <td class="invoice-qty-cell">${typeof qdFormatQuantity === 'function' ? qdFormatQuantity(item.quantity || 0, item.unitType || item.unit || '') : ((item.quantity || 0) + ' ' + (item.unitType || ''))}</td>
                                 <td class="invoice-rate-cell">${formatMoney(activeRate, _iCurrency)}</td>
-                                <td class="invoice-amount-cell">${formatMoney(itemTotal, _iCurrency)}</td>
+                                <td class="invoice-amount-cell">${formatMoney(itemTotal, _iCurrency)}${invoiceDiscountHtml(item, _iCurrency)}</td>
                             </tr>`;
                     }); // end catItems
                 }); // end catGroups
