@@ -266,6 +266,7 @@
                 clientPhone:    document.getElementById('clientPhone')?.value    || '',
                 clientEmail:    document.getElementById('clientEmail')?.value    || '',
                 terms: getSelectedTerms(),
+                termsExplicit: true,
                 rooms: sanitizeQuoteRoomsForSave(rooms),
                 categoryStyles: JSON.parse(JSON.stringify(categoryStyles || {})),
                 roomCounter: roomCounter,
@@ -313,7 +314,7 @@
             if (document.getElementById('projectAddress')) document.getElementById('projectAddress').value = data.projectAddress || data.project_address || '';
             if (document.getElementById('clientPhone'))    document.getElementById('clientPhone').value    = data.clientPhone || data.phone || '';
             if (document.getElementById('clientEmail'))    document.getElementById('clientEmail').value    = data.clientEmail || data.email || '';
-            renderTermsCheckboxes(data.terms);
+            renderTermsCheckboxes(getQuoteTermsForRender(data));
             rooms = data.rooms || [];
             if (data.categoryStyles && typeof categoryStyles !== 'undefined') {
                 Object.assign(categoryStyles, data.categoryStyles || {});
@@ -985,7 +986,7 @@ async function saveQuote() {
             cleanupModalBackdrop();
             applyQuoteData(session);
             if (session.quoteNumber) document.getElementById('quoteNumber').value = session.quoteNumber;
-            renderTermsCheckboxes(session.terms);
+            renderTermsCheckboxes(getQuoteTermsForRender(session));
             // Cancel any autosave triggered during restore - we just loaded, nothing is actually unsaved
             unsavedChanges = false;
             clearTimeout(_autoSaveTimer);
@@ -1034,7 +1035,7 @@ async function saveQuote() {
                 bootstrap.Modal.getInstance(document.getElementById('startupModal')).hide(); cleanupModalBackdrop();
                 applyQuoteData(draft);
                 if (draft.quoteNumber) document.getElementById('quoteNumber').value = draft.quoteNumber;
-                renderTermsCheckboxes(draft.terms);
+                renderTermsCheckboxes(getQuoteTermsForRender(draft));
                 var el = document.getElementById('saveStatus');
                 if (el) el.innerHTML = '<span style="color:#fd7e14;"><i class="fas fa-history"></i> Draft recovered - save to file to keep it safe</span>';
                 updateDraftWarning();
@@ -1193,7 +1194,7 @@ async function saveQuote() {
                                 localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
                                 applyQuoteData(qData);
                                 if (qData.quoteNumber) document.getElementById('quoteNumber').value = qData.quoteNumber;
-                                renderTermsCheckboxes(qData.terms);
+                                renderTermsCheckboxes(getQuoteTermsForRender(qData));
                                 var el = document.getElementById('saveStatus');
                                 if (el) el.innerHTML = '<span style="color:#1a56a0;"><i class="fas fa-cloud"></i> Loaded from cloud</span>';
                                 updateDraftWarning();
@@ -1247,7 +1248,7 @@ async function saveQuote() {
                                 localStorage.setItem("ald_active_quote_id", result.data.id);
                                 applyQuoteData(qData);
                                 if (qData.quoteNumber) document.getElementById("quoteNumber").value = qData.quoteNumber || "";
-                                renderTermsCheckboxes(qData.terms);
+                                renderTermsCheckboxes(getQuoteTermsForRender(qData));
                                 unsavedChanges = false;
                                 clearTimeout(_autoSaveTimer);
                                 var el = document.getElementById("saveStatus");

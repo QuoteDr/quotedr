@@ -2246,7 +2246,8 @@
                         quoteTitle: portalName + ' Portal',
                         projectAddress: '',
                         rooms: [],
-                        terms: []
+                        terms: [],
+                        termsExplicit: false
                     };
                     stampPortalAddedAt(placeholderData);
                     var insertResult = await _supabase.from('quotes').insert({

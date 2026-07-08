@@ -16,11 +16,23 @@ assert(
 );
 
 assert(
-  storage.includes('renderTermsCheckboxes(data.terms);') &&
-  storage.includes('renderTermsCheckboxes(session.terms);') &&
-  storage.includes('renderTermsCheckboxes(draft.terms);') &&
-  storage.includes('renderTermsCheckboxes(qData.terms);'),
-  'Every quote load/restore path should render terms with the saved applied terms'
+  builder.includes('function getQuoteTermsForRender(data)') &&
+  builder.includes('if (data.termsExplicit === true) return Array.isArray(data.terms) ? data.terms : undefined;') &&
+  builder.includes('if (Array.isArray(data.terms) && data.terms.length > 0) return data.terms;'),
+  'Builder should distinguish explicit saved term choices from legacy empty term arrays'
+);
+
+assert(
+  storage.includes('termsExplicit: true'),
+  'Quote saves should mark terms as an explicit user selection so an intentional empty selection is preserved'
+);
+
+assert(
+  storage.includes('renderTermsCheckboxes(getQuoteTermsForRender(data));') &&
+  storage.includes('renderTermsCheckboxes(getQuoteTermsForRender(session));') &&
+  storage.includes('renderTermsCheckboxes(getQuoteTermsForRender(draft));') &&
+  storage.includes('renderTermsCheckboxes(getQuoteTermsForRender(qData));'),
+  'Every quote load/restore path should normalize saved terms before rendering checkboxes'
 );
 
 assert(

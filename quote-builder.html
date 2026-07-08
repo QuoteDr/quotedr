@@ -11132,6 +11132,13 @@ Example:
             return terms;
         }
 
+        function getQuoteTermsForRender(data) {
+            if (!data || !Object.prototype.hasOwnProperty.call(data, 'terms')) return undefined;
+            if (data.termsExplicit === true) return Array.isArray(data.terms) ? data.terms : undefined;
+            if (Array.isArray(data.terms) && data.terms.length > 0) return data.terms;
+            return undefined;
+        }
+
         function renderTermsCheckboxes(appliedTerms) {
             var container = document.getElementById('termsCheckboxes');
             if (!container) return;
@@ -11327,6 +11334,7 @@ Example:
                 paymentsReceived: getQuotePaymentsReceived(),
                 grandTotal: parseFloat(document.getElementById('grandTotalDisplay')?.textContent.replace(/[^0-9.]/g, '')) || 0,
                 terms: getSelectedTerms(),
+                termsExplicit: true,
                 taxEnabled: getQuoteTaxEnabled(),
                 taxRate: taxPrefs.rate,
                 taxLabel: taxPrefs.label,
@@ -12158,6 +12166,8 @@ Example:
                 email: document.getElementById('clientEmail')?.value || '',
                 phone: document.getElementById('clientPhone')?.value || '',
                 rooms: JSON.parse(JSON.stringify(rooms)), // Deep copy
+                terms: getSelectedTerms(),
+                termsExplicit: true,
                 quoteAdjustment: getQuoteClientAdjustment(),
                 paymentsReceived: getQuotePaymentsReceived(),
                 taxEnabled: getQuoteTaxEnabled(),
