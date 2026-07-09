@@ -34,6 +34,9 @@ assert(items.includes('manage-upgrade-unit-warning'), 'Upgrade setup should warn
 assert(items.includes('upgrade-quantity-mode'), 'Upgrade setup should let users choose how mixed-unit upgrade quantities are calculated');
 assert(items.includes('Enter quantity on quote'), 'Upgrade quantity modes should include a contractor-entered quote quantity option');
 assert(items.includes('quantityMultiplier'), 'Upgrade quantity modes should persist multiplier values for mixed-unit upgrades');
+assert(items.includes('function syncManageUpgradeWizardOptionQuantityState'), 'Upgrade Wizard should sync mixed-unit quantity mode selections into wizard state before re-rendering');
+assert(items.includes('syncManageUpgradeWizardOptionQuantityState(optionEl);'), 'Upgrade Wizard quantity state should be preserved when quantity controls refresh');
+assert(items.includes('syncManageUpgradeWizardOptionQuantityState(selectEl.closest'), 'Changing the Upgrade Wizard quantity mode should immediately persist the selected behavior');
 assert(items.includes('saveManageUpgradeWizardRow(detailsRow)'), 'Upgrade Wizard Save should persist the edited Manage Items row immediately');
 assert(items.includes('function bindManageItemsCloseGuard'), 'Manage Items should guard every modal close path against unsaved changes');
 assert(items.includes('You have unsaved changes, are you sure you want to exit?'), 'Manage Items close warning should use the clear unsaved changes message');

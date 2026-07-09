@@ -283,6 +283,20 @@
             };
         }
 
+        function syncManageUpgradeWizardOptionQuantityState(optionEl) {
+            if (!optionEl || !manageUpgradeWizardState || !manageUpgradeWizardState.group) return;
+            if (!optionEl.closest('#manageUpgradeWizardModal')) return;
+            const optionId = optionEl.dataset.upgradeOptionId || '';
+            if (!optionId) return;
+            const options = Array.isArray(manageUpgradeWizardState.group.options) ? manageUpgradeWizardState.group.options : [];
+            const option = options.find(function(candidate) { return candidate.id === optionId; });
+            if (!option) return;
+            Object.assign(option, readManageUpgradeOptionQuantityState(optionEl), {
+                name: optionEl.querySelector('.upgrade-name')?.value || option.name || '',
+                unitType: optionEl.querySelector('.upgrade-unit-type')?.value || option.unitType || ''
+            });
+        }
+
         function refreshManageUpgradeQuantityControls(optionEl) {
             if (!optionEl) return;
             const controls = optionEl.querySelector('.manage-upgrade-quantity-controls');
@@ -294,6 +308,7 @@
                 name: optionEl.querySelector('.upgrade-name')?.value || '',
                 unitType: optionEl.querySelector('.upgrade-unit-type')?.value || ''
             });
+            syncManageUpgradeWizardOptionQuantityState(optionEl);
             controls.outerHTML = renderManageUpgradeQuantityControls(option, baseUnit);
         }
 
@@ -307,6 +322,7 @@
             if (multiplierWrap) multiplierWrap.style.display = mode === 'multiplier' ? '' : 'none';
             if (overrideWrap) overrideWrap.style.display = mode === 'override' ? '' : 'none';
             if (manualNote) manualNote.style.display = mode === 'manual' ? '' : 'none';
+            syncManageUpgradeWizardOptionQuantityState(selectEl.closest('.manage-upgrade-wizard-option'));
         }
 
         function renderManageItemUpgradeGroupsEditor(item, baseUnitType) {
