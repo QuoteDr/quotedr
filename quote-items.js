@@ -43,6 +43,29 @@
             return clean === 'multiple' ? 'multiple' : 'single_optional';
         }
 
+        function normalizeManageUpgradeQuantityMode(value) {
+            const clean = String(value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+            if (clean === 'manual' || clean === 'quote_quantity' || clean === 'enter_quantity_on_quote') return 'manual';
+            if (clean === 'multiplier') return 'multiplier';
+            if (clean === 'override' || clean === 'fixed' || clean === 'fixed_quantity') return 'override';
+            return 'parent';
+        }
+
+        function normalizeManageUnitForCompare(unit) {
+            const clean = String(unit || '').trim().toLowerCase().replace(/\s+/g, ' ');
+            if (!clean) return '';
+            if (['sq ft', 'sqft', 'square foot', 'square feet', 'sf'].indexOf(clean) !== -1) return 'sq ft';
+            if (['lf', 'linear foot', 'linear feet', 'linear ft', 'lin ft'].indexOf(clean) !== -1) return 'lf';
+            if (['each', 'ea'].indexOf(clean) !== -1) return 'each';
+            return clean;
+        }
+
+        function manageUpgradeUnitsDiffer(baseUnitType, upgradeUnitType) {
+            const base = normalizeManageUnitForCompare(baseUnitType);
+            const upgrade = normalizeManageUnitForCompare(upgradeUnitType);
+            return !!base && !!upgrade && base !== upgrade;
+        }
+
         function manageUpgradeGroupId(prefix) {
             return (prefix || 'upg') + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
         }
@@ -60,6 +83,10 @@
                 itemDescription: option.itemDescription || option.description || '',
                 upgradeType: normalizeManageUpgradeType(option.upgradeType || option.type || option.mode),
                 requiresConsultation: option.requiresConsultation === true || normalizeManageUpgradeType(option.upgradeType || option.type || option.mode) === 'consultation',
+                quantityMode: normalizeManageUpgradeQuantityMode(option.quantityMode),
+                quantityMultiplier: parseFloat(option.quantityMultiplier || 1) || 1,
+                quantityOverride: parseFloat(option.quantityOverride || 0) || 0,
+                manualQuantity: parseFloat(option.manualQuantity || 0) || 0,
                 sourceItemName: option.sourceItemName || '',
                 category: option.category || '',
                 availableAfterOptionIds: Array.isArray(option.availableAfterOptionIds) ? option.availableAfterOptionIds.filter(Boolean) : [],
@@ -78,6 +105,7 @@
                 return {
                     id: group.id || manageUpgradeGroupId('upg'),
                     name: group.name || (groupIndex === 0 ? 'Upgrade Options' : 'Upgrade Group'),
+                    note: group.note || '',
                     type: normalizeManageUpgradeGroupType(group.type),
                     options: options
                 };
@@ -87,6 +115,7 @@
                 normalized.push({
                     id: 'legacy_upgrade',
                     name: 'Upgrade Options',
+                    note: '',
                     type: 'single_optional',
                     options: [normalizeManageUpgradeOption(Object.assign({}, item.upgrade, {
                         id: item.upgrade.id || 'legacy_upgrade_option',
@@ -110,6 +139,7 @@
             return normalized[0] ? cloneManageUpgradeGroups([normalized[0]])[0] : {
                 id: manageUpgradeGroupId('upg'),
                 name: 'Upgrade Options',
+                note: '',
                 type: 'single_optional',
                 options: []
             };
@@ -221,6 +251,64 @@
                 '</div>';
         }
 
+        function renderManageUpgradeQuantityControls(option, baseUnitType) {
+            option = normalizeManageUpgradeOption(option || {});
+            const mode = normalizeManageUpgradeQuantityMode(option.quantityMode);
+            const baseUnit = String(baseUnitType || '').trim();
+            const upgradeUnit = String(option.unitType || '').trim();
+            const hasMismatch = manageUpgradeUnitsDiffer(baseUnit, upgradeUnit);
+            const multiplier = parseFloat(option.quantityMultiplier || 1) || 1;
+            const override = parseFloat(option.quantityOverride || 0) || 0;
+            return '<div class="col-12 manage-upgrade-quantity-controls">' +
+                (hasMismatch ? '<div class="alert alert-warning py-2 px-2 small mb-2 manage-upgrade-unit-warning"><i class="fas fa-triangle-exclamation me-1"></i>Base item is <strong>' + manageItemsEscape(baseUnit || 'not set') + '</strong>, upgrade is <strong>' + manageItemsEscape(upgradeUnit || 'not set') + '</strong>. Choose how QuoteDr should calculate this upgrade quantity.</div>' : '') +
+                '<div class="row g-2 align-items-end">' +
+                '<div class="col-md-4"><label class="form-label mb-1" style="font-size:0.75em">Quantity behavior</label><select class="form-select form-select-sm upgrade-quantity-mode" onchange="handleManageUpgradeQuantityModeChange(this); markPricingDirty(this)">' +
+                '<option value="parent" ' + (mode === 'parent' ? 'selected' : '') + '>Use parent quantity</option>' +
+                '<option value="manual" ' + (mode === 'manual' ? 'selected' : '') + '>Enter quantity on quote</option>' +
+                '<option value="multiplier" ' + (mode === 'multiplier' ? 'selected' : '') + '>Multiplier</option>' +
+                '<option value="override" ' + (mode === 'override' ? 'selected' : '') + '>Fixed quantity</option>' +
+                '</select></div>' +
+                '<div class="col-md-4 upgrade-quantity-multiplier-wrap" style="' + (mode === 'multiplier' ? '' : 'display:none') + '"><label class="form-label mb-1" style="font-size:0.75em">Multiplier</label><input type="number" class="form-control form-control-sm upgrade-quantity-multiplier" value="' + manageItemsAttr(multiplier) + '" step="0.01" min="0" oninput="markPricingDirty(this)"><div class="small text-muted mt-1">Example: base qty x multiplier.</div></div>' +
+                '<div class="col-md-4 upgrade-quantity-override-wrap" style="' + (mode === 'override' ? '' : 'display:none') + '"><label class="form-label mb-1" style="font-size:0.75em">Fixed quantity</label><input type="number" class="form-control form-control-sm upgrade-quantity-override" value="' + manageItemsAttr(override) + '" step="0.01" min="0" oninput="markPricingDirty(this)"></div>' +
+                '<div class="col-md-4 upgrade-quantity-manual-note" style="' + (mode === 'manual' ? '' : 'display:none') + '"><div class="small text-muted">Quote Builder will show a quantity box for this upgrade before you send the quote.</div></div>' +
+                '</div>' +
+                '</div>';
+        }
+
+        function readManageUpgradeOptionQuantityState(optionEl) {
+            return {
+                quantityMode: normalizeManageUpgradeQuantityMode(optionEl?.querySelector('.upgrade-quantity-mode')?.value || 'parent'),
+                quantityMultiplier: parseFloat(optionEl?.querySelector('.upgrade-quantity-multiplier')?.value || 1) || 1,
+                quantityOverride: parseFloat(optionEl?.querySelector('.upgrade-quantity-override')?.value || 0) || 0
+            };
+        }
+
+        function refreshManageUpgradeQuantityControls(optionEl) {
+            if (!optionEl) return;
+            const controls = optionEl.querySelector('.manage-upgrade-quantity-controls');
+            if (!controls) return;
+            const detailsRow = optionEl.closest('.item-details-row');
+            const baseUnit = detailsRow ? rowUnitTypeForDetails(detailsRow) : (manageUpgradeWizardState?.baseUnitType || '');
+            const option = Object.assign(readManageUpgradeOptionQuantityState(optionEl), {
+                id: optionEl.dataset.upgradeOptionId || '',
+                name: optionEl.querySelector('.upgrade-name')?.value || '',
+                unitType: optionEl.querySelector('.upgrade-unit-type')?.value || ''
+            });
+            controls.outerHTML = renderManageUpgradeQuantityControls(option, baseUnit);
+        }
+
+        function handleManageUpgradeQuantityModeChange(selectEl) {
+            const controls = selectEl ? selectEl.closest('.manage-upgrade-quantity-controls') : null;
+            if (!controls) return;
+            const mode = normalizeManageUpgradeQuantityMode(selectEl.value);
+            const multiplierWrap = controls.querySelector('.upgrade-quantity-multiplier-wrap');
+            const overrideWrap = controls.querySelector('.upgrade-quantity-override-wrap');
+            const manualNote = controls.querySelector('.upgrade-quantity-manual-note');
+            if (multiplierWrap) multiplierWrap.style.display = mode === 'multiplier' ? '' : 'none';
+            if (overrideWrap) overrideWrap.style.display = mode === 'override' ? '' : 'none';
+            if (manualNote) manualNote.style.display = mode === 'manual' ? '' : 'none';
+        }
+
         function renderManageItemUpgradeGroupsEditor(item, baseUnitType) {
             const groups = normalizeManageItemUpgradeGroups(item);
             const flatOptions = [];
@@ -248,7 +336,12 @@
                     '<div class="row g-2 align-items-end">' +
                     '<div class="col-md-5"><label class="form-label" style="font-size:0.75em">Group Name</label><input type="text" class="form-control form-control-sm upgrade-group-name" value="' + manageItemsAttr(group.name) + '" placeholder="e.g., Drink Rail" oninput="markPricingDirty(this)"></div>' +
                     '<div class="col-md-4"><label class="form-label" style="font-size:0.75em">Selection Type</label><select class="form-select form-select-sm upgrade-group-type" onchange="handleManageUpgradeGroupTypeChange(this); markPricingDirty(this)"><option value="single_optional" ' + (group.type === 'single_optional' ? 'selected' : '') + '>Pick One Optional</option><option value="multiple" ' + (group.type === 'multiple' ? 'selected' : '') + '>Pick Multiple</option><option value="consultation" ' + (group.type === 'consultation' ? 'selected' : '') + '>Requires consultation</option></select></div>' +
-                    '<div class="col-md-3 d-flex gap-1"><button type="button" class="btn btn-sm btn-outline-primary flex-fill" data-upgrade-group-action="add-option"><i class="fas fa-plus me-1"></i>Option</button><button type="button" class="btn btn-sm btn-outline-secondary" data-upgrade-wizard-action="edit-existing" data-upgrade-group-id="' + manageItemsAttr(group.id) + '" title="Edit this group in the wizard"><i class="fas fa-magic"></i></button><button type="button" class="btn btn-sm btn-outline-danger" data-upgrade-group-action="remove-group" title="Remove group"><i class="fas fa-trash"></i></button></div>' +
+                    '<div class="col-md-3 d-flex gap-1"><button type="button" class="btn btn-sm btn-outline-primary flex-fill" data-upgrade-group-action="add-option"><i class="fas fa-plus me-1"></i>Option</button><button type="button" class="btn btn-sm btn-outline-secondary" data-upgrade-group-action="toggle-note" title="Add note"><i class="fas fa-note-sticky"></i></button><button type="button" class="btn btn-sm btn-outline-secondary" data-upgrade-wizard-action="edit-existing" data-upgrade-group-id="' + manageItemsAttr(group.id) + '" title="Edit this group in the wizard"><i class="fas fa-magic"></i></button><button type="button" class="btn btn-sm btn-outline-danger" data-upgrade-group-action="remove-group" title="Remove group"><i class="fas fa-trash"></i></button></div>' +
+                    '</div>';
+                html += '<div class="upgrade-group-note-wrap mt-2 ' + (group.note ? '' : 'd-none') + '">' +
+                    '<label class="form-label mb-1" style="font-size:0.75em">Upgrade group note</label>' +
+                    '<textarea class="form-control form-control-sm upgrade-group-note" rows="2" placeholder="Explain this upgrade set for the client..." oninput="markPricingDirty(this)">' + manageItemsEscape(group.note || '') + '</textarea>' +
+                    '<div class="small text-muted mt-1">Shown behind <strong>See Upgrade Notes</strong> in the quote.</div>' +
                     '</div>';
 
                 if (!group.options.length) {
@@ -270,6 +363,7 @@
                         '<div class="col-md-6">' + renderManageUpgradePathSelect(flatOptions, option.availableAfterOptionIds, option.id, 'upgrade-available-after', 'Available after') + '</div>' +
                         '<div class="col-md-5">' + renderManageUpgradePathSelect(flatOptions, option.blockedByOptionIds, option.id, 'upgrade-blocked-by', 'Blocked by') + '</div>' +
                         '<div class="col-md-1 d-flex align-items-end"><button type="button" class="btn btn-sm btn-outline-danger w-100" data-upgrade-group-action="remove-option" title="Remove option"><i class="fas fa-trash"></i></button></div>' +
+                        renderManageUpgradeQuantityControls(option, baseUnitType) +
                         '</div><div class="mt-2">' + renderManageMarginPill(option.rate, option.materialCost) + '</div>' +
                         '</div>';
                 });
@@ -302,13 +396,15 @@
                         sourceItemName: selectedSource?.dataset.name || '',
                         category: selectedSource?.dataset.category || '',
                         availableAfterOptionIds: collectManageUpgradeRuleCheckboxIds(optionEl, 'upgrade-available-after'),
-                        blockedByOptionIds: collectManageUpgradeRuleCheckboxIds(optionEl, 'upgrade-blocked-by')
+                        blockedByOptionIds: collectManageUpgradeRuleCheckboxIds(optionEl, 'upgrade-blocked-by'),
+                        ...readManageUpgradeOptionQuantityState(optionEl)
                     };
                 }).filter(Boolean);
                 if (!options.length && !includeEmpty) return null;
                 return {
                     id: groupEl.dataset.upgradeGroupId || manageUpgradeGroupId('upg'),
                     name: groupEl.querySelector('.upgrade-group-name')?.value.trim() || ('Upgrade Group ' + (groupIndex + 1)),
+                    note: groupEl.querySelector('.upgrade-group-note')?.value.trim() || '',
                     type: groupType,
                     options: options
                 };
@@ -344,11 +440,12 @@
             const optionId = optionEl?.dataset.upgradeOptionId || '';
 
             if (action === 'add-group') {
-                groups.push({ id: manageUpgradeGroupId('upg'), name: 'Upgrade Group', type: 'single_optional', options: [] });
+                groups.push({ id: manageUpgradeGroupId('upg'), name: 'Upgrade Group', note: '', type: 'single_optional', options: [] });
             } else if (action === 'add-single-upgrade') {
                 groups.push({
                     id: manageUpgradeGroupId('upg'),
                     name: 'Upgrade Options',
+                    note: '',
                     type: 'single_optional',
                     options: [{
                         id: manageUpgradeGroupId('upo'),
@@ -361,9 +458,21 @@
                         upgradeType: 'add_on',
                         requiresConsultation: false,
                         availableAfterOptionIds: [],
-                        blockedByOptionIds: []
+                        blockedByOptionIds: [],
+                        quantityMode: 'parent',
+                        quantityMultiplier: 1,
+                        quantityOverride: 0
                     }]
                 });
+            } else if (action === 'toggle-note') {
+                const noteWrap = groupEl?.querySelector('.upgrade-group-note-wrap');
+                if (noteWrap) {
+                    noteWrap.classList.remove('d-none');
+                    const textarea = noteWrap.querySelector('.upgrade-group-note');
+                    if (textarea) textarea.focus();
+                    markPricingDirty(detailsRow);
+                }
+                return;
             } else if (action === 'remove-group') {
                 const index = groups.findIndex(function(group) { return group.id === groupId; });
                 if (index !== -1) groups.splice(index, 1);
@@ -382,7 +491,10 @@
                         upgradeType: 'add_on',
                         requiresConsultation: group.type === 'consultation',
                         availableAfterOptionIds: [],
-                        blockedByOptionIds: []
+                        blockedByOptionIds: [],
+                        quantityMode: 'parent',
+                        quantityMultiplier: 1,
+                        quantityOverride: 0
                     });
                 }
             } else if (action === 'remove-option') {
@@ -428,7 +540,10 @@
                 sourceItemName: '',
                 category: '',
                 availableAfterOptionIds: [],
-                blockedByOptionIds: []
+                blockedByOptionIds: [],
+                quantityMode: 'parent',
+                quantityMultiplier: 1,
+                quantityOverride: 0
             };
         }
 
@@ -436,6 +551,7 @@
             const group = {
                 id: manageUpgradeGroupId('upg'),
                 name: setupType === 'consultation' ? 'Consultation Options' : (setupType === 'path' ? 'Upgrade Path' : (setupType === 'multiple' ? 'Add-on Options' : 'Upgrade Options')),
+                note: '',
                 type: setupType === 'consultation' ? 'consultation' : (setupType === 'multiple' ? 'multiple' : 'single_optional'),
                 options: []
             };
@@ -535,7 +651,12 @@
                 '<div class="col-md-7"><label class="form-label small fw-bold">Upgrade group name</label><input type="text" class="form-control form-control-sm upgrade-group-name" value="' + manageItemsAttr(group.name || '') + '" placeholder="e.g., Drink Rail"></div>' +
                 '<div class="col-md-5"><label class="form-label small fw-bold">Client selection</label><select class="form-select form-select-sm upgrade-group-type"><option value="single_optional" ' + (group.type === 'single_optional' ? 'selected' : '') + '>Pick One Optional</option><option value="multiple" ' + (group.type === 'multiple' ? 'selected' : '') + '>Pick Multiple</option><option value="consultation" ' + (group.type === 'consultation' ? 'selected' : '') + '>Requires consultation</option></select></div>' +
                 '</div>' +
-                '<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2"><div class="small text-muted">Copy from saved items or type a custom upgrade.</div><button type="button" class="btn btn-sm btn-outline-primary" data-upgrade-wizard-action="add-option"><i class="fas fa-plus me-1"></i>Add Option</button></div>' +
+                '<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2"><div class="small text-muted">Copy from saved items or type a custom upgrade.</div><div class="d-flex gap-1 flex-wrap"><button type="button" class="btn btn-sm btn-outline-secondary" data-upgrade-wizard-action="toggle-note"><i class="fas fa-note-sticky me-1"></i>Add Note</button><button type="button" class="btn btn-sm btn-outline-primary" data-upgrade-wizard-action="add-option"><i class="fas fa-plus me-1"></i>Add Option</button></div></div>' +
+                '<div class="upgrade-wizard-note-wrap upgrade-group-note-wrap mb-3 ' + (group.note ? '' : 'd-none') + '">' +
+                '<label class="form-label small fw-bold">Upgrade note shown to client</label>' +
+                '<textarea class="form-control form-control-sm upgrade-group-note" rows="3" placeholder="Explain this upgrade set, material choices, or what the client should know...">' + manageItemsEscape(group.note || '') + '</textarea>' +
+                '<div class="small text-muted mt-1">This starts collapsed behind <strong>See Upgrade Notes</strong> on the quote.</div>' +
+                '</div>' +
                 options.map(function(option, optionIndex) {
                     option = normalizeManageUpgradeOption(option, 'wizard_' + optionIndex);
                     const optionRequiresConsultation = isConsultationGroup || option.requiresConsultation === true || option.upgradeType === 'consultation';
@@ -550,6 +671,7 @@
                         '<div class="col-md-7"><label class="form-label small mb-1">Supplier URL</label><input type="url" class="form-control form-control-sm upgrade-supplier-url" value="' + manageItemsAttr(option.supplierUrl || '') + '" placeholder="https://..."></div>' +
                         '<div class="col-md-1 d-flex align-items-end"><button type="button" class="btn btn-sm btn-outline-danger w-100" data-upgrade-wizard-action="remove-option" title="Remove option"><i class="fas fa-trash"></i></button></div>' +
                         '<div class="col-12"><label class="form-label small mb-1">Upgrade Description</label><input type="text" class="form-control form-control-sm upgrade-desc" value="' + manageItemsAttr(option.description || '') + '" placeholder="Optional client-facing description"></div>' +
+                        renderManageUpgradeQuantityControls(option, state.baseUnitType) +
                         '</div>' +
                         '</div>';
                 }).join('') +
@@ -584,10 +706,15 @@
                 '<div class="manage-upgrade-wizard-preview border rounded bg-light p-3">' +
                 '<div class="fw-bold mb-1">' + manageItemsEscape(group.name || 'Upgrade Options') + '</div>' +
                 '<div class="small text-muted mb-3">' + (group.type === 'consultation' ? 'Client can request this option and send the quote back for pricing.' : (group.type === 'multiple' ? 'Client can pick multiple upgrades.' : 'Client can pick one upgrade, or leave the base item unchanged.')) + '</div>' +
+                (group.note ? '<div class="alert alert-light border small"><strong>Client note:</strong> ' + manageItemsEscape(group.note) + '</div>' : '') +
                 (options.length ? options.map(function(option) {
                     const rules = [];
                     if ((option.availableAfterOptionIds || []).length) rules.push('Available after ' + option.availableAfterOptionIds.length + ' option(s)');
                     if ((option.blockedByOptionIds || []).length) rules.push('Blocked by ' + option.blockedByOptionIds.length + ' option(s)');
+                    const quantityMode = normalizeManageUpgradeQuantityMode(option.quantityMode);
+                    if (quantityMode === 'manual') rules.push('Quantity entered on quote');
+                    if (quantityMode === 'multiplier') rules.push('Quantity multiplier x ' + (parseFloat(option.quantityMultiplier || 1) || 1));
+                    if (quantityMode === 'override') rules.push('Fixed quantity ' + (parseFloat(option.quantityOverride || 0) || 0));
                     return '<div class="border rounded bg-white p-2 mb-2">' +
                         '<div class="d-flex justify-content-between gap-2 flex-wrap"><strong>' + manageItemsEscape(option.name || 'Unnamed upgrade') + '</strong><span>' + (option.requiresConsultation || option.upgradeType === 'consultation' ? 'Requires consultation' : (manageItemsEscape(option.upgradeType === 'replacement' ? 'Replacement' : 'Add-on') + ' - $' + (parseFloat(option.rate) || 0).toFixed(2) + '/' + manageItemsEscape(option.unitType || 'unit'))) + '</span></div>' +
                         (option.description ? '<div class="small text-muted mt-1">' + manageItemsEscape(option.description) + '</div>' : '') +
@@ -644,8 +771,10 @@
             const group = manageUpgradeWizardState.group;
             const groupName = modalEl.querySelector('.upgrade-group-name');
             const groupType = modalEl.querySelector('.upgrade-group-type');
+            const groupNote = modalEl.querySelector('.upgrade-group-note');
             if (groupName) group.name = groupName.value.trim();
             if (groupType) group.type = normalizeManageUpgradeGroupType(groupType.value);
+            if (groupNote) group.note = groupNote.value.trim();
             const optionEls = Array.from(modalEl.querySelectorAll('.manage-upgrade-wizard-option'));
             if (!optionEls.length) return;
             group.options = optionEls.map(function(optionEl, optionIndex) {
@@ -679,7 +808,8 @@
                     sourceItemName: selectedSource?.dataset.name || previous.sourceItemName || '',
                     category: selectedSource?.dataset.category || previous.category || '',
                     availableAfterOptionIds: selectedFrom('.upgrade-available-after', previous.availableAfterOptionIds),
-                    blockedByOptionIds: selectedFrom('.upgrade-blocked-by', previous.blockedByOptionIds)
+                    blockedByOptionIds: selectedFrom('.upgrade-blocked-by', previous.blockedByOptionIds),
+                    ...readManageUpgradeOptionQuantityState(optionEl)
                 };
             });
         }
@@ -823,6 +953,15 @@
                 showManageUpgradeWizard();
                 return;
             }
+            if (action === 'toggle-note') {
+                const noteWrap = document.querySelector('#manageUpgradeWizardModal .upgrade-wizard-note-wrap');
+                if (noteWrap) {
+                    noteWrap.classList.remove('d-none');
+                    const textarea = noteWrap.querySelector('.upgrade-group-note');
+                    if (textarea) textarea.focus();
+                }
+                return;
+            }
             if (action === 'remove-option') {
                 collectManageUpgradeWizardForm();
                 const optionId = button.closest('.manage-upgrade-wizard-option')?.dataset.upgradeOptionId || '';
@@ -886,6 +1025,7 @@
             setValue('.upgrade-material-cost', selected.dataset.cost || '0');
             setValue('.upgrade-supplier-url', selected.dataset.supplier || '');
             setValue('.upgrade-desc', selected.dataset.description || '');
+            refreshManageUpgradeQuantityControls(optionEl);
         }
 
         document.addEventListener('click', function(event) {
@@ -1014,6 +1154,9 @@
             if (selectEl.value !== MANAGE_CUSTOM_UNIT_VALUE) {
                 selectEl.dataset.currentUnit = selectEl.value || '';
                 markPricingDirty(selectEl);
+                if (selectEl.classList.contains('upgrade-unit-type')) {
+                    refreshManageUpgradeQuantityControls(selectEl.closest('.manage-upgrade-option') || selectEl.closest('.manage-upgrade-wizard-option'));
+                }
                 return;
             }
 
@@ -1037,6 +1180,9 @@
             selectEl.dataset.currentUnit = selectEl.value;
 
             markPricingDirty(selectEl);
+            if (selectEl.classList.contains('upgrade-unit-type')) {
+                refreshManageUpgradeQuantityControls(selectEl.closest('.manage-upgrade-option') || selectEl.closest('.manage-upgrade-wizard-option'));
+            }
         }
 
         function manageItemsRowKey(cat, name) {
@@ -4066,6 +4212,8 @@
         window.saveManageUpgradeWizard = saveManageUpgradeWizard;
         window.handleManageUpgradeWizardAction = handleManageUpgradeWizardAction;
         window.handleManageUpgradePathSelectChange = handleManageUpgradePathSelectChange;
+        window.handleManageUpgradeQuantityModeChange = handleManageUpgradeQuantityModeChange;
+        window.refreshManageUpgradeQuantityControls = refreshManageUpgradeQuantityControls;
         window.fillManageUpgradeOptionFromSource = fillManageUpgradeOptionFromSource;
         window.addCustomItem = addCustomItem;
         window.openChoiceGroupHelpModal = openChoiceGroupHelpModal;

@@ -22,6 +22,10 @@ assert(builder.includes('renderItemUpgradeGroups'), 'Quote builder should render
 assert(builder.includes('toggleItemUpgradeOption'), 'Quote builder should toggle item upgrade options');
 assert(builder.includes('toggleItemUpgradeDescription'), 'Quote builder should let upgrade descriptions expand inline');
 assert(builder.includes('item-upgrade-option-description'), 'Quote builder should render upgrade descriptions in expandable panels');
+assert(builder.includes('toggleItemUpgradeGroupNote'), 'Quote builder should let contractors expand upgrade group notes');
+assert(builder.includes('setItemUpgradeManualQuantity'), 'Quote builder should let contractors enter manual mixed-unit upgrade quantities');
+assert(builder.includes('getQuoteItemUpgradeOptionQuantity'), 'Quote builder should calculate upgrade option quantities by parent, manual, multiplier, or override mode');
+assert(builder.includes('See Upgrade Notes'), 'Quote builder should render a clear upgrade note affordance');
 assert(builder.includes('clearInvalidItemUpgradeSelections'), 'Quote builder should clear blocked upgrade path selections');
 assert(builder.includes('applyItemUpgradeGroupsToItem'), 'Quote builder should apply selected upgrade groups to totals');
 assert(builder.includes('selectedUpgradeOptionIds'), 'Quote builder should track selected item upgrade option ids');
@@ -32,6 +36,9 @@ assert(viewer.includes('renderViewerItemUpgradeGroups'), 'Client viewer should r
 assert(viewer.includes('toggleViewerItemUpgradeOption'), 'Client viewer should toggle item upgrade choices');
 assert(viewer.includes('toggleViewerUpgradeDescription'), 'Client viewer should let clients expand upgrade descriptions');
 assert(viewer.includes('viewer-upgrade-option-description'), 'Client viewer should render upgrade descriptions in expandable panels');
+assert(viewer.includes('toggleViewerUpgradeGroupNote'), 'Client viewer should let clients expand upgrade group notes');
+assert(viewer.includes('getViewerItemUpgradeOptionQuantity'), 'Client viewer should calculate final upgrade quantities without client editing');
+assert(viewer.includes('See Upgrade Notes'), 'Client viewer should show a clear upgrade note affordance');
 assert(viewer.includes('clearInvalidViewerItemUpgradeSelections'), 'Client viewer should clear blocked upgrade path selections');
 assert(viewer.includes('_clientItemUpgradeSelections'), 'Approval payload should record selected item upgrade paths');
 

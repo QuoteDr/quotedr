@@ -238,10 +238,46 @@
         .quote-upgrade-description-toggle:hover {
             color: var(--quote-upgrade-accent, #0d9488) !important;
         }
+        .quote-upgrade-note-toggle {
+            border: 1px solid var(--quote-upgrade-border, rgba(13, 148, 136, 0.35));
+            background: #ffffff;
+            color: var(--quote-upgrade-accent, #0d9488);
+            border-radius: 999px;
+            font-weight: 800;
+            line-height: 1.2;
+        }
+        .quote-upgrade-note-toggle:hover,
+        .quote-upgrade-note-toggle:focus {
+            color: var(--quote-upgrade-accent, #0d9488);
+            background: var(--quote-upgrade-accent-soft, rgba(13, 148, 136, 0.14));
+            border-color: var(--quote-upgrade-accent, #0d9488);
+        }
+        .quote-upgrade-note-toggle.quote-upgrade-note-pulse {
+            animation: quoteUpgradeNotePulse 1.8s ease-in-out infinite;
+        }
+        .quote-upgrade-note-toggle[aria-expanded="true"] {
+            animation: none;
+        }
+        .quote-upgrade-group-note {
+            border-color: var(--quote-upgrade-border, rgba(13, 148, 136, 0.35)) !important;
+            background: #ffffff;
+        }
+        .quote-upgrade-quantity-note {
+            color: #64748b;
+        }
+        .item-upgrade-manual-quantity {
+            max-width: 130px;
+        }
+        @keyframes quoteUpgradeNotePulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(13, 148, 136, 0.22); }
+            50% { box-shadow: 0 0 0 6px rgba(13, 148, 136, 0); }
+        }
         @media (prefers-reduced-motion: reduce) {
             .quote-upgrade-option-btn,
-            .quote-upgrade-option-btn i {
+            .quote-upgrade-option-btn i,
+            .quote-upgrade-note-toggle.quote-upgrade-note-pulse {
                 transition: none;
+                animation: none;
             }
             .quote-upgrade-option-btn:hover,
             .quote-upgrade-option-btn:focus {
@@ -3239,6 +3275,30 @@ Example:
             return upgradeDescription;
         }
 
+        function normalizeQuoteItemUpgradeQuantityMode(value) {
+            var clean = String(value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+            if (clean === 'manual' || clean === 'enter_on_quote' || clean === 'quote_quantity') return 'manual';
+            if (clean === 'multiplier' || clean === 'multiply') return 'multiplier';
+            if (clean === 'override' || clean === 'fixed') return 'override';
+            return 'parent';
+        }
+
+        function normalizeQuoteUpgradeUnitForCompare(unit) {
+            var clean = String(unit || '').trim().toLowerCase().replace(/\s+/g, ' ');
+            if (!clean) return '';
+            if (['sq ft', 'sqft', 'square foot', 'square feet', 'ft2', 'ft²'].indexOf(clean) !== -1) return 'sq ft';
+            if (['lf', 'linear foot', 'linear feet', 'linear ft'].indexOf(clean) !== -1) return 'LF';
+            if (['each', 'ea'].indexOf(clean) !== -1) return 'each';
+            if (['flatrate', 'flat rate', 'flat'].indexOf(clean) !== -1) return 'Flatrate';
+            return clean;
+        }
+
+        function quoteUpgradeUnitsDiffer(baseUnit, upgradeUnit) {
+            var base = normalizeQuoteUpgradeUnitForCompare(baseUnit);
+            var upgrade = normalizeQuoteUpgradeUnitForCompare(upgradeUnit);
+            return !!base && !!upgrade && base !== upgrade;
+        }
+
         function normalizeQuoteItemUpgradeOption(option, fallbackId) {
             option = option || {};
             var upgradeType = normalizeQuoteUpgradeType(option.upgradeType || option.type || option.mode);
@@ -3256,6 +3316,10 @@ Example:
                 laborTime: normalizeLaborTime(option.laborTime),
                 upgradeType: upgradeType,
                 requiresConsultation: option.requiresConsultation === true || upgradeType === 'consultation',
+                quantityMode: normalizeQuoteItemUpgradeQuantityMode(option.quantityMode),
+                quantityMultiplier: parseFloat(option.quantityMultiplier || 1) || 1,
+                quantityOverride: parseFloat(option.quantityOverride || 0) || 0,
+                manualQuantity: parseFloat(option.manualQuantity || 0) || 0,
                 availableAfterOptionIds: Array.isArray(option.availableAfterOptionIds) ? option.availableAfterOptionIds.filter(Boolean) : [],
                 blockedByOptionIds: Array.isArray(option.blockedByOptionIds) ? option.blockedByOptionIds.filter(Boolean) : []
             };
@@ -3276,6 +3340,7 @@ Example:
                 return {
                     id: group.id || ('item_upg_' + groupIndex),
                     name: group.name || 'Upgrade Options',
+                    note: group.note || '',
                     type: group.type === 'consultation' ? 'consultation' : (group.type === 'multiple' ? 'multiple' : 'single_optional'),
                     selectedOptionIds: Array.isArray(group.selectedOptionIds) ? group.selectedOptionIds.filter(Boolean) : [],
                     options: options
@@ -3285,6 +3350,7 @@ Example:
                 normalized.push({
                     id: 'legacy_upgrade',
                     name: 'Upgrade Options',
+                    note: '',
                     type: 'single_optional',
                     selectedOptionIds: item.upgraded ? ['legacy_upgrade_option'] : [],
                     options: [normalizeQuoteItemUpgradeOption(Object.assign({}, item.upgrade, {
@@ -3342,10 +3408,59 @@ Example:
             }, []);
         }
 
+        function getQuoteItemUpgradeBaseQuantity(item) {
+            var current = parseFloat(item && item.quantity);
+            if (isFinite(current)) return current;
+            var captured = parseFloat(item && item._baseQuantity);
+            return isFinite(captured) ? captured : 0;
+        }
+
+        function getQuoteItemUpgradeOptionQuantity(item, option) {
+            var mode = normalizeQuoteItemUpgradeQuantityMode(option && option.quantityMode);
+            if (mode === 'manual') {
+                var manual = parseFloat(option && option.manualQuantity);
+                return isFinite(manual) ? manual : 0;
+            }
+            if (mode === 'multiplier') {
+                var multiplier = parseFloat(option && option.quantityMultiplier);
+                if (!isFinite(multiplier)) multiplier = 1;
+                return getQuoteItemUpgradeBaseQuantity(item) * multiplier;
+            }
+            if (mode === 'override') {
+                var override = parseFloat(option && option.quantityOverride);
+                return isFinite(override) ? override : 0;
+            }
+            return getQuoteItemUpgradeBaseQuantity(item);
+        }
+
+        function getQuoteItemUpgradeOptionQuantitySummary(item, option) {
+            if (!item || !option || isQuoteItemConsultationUpgradeOption(option)) return '';
+            var mode = normalizeQuoteItemUpgradeQuantityMode(option.quantityMode);
+            var baseQty = getQuoteItemUpgradeBaseQuantity(item);
+            var baseUnit = item._baseUnitType || item.unitType || item.unit || '';
+            var optionUnit = option.unitType || baseUnit;
+            var qty = getQuoteItemUpgradeOptionQuantity(item, option);
+            if (mode === 'manual') {
+                return 'Upgrade quantity: ' + qty + ' ' + optionUnit;
+            }
+            if (mode === 'multiplier') {
+                var multiplier = parseFloat(option.quantityMultiplier || 1) || 1;
+                return baseQty + ' ' + baseUnit + ' x ' + multiplier + ' ' + optionUnit + '/' + (baseUnit || 'item') + ' = ' + qty + ' ' + optionUnit;
+            }
+            if (mode === 'override') {
+                return 'Fixed upgrade quantity: ' + qty + ' ' + optionUnit;
+            }
+            if (quoteUpgradeUnitsDiffer(baseUnit, optionUnit)) {
+                return 'Using parent quantity: ' + qty + ' ' + optionUnit;
+            }
+            return '';
+        }
+
         function ensureItemUpgradeBaseState(item) {
             if (!item || item._itemUpgradeBaseCaptured) return;
             item._baseRate = parseFloat(item.rate || 0) || 0;
             item._baseMaterialCost = parseFloat(item.materialCost || 0) || 0;
+            item._baseQuantity = parseFloat(item.quantity || 0) || 0;
             item._baseUnitType = item.unitType || item.unit || '';
             item._baseSupplierUrl = item.supplierUrl || '';
             item._baseItemDescription = item.itemDescription || '';
@@ -3360,11 +3475,12 @@ Example:
             if (!item.upgradeGroups.length) return item;
             ensureItemUpgradeBaseState(item);
             clearInvalidItemUpgradeSelections(item);
-            var quantity = parseFloat(item.quantity || 0) || 0;
+            var quantity = getQuoteItemUpgradeBaseQuantity(item);
             var baseRate = parseFloat(item._baseRate || 0) || 0;
             var baseCost = parseFloat(item._baseMaterialCost || 0) || 0;
             var rate = baseRate;
             var materialCost = baseCost;
+            var lineTotal = quantity * baseRate;
             var unitType = item._baseUnitType || item.unitType || '';
             var supplierUrl = item._baseSupplierUrl || '';
             var itemDescription = item._baseItemDescription || '';
@@ -3379,16 +3495,23 @@ Example:
                 }
                 var optionRate = parseFloat(option.rate || 0) || 0;
                 var optionCost = parseFloat(option.materialCost || 0) || 0;
+                var optionQuantity = getQuoteItemUpgradeOptionQuantity(item, option);
+                var optionUnitType = option.unitType || unitType;
+                var sameUnit = !quoteUpgradeUnitsDiffer(unitType, optionUnitType);
                 if (option.upgradeType === 'replacement') {
                     rate = optionRate;
                     materialCost = optionCost;
-                    unitType = option.unitType || unitType;
+                    unitType = optionUnitType || unitType;
                     supplierUrl = option.supplierUrl || supplierUrl;
                     itemDescription = option.itemDescription || option.description || itemDescription;
                     description = option.name || description;
+                    lineTotal = optionQuantity * optionRate;
                     if (option.laborTime && option.laborTime.mode) laborTime = normalizeLaborTime(option.laborTime);
                 } else {
-                    rate += optionRate;
+                    if (sameUnit && normalizeQuoteItemUpgradeQuantityMode(option.quantityMode) === 'parent') {
+                        rate += optionRate;
+                    }
+                    lineTotal += optionQuantity * optionRate;
                     materialCost += optionCost;
                     if (option.description || option.itemDescription) {
                         itemDescription = [itemDescription, option.itemDescription || option.description].filter(function(part) { return String(part || '').trim(); }).join('\n\n');
@@ -3406,7 +3529,7 @@ Example:
             item.upgraded = selectedOptions.length > 0;
             item.requiresConsultation = requiresConsultation;
             item.selectedUpgradeOptionIds = selectedOptions.map(function(option) { return option.id; });
-            item.total = quantity * rate;
+            item.total = lineTotal;
             return item;
         }
 
@@ -3421,6 +3544,10 @@ Example:
 
         function itemUpgradeDescriptionPanelId(roomId, itemIndex, groupId, optionId) {
             return 'item-upgrade-desc-' + qdUpgradeDomIdPart(roomId) + '-' + qdUpgradeDomIdPart(itemIndex) + '-' + qdUpgradeDomIdPart(groupId) + '-' + qdUpgradeDomIdPart(optionId);
+        }
+
+        function itemUpgradeGroupNotePanelId(roomId, itemIndex, groupId) {
+            return 'item-upgrade-note-' + qdUpgradeDomIdPart(roomId) + '-' + qdUpgradeDomIdPart(itemIndex) + '-' + qdUpgradeDomIdPart(groupId);
         }
 
         function toggleItemUpgradeDescription(event, roomId, itemIndex, groupId, optionId) {
@@ -3444,6 +3571,41 @@ Example:
             }
         }
 
+        function toggleItemUpgradeGroupNote(event, roomId, itemIndex, groupId) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            var panel = document.getElementById(itemUpgradeGroupNotePanelId(roomId, itemIndex, groupId));
+            if (!panel) return;
+            var hidden = panel.classList.toggle('d-none');
+            var button = event && event.currentTarget;
+            if (button) {
+                button.setAttribute('aria-expanded', hidden ? 'false' : 'true');
+                button.classList.toggle('quote-upgrade-note-pulse', hidden);
+                var label = button.querySelector('[data-upgrade-note-label]');
+                if (label) label.textContent = hidden ? 'See Upgrade Notes' : 'Hide Upgrade Notes';
+            }
+        }
+
+        function setItemUpgradeManualQuantity(event, roomId, itemIndex, groupId, optionId) {
+            if (event) {
+                event.stopPropagation();
+            }
+            var room = rooms.find(function(r) { return r.id === roomId; });
+            if (!room || !room.items || !room.items[itemIndex]) return;
+            var item = room.items[itemIndex];
+            item.upgradeGroups = normalizeQuoteItemUpgradeGroups(item);
+            var group = item.upgradeGroups.find(function(candidate) { return candidate.id === groupId; });
+            var option = group && (group.options || []).find(function(candidate) { return candidate.id === optionId; });
+            if (!option) return;
+            option.manualQuantity = parseFloat(event && event.currentTarget ? event.currentTarget.value : 0) || 0;
+            applyItemUpgradeGroupsToItem(item);
+            renderRooms();
+            calculateTotals();
+            markUnsaved();
+        }
+
         function renderItemUpgradeGroups(roomId, itemIndex, item) {
             if (!item) return '';
             item.upgradeGroups = normalizeQuoteItemUpgradeGroups(item);
@@ -3459,11 +3621,19 @@ Example:
                 if (!compatible.length) return;
                 html += '<div class="small mb-2"><span class="fw-semibold">' + qdTemplateEscapeHtml(group.name || 'Upgrade Options') + '</span> ';
                 html += '<span class="text-muted">(' + (group.type === 'consultation' ? 'requires consultation' : (group.type === 'multiple' ? 'pick multiple' : 'optional pick one')) + ')</span>';
+                var note = String(group.note || '').trim();
+                var noteId = itemUpgradeGroupNotePanelId(roomId, itemIndex, group.id || '');
+                if (note) {
+                    var noteGroupArg = JSON.stringify(group.id || '').replace(/"/g, '&quot;');
+                    html += ' <button type="button" class="btn btn-sm quote-upgrade-note-toggle quote-upgrade-note-pulse py-0 px-2" aria-expanded="false" aria-controls="' + qdTemplateEscapeHtml(noteId) + '" onclick="toggleItemUpgradeGroupNote(event, ' + roomId + ', ' + itemIndex + ', ' + noteGroupArg + ')"><i class="fas fa-circle-info me-1"></i><span data-upgrade-note-label>See Upgrade Notes</span></button>';
+                    html += '<div id="' + qdTemplateEscapeHtml(noteId) + '" class="quote-upgrade-group-note d-none small text-muted border rounded px-2 py-2 mt-2 mb-1">' + qdTemplateEscapeHtml(note).replace(/\n/g, '<br>') + '</div>';
+                }
                 html += '<div class="d-flex flex-wrap gap-1 mt-1">';
                 compatible.forEach(function(option) {
                     var selected = (group.selectedOptionIds || []).indexOf(option.id) !== -1;
                     var requiresConsultation = isQuoteItemConsultationUpgradeOption(option);
-                    var optionTotal = (parseFloat(item.quantity) || 0) * (parseFloat(option.rate) || 0);
+                    var optionQuantity = getQuoteItemUpgradeOptionQuantity(item, option);
+                    var optionTotal = optionQuantity * (parseFloat(option.rate) || 0);
                     var groupArg = JSON.stringify(group.id || '').replace(/"/g, '&quot;');
                     var optionArg = JSON.stringify(option.id || '').replace(/"/g, '&quot;');
                     var description = getItemUpgradeOptionDescription(option);
@@ -3476,6 +3646,14 @@ Example:
                     html += '<button type="button" class="btn btn-sm quote-upgrade-option-btn ' + (selected ? 'is-selected' : '') + ' py-0" onclick="event.stopPropagation(); toggleItemUpgradeOption(' + roomId + ', ' + itemIndex + ', ' + groupArg + ', ' + optionArg + ')" title="' + qdTemplateEscapeHtml(optionTitle) + '">' +
                         '<i class="fas ' + (selected ? checkedIcon : uncheckedIcon) + ' me-1"></i>' + qdTemplateEscapeHtml(option.name || 'Upgrade') + ' ' + optionPriceHtml +
                         '</button>';
+                    if (selected && !requiresConsultation) {
+                        if (normalizeQuoteItemUpgradeQuantityMode(option.quantityMode) === 'manual') {
+                            html += '<label class="quote-upgrade-quantity-note small d-flex align-items-center gap-1 mb-0">Qty <input type="number" min="0" step="0.01" class="form-control form-control-sm item-upgrade-manual-quantity" value="' + qdTemplateEscapeHtml(optionQuantity) + '" onclick="event.stopPropagation()" onchange="setItemUpgradeManualQuantity(event, ' + roomId + ', ' + itemIndex + ', ' + groupArg + ', ' + optionArg + ')"> ' + qdTemplateEscapeHtml(option.unitType || item.unitType || '') + '</label>';
+                        } else {
+                            var quantitySummary = getQuoteItemUpgradeOptionQuantitySummary(item, option);
+                            if (quantitySummary) html += '<div class="quote-upgrade-quantity-note small">' + qdTemplateEscapeHtml(quantitySummary) + '</div>';
+                        }
+                    }
                     if (description) {
                         html += '<button type="button" class="btn btn-link btn-sm text-muted p-0 item-upgrade-description-toggle quote-upgrade-description-toggle" aria-expanded="false" aria-controls="' + qdTemplateEscapeHtml(panelId) + '" onclick="toggleItemUpgradeDescription(event, ' + roomId + ', ' + itemIndex + ', ' + groupArg + ', ' + optionArg + ')"><i class="fas fa-chevron-down me-1"></i><span data-upgrade-desc-label>Details</span></button>';
                         html += '<div id="' + qdTemplateEscapeHtml(panelId) + '" class="item-upgrade-option-description quote-upgrade-option-description d-none small text-muted border rounded bg-white px-2 py-1">' + qdTemplateEscapeHtml(description).replace(/\n/g, '<br>') + '</div>';
@@ -6591,6 +6769,7 @@ Example:
                 return {
                     id: group.id || '',
                     name: group.name || '',
+                    note: group.note || '',
                     type: group.type || 'single_optional',
                     options: (group.options || []).map(function(option) {
                         return {
@@ -6604,6 +6783,9 @@ Example:
                             supplierUrl: option.supplierUrl || '',
                             description: option.description || option.itemDescription || '',
                             upgradeType: normalizeQuoteUpgradeType(option.upgradeType || option.type || option.mode),
+                            quantityMode: normalizeQuoteItemUpgradeQuantityMode(option.quantityMode),
+                            quantityMultiplier: parseFloat(option.quantityMultiplier || 1) || 1,
+                            quantityOverride: parseFloat(option.quantityOverride || 0) || 0,
                             availableAfterOptionIds: Array.isArray(option.availableAfterOptionIds) ? option.availableAfterOptionIds.slice().sort() : [],
                             blockedByOptionIds: Array.isArray(option.blockedByOptionIds) ? option.blockedByOptionIds.slice().sort() : []
                         };

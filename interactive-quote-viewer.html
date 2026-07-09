@@ -1023,10 +1023,43 @@
         .quote-upgrade-description-toggle:hover {
             color: var(--quote-upgrade-accent, #0d9488) !important;
         }
+        .quote-upgrade-note-toggle {
+            border: 1px solid var(--quote-upgrade-border, rgba(13, 148, 136, 0.35));
+            background: #ffffff;
+            color: var(--quote-upgrade-accent, #0d9488);
+            border-radius: 999px;
+            font-weight: 800;
+            line-height: 1.2;
+        }
+        .quote-upgrade-note-toggle:hover,
+        .quote-upgrade-note-toggle:focus {
+            color: var(--quote-upgrade-accent, #0d9488);
+            background: var(--quote-upgrade-accent-soft, rgba(13, 148, 136, 0.20));
+            border-color: var(--quote-upgrade-accent, #0d9488);
+        }
+        .quote-upgrade-note-toggle.quote-upgrade-note-pulse {
+            animation: quoteUpgradeNotePulse 1.8s ease-in-out infinite;
+        }
+        .quote-upgrade-note-toggle[aria-expanded="true"] {
+            animation: none;
+        }
+        .quote-upgrade-group-note {
+            border-color: var(--quote-upgrade-border, rgba(13, 148, 136, 0.35)) !important;
+            background: #ffffff;
+        }
+        .quote-upgrade-quantity-note {
+            color: #64748b;
+        }
+        @keyframes quoteUpgradeNotePulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(13, 148, 136, 0.22); }
+            50% { box-shadow: 0 0 0 6px rgba(13, 148, 136, 0); }
+        }
         @media (prefers-reduced-motion: reduce) {
             .quote-upgrade-option-btn,
-            .quote-upgrade-option-btn i {
+            .quote-upgrade-option-btn i,
+            .quote-upgrade-note-toggle.quote-upgrade-note-pulse {
                 transition: none;
+                animation: none;
             }
             .quote-upgrade-option-btn:hover,
             .quote-upgrade-option-btn:focus {
@@ -2416,6 +2449,30 @@ if (location.search.includes('debug')) {
             return clean === 'replacement' ? 'replacement' : 'add_on';
         }
 
+        function normalizeViewerItemUpgradeQuantityMode(value) {
+            var clean = String(value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+            if (clean === 'manual' || clean === 'enter_on_quote' || clean === 'quote_quantity') return 'manual';
+            if (clean === 'multiplier' || clean === 'multiply') return 'multiplier';
+            if (clean === 'override' || clean === 'fixed') return 'override';
+            return 'parent';
+        }
+
+        function normalizeViewerUpgradeUnitForCompare(unit) {
+            var clean = String(unit || '').trim().toLowerCase().replace(/\s+/g, ' ');
+            if (!clean) return '';
+            if (['sq ft', 'sqft', 'square foot', 'square feet', 'ft2', 'ft²'].indexOf(clean) !== -1) return 'sq ft';
+            if (['lf', 'linear foot', 'linear feet', 'linear ft'].indexOf(clean) !== -1) return 'LF';
+            if (['each', 'ea'].indexOf(clean) !== -1) return 'each';
+            if (['flatrate', 'flat rate', 'flat'].indexOf(clean) !== -1) return 'Flatrate';
+            return clean;
+        }
+
+        function viewerUpgradeUnitsDiffer(baseUnit, upgradeUnit) {
+            var base = normalizeViewerUpgradeUnitForCompare(baseUnit);
+            var upgrade = normalizeViewerUpgradeUnitForCompare(upgradeUnit);
+            return !!base && !!upgrade && base !== upgrade;
+        }
+
         function normalizeViewerItemUpgradeOption(option, fallbackId) {
             option = option || {};
             var upgradeType = normalizeViewerUpgradeType(option.upgradeType || option.type || option.mode);
@@ -2432,6 +2489,10 @@ if (location.search.includes('debug')) {
                 itemDescription: option.itemDescription || option.description || '',
                 upgradeType: upgradeType,
                 requiresConsultation: option.requiresConsultation === true || upgradeType === 'consultation',
+                quantityMode: normalizeViewerItemUpgradeQuantityMode(option.quantityMode),
+                quantityMultiplier: viewerNumber(option.quantityMultiplier || 1) || 1,
+                quantityOverride: viewerNumber(option.quantityOverride),
+                manualQuantity: viewerNumber(option.manualQuantity),
                 availableAfterOptionIds: Array.isArray(option.availableAfterOptionIds) ? option.availableAfterOptionIds.filter(Boolean) : [],
                 blockedByOptionIds: Array.isArray(option.blockedByOptionIds) ? option.blockedByOptionIds.filter(Boolean) : []
             };
@@ -2452,6 +2513,7 @@ if (location.search.includes('debug')) {
                 return {
                     id: group.id || ('viewer_upg_' + groupIndex),
                     name: group.name || 'Upgrade Options',
+                    note: group.note || '',
                     type: group.type === 'consultation' ? 'consultation' : (group.type === 'multiple' ? 'multiple' : 'single_optional'),
                     selectedOptionIds: Array.isArray(group.selectedOptionIds) ? group.selectedOptionIds.filter(Boolean) : [],
                     options: options
@@ -2461,6 +2523,7 @@ if (location.search.includes('debug')) {
                 normalized.push({
                     id: 'legacy_upgrade',
                     name: 'Upgrade Options',
+                    note: '',
                     type: 'single_optional',
                     selectedOptionIds: item.upgraded ? ['legacy_upgrade_option'] : [],
                     options: [normalizeViewerItemUpgradeOption(Object.assign({}, item.upgrade, {
@@ -2521,10 +2584,42 @@ if (location.search.includes('debug')) {
             }, []);
         }
 
+        function getViewerItemUpgradeBaseQuantity(item) {
+            var current = viewerItemQuantity(item);
+            if (isFinite(current)) return current;
+            return viewerNumber(item && item._baseQuantity);
+        }
+
+        function getViewerItemUpgradeOptionQuantity(item, option) {
+            var mode = normalizeViewerItemUpgradeQuantityMode(option && option.quantityMode);
+            if (mode === 'manual') return viewerNumber(option && option.manualQuantity);
+            if (mode === 'multiplier') return getViewerItemUpgradeBaseQuantity(item) * (viewerNumber(option && option.quantityMultiplier) || 1);
+            if (mode === 'override') return viewerNumber(option && option.quantityOverride);
+            return getViewerItemUpgradeBaseQuantity(item);
+        }
+
+        function getViewerItemUpgradeOptionQuantitySummary(item, option) {
+            if (!item || !option || isViewerConsultationUpgradeOption(option)) return '';
+            var mode = normalizeViewerItemUpgradeQuantityMode(option.quantityMode);
+            var baseQty = getViewerItemUpgradeBaseQuantity(item);
+            var baseUnit = item._baseUnitType || item.unitType || item.unit || '';
+            var optionUnit = option.unitType || baseUnit;
+            var qty = getViewerItemUpgradeOptionQuantity(item, option);
+            if (mode === 'manual') return qty + ' ' + optionUnit;
+            if (mode === 'multiplier') {
+                var multiplier = viewerNumber(option.quantityMultiplier) || 1;
+                return baseQty + ' ' + baseUnit + ' x ' + multiplier + ' ' + optionUnit + '/' + (baseUnit || 'item') + ' = ' + qty + ' ' + optionUnit;
+            }
+            if (mode === 'override') return qty + ' ' + optionUnit;
+            if (viewerUpgradeUnitsDiffer(baseUnit, optionUnit)) return qty + ' ' + optionUnit;
+            return '';
+        }
+
         function ensureViewerItemUpgradeBaseState(item) {
             if (!item || item._viewerItemUpgradeBaseCaptured) return;
             item._baseRate = viewerNumber(item._baseRate !== undefined && item._baseRate !== null ? item._baseRate : item.rate);
             item._baseMaterialCost = viewerNumber(item._baseMaterialCost !== undefined && item._baseMaterialCost !== null ? item._baseMaterialCost : item.materialCost);
+            item._baseQuantity = viewerNumber(item._baseQuantity !== undefined && item._baseQuantity !== null ? item._baseQuantity : item.quantity);
             item._baseUnitType = item._baseUnitType || item.unitType || item.unit || '';
             item._baseDescription = item._baseDescription || item.description || item.name || '';
             item._baseItemDescription = item._baseItemDescription || item.itemDescription || '';
@@ -2539,6 +2634,7 @@ if (location.search.includes('debug')) {
             clearInvalidViewerItemUpgradeSelections(item);
             var rate = viewerNumber(item._baseRate);
             var materialCost = viewerNumber(item._baseMaterialCost);
+            var lineTotal = getViewerItemUpgradeBaseQuantity(item) * rate;
             var unitType = item._baseUnitType || item.unitType || item.unit || '';
             var description = item._baseDescription || item.description || item.name || '';
             var itemDescription = item._baseItemDescription || item.itemDescription || '';
@@ -2549,14 +2645,21 @@ if (location.search.includes('debug')) {
                     requiresConsultation = true;
                     return;
                 }
+                var optionQuantity = getViewerItemUpgradeOptionQuantity(item, option);
+                var optionUnitType = option.unitType || unitType;
+                var sameUnit = !viewerUpgradeUnitsDiffer(unitType, optionUnitType);
                 if (option.upgradeType === 'replacement') {
                     rate = viewerNumber(option.rate);
                     materialCost = viewerNumber(option.materialCost);
-                    unitType = option.unitType || unitType;
+                    unitType = optionUnitType || unitType;
                     description = option.name || description;
                     itemDescription = option.itemDescription || option.description || itemDescription;
+                    lineTotal = optionQuantity * viewerNumber(option.rate);
                 } else {
-                    rate += viewerNumber(option.rate);
+                    if (sameUnit && normalizeViewerItemUpgradeQuantityMode(option.quantityMode) === 'parent') {
+                        rate += viewerNumber(option.rate);
+                    }
+                    lineTotal += optionQuantity * viewerNumber(option.rate);
                     materialCost += viewerNumber(option.materialCost);
                     if (option.itemDescription || option.description) {
                         itemDescription = [itemDescription, option.itemDescription || option.description].filter(function(part) { return String(part || '').trim(); }).join('\n\n');
@@ -2571,7 +2674,7 @@ if (location.search.includes('debug')) {
             item.itemDescription = itemDescription;
             item.upgraded = selectedOptions.length > 0;
             item.requiresConsultation = requiresConsultation;
-            item.total = viewerItemQuantity(item) * rate;
+            item.total = lineTotal;
             item.selectedUpgradeOptionIds = selectedOptions.map(function(option) { return option.id; });
             return item;
         }
@@ -2581,6 +2684,7 @@ if (location.search.includes('debug')) {
             delete item._viewerItemUpgradeBaseCaptured;
             delete item._baseRate;
             delete item._baseMaterialCost;
+            delete item._baseQuantity;
             delete item._baseUnitType;
             delete item._baseDescription;
             delete item._baseItemDescription;
@@ -2598,6 +2702,10 @@ if (location.search.includes('debug')) {
 
         function viewerUpgradeDescriptionPanelId(roomIdx, itemIndex, groupId, optionId) {
             return 'viewer-upgrade-desc-' + viewerUpgradeDomIdPart(roomIdx) + '-' + viewerUpgradeDomIdPart(itemIndex) + '-' + viewerUpgradeDomIdPart(groupId) + '-' + viewerUpgradeDomIdPart(optionId);
+        }
+
+        function viewerUpgradeGroupNotePanelId(roomIdx, itemIndex, groupId) {
+            return 'viewer-upgrade-note-' + viewerUpgradeDomIdPart(roomIdx) + '-' + viewerUpgradeDomIdPart(itemIndex) + '-' + viewerUpgradeDomIdPart(groupId);
         }
 
         function toggleViewerUpgradeDescription(event, roomIdx, itemIndex, groupId, optionId) {
@@ -2621,6 +2729,23 @@ if (location.search.includes('debug')) {
             }
         }
 
+        function toggleViewerUpgradeGroupNote(event, roomIdx, itemIndex, groupId) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            var panel = document.getElementById(viewerUpgradeGroupNotePanelId(roomIdx, itemIndex, groupId));
+            if (!panel) return;
+            var hidden = panel.classList.toggle('d-none');
+            var button = event && event.currentTarget;
+            if (button) {
+                button.setAttribute('aria-expanded', hidden ? 'false' : 'true');
+                button.classList.toggle('quote-upgrade-note-pulse', hidden);
+                var label = button.querySelector('[data-upgrade-note-label]');
+                if (label) label.textContent = hidden ? 'See Upgrade Notes' : 'Hide Upgrade Notes';
+            }
+        }
+
         function renderViewerItemUpgradeGroups(roomIdx, itemIndex, item, isSignedDiff) {
             if (isSignedDiff || !item) return '';
             item.upgradeGroups = normalizeViewerItemUpgradeGroups(item);
@@ -2636,11 +2761,19 @@ if (location.search.includes('debug')) {
                 if (!compatible.length) return;
                 html += '<div class="small mb-2"><span class="fw-semibold">' + escapeHtml(group.name || 'Upgrade Options') + '</span> ';
                 html += '<span class="text-muted">(' + (group.type === 'consultation' ? 'requires consultation' : (group.type === 'multiple' ? 'pick multiple' : 'optional pick one')) + ')</span>';
+                var note = String(group.note || '').trim();
+                var noteId = viewerUpgradeGroupNotePanelId(roomIdx, itemIndex, group.id || '');
+                if (note) {
+                    var noteGroupArg = JSON.stringify(group.id || '').replace(/"/g, '&quot;');
+                    html += ' <button type="button" class="btn btn-sm quote-upgrade-note-toggle quote-upgrade-note-pulse py-0 px-2" aria-expanded="false" aria-controls="' + escapeHtml(noteId) + '" onclick="toggleViewerUpgradeGroupNote(event, ' + roomIdx + ', ' + itemIndex + ', ' + noteGroupArg + ')"><i class="fas fa-circle-info me-1"></i><span data-upgrade-note-label>See Upgrade Notes</span></button>';
+                    html += '<div id="' + escapeHtml(noteId) + '" class="quote-upgrade-group-note d-none small text-muted border rounded px-2 py-2 mt-2 mb-1">' + formatDescriptionText(note) + '</div>';
+                }
                 html += '<div class="d-flex flex-wrap gap-1 mt-1">';
                 compatible.forEach(function(option) {
                     var selected = (group.selectedOptionIds || []).indexOf(option.id) !== -1;
                     var requiresConsultation = isViewerConsultationUpgradeOption(option);
-                    var optionTotal = viewerItemQuantity(item) * viewerNumber(option.rate);
+                    var optionQuantity = getViewerItemUpgradeOptionQuantity(item, option);
+                    var optionTotal = optionQuantity * viewerNumber(option.rate);
                     var groupArg = JSON.stringify(group.id || '').replace(/"/g, '&quot;');
                     var optionArg = JSON.stringify(option.id || '').replace(/"/g, '&quot;');
                     var description = getViewerUpgradeOptionDescription(option);
@@ -2652,6 +2785,10 @@ if (location.search.includes('debug')) {
                     html += '<button type="button" class="btn btn-sm quote-upgrade-option-btn ' + (selected ? 'is-selected' : '') + ' py-0" onclick="toggleViewerItemUpgradeOption(' + roomIdx + ', ' + itemIndex + ', ' + groupArg + ', ' + optionArg + ')">' +
                         '<i class="fas ' + (selected ? checkedIcon : uncheckedIcon) + ' me-1"></i>' + escapeHtml(option.name || 'Upgrade') + ' ' + optionPriceHtml +
                         '</button>';
+                    if (selected && !requiresConsultation) {
+                        var quantitySummary = getViewerItemUpgradeOptionQuantitySummary(item, option);
+                        if (quantitySummary) html += '<div class="quote-upgrade-quantity-note small">' + escapeHtml(quantitySummary) + '</div>';
+                    }
                     if (description) {
                         html += '<button type="button" class="btn btn-link btn-sm text-muted p-0 viewer-upgrade-description-toggle quote-upgrade-description-toggle" aria-expanded="false" aria-controls="' + escapeHtml(panelId) + '" onclick="toggleViewerUpgradeDescription(event, ' + roomIdx + ', ' + itemIndex + ', ' + groupArg + ', ' + optionArg + ')"><i class="fas fa-chevron-down me-1"></i><span data-upgrade-desc-label>Details</span></button>';
                         html += '<div id="' + escapeHtml(panelId) + '" class="viewer-upgrade-option-description quote-upgrade-option-description d-none small text-muted border rounded bg-white px-2 py-1">' + formatDescriptionText(description) + '</div>';

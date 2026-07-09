@@ -28,6 +28,12 @@ assert(items.includes("filterManageUpgradeRuleOptionIds"), 'Upgrade Wizard shoul
 assert(items.includes('manage-upgrade-rule-checkboxes'), 'Upgrade Wizard path rules should render checkbox groups instead of multi-select boxes');
 assert(items.includes('type="checkbox"'), 'Upgrade Wizard path rule options should be selectable with checkboxes');
 assert(items.includes('collectManageUpgradeRuleCheckboxIds'), 'Upgrade Wizard should collect multiple checked path rule options or none');
+assert(items.includes('data-upgrade-wizard-action="toggle-note"'), 'Upgrade Wizard should let users add a note to an upgrade group');
+assert(items.includes('upgrade-group-note'), 'Upgrade Wizard and manual editor should persist upgrade group notes');
+assert(items.includes('manage-upgrade-unit-warning'), 'Upgrade setup should warn when base item and upgrade units differ');
+assert(items.includes('upgrade-quantity-mode'), 'Upgrade setup should let users choose how mixed-unit upgrade quantities are calculated');
+assert(items.includes('Enter quantity on quote'), 'Upgrade quantity modes should include a contractor-entered quote quantity option');
+assert(items.includes('quantityMultiplier'), 'Upgrade quantity modes should persist multiplier values for mixed-unit upgrades');
 assert(items.includes('saveManageUpgradeWizardRow(detailsRow)'), 'Upgrade Wizard Save should persist the edited Manage Items row immediately');
 assert(items.includes('function bindManageItemsCloseGuard'), 'Manage Items should guard every modal close path against unsaved changes');
 assert(items.includes('You have unsaved changes, are you sure you want to exit?'), 'Manage Items close warning should use the clear unsaved changes message');
