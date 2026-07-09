@@ -2437,7 +2437,7 @@ if (location.search.includes('debug')) {
                     });
                 }
             });
-            delete item._viewerItemUpgradeBaseCaptured;
+            resetViewerItemUpgradeBaseState(item);
             if (item.upgradeGroups.length) applyViewerItemUpgradeGroups(item);
             clearInvalidViewerChoiceGroupEnhancementSelections(group);
             return item;
@@ -2925,6 +2925,10 @@ if (location.search.includes('debug')) {
 
         function viewerItemActiveRate(item) {
             if (!item) return 0;
+            if (item.choiceGroup) {
+                applyViewerChoiceGroupToItem(item);
+                return viewerNumber(item.rate);
+            }
             if (normalizeViewerItemUpgradeGroups(item).length) {
                 applyViewerItemUpgradeGroups(item);
                 return viewerNumber(item.rate);
@@ -2935,6 +2939,10 @@ if (location.search.includes('debug')) {
 
         function viewerItemActiveTotal(item) {
             if (!item) return 0;
+            if (item.choiceGroup) {
+                applyViewerChoiceGroupToItem(item);
+                return viewerNumber(item.total);
+            }
             if (normalizeViewerItemUpgradeGroups(item).length) {
                 applyViewerItemUpgradeGroups(item);
                 return viewerNumber(item.total);
