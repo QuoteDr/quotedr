@@ -16528,13 +16528,15 @@ Example:
 
         window.syncManageDetailsSections = syncManageDetailsSections;
 
-        function openManageItemPhotoFilePicker(cat, name, field, photoIndex) {
+        function openManageItemPhotoFilePicker(cat, name, field, photoIndex, upgradeGroupId, upgradeOptionId) {
             var inp = document.createElement('input');
             inp.type = 'file';
             inp.accept = 'image/*';
             inp.dataset.cat = cat || '';
             inp.dataset.name = name || '';
             inp.dataset.field = field || 'photo';
+            if (upgradeGroupId) inp.dataset.upgradeGroupId = upgradeGroupId;
+            if (upgradeOptionId) inp.dataset.upgradeOptionId = upgradeOptionId;
             if (photoIndex !== undefined && photoIndex !== null && photoIndex !== '') {
                 inp.dataset.photoIndex = String(photoIndex);
             }
@@ -16628,7 +16630,12 @@ Example:
                             openManageItemPhotoReplacePicker(photoBtn.dataset.cat, photoBtn.dataset.name);
                             return;
                         }
-                        openManageItemPhotoFilePicker(photoBtn.dataset.cat, photoBtn.dataset.name, photoField, photoIndex);
+                        openManageItemPhotoFilePicker(photoBtn.dataset.cat, photoBtn.dataset.name, photoField, photoIndex, photoBtn.dataset.upgradeGroupId, photoBtn.dataset.upgradeOptionId);
+                        return;
+                    }
+                    var upgradePhotoRemoveBtn = e.target.closest('.upgrade-photo-remove-btn');
+                    if (upgradePhotoRemoveBtn && typeof removeManageUpgradePhoto === 'function') {
+                        removeManageUpgradePhoto(upgradePhotoRemoveBtn.dataset.cat, upgradePhotoRemoveBtn.dataset.name, upgradePhotoRemoveBtn.dataset.upgradeGroupId, upgradePhotoRemoveBtn.dataset.upgradeOptionId);
                         return;
                     }
                     var photoRemoveBtn = e.target.closest('.item-photo-remove-btn');

@@ -389,6 +389,7 @@
                 group.options.forEach(function(option, optionIndex) {
                     const optionRequiresConsultation = isConsultationGroup || option.upgradeType === 'consultation' || option.requiresConsultation === true;
                     html += '<div class="manage-upgrade-option border rounded p-2 mt-2" data-upgrade-option-id="' + manageItemsAttr(option.id) + '">' +
+                        '<input type="hidden" class="upgrade-photo-value" value="' + manageItemsAttr(option.photo || '') + '">' +
                         '<div class="row g-2 align-items-end">' +
                         '<div class="col-md-4"><label class="form-label" style="font-size:0.75em">Copy From Saved Item</label>' + renderManageUpgradeSourceSelect(option.sourceItemName, option.category) + '</div>' +
                         '<div class="col-md-4"><label class="form-label" style="font-size:0.75em">Upgrade Name</label><input type="text" class="form-control form-control-sm upgrade-name" value="' + manageItemsAttr(option.name) + '" placeholder="e.g., Post-to-post drink rail" oninput="markPricingDirty(this)"></div>' +
@@ -428,6 +429,7 @@
                         rate: requiresConsultation ? 0 : (parseFloat(optionEl.querySelector('.upgrade-rate')?.value || 0) || 0),
                         materialCost: requiresConsultation ? 0 : (parseFloat(optionEl.querySelector('.upgrade-material-cost')?.value || 0) || 0),
                         supplierUrl: optionEl.querySelector('.upgrade-supplier-url')?.value.trim() || '',
+                        photo: optionEl.querySelector('.upgrade-photo-value')?.value || '',
                         description: optionEl.querySelector('.upgrade-desc')?.value.trim() || '',
                         upgradeType: groupType === 'consultation' ? 'consultation' : normalizeManageUpgradeType(optionEl.querySelector('.upgrade-type')?.value),
                         requiresConsultation: requiresConsultation,
@@ -1321,6 +1323,80 @@
             });
         }
 
+        function findManageUpgradePhotoTarget(item, groupId, optionId) {
+            if (!item) return null;
+            var targetGroupId = String(groupId || '');
+            var targetOptionId = String(optionId || '');
+            if (targetGroupId === 'legacy_upgrade' || targetOptionId === 'legacy_upgrade_option') {
+                if (!item.upgrade) item.upgrade = {};
+                return { option: item.upgrade, legacy: true };
+            }
+            var groups = Array.isArray(item.upgradeGroups) ? item.upgradeGroups : [];
+            for (var g = 0; g < groups.length; g++) {
+                var group = groups[g] || {};
+                if (String(group.id || '') !== targetGroupId) continue;
+                var options = Array.isArray(group.options) ? group.options : [];
+                for (var o = 0; o < options.length; o++) {
+                    var option = options[o] || {};
+                    if (String(option.id || '') === targetOptionId) {
+                        return { option: option, legacy: false };
+                    }
+                }
+            }
+            if (!groups.length && item.upgrade && item.upgrade.name) {
+                return { option: item.upgrade, legacy: true };
+            }
+            return null;
+        }
+
+        function setManageUpgradeOptionPhoto(item, groupId, optionId, photo) {
+            var target = findManageUpgradePhotoTarget(item, groupId, optionId);
+            if (!target || !target.option) return false;
+            target.option.photo = photo || '';
+            if (target.legacy && item.upgrade) item.upgrade.photo = photo || '';
+            if (item.upgrade && item.upgrade.name && target.option.name && item.upgrade.name === target.option.name) {
+                item.upgrade.photo = photo || '';
+            }
+            return true;
+        }
+
+        function getManageUpgradePhotoTargets(item) {
+            var groups = normalizeManageItemUpgradeGroups(item);
+            var targets = [];
+            groups.forEach(function(group) {
+                (group.options || []).forEach(function(option) {
+                    if (!option || !option.name) return;
+                    targets.push({
+                        groupId: group.id || '',
+                        groupName: group.name || 'Upgrade Options',
+                        optionId: option.id || '',
+                        optionName: option.name || '',
+                        photo: option.photo || '',
+                        upgradeType: option.upgradeType || ''
+                    });
+                });
+            });
+            return targets;
+        }
+
+        function countManageUpgradePhotos(item) {
+            return getManageUpgradePhotoTargets(item).filter(function(target) {
+                return !!target.photo;
+            }).length;
+        }
+
+        function removeManageUpgradePhoto(cat, name, groupId, optionId) {
+            if (!groupId && !optionId) return;
+            pushUndoState();
+            findManagePhotoItems(cat, name).forEach(function(item) {
+                setManageUpgradeOptionPhoto(item, groupId, optionId, '');
+            });
+            setManageItemDetailSectionOpen(cat, name, 'photos', true);
+            markRowDirty(manageItemsRowKey(cat, name));
+            renderAllItemsList();
+            showManageItemsToast('Upgrade photo removed. Save changes when ready.', true);
+        }
+
         function removeManageItemPhoto(cat, name, photoIndex) {
             var index = parseInt(photoIndex, 10);
             if (!Number.isFinite(index) || index < 0) return;
@@ -1912,6 +1988,8 @@
             var file = input.files[0];
             if (!file) return;
             var cat = input.dataset.cat, name = input.dataset.name, field = input.dataset.field || 'photo';
+            var upgradeGroupId = input.dataset.upgradeGroupId || '';
+            var upgradeOptionId = input.dataset.upgradeOptionId || '';
             var requestedIndex = input.dataset.photoIndex === undefined || input.dataset.photoIndex === ''
                 ? -1
                 : parseInt(input.dataset.photoIndex, 10);
@@ -1936,8 +2014,10 @@
                         var item = db[cat].find(function(it) { return it && it.name === name; });
                         if (!item) return;
                         if (field === 'upgradePhoto') {
-                            if (!item.upgrade) item.upgrade = {};
-                            item.upgrade.photo = dataUrl;
+                            if (!setManageUpgradeOptionPhoto(item, upgradeGroupId, upgradeOptionId, dataUrl)) {
+                                if (!item.upgrade) item.upgrade = {};
+                                item.upgrade.photo = dataUrl;
+                            }
                         } else {
                             var photos = normalizeManageItemPhotos(item);
                             if (Number.isFinite(requestedIndex) && requestedIndex >= 0 && requestedIndex < MANAGE_ITEM_PHOTO_LIMIT) {
@@ -2831,7 +2911,7 @@
                                     </div>
                                 </div>
                                 <div class="mt-2">
-                                    <button class="btn btn-sm btn-outline-secondary item-photo-btn" data-cat="${catE}" data-name="${nameE}" data-field="upgradePhoto" title="Add upgrade photo" style="font-size:0.75em;"><i class="fas fa-camera me-1"></i>Upgrade Photo</button>
+                                    <button class="btn btn-sm btn-outline-secondary item-photo-btn" data-cat="${catE}" data-name="${nameE}" data-field="upgradePhoto" data-upgrade-group-id="legacy_upgrade" data-upgrade-option-id="legacy_upgrade_option" title="Add upgrade photo" style="font-size:0.75em;"><i class="fas fa-camera me-1"></i>Upgrade Photo</button>
                                     ${upg.photo ? `<img src="${upg.photo}" class="ms-2 rounded" style="max-width:80px;max-height:50px;cursor:pointer;vertical-align:middle;" onclick="openPhotoLightbox(this.src)" title="Click to enlarge">` : ''}
                                 </div>
                                 <small class="text-muted">Leave name blank to remove upgrade option. Save the row above to save upgrade too.</small>
@@ -2982,6 +3062,8 @@
                     const upg = item.upgrade || {};
                     const itemPhotos = normalizeManageItemPhotos(item);
                     const upgradeGroups = normalizeManageItemUpgradeGroups(item);
+                    const upgradePhotoTargets = getManageUpgradePhotoTargets(item);
+                    const upgradePhotoCount = upgradePhotoTargets.filter(function(target) { return !!target.photo; }).length;
                     const allUpgradeOptions = upgradeGroups.reduce(function(list, group) {
                         return list.concat(group.options || []);
                     }, []);
@@ -2989,8 +3071,8 @@
                     const noDescription = !(item.itemDescription || '').trim();
                     const missingMaterial = parseFloat(item.materialCost || 0) <= 0;
                     const detailsId = 'details_' + safeId;
-                    const photosBadge = (itemPhotos.length || upg.photo)
-                        ? `<span class="badge text-bg-secondary ms-auto">${itemPhotos.length ? itemPhotos.length + '/3' : 'set'}</span>`
+                    const photosBadge = (itemPhotos.length || upgradePhotoCount || upg.photo)
+                        ? `<span class="badge text-bg-secondary ms-auto">${itemPhotos.length ? itemPhotos.length + '/3' : '0/3'}${upgradePhotoCount ? ' +' + upgradePhotoCount : ''}</span>`
                         : '';
                     const isDirty = dirtyPricingRows.has(rowKey);
                     const searchBlob = [
@@ -3104,7 +3186,7 @@
                                             <div class="mt-2">
                                                 <div class="d-flex align-items-center gap-2 flex-wrap">
                                                     <button class="btn btn-sm btn-outline-secondary item-photo-btn" data-cat="${catE}" data-name="${nameE}" data-field="photo" title="Add item photo"><i class="fas fa-camera me-1"></i>${itemPhotos.length >= MANAGE_ITEM_PHOTO_LIMIT ? 'Replace Item Photo' : 'Add Item Photo'} (${itemPhotos.length}/${MANAGE_ITEM_PHOTO_LIMIT})</button>
-                                                    <small class="text-muted">Base item photos. Upgrade photos are separate.</small>
+                                                    <small class="text-muted">Base item photos. Upgrade photos are selected below.</small>
                                                 </div>
                                                 <div class="d-flex align-items-start gap-2 mt-2 flex-wrap">
                                                     ${itemPhotos.length ? itemPhotos.map(function(photo, index) {
@@ -3118,9 +3200,31 @@
                                                     }).join('') : '<small class="text-muted">No item photos yet.</small>'}
                                                 </div>
                                             </div>
-                                            <div class="d-flex align-items-center gap-2 mt-3 flex-wrap">
-                                                <button class="btn btn-sm btn-outline-secondary item-photo-btn" data-cat="${catE}" data-name="${nameE}" data-field="upgradePhoto" title="Add upgrade photo"><i class="fas fa-camera me-1"></i>Upgrade Photo</button>
-                                                ${upg.photo ? `<img src="${manageItemsAttr(upg.photo)}" class="rounded" style="max-width:80px;max-height:52px;cursor:pointer;" onclick="openPhotoLightbox(this.src)" title="Click to enlarge">` : ''}
+                                            <div class="mt-3 pt-2 border-top">
+                                                <small class="text-secondary fw-bold"><i class="fas fa-images"></i> Upgrade photos</small>
+                                                <div class="small text-muted mb-2">Choose the upgrade option you want the photo attached to.</div>
+                                                ${upgradePhotoTargets.length ? `<div class="d-flex flex-column gap-2">
+                                                    ${upgradePhotoTargets.map(function(target) {
+                                                        const groupIdE = manageItemsAttr(target.groupId);
+                                                        const optionIdE = manageItemsAttr(target.optionId);
+                                                        const optionNameE = manageItemsEscape(target.optionName);
+                                                        const optionTitleE = manageItemsAttr(target.optionName);
+                                                        const groupNameE = manageItemsEscape(target.groupName);
+                                                        return `<div class="manage-upgrade-photo-target border rounded p-2 bg-white d-flex align-items-center justify-content-between gap-2 flex-wrap">
+                                                            <div class="d-flex align-items-center gap-2 min-w-0">
+                                                                ${target.photo ? `<img src="${manageItemsAttr(target.photo)}" class="rounded border" style="width:70px;height:48px;object-fit:cover;cursor:pointer;" onclick="openPhotoLightbox(this.src)" title="Click to enlarge">` : '<span class="badge text-bg-light border text-secondary"><i class="fas fa-camera"></i></span>'}
+                                                                <div class="min-w-0">
+                                                                    <div class="fw-semibold text-truncate">${optionNameE}</div>
+                                                                    <div class="small text-muted text-truncate">${groupNameE}</div>
+                                                                </div>
+                                                            </div>
+                                                            <div class="btn-group btn-group-sm">
+                                                                <button type="button" class="btn btn-outline-primary item-photo-btn" data-cat="${catE}" data-name="${nameE}" data-field="upgradePhoto" data-upgrade-group-id="${groupIdE}" data-upgrade-option-id="${optionIdE}" title="${target.photo ? 'Replace' : 'Add'} photo for ${optionTitleE}"><i class="fas fa-camera me-1"></i>${target.photo ? 'Replace' : 'Add'}</button>
+                                                                ${target.photo ? `<button type="button" class="btn btn-outline-danger upgrade-photo-remove-btn" data-cat="${catE}" data-name="${nameE}" data-upgrade-group-id="${groupIdE}" data-upgrade-option-id="${optionIdE}" title="Remove photo from ${optionTitleE}"><i class="fas fa-times"></i></button>` : ''}
+                                                            </div>
+                                                        </div>`;
+                                                    }).join('')}
+                                                </div>` : '<small class="text-muted">No upgrade options yet. Add upgrades first, then attach photos here.</small>'}
                                             </div>
                                         </div>
                                     </div>
@@ -4457,6 +4561,8 @@
         window.normalizeManageItemUpgradeGroups = normalizeManageItemUpgradeGroups;
         window.renderManageItemUpgradeGroupsEditor = renderManageItemUpgradeGroupsEditor;
         window.collectManageItemUpgradeGroups = collectManageItemUpgradeGroups;
+        window.getManageUpgradePhotoTargets = getManageUpgradePhotoTargets;
+        window.removeManageUpgradePhoto = removeManageUpgradePhoto;
         window.handleManageUpgradeGroupAction = handleManageUpgradeGroupAction;
         window.handleManageUpgradeGroupTypeChange = handleManageUpgradeGroupTypeChange;
         window.openManageUpgradeWizard = openManageUpgradeWizard;
