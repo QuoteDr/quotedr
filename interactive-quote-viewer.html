@@ -2308,6 +2308,26 @@ if (location.search.includes('debug')) {
             return choiceGroup.options.filter(function(option) { return selected.indexOf(option.id) !== -1; });
         }
 
+        function normalizeViewerChoiceGroupEnhancementOption(option, groupIndex, optionIndex) {
+            option = option || {};
+            return {
+                id: option.id || ('viewer_enh_' + groupIndex + '_' + optionIndex),
+                name: option.name || option.sourceItemName || option.description || 'Enhancement',
+                category: option.category || '',
+                sourceItemName: option.sourceItemName || option.name || '',
+                unitType: option.unitType || option.unit || '',
+                rate: viewerNumber(option.rate),
+                materialCost: viewerNumber(option.materialCost),
+                supplierUrl: option.supplierUrl || '',
+                photo: option.photo || '',
+                description: option.description || option.itemDescription || option.name || '',
+                itemDescription: option.itemDescription || option.description || '',
+                upgradeType: option.upgradeType === 'replacement' ? 'replacement' : 'add_on',
+                allowedBaseOptionIds: Array.isArray(option.allowedBaseOptionIds) ? option.allowedBaseOptionIds.filter(Boolean) : [],
+                blockedByEnhancementOptionIds: Array.isArray(option.blockedByEnhancementOptionIds) ? option.blockedByEnhancementOptionIds.filter(Boolean) : []
+            };
+        }
+
         function normalizeViewerChoiceGroupEnhancementGroups(groups) {
             return Array.isArray(groups) ? groups.map(function(group, groupIndex) {
                 group = group || {};
@@ -2317,22 +2337,7 @@ if (location.search.includes('debug')) {
                     type: group.type === 'multiple' ? 'multiple' : 'single_optional',
                     selectedOptionIds: Array.isArray(group.selectedOptionIds) ? group.selectedOptionIds.filter(Boolean) : [],
                     options: Array.isArray(group.options) ? group.options.map(function(option, optionIndex) {
-                        option = option || {};
-                        return {
-                            id: option.id || ('viewer_enh_' + groupIndex + '_' + optionIndex),
-                            name: option.name || option.sourceItemName || option.description || 'Enhancement',
-                            category: option.category || '',
-                            sourceItemName: option.sourceItemName || option.name || '',
-                            unitType: option.unitType || option.unit || '',
-                            rate: viewerNumber(option.rate),
-                            materialCost: viewerNumber(option.materialCost),
-                            supplierUrl: option.supplierUrl || '',
-                            description: option.description || option.itemDescription || option.name || '',
-                            itemDescription: option.itemDescription || option.description || '',
-                            upgradeType: option.upgradeType === 'replacement' ? 'replacement' : 'add_on',
-                            allowedBaseOptionIds: Array.isArray(option.allowedBaseOptionIds) ? option.allowedBaseOptionIds.filter(Boolean) : [],
-                            blockedByEnhancementOptionIds: Array.isArray(option.blockedByEnhancementOptionIds) ? option.blockedByEnhancementOptionIds.filter(Boolean) : []
-                        };
+                        return normalizeViewerChoiceGroupEnhancementOption(option, groupIndex, optionIndex);
                     }) : []
                 };
             }) : [];
@@ -2392,6 +2397,7 @@ if (location.search.includes('debug')) {
 
         function applyViewerChoiceGroupToItem(item) {
             if (!item || !item.choiceGroup) return item;
+            if (item._choiceGroupBasePhoto === undefined) item._choiceGroupBasePhoto = item.photo || '';
             var group = item.choiceGroup;
             group.enhancementGroups = normalizeViewerChoiceGroupEnhancementGroups(group.enhancementGroups);
             var selected = getViewerChoiceSelectedOptions(group);
@@ -2411,6 +2417,7 @@ if (location.search.includes('debug')) {
                 var replacementQty = replacement.quantityMode === 'override' ? (parseFloat(replacement.quantityOverride) || 0) : qty;
                 rateSum = viewerNumber(replacement.rate);
                 total = replacementQty * rateSum;
+                item.photo = replacement.photo || item.photo || item._choiceGroupBasePhoto || '';
             }
             selectedEnhancements.filter(function(option) { return option.upgradeType !== 'replacement'; }).forEach(function(option) {
                 var optionQty = option.quantityMode === 'override' ? (parseFloat(option.quantityOverride) || 0) : qty;
@@ -2429,6 +2436,8 @@ if (location.search.includes('debug')) {
                     : [];
             });
             var selectedBaseOption = selected[0] || null;
+            item.photo = selectedBaseOption && selectedBaseOption.photo ? selectedBaseOption.photo : (item._choiceGroupBasePhoto || '');
+            if (replacement && replacement.photo) item.photo = replacement.photo;
             item.upgradeGroups = selectedBaseOption ? normalizeViewerItemUpgradeGroups(selectedBaseOption) : [];
             item.upgradeGroups.forEach(function(upgradeGroup) {
                 if (priorUpgradeSelections[upgradeGroup.id]) {
@@ -2485,6 +2494,7 @@ if (location.search.includes('debug')) {
                 rate: viewerNumber(option.rate),
                 materialCost: viewerNumber(option.materialCost),
                 supplierUrl: option.supplierUrl || '',
+                photo: option.photo || '',
                 description: option.description || option.itemDescription || '',
                 itemDescription: option.itemDescription || option.description || '',
                 upgradeType: upgradeType,
@@ -2623,6 +2633,7 @@ if (location.search.includes('debug')) {
             item._baseUnitType = item._baseUnitType || item.unitType || item.unit || '';
             item._baseDescription = item._baseDescription || item.description || item.name || '';
             item._baseItemDescription = item._baseItemDescription || item.itemDescription || '';
+            item._basePhoto = item._basePhoto || item.photo || '';
             item._viewerItemUpgradeBaseCaptured = true;
         }
 
@@ -2638,6 +2649,7 @@ if (location.search.includes('debug')) {
             var unitType = item._baseUnitType || item.unitType || item.unit || '';
             var description = item._baseDescription || item.description || item.name || '';
             var itemDescription = item._baseItemDescription || item.itemDescription || '';
+            var photo = item._basePhoto || item.photo || '';
             var selectedOptions = getViewerSelectedItemUpgradeOptions(item);
             var requiresConsultation = false;
             selectedOptions.forEach(function(option) {
@@ -2654,6 +2666,7 @@ if (location.search.includes('debug')) {
                     unitType = optionUnitType || unitType;
                     description = option.name || description;
                     itemDescription = option.itemDescription || option.description || itemDescription;
+                    photo = option.photo || photo;
                     lineTotal = optionQuantity * viewerNumber(option.rate);
                 } else {
                     if (sameUnit && normalizeViewerItemUpgradeQuantityMode(option.quantityMode) === 'parent') {
@@ -2672,6 +2685,7 @@ if (location.search.includes('debug')) {
             item.unit = unitType;
             item.description = description;
             item.itemDescription = itemDescription;
+            item.photo = photo;
             item.upgraded = selectedOptions.length > 0;
             item.requiresConsultation = requiresConsultation;
             item.total = lineTotal;
@@ -2688,6 +2702,7 @@ if (location.search.includes('debug')) {
             delete item._baseUnitType;
             delete item._baseDescription;
             delete item._baseItemDescription;
+            delete item._basePhoto;
             return item;
         }
 
@@ -2706,6 +2721,33 @@ if (location.search.includes('debug')) {
 
         function viewerUpgradeGroupNotePanelId(roomIdx, itemIndex, groupId) {
             return 'viewer-upgrade-note-' + viewerUpgradeDomIdPart(roomIdx) + '-' + viewerUpgradeDomIdPart(itemIndex) + '-' + viewerUpgradeDomIdPart(groupId);
+        }
+
+        var viewerPhotoRegistry = {};
+        var viewerPhotoCounter = 0;
+
+        function registerViewerPhoto(src) {
+            if (!src) return '';
+            viewerPhotoCounter += 1;
+            var key = 'photo_' + viewerPhotoCounter;
+            viewerPhotoRegistry[key] = src;
+            return key;
+        }
+
+        function openViewerPhotoButton(event, button) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            var key = button ? button.getAttribute('data-viewer-photo-key') : '';
+            var src = key ? viewerPhotoRegistry[key] : '';
+            if (src) openPhotoLightbox(src);
+        }
+
+        function renderViewerPhotoButton(src, label, buttonClass) {
+            if (!src) return '';
+            var key = registerViewerPhoto(src);
+            return '<button type="button" class="btn btn-sm ' + (buttonClass || 'btn-outline-secondary') + ' viewer-photo-btn mt-1" data-viewer-photo-key="' + escapeHtml(key) + '" onclick="openViewerPhotoButton(event, this)" style="font-size:0.75rem;"><i class="fas fa-camera me-1"></i>' + escapeHtml(label || 'Picture') + '</button>';
         }
 
         function toggleViewerUpgradeDescription(event, roomIdx, itemIndex, groupId, optionId) {
@@ -2785,6 +2827,9 @@ if (location.search.includes('debug')) {
                     html += '<button type="button" class="btn btn-sm quote-upgrade-option-btn ' + (selected ? 'is-selected' : '') + ' py-0" onclick="toggleViewerItemUpgradeOption(' + roomIdx + ', ' + itemIndex + ', ' + groupArg + ', ' + optionArg + ')">' +
                         '<i class="fas ' + (selected ? checkedIcon : uncheckedIcon) + ' me-1"></i>' + escapeHtml(option.name || 'Upgrade') + ' ' + optionPriceHtml +
                         '</button>';
+                    if (option.photo) {
+                        html += renderViewerPhotoButton(option.photo, 'Upgrade Picture', 'btn-outline-warning');
+                    }
                     if (selected && !requiresConsultation) {
                         var quantitySummary = getViewerItemUpgradeOptionQuantitySummary(item, option);
                         if (quantitySummary) html += '<div class="quote-upgrade-quantity-note small">' + escapeHtml(quantitySummary) + '</div>';
@@ -3173,7 +3218,7 @@ if (location.search.includes('debug')) {
                 html += '<div class="d-flex justify-content-between gap-2"><span><i class="fas ' + (checked ? 'fa-check-circle' : 'fa-circle') + ' me-1"></i>' + escapeHtml(option.name) + '</span><strong>' + viewerMoney(optionTotal) + '</strong></div>';
                 if (option.itemDescription || option.description) html += '<div class="small opacity-75 mt-1">' + escapeHtml(option.itemDescription || option.description) + '</div>';
                 html += '<div class="small opacity-75 mt-1">' + optionQty + ' ' + escapeHtml(option.unitType || item.unitType || '') + ' @ ' + viewerMoney(option.rate) + '</div>';
-                html += '</button></div>';
+                html += '</button>' + (!isSignedDiff && option.photo ? renderViewerPhotoButton(option.photo, 'Picture', 'btn-outline-secondary') : '') + '</div>';
             });
             html += '</div>';
             html += renderViewerChoiceGroupEnhancements(roomIdx, itemIndex, item, isSignedDiff);
@@ -3209,7 +3254,7 @@ if (location.search.includes('debug')) {
                     html += '<div class="d-flex justify-content-between gap-2"><span><i class="fas ' + (checked ? 'fa-check-circle' : 'fa-circle') + ' me-1"></i>' + escapeHtml(option.name) + '</span><strong>' + viewerMoney(total, { forceSign: option.upgradeType !== 'replacement' }) + '</strong></div>';
                     if (option.itemDescription || option.description) html += '<div class="small opacity-75 mt-1">' + escapeHtml(option.itemDescription || option.description) + '</div>';
                     html += '<div class="small opacity-75 mt-1">' + escapeHtml(option.upgradeType === 'replacement' ? 'Replacement' : 'Add-on') + '</div>';
-                    html += '</button></div>';
+                    html += '</button>' + (!isSignedDiff && option.photo ? renderViewerPhotoButton(option.photo, 'Picture', 'btn-outline-secondary') : '') + '</div>';
                 });
                 html += '</div></div>';
             });
@@ -3436,6 +3481,8 @@ if (location.search.includes('debug')) {
         }
 
         function renderQuote() {
+            viewerPhotoRegistry = {};
+            viewerPhotoCounter = 0;
             var co = window.QuoteDrChangeOrders;
             var isChangeOrder = !!(co && co.isChangeOrder(quoteData));
             // Populate header fields
@@ -3705,7 +3752,7 @@ if (location.search.includes('debug')) {
                                     ${isChangeOrder && coStatus === 'changed' ? '<span class="badge bg-warning text-dark ms-2">Changed</span>' : ''}
                                     ${isChangeOrder && coStatus === 'added' ? '<span class="badge bg-success ms-2">Added</span>' : ''}
                                     ${isChangeOrder && coStatus === 'removed' ? '<span class="badge bg-danger ms-2">Removed</span>' : ''}
-                                    ${item.photo && !isSignedDiff ? `<div class="mt-1"><button class="btn btn-sm btn-outline-secondary" onclick="openPhotoLightbox('${item.photo}')" style="font-size:0.7rem;"><i class="fas fa-expand me-1"></i>View Photo</button></div>` : ''}
+                                    ${item.photo && !isSignedDiff ? renderViewerPhotoButton(item.photo, 'Picture', 'btn-outline-secondary') : ''}
                                     ${isOptional && !isSignedDiff ? '<span class="badge bg-info ms-2" style="font-size:0.65em;">Optional</span>' : ''}
                                 </div>
                                 <div style="text-align:right; min-width:140px; padding-left:16px;">
@@ -3725,7 +3772,7 @@ if (location.search.includes('debug')) {
                                 ${hasLegacyUpgrade ? `
                                 <div>
                                     ${!isUpgraded ? `<div class="text-muted mb-1" style="font-size:0.88rem;"><i class="fas fa-arrow-up" style="color:#f0ad4e;"></i> <strong>Upgrade available:</strong> ${item.upgrade.name}</div>` : ''}
-                                    ${item.upgrade.photo ? `<div class="mb-2"><button class="btn btn-sm btn-outline-warning" onclick="openPhotoLightbox('${item.upgrade.photo}')" style="font-size:0.75rem;"><i class="fas fa-camera me-1"></i>View Upgrade Photo</button></div>` : ''}
+                                    ${item.upgrade.photo ? `<div class="mb-2">${renderViewerPhotoButton(item.upgrade.photo, 'Upgrade Picture', 'btn-outline-warning')}</div>` : ''}
                                     <button class="btn btn-sm upgrade-action-btn ${isUpgraded ? 'btn-warning' : 'btn-outline-warning'}" onclick="toggleViewerUpgrade(${roomIdx}, ${itemIndex})" style="font-size:0.85rem;">
                                         <i class="fas fa-arrow-up"></i> ${isUpgraded ? 'Upgraded ✓' : 'Upgrade: ' + item.upgrade.name}
                                     </button>

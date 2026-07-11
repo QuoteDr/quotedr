@@ -213,6 +213,9 @@
                 if (saved && saved.upgrade && saved.upgrade.name && !(option.upgrade && option.upgrade.name)) {
                     option.upgrade = cloneQuoteStorageValue(saved.upgrade);
                 }
+                if (saved && saved.photo && !option.photo) {
+                    option.photo = saved.photo;
+                }
                 var savedUpgradeGroups = quoteStorageSavedItemUpgradeGroups(saved);
                 if (savedUpgradeGroups.length) {
                     option.upgradeGroups = cloneQuoteStorageValue(savedUpgradeGroups);

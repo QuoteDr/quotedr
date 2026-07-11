@@ -3375,6 +3375,7 @@ Example:
                 rate: parseFloat(option.rate || 0) || 0,
                 materialCost: parseFloat(option.materialCost || option.material_cost || 0) || 0,
                 supplierUrl: option.supplierUrl || '',
+                photo: option.photo || '',
                 description: option.description || option.itemDescription || '',
                 itemDescription: option.itemDescription || option.description || '',
                 laborTime: normalizeLaborTime(option.laborTime),
@@ -3527,6 +3528,7 @@ Example:
             item._baseQuantity = parseFloat(item.quantity || 0) || 0;
             item._baseUnitType = item.unitType || item.unit || '';
             item._baseSupplierUrl = item.supplierUrl || '';
+            item._basePhoto = item.photo || '';
             item._baseItemDescription = item.itemDescription || '';
             item._baseDescription = item.description || item.name || '';
             item._baseLaborTime = normalizeLaborTime(item.laborTime);
@@ -3547,6 +3549,7 @@ Example:
             var lineTotal = quantity * baseRate;
             var unitType = item._baseUnitType || item.unitType || '';
             var supplierUrl = item._baseSupplierUrl || '';
+            var photo = item._basePhoto || item.photo || '';
             var itemDescription = item._baseItemDescription || '';
             var description = item._baseDescription || item.description || '';
             var laborTime = normalizeLaborTime(item._baseLaborTime || item.laborTime);
@@ -3567,6 +3570,7 @@ Example:
                     materialCost = optionCost;
                     unitType = optionUnitType || unitType;
                     supplierUrl = option.supplierUrl || supplierUrl;
+                    photo = option.photo || photo;
                     itemDescription = option.itemDescription || option.description || itemDescription;
                     description = option.name || description;
                     lineTotal = optionQuantity * optionRate;
@@ -3587,6 +3591,7 @@ Example:
             item.unitType = unitType;
             item.unit = unitType;
             item.supplierUrl = supplierUrl;
+            item.photo = photo;
             item.itemDescription = itemDescription;
             item.description = description;
             item.laborTime = laborTime;
@@ -6825,6 +6830,7 @@ Example:
                 rate: parseFloat(item.upgrade.rate) || 0,
                 materialCost: parseFloat(item.upgrade.materialCost !== undefined ? item.upgrade.materialCost : item.upgrade.material_cost) || 0,
                 supplierUrl: item.upgrade.supplierUrl || '',
+                photo: item.upgrade.photo || '',
                 description: item.upgrade.description || item.upgrade.itemDescription || item.upgrade.notes || '',
                 type: normalizeQuoteUpgradeType(item.upgrade.type || item.upgrade.upgradeType || item.upgrade.mode),
                 laborTime: normalizeLaborTime(item.upgrade.laborTime)
@@ -6845,6 +6851,7 @@ Example:
                             rate: parseFloat(option.rate) || 0,
                             materialCost: parseFloat(option.materialCost) || 0,
                             supplierUrl: option.supplierUrl || '',
+                            photo: option.photo || '',
                             description: option.description || option.itemDescription || '',
                             upgradeType: normalizeQuoteUpgradeType(option.upgradeType || option.type || option.mode),
                             quantityMode: normalizeQuoteItemUpgradeQuantityMode(option.quantityMode),
@@ -7755,6 +7762,16 @@ Example:
             return null;
         }
 
+        function hydrateQuoteLineItemPhotoFromSavedItem(item) {
+            if (!item || item.photo) return item;
+            const savedMatch = findSavedItemForQuoteEdit(item);
+            const saved = savedMatch && savedMatch.item;
+            if (saved && saved.photo) {
+                item.photo = saved.photo;
+            }
+            return item;
+        }
+
         function buildSavedItemFromEditedLineItem(existingItem) {
             const desc = document.getElementById('lineDescription').value.trim();
             const itemDescription = document.getElementById('lineItemDescription').value.trim();
@@ -7924,6 +7941,7 @@ Example:
                         const savedUpdateResult = await saveEditedLineItemToDatabase(previousSavedItemSource, editedSavedItemData);
                         if (savedUpdateResult && savedUpdateResult.item) {
                             item.serviceName = savedUpdateResult.item.name || item.serviceName;
+                            item.photo = savedUpdateResult.item.photo || item.photo || '';
                             item.upgrade = savedUpdateResult.item.upgrade || null;
                             item.upgradeGroups = normalizeQuoteItemUpgradeGroups(savedUpdateResult.item);
                             item.selectedUpgradeOptionIds = [];
@@ -7931,6 +7949,7 @@ Example:
                             item.savedItemFingerprint = getSavedItemFingerprintForQuoteSync(savedUpdateResult.item);
                         }
                     } else if (savedItemForEdit) {
+                        item.photo = savedItemForEdit.photo || item.photo || '';
                         item.upgrade = savedItemForEdit.upgrade || null;
                         item.upgradeGroups = normalizeQuoteItemUpgradeGroups(savedItemForEdit);
                         item.selectedUpgradeOptionIds = [];
@@ -7955,6 +7974,7 @@ Example:
                         notes,
                         materialCost,
                         supplierUrl,
+                        photo: dbItem?.photo || '',
                         upgrade: dbItem?.upgrade || null,
                         upgradeGroups: normalizeQuoteItemUpgradeGroups(dbItem || {}),
                         selectedUpgradeOptionIds: [],
@@ -8290,6 +8310,7 @@ Example:
                 rate: parseFloat(option.rate) || 0,
                 materialCost: parseFloat(option.materialCost) || 0,
                 supplierUrl: option.supplierUrl || '',
+                photo: option.photo || '',
                 description: option.description || option.itemDescription || option.name || '',
                 itemDescription: option.itemDescription || option.description || '',
                 laborTime: normalizeLaborTime(option.laborTime),
@@ -8383,6 +8404,7 @@ Example:
                 state.description = replacement.name || state.description;
                 state.unitType = replacement.unitType || state.unitType;
                 state.supplierUrl = replacement.supplierUrl || state.supplierUrl;
+                state.photo = replacement.photo || state.photo || '';
                 state.itemDescription = replacement.itemDescription || replacement.description || state.itemDescription;
                 state.laborTime = normalizeLaborTime(replacement.laborTime || state.laborTime);
             }
@@ -8399,6 +8421,7 @@ Example:
 
         function applyChoiceGroupSelectionToItem(item) {
             if (!item || !item.choiceGroup) return item;
+            if (item._choiceGroupBasePhoto === undefined) item._choiceGroupBasePhoto = item.photo || '';
             item.choiceGroup = hydrateChoiceGroupOptionsFromSavedItems(item.choiceGroup, item.category);
             var group = item.choiceGroup;
             group.enhancementGroups = normalizeChoiceGroupEnhancementGroups(group.enhancementGroups);
@@ -8413,6 +8436,7 @@ Example:
                 description: group.name || item.description || 'Option Group',
                 unitType: item.unitType || item.unit || '',
                 supplierUrl: item.supplierUrl || '',
+                photo: item._choiceGroupBasePhoto || '',
                 itemDescription: item.itemDescription || '',
                 laborTime: normalizeLaborTime(item.laborTime)
             };
@@ -8431,6 +8455,7 @@ Example:
                     description: option.name || group.name || item.description,
                     unitType: option.unitType || item.unitType || item.unit || '',
                     supplierUrl: option.supplierUrl || item.supplierUrl || '',
+                    photo: option.photo || item._choiceGroupBasePhoto || '',
                     itemDescription: option.itemDescription || option.description || item.itemDescription || '',
                     laborTime: normalizeLaborTime(option.laborTime || item.laborTime)
                 };
@@ -8445,6 +8470,7 @@ Example:
             item.rate = parseFloat(finalState.rate) || 0;
             item.materialCost = parseFloat(finalState.materialCost) || 0;
             item.supplierUrl = finalState.supplierUrl || item.supplierUrl || '';
+            item.photo = finalState.photo || item.photo || '';
             item.itemDescription = finalState.itemDescription || item.itemDescription || '';
             item.laborTime = normalizeLaborTime(finalState.laborTime || item.laborTime);
             item.choiceGroup.selectedOptionIds = selectedOptions.map(function(option) { return option.id; });
@@ -8722,6 +8748,7 @@ Example:
                 if (!savedMatch || !savedMatch.item) return next;
                 var saved = savedMatch.item;
                 if (saved.upgrade && saved.upgrade.name) next.upgrade = cloneSavedItemForQuoteSync(saved.upgrade);
+                if (saved.photo && !next.photo) next.photo = saved.photo;
                 var savedUpgradeGroups = normalizeQuoteItemUpgradeGroups(saved);
                 if (savedUpgradeGroups.length) next.upgradeGroups = savedUpgradeGroups;
                 if (!next.category && savedMatch.category) next.category = savedMatch.category;
@@ -10550,6 +10577,23 @@ Example:
             lb.style.display = 'flex';
         }
 
+        function getQuoteLineItemPhoto(roomId, itemIndex) {
+            var room = rooms.find(function(candidate) { return candidate.id === roomId; });
+            var item = room && room.items ? room.items[itemIndex] : null;
+            if (!item) return '';
+            if (item.upgraded && item.upgrade && item.upgrade.photo && !(item.upgradeGroups && item.upgradeGroups.length)) return item.upgrade.photo;
+            return item.photo || '';
+        }
+
+        function openQuoteLineItemPhoto(event, roomId, itemIndex) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            var photo = getQuoteLineItemPhoto(roomId, itemIndex);
+            if (photo) openPhotoLightbox(photo);
+        }
+
         // Room photo functions
         function addRoomPhoto(roomId) {
             var input = document.createElement('input');
@@ -11144,6 +11188,7 @@ Example:
                         html += '<div style="overflow-x:auto;"><table class="table table-sm mb-0 quote-items-table"><colgroup>' + quoteItemTableColgroup + '</colgroup><tbody>';
 
                         entries.forEach(({ item, origIndex }) => {
+                            hydrateQuoteLineItemPhotoFromSavedItem(item);
                             applyChoiceGroupSelectionToItem(item);
                             const hasChoiceGroup = !!(item.choiceGroup && Array.isArray(item.choiceGroup.options));
                             if (!hasChoiceGroup) applyItemUpgradeGroupsToItem(item);
@@ -11240,11 +11285,13 @@ Example:
                             if (item.upgrade && item.upgrade.name && !hasUpgradeGroups && !hasChoiceGroup) {
                                 upgradeBtn = '<button onclick="toggleItemUpgrade(' + room.id + ', ' + origIndex + ')" class="btn btn-sm ' + (isUpgraded ? 'btn-warning' : 'btn-outline-warning') + '" title="' + (isUpgraded ? 'Upgraded: ' + item.upgrade.name : 'Upgrade: ' + item.upgrade.name) + '"><i class="fas fa-arrow-up"></i> ' + (isUpgraded ? 'Upgraded' : 'Upgrade') + '</button>';
                             }
+                            const linePhoto = getQuoteLineItemPhoto(room.id, origIndex);
+                            const photoBtn = linePhoto ? '<button type="button" onclick="openQuoteLineItemPhoto(event, ' + room.id + ', ' + origIndex + ')" class="btn btn-sm btn-outline-secondary quote-line-photo-btn" title="View line item picture"><i class="fas fa-camera"></i> Picture</button>' : '';
                             const optionalBtn = hasChoiceGroup ? '' : '<button onclick="toggleItemOptional(' + room.id + ', ' + origIndex + ')" class="btn btn-sm ' + (isOptional ? 'btn-info' : 'btn-outline-secondary') + '" title="' + (isOptional ? 'Client can remove this item' : 'Mark as removable by client') + '"><i class="fas fa-' + (isOptional ? 'toggle-on' : 'toggle-off') + '"></i> Optional</button>';
                             const noteBtn = '<button onclick="editLineItemNote(' + room.id + ', ' + origIndex + ')" class="btn btn-sm ' + (item.notes ? 'btn-info' : 'btn-outline-secondary') + '" title="' + (item.notes ? 'Edit job note' : 'Add job note') + '"><i class="fas fa-sticky-note"></i></button>';
                             const highlightBtn = renderLineItemHighlightButton(room.id, origIndex, item);
                             var deleteTitle = (window._quoteDocumentType === 'change_order' && item._coOriginal) ? 'Mark as removed from this change order' : 'Delete';
-                            html += '<td class="quote-item-actions-cell"><div class="d-flex gap-1 flex-wrap quote-item-actions" style="justify-content:flex-end">' + upgradeBtn + optionalBtn + noteBtn + highlightBtn + '<button onclick="editLineItem(' + room.id + ', ' + origIndex + ')" class="btn btn-sm btn-outline-primary" title="Edit"><i class="fas fa-edit"></i></button><button onclick="deleteItem(' + room.id + ', ' + origIndex + ')" class="btn btn-sm btn-danger" title="' + deleteTitle + '"><i class="fas fa-trash"></i></button></div></td>';
+                            html += '<td class="quote-item-actions-cell"><div class="d-flex gap-1 flex-wrap quote-item-actions" style="justify-content:flex-end">' + upgradeBtn + optionalBtn + photoBtn + noteBtn + highlightBtn + '<button onclick="editLineItem(' + room.id + ', ' + origIndex + ')" class="btn btn-sm btn-outline-primary" title="Edit"><i class="fas fa-edit"></i></button><button onclick="deleteItem(' + room.id + ', ' + origIndex + ')" class="btn btn-sm btn-danger" title="' + deleteTitle + '"><i class="fas fa-trash"></i></button></div></td>';
                             html += '</tr>';
                             displayNum++;
                         });
