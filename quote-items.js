@@ -10,6 +10,7 @@
         var MANAGE_CATEGORY_RENAMES_KEY = 'ald_manage_items_category_renames';
         var MANAGE_CATEGORY_ORDER_MODE_KEY = 'ald_manage_items_category_order_mode';
         var MANAGE_CATEGORY_CUSTOM_ORDER_KEY = 'ald_manage_items_category_custom_order';
+        var MANAGE_PORTRAIT_FIELDS_KEY = 'ald_manage_items_portrait_fields';
         var manageItemsFilter = 'all';
         var manageItemsCategoryState = {};
         var manageCategoryRenames = {};
@@ -20,6 +21,24 @@
         var manageUpgradeWizardState = null;
         var dirtyPricingRows = new Set();
         var pricingOtherDirty = false;
+
+        function getManageItemsPortraitFields() {
+            try {
+                var parsed = JSON.parse(localStorage.getItem(MANAGE_PORTRAIT_FIELDS_KEY) || '[]');
+                return Array.isArray(parsed) ? parsed.map(function(field) { return String(field || '').trim(); }).filter(Boolean) : [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function applyManageItemsPortraitFieldSettings() {
+            var modal = document.getElementById('manageItemsModal');
+            if (!modal) return;
+            var fields = getManageItemsPortraitFields();
+            ['badges', 'unit', 'rate', 'material', 'supplier'].forEach(function(field) {
+                modal.setAttribute('data-portrait-show-' + field, fields.indexOf(field) !== -1 ? '1' : '0');
+            });
+        }
 
         function manageItemsEscape(value) {
             return String(value == null ? '' : value).replace(/[&<>"']/g, function(ch) {
@@ -2798,18 +2817,18 @@
                                 <span class="manage-dirty-dot" title="Unsaved row"></span>
                                 <input type="text" class="form-control form-control-sm item-name-input" value="${manageItemsAttr(item.name)}" placeholder="Item name" oninput="markPricingDirty(this)">
                             </div>
-                            <div class="mt-1 d-flex flex-wrap gap-1"><span class="manage-row-margin-target">${renderManageMarginPill(rate, matCost)}</span> ${renderManageLaborPill(laborTime, item.unitType || '')}</div>
+                            <div class="mt-1 d-flex flex-wrap gap-1 manage-items-portrait-optional manage-items-row-badges" data-manage-portrait-field="badges"><span class="manage-row-margin-target">${renderManageMarginPill(rate, matCost)}</span> ${renderManageLaborPill(laborTime, item.unitType || '')}</div>
                         </td>
-                        <td data-label="Unit">${renderManageUnitSelect(item.unitType || '')}</td>
-                        <td data-label="Rate"><input type="number" class="form-control form-control-sm item-input" value="${rate}" step="0.01" min="0" oninput="markPricingDirty(this); updateManageRowMargin(this)"></td>
-                        <td data-label="Mat. Cost"><input type="number" class="form-control form-control-sm item-input" value="${matCost}" step="0.01" min="0" oninput="markPricingDirty(this); updateManageRowMargin(this)"></td>
-                        <td data-label="Supplier">
+                        <td data-label="Unit" class="manage-items-portrait-optional" data-manage-portrait-field="unit">${renderManageUnitSelect(item.unitType || '')}</td>
+                        <td data-label="Rate" class="manage-items-portrait-optional" data-manage-portrait-field="rate"><input type="number" class="form-control form-control-sm item-input" value="${rate}" step="0.01" min="0" oninput="markPricingDirty(this); updateManageRowMargin(this)"></td>
+                        <td data-label="Mat. Cost" class="manage-items-portrait-optional" data-manage-portrait-field="material"><input type="number" class="form-control form-control-sm item-input" value="${matCost}" step="0.01" min="0" oninput="markPricingDirty(this); updateManageRowMargin(this)"></td>
+                        <td data-label="Supplier" class="manage-items-portrait-optional" data-manage-portrait-field="supplier">
                             <div class="input-group input-group-sm">
                                 <input type="url" class="form-control item-input" value="${supplier}" placeholder="https://..." oninput="markPricingDirty(this)">
                                 <button type="button" class="btn btn-outline-secondary" title="Help with supplier URLs" aria-label="Help with supplier URLs" onclick="if(window.QuoteDrModalHelp){QuoteDrModalHelp.openInline('supplierUrl');} return false;"><i class="fas fa-question"></i></button>
                             </div>
                         </td>
-                        <td data-label="Actions">
+                        <td data-label="Actions" class="manage-items-actions-cell">
                             <div class="manage-item-actions">
                                 <div class="btn-group details-section-menu" data-target="${detailsId}">
                                     <button class="btn btn-sm btn-info dropdown-toggle details-menu-btn" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Choose item details to display"><i class="fas fa-sliders-h"></i> Details</button>
@@ -2910,6 +2929,7 @@
             });
 
             container.innerHTML = html || '<p class="text-muted">No items found.</p>';
+            applyManageItemsPortraitFieldSettings();
             filterItemsList();
             initManageCategorySortable();
         }
@@ -4209,6 +4229,7 @@
         window.setManageItemsFilter = setManageItemsFilter;
         window.openManageCategoryOrganizeMenu = openManageCategoryOrganizeMenu;
         window.setManageItemsCategoryOrderMode = setManageItemsCategoryOrderMode;
+        window.applyManageItemsPortraitFieldSettings = applyManageItemsPortraitFieldSettings;
         window.filterItemsList = filterItemsList;
         window.renderAllItemsList = renderAllItemsList;
         window.saveItemFieldEdit = saveItemFieldEdit;
