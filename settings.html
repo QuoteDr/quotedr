@@ -413,6 +413,7 @@ if (location.search.includes('debug')) {
 					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('payments',this);return false;"><i class="fas fa-credit-card me-2" style="color:#28a745"></i>Payments</a>
 					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('portal',this);return false;"><i class="fas fa-paint-brush me-2" style="color:#e87e2a"></i>Portal Theme</a>
 					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('integrations',this);return false;"><i class="fas fa-plug me-2" style="color:#2b6cb0"></i>Integrations</a>
+					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('help',this);return false;"><i class="fas fa-circle-question me-2" style="color:#1a56a0"></i>Help</a>
 					<a href="#" id="analyticsBriefTabLink" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('analytics',this);return false;" style="display:none;"><i class="fas fa-chart-line me-2" style="color:#198754"></i>Analytics Brief</a>
 					<a href="#" id="userMessagesTabLink" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('user-messages',this);return false;" style="display:none;"><i class="fas fa-bullhorn me-2" style="color:#f97316"></i>User Messages</a>
 					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('account',this);return false;"><i class="fas fa-user-circle me-2" style="color:#6f42c1"></i>Account</a>
@@ -1344,6 +1345,76 @@ Sarah Jones, 905-555-5678"></textarea>
 					</div>
 				</div><!-- /tab-integrations -->
 
+				<div id="tab-help" style="display:none;">
+					<div class="settings-card">
+						<div class="d-flex align-items-start justify-content-between gap-3 flex-wrap mb-3">
+							<div>
+								<h5 class="mb-1"><i class="fas fa-circle-question me-2" style="color:#1a56a0"></i>Help</h5>
+								<p class="text-muted small mb-0">Control helpful QuoteDr tips, tutorial prompts, and learning links.</p>
+							</div>
+							<div class="d-flex gap-2 flex-wrap">
+								<a class="btn btn-outline-primary btn-sm" href="help.html" target="_blank" rel="noopener">
+									<i class="fas fa-book-open me-1"></i>Help Center
+								</a>
+								<a class="btn btn-outline-primary btn-sm" href="tutorials.html" target="_blank" rel="noopener">
+									<i class="fas fa-circle-play me-1"></i>Tutorials
+								</a>
+							</div>
+						</div>
+						<div class="row g-3">
+							<div class="col-lg-6">
+								<div class="border rounded-3 p-3 h-100 bg-light">
+									<div class="d-flex align-items-start justify-content-between gap-3 mb-2">
+										<div>
+											<div class="fw-bold"><i class="fas fa-lightbulb me-1 text-warning"></i>Quote Builder Tips</div>
+											<div class="text-muted small">Show one short feature tip in the quote builder at most once per hour.</div>
+										</div>
+										<div class="form-check form-switch">
+											<input class="form-check-input" type="checkbox" id="quoteTipsEnabled" onchange="saveQuoteTipsSettingsFromUI()">
+											<label class="form-check-label small" for="quoteTipsEnabled">On</label>
+										</div>
+									</div>
+									<div class="d-flex gap-2 flex-wrap mt-3">
+										<button type="button" class="btn btn-primary btn-sm" onclick="showQuoteTipNow()">
+											<i class="fas fa-wand-magic-sparkles me-1"></i>Show a Tip Now
+										</button>
+										<button type="button" class="btn btn-outline-secondary btn-sm" onclick="resetQuoteTipsRotation()">
+											<i class="fas fa-rotate-left me-1"></i>Reset Tip Rotation
+										</button>
+									</div>
+									<div id="quoteTipsStatus" class="small text-muted mt-3">Loading tip settings...</div>
+								</div>
+							</div>
+							<div class="col-lg-6">
+								<div class="border rounded-3 p-3 h-100 bg-light">
+									<div class="d-flex align-items-start justify-content-between gap-3 mb-2">
+										<div>
+											<div class="fw-bold"><i class="fas fa-route me-1 text-primary"></i>QuoteDr Tutorial</div>
+											<div class="text-muted small">Use the interactive step-by-step guide inside the quote builder.</div>
+										</div>
+										<div class="form-check form-switch">
+											<input class="form-check-input" type="checkbox" id="builderTutorialEnabled" onchange="toggleBuilderTutorialFromSettings(this.checked)">
+											<label class="form-check-label small" for="builderTutorialEnabled">On</label>
+										</div>
+									</div>
+									<div class="d-flex gap-2 flex-wrap mt-3">
+										<button type="button" class="btn btn-outline-primary btn-sm" onclick="restartBuilderTutorialFromSettings()">
+											<i class="fas fa-rotate-left me-1"></i>Restart First Quote Tutorial
+										</button>
+										<a class="btn btn-outline-secondary btn-sm" href="quote-builder.html" target="_blank" rel="noopener">
+											<i class="fas fa-arrow-up-right-from-square me-1"></i>Open Quote Builder
+										</a>
+									</div>
+									<div id="builderTutorialStatus" class="small text-muted mt-3">Tutorial preferences stay on this browser.</div>
+								</div>
+							</div>
+						</div>
+						<div class="alert alert-info small mt-3 mb-0">
+							<i class="fas fa-info-circle me-1"></i>Admin User Messages are separate. Tips are controlled by each user and never use broadcast message settings.
+						</div>
+					</div>
+				</div><!-- /tab-help -->
+
 				<div id="tab-analytics" style="display:none;">
 					<div class="settings-card">
 						<div class="d-flex align-items-start justify-content-between gap-3 flex-wrap mb-3">
@@ -1495,6 +1566,7 @@ Sarah Jones, 905-555-5678"></textarea>
 	<script src="app-broadcasts.js?v=1779131000"></script>
 	<script src="help-content.js?v=1777741200"></script>
 	<script src="modal-help.js?v=1777741200"></script>
+	<script src="quote-tips.js?v=1783300000"></script>
 	<script>
 		// ── Tab Navigation ──────────────────────────────────────────────────
 		// === QuickBooks Integration ===
@@ -2136,6 +2208,10 @@ Sarah Jones, 905-555-5678"></textarea>
 			if (el) el.classList.add('active');
 			localStorage.setItem('ald_settings_tab', name);
 			if (name === 'user-messages') loadBroadcastAdminMessages();
+			if (name === 'help') {
+				loadQuoteTipsSettingsUI();
+				renderBuilderTutorialSettingsUI();
+			}
 		}
 
 		function getRequestedSettingsTab() {
@@ -2172,6 +2248,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			{ tab: 'notifications', keywords: ['email','reminder','followup','follow-up','notification','auto','automatic','days','message'], label: 'Notifications & Reminders' },
 			{ tab: 'feedback', keywords: ['bug','report','feature','request','feedback','idea','problem','issue','broken'], label: 'Feedback & Bug Reports' },
 			{ tab: 'payments', keywords: ['payment','stripe','deposit','credit card','pay','invoice payment','checkout'], label: 'Payments' },
+			{ tab: 'help', keywords: ['help','tips','tip','tutorial','guide','onboarding','youtube','video','learn','support'], label: 'Help, Tips & Tutorial' },
 			{ tab: 'analytics', keywords: ['analytics','posthog','brief','report','summary','funnel','conversion','session','rage click','users'], label: 'AI Analytics Brief' },
 			{ tab: 'account', keywords: ['account','subscription','billing','plan','upgrade','pro'], label: 'Account' },
 		];
@@ -2338,7 +2415,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			applyAnalyticsAdminVisibility(window.currentUser);
 			// Restore last active tab, unless the URL asks for a specific settings area.
 			var hashTab = (window.location.hash || '').replace(/^#/, '');
-			var allowedHashTabs = ['business', 'quotes', 'pricing', 'notifications', 'payments', 'portal', 'integrations', 'analytics', 'user-messages', 'account', 'feedback'];
+			var allowedHashTabs = ['business', 'quotes', 'pricing', 'notifications', 'payments', 'portal', 'integrations', 'help', 'analytics', 'user-messages', 'account', 'feedback'];
 			var requestedTab = getRequestedSettingsTab();
 			var lastTab = requestedTab || (allowedHashTabs.indexOf(hashTab) !== -1 ? hashTab : (localStorage.getItem('ald_settings_tab') || 'business'));
 			if ((lastTab === 'analytics' || lastTab === 'user-messages') && !isQuoteDrAdminUser(window.currentUser)) lastTab = 'business';
@@ -2349,6 +2426,9 @@ Sarah Jones, 905-555-5678"></textarea>
 			loadNotificationSettings();
 			// Load payment settings
 			loadPaymentSettingsUI();
+			// Load Help tab settings
+			loadQuoteTipsSettingsUI();
+			renderBuilderTutorialSettingsUI();
 			// Load AI voice learning mappings
 			if (typeof loadAiLearnedMappingsUI === 'function') loadAiLearnedMappingsUI();
 			if (typeof loadAiTradeRulesUI === 'function') loadAiTradeRulesUI();
@@ -3869,6 +3949,124 @@ Sarah Jones, 905-555-5678"></textarea>
 					if (badge) { badge.style.display = 'inline'; setTimeout(function() { badge.style.display = 'none'; }, 2500); }
 				});
 			}
+		}
+
+		function formatQuoteTipTime(ts) {
+			var value = Number(ts || 0);
+			if (!value) return 'Never shown on this device.';
+			try {
+				return 'Last shown ' + new Date(value).toLocaleString() + '.';
+			} catch(e) {
+				return 'Last shown recently.';
+			}
+		}
+
+		function renderQuoteTipsSettingsUI(settings) {
+			var enabled = document.getElementById('quoteTipsEnabled');
+			var status = document.getElementById('quoteTipsStatus');
+			if (!enabled && !status) return;
+			settings = settings || (window.QuoteDrTips && window.QuoteDrTips.getSettings ? window.QuoteDrTips.getSettings() : null) || {};
+			if (enabled) enabled.checked = settings.enabled !== false;
+			if (status) {
+				var state = settings.enabled === false ? 'Tips are off.' : 'Tips are on.';
+				status.textContent = state + ' ' + formatQuoteTipTime(settings.lastShownAt) + ' Tip rotation #' + ((Number(settings.rotationIndex || 0) % 1000) + 1) + '.';
+			}
+		}
+
+		async function loadQuoteTipsSettingsUI() {
+			var status = document.getElementById('quoteTipsStatus');
+			if (!document.getElementById('quoteTipsEnabled')) return;
+			if (!window.QuoteDrTips) {
+				if (status) status.textContent = 'Tip settings are still loading. Refresh Settings if this stays here.';
+				return;
+			}
+			renderQuoteTipsSettingsUI(window.QuoteDrTips.getSettings());
+			try {
+				if (window.QuoteDrTips.loadCloudSettings) {
+					var cloudSettings = await window.QuoteDrTips.loadCloudSettings();
+					renderQuoteTipsSettingsUI(cloudSettings);
+				}
+			} catch(e) {
+				if (status) status.textContent = 'Using this browser for tip settings. Cloud sync will retry after sign in.';
+			}
+		}
+
+		async function saveQuoteTipsSettingsFromUI() {
+			if (!window.QuoteDrTips) return;
+			var enabled = document.getElementById('quoteTipsEnabled');
+			var settings = window.QuoteDrTips.getSettings();
+			settings.enabled = !!(enabled && enabled.checked);
+			settings.updatedAt = new Date().toISOString();
+			await window.QuoteDrTips.saveSettings(settings);
+			renderQuoteTipsSettingsUI(settings);
+		}
+
+		async function showQuoteTipNow() {
+			if (!window.QuoteDrTips || !window.QuoteDrTips.forceShowNextTip) {
+				qdAlert('Tip helper is still loading. Try again in a moment.');
+				return;
+			}
+			await window.QuoteDrTips.forceShowNextTip({ onSettingsChanged: renderQuoteTipsSettingsUI });
+			renderQuoteTipsSettingsUI(window.QuoteDrTips.getSettings());
+		}
+
+		async function resetQuoteTipsRotation() {
+			if (!window.QuoteDrTips || !window.QuoteDrTips.resetRotation) return;
+			var settings = await window.QuoteDrTips.resetRotation();
+			renderQuoteTipsSettingsUI(settings);
+			qdAlert('Tip rotation reset. The next automatic quote builder tip can appear after the normal hourly window.', { title: 'Tips Reset', type: 'success' });
+		}
+
+		function getBuilderTutorialEnabledFromSettings() {
+			return localStorage.getItem('ald_builder_guide_hidden') !== '1' && localStorage.getItem('ald_onboarding_dismissed') !== '1';
+		}
+
+		function renderBuilderTutorialSettingsUI() {
+			var toggle = document.getElementById('builderTutorialEnabled');
+			var status = document.getElementById('builderTutorialStatus');
+			var enabled = getBuilderTutorialEnabledFromSettings();
+			if (toggle) toggle.checked = enabled;
+			if (status) {
+				status.textContent = enabled
+					? 'Tutorial is available in the quote builder. Use Restart First Quote Tutorial to start that guide fresh.'
+					: 'Tutorial is hidden in the quote builder. Turn it on here whenever you want it back.';
+			}
+		}
+
+		function toggleBuilderTutorialFromSettings(show) {
+			localStorage.setItem('ald_builder_guide_hidden', show ? '0' : '1');
+			localStorage.setItem('ald_onboarding_dismissed', show ? '0' : '1');
+			renderBuilderTutorialSettingsUI();
+		}
+
+		async function restartBuilderTutorialFromSettings() {
+			var completed = [];
+			try {
+				completed = JSON.parse(localStorage.getItem('ald_onboarding_completed_steps') || '[]') || [];
+			} catch(e) {
+				completed = [];
+			}
+			completed = completed.filter(function(key) {
+				return String(key || '').indexOf('first_quote:') !== 0;
+			});
+			localStorage.setItem('ald_onboarding_completed_steps', JSON.stringify(completed));
+			localStorage.setItem('ald_onboarding_track', 'first_quote');
+			localStorage.setItem('ald_onboarding_step', '0');
+			localStorage.setItem('ald_builder_guide_step', '0');
+			localStorage.setItem('ald_builder_guide_hidden', '0');
+			localStorage.setItem('ald_onboarding_dismissed', '0');
+			localStorage.removeItem('ald_onboarding_substeps');
+			localStorage.removeItem('ald_onboarding_restarted_steps');
+			var restartedTracks = {};
+			try {
+				restartedTracks = JSON.parse(localStorage.getItem('ald_onboarding_restarted_tracks') || '{}') || {};
+			} catch(e) {
+				restartedTracks = {};
+			}
+			restartedTracks.first_quote = true;
+			localStorage.setItem('ald_onboarding_restarted_tracks', JSON.stringify(restartedTracks));
+			renderBuilderTutorialSettingsUI();
+			qdAlert('First Quote tutorial reset. Open the quote builder to start from the beginning.', { title: 'Tutorial Restarted', type: 'success' });
 		}
 
 		async function loadAccountPlanSummary() {
