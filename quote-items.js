@@ -19,6 +19,8 @@
         var manageCategorySortable = null;
         var manageNewItemWizardUpgradeGroups = [];
         var manageUpgradeWizardState = null;
+        var MANAGE_ITEM_PHOTO_LIMIT = 3;
+        var manageOpenDetailSections = {};
         var dirtyPricingRows = new Set();
         var pricingOtherDirty = false;
 
@@ -1225,6 +1227,174 @@
             return String(cat || '') + '||' + String(name || '');
         }
 
+        function normalizeManageItemPhotos(item) {
+            if (!item) return [];
+            var photos = [];
+            if (Array.isArray(item.photos)) {
+                item.photos.forEach(function(photo) {
+                    if (typeof photo === 'string' && photo.trim()) photos.push(photo);
+                });
+            }
+            if (!photos.length && typeof item.photo === 'string' && item.photo.trim()) {
+                photos.push(item.photo);
+            }
+            return photos.slice(0, MANAGE_ITEM_PHOTO_LIMIT);
+        }
+
+        function syncManageItemPhotoCompatibility(item) {
+            if (!item) return [];
+            var photos = normalizeManageItemPhotos(item);
+            item.photos = photos;
+            item.photo = photos[0] || '';
+            return photos;
+        }
+
+        function normalizeManageItemPhotoCollections(db) {
+            if (!db) return db;
+            Object.keys(db).forEach(function(cat) {
+                if (cat === '__choiceGroupTemplates' || !Array.isArray(db[cat])) return;
+                db[cat].forEach(function(item) {
+                    syncManageItemPhotoCompatibility(item);
+                });
+            });
+            return db;
+        }
+
+        function findManagePhotoItems(cat, name) {
+            var matches = [];
+            [customItems, pricingDatabase].forEach(function(db) {
+                if (!db || !Array.isArray(db[cat])) return;
+                var item = db[cat].find(function(it) { return it && it.name === name; });
+                if (item && matches.indexOf(item) === -1) matches.push(item);
+            });
+            return matches;
+        }
+
+        function findManagePhotoItem(cat, name) {
+            var matches = findManagePhotoItems(cat, name);
+            return matches[0] || null;
+        }
+
+        function shouldPromptManageItemPhotoReplacement(cat, name) {
+            return normalizeManageItemPhotos(findManagePhotoItem(cat, name)).length >= MANAGE_ITEM_PHOTO_LIMIT;
+        }
+
+        function setManageItemDetailSectionOpen(cat, name, section, open) {
+            var rowKey = manageItemsRowKey(cat, name);
+            if (!manageOpenDetailSections[rowKey]) manageOpenDetailSections[rowKey] = {};
+            manageOpenDetailSections[rowKey][section] = open !== false;
+            if (open === false) delete manageOpenDetailSections[rowKey][section];
+            if (!Object.keys(manageOpenDetailSections[rowKey]).length) delete manageOpenDetailSections[rowKey];
+        }
+
+        function setManageItemDetailSectionOpenFromToggle(toggle) {
+            if (!toggle) return;
+            var section = toggle.getAttribute('data-section') || '';
+            var targetId = toggle.dataset ? toggle.dataset.target : '';
+            var detailsRow = targetId ? document.getElementById(targetId) : null;
+            var rowKey = detailsRow ? (detailsRow.getAttribute('data-row-key') || '') : '';
+            var parts = rowKey.split('||');
+            if (!parts.length || !parts[0]) return;
+            setManageItemDetailSectionOpen(parts[0], parts.slice(1).join('||'), section, toggle.checked);
+        }
+
+        function applyManageDetailSectionState() {
+            Object.keys(manageOpenDetailSections || {}).forEach(function(rowKey) {
+                var detailsRow = Array.from(document.querySelectorAll('.item-details-row')).find(function(row) {
+                    return row.getAttribute('data-row-key') === rowKey;
+                });
+                if (!detailsRow) return;
+                var detailsId = detailsRow.id;
+                var menu = Array.from(document.querySelectorAll('.details-section-menu')).find(function(el) {
+                    return el.dataset && el.dataset.target === detailsId;
+                });
+                if (!menu) return;
+                Object.keys(manageOpenDetailSections[rowKey] || {}).forEach(function(section) {
+                    var toggle = Array.from(menu.querySelectorAll('[data-detail-section-toggle]')).find(function(el) {
+                        return el.getAttribute('data-section') === section;
+                    });
+                    if (toggle) toggle.checked = true;
+                });
+                if (typeof window.syncManageDetailsSections === 'function') {
+                    window.syncManageDetailsSections(detailsId);
+                }
+            });
+        }
+
+        function removeManageItemPhoto(cat, name, photoIndex) {
+            var index = parseInt(photoIndex, 10);
+            if (!Number.isFinite(index) || index < 0) return;
+            pushUndoState();
+            findManagePhotoItems(cat, name).forEach(function(item) {
+                var photos = normalizeManageItemPhotos(item);
+                if (index >= photos.length) return;
+                photos.splice(index, 1);
+                item.photos = photos;
+                item.photo = photos[0] || '';
+            });
+            setManageItemDetailSectionOpen(cat, name, 'photos', true);
+            markRowDirty(manageItemsRowKey(cat, name));
+            renderAllItemsList();
+            showManageItemsToast('Photo removed. Save changes when ready.', true);
+        }
+
+        function openManageItemPhotoReplacePicker(cat, name) {
+            var photos = normalizeManageItemPhotos(findManagePhotoItem(cat, name));
+            if (photos.length < MANAGE_ITEM_PHOTO_LIMIT) {
+                if (typeof window.openManageItemPhotoFilePicker === 'function') {
+                    window.openManageItemPhotoFilePicker(cat, name, 'photo');
+                }
+                return;
+            }
+            var existing = document.getElementById('manageItemPhotoReplaceModal');
+            if (existing) existing.remove();
+            var modal = document.createElement('div');
+            modal.className = 'modal fade';
+            modal.id = 'manageItemPhotoReplaceModal';
+            modal.tabIndex = -1;
+            modal.innerHTML = `
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header bg-primary text-white">
+                            <h5 class="modal-title"><i class="fas fa-camera me-2"></i>Replace Item Photo</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="text-muted mb-3">This item already has 3 photos. Choose which photo to replace.</p>
+                            <div class="row g-2">
+                                ${photos.map(function(photo, index) {
+                                    return `<div class="col-4">
+                                        <button type="button" class="btn btn-outline-primary w-100 p-2 manage-photo-replace-choice" data-photo-index="${index}">
+                                            <img src="${manageItemsAttr(photo)}" class="rounded d-block mx-auto mb-2" style="width:100%;height:88px;object-fit:cover;" alt="Photo ${index + 1}">
+                                            Replace ${index + 1}
+                                        </button>
+                                    </div>`;
+                                }).join('')}
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            document.body.appendChild(modal);
+            modal.querySelectorAll('.manage-photo-replace-choice').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var index = this.dataset.photoIndex;
+                    var bs = window.bootstrap && window.bootstrap.Modal ? window.bootstrap.Modal.getInstance(modal) : null;
+                    if (bs) bs.hide();
+                    else modal.remove();
+                    if (typeof window.openManageItemPhotoFilePicker === 'function') {
+                        window.openManageItemPhotoFilePicker(cat, name, 'photo', index);
+                    }
+                });
+            });
+            if (window.bootstrap && window.bootstrap.Modal) {
+                modal.addEventListener('hidden.bs.modal', function() { modal.remove(); }, { once: true });
+                window.bootstrap.Modal.getOrCreateInstance(modal).show();
+            } else {
+                modal.classList.add('show');
+                modal.style.display = 'block';
+            }
+        }
+
         function manageItemsSafeId(cat, name) {
             return (String(cat || '') + '_' + String(name || '')).replace(/[^a-z0-9]/gi,'_');
         }
@@ -1579,13 +1749,14 @@
             } catch (e) {
                 customItems = {};
             }
+            normalizeManageItemPhotoCollections(customItems);
 
             var localIsEmpty = Object.keys(customItems).length === 0;
 
             // Always sync from cloud on load - cloud is source of truth
             _doRestoreItemsFromCloud().then(function(result) {
                 if (!result.error && result.data && Object.keys(result.data).length > 0) {
-                    var cloudItems = result.data;
+                    var cloudItems = normalizeManageItemPhotoCollections(result.data);
                     var changed = false;
                     // Merge: cloud categories win, but keep any local-only categories
                     Object.keys(cloudItems).forEach(function(cat) {
@@ -1643,6 +1814,7 @@
         }
 
         function saveCustomItems(showToast) {
+            normalizeManageItemPhotoCollections(customItems);
             localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
             localStorage.setItem('ald_category_styles', JSON.stringify(categoryStyles));
             _saveCategoryStylesToCloud().catch(function(){});
@@ -1740,6 +1912,9 @@
             var file = input.files[0];
             if (!file) return;
             var cat = input.dataset.cat, name = input.dataset.name, field = input.dataset.field || 'photo';
+            var requestedIndex = input.dataset.photoIndex === undefined || input.dataset.photoIndex === ''
+                ? -1
+                : parseInt(input.dataset.photoIndex, 10);
             var reader = new FileReader();
             reader.onload = function(e) {
                 var img = new Image();
@@ -1764,15 +1939,22 @@
                             if (!item.upgrade) item.upgrade = {};
                             item.upgrade.photo = dataUrl;
                         } else {
-                            item.photo = dataUrl;
+                            var photos = normalizeManageItemPhotos(item);
+                            if (Number.isFinite(requestedIndex) && requestedIndex >= 0 && requestedIndex < MANAGE_ITEM_PHOTO_LIMIT) {
+                                photos[requestedIndex] = dataUrl;
+                            } else if (photos.length < MANAGE_ITEM_PHOTO_LIMIT) {
+                                photos.push(dataUrl);
+                            } else {
+                                return;
+                            }
+                            item.photos = photos.filter(Boolean).slice(0, MANAGE_ITEM_PHOTO_LIMIT);
+                            item.photo = item.photos[0] || '';
                         }
                     });
-                    markPricingDirty();
+                    setManageItemDetailSectionOpen(cat, name, 'photos', true);
+                    markRowDirty(manageItemsRowKey(cat, name));
                     renderAllItemsList();
-                    var t = document.createElement('div');
-                    t.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#198754;color:white;padding:10px 18px;border-radius:8px;z-index:9999;font-size:0.9rem;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
-                    t.innerHTML = '<i class="fas fa-camera me-2"></i>Photo added! Don\'t forget to save.';
-                    document.body.appendChild(t); setTimeout(function(){ t.remove(); }, 3000);
+                    showManageItemsToast('Photo updated. Save changes when ready.', true);
                 };
                 img.src = e.target.result;
             };
@@ -2245,7 +2427,8 @@
                 const pi = pricingDatabase[cat]?.find(i => i.name === name);
                 if (pi) {
                     hadSavedItemForQuoteSync = true;
-                    ci = { name: pi.name, unitType: pi.unitType || '', rate: pi.rate || 0, materialCost: pi.materialCost || 0, supplierUrl: pi.supplierUrl || '', itemDescription: pi.itemDescription || '', laborTime: normalizeManageLaborTime(pi.laborTime), upgrade: pi.upgrade || undefined, upgradeGroups: normalizeManageItemUpgradeGroups(pi) };
+                    ci = { name: pi.name, unitType: pi.unitType || '', rate: pi.rate || 0, materialCost: pi.materialCost || 0, supplierUrl: pi.supplierUrl || '', itemDescription: pi.itemDescription || '', photo: pi.photo || '', photos: normalizeManageItemPhotos(pi), laborTime: normalizeManageLaborTime(pi.laborTime), upgrade: pi.upgrade || undefined, upgradeGroups: normalizeManageItemUpgradeGroups(pi) };
+                    syncManageItemPhotoCompatibility(ci);
                     customItems[cat].push(ci);
                 } else {
                     // Brand new item
@@ -2283,11 +2466,14 @@
                     if (option.unitType) rememberManageUnitType(option.unitType);
                 });
             });
-            // Preserve item photo from previous state
-            if (!ci.photo) {
-                var oldPhoto = pricingDatabase[cat]?.find(function(i){return i.name===name||i.name===newName;})?.photo;
-                if (oldPhoto) ci.photo = oldPhoto;
+            // Preserve item photos from previous state and keep legacy item.photo compatible.
+            var currentPhotos = normalizeManageItemPhotos(ci);
+            if (!currentPhotos.length) {
+                var oldPhotoItem = pricingDatabase[cat]?.find(function(i){return i.name===name||i.name===newName;});
+                currentPhotos = normalizeManageItemPhotos(oldPhotoItem);
+                if (currentPhotos.length) ci.photos = currentPhotos;
             }
+            syncManageItemPhotoCompatibility(ci);
             if (beforeQuoteSyncItem && typeof recordSavedItemQuoteChange === 'function' && typeof getSavedItemFingerprintForQuoteSync === 'function') {
                 recordSavedItemQuoteChange(cat, name, beforeQuoteSyncItem, ci);
             }
@@ -2794,6 +2980,7 @@
                     const catE = manageItemsAttr(cat);
                     const nameE = manageItemsAttr(item.name);
                     const upg = item.upgrade || {};
+                    const itemPhotos = normalizeManageItemPhotos(item);
                     const upgradeGroups = normalizeManageItemUpgradeGroups(item);
                     const allUpgradeOptions = upgradeGroups.reduce(function(list, group) {
                         return list.concat(group.options || []);
@@ -2802,6 +2989,9 @@
                     const noDescription = !(item.itemDescription || '').trim();
                     const missingMaterial = parseFloat(item.materialCost || 0) <= 0;
                     const detailsId = 'details_' + safeId;
+                    const photosBadge = (itemPhotos.length || upg.photo)
+                        ? `<span class="badge text-bg-secondary ms-auto">${itemPhotos.length ? itemPhotos.length + '/3' : 'set'}</span>`
+                        : '';
                     const isDirty = dirtyPricingRows.has(rowKey);
                     const searchBlob = [
                         cat, item.name, item.unitType, item.supplierUrl, item.itemDescription,
@@ -2839,7 +3029,7 @@
                                         <label class="dropdown-item d-flex align-items-center gap-2"><input class="form-check-input m-0" type="checkbox" data-detail-section-toggle data-target="${detailsId}" data-section="upgrade"> Upgrade Options ${hasUpgrade ? '<span class="badge text-bg-warning ms-auto">set</span>' : ''}</label>
                                         <label class="dropdown-item d-flex align-items-center gap-2"><input class="form-check-input m-0" type="checkbox" data-detail-section-toggle data-target="${detailsId}" data-section="labor"> Labor Time ${laborTime.mode ? '<span class="badge text-bg-success ms-auto">set</span>' : ''}</label>
                                         <label class="dropdown-item d-flex align-items-center gap-2"><input class="form-check-input m-0" type="checkbox" data-detail-section-toggle data-target="${detailsId}" data-section="supplier-cost"> Supplier / Cost</label>
-                                        <label class="dropdown-item d-flex align-items-center gap-2"><input class="form-check-input m-0" type="checkbox" data-detail-section-toggle data-target="${detailsId}" data-section="photos"> Photos ${(item.photo || upg.photo) ? '<span class="badge text-bg-secondary ms-auto">set</span>' : ''}</label>
+                                        <label class="dropdown-item d-flex align-items-center gap-2"><input class="form-check-input m-0" type="checkbox" data-detail-section-toggle data-target="${detailsId}" data-section="photos"> Photos ${photosBadge}</label>
                                     </div>
                                 </div>
                                 <button class="btn btn-sm btn-success item-save-btn" data-cat="${catE}" data-name="${nameE}" title="Save this row"><i class="fas fa-save"></i></button>
@@ -2847,7 +3037,7 @@
                             </div>
                         </td>
                     </tr>
-                    <tr id="${detailsId}" class="item-details-row ${isDirty ? 'manage-item-dirty' : ''}" data-row-key="${manageItemsAttr(rowKey)}" style="display:none;">
+                    <tr id="${detailsId}" class="item-details-row ${isDirty ? 'manage-item-dirty' : ''}" data-row-key="${manageItemsAttr(rowKey)}" data-cat="${catE}" data-name="${nameE}" style="display:none;">
                         <td colspan="6">
                             <div class="p-3">
                                 <div class="row g-3">
@@ -2911,13 +3101,26 @@
                                     <div class="col-12 manage-detail-section" data-detail-section="photos" style="display:none;">
                                         <div class="border rounded p-2 bg-light">
                                             <small class="text-secondary fw-bold"><i class="fas fa-camera"></i> Photos</small>
-                                            <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
-                                                <button class="btn btn-sm btn-outline-secondary item-photo-btn" data-cat="${catE}" data-name="${nameE}" data-field="photo" title="Add item photo"><i class="fas fa-camera me-1"></i>Item Photo</button>
-                                                ${item.photo ? `<img src="${manageItemsAttr(item.photo)}" class="rounded" style="max-width:80px;max-height:52px;cursor:pointer;" onclick="openPhotoLightbox(this.src)" title="Click to enlarge">` : ''}
+                                            <div class="mt-2">
+                                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                                    <button class="btn btn-sm btn-outline-secondary item-photo-btn" data-cat="${catE}" data-name="${nameE}" data-field="photo" title="Add item photo"><i class="fas fa-camera me-1"></i>${itemPhotos.length >= MANAGE_ITEM_PHOTO_LIMIT ? 'Replace Item Photo' : 'Add Item Photo'} (${itemPhotos.length}/${MANAGE_ITEM_PHOTO_LIMIT})</button>
+                                                    <small class="text-muted">Base item photos. Upgrade photos are separate.</small>
+                                                </div>
+                                                <div class="d-flex align-items-start gap-2 mt-2 flex-wrap">
+                                                    ${itemPhotos.length ? itemPhotos.map(function(photo, index) {
+                                                        return `<div class="manage-item-photo-thumb border rounded p-1 bg-white">
+                                                            <img src="${manageItemsAttr(photo)}" class="rounded d-block" style="width:88px;height:58px;object-fit:cover;cursor:pointer;" onclick="openPhotoLightbox(this.src)" title="Click to enlarge">
+                                                            <div class="btn-group btn-group-sm mt-1 w-100">
+                                                                <button type="button" class="btn btn-outline-primary item-photo-btn" data-cat="${catE}" data-name="${nameE}" data-field="photo" data-photo-index="${index}" title="Replace photo ${index + 1}"><i class="fas fa-sync-alt"></i></button>
+                                                                <button type="button" class="btn btn-outline-danger item-photo-remove-btn" data-cat="${catE}" data-name="${nameE}" data-photo-index="${index}" title="Remove photo ${index + 1}"><i class="fas fa-times"></i></button>
+                                                            </div>
+                                                        </div>`;
+                                                    }).join('') : '<small class="text-muted">No item photos yet.</small>'}
+                                                </div>
                                             </div>
-                                            <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
-                                            <button class="btn btn-sm btn-outline-secondary item-photo-btn" data-cat="${catE}" data-name="${nameE}" data-field="upgradePhoto" title="Add upgrade photo"><i class="fas fa-camera me-1"></i>Upgrade Photo</button>
-                                            ${upg.photo ? `<img src="${manageItemsAttr(upg.photo)}" class="rounded" style="max-width:80px;max-height:52px;cursor:pointer;" onclick="openPhotoLightbox(this.src)" title="Click to enlarge">` : ''}
+                                            <div class="d-flex align-items-center gap-2 mt-3 flex-wrap">
+                                                <button class="btn btn-sm btn-outline-secondary item-photo-btn" data-cat="${catE}" data-name="${nameE}" data-field="upgradePhoto" title="Add upgrade photo"><i class="fas fa-camera me-1"></i>Upgrade Photo</button>
+                                                ${upg.photo ? `<img src="${manageItemsAttr(upg.photo)}" class="rounded" style="max-width:80px;max-height:52px;cursor:pointer;" onclick="openPhotoLightbox(this.src)" title="Click to enlarge">` : ''}
                                             </div>
                                         </div>
                                     </div>
@@ -2932,6 +3135,7 @@
             container.innerHTML = html || '<p class="text-muted">No items found.</p>';
             applyManageItemsPortraitFieldSettings();
             filterItemsList();
+            applyManageDetailSectionState();
             initManageCategorySortable();
         }
 
@@ -3125,6 +3329,7 @@
                 var items = Array.isArray(pricingDatabase[cat]) ? pricingDatabase[cat] : [];
                 items.forEach(function(item) {
                     if (!item || !item.name) return;
+                    var itemPhotos = normalizeManageItemPhotos(item);
                     out.push({
                         category: cat,
                         id: 'cgt_' + cat.replace(/[^a-z0-9]/gi, '_') + '_' + item.name.replace(/[^a-z0-9]/gi, '_'),
@@ -3134,7 +3339,8 @@
                         rate: parseFloat(item.rate) || 0,
                         materialCost: parseFloat(item.materialCost) || 0,
                         supplierUrl: item.supplierUrl || '',
-                        photo: item.photo || '',
+                        photos: itemPhotos,
+                        photo: itemPhotos[0] || item.photo || '',
                         itemDescription: item.itemDescription || item.description || '',
                         laborTime: normalizeManageLaborTime(item.laborTime),
                         upgrade: item.upgrade ? JSON.parse(JSON.stringify(item.upgrade)) : null,
@@ -4208,6 +4414,14 @@
         window.addNewUnitType = addNewUnitType;
         window.handleCategoryChange = handleCategoryChange;
         window.handleItemPhotoUpload = handleItemPhotoUpload;
+        window.normalizeManageItemPhotos = normalizeManageItemPhotos;
+        window.syncManageItemPhotoCompatibility = syncManageItemPhotoCompatibility;
+        window.shouldPromptManageItemPhotoReplacement = shouldPromptManageItemPhotoReplacement;
+        window.openManageItemPhotoReplacePicker = openManageItemPhotoReplacePicker;
+        window.removeManageItemPhoto = removeManageItemPhoto;
+        window.setManageItemDetailSectionOpen = setManageItemDetailSectionOpen;
+        window.setManageItemDetailSectionOpenFromToggle = setManageItemDetailSectionOpenFromToggle;
+        window.applyManageDetailSectionState = applyManageDetailSectionState;
         window.openManageItemsModal = openManageItemsModal;
         window.closeManageItemsModal = closeManageItemsModal;
         window.pushUndoState = pushUndoState;

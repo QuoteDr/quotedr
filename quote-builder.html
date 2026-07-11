@@ -16301,6 +16301,24 @@ Example:
             }
         }
 
+        window.syncManageDetailsSections = syncManageDetailsSections;
+
+        function openManageItemPhotoFilePicker(cat, name, field, photoIndex) {
+            var inp = document.createElement('input');
+            inp.type = 'file';
+            inp.accept = 'image/*';
+            inp.dataset.cat = cat || '';
+            inp.dataset.name = name || '';
+            inp.dataset.field = field || 'photo';
+            if (photoIndex !== undefined && photoIndex !== null && photoIndex !== '') {
+                inp.dataset.photoIndex = String(photoIndex);
+            }
+            inp.onchange = function() { handleItemPhotoUpload(this); };
+            inp.click();
+        }
+
+        window.openManageItemPhotoFilePicker = openManageItemPhotoFilePicker;
+
         // These run independently of auth - always fire on page load
         document.addEventListener('DOMContentLoaded', function() {
             loadInvoiceSettingsDefaultsFromCloud();
@@ -16338,6 +16356,9 @@ Example:
                     }
                     var detailSectionToggle = e.target.closest('[data-detail-section-toggle]');
                     if (detailSectionToggle) {
+                        if (typeof setManageItemDetailSectionOpenFromToggle === 'function') {
+                            setManageItemDetailSectionOpenFromToggle(detailSectionToggle);
+                        }
                         syncManageDetailsSections(detailSectionToggle.dataset.target);
                         return;
                     }
@@ -16376,13 +16397,18 @@ Example:
                     }
                     var photoBtn = e.target.closest('.item-photo-btn');
                     if (photoBtn) {
-                        var inp = document.createElement('input');
-                        inp.type = 'file'; inp.accept = 'image/*';
-                        inp.dataset.cat = photoBtn.dataset.cat;
-                        inp.dataset.name = photoBtn.dataset.name;
-                        inp.dataset.field = photoBtn.dataset.field || 'photo';
-                        inp.onchange = function() { handleItemPhotoUpload(this); };
-                        inp.click();
+                        var photoField = photoBtn.dataset.field || 'photo';
+                        var photoIndex = photoBtn.dataset.photoIndex;
+                        if (photoField === 'photo' && !photoIndex && typeof shouldPromptManageItemPhotoReplacement === 'function' && shouldPromptManageItemPhotoReplacement(photoBtn.dataset.cat, photoBtn.dataset.name)) {
+                            openManageItemPhotoReplacePicker(photoBtn.dataset.cat, photoBtn.dataset.name);
+                            return;
+                        }
+                        openManageItemPhotoFilePicker(photoBtn.dataset.cat, photoBtn.dataset.name, photoField, photoIndex);
+                        return;
+                    }
+                    var photoRemoveBtn = e.target.closest('.item-photo-remove-btn');
+                    if (photoRemoveBtn && typeof removeManageItemPhoto === 'function') {
+                        removeManageItemPhoto(photoRemoveBtn.dataset.cat, photoRemoveBtn.dataset.name, photoRemoveBtn.dataset.photoIndex);
                         return;
                     }
                 });
