@@ -1474,6 +1474,41 @@
             border-radius: 8px;
             background: #f8fafc;
         }
+        @media (min-width: 769px) {
+            #manageItemsModal .modal-dialog {
+                width: 96vw !important;
+                max-width: 96vw !important;
+                height: 92vh;
+                margin: 4vh auto !important;
+            }
+            #manageItemsModal .modal-content {
+                height: 92vh;
+                max-height: 92vh;
+                display: flex;
+                flex-direction: column;
+            }
+            #manageItemsModal .modal-header,
+            #manageItemsModal .modal-footer {
+                flex: 0 0 auto;
+            }
+            #manageItemsModal .modal-body {
+                flex: 1 1 auto;
+                min-height: 0;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            }
+            #manageItemsModal .manage-items-add-shell,
+            #manageItemsModal .manage-items-toolbar {
+                flex: 0 0 auto;
+            }
+            #manageItemsModal #customItemsList {
+                flex: 1 1 auto;
+                min-height: 0;
+                max-height: none !important;
+                overflow-y: auto;
+            }
+        }
         .quote-items-table {
             width: 100%;
             min-width: 980px;
@@ -2824,8 +2859,8 @@ Example:
 
     <!-- Manage Line Items Modal -->
     <div class="modal fade" id="manageItemsModal" tabindex="-1">
-        <div class="modal-dialog modal-xl" style="max-width:90vw;margin-left:auto;margin-right:auto;width:96%;">
-            <!-- On mobile: 96% width, centered. On desktop: capped at 90vw -->
+        <div class="modal-dialog modal-xl" style="max-width:96vw;margin-left:auto;margin-right:auto;width:96%;">
+            <!-- Desktop sizing is expanded in CSS; mobile keeps its full-width layout. -->
             <div class="modal-content" style="position:relative;">
                 <div class="modal-header" id="manageItemsTopBar">
                     <h5 class="modal-title"><i class="fas fa-database"></i> Manage Line Items</h5>
