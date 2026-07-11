@@ -57,5 +57,13 @@ assert(viewer.includes('renderViewerPhotoButton'), 'Client viewer should render 
 assert(viewer.includes('data-viewer-photo-key'), 'Client viewer photo buttons should use photo keys instead of inline data URLs');
 assert(viewer.includes('Picture'), 'Client viewer should label compact line item photo buttons as Picture');
 assert(viewer.includes('Upgrade Picture'), 'Client viewer should label upgrade option photo buttons clearly');
+assert(viewer.includes('function normalizeViewerPhotoList'), 'Client viewer should normalize multi-photo arrays with legacy single-photo fallback');
+assert(viewer.includes('viewerPhotoRegistry[key] = photos'), 'Client viewer photo registry should store photo arrays for lightbox navigation');
+assert(viewer.includes('viewer-line-photo-actions'), 'Client viewer should render line item photo buttons in a separate action row');
+assert(viewer.includes('function showViewerPhotoAt'), 'Client viewer lightbox should support switching between registered photos');
+assert(viewer.includes('viewerPhotoLightboxPrev'), 'Client viewer lightbox should render a previous-photo control');
+assert(viewer.includes('viewerPhotoLightboxNext'), 'Client viewer lightbox should render a next-photo control');
+assert(viewer.includes('viewerPhotoLightboxCounter'), 'Client viewer lightbox should render a current photo counter');
+assert(viewer.includes('touchstart') && viewer.includes('touchend'), 'Client viewer lightbox should support mobile swipe navigation');
 
 console.log('line item photo static checks passed');

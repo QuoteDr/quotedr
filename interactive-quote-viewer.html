@@ -2777,12 +2777,34 @@ if (location.search.includes('debug')) {
 
         var viewerPhotoRegistry = {};
         var viewerPhotoCounter = 0;
+        var viewerPhotoLightboxPhotos = [];
+        var viewerPhotoLightboxIndex = 0;
+        var viewerPhotoLightboxKeyHandlerBound = false;
+        var viewerPhotoLightboxTouchStartX = 0;
+
+        function normalizeViewerPhotoList(value, fallback) {
+            var photos = [];
+            function addPhoto(photo) {
+                var cleaned = String(photo || '').trim();
+                if (cleaned && photos.indexOf(cleaned) === -1) photos.push(cleaned);
+            }
+            if (Array.isArray(value)) value.forEach(addPhoto);
+            else addPhoto(value);
+            if (Array.isArray(fallback)) fallback.forEach(addPhoto);
+            else addPhoto(fallback);
+            return photos.slice(0, 3);
+        }
+
+        function getViewerItemPhotoList(item) {
+            return normalizeViewerPhotoList(item && item.photos, item && item.photo);
+        }
 
         function registerViewerPhoto(src) {
-            if (!src) return '';
+            var photos = normalizeViewerPhotoList(src);
+            if (!photos.length) return '';
             viewerPhotoCounter += 1;
             var key = 'photo_' + viewerPhotoCounter;
-            viewerPhotoRegistry[key] = src;
+            viewerPhotoRegistry[key] = photos;
             return key;
         }
 
@@ -2792,14 +2814,75 @@ if (location.search.includes('debug')) {
                 event.stopPropagation();
             }
             var key = button ? button.getAttribute('data-viewer-photo-key') : '';
-            var src = key ? viewerPhotoRegistry[key] : '';
-            if (src) openPhotoLightbox(src);
+            var photos = key ? viewerPhotoRegistry[key] : [];
+            if (photos && photos.length) openPhotoLightbox(photos);
         }
 
         function renderViewerPhotoButton(src, label, buttonClass) {
-            if (!src) return '';
-            var key = registerViewerPhoto(src);
-            return '<button type="button" class="btn btn-sm ' + (buttonClass || 'btn-outline-secondary') + ' viewer-photo-btn mt-1" data-viewer-photo-key="' + escapeHtml(key) + '" onclick="openViewerPhotoButton(event, this)" style="font-size:0.75rem;"><i class="fas fa-camera me-1"></i>' + escapeHtml(label || 'Picture') + '</button>';
+            var photos = normalizeViewerPhotoList(src);
+            if (!photos.length) return '';
+            var key = registerViewerPhoto(photos);
+            var countText = photos.length > 1 ? ' <span class="viewer-photo-count">(' + photos.length + ')</span>' : '';
+            return '<button type="button" class="btn btn-sm ' + (buttonClass || 'btn-outline-secondary') + ' viewer-photo-btn mt-1" data-viewer-photo-key="' + escapeHtml(key) + '" onclick="openViewerPhotoButton(event, this)" style="font-size:0.75rem;"><i class="fas fa-camera me-1"></i>' + escapeHtml(label || 'Picture') + countText + '</button>';
+        }
+
+        function closeViewerPhotoLightbox() {
+            var lb = document.getElementById('photoLightbox');
+            if (lb) lb.style.display = 'none';
+        }
+
+        function ensureViewerPhotoLightbox() {
+            var existing = document.getElementById('photoLightbox');
+            if (!existing) {
+                document.body.insertAdjacentHTML('beforeend',
+                    '<div id="photoLightbox" onclick="if(event.target===this) closeViewerPhotoLightbox()" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.92);z-index:99999;align-items:center;justify-content:center;cursor:zoom-out;padding:56px 16px 64px;">'
+                    + '<button onclick="event.stopPropagation();closeViewerPhotoLightbox()" style="position:absolute;top:16px;right:20px;background:none;border:none;color:white;font-size:2rem;cursor:pointer;line-height:1;" aria-label="Close photo">&times;</button>'
+                    + '<button id="viewerPhotoLightboxPrev" onclick="event.stopPropagation();showViewerPhotoAt(viewerPhotoLightboxIndex - 1)" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,0.45);background:rgba(0,0,0,0.35);color:white;font-size:1.8rem;line-height:1;cursor:pointer;" aria-label="Previous photo">&lsaquo;</button>'
+                    + '<img id="photoLightboxImg" onclick="event.stopPropagation()" style="max-width:95vw;max-height:82vh;object-fit:contain;border-radius:8px;box-shadow:0 4px 32px rgba(0,0,0,0.7);">'
+                    + '<button id="viewerPhotoLightboxNext" onclick="event.stopPropagation();showViewerPhotoAt(viewerPhotoLightboxIndex + 1)" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,0.45);background:rgba(0,0,0,0.35);color:white;font-size:1.8rem;line-height:1;cursor:pointer;" aria-label="Next photo">&rsaquo;</button>'
+                    + '<div id="viewerPhotoLightboxCounter" style="position:absolute;bottom:18px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.55);color:white;border-radius:999px;padding:6px 12px;font-weight:700;font-size:0.85rem;"></div>'
+                    + '</div>');
+                var lb = document.getElementById('photoLightbox');
+                lb.addEventListener('touchstart', function(event) {
+                    viewerPhotoLightboxTouchStartX = event.touches && event.touches.length ? event.touches[0].clientX : 0;
+                }, { passive: true });
+                lb.addEventListener('touchend', function(event) {
+                    if (!viewerPhotoLightboxTouchStartX || !event.changedTouches || !event.changedTouches.length || viewerPhotoLightboxPhotos.length < 2) return;
+                    var deltaX = event.changedTouches[0].clientX - viewerPhotoLightboxTouchStartX;
+                    viewerPhotoLightboxTouchStartX = 0;
+                    if (Math.abs(deltaX) < 40) return;
+                    showViewerPhotoAt(viewerPhotoLightboxIndex + (deltaX < 0 ? 1 : -1));
+                }, { passive: true });
+            }
+            if (!viewerPhotoLightboxKeyHandlerBound) {
+                viewerPhotoLightboxKeyHandlerBound = true;
+                document.addEventListener('keydown', function(event) {
+                    var lb = document.getElementById('photoLightbox');
+                    if (!lb || lb.style.display !== 'flex') return;
+                    if (event.key === 'Escape') closeViewerPhotoLightbox();
+                    else if (event.key === 'ArrowLeft') showViewerPhotoAt(viewerPhotoLightboxIndex - 1);
+                    else if (event.key === 'ArrowRight') showViewerPhotoAt(viewerPhotoLightboxIndex + 1);
+                });
+            }
+        }
+
+        function showViewerPhotoAt(index) {
+            if (!viewerPhotoLightboxPhotos.length) return;
+            ensureViewerPhotoLightbox();
+            var total = viewerPhotoLightboxPhotos.length;
+            viewerPhotoLightboxIndex = ((index % total) + total) % total;
+            var img = document.getElementById('photoLightboxImg');
+            var prev = document.getElementById('viewerPhotoLightboxPrev');
+            var next = document.getElementById('viewerPhotoLightboxNext');
+            var counter = document.getElementById('viewerPhotoLightboxCounter');
+            if (img) img.src = viewerPhotoLightboxPhotos[viewerPhotoLightboxIndex];
+            if (prev) prev.style.display = total > 1 ? 'block' : 'none';
+            if (next) next.style.display = total > 1 ? 'block' : 'none';
+            if (counter) {
+                counter.style.display = total > 1 ? 'block' : 'none';
+                counter.textContent = (viewerPhotoLightboxIndex + 1) + ' / ' + total;
+            }
+            document.getElementById('photoLightbox').style.display = 'flex';
         }
 
         function toggleViewerUpgradeDescription(event, roomIdx, itemIndex, groupId, optionId) {
@@ -3796,6 +3879,7 @@ if (location.search.includes('debug')) {
                             itemStyles.push('border-left:3px dashed #0dcaf0');
                             itemStyles.push('padding-left:8px');
                         }
+                        const lineItemPhotoButton = !isSignedDiff ? renderViewerPhotoButton(getViewerItemPhotoList(item), 'Picture', 'btn-outline-secondary') : '';
                         html += `
                         <div class="${itemClasses.join(' ')}" id="item_${roomIdx}_${itemIndex}" ${itemStyles.length ? `style="${itemStyles.join('; ')}"` : ''}>
                             <div class="d-flex justify-content-between align-items-baseline mb-1">
@@ -3804,7 +3888,6 @@ if (location.search.includes('debug')) {
                                     ${isChangeOrder && coStatus === 'changed' ? '<span class="badge bg-warning text-dark ms-2">Changed</span>' : ''}
                                     ${isChangeOrder && coStatus === 'added' ? '<span class="badge bg-success ms-2">Added</span>' : ''}
                                     ${isChangeOrder && coStatus === 'removed' ? '<span class="badge bg-danger ms-2">Removed</span>' : ''}
-                                    ${item.photo && !isSignedDiff ? renderViewerPhotoButton(item.photo, 'Picture', 'btn-outline-secondary') : ''}
                                     ${isOptional && !isSignedDiff ? '<span class="badge bg-info ms-2" style="font-size:0.65em;">Optional</span>' : ''}
                                 </div>
                                 <div style="text-align:right; min-width:140px; padding-left:16px;">
@@ -3813,6 +3896,7 @@ if (location.search.includes('debug')) {
                                     ${qvDiscountDetailsHtml(item)}
                                 </div>
                             </div>
+                            ${lineItemPhotoButton ? `<div class="viewer-line-photo-actions mb-1">${lineItemPhotoButton}</div>` : ''}
                             ${coCanExplain ? `<div class="viewer-change-order-note" id="co_note_${roomIdx}_${itemIndex}"><i class="fas fa-circle-info me-1"></i>${escapeHtml(coExplanation)}</div>` : ''}
                             ${renderExpandableDescription(displayDesc, `itemdesc_${roomIdx}_${itemIndex}`)}
                             ${hasUpgradeGroups ? renderViewerItemUpgradeGroups(roomIdx, itemIndex, item, isSignedDiff) : ''}
@@ -3881,17 +3965,10 @@ if (location.search.includes('debug')) {
         }
 
         function openPhotoLightbox(src) {
-            var existing = document.getElementById('photoLightbox');
-            if (!existing) {
-                document.body.insertAdjacentHTML('beforeend',
-                    '<div id="photoLightbox" onclick="this.style.display=\'none\'" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.92);z-index:99999;align-items:center;justify-content:center;cursor:zoom-out;">'
-                    + '<img id="photoLightboxImg" style="max-width:95vw;max-height:90vh;object-fit:contain;border-radius:8px;box-shadow:0 4px 32px rgba(0,0,0,0.7);">'
-                    + '<button onclick="event.stopPropagation();document.getElementById(\'photoLightbox\').style.display=\'none\'" style="position:absolute;top:16px;right:20px;background:none;border:none;color:white;font-size:2rem;cursor:pointer;line-height:1;">&times;</button>'
-                    + '</div>');
-            }
-            var lb = document.getElementById('photoLightbox');
-            document.getElementById('photoLightboxImg').src = src;
-            lb.style.display = 'flex';
+            var photos = normalizeViewerPhotoList(src);
+            if (!photos.length) return;
+            viewerPhotoLightboxPhotos = photos;
+            showViewerPhotoAt(0);
         }
 
         function toggleRoomNote(roomIdx) {
@@ -4829,17 +4906,10 @@ if (location.search.includes('debug')) {
         }
 
         function openPhotoLightbox(src) {
-            var existing = document.getElementById('photoLightbox');
-            if (!existing) {
-                document.body.insertAdjacentHTML('beforeend',
-                    '<div id="photoLightbox" onclick="this.style.display=\'none\'" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.92);z-index:99999;align-items:center;justify-content:center;cursor:zoom-out;">'
-                    + '<img id="photoLightboxImg" style="max-width:95vw;max-height:90vh;object-fit:contain;border-radius:8px;box-shadow:0 4px 32px rgba(0,0,0,0.7);">'
-                    + '<button onclick="event.stopPropagation();document.getElementById(\'photoLightbox\').style.display=\'none\'" style="position:absolute;top:16px;right:20px;background:none;border:none;color:white;font-size:2rem;cursor:pointer;line-height:1;">&times;</button>'
-                    + '</div>');
-            }
-            var lb = document.getElementById('photoLightbox');
-            document.getElementById('photoLightboxImg').src = src;
-            lb.style.display = 'flex';
+            var photos = normalizeViewerPhotoList(src);
+            if (!photos.length) return;
+            viewerPhotoLightboxPhotos = photos;
+            showViewerPhotoAt(0);
         }
     </script>
     <div class="text-center text-muted small py-3 d-print-none">
