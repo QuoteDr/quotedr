@@ -3698,7 +3698,8 @@ Example:
             }
         }
 
-        function setItemUpgradeManualQuantity(event, roomId, itemIndex, groupId, optionId) {
+        function setItemUpgradeManualQuantity(event, roomId, itemIndex, groupId, optionId, options) {
+            options = options || {};
             if (event) {
                 event.stopPropagation();
             }
@@ -3711,9 +3712,33 @@ Example:
             if (!option) return;
             option.manualQuantity = parseFloat(event && event.currentTarget ? event.currentTarget.value : 0) || 0;
             applyItemUpgradeGroupsToItem(item);
-            renderRooms();
+            if (options.render !== false) renderRooms();
             calculateTotals();
             markUnsaved();
+        }
+
+        function handleItemUpgradeManualQuantityKeydown(event, roomId, itemIndex, groupId, optionId) {
+            if (!event) return;
+            event.stopPropagation();
+            if (event.key !== 'Enter') return;
+            event.preventDefault();
+            setItemUpgradeManualQuantity(event, roomId, itemIndex, groupId, optionId);
+            if (event.currentTarget && typeof event.currentTarget.blur === 'function') event.currentTarget.blur();
+        }
+
+        function setItemUpgradeManualQuantityFromButton(event, roomId, itemIndex, groupId, optionId) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            var input = event && event.currentTarget && event.currentTarget.closest('.quote-upgrade-quantity-note')
+                ? event.currentTarget.closest('.quote-upgrade-quantity-note').querySelector('.item-upgrade-manual-quantity')
+                : null;
+            setItemUpgradeManualQuantity({
+                currentTarget: input,
+                stopPropagation: function() {}
+            }, roomId, itemIndex, groupId, optionId);
+            if (input && typeof input.blur === 'function') input.blur();
         }
 
         function renderItemUpgradeGroups(roomId, itemIndex, item) {
@@ -3758,7 +3783,7 @@ Example:
                         '</button>';
                     if (selected && !requiresConsultation) {
                         if (normalizeQuoteItemUpgradeQuantityMode(option.quantityMode) === 'manual') {
-                            html += '<label class="quote-upgrade-quantity-note small d-flex align-items-center gap-1 mb-0">Qty <input type="number" min="0" step="0.01" class="form-control form-control-sm item-upgrade-manual-quantity" value="' + qdTemplateEscapeHtml(optionQuantity) + '" onclick="event.stopPropagation()" onchange="setItemUpgradeManualQuantity(event, ' + roomId + ', ' + itemIndex + ', ' + groupArg + ', ' + optionArg + ')"> ' + qdTemplateEscapeHtml(option.unitType || item.unitType || '') + '</label>';
+                            html += '<label class="quote-upgrade-quantity-note small d-flex align-items-center gap-1 mb-0">Qty <input type="number" min="0" step="0.01" class="form-control form-control-sm item-upgrade-manual-quantity" value="' + qdTemplateEscapeHtml(optionQuantity) + '" onclick="event.stopPropagation()" oninput="setItemUpgradeManualQuantity(event, ' + roomId + ', ' + itemIndex + ', ' + groupArg + ', ' + optionArg + ', { render: false })" onchange="setItemUpgradeManualQuantity(event, ' + roomId + ', ' + itemIndex + ', ' + groupArg + ', ' + optionArg + ')" onkeydown="handleItemUpgradeManualQuantityKeydown(event, ' + roomId + ', ' + itemIndex + ', ' + groupArg + ', ' + optionArg + ')"><button type="button" class="btn btn-sm btn-outline-success py-0 px-2 item-upgrade-manual-quantity-set" onclick="setItemUpgradeManualQuantityFromButton(event, ' + roomId + ', ' + itemIndex + ', ' + groupArg + ', ' + optionArg + ')" title="Set quantity" aria-label="Set quantity"><i class="fas fa-check"></i></button> ' + qdTemplateEscapeHtml(option.unitType || item.unitType || '') + '</label>';
                         } else {
                             var quantitySummary = getQuoteItemUpgradeOptionQuantitySummary(item, option);
                             if (quantitySummary) html += '<div class="quote-upgrade-quantity-note small">' + qdTemplateEscapeHtml(quantitySummary) + '</div>';
@@ -8430,6 +8455,34 @@ Example:
             return out;
         }
 
+        function mergeQuoteItemUpgradeGroupRuntimeState(targetGroups, previousGroups) {
+            targetGroups = normalizeQuoteItemUpgradeGroups({ upgradeGroups: targetGroups });
+            previousGroups = normalizeQuoteItemUpgradeGroups({ upgradeGroups: previousGroups });
+            var selectedIdsByGroup = {};
+            var quantityStateByGroupAndOption = {};
+            previousGroups.forEach(function(group) {
+                selectedIdsByGroup[group.id] = Array.isArray(group.selectedOptionIds) ? group.selectedOptionIds.slice() : [];
+                (group.options || []).forEach(function(option) {
+                    quantityStateByGroupAndOption[group.id + '||' + option.id] = {
+                        manualQuantity: option.manualQuantity
+                    };
+                });
+            });
+            targetGroups.forEach(function(group) {
+                if (selectedIdsByGroup[group.id]) {
+                    group.selectedOptionIds = selectedIdsByGroup[group.id].filter(function(optionId) {
+                        return (group.options || []).some(function(option) { return option.id === optionId; });
+                    });
+                }
+                (group.options || []).forEach(function(option) {
+                    var quantityState = quantityStateByGroupAndOption[group.id + '||' + option.id];
+                    if (!quantityState) return;
+                    option.manualQuantity = parseFloat(quantityState.manualQuantity || 0) || 0;
+                });
+            });
+            return targetGroups;
+        }
+
         function applyChoiceGroupEnhancementsToItem(item, baseState) {
             if (!item || !item.choiceGroup) return baseState;
             var baseQty = parseFloat(item.quantity) || 0;
@@ -8516,21 +8569,10 @@ Example:
             item.itemDescription = finalState.itemDescription || item.itemDescription || '';
             item.laborTime = normalizeLaborTime(finalState.laborTime || item.laborTime);
             item.choiceGroup.selectedOptionIds = selectedOptions.map(function(option) { return option.id; });
-            var priorUpgradeSelections = {};
-            normalizeQuoteItemUpgradeGroups(item).forEach(function(upgradeGroup) {
-                priorUpgradeSelections[upgradeGroup.id] = Array.isArray(upgradeGroup.selectedOptionIds)
-                    ? upgradeGroup.selectedOptionIds.slice()
-                    : [];
-            });
+            var priorUpgradeGroups = normalizeQuoteItemUpgradeGroups(item);
             var selectedBaseOption = selectedOptions[0] || null;
             var optionUpgradeGroups = selectedBaseOption ? normalizeQuoteItemUpgradeGroups(selectedBaseOption) : [];
-            optionUpgradeGroups.forEach(function(upgradeGroup) {
-                if (priorUpgradeSelections[upgradeGroup.id]) {
-                    upgradeGroup.selectedOptionIds = priorUpgradeSelections[upgradeGroup.id].filter(function(optionId) {
-                        return (upgradeGroup.options || []).some(function(option) { return option.id === optionId; });
-                    });
-                }
-            });
+            optionUpgradeGroups = mergeQuoteItemUpgradeGroupRuntimeState(optionUpgradeGroups, priorUpgradeGroups);
             item.upgradeGroups = optionUpgradeGroups;
             delete item._itemUpgradeBaseCaptured;
             if (item.upgradeGroups.length) applyItemUpgradeGroupsToItem(item);

@@ -297,11 +297,15 @@
                 '</div>';
         }
 
-        function readManageUpgradeOptionQuantityState(optionEl) {
+        function readManageUpgradeOptionQuantityState(optionEl, previousState) {
+            previousState = previousState || {};
+            const modeControl = optionEl?.querySelector('.upgrade-quantity-mode');
+            const multiplierControl = optionEl?.querySelector('.upgrade-quantity-multiplier');
+            const overrideControl = optionEl?.querySelector('.upgrade-quantity-override');
             return {
-                quantityMode: normalizeManageUpgradeQuantityMode(optionEl?.querySelector('.upgrade-quantity-mode')?.value || 'parent'),
-                quantityMultiplier: parseFloat(optionEl?.querySelector('.upgrade-quantity-multiplier')?.value || 1) || 1,
-                quantityOverride: parseFloat(optionEl?.querySelector('.upgrade-quantity-override')?.value || 0) || 0
+                quantityMode: modeControl ? normalizeManageUpgradeQuantityMode(modeControl.value) : normalizeManageUpgradeQuantityMode(previousState.quantityMode),
+                quantityMultiplier: multiplierControl ? (parseFloat(multiplierControl.value || 1) || 1) : (parseFloat(previousState.quantityMultiplier || 1) || 1),
+                quantityOverride: overrideControl ? (parseFloat(overrideControl.value || 0) || 0) : (parseFloat(previousState.quantityOverride || 0) || 0)
             };
         }
 
@@ -313,7 +317,7 @@
             const options = Array.isArray(manageUpgradeWizardState.group.options) ? manageUpgradeWizardState.group.options : [];
             const option = options.find(function(candidate) { return candidate.id === optionId; });
             if (!option) return;
-            Object.assign(option, readManageUpgradeOptionQuantityState(optionEl), {
+            Object.assign(option, readManageUpgradeOptionQuantityState(optionEl, option), {
                 name: optionEl.querySelector('.upgrade-name')?.value || option.name || '',
                 unitType: optionEl.querySelector('.upgrade-unit-type')?.value || option.unitType || ''
             });
@@ -849,7 +853,7 @@
                     category: selectedSource?.dataset.category || previous.category || '',
                     availableAfterOptionIds: selectedFrom('.upgrade-available-after', previous.availableAfterOptionIds),
                     blockedByOptionIds: selectedFrom('.upgrade-blocked-by', previous.blockedByOptionIds),
-                    ...readManageUpgradeOptionQuantityState(optionEl)
+                    ...readManageUpgradeOptionQuantityState(optionEl, previous)
                 };
             });
         }

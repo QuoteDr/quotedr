@@ -5,6 +5,14 @@ const assert = require('assert');
 const root = path.resolve(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'quote-builder.html'), 'utf8');
 const items = fs.readFileSync(path.join(root, 'quote-items.js'), 'utf8');
+const wizardCollector = items.slice(
+  items.indexOf('function collectManageUpgradeWizardForm'),
+  items.indexOf('function showManageUpgradeWizard')
+);
+const manualCollector = items.slice(
+  items.indexOf('function collectManageItemUpgradeGroups'),
+  items.indexOf('function handleManageUpgradeGroupTypeChange')
+);
 
 assert(items.includes('function openManageUpgradeWizard'), 'Manage Items should expose an Upgrade Wizard launcher for existing saved items');
 assert(items.includes('function openManageNewItemUpgradeWizard'), 'Manage Items should expose an Upgrade Wizard launcher for the new-item form');
@@ -37,6 +45,9 @@ assert(items.includes('quantityMultiplier'), 'Upgrade quantity modes should pers
 assert(items.includes('function syncManageUpgradeWizardOptionQuantityState'), 'Upgrade Wizard should sync mixed-unit quantity mode selections into wizard state before re-rendering');
 assert(items.includes('syncManageUpgradeWizardOptionQuantityState(optionEl);'), 'Upgrade Wizard quantity state should be preserved when quantity controls refresh');
 assert(items.includes('syncManageUpgradeWizardOptionQuantityState(selectEl.closest'), 'Changing the Upgrade Wizard quantity mode should immediately persist the selected behavior');
+assert(items.includes('function readManageUpgradeOptionQuantityState(optionEl, previousState)'), 'Upgrade Wizard quantity reader should accept prior option state so later steps cannot reset quantity behavior');
+assert(wizardCollector.includes('...readManageUpgradeOptionQuantityState(optionEl, previous)'), 'Upgrade Wizard collection should preserve previous quantity behavior when a step omits quantity controls');
+assert(!manualCollector.includes('...readManageUpgradeOptionQuantityState(optionEl, previous)'), 'Manual upgrade collection should not reference wizard-only previous option state');
 assert(items.includes('saveManageUpgradeWizardRow(detailsRow)'), 'Upgrade Wizard Save should persist the edited Manage Items row immediately');
 assert(items.includes('function bindManageItemsCloseGuard'), 'Manage Items should guard every modal close path against unsaved changes');
 assert(items.includes('You have unsaved changes, are you sure you want to exit?'), 'Manage Items close warning should use the clear unsaved changes message');
