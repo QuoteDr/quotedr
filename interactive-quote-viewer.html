@@ -2192,10 +2192,28 @@ if (location.search.includes('debug')) {
             return cleaned || fallback;
         }
 
+        function getQuoteDividerLabelSources() {
+            var row = window._quoteRow || {};
+            return [
+                quoteData || {},
+                quoteData && quoteData.data || {},
+                row.data || {},
+                row || {}
+            ];
+        }
+
         function getQuoteDividerLabels() {
             var prefs = {};
             try { prefs = JSON.parse(localStorage.getItem('ald_quote_prefs') || '{}') || {}; } catch(e) {}
-            var data = quoteData || {};
+            var sources = getQuoteDividerLabelSources();
+            var data = {};
+            for (var i = 0; i < sources.length; i++) {
+                var candidate = sources[i] || {};
+                if (candidate.dividerSingular || candidate.quoteDividerSingular || candidate.dividerPlural || candidate.quoteDividerPlural || candidate.quoteDividerLabels) {
+                    data = candidate;
+                    break;
+                }
+            }
             var singular = normalizeQuoteDividerLabel(
                 data.dividerSingular || data.quoteDividerSingular || (data.quoteDividerLabels && data.quoteDividerLabels.singular) || prefs.dividerSingular,
                 'Room'

@@ -1092,10 +1092,28 @@ if (location.search.includes('debug')) {
             return cleaned || fallback;
         }
 
+        function getInvoiceDividerLabelSources() {
+            var row = window._invoiceRow || {};
+            return [
+                invoiceData || {},
+                invoiceData && invoiceData.data || {},
+                row.data || {},
+                row || {}
+            ];
+        }
+
         function getQuoteDividerLabels() {
             var prefs = {};
             try { prefs = JSON.parse(localStorage.getItem('ald_quote_prefs') || '{}') || {}; } catch(e) {}
-            var data = invoiceData || {};
+            var sources = getInvoiceDividerLabelSources();
+            var data = {};
+            for (var i = 0; i < sources.length; i++) {
+                var candidate = sources[i] || {};
+                if (candidate.dividerSingular || candidate.quoteDividerSingular || candidate.dividerPlural || candidate.quoteDividerPlural || candidate.quoteDividerLabels) {
+                    data = candidate;
+                    break;
+                }
+            }
             var singular = normalizeQuoteDividerLabel(
                 data.dividerSingular || data.quoteDividerSingular || (data.quoteDividerLabels && data.quoteDividerLabels.singular) || prefs.dividerSingular,
                 'Room'
@@ -1435,6 +1453,7 @@ if (location.search.includes('debug')) {
                         loadQuoteFromSupabase(supabaseId).then(function(ownerResult) {
                             if (ownerResult && ownerResult.data && ownerResult.data.data) {
                                 var row = ownerResult.data;
+                                window._invoiceRow = row;
                                 invoiceData = row.data || row;
                                 if (!invoiceData.clientName && row.client_name) invoiceData.clientName = row.client_name;
                                 if (!invoiceData.rooms && row.rooms) invoiceData.rooms = row.rooms;
@@ -1463,6 +1482,7 @@ if (location.search.includes('debug')) {
                         return;
                     }
                     var row = result.data;
+                    window._invoiceRow = row;
                     invoiceData = row.data || row;
                     if (!invoiceData.clientName && row.client_name) invoiceData.clientName = row.client_name;
                     if (!invoiceData.rooms && row.rooms) invoiceData.rooms = row.rooms;

@@ -36,13 +36,16 @@ assert(builder.includes('data-divider-label="add-singular"'), 'quote builder too
 assert(builder.includes('data-divider-label="bottom-nav-plural"'), 'quote builder mobile nav should render dynamic plural divider wording');
 assert(builder.includes("const emptyHeading = 'No ' + dividerLabels.pluralLower + ' yet'"), 'quote builder empty state should use dynamic divider wording');
 assert(builder.includes("const emptyButton = 'Add Your First ' + dividerLabels.singular"), 'quote builder empty action should use dynamic divider wording');
+assert(builder.includes("const addAnotherRoomLabel = 'Add Another ' + dividerLabels.singular"), 'quote builder bottom add-another action should use dynamic divider wording');
 
 assert(quoteViewer.includes('function getQuoteDividerLabels'), 'interactive quote viewer should read divider labels from quote preferences');
 assert(quoteViewer.includes('data-divider-label="find-singular"'), 'interactive quote viewer room finder should use dynamic divider wording');
 assert(quoteViewer.includes('getQuoteRoomOptionPlaceholder'), 'interactive quote viewer should use a dynamic room picker placeholder');
+assert(quoteViewer.includes('getQuoteDividerLabelSources'), 'interactive quote viewer should read divider labels from quote data and the loaded row');
 
 assert(invoiceViewer.includes('function getQuoteDividerLabels'), 'invoice viewer should read divider labels from quote preferences');
 assert(invoiceViewer.includes('data-divider-label="find-singular"'), 'invoice viewer room finder should use dynamic divider wording');
 assert(invoiceViewer.includes('getQuoteRoomOptionPlaceholder'), 'invoice viewer should use a dynamic room picker placeholder');
+assert(invoiceViewer.includes('getInvoiceDividerLabelSources'), 'invoice viewer should read divider labels from invoice data and the loaded row');
 
 console.log('quote-divider-wording-static.test.js passed');
