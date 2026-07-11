@@ -4126,6 +4126,114 @@ function renderBusinessInsights(quotes) {
             window._portalAssignSelectedClient = client;
         }
 
+        function normalizeDashboardQuoteDividerLabel(value, fallback) {
+            var cleaned = String(value || '').trim().replace(/\s+/g, ' ');
+            return cleaned || fallback;
+        }
+
+        function dashboardQuoteDividerPresetMap() {
+            return {
+                room: { singular: 'Room', plural: 'Rooms' },
+                area: { singular: 'Area', plural: 'Areas' },
+                project: { singular: 'Project', plural: 'Projects' },
+                phase: { singular: 'Phase', plural: 'Phases' },
+                section: { singular: 'Section', plural: 'Sections' }
+            };
+        }
+
+        function getDashboardQuoteDividerPresetValue(singular, plural) {
+            var presets = dashboardQuoteDividerPresetMap();
+            var s = normalizeDashboardQuoteDividerLabel(singular, 'Room').toLowerCase();
+            var p = normalizeDashboardQuoteDividerLabel(plural, 'Rooms').toLowerCase();
+            for (var key in presets) {
+                if (presets[key].singular.toLowerCase() === s && presets[key].plural.toLowerCase() === p) return key;
+            }
+            return 'custom';
+        }
+
+        function getDashboardQuoteDividerPrefs() {
+            var prefs = {};
+            try { prefs = JSON.parse(localStorage.getItem('ald_quote_prefs') || '{}') || {}; } catch(e) {}
+            var singular = normalizeDashboardQuoteDividerLabel(prefs.dividerSingular, 'Room');
+            var plural = normalizeDashboardQuoteDividerLabel(prefs.dividerPlural, singular === 'Room' ? 'Rooms' : singular + 's');
+            return {
+                dividerPromptMode: prefs.dividerPromptMode || 'default',
+                singular: singular,
+                plural: plural
+            };
+        }
+
+        function setQuoteDividerPromptFields(singular, plural) {
+            var singularEl = document.getElementById('quoteDividerPromptSingular');
+            var pluralEl = document.getElementById('quoteDividerPromptPlural');
+            if (singularEl) singularEl.value = normalizeDashboardQuoteDividerLabel(singular, 'Room');
+            if (pluralEl) pluralEl.value = normalizeDashboardQuoteDividerLabel(plural, 'Rooms');
+            updateQuoteDividerPromptPresetFromFields();
+        }
+
+        function applyQuoteDividerPromptPreset() {
+            var presetEl = document.getElementById('quoteDividerPromptPreset');
+            if (!presetEl || presetEl.value === 'custom') return;
+            var preset = dashboardQuoteDividerPresetMap()[presetEl.value] || dashboardQuoteDividerPresetMap().room;
+            setQuoteDividerPromptFields(preset.singular, preset.plural);
+            presetEl.value = getDashboardQuoteDividerPresetValue(preset.singular, preset.plural);
+        }
+
+        function updateQuoteDividerPromptPresetFromFields() {
+            var presetEl = document.getElementById('quoteDividerPromptPreset');
+            if (!presetEl) return;
+            var singular = document.getElementById('quoteDividerPromptSingular') ? document.getElementById('quoteDividerPromptSingular').value : '';
+            var plural = document.getElementById('quoteDividerPromptPlural') ? document.getElementById('quoteDividerPromptPlural').value : '';
+            presetEl.value = getDashboardQuoteDividerPresetValue(singular, plural);
+        }
+
+        function askQuoteDividerForNewQuote() {
+            var prefs = getDashboardQuoteDividerPrefs();
+            if (prefs.dividerPromptMode === 'ask') {
+                return new Promise(function(resolve) {
+                    var modalEl = document.getElementById('quoteDividerPromptModal');
+                    var errorEl = document.getElementById('quoteDividerPromptError');
+                    if (!modalEl || !window.bootstrap) {
+                        resolve({ singular: prefs.singular, plural: prefs.plural });
+                        return;
+                    }
+                    window._quoteDividerPromptResolve = resolve;
+                    if (errorEl) errorEl.textContent = '';
+                    setQuoteDividerPromptFields(prefs.singular, prefs.plural);
+                    var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                    modal.show();
+                    setTimeout(function() {
+                        var singularEl = document.getElementById('quoteDividerPromptSingular');
+                        if (singularEl) singularEl.focus();
+                    }, 250);
+                });
+            }
+            return Promise.resolve({ singular: prefs.singular, plural: prefs.plural });
+        }
+
+        function confirmQuoteDividerPrompt() {
+            var singular = normalizeDashboardQuoteDividerLabel(document.getElementById('quoteDividerPromptSingular') ? document.getElementById('quoteDividerPromptSingular').value : '', '');
+            var plural = normalizeDashboardQuoteDividerLabel(document.getElementById('quoteDividerPromptPlural') ? document.getElementById('quoteDividerPromptPlural').value : '', '');
+            var errorEl = document.getElementById('quoteDividerPromptError');
+            if (!singular || !plural) {
+                if (errorEl) errorEl.textContent = 'Enter both singular and plural wording.';
+                return;
+            }
+            var modalEl = document.getElementById('quoteDividerPromptModal');
+            if (modalEl && window.bootstrap) bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+            var resolve = window._quoteDividerPromptResolve;
+            window._quoteDividerPromptResolve = null;
+            if (resolve) resolve({ singular: singular, plural: plural });
+        }
+
+        function cancelQuoteDividerPrompt() {
+            var modalEl = document.getElementById('quoteDividerPromptModal');
+            if (modalEl && window.bootstrap) bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+            var resolve = window._quoteDividerPromptResolve;
+            window._quoteDividerPromptResolve = null;
+            if (resolve) resolve(null);
+        }
+
         function openNewQuoteModal() {
             document.getElementById('newQuoteClientName').value = '';
             document.getElementById('newQuoteAddress').value = '';
@@ -4190,6 +4298,12 @@ function renderBusinessInsights(quotes) {
                 document.getElementById('newQuoteNumber').focus();
                 return;
             }
+            var dividerLabels = await askQuoteDividerForNewQuote();
+            if (!dividerLabels) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-arrow-right me-1"></i>Create & Open Builder';
+                return;
+            }
 
             try {
                 var result = await saveQuoteToSupabase({
@@ -4200,10 +4314,12 @@ function renderBusinessInsights(quotes) {
                     quoteNumber: quoteNum,
                     quoteTitle: quoteTitle,
                     title: quoteTitle,
+                    dividerSingular: dividerLabels.singular,
+                    dividerPlural: dividerLabels.plural,
                     rooms: [],
                     grandTotal: 0,
                     status: 'draft',
-                    data: { clientName: clientName, clientEmail: clientEmail, clientPhone: clientPhone, projectAddress: address, quoteNumber: quoteNum, quoteTitle: quoteTitle, title: quoteTitle, rooms: [] }
+                    data: { clientName: clientName, clientEmail: clientEmail, clientPhone: clientPhone, projectAddress: address, quoteNumber: quoteNum, quoteTitle: quoteTitle, title: quoteTitle, dividerSingular: dividerLabels.singular, dividerPlural: dividerLabels.plural, quoteDividerLabels: { singular: dividerLabels.singular, plural: dividerLabels.plural }, rooms: [] }
                 });
 
                 if (result.error) throw new Error(result.error.message || 'Save failed');
@@ -4501,6 +4617,47 @@ function renderBusinessInsights(quotes) {
           <button class="btn btn-primary" onclick="copyPortalBoth()"><i class="fas fa-copy me-1"></i>Copy Link</button>
           <button class="btn btn-outline-secondary btn-sm" onclick="resetPortalPin()"><i class="fas fa-sync me-1"></i>Reset PIN (generate new)</button>
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Quote Divider Wording Prompt Modal -->
+<div class="modal fade" id="quoteDividerPromptModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#1a56a0; color:white;">
+        <h5 class="modal-title"><i class="fas fa-tags me-2"></i>Quote Divider Wording</h5>
+        <button type="button" class="btn-close btn-close-white" onclick="cancelQuoteDividerPrompt()"></button>
+      </div>
+      <div class="modal-body">
+        <p class="fw-semibold mb-3">What should the quote divider wording be for this quote?</p>
+        <div class="mb-3">
+          <label class="form-label small text-muted" for="quoteDividerPromptPreset">Preset</label>
+          <select class="form-select" id="quoteDividerPromptPreset" onchange="applyQuoteDividerPromptPreset()">
+            <option value="room">Room / Rooms</option>
+            <option value="area">Area / Areas</option>
+            <option value="project">Project / Projects</option>
+            <option value="phase">Phase / Phases</option>
+            <option value="section">Section / Sections</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label small text-muted" for="quoteDividerPromptSingular">Singular label</label>
+            <input type="text" class="form-control" id="quoteDividerPromptSingular" placeholder="Room" oninput="updateQuoteDividerPromptPresetFromFields()">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small text-muted" for="quoteDividerPromptPlural">Plural label</label>
+            <input type="text" class="form-control" id="quoteDividerPromptPlural" placeholder="Rooms" oninput="updateQuoteDividerPromptPresetFromFields()">
+          </div>
+        </div>
+        <div id="quoteDividerPromptError" class="text-danger small mt-2" style="min-height:1.2rem;"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" onclick="cancelQuoteDividerPrompt()">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="confirmQuoteDividerPrompt()">Use This Wording</button>
       </div>
     </div>
   </div>

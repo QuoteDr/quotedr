@@ -573,6 +573,32 @@ if (location.search.includes('debug')) {
 						<label class="form-check-label" for="showPrefix">Show prefix in quotes</label>
 					</div>
 				</div>
+				<div class="col-12">
+					<label class="form-label fw-bold" for="quoteDividerPreset">Quote Divider Wording</label>
+					<div class="row g-2 align-items-end">
+						<div class="col-md-4">
+							<label class="form-label small text-muted" for="quoteDividerPreset">Preset</label>
+							<select class="form-select" id="quoteDividerPreset" onchange="applyQuoteDividerPreset()">
+								<option value="room">Room / Rooms</option>
+								<option value="area">Area / Areas</option>
+								<option value="project">Project / Projects</option>
+								<option value="phase">Phase / Phases</option>
+								<option value="section">Section / Sections</option>
+								<option value="ask">Ask Every Time</option>
+								<option value="custom">Custom</option>
+							</select>
+						</div>
+						<div class="col-md-4">
+							<label class="form-label small text-muted" for="quoteDividerSingular">Singular label</label>
+							<input type="text" class="form-control" id="quoteDividerSingular" placeholder="Room" oninput="updateQuoteDividerPresetFromFields()">
+						</div>
+						<div class="col-md-4">
+							<label class="form-label small text-muted" for="quoteDividerPlural">Plural label</label>
+							<input type="text" class="form-control" id="quoteDividerPlural" placeholder="Rooms" oninput="updateQuoteDividerPresetFromFields()">
+						</div>
+					</div>
+					<div class="form-text">Controls labels like Add Room, Find Room, and the mobile Rooms tab. Existing quote data is unchanged.</div>
+				</div>
 			</div>
 				<div class="row g-3 mt-2">
 					<div class="col-sm-6">
@@ -2243,7 +2269,7 @@ Sarah Jones, 905-555-5678"></textarea>
 		// ── Settings Search ──────────────────────────────────────────────────
 		var settingsIndex = [
 			{ tab: 'business', keywords: ['business','company','name','logo','phone','email','address','hst','tagline','owner','city','province','postal'], label: 'Business Profile' },
-			{ tab: 'quotes', keywords: ['quote','prefix','tax','valid','expiry','markup','terms','conditions','heading','number','send','client view','message','deposit','commitment','units','measurement','metric','imperial','feet','inches','meters'], label: 'Quote Preferences & Send Settings' },
+			{ tab: 'quotes', keywords: ['quote','prefix','tax','valid','expiry','markup','terms','conditions','heading','number','send','client view','message','deposit','commitment','units','measurement','metric','imperial','feet','inches','meters','divider','wording','room','area','project','phase','section'], label: 'Quote Preferences & Send Settings' },
 			{ tab: 'pricing', keywords: ['pricing','items','materials','import','export','ai','csv','custom','clients','quickbooks'], label: 'Pricing & Data' },
 			{ tab: 'notifications', keywords: ['email','reminder','followup','follow-up','notification','auto','automatic','days','message'], label: 'Notifications & Reminders' },
 			{ tab: 'feedback', keywords: ['bug','report','feature','request','feedback','idea','problem','issue','broken'], label: 'Feedback & Bug Reports' },
@@ -2479,6 +2505,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			if (document.getElementById('taxEnabledDefault')) document.getElementById('taxEnabledDefault').checked = savedPrefs.taxEnabledDefault !== false;
 			if (document.getElementById('currencySetting') && savedPrefs.currency) document.getElementById('currencySetting').value = savedPrefs.currency;
 			if (document.getElementById('measurementSystemSetting')) document.getElementById('measurementSystemSetting').value = savedPrefs.measurementSystem === 'metric' ? 'metric' : 'imperial';
+			loadQuoteDividerPrefs(savedPrefs);
 			loadEmailTemplate();
 		});
 
@@ -2866,6 +2893,58 @@ Sarah Jones, 905-555-5678"></textarea>
 			}
 		}
 
+		function normalizeQuoteDividerLabel(value, fallback) {
+			var cleaned = String(value || '').trim().replace(/\s+/g, ' ');
+			return cleaned || fallback;
+		}
+
+		function quoteDividerPresetMap() {
+			return {
+				room: { singular: 'Room', plural: 'Rooms' },
+				area: { singular: 'Area', plural: 'Areas' },
+				project: { singular: 'Project', plural: 'Projects' },
+				phase: { singular: 'Phase', plural: 'Phases' },
+				section: { singular: 'Section', plural: 'Sections' }
+			};
+		}
+
+		function getQuoteDividerPresetValue(singular, plural) {
+			var presets = quoteDividerPresetMap();
+			var normalizedSingular = normalizeQuoteDividerLabel(singular, 'Room').toLowerCase();
+			var normalizedPlural = normalizeQuoteDividerLabel(plural, 'Rooms').toLowerCase();
+			for (var key in presets) {
+				if (presets[key].singular.toLowerCase() === normalizedSingular && presets[key].plural.toLowerCase() === normalizedPlural) {
+					return key;
+				}
+			}
+			return 'custom';
+		}
+
+		function applyQuoteDividerPreset() {
+			var presetEl = document.getElementById('quoteDividerPreset');
+			if (!presetEl || presetEl.value === 'custom' || presetEl.value === 'ask') return;
+			var preset = quoteDividerPresetMap()[presetEl.value] || quoteDividerPresetMap().room;
+			if (document.getElementById('quoteDividerSingular')) document.getElementById('quoteDividerSingular').value = preset.singular;
+			if (document.getElementById('quoteDividerPlural')) document.getElementById('quoteDividerPlural').value = preset.plural;
+		}
+
+		function updateQuoteDividerPresetFromFields() {
+			var presetEl = document.getElementById('quoteDividerPreset');
+			if (!presetEl) return;
+			if (presetEl.value === 'ask') return;
+			var singular = document.getElementById('quoteDividerSingular') ? document.getElementById('quoteDividerSingular').value : '';
+			var plural = document.getElementById('quoteDividerPlural') ? document.getElementById('quoteDividerPlural').value : '';
+			presetEl.value = getQuoteDividerPresetValue(singular, plural);
+		}
+
+		function loadQuoteDividerPrefs(savedPrefs) {
+			var singular = normalizeQuoteDividerLabel(savedPrefs && savedPrefs.dividerSingular, 'Room');
+			var plural = normalizeQuoteDividerLabel(savedPrefs && savedPrefs.dividerPlural, 'Rooms');
+			if (document.getElementById('quoteDividerSingular')) document.getElementById('quoteDividerSingular').value = singular;
+			if (document.getElementById('quoteDividerPlural')) document.getElementById('quoteDividerPlural').value = plural;
+			if (document.getElementById('quoteDividerPreset')) document.getElementById('quoteDividerPreset').value = (savedPrefs && savedPrefs.dividerPromptMode === 'ask') ? 'ask' : getQuoteDividerPresetValue(singular, plural);
+		}
+
 		function saveQuotePrefs() {
 			var prefs = {
 				heading: document.getElementById('quoteHeading').value.trim() || 'Your Quote',
@@ -2875,7 +2954,10 @@ Sarah Jones, 905-555-5678"></textarea>
 				taxLabel: document.getElementById('taxLabel') ? document.getElementById('taxLabel').value.trim() || 'HST' : 'HST',
 				taxEnabledDefault: document.getElementById('taxEnabledDefault') ? document.getElementById('taxEnabledDefault').checked : true,
 				currency: document.getElementById('currencySetting') ? document.getElementById('currencySetting').value : 'CAD',
-				measurementSystem: document.getElementById('measurementSystemSetting') ? document.getElementById('measurementSystemSetting').value : 'imperial'
+				measurementSystem: document.getElementById('measurementSystemSetting') ? document.getElementById('measurementSystemSetting').value : 'imperial',
+				dividerPromptMode: (document.getElementById('quoteDividerPreset') && document.getElementById('quoteDividerPreset').value === 'ask') ? 'ask' : 'default',
+				dividerSingular: normalizeQuoteDividerLabel(document.getElementById('quoteDividerSingular') ? document.getElementById('quoteDividerSingular').value : '', 'Room'),
+				dividerPlural: normalizeQuoteDividerLabel(document.getElementById('quoteDividerPlural') ? document.getElementById('quoteDividerPlural').value : '', 'Rooms')
 			};
 			localStorage.setItem('ald_quote_prefs', JSON.stringify(prefs));
 			

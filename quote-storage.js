@@ -245,6 +245,7 @@
             var status = statusEl ? statusEl.value : (isChangeOrder ? 'draft' : 'draft');
             var supabaseId = window._supabaseQuoteId || null;
             var loadedData = window._loadedQuoteData || window._currentQuoteData || {};
+            var dividerLabels = (typeof getQuoteDividerLabels === 'function') ? getQuoteDividerLabels() : { singular: 'Room', plural: 'Rooms' };
             if (isChangeOrder && supabaseId && window._parentQuoteId && supabaseId === window._parentQuoteId) {
                 supabaseId = null;
             }
@@ -270,6 +271,9 @@
                 clientEmail:    document.getElementById('clientEmail')?.value    || '',
                 terms: getSelectedTerms(),
                 termsExplicit: true,
+                dividerSingular: dividerLabels.singular,
+                dividerPlural: dividerLabels.plural,
+                quoteDividerLabels: { singular: dividerLabels.singular, plural: dividerLabels.plural },
                 rooms: sanitizeQuoteRoomsForSave(rooms),
                 categoryStyles: JSON.parse(JSON.stringify(categoryStyles || {})),
                 roomCounter: roomCounter,

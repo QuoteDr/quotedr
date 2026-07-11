@@ -592,7 +592,7 @@ if (location.search.includes('debug')) {
         </div>
 
         <div class="invoice-room-locator d-print-none" id="invoiceRoomLocatorWrap" style="display:none;">
-            <div class="invoice-room-locator-label"><i class="fas fa-location-dot me-1"></i>Find Room</div>
+            <div class="invoice-room-locator-label"><i class="fas fa-location-dot me-1"></i><span data-divider-label="find-singular">Find Room</span></div>
             <select class="form-select" id="invoiceRoomLocatorSelect" onchange="jumpToInvoiceRoom(this.value)">
                 <option value="">Choose a room...</option>
             </select>
@@ -1087,19 +1087,53 @@ if (location.search.includes('debug')) {
             return 'invoiceRoom_' + roomIndex;
         }
 
+        function normalizeQuoteDividerLabel(value, fallback) {
+            var cleaned = String(value || '').trim().replace(/\s+/g, ' ');
+            return cleaned || fallback;
+        }
+
+        function getQuoteDividerLabels() {
+            var prefs = {};
+            try { prefs = JSON.parse(localStorage.getItem('ald_quote_prefs') || '{}') || {}; } catch(e) {}
+            var data = invoiceData || {};
+            var singular = normalizeQuoteDividerLabel(
+                data.dividerSingular || data.quoteDividerSingular || (data.quoteDividerLabels && data.quoteDividerLabels.singular) || prefs.dividerSingular,
+                'Room'
+            );
+            var plural = normalizeQuoteDividerLabel(
+                data.dividerPlural || data.quoteDividerPlural || (data.quoteDividerLabels && data.quoteDividerLabels.plural) || prefs.dividerPlural,
+                singular === 'Room' ? 'Rooms' : singular + 's'
+            );
+            return { singular: singular, plural: plural, singularLower: singular.toLowerCase(), pluralLower: plural.toLowerCase() };
+        }
+
+        function getQuoteRoomOptionPlaceholder() {
+            var labels = getQuoteDividerLabels();
+            return 'Choose a ' + labels.singularLower + '...';
+        }
+
+        function updateQuoteDividerLabels() {
+            var labels = getQuoteDividerLabels();
+            document.querySelectorAll('[data-divider-label]').forEach(function(el) {
+                if (el.getAttribute('data-divider-label') === 'find-singular') el.textContent = 'Find ' + labels.singular;
+            });
+        }
+
         function updateInvoiceRoomLocator() {
             var wrap = document.getElementById('invoiceRoomLocatorWrap');
             var select = document.getElementById('invoiceRoomLocatorSelect');
             if (!wrap || !select) return;
+            updateQuoteDividerLabels();
+            var placeholder = escapeHtml(getQuoteRoomOptionPlaceholder());
             var rooms = Array.isArray(invoiceData && invoiceData.rooms) ? invoiceData.rooms : [];
             if (!rooms.length) {
                 wrap.style.display = 'none';
-                select.innerHTML = '<option value="">Choose a room...</option>';
+                select.innerHTML = '<option value="">' + placeholder + '</option>';
                 updateInvoiceStickyNav();
                 return;
             }
-            select.innerHTML = '<option value="">Choose a room...</option>' + rooms.map(function(room, idx) {
-                var name = escapeHtml(room && room.name ? room.name : 'Room ' + (idx + 1));
+            select.innerHTML = '<option value="">' + placeholder + '</option>' + rooms.map(function(room, idx) {
+                var name = escapeHtml(room && room.name ? room.name : getQuoteDividerLabels().singular + ' ' + (idx + 1));
                 return '<option value="' + invoiceRoomAnchorId(idx) + '">' + name + '</option>';
             }).join('');
             wrap.style.display = '';
