@@ -914,12 +914,15 @@
             try {
                 await initStyleModal();
                 var viewerUrl = await createInteractiveQuoteLink();
+                var previewUrl = new URL(viewerUrl, window.location.href);
+                previewUrl.searchParams.set('preview', '1');
+                previewUrl.searchParams.set('admin_preview', '1');
                 if (typeof saveSessionQuote === 'function') saveSessionQuote();
                 if (saveStatus) saveStatus.innerHTML = '<span style="color:green;"><i class="fas fa-check"></i> Opening preview...</span>';
                 if (typeof qdToast === 'function') {
                     qdToast({ title: 'Preview Ready', message: 'Opening the client quote view.', type: 'success' });
                 }
-                window.location.href = viewerUrl;
+                window.location.href = previewUrl.toString();
             } catch(err) {
                 console.error('Failed to preview quote:', err);
                 alert('Failed to prepare quote preview: ' + (err.message || err));

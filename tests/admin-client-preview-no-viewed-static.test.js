@@ -4,6 +4,7 @@ const assert = require('assert');
 const dashboard = fs.readFileSync('dashboard.html', 'utf8');
 const portal = fs.readFileSync('client-portal.html', 'utf8');
 const viewer = fs.readFileSync('interactive-quote-viewer.html', 'utf8');
+const quoteStyle = fs.readFileSync('quote-style.js', 'utf8');
 
 assert(
   dashboard.includes("url.searchParams.set('preview', '1')") &&
@@ -15,6 +16,11 @@ assert(
   portal.includes('portalPreviewQuerySuffix') &&
     portal.includes("requestedAdminView ? '&preview=1&admin_preview=1' : ''"),
   'Admin portal document links should carry contractor preview flags'
+);
+
+assert(
+  /function previewInteractiveQuote\(\)[\s\S]*previewUrl\.searchParams\.set\('preview', '1'\)[\s\S]*previewUrl\.searchParams\.set\('admin_preview', '1'\)[\s\S]*window\.location\.href = previewUrl\.toString\(\)/.test(quoteStyle),
+  'Quote builder Preview Quote should open with contractor preview flags so it does not trigger client-view alerts'
 );
 
 assert(
@@ -38,7 +44,7 @@ assert(
 assert(
   viewer.includes('function showContractorPreviewSignBlockedMessage()') &&
     /You cannot sign this for the client/i.test(viewer) &&
-    /function handleMainAction\(\)[\s\S]*if\s*\(isContractorPreviewView\(\)\)\s*\{[\s\S]*showContractorPreviewSignBlockedMessage\(\);[\s\S]*return;/.test(viewer),
+    /function handleMainAction\([^)]*\)[\s\S]*if\s*\(isContractorPreviewView\(\)\)\s*\{[\s\S]*showContractorPreviewSignBlockedMessage\(\);[\s\S]*return;/.test(viewer),
   'Interactive quote viewer should block contractor previews from signing for the client'
 );
 
