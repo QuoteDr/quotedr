@@ -6867,7 +6867,8 @@ Example:
             if (typeof customItems === 'object' && typeof _injectItemsIntoPricingDB === 'function') {
                 _injectItemsIntoPricingDB(customItems);
             }
-            const modal = new bootstrap.Modal(document.getElementById('addLineModal'));
+            const modalEl = document.getElementById('addLineModal');
+            const modal = new bootstrap.Modal(modalEl);
 
             // Reset form fields
             document.getElementById('lineDescription').value = '';
@@ -6893,6 +6894,11 @@ Example:
             clearAddLineItemValidation();
             // Don't call updatePricingOptions() here - let user pick category first
 
+            modalEl.addEventListener('shown.bs.modal', function focusLineItemQuickSearch() {
+                const quickSearch = document.getElementById('itemQuickSearch');
+                if (quickSearch) quickSearch.focus();
+                modalEl.removeEventListener('shown.bs.modal', focusLineItemQuickSearch);
+            });
             modal.show();
             if (typeof window.notifyBuilderGuideAddLineModalOpened === 'function') {
                 window.notifyBuilderGuideAddLineModalOpened();

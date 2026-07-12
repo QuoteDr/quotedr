@@ -16,3 +16,10 @@ assert(
     source.includes("tagName === 'TEXTAREA'"),
   'Shared Enter submit helper should keep textarea Enter behavior intact'
 );
+
+assert(
+  source.includes("modalEl.addEventListener('shown.bs.modal', function focusLineItemQuickSearch()") &&
+    source.includes("document.getElementById('itemQuickSearch')") &&
+    source.includes('quickSearch.focus()'),
+  'Opening Add Line Item should focus Quick Search after the modal is ready for keyboard input'
+);
