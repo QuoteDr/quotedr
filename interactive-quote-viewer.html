@@ -1020,6 +1020,39 @@
         .quote-upgrade-option-btn.is-selected i {
             transform: scale(1.08);
         }
+        .viewer-line-title-actions {
+            margin-top: 0.2rem;
+            line-height: 1;
+        }
+        .viewer-line-title-actions .viewer-photo-btn,
+        .viewer-choice-option-photo-actions .viewer-photo-btn {
+            margin-top: 0 !important;
+        }
+        .viewer-choice-option-photo-actions {
+            position: relative;
+            z-index: 2;
+            margin-top: 0.35rem;
+            margin-bottom: 0.8rem;
+            padding-left: 0.15rem;
+        }
+        .choice-option-with-photo {
+            position: relative;
+        }
+        .choice-option-with-photo .choice-option-btn {
+            padding-top: 2.15rem;
+        }
+        .choice-option-with-photo .viewer-choice-option-photo-actions {
+            position: absolute;
+            top: 0.45rem;
+            left: 0.75rem;
+            margin: 0;
+            padding: 0;
+        }
+        .choice-option-with-photo .viewer-photo-btn {
+            background: #ffffff;
+            border-color: rgba(71, 85, 105, 0.5);
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+        }
         .quote-upgrade-description-toggle:hover {
             color: var(--quote-upgrade-accent, #0d9488) !important;
         }
@@ -3349,11 +3382,11 @@ if (location.search.includes('debug')) {
                 var optionQty = option.quantityMode === 'override' ? (parseFloat(option.quantityOverride) || 0) : (parseFloat(item.quantity) || 0);
                 var optionTotal = optionQty * (parseFloat(option.rate) || 0);
                 var optionArg = JSON.stringify(option.id || '').replace(/"/g, '&quot;');
-                html += '<div class="col-md-6"><button type="button" class="w-100 text-start btn choice-option-btn ' + (checked ? 'choice-option-selected' : '') + '" ' + (isSignedDiff ? 'disabled' : 'onclick="toggleViewerChoiceOption(' + roomIdx + ',' + itemIndex + ',' + optionArg + ')"') + '>';
+                html += '<div class="col-md-6' + (!isSignedDiff && option.photo ? ' choice-option-with-photo' : '') + '"><button type="button" class="w-100 text-start btn choice-option-btn ' + (checked ? 'choice-option-selected' : '') + '" ' + (isSignedDiff ? 'disabled' : 'onclick="toggleViewerChoiceOption(' + roomIdx + ',' + itemIndex + ',' + optionArg + ')"') + '>';
                 html += '<div class="d-flex justify-content-between gap-2"><span><i class="fas ' + (checked ? 'fa-check-circle' : 'fa-circle') + ' me-1"></i>' + escapeHtml(option.name) + '</span><strong>' + viewerMoney(optionTotal) + '</strong></div>';
                 if (option.itemDescription || option.description) html += '<div class="small opacity-75 mt-1">' + escapeHtml(option.itemDescription || option.description) + '</div>';
                 html += '<div class="small opacity-75 mt-1">' + optionQty + ' ' + escapeHtml(option.unitType || item.unitType || '') + ' @ ' + viewerMoney(option.rate) + '</div>';
-                html += '</button>' + (!isSignedDiff && option.photo ? renderViewerPhotoButton(option.photo, 'Picture', 'btn-outline-secondary') : '') + '</div>';
+                html += '</button>' + (!isSignedDiff && option.photo ? '<div class="viewer-choice-option-photo-actions">' + renderViewerPhotoButton(option.photo, 'Picture', 'btn-outline-secondary') + '</div>' : '') + '</div>';
             });
             html += '</div>';
             html += renderViewerChoiceGroupEnhancements(roomIdx, itemIndex, item, isSignedDiff);
@@ -3385,11 +3418,11 @@ if (location.search.includes('debug')) {
                     var total = qty * viewerNumber(option.rate);
                     var groupArg = JSON.stringify(enhGroup.id || '').replace(/"/g, '&quot;');
                     var optionArg = JSON.stringify(option.id || '').replace(/"/g, '&quot;');
-                    html += '<div class="col-md-6"><button type="button" class="w-100 text-start btn choice-option-btn ' + (checked ? 'choice-option-selected' : '') + '" ' + (isSignedDiff ? 'disabled' : 'onclick="toggleViewerChoiceGroupEnhancement(' + roomIdx + ',' + itemIndex + ',' + groupArg + ',' + optionArg + ')"') + '>';
+                    html += '<div class="col-md-6' + (!isSignedDiff && option.photo ? ' choice-option-with-photo' : '') + '"><button type="button" class="w-100 text-start btn choice-option-btn ' + (checked ? 'choice-option-selected' : '') + '" ' + (isSignedDiff ? 'disabled' : 'onclick="toggleViewerChoiceGroupEnhancement(' + roomIdx + ',' + itemIndex + ',' + groupArg + ',' + optionArg + ')"') + '>';
                     html += '<div class="d-flex justify-content-between gap-2"><span><i class="fas ' + (checked ? 'fa-check-circle' : 'fa-circle') + ' me-1"></i>' + escapeHtml(option.name) + '</span><strong>' + viewerMoney(total, { forceSign: option.upgradeType !== 'replacement' }) + '</strong></div>';
                     if (option.itemDescription || option.description) html += '<div class="small opacity-75 mt-1">' + escapeHtml(option.itemDescription || option.description) + '</div>';
                     html += '<div class="small opacity-75 mt-1">' + escapeHtml(option.upgradeType === 'replacement' ? 'Replacement' : 'Add-on') + '</div>';
-                    html += '</button>' + (!isSignedDiff && option.photo ? renderViewerPhotoButton(option.photo, 'Picture', 'btn-outline-secondary') : '') + '</div>';
+                    html += '</button>' + (!isSignedDiff && option.photo ? '<div class="viewer-choice-option-photo-actions">' + renderViewerPhotoButton(option.photo, 'Picture', 'btn-outline-secondary') + '</div>' : '') + '</div>';
                 });
                 html += '</div></div>';
             });
@@ -3889,6 +3922,7 @@ if (location.search.includes('debug')) {
                                     ${isChangeOrder && coStatus === 'added' ? '<span class="badge bg-success ms-2">Added</span>' : ''}
                                     ${isChangeOrder && coStatus === 'removed' ? '<span class="badge bg-danger ms-2">Removed</span>' : ''}
                                     ${isOptional && !isSignedDiff ? '<span class="badge bg-info ms-2" style="font-size:0.65em;">Optional</span>' : ''}
+                                    ${lineItemPhotoButton ? `<div class="viewer-line-photo-actions viewer-line-title-actions">${lineItemPhotoButton}</div>` : ''}
                                 </div>
                                 <div style="text-align:right; min-width:140px; padding-left:16px;">
                                     <div>${coCanExplain ? `<button type="button" class="viewer-change-order-total-btn" onclick="toggleViewerChangeOrderExplanation(${roomIdx}, ${itemIndex})">${viewerMoney(itemTotal)}</button>` : `<strong>${viewerMoney(itemTotal)}</strong>`}</div>
@@ -3896,7 +3930,6 @@ if (location.search.includes('debug')) {
                                     ${qvDiscountDetailsHtml(item)}
                                 </div>
                             </div>
-                            ${lineItemPhotoButton ? `<div class="viewer-line-photo-actions mb-1">${lineItemPhotoButton}</div>` : ''}
                             ${coCanExplain ? `<div class="viewer-change-order-note" id="co_note_${roomIdx}_${itemIndex}"><i class="fas fa-circle-info me-1"></i>${escapeHtml(coExplanation)}</div>` : ''}
                             ${renderExpandableDescription(displayDesc, `itemdesc_${roomIdx}_${itemIndex}`)}
                             ${hasUpgradeGroups ? renderViewerItemUpgradeGroups(roomIdx, itemIndex, item, isSignedDiff) : ''}

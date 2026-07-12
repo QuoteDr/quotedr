@@ -60,6 +60,9 @@ assert(viewer.includes('Upgrade Picture'), 'Client viewer should label upgrade o
 assert(viewer.includes('function normalizeViewerPhotoList'), 'Client viewer should normalize multi-photo arrays with legacy single-photo fallback');
 assert(viewer.includes('viewerPhotoRegistry[key] = photos'), 'Client viewer photo registry should store photo arrays for lightbox navigation');
 assert(viewer.includes('viewer-line-photo-actions'), 'Client viewer should render line item photo buttons in a separate action row');
+assert(viewer.includes('viewer-line-title-actions'), 'Client viewer should place standard line item photo buttons beside the line item title area');
+assert(viewer.includes('viewer-choice-option-photo-actions'), 'Client viewer should give choice option photo buttons a protected action row before upgrade panels');
+assert(viewer.includes('choice-option-with-photo'), 'Client viewer should position choice option photo buttons inside the option card area instead of below the card');
 assert(viewer.includes('function showViewerPhotoAt'), 'Client viewer lightbox should support switching between registered photos');
 assert(viewer.includes('viewerPhotoLightboxPrev'), 'Client viewer lightbox should render a previous-photo control');
 assert(viewer.includes('viewerPhotoLightboxNext'), 'Client viewer lightbox should render a next-photo control');
