@@ -15,13 +15,17 @@ assert(
 
 assert(
   items.includes('class="upgrade-photo-value"') &&
-    items.includes("photo: optionEl.querySelector('.upgrade-photo-value')?.value || ''"),
+    items.includes('class="upgrade-photos-value"') &&
+    items.includes('photo: upgradePhotos[0] ||') &&
+    items.includes('photos: upgradePhotos') &&
+    items.includes('photosFull: upgradePhotos.map'),
   'Upgrade option photos should persist through the manual upgrade editor collection path'
 );
 
 assert(
   items.includes('function syncManageUpgradePhotoFromDetails') &&
-    items.includes("hidden.value = photo || ''") &&
+    items.includes('hidden.value = photos[0] ||') &&
+    items.includes('photosHidden.value = JSON.stringify(photos)') &&
     items.includes('collectManageItemUpgradeGroups(detailsRow, true)') &&
     items.includes('upgradePhotoSyncedFromDetails'),
   'Upgrade photo uploads should update the open details editor before re-rendering'
@@ -33,6 +37,26 @@ assert(
     items.includes('data-upgrade-option-id') &&
     items.includes('upgrade-photo-remove-btn'),
   'Photos details should list upgrade options and attach add/remove controls to a specific option'
+);
+
+assert(
+  items.includes('function normalizeManageUpgradePhotos') &&
+    items.includes('function normalizeManageUpgradePhotosFull') &&
+    items.includes('upgrade-photos-value') &&
+    items.includes('upgrade-photos-full-value') &&
+    items.includes('data-photo-index="${index}"') &&
+    items.includes('Add Upgrade Photo') &&
+    items.includes('target.photos.length < MANAGE_ITEM_PHOTO_LIMIT'),
+  'Upgrade options should support up to three compressed and full-resolution photos'
+);
+
+assert(
+  items.includes('setManageUpgradeOptionPhoto(item, groupId, optionId, photo, photoIndex)') &&
+    items.includes('setManageUpgradeOptionPhotoFull(item, groupId, optionId, photoFull, photoIndex)') &&
+    items.includes('removeManageUpgradePhoto(cat, name, groupId, optionId, photoIndex)') &&
+    items.includes('normalizeManageUpgradePhotos(existingTarget.option)') &&
+    items.includes('normalizeManageUpgradePhotosFull(existingTarget.option)'),
+  'Upload and remove handlers should target a specific upgrade photo slot'
 );
 
 assert(

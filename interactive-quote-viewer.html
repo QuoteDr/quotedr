@@ -1375,6 +1375,7 @@ if (location.search.includes('debug')) {
                 <strong id="quoteTaxDisplay">$0.00</strong>
             </div>
             <div class="total-row" id="quotePaymentTotalDisplay" style="display:none;"></div>
+            <div class="alert alert-warning py-2 px-3 small mt-2 mb-0" id="quoteTbdDisplay" style="display:none;"></div>
             <div class="deposit-summary" id="depositSummary">
                 <div class="total-row py-0">
                     <span id="depositLabel">Deposit</span>
@@ -2067,11 +2068,13 @@ if (location.search.includes('debug')) {
         }
 
         function qvLineTotal(item) {
+            if (isViewerPriceTbd(item)) return 0;
             var discounts = qvDiscounts();
             return discounts.hasDiscount(item) ? discounts.chargedTotal(item) : viewerItemActiveTotal(item);
         }
 
         function qvLineRate(item) {
+            if (isViewerPriceTbd(item)) return 0;
             var discounts = qvDiscounts();
             return discounts.hasDiscount(item) ? discounts.activeRate(item) : viewerItemActiveRate(item);
         }
@@ -2396,17 +2399,24 @@ if (location.search.includes('debug')) {
 
         function normalizeViewerChoiceGroupEnhancementOption(option, groupIndex, optionIndex) {
             option = option || {};
+            var photos = normalizeViewerPhotoList(option.photos, option.photo);
+            var photosFull = normalizeViewerPhotoFullList(option.photosFull, option.photoFull);
+            var priceTbd = isViewerPriceTbd(option);
             return {
                 id: option.id || ('viewer_enh_' + groupIndex + '_' + optionIndex),
                 name: option.name || option.sourceItemName || option.description || 'Enhancement',
                 category: option.category || '',
                 sourceItemName: option.sourceItemName || option.name || '',
                 unitType: option.unitType || option.unit || '',
-                rate: viewerNumber(option.rate),
+                rate: priceTbd ? 0 : viewerNumber(option.rate),
                 materialCost: viewerNumber(option.materialCost),
+                priceTbd: isViewerPriceTbd(option),
+                pricingMode: priceTbd ? 'tbd' : 'fixed',
                 supplierUrl: option.supplierUrl || '',
-                photo: option.photo || '',
-                photoFull: option.photoFull || null,
+                photo: photos[0] || '',
+                photos: photos,
+                photoFull: photosFull[0] || null,
+                photosFull: photos.map(function(_photo, index) { return photosFull[index] || null; }),
                 description: option.description || option.itemDescription || option.name || '',
                 itemDescription: option.itemDescription || option.description || '',
                 upgradeType: option.upgradeType === 'replacement' ? 'replacement' : 'add_on',
@@ -2520,7 +2530,12 @@ if (location.search.includes('debug')) {
             var qty = parseFloat(item.quantity) || 0;
             var total = 0;
             var rateSum = 0;
+            var hasTbdSelections = false;
             selected.forEach(function(option) {
+                if (isViewerPriceTbd(option)) {
+                    hasTbdSelections = true;
+                    return;
+                }
                 var optionQty = option.quantityMode === 'override' ? (parseFloat(option.quantityOverride) || 0) : qty;
                 var rate = parseFloat(option.rate) || 0;
                 rateSum += rate;
@@ -2530,13 +2545,27 @@ if (location.search.includes('debug')) {
             var replacementOptions = selectedEnhancements.filter(function(option) { return option.upgradeType === 'replacement'; });
             var replacement = replacementOptions.length ? replacementOptions[replacementOptions.length - 1] : null;
             if (replacement) {
+                if (isViewerPriceTbd(replacement)) {
+                    hasTbdSelections = true;
+                    rateSum = 0;
+                    total = 0;
+                    item.priceTbd = true;
+                    item.pricingMode = 'tbd';
+                    item.photo = replacement.photo || item.photo || item._choiceGroupBasePhoto || '';
+                    item.photoFull = replacement.photoFull || item.photoFull || item._choiceGroupBasePhotoFull || null;
+                } else {
                 var replacementQty = replacement.quantityMode === 'override' ? (parseFloat(replacement.quantityOverride) || 0) : qty;
                 rateSum = viewerNumber(replacement.rate);
                 total = replacementQty * rateSum;
                 item.photo = replacement.photo || item.photo || item._choiceGroupBasePhoto || '';
                 item.photoFull = replacement.photoFull || item.photoFull || item._choiceGroupBasePhotoFull || null;
+                }
             }
             selectedEnhancements.filter(function(option) { return option.upgradeType !== 'replacement'; }).forEach(function(option) {
+                if (isViewerPriceTbd(option)) {
+                    hasTbdSelections = true;
+                    return;
+                }
                 var optionQty = option.quantityMode === 'override' ? (parseFloat(option.quantityOverride) || 0) : qty;
                 var rate = viewerNumber(option.rate);
                 rateSum += rate;
@@ -2545,6 +2574,16 @@ if (location.search.includes('debug')) {
             item.total = total;
             item.rate = group.type === 'single' && selected[0] ? (parseFloat(selected[0].rate) || 0) : rateSum;
             if (selectedEnhancements.length) item.rate = rateSum;
+            if (group.type === 'single' && selected[0] && isViewerPriceTbd(selected[0])) {
+                item.rate = 0;
+                item.total = 0;
+                item.priceTbd = true;
+                item.pricingMode = 'tbd';
+            } else if (!hasTbdSelections) {
+                item.priceTbd = false;
+                item.pricingMode = 'fixed';
+            }
+            item.hasTbdSelections = hasTbdSelections;
             item.choiceGroup.selectedOptionIds = selected.map(function(option) { return option.id; });
             var priorUpgradeGroups = normalizeViewerItemUpgradeGroups(item);
             var selectedBaseOption = selected[0] || null;
@@ -2592,17 +2631,24 @@ if (location.search.includes('debug')) {
         function normalizeViewerItemUpgradeOption(option, fallbackId) {
             option = option || {};
             var upgradeType = normalizeViewerUpgradeType(option.upgradeType || option.type || option.mode);
+            var photos = normalizeViewerPhotoList(option.photos, option.photo);
+            var photosFull = normalizeViewerPhotoFullList(option.photosFull, option.photoFull);
+            var priceTbd = isViewerPriceTbd(option);
             return {
                 id: option.id || fallbackId || ('viewer_upo_' + Math.random().toString(36).slice(2, 8)),
                 name: option.name || option.sourceItemName || option.description || 'Upgrade',
                 category: option.category || '',
                 sourceItemName: option.sourceItemName || option.name || '',
                 unitType: option.unitType || option.unit || '',
-                rate: viewerNumber(option.rate),
+                rate: priceTbd ? 0 : viewerNumber(option.rate),
                 materialCost: viewerNumber(option.materialCost),
+                priceTbd: isViewerPriceTbd(option),
+                pricingMode: priceTbd ? 'tbd' : 'fixed',
                 supplierUrl: option.supplierUrl || '',
-                photo: option.photo || '',
-                photoFull: option.photoFull || null,
+                photo: photos[0] || '',
+                photos: photos,
+                photoFull: photosFull[0] || null,
+                photosFull: photos.map(function(_photo, index) { return photosFull[index] || null; }),
                 description: option.description || option.itemDescription || '',
                 itemDescription: option.itemDescription || option.description || '',
                 upgradeType: upgradeType,
@@ -2735,6 +2781,7 @@ if (location.search.includes('debug')) {
 
         function ensureViewerItemUpgradeBaseState(item) {
             if (!item || item._viewerItemUpgradeBaseCaptured) return;
+            item._basePriceTbd = item._basePriceTbd === true || isViewerPriceTbd(item);
             item._baseRate = viewerNumber(item._baseRate !== undefined && item._baseRate !== null ? item._baseRate : item.rate);
             item._baseMaterialCost = viewerNumber(item._baseMaterialCost !== undefined && item._baseMaterialCost !== null ? item._baseMaterialCost : item.materialCost);
             item._baseQuantity = viewerNumber(item._baseQuantity !== undefined && item._baseQuantity !== null ? item._baseQuantity : item.quantity);
@@ -2743,6 +2790,8 @@ if (location.search.includes('debug')) {
             item._baseItemDescription = item._baseItemDescription || item.itemDescription || '';
             item._basePhoto = item._basePhoto || item.photo || '';
             item._basePhotoFull = item._basePhotoFull || item.photoFull || null;
+            item._basePhotos = Array.isArray(item._basePhotos) ? item._basePhotos : normalizeViewerPhotoList(item.photos, item.photo);
+            item._basePhotosFull = Array.isArray(item._basePhotosFull) ? item._basePhotosFull : normalizeViewerPhotoFullList(item.photosFull, item.photoFull);
             item._viewerItemUpgradeBaseCaptured = true;
         }
 
@@ -2752,19 +2801,39 @@ if (location.search.includes('debug')) {
             if (!item.upgradeGroups.length) return item;
             ensureViewerItemUpgradeBaseState(item);
             clearInvalidViewerItemUpgradeSelections(item);
-            var rate = viewerNumber(item._baseRate);
+            var basePriceTbd = item._basePriceTbd === true;
+            var rate = basePriceTbd ? 0 : viewerNumber(item._baseRate);
             var materialCost = viewerNumber(item._baseMaterialCost);
-            var lineTotal = getViewerItemUpgradeBaseQuantity(item) * rate;
+            var lineTotal = basePriceTbd ? 0 : (getViewerItemUpgradeBaseQuantity(item) * rate);
             var unitType = item._baseUnitType || item.unitType || item.unit || '';
             var description = item._baseDescription || item.description || item.name || '';
             var itemDescription = item._baseItemDescription || item.itemDescription || '';
             var photo = item._basePhoto || item.photo || '';
             var photoFull = item._basePhotoFull || item.photoFull || null;
+            var photos = Array.isArray(item._basePhotos) ? item._basePhotos.slice() : normalizeViewerPhotoList(item.photos, item.photo);
+            var photosFull = Array.isArray(item._basePhotosFull) ? item._basePhotosFull.slice() : normalizeViewerPhotoFullList(item.photosFull, item.photoFull);
             var selectedOptions = getViewerSelectedItemUpgradeOptions(item);
             var requiresConsultation = false;
+            var hasTbdSelections = basePriceTbd;
             selectedOptions.forEach(function(option) {
                 if (isViewerConsultationUpgradeOption(option)) {
                     requiresConsultation = true;
+                    return;
+                }
+                if (isViewerPriceTbd(option)) {
+                    hasTbdSelections = true;
+                    if (option.upgradeType === 'replacement') {
+                        rate = 0;
+                        materialCost = 0;
+                        unitType = option.unitType || unitType;
+                        description = option.name || description;
+                        itemDescription = option.itemDescription || option.description || itemDescription;
+                        photo = option.photo || photo;
+                        photoFull = option.photoFull || photoFull;
+                        photos = normalizeViewerPhotoList(option.photos, option.photo).length ? normalizeViewerPhotoList(option.photos, option.photo) : photos;
+                        photosFull = normalizeViewerPhotoFullList(option.photosFull, option.photoFull).length ? normalizeViewerPhotoFullList(option.photosFull, option.photoFull) : photosFull;
+                        lineTotal = 0;
+                    }
                     return;
                 }
                 var optionQuantity = getViewerItemUpgradeOptionQuantity(item, option);
@@ -2778,6 +2847,8 @@ if (location.search.includes('debug')) {
                     itemDescription = option.itemDescription || option.description || itemDescription;
                     photo = option.photo || photo;
                     photoFull = option.photoFull || photoFull;
+                    photos = normalizeViewerPhotoList(option.photos, option.photo).length ? normalizeViewerPhotoList(option.photos, option.photo) : photos;
+                    photosFull = normalizeViewerPhotoFullList(option.photosFull, option.photoFull).length ? normalizeViewerPhotoFullList(option.photosFull, option.photoFull) : photosFull;
                     lineTotal = optionQuantity * viewerNumber(option.rate);
                 } else {
                     if (sameUnit && normalizeViewerItemUpgradeQuantityMode(option.quantityMode) === 'parent') {
@@ -2798,8 +2869,15 @@ if (location.search.includes('debug')) {
             item.itemDescription = itemDescription;
             item.photo = photo;
             item.photoFull = photoFull;
+            item.photos = photos;
+            item.photosFull = photos.map(function(_photo, index) { return photosFull[index] || null; });
             item.upgraded = selectedOptions.length > 0;
             item.requiresConsultation = requiresConsultation;
+            item.hasTbdSelections = hasTbdSelections;
+            item.priceTbd = selectedOptions.some(function(option) {
+                return isViewerPriceTbd(option) && option.upgradeType === 'replacement';
+            }) || basePriceTbd;
+            item.pricingMode = item.priceTbd ? 'tbd' : 'fixed';
             item.total = lineTotal;
             item.selectedUpgradeOptionIds = selectedOptions.map(function(option) { return option.id; });
             return item;
@@ -2816,6 +2894,8 @@ if (location.search.includes('debug')) {
             delete item._baseItemDescription;
             delete item._basePhoto;
             delete item._basePhotoFull;
+            delete item._basePhotos;
+            delete item._basePhotosFull;
             return item;
         }
 
@@ -2839,6 +2919,7 @@ if (location.search.includes('debug')) {
         var viewerPhotoRegistry = {};
         var viewerPhotoCounter = 0;
         var viewerPhotoLightboxPhotos = [];
+        var viewerPhotoLightboxFallbackPhotos = [];
         var viewerPhotoLightboxIndex = 0;
         var viewerPhotoLightboxKeyHandlerBound = false;
         var viewerPhotoLightboxTouchStartX = 0;
@@ -2893,6 +2974,17 @@ if (location.search.includes('debug')) {
             return photos.slice(0, 3);
         }
 
+        function normalizeViewerPhotoFullSlots(value, fallback, limit) {
+            var source = Array.isArray(value) ? value : (value ? [value] : []);
+            if (!source.length && fallback) source = Array.isArray(fallback) ? fallback : [fallback];
+            var max = Math.min(parseInt(limit || 3, 10) || 3, 3);
+            var slots = [];
+            for (var i = 0; i < max; i++) {
+                slots.push(viewerPhotoFullUrl(source[i]));
+            }
+            return slots;
+        }
+
         function getViewerItemPhotoList(item) {
             return normalizeViewerPhotoList(item && item.photos, item && item.photo);
         }
@@ -2904,15 +2996,16 @@ if (location.search.includes('debug')) {
         function registerViewerPhoto(src, fullSrc) {
             var photos = normalizeViewerPhotoList(src);
             if (!photos.length) return '';
+            var fallbackPhotos = photos.slice();
             if (viewerFullResolutionPhotosEnabled()) {
-                var fullPhotos = normalizeViewerPhotoFullList(fullSrc);
+                var fullPhotos = normalizeViewerPhotoFullSlots(fullSrc, null, photos.length);
                 photos = photos.map(function(photo, index) {
-                    return fullPhotos[index] || (photos.length === 1 && fullPhotos.length === 1 ? fullPhotos[0] : photo);
+                    return fullPhotos[index] || (photos.length === 1 && fullPhotos.filter(Boolean).length === 1 ? fullPhotos.filter(Boolean)[0] : photo);
                 });
             }
             viewerPhotoCounter += 1;
             var key = 'photo_' + viewerPhotoCounter;
-            viewerPhotoRegistry[key] = photos;
+            viewerPhotoRegistry[key] = { photos: photos, fallbacks: fallbackPhotos };
             return key;
         }
 
@@ -2922,8 +3015,9 @@ if (location.search.includes('debug')) {
                 event.stopPropagation();
             }
             var key = button ? button.getAttribute('data-viewer-photo-key') : '';
-            var photos = key ? viewerPhotoRegistry[key] : [];
-            if (photos && photos.length) openPhotoLightbox(photos);
+            var entry = key ? viewerPhotoRegistry[key] : null;
+            if (entry && Array.isArray(entry.photos) && entry.photos.length) openPhotoLightbox(entry.photos, entry.fallbacks);
+            else if (Array.isArray(entry) && entry.length) openPhotoLightbox(entry);
         }
 
         function renderViewerPhotoButton(src, label, buttonClass, fullSrc) {
@@ -2984,7 +3078,17 @@ if (location.search.includes('debug')) {
             var prev = document.getElementById('viewerPhotoLightboxPrev');
             var next = document.getElementById('viewerPhotoLightboxNext');
             var counter = document.getElementById('viewerPhotoLightboxCounter');
-            if (img) img.src = viewerPhotoLightboxPhotos[viewerPhotoLightboxIndex];
+            if (img) {
+                img.onerror = function() {
+                    var fallback = viewerPhotoLightboxFallbackPhotos[viewerPhotoLightboxIndex] || '';
+                    var current = viewerPhotoLightboxPhotos[viewerPhotoLightboxIndex] || '';
+                    if (fallback && fallback !== current) {
+                        img.onerror = null;
+                        img.src = fallback;
+                    }
+                };
+                img.src = viewerPhotoLightboxPhotos[viewerPhotoLightboxIndex];
+            }
             if (prev) prev.style.display = total > 1 ? 'block' : 'none';
             if (next) next.style.display = total > 1 ? 'block' : 'none';
             if (counter) {
@@ -3058,6 +3162,7 @@ if (location.search.includes('debug')) {
                 compatible.forEach(function(option) {
                     var selected = (group.selectedOptionIds || []).indexOf(option.id) !== -1;
                     var requiresConsultation = isViewerConsultationUpgradeOption(option);
+                    var priceTbd = isViewerPriceTbd(option);
                     var optionQuantity = getViewerItemUpgradeOptionQuantity(item, option);
                     var optionTotal = optionQuantity * viewerNumber(option.rate);
                     var groupArg = JSON.stringify(group.id || '').replace(/"/g, '&quot;');
@@ -3066,13 +3171,13 @@ if (location.search.includes('debug')) {
                     var panelId = viewerUpgradeDescriptionPanelId(roomIdx, itemIndex, group.id || '', option.id || '');
                     var checkedIcon = group.type === 'multiple' ? 'fa-square-check' : 'fa-circle-check';
                     var uncheckedIcon = group.type === 'multiple' ? 'fa-square' : 'fa-circle';
-                    var optionPriceHtml = requiresConsultation ? '<span class="opacity-75">Consultation required</span>' : '<span class="opacity-75">' + viewerMoney(optionTotal, { forceSign: option.upgradeType !== 'replacement' }) + '</span>';
+                    var optionPriceHtml = requiresConsultation ? '<span class="opacity-75">Consultation required</span>' : (priceTbd ? '<span class="opacity-75">' + viewerPriceTbdLabel() + '</span>' : '<span class="opacity-75">' + viewerMoney(optionTotal, { forceSign: option.upgradeType !== 'replacement' }) + '</span>');
                     html += '<div class="viewer-upgrade-option-wrap d-inline-flex flex-column align-items-start gap-1">';
                     html += '<button type="button" class="btn btn-sm quote-upgrade-option-btn ' + (selected ? 'is-selected' : '') + ' py-0" onclick="toggleViewerItemUpgradeOption(' + roomIdx + ', ' + itemIndex + ', ' + groupArg + ', ' + optionArg + ')">' +
                         '<i class="fas ' + (selected ? checkedIcon : uncheckedIcon) + ' me-1"></i>' + escapeHtml(option.name || 'Upgrade') + ' ' + optionPriceHtml +
                         '</button>';
                     if (option.photo) {
-                        html += renderViewerPhotoButton(option.photo, 'Upgrade Picture', 'btn-outline-warning', option.photoFull);
+                        html += renderViewerPhotoButton(option.photos || option.photo, 'Upgrade Picture', 'btn-outline-warning', option.photosFull || option.photoFull);
                     }
                     if (selected && !requiresConsultation) {
                         var quantitySummary = getViewerItemUpgradeOptionQuantitySummary(item, option);
@@ -3132,6 +3237,20 @@ if (location.search.includes('debug')) {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
             });
+        }
+
+        function normalizeViewerPricingMode(value, priceTbd) {
+            var clean = String(value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+            if (priceTbd === true || clean === 'tbd' || clean === 'price_tbd' || clean === 'to_be_determined') return 'tbd';
+            return 'fixed';
+        }
+
+        function isViewerPriceTbd(item) {
+            return normalizeViewerPricingMode(item && item.pricingMode, item && item.priceTbd) === 'tbd';
+        }
+
+        function viewerPriceTbdLabel() {
+            return 'Price TBD';
         }
 
         const VIEWER_LINE_ITEM_HIGHLIGHTS = {
@@ -3214,6 +3333,7 @@ if (location.search.includes('debug')) {
 
         function viewerItemActiveRate(item) {
             if (!item) return 0;
+            if (isViewerPriceTbd(item)) return 0;
             if (item.choiceGroup) {
                 applyViewerChoiceGroupToItem(item);
                 return viewerNumber(item.rate);
@@ -3228,6 +3348,7 @@ if (location.search.includes('debug')) {
 
         function viewerItemActiveTotal(item) {
             if (!item) return 0;
+            if (isViewerPriceTbd(item)) return 0;
             if (item.choiceGroup) {
                 applyViewerChoiceGroupToItem(item);
                 return viewerNumber(item.total);
@@ -3457,12 +3578,14 @@ if (location.search.includes('debug')) {
                 var checked = selectedIds.indexOf(option.id) !== -1;
                 var optionQty = option.quantityMode === 'override' ? (parseFloat(option.quantityOverride) || 0) : (parseFloat(item.quantity) || 0);
                 var optionTotal = optionQty * (parseFloat(option.rate) || 0);
+                var optionPriceText = isViewerPriceTbd(option) ? viewerPriceTbdLabel() : viewerMoney(optionTotal);
+                var optionRateText = isViewerPriceTbd(option) ? viewerPriceTbdLabel() : viewerMoney(option.rate);
                 var optionArg = JSON.stringify(option.id || '').replace(/"/g, '&quot;');
                 html += '<div class="col-md-6' + (!isSignedDiff && option.photo ? ' choice-option-with-photo' : '') + '"><button type="button" class="w-100 text-start btn choice-option-btn ' + (checked ? 'choice-option-selected' : '') + '" ' + (isSignedDiff ? 'disabled' : 'onclick="toggleViewerChoiceOption(' + roomIdx + ',' + itemIndex + ',' + optionArg + ')"') + '>';
-                html += '<div class="d-flex justify-content-between gap-2"><span><i class="fas ' + (checked ? 'fa-check-circle' : 'fa-circle') + ' me-1"></i>' + escapeHtml(option.name) + '</span><strong>' + viewerMoney(optionTotal) + '</strong></div>';
+                html += '<div class="d-flex justify-content-between gap-2"><span><i class="fas ' + (checked ? 'fa-check-circle' : 'fa-circle') + ' me-1"></i>' + escapeHtml(option.name) + '</span><strong>' + optionPriceText + '</strong></div>';
                 if (option.itemDescription || option.description) html += '<div class="small opacity-75 mt-1">' + escapeHtml(option.itemDescription || option.description) + '</div>';
-                html += '<div class="small opacity-75 mt-1">' + optionQty + ' ' + escapeHtml(option.unitType || item.unitType || '') + ' @ ' + viewerMoney(option.rate) + '</div>';
-                html += '</button>' + (!isSignedDiff && option.photo ? '<div class="viewer-choice-option-photo-actions">' + renderViewerPhotoButton(option.photo, 'Picture', 'btn-outline-secondary', option.photoFull) + '</div>' : '') + '</div>';
+                html += '<div class="small opacity-75 mt-1">' + optionQty + ' ' + escapeHtml(option.unitType || item.unitType || '') + ' @ ' + optionRateText + '</div>';
+                html += '</button>' + (!isSignedDiff && option.photo ? '<div class="viewer-choice-option-photo-actions">' + renderViewerPhotoButton(option.photos || option.photo, 'Picture', 'btn-outline-secondary', option.photosFull || option.photoFull) + '</div>' : '') + '</div>';
             });
             html += '</div>';
             html += renderViewerChoiceGroupEnhancements(roomIdx, itemIndex, item, isSignedDiff);
@@ -3492,13 +3615,14 @@ if (location.search.includes('debug')) {
                     var checked = (enhGroup.selectedOptionIds || []).indexOf(option.id) !== -1;
                     var qty = parseFloat(item.quantity) || 0;
                     var total = qty * viewerNumber(option.rate);
+                    var totalText = isViewerPriceTbd(option) ? viewerPriceTbdLabel() : viewerMoney(total, { forceSign: option.upgradeType !== 'replacement' });
                     var groupArg = JSON.stringify(enhGroup.id || '').replace(/"/g, '&quot;');
                     var optionArg = JSON.stringify(option.id || '').replace(/"/g, '&quot;');
                     html += '<div class="col-md-6' + (!isSignedDiff && option.photo ? ' choice-option-with-photo' : '') + '"><button type="button" class="w-100 text-start btn choice-option-btn ' + (checked ? 'choice-option-selected' : '') + '" ' + (isSignedDiff ? 'disabled' : 'onclick="toggleViewerChoiceGroupEnhancement(' + roomIdx + ',' + itemIndex + ',' + groupArg + ',' + optionArg + ')"') + '>';
-                    html += '<div class="d-flex justify-content-between gap-2"><span><i class="fas ' + (checked ? 'fa-check-circle' : 'fa-circle') + ' me-1"></i>' + escapeHtml(option.name) + '</span><strong>' + viewerMoney(total, { forceSign: option.upgradeType !== 'replacement' }) + '</strong></div>';
+                    html += '<div class="d-flex justify-content-between gap-2"><span><i class="fas ' + (checked ? 'fa-check-circle' : 'fa-circle') + ' me-1"></i>' + escapeHtml(option.name) + '</span><strong>' + totalText + '</strong></div>';
                     if (option.itemDescription || option.description) html += '<div class="small opacity-75 mt-1">' + escapeHtml(option.itemDescription || option.description) + '</div>';
                     html += '<div class="small opacity-75 mt-1">' + escapeHtml(option.upgradeType === 'replacement' ? 'Replacement' : 'Add-on') + '</div>';
-                    html += '</button>' + (!isSignedDiff && option.photo ? '<div class="viewer-choice-option-photo-actions">' + renderViewerPhotoButton(option.photo, 'Picture', 'btn-outline-secondary', option.photoFull) + '</div>' : '') + '</div>';
+                    html += '</button>' + (!isSignedDiff && option.photo ? '<div class="viewer-choice-option-photo-actions">' + renderViewerPhotoButton(option.photos || option.photo, 'Picture', 'btn-outline-secondary', option.photosFull || option.photoFull) + '</div>' : '') + '</div>';
                 });
                 html += '</div></div>';
             });
@@ -3922,6 +4046,9 @@ if (location.search.includes('debug')) {
                     const activeRate = qvLineRate(item);
                     const itemDisplayTotal = isChangeOrder ? viewerChangeOrderLineDisplayTotal(item, room) : qvLineTotal(item);
                     const itemTotal = itemDisplayTotal;
+                    const linePriceTbd = isViewerPriceTbd(item);
+                    const itemTotalText = linePriceTbd ? viewerPriceTbdLabel() : viewerMoney(itemTotal);
+                    const activeRateText = linePriceTbd ? viewerPriceTbdLabel() : viewerMoney(activeRate);
                     const coStatus = isChangeOrder ? viewerChangeOrderStatus(item, room) : '';
                     const coCanExplain = isChangeOrder && coStatus !== 'unchanged';
                     const coExplanation = coCanExplain ? viewerChangeOrderExplanation(item, room) : '';
@@ -4001,8 +4128,8 @@ if (location.search.includes('debug')) {
                                     ${lineItemPhotoButton ? `<div class="viewer-line-photo-actions viewer-line-title-actions">${lineItemPhotoButton}</div>` : ''}
                                 </div>
                                 <div style="text-align:right; min-width:140px; padding-left:16px;">
-                                    <div>${coCanExplain ? `<button type="button" class="viewer-change-order-total-btn" onclick="toggleViewerChangeOrderExplanation(${roomIdx}, ${itemIndex})">${viewerMoney(itemTotal)}</button>` : `<strong>${viewerMoney(itemTotal)}</strong>`}</div>
-                                    <small class="text-muted">${typeof qdFormatQuantity === 'function' ? qdFormatQuantity(item.quantity, item.unitType || item.unit || '') : (item.quantity + ' ' + (item.unitType || ''))} @ ${viewerMoney(activeRate)}</small>
+                                    <div>${coCanExplain ? `<button type="button" class="viewer-change-order-total-btn" onclick="toggleViewerChangeOrderExplanation(${roomIdx}, ${itemIndex})">${itemTotalText}</button>` : `<strong>${itemTotalText}</strong>`}</div>
+                                    <small class="text-muted">${typeof qdFormatQuantity === 'function' ? qdFormatQuantity(item.quantity, item.unitType || item.unit || '') : (item.quantity + ' ' + (item.unitType || ''))} @ ${activeRateText}</small>
                                     ${qvDiscountDetailsHtml(item)}
                                 </div>
                             </div>
@@ -4017,7 +4144,7 @@ if (location.search.includes('debug')) {
                                 ${hasLegacyUpgrade ? `
                                 <div>
                                     ${!isUpgraded ? `<div class="text-muted mb-1" style="font-size:0.88rem;"><i class="fas fa-arrow-up" style="color:#f0ad4e;"></i> <strong>Upgrade available:</strong> ${item.upgrade.name}</div>` : ''}
-                                    ${item.upgrade.photo ? `<div class="mb-2">${renderViewerPhotoButton(item.upgrade.photo, 'Upgrade Picture', 'btn-outline-warning', item.upgrade.photoFull)}</div>` : ''}
+                                    ${item.upgrade.photo ? `<div class="mb-2">${renderViewerPhotoButton(item.upgrade.photos || item.upgrade.photo, 'Upgrade Picture', 'btn-outline-warning', item.upgrade.photosFull || item.upgrade.photoFull)}</div>` : ''}
                                     <button class="btn btn-sm upgrade-action-btn ${isUpgraded ? 'btn-warning' : 'btn-outline-warning'}" onclick="toggleViewerUpgrade(${roomIdx}, ${itemIndex})" style="font-size:0.85rem;">
                                         <i class="fas fa-arrow-up"></i> ${isUpgraded ? 'Upgraded ✓' : 'Upgrade: ' + item.upgrade.name}
                                     </button>
@@ -4073,10 +4200,11 @@ if (location.search.includes('debug')) {
             updateActionButton();
         }
 
-        function openPhotoLightbox(src) {
+        function openPhotoLightbox(src, fallbackSrc) {
             var photos = normalizeViewerPhotoList(src);
             if (!photos.length) return;
             viewerPhotoLightboxPhotos = photos;
+            viewerPhotoLightboxFallbackPhotos = normalizeViewerPhotoList(fallbackSrc || src);
             showViewerPhotoAt(0);
         }
 
@@ -4161,6 +4289,41 @@ if (location.search.includes('debug')) {
             if (totalEl) totalEl.textContent = paymentAmount > 0 ? viewerMoney(balanceDue) : viewerMoney(total);
         }
 
+        function countViewerTbdSelections() {
+            var count = viewerNumber(quoteData && quoteData.priceTbdSelectionCount);
+            var liveCount = 0;
+            (quoteData.rooms || []).forEach(function(room) {
+                (room.items || []).forEach(function(item) {
+                    if (item._removed) return;
+                    if (isViewerPriceTbd(item)) liveCount += 1;
+                    getViewerSelectedItemUpgradeOptions(item).forEach(function(option) {
+                        if (isViewerPriceTbd(option)) liveCount += 1;
+                    });
+                    if (item.choiceGroup) {
+                        getViewerChoiceSelectedOptions(item.choiceGroup).forEach(function(option) {
+                            if (isViewerPriceTbd(option)) liveCount += 1;
+                        });
+                        getViewerSelectedEnhancementOptions(item.choiceGroup).forEach(function(option) {
+                            if (isViewerPriceTbd(option)) liveCount += 1;
+                        });
+                    }
+                });
+            });
+            return liveCount || count;
+        }
+
+        function updateViewerTbdDisplay(count) {
+            var display = document.getElementById('quoteTbdDisplay');
+            if (!display) return;
+            if (!count) {
+                display.style.display = 'none';
+                display.textContent = '';
+                return;
+            }
+            display.style.display = 'block';
+            display.innerHTML = '<i class="fas fa-circle-question me-1"></i>This quote includes ' + count + ' selected Price TBD item' + (count === 1 ? '' : 's') + '. TBD pricing is not included in the displayed total.';
+        }
+
         function updateTotal() {
             var co = window.QuoteDrChangeOrders;
             var isChangeOrder = !!(co && co.isChangeOrder(quoteData));
@@ -4193,6 +4356,7 @@ if (location.search.includes('debug')) {
             const paymentReceivedAmount = calculateViewerPaymentsReceivedAmount(total);
             const balanceDue = Math.max(total - paymentReceivedAmount, 0);
             updateQuoteTotalBreakdown(subtotal, tax, total, _vTaxLabel, _vTaxRate, paymentReceivedAmount, _vTaxEnabled);
+            updateViewerTbdDisplay(countViewerTbdSelections());
 
             var upgradesEl = document.getElementById('upgradesTotalDisplay');
             if (upgradesEl) {
@@ -5014,10 +5178,11 @@ if (location.search.includes('debug')) {
             }
         }
 
-        function openPhotoLightbox(src) {
+        function openPhotoLightbox(src, fallbackSrc) {
             var photos = normalizeViewerPhotoList(src);
             if (!photos.length) return;
             viewerPhotoLightboxPhotos = photos;
+            viewerPhotoLightboxFallbackPhotos = normalizeViewerPhotoList(fallbackSrc || src);
             showViewerPhotoAt(0);
         }
     </script>

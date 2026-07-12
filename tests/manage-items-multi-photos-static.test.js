@@ -31,9 +31,10 @@ assert(
 );
 
 assert(
-  items.includes('item-photo-remove-btn') &&
+    items.includes('item-photo-remove-btn') &&
     items.includes('function removeManageItemPhoto') &&
     items.includes("data-field=\"upgradePhoto\"") &&
-    items.includes('item.upgrade.photo = dataUrl'),
+    items.includes("setManageUpgradeOptionPhoto(item, 'legacy_upgrade', 'legacy_upgrade_option', dataUrl, requestedIndex)") &&
+    items.includes('removeManageUpgradePhoto(cat, name, groupId, optionId, photoIndex)'),
   'Manage Items should allow removing base photos while keeping upgrade photos separate'
 );

@@ -2243,6 +2243,7 @@ if (location.search.includes('debug')) {
                         </div>
                     </div>
                     <div id="changeOrderPriceSummary" class="change-order-price-summary" aria-live="polite"></div>
+                    <div id="quoteTbdNotice" class="alert alert-warning py-2 px-3 small mt-2 mb-0" style="display:none;"></div>
                     <!-- Deposit Calculator -->
                     <div class="deposit-section mt-3 mb-2 p-3 rounded" style="display:none;" id="depositSection">
                         <label><strong>Deposit:</strong></label>
@@ -2858,7 +2859,13 @@ Example:
                             <input type="number" id="lineQuantity" class="form-control" value="1" step="0.01">
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label><strong>Rate ($):</strong></label>
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <label class="mb-0" for="lineRate"><strong>Rate ($):</strong></label>
+                                <div class="form-check form-check-inline mb-0 price-tbd-inline">
+                                    <input class="form-check-input" type="checkbox" id="linePriceTbd" onchange="document.getElementById('lineRate').disabled=this.checked; calculateMaterialTotal()">
+                                    <label class="form-check-label small" for="linePriceTbd">Price TBD</label>
+                                </div>
+                            </div>
                             <input type="number" id="lineRate" class="form-control" value="0" step="0.01">
                         </div>
                     </div>
@@ -2980,7 +2987,13 @@ Example:
                             </datalist>
                         </div>
                         <div class="col-md-2">
-                            <label class="form-label"><strong>Rate ($)</strong></label>
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <label class="form-label mb-0" for="newItemRate"><strong>Rate ($)</strong></label>
+                                <div class="form-check form-check-inline mb-0 price-tbd-inline">
+                                    <input class="form-check-input manage-price-tbd" type="checkbox" id="newItemPriceTbd" onchange="document.getElementById('newItemRate').disabled=this.checked">
+                                    <label class="form-check-label small" for="newItemPriceTbd">Price TBD</label>
+                                </div>
+                            </div>
                             <input type="number" id="newItemRate" class="form-control" step="0.01" min="0" placeholder="0.00">
                         </div>
                     </div>
@@ -3035,7 +3048,13 @@ Example:
                                 <input type="text" id="newItemUpgradeUnit" class="form-control form-control-sm" list="unitTypeOptions" placeholder="same as item">
                             </div>
                             <div class="col-md-2">
-                                <label class="form-label small mb-1">Rate ($)</label>
+                                <div class="d-flex align-items-center gap-2 mb-1">
+                                    <label class="form-label small mb-0" for="newItemUpgradeRate">Rate ($)</label>
+                                    <div class="form-check form-check-inline mb-0 price-tbd-inline">
+                                        <input class="form-check-input upgrade-price-tbd" type="checkbox" id="newItemUpgradePriceTbd" onchange="document.getElementById('newItemUpgradeRate').disabled=this.checked">
+                                        <label class="form-check-label small" for="newItemUpgradePriceTbd">Price TBD</label>
+                                    </div>
+                                </div>
                                 <input type="number" id="newItemUpgradeRate" class="form-control form-control-sm" step="0.01" min="0" placeholder="0.00">
                             </div>
                             <div class="col-md-2">
@@ -3262,6 +3281,20 @@ Example:
             };
         }
 
+        function normalizeQuotePricingMode(value, priceTbd) {
+            var clean = String(value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+            if (priceTbd === true || clean === 'tbd' || clean === 'price_tbd' || clean === 'to_be_determined') return 'tbd';
+            return 'fixed';
+        }
+
+        function isQuotePriceTbd(item) {
+            return normalizeQuotePricingMode(item && item.pricingMode, item && item.priceTbd) === 'tbd';
+        }
+
+        function qdFormatPriceTbd() {
+            return 'Price TBD';
+        }
+
         function resetLineDiscountFields() {
             const type = document.getElementById('lineDiscountType');
             const value = document.getElementById('lineDiscountValue');
@@ -3304,6 +3337,10 @@ Example:
 
         function applyLineDiscountFields(item) {
             if (!item) return item;
+            if (isQuotePriceTbd(item)) {
+                item.total = 0;
+                return item;
+            }
             const discount = readLineDiscountFields();
             item.discountType = discount.discountType;
             item.discountValue = discount.discountValue;
@@ -3313,6 +3350,7 @@ Example:
         }
 
         function itemChargedTotal(item) {
+            if (isQuotePriceTbd(item)) return 0;
             return qdDiscounts().chargedTotal(item);
         }
 
@@ -3404,20 +3442,47 @@ Example:
             return !!base && !!upgrade && base !== upgrade;
         }
 
+        function normalizeQuoteUpgradePhotos(option) {
+            option = option || {};
+            var photos = [];
+            if (Array.isArray(option.photos)) {
+                option.photos.forEach(function(photo) {
+                    if (typeof photo === 'string' && photo.trim()) photos.push(photo);
+                });
+            }
+            if (!photos.length && typeof option.photo === 'string' && option.photo.trim()) photos.push(option.photo);
+            return photos.slice(0, 3);
+        }
+
+        function normalizeQuoteUpgradePhotosFull(option) {
+            option = option || {};
+            var full = [];
+            if (Array.isArray(option.photosFull)) full = option.photosFull.slice(0, 3);
+            if (!full.length && option.photoFull) full.push(option.photoFull);
+            return full.slice(0, 3);
+        }
+
         function normalizeQuoteItemUpgradeOption(option, fallbackId) {
             option = option || {};
             var upgradeType = normalizeQuoteUpgradeType(option.upgradeType || option.type || option.mode);
+            var photos = normalizeQuoteUpgradePhotos(option);
+            var photosFull = normalizeQuoteUpgradePhotosFull(option);
+            var priceTbd = isQuotePriceTbd(option);
             return {
                 id: option.id || fallbackId || choiceGroupId(),
                 name: option.name || option.sourceItemName || option.description || 'Upgrade',
                 category: option.category || '',
                 sourceItemName: option.sourceItemName || option.name || '',
                 unitType: option.unitType || option.unit || '',
-                rate: parseFloat(option.rate || 0) || 0,
+                rate: priceTbd ? 0 : (parseFloat(option.rate || 0) || 0),
                 materialCost: parseFloat(option.materialCost || option.material_cost || 0) || 0,
+                priceTbd: isQuotePriceTbd(option),
+                pricingMode: priceTbd ? 'tbd' : 'fixed',
                 supplierUrl: option.supplierUrl || '',
-                photo: option.photo || '',
-                photoFull: option.photoFull || null,
+                photo: photos[0] || '',
+                photos: photos,
+                photoFull: photosFull[0] || null,
+                photosFull: photos.map(function(_photo, index) { return photosFull[index] || null; }),
                 description: option.description || option.itemDescription || '',
                 itemDescription: option.itemDescription || option.description || '',
                 laborTime: normalizeLaborTime(option.laborTime),
@@ -3566,12 +3631,15 @@ Example:
         function ensureItemUpgradeBaseState(item) {
             if (!item || item._itemUpgradeBaseCaptured) return;
             item._baseRate = parseFloat(item.rate || 0) || 0;
+            item._basePriceTbd = isQuotePriceTbd(item);
             item._baseMaterialCost = parseFloat(item.materialCost || 0) || 0;
             item._baseQuantity = parseFloat(item.quantity || 0) || 0;
             item._baseUnitType = item.unitType || item.unit || '';
             item._baseSupplierUrl = item.supplierUrl || '';
             item._basePhoto = item.photo || '';
             item._basePhotoFull = item.photoFull || null;
+            item._basePhotos = Array.isArray(item.photos) ? item.photos.slice() : (item.photo ? [item.photo] : []);
+            item._basePhotosFull = Array.isArray(item.photosFull) ? item.photosFull.slice() : (item.photoFull ? [item.photoFull] : []);
             item._baseItemDescription = item.itemDescription || '';
             item._baseDescription = item.description || item.name || '';
             item._baseLaborTime = normalizeLaborTime(item.laborTime);
@@ -3585,23 +3653,44 @@ Example:
             ensureItemUpgradeBaseState(item);
             clearInvalidItemUpgradeSelections(item);
             var quantity = getQuoteItemUpgradeBaseQuantity(item);
-            var baseRate = parseFloat(item._baseRate || 0) || 0;
+            var basePriceTbd = item._basePriceTbd === true;
+            var baseRate = basePriceTbd ? 0 : (parseFloat(item._baseRate || 0) || 0);
             var baseCost = parseFloat(item._baseMaterialCost || 0) || 0;
             var rate = baseRate;
             var materialCost = baseCost;
-            var lineTotal = quantity * baseRate;
+            var lineTotal = basePriceTbd ? 0 : (quantity * baseRate);
             var unitType = item._baseUnitType || item.unitType || '';
             var supplierUrl = item._baseSupplierUrl || '';
             var photo = item._basePhoto || item.photo || '';
             var photoFull = item._basePhotoFull || item.photoFull || null;
+            var photos = Array.isArray(item._basePhotos) ? item._basePhotos.slice() : (Array.isArray(item.photos) ? item.photos.slice() : (photo ? [photo] : []));
+            var photosFull = Array.isArray(item._basePhotosFull) ? item._basePhotosFull.slice() : (Array.isArray(item.photosFull) ? item.photosFull.slice() : (photoFull ? [photoFull] : []));
             var itemDescription = item._baseItemDescription || '';
             var description = item._baseDescription || item.description || '';
             var laborTime = normalizeLaborTime(item._baseLaborTime || item.laborTime);
             var selectedOptions = getSelectedItemUpgradeOptions(item);
             var requiresConsultation = false;
+            var hasTbdSelections = basePriceTbd;
             selectedOptions.forEach(function(option) {
                 if (isQuoteItemConsultationUpgradeOption(option)) {
                     requiresConsultation = true;
+                    return;
+                }
+                if (isQuotePriceTbd(option)) {
+                    hasTbdSelections = true;
+                    if (option.upgradeType === 'replacement') {
+                        rate = 0;
+                        materialCost = 0;
+                        unitType = option.unitType || unitType;
+                        supplierUrl = option.supplierUrl || supplierUrl;
+                        photo = option.photo || photo;
+                        photoFull = option.photoFull || photoFull;
+                        photos = normalizeQuoteUpgradePhotos(option).length ? normalizeQuoteUpgradePhotos(option) : photos;
+                        photosFull = normalizeQuoteUpgradePhotosFull(option).length ? normalizeQuoteUpgradePhotosFull(option) : photosFull;
+                        itemDescription = option.itemDescription || option.description || itemDescription;
+                        description = option.name || description;
+                        lineTotal = 0;
+                    }
                     return;
                 }
                 var optionRate = parseFloat(option.rate || 0) || 0;
@@ -3616,6 +3705,8 @@ Example:
                     supplierUrl = option.supplierUrl || supplierUrl;
                     photo = option.photo || photo;
                     photoFull = option.photoFull || photoFull;
+                    photos = normalizeQuoteUpgradePhotos(option).length ? normalizeQuoteUpgradePhotos(option) : photos;
+                    photosFull = normalizeQuoteUpgradePhotosFull(option).length ? normalizeQuoteUpgradePhotosFull(option) : photosFull;
                     itemDescription = option.itemDescription || option.description || itemDescription;
                     description = option.name || description;
                     lineTotal = optionQuantity * optionRate;
@@ -3638,11 +3729,18 @@ Example:
             item.supplierUrl = supplierUrl;
             item.photo = photo;
             item.photoFull = photoFull;
+            item.photos = photos;
+            item.photosFull = photos.map(function(_photo, index) { return photosFull[index] || null; });
             item.itemDescription = itemDescription;
             item.description = description;
             item.laborTime = laborTime;
             item.upgraded = selectedOptions.length > 0;
             item.requiresConsultation = requiresConsultation;
+            item.hasTbdSelections = hasTbdSelections;
+            item.priceTbd = basePriceTbd || selectedOptions.some(function(option) {
+                return isQuotePriceTbd(option) && option.upgradeType === 'replacement';
+            });
+            item.pricingMode = item.priceTbd ? 'tbd' : 'fixed';
             item.selectedUpgradeOptionIds = selectedOptions.map(function(option) { return option.id; });
             item.total = lineTotal;
             return item;
@@ -3773,6 +3871,7 @@ Example:
                 compatible.forEach(function(option) {
                     var selected = (group.selectedOptionIds || []).indexOf(option.id) !== -1;
                     var requiresConsultation = isQuoteItemConsultationUpgradeOption(option);
+                    var priceTbd = isQuotePriceTbd(option);
                     var optionQuantity = getQuoteItemUpgradeOptionQuantity(item, option);
                     var optionTotal = optionQuantity * (parseFloat(option.rate) || 0);
                     var groupArg = JSON.stringify(group.id || '').replace(/"/g, '&quot;');
@@ -3781,8 +3880,8 @@ Example:
                     var panelId = itemUpgradeDescriptionPanelId(roomId, itemIndex, group.id || '', option.id || '');
                     var checkedIcon = group.type === 'multiple' ? 'fa-square-check' : 'fa-circle-check';
                     var uncheckedIcon = group.type === 'multiple' ? 'fa-square' : 'fa-circle';
-                    var optionTitle = requiresConsultation ? 'Consultation required' : (option.upgradeType === 'replacement' ? 'Replacement' : 'Add-on');
-                    var optionPriceHtml = requiresConsultation ? '<span class="opacity-75">Consultation required</span>' : '<span class="opacity-75">' + qdFormatMoney(optionTotal, '$', { showSign: option.upgradeType !== 'replacement' }) + '</span>';
+                    var optionTitle = requiresConsultation ? 'Consultation required' : (priceTbd ? qdFormatPriceTbd() : (option.upgradeType === 'replacement' ? 'Replacement' : 'Add-on'));
+                    var optionPriceHtml = requiresConsultation ? '<span class="opacity-75">Consultation required</span>' : (priceTbd ? '<span class="opacity-75">' + qdFormatPriceTbd() + '</span>' : '<span class="opacity-75">' + qdFormatMoney(optionTotal, '$', { showSign: option.upgradeType !== 'replacement' }) + '</span>');
                     html += '<div class="item-upgrade-option-wrap d-inline-flex flex-column align-items-start gap-1">';
                     html += '<button type="button" class="btn btn-sm quote-upgrade-option-btn ' + (selected ? 'is-selected' : '') + ' py-0" onclick="event.stopPropagation(); toggleItemUpgradeOption(' + roomId + ', ' + itemIndex + ', ' + groupArg + ', ' + optionArg + ')" title="' + qdTemplateEscapeHtml(optionTitle) + '">' +
                         '<i class="fas ' + (selected ? checkedIcon : uncheckedIcon) + ' me-1"></i>' + qdTemplateEscapeHtml(option.name || 'Upgrade') + ' ' + optionPriceHtml +
@@ -6733,6 +6832,7 @@ Example:
             populateLineUnitTypeDropdown('');
             document.getElementById('lineQuantity').value = '1';
             document.getElementById('lineRate').value = '0';
+            setLinePriceTbdState(false);
             resetLineDiscountFields();
             document.getElementById('lineNotes').value = '';
             document.getElementById('lineMaterialCost').value = '0';
@@ -6835,6 +6935,7 @@ Example:
                     option.text = service.name;
                     option.dataset.unitType = service.unitType;
                     option.dataset.rate = service.rate;
+                    option.dataset.priceTbd = isQuotePriceTbd(service) ? '1' : '0';
                     if (service.note) option.dataset.note = service.note;
                     if (service.itemDescription) option.dataset.itemDescription = service.itemDescription;
                     if (service.materialCost) option.dataset.materialCost = service.materialCost;
@@ -6849,6 +6950,13 @@ Example:
             }
         }
 
+        function setLinePriceTbdState(priceTbd) {
+            const checkbox = document.getElementById('linePriceTbd');
+            const rateInput = document.getElementById('lineRate');
+            if (checkbox) checkbox.checked = priceTbd === true;
+            if (rateInput) rateInput.disabled = priceTbd === true;
+        }
+
         function autoFillPricing() {
             const serviceSelect = document.getElementById('lineService');
             const selectedOption = serviceSelect.options[serviceSelect.selectedIndex];
@@ -6856,6 +6964,7 @@ Example:
             if (selectedOption && selectedOption.dataset.unitType) {
                 populateLineUnitTypeDropdown(selectedOption.dataset.unitType);
                 document.getElementById('lineRate').value = selectedOption.dataset.rate;
+                setLinePriceTbdState(selectedOption.dataset.priceTbd === '1');
                 if (selectedOption.value !== 'custom') {
                     document.getElementById('lineDescription').value = selectedOption.text;
                 }
@@ -6902,9 +7011,13 @@ Example:
                 unitType: item.upgrade.unitType || item.upgrade.unit || '',
                 rate: parseFloat(item.upgrade.rate) || 0,
                 materialCost: parseFloat(item.upgrade.materialCost !== undefined ? item.upgrade.materialCost : item.upgrade.material_cost) || 0,
+                priceTbd: isQuotePriceTbd(item.upgrade),
+                pricingMode: isQuotePriceTbd(item.upgrade) ? 'tbd' : 'fixed',
                 supplierUrl: item.upgrade.supplierUrl || '',
                 photo: item.upgrade.photo || '',
+                photos: normalizeQuoteUpgradePhotos(item.upgrade),
                 photoFull: item.upgrade.photoFull || null,
+                photosFull: normalizeQuoteUpgradePhotosFull(item.upgrade),
                 description: item.upgrade.description || item.upgrade.itemDescription || item.upgrade.notes || '',
                 type: normalizeQuoteUpgradeType(item.upgrade.type || item.upgrade.upgradeType || item.upgrade.mode),
                 laborTime: normalizeLaborTime(item.upgrade.laborTime)
@@ -6924,9 +7037,13 @@ Example:
                             unitType: option.unitType || '',
                             rate: parseFloat(option.rate) || 0,
                             materialCost: parseFloat(option.materialCost) || 0,
+                            priceTbd: isQuotePriceTbd(option),
+                            pricingMode: isQuotePriceTbd(option) ? 'tbd' : 'fixed',
                             supplierUrl: option.supplierUrl || '',
                             photo: option.photo || '',
+                            photos: normalizeQuoteUpgradePhotos(option),
                             photoFull: option.photoFull || null,
+                            photosFull: normalizeQuoteUpgradePhotosFull(option),
                             description: option.description || option.itemDescription || '',
                             upgradeType: normalizeQuoteUpgradeType(option.upgradeType || option.type || option.mode),
                             quantityMode: normalizeQuoteItemUpgradeQuantityMode(option.quantityMode),
@@ -6943,9 +7060,12 @@ Example:
                 unitType: item.unitType || item.unit || '',
                 rate: parseFloat(item.rate) || 0,
                 materialCost: parseFloat(item.materialCost !== undefined ? item.materialCost : item.material_cost) || 0,
+                priceTbd: isQuotePriceTbd(item),
+                pricingMode: isQuotePriceTbd(item) ? 'tbd' : 'fixed',
                 supplierUrl: item.supplierUrl || '',
                 itemDescription: item.itemDescription || item.displayDescription || '',
                 photo: item.photo || '',
+                photos: Array.isArray(item.photos) ? item.photos : (item.photo ? [item.photo] : []),
                 photoFull: item.photoFull || null,
                 photosFull: Array.isArray(item.photosFull) ? item.photosFull : [],
                 laborTime: normalizeLaborTime(item.laborTime),
@@ -7098,7 +7218,7 @@ Example:
                 var id = 'savedItemSync_' + index;
                 var before = change.originalName || change.before?.name || 'Saved item';
                 var after = change.newName || change.after?.name || before;
-                var priceText = qdFormatMoney(parseFloat(item.rate) || 0) + ' -> ' + qdFormatMoney(parseFloat(change.after?.rate) || 0);
+                var priceText = (isQuotePriceTbd(item) ? qdFormatPriceTbd() : qdFormatMoney(parseFloat(item.rate) || 0)) + ' -> ' + (isQuotePriceTbd(change.after) ? qdFormatPriceTbd() : qdFormatMoney(parseFloat(change.after?.rate) || 0));
                 return '<div class="saved-item-sync-row d-flex gap-2 align-items-start mb-2">' +
                     '<input class="form-check-input mt-1 saved-item-sync-checkbox" type="checkbox" checked id="' + id + '" data-change-id="' + qdTemplateEscapeHtml(change.id) + '" data-room-id="' + qdTemplateEscapeHtml(room.id) + '" data-item-index="' + match.itemIndex + '">' +
                     '<div class="flex-grow-1">' +
@@ -7149,6 +7269,8 @@ Example:
             item.unitType = savedItem.unitType || savedItem.unit || item.unitType || '';
             item.itemDescription = savedItem.itemDescription || '';
             item.materialCost = parseFloat(savedItem.materialCost !== undefined ? savedItem.materialCost : savedItem.material_cost) || 0;
+            item.priceTbd = isQuotePriceTbd(savedItem);
+            item.pricingMode = item.priceTbd ? 'tbd' : 'fixed';
             item.supplierUrl = savedItem.supplierUrl || '';
             item.photo = savedItem.photo || item.photo || '';
             item.photoFull = savedItem.photoFull || item.photoFull || null;
@@ -7162,16 +7284,18 @@ Example:
             }
             if (wasUpgraded && item.upgrade && item.upgrade.name) {
                 item.upgraded = true;
-                item.rate = parseFloat(item.upgrade.rate) || 0;
+                item.priceTbd = isQuotePriceTbd(item.upgrade);
+                item.pricingMode = item.priceTbd ? 'tbd' : 'fixed';
+                item.rate = item.priceTbd ? 0 : (parseFloat(item.upgrade.rate) || 0);
                 item.unitType = item.upgrade.unitType || item.upgrade.unit || item.unitType;
                 item.materialCost = parseFloat(item.upgrade.materialCost !== undefined ? item.upgrade.materialCost : item.upgrade.material_cost) || 0;
                 item.supplierUrl = item.upgrade.supplierUrl || item.supplierUrl || '';
                 if (item.upgrade.laborTime) item.laborTime = normalizeLaborTime(item.upgrade.laborTime);
             } else {
-                item.rate = parseFloat(savedItem.rate) || 0;
+                item.rate = item.priceTbd ? 0 : (parseFloat(savedItem.rate) || 0);
             }
             item.notes = existingNotes;
-            item.total = (parseFloat(item.quantity) || 0) * (parseFloat(item.rate) || 0);
+            item.total = isQuotePriceTbd(item) ? 0 : ((parseFloat(item.quantity) || 0) * (parseFloat(item.rate) || 0));
             item.savedItemSource = savedItemQuoteSource(category, savedItem);
             item.savedItemFingerprint = getSavedItemFingerprintForQuoteSync(savedItem);
         }
@@ -7747,6 +7871,7 @@ Example:
             populateLineUnitTypeDropdown(item.unitType);
             document.getElementById('lineQuantity').value = item.quantity;
             document.getElementById('lineRate').value = item.rate;
+            setLinePriceTbdState(isQuotePriceTbd(item));
             document.getElementById('lineDiscountType').value = item.discountType || 'none';
             document.getElementById('lineDiscountValue').value = item.discountValue || 0;
             document.getElementById('lineDiscountLabel').value = item.discountLabel || 'Courtesy discount';
@@ -7862,7 +7987,8 @@ Example:
             const itemDescription = document.getElementById('lineItemDescription').value.trim();
             const category = normalizeLineItemCategoryValue(document.getElementById('lineCategory'));
             const unitType = normalizeLineUnitTypeValue(document.getElementById('lineUnitType'));
-            const rate = parseFloat(document.getElementById('lineRate').value) || 0;
+            const priceTbd = document.getElementById('linePriceTbd')?.checked === true;
+            const rate = priceTbd ? 0 : (parseFloat(document.getElementById('lineRate').value) || 0);
             const materialCost = parseFloat(document.getElementById('lineMaterialCost').value) || 0;
             const existingSavedItem = findSavedItemForQuoteEdit(existingItem)?.item || {};
             const savedItem = {
@@ -7870,6 +7996,8 @@ Example:
                 unitType: unitType,
                 rate: rate,
                 materialCost: materialCost,
+                priceTbd: priceTbd,
+                pricingMode: priceTbd ? 'tbd' : 'fixed',
                 supplierUrl: getLineItemSupplierUrlFromForm(),
                 itemDescription: itemDescription
             };
@@ -7977,7 +8105,8 @@ Example:
             const category = normalizeLineItemCategoryValue(document.getElementById('lineCategory'));
             const unitType = normalizeLineUnitTypeValue(document.getElementById('lineUnitType'));
             const quantity = parseFloat(document.getElementById('lineQuantity').value) || 0;
-            const rate = parseFloat(document.getElementById('lineRate').value) || 0;
+            const priceTbd = document.getElementById('linePriceTbd')?.checked === true;
+            const rate = priceTbd ? 0 : (parseFloat(document.getElementById('lineRate').value) || 0);
             const notes = document.getElementById('lineNotes').value.trim();
             const materialCost = parseFloat(document.getElementById('lineMaterialCost').value) || 0;
             const roomIndex = rooms.findIndex(r => r.id === roomId);
@@ -7988,7 +8117,7 @@ Example:
                 if (editingItemIndex !== null && rooms[roomIndex].items[editingItemIndex]) {
                     const item = rooms[roomIndex].items[editingItemIndex];
                     editedSavedItemData = buildSavedItemFromEditedLineItem(item);
-                    previousSavedItemSource = cloneSavedItemForQuoteSync(item.savedItemSource || savedItemQuoteSource(item.category, { name: item.serviceName || item.description, unitType: item.unitType, rate: item.rate, materialCost: item.materialCost, supplierUrl: item.supplierUrl, itemDescription: item.itemDescription, photo: item.photo, photoFull: item.photoFull, photosFull: item.photosFull, laborTime: item.laborTime, upgrade: item.upgrade }));
+                    previousSavedItemSource = cloneSavedItemForQuoteSync(item.savedItemSource || savedItemQuoteSource(item.category, { name: item.serviceName || item.description, unitType: item.unitType, rate: item.rate, materialCost: item.materialCost, priceTbd: item.priceTbd, pricingMode: item.pricingMode, supplierUrl: item.supplierUrl, itemDescription: item.itemDescription, photo: item.photo, photos: item.photos, photoFull: item.photoFull, photosFull: item.photosFull, laborTime: item.laborTime, upgrade: item.upgrade }));
                     savedDbChoice = await maybeConfirmSavedItemDatabaseUpdate(item, editedSavedItemData);
                     if (savedDbChoice === false) return;
                 }
@@ -8019,6 +8148,8 @@ Example:
                     item.unitType = unitType;
                     item.quantity = quantity;
                     item.rate = rate;
+                    item.priceTbd = priceTbd;
+                    item.pricingMode = priceTbd ? 'tbd' : 'fixed';
                     item.notes = notes;
                     item.itemDescription = itemDescription;
                     item.materialCost = materialCost;
@@ -8047,7 +8178,7 @@ Example:
                         item.savedItemSource = savedItemQuoteSource(category, savedItemForEdit);
                         item.savedItemFingerprint = getSavedItemFingerprintForQuoteSync(savedItemForEdit);
                     }
-                    item.total = quantity * rate;
+                    item.total = priceTbd ? 0 : (quantity * rate);
                     applyLineDiscountFields(item);
                     coRefreshItemDelta(item);
                 } else {
@@ -8062,10 +8193,13 @@ Example:
                         unitType,
                         quantity,
                         rate,
+                        priceTbd,
+                        pricingMode: priceTbd ? 'tbd' : 'fixed',
                         notes,
                         materialCost,
                         supplierUrl,
                         photo: dbItem?.photo || '',
+                        photos: Array.isArray(dbItem?.photos) ? dbItem.photos : (dbItem?.photo ? [dbItem.photo] : []),
                         photoFull: dbItem?.photoFull || null,
                         photosFull: Array.isArray(dbItem?.photosFull) ? dbItem.photosFull : [],
                         upgrade: dbItem?.upgrade || null,
@@ -8077,7 +8211,7 @@ Example:
                         laborTime: normalizeLaborTime(dbItem?.laborTime),
                         savedItemSource: dbItem ? savedItemQuoteSource(category, dbItem) : null,
                         savedItemFingerprint: dbItem ? getSavedItemFingerprintForQuoteSync(dbItem) : '',
-                        total: quantity * rate
+                        total: priceTbd ? 0 : (quantity * rate)
                     };
                     applyLineDiscountFields(newItem);
                     const itemsToAdd = await autoGroupQuoteItem(newItem, rooms[roomIndex]);
@@ -8135,7 +8269,8 @@ Example:
             const itemDescription = document.getElementById('lineItemDescription').value.trim();
             const category = normalizeLineItemCategoryValue(document.getElementById('lineCategory'));
             const unitType = normalizeLineUnitTypeValue(document.getElementById('lineUnitType'));
-            const rate = parseFloat(document.getElementById('lineRate').value) || 0;
+            const priceTbd = document.getElementById('linePriceTbd')?.checked === true;
+            const rate = priceTbd ? 0 : (parseFloat(document.getElementById('lineRate').value) || 0);
             const materialCost = parseFloat(document.getElementById('lineMaterialCost').value) || 0;
             const supplierLinkBtn = document.getElementById('supplierLinkBtn');
             const supplierUrl = (supplierLinkBtn && supplierLinkBtn.style.display !== 'none' && supplierLinkBtn.href !== '#') ? supplierLinkBtn.href : '';
@@ -8143,7 +8278,7 @@ Example:
             try {
                 if (!customItems || typeof customItems !== 'object') customItems = {};
                 if (!customItems[category]) customItems[category] = [];
-                var newItem = { name: desc, unitType: unitType, rate: rate, materialCost: materialCost, supplierUrl: supplierUrl, itemDescription: itemDescription, upgrade: null };
+                var newItem = { name: desc, unitType: unitType, rate: rate, materialCost: materialCost, priceTbd: priceTbd, pricingMode: priceTbd ? 'tbd' : 'fixed', supplierUrl: supplierUrl, itemDescription: itemDescription, upgrade: null };
                 var existingCustom = customItems[category].find(function(i) { return i && i.name === desc; });
                 if (existingCustom) {
                     Object.assign(existingCustom, newItem);
@@ -8363,15 +8498,19 @@ Example:
 
         function normalizeChoiceGroupOption(item, fallbackId) {
             item = item || {};
+            var priceTbd = isQuotePriceTbd(item);
             return {
                 id: item.id || fallbackId || choiceGroupId(),
                 name: item.name || item.description || item.serviceName || 'Option',
                 description: item.description || item.name || item.serviceName || '',
                 unitType: item.unitType || item.unit || '',
-                rate: parseFloat(item.rate) || 0,
+                rate: priceTbd ? 0 : (parseFloat(item.rate) || 0),
                 materialCost: parseFloat(item.materialCost) || 0,
+                priceTbd: priceTbd,
+                pricingMode: priceTbd ? 'tbd' : 'fixed',
                 supplierUrl: item.supplierUrl || '',
                 photo: item.photo || '',
+                photos: Array.isArray(item.photos) ? item.photos : (item.photo ? [item.photo] : []),
                 photoFull: item.photoFull || null,
                 photosFull: Array.isArray(item.photosFull) ? item.photosFull : [],
                 itemDescription: item.itemDescription || item.description || '',
@@ -8396,17 +8535,24 @@ Example:
 
         function normalizeChoiceGroupEnhancementOption(option, fallbackId) {
             option = option || {};
+            var photos = normalizeQuoteUpgradePhotos(option);
+            var photosFull = normalizeQuoteUpgradePhotosFull(option);
+            var priceTbd = isQuotePriceTbd(option);
             return {
                 id: option.id || fallbackId || choiceGroupId(),
                 name: option.name || option.sourceItemName || option.description || 'Enhancement',
                 category: option.category || '',
                 sourceItemName: option.sourceItemName || option.name || '',
                 unitType: option.unitType || option.unit || '',
-                rate: parseFloat(option.rate) || 0,
+                rate: priceTbd ? 0 : (parseFloat(option.rate) || 0),
                 materialCost: parseFloat(option.materialCost) || 0,
+                priceTbd: isQuotePriceTbd(option),
+                pricingMode: priceTbd ? 'tbd' : 'fixed',
                 supplierUrl: option.supplierUrl || '',
-                photo: option.photo || '',
-                photoFull: option.photoFull || null,
+                photo: photos[0] || '',
+                photos: photos,
+                photoFull: photosFull[0] || null,
+                photosFull: photos.map(function(_photo, index) { return photosFull[index] || null; }),
                 description: option.description || option.itemDescription || option.name || '',
                 itemDescription: option.itemDescription || option.description || '',
                 laborTime: normalizeLaborTime(option.laborTime),
@@ -8530,6 +8676,23 @@ Example:
             var replacementOptions = selectedEnhancements.filter(function(option) { return option.upgradeType === 'replacement'; });
             var replacement = replacementOptions.length ? replacementOptions[replacementOptions.length - 1] : null;
             if (replacement) {
+                if (isQuotePriceTbd(replacement)) {
+                    state.total = 0;
+                    state.rate = 0;
+                    state.materialCost = 0;
+                    state.priceTbd = true;
+                    state.pricingMode = 'tbd';
+                    state.hasTbdSelections = true;
+                    state.description = replacement.name || state.description;
+                    state.unitType = replacement.unitType || state.unitType;
+                    state.supplierUrl = replacement.supplierUrl || state.supplierUrl;
+                    state.photo = replacement.photo || state.photo || '';
+                    state.photoFull = replacement.photoFull || state.photoFull || null;
+                    state.photos = normalizeQuoteUpgradePhotos(replacement).length ? normalizeQuoteUpgradePhotos(replacement) : (Array.isArray(state.photos) ? state.photos : []);
+                    state.photosFull = normalizeQuoteUpgradePhotosFull(replacement).length ? normalizeQuoteUpgradePhotosFull(replacement) : (Array.isArray(state.photosFull) ? state.photosFull : []);
+                    state.itemDescription = replacement.itemDescription || replacement.description || state.itemDescription;
+                    state.laborTime = normalizeLaborTime(replacement.laborTime || state.laborTime);
+                } else {
                 var replacementQty = replacement.quantityMode === 'override' ? (parseFloat(replacement.quantityOverride) || 0) : baseQty;
                 var replacementRate = parseFloat(replacement.rate) || 0;
                 state.total = replacementQty * replacementRate;
@@ -8540,10 +8703,17 @@ Example:
                 state.supplierUrl = replacement.supplierUrl || state.supplierUrl;
                 state.photo = replacement.photo || state.photo || '';
                 state.photoFull = replacement.photoFull || state.photoFull || null;
+                state.photos = normalizeQuoteUpgradePhotos(replacement).length ? normalizeQuoteUpgradePhotos(replacement) : (Array.isArray(state.photos) ? state.photos : []);
+                state.photosFull = normalizeQuoteUpgradePhotosFull(replacement).length ? normalizeQuoteUpgradePhotosFull(replacement) : (Array.isArray(state.photosFull) ? state.photosFull : []);
                 state.itemDescription = replacement.itemDescription || replacement.description || state.itemDescription;
                 state.laborTime = normalizeLaborTime(replacement.laborTime || state.laborTime);
+                }
             }
             selectedEnhancements.filter(function(option) { return option.upgradeType !== 'replacement'; }).forEach(function(option) {
+                if (isQuotePriceTbd(option)) {
+                    state.hasTbdSelections = true;
+                    return;
+                }
                 var qty = option.quantityMode === 'override' ? (parseFloat(option.quantityOverride) || 0) : baseQty;
                 var rate = parseFloat(option.rate) || 0;
                 var materialCost = parseFloat(option.materialCost) || 0;
@@ -8558,6 +8728,8 @@ Example:
             if (!item || !item.choiceGroup) return item;
             if (item._choiceGroupBasePhoto === undefined) item._choiceGroupBasePhoto = item.photo || '';
             if (item._choiceGroupBasePhotoFull === undefined) item._choiceGroupBasePhotoFull = item.photoFull || null;
+            if (item._choiceGroupBasePhotos === undefined) item._choiceGroupBasePhotos = Array.isArray(item.photos) ? item.photos.slice() : (item.photo ? [item.photo] : []);
+            if (item._choiceGroupBasePhotosFull === undefined) item._choiceGroupBasePhotosFull = Array.isArray(item.photosFull) ? item.photosFull.slice() : (item.photoFull ? [item.photoFull] : []);
             item.choiceGroup = hydrateChoiceGroupOptionsFromSavedItems(item.choiceGroup, item.category);
             var group = item.choiceGroup;
             group.enhancementGroups = normalizeChoiceGroupEnhancementGroups(group.enhancementGroups);
@@ -8565,6 +8737,7 @@ Example:
             var baseQty = parseFloat(item.quantity) || 0;
             var selectedTotal = 0;
             var selectedRate = 0;
+            var hasTbdSelections = false;
             var baseState = {
                 total: 0,
                 rate: 0,
@@ -8574,10 +8747,16 @@ Example:
                 supplierUrl: item.supplierUrl || '',
                 photo: item._choiceGroupBasePhoto || '',
                 photoFull: item._choiceGroupBasePhotoFull || null,
+                photos: Array.isArray(item._choiceGroupBasePhotos) ? item._choiceGroupBasePhotos.slice() : [],
+                photosFull: Array.isArray(item._choiceGroupBasePhotosFull) ? item._choiceGroupBasePhotosFull.slice() : [],
                 itemDescription: item.itemDescription || '',
                 laborTime: normalizeLaborTime(item.laborTime)
             };
             selectedOptions.forEach(function(option) {
+                if (isQuotePriceTbd(option)) {
+                    hasTbdSelections = true;
+                    return;
+                }
                 var qty = option.quantityMode === 'override' ? (parseFloat(option.quantityOverride) || 0) : baseQty;
                 var rate = parseFloat(option.rate) || 0;
                 selectedRate += rate;
@@ -8585,15 +8764,22 @@ Example:
             });
             if (group.type === 'single' && selectedOptions[0]) {
                 var option = selectedOptions[0];
+                var optionPriceTbd = isQuotePriceTbd(option);
+                if (optionPriceTbd) hasTbdSelections = true;
                 baseState = {
-                    total: selectedTotal,
-                    rate: parseFloat(option.rate) || 0,
+                    total: optionPriceTbd ? 0 : selectedTotal,
+                    rate: optionPriceTbd ? 0 : (parseFloat(option.rate) || 0),
                     materialCost: parseFloat(option.materialCost) || 0,
+                    priceTbd: optionPriceTbd,
+                    pricingMode: optionPriceTbd ? 'tbd' : 'fixed',
+                    hasTbdSelections: optionPriceTbd,
                     description: option.name || group.name || item.description,
                     unitType: option.unitType || item.unitType || item.unit || '',
                     supplierUrl: option.supplierUrl || item.supplierUrl || '',
                     photo: option.photo || item._choiceGroupBasePhoto || '',
                     photoFull: option.photoFull || item._choiceGroupBasePhotoFull || null,
+                    photos: normalizeQuoteUpgradePhotos(option).length ? normalizeQuoteUpgradePhotos(option) : (Array.isArray(item._choiceGroupBasePhotos) ? item._choiceGroupBasePhotos.slice() : []),
+                    photosFull: normalizeQuoteUpgradePhotosFull(option).length ? normalizeQuoteUpgradePhotosFull(option) : (Array.isArray(item._choiceGroupBasePhotosFull) ? item._choiceGroupBasePhotosFull.slice() : []),
                     itemDescription: option.itemDescription || option.description || item.itemDescription || '',
                     laborTime: normalizeLaborTime(option.laborTime || item.laborTime)
                 };
@@ -8607,9 +8793,16 @@ Example:
             item.unitType = finalState.unitType || item.unitType || item.unit || '';
             item.rate = parseFloat(finalState.rate) || 0;
             item.materialCost = parseFloat(finalState.materialCost) || 0;
+            item.priceTbd = finalState.priceTbd === true;
+            item.pricingMode = item.priceTbd ? 'tbd' : 'fixed';
+            item.hasTbdSelections = hasTbdSelections || finalState.hasTbdSelections === true;
             item.supplierUrl = finalState.supplierUrl || item.supplierUrl || '';
             item.photo = finalState.photo || item.photo || '';
             item.photoFull = finalState.photoFull || item.photoFull || null;
+            item.photos = Array.isArray(finalState.photos) ? finalState.photos.slice() : (item.photo ? [item.photo] : []);
+            item.photosFull = item.photos.map(function(_photo, index) {
+                return Array.isArray(finalState.photosFull) ? (finalState.photosFull[index] || null) : null;
+            });
             item.itemDescription = finalState.itemDescription || item.itemDescription || '';
             item.laborTime = normalizeLaborTime(finalState.laborTime || item.laborTime);
             item.choiceGroup.selectedOptionIds = selectedOptions.map(function(option) { return option.id; });
@@ -9817,6 +10010,39 @@ Example:
             if (typeof markUnsaved === 'function') markUnsaved();
         }
 
+        function countQuoteTbdSelections() {
+            var count = 0;
+            (rooms || []).forEach(function(room) {
+                (room.items || []).forEach(function(item) {
+                    if (isQuotePriceTbd(item)) count += 1;
+                    getSelectedItemUpgradeOptions(item).forEach(function(option) {
+                        if (isQuotePriceTbd(option)) count += 1;
+                    });
+                    if (item.choiceGroup) {
+                        getChoiceGroupSelectedOptions(item.choiceGroup).forEach(function(option) {
+                            if (isQuotePriceTbd(option)) count += 1;
+                        });
+                        getChoiceGroupSelectedEnhancementOptions(item.choiceGroup).forEach(function(option) {
+                            if (isQuotePriceTbd(option)) count += 1;
+                        });
+                    }
+                });
+            });
+            return count;
+        }
+
+        function updateQuoteTbdNotice(count) {
+            var notice = document.getElementById('quoteTbdNotice');
+            if (!notice) return;
+            if (!count) {
+                notice.style.display = 'none';
+                notice.textContent = '';
+                return;
+            }
+            notice.style.display = 'block';
+            notice.innerHTML = '<i class="fas fa-circle-question me-1"></i>This quote includes ' + count + ' selected Price TBD item' + (count === 1 ? '' : 's') + '. TBD pricing is not included in the displayed total.';
+        }
+
         function calculateTotals() {
             initializeQuoteTaxToggleFromDefault();
             refreshChoiceGroupTotals();
@@ -9864,6 +10090,7 @@ Example:
                 }
             }
             const balanceDue = Math.max(total - paymentReceivedAmount, 0);
+            updateQuoteTbdNotice(countQuoteTbdSelections());
 
             document.getElementById('subtotalDisplay').textContent = window._quoteDocumentType === 'change_order'
                 ? coMoney(subtotal, _sym, true)
@@ -11512,6 +11739,7 @@ Example:
                             const displayDiscount = discounts.discountAmount(item) * markupFactor;
                             const displayTotal = (window._quoteDocumentType === 'change_order' ? coDisplayLineAmount(item) : discounts.chargedTotal(item)) * markupFactor;
                             const hasDiscount = displayDiscount > 0;
+                            const linePriceTbd = isQuotePriceTbd(item);
                             const hasUpgrade = !!(item.upgrade && item.upgrade.name) || hasUpgradeGroups;
                             const isUpgraded = !!item.upgraded;
                             const isOptional = !!item.optional;
@@ -11571,8 +11799,10 @@ Example:
                             html += '</td>';
                             html += '<td class="quote-item-qty-cell">' + formatQuoteQuantityDisplay(item.quantity, item.unitType || item.unit || '') + '</td>';
                             var displayRateText = qdFormatMoney(displayRate);
+                            if (linePriceTbd) displayRateText = qdFormatPriceTbd();
                             html += '<td class="quote-item-rate-cell">' + displayRateText + '</td>';
                             var displayTotalText = qdFormatMoney(displayTotal);
+                            if (linePriceTbd) displayTotalText = qdFormatPriceTbd();
                             html += '<td class="quote-item-total-cell"><strong>' + displayTotalText + '</strong>';
                             if (hasDiscount) {
                                 html += '<div class="small text-muted"><s>' + qdFormatMoney(originalLineTotal) + '</s></div>';
@@ -12053,6 +12283,7 @@ Example:
                 categoryStyles: JSON.parse(JSON.stringify(categoryStyles || {})),
                 quoteAdjustment: getQuoteClientAdjustment(),
                 paymentsReceived: getQuotePaymentsReceived(),
+                priceTbdSelectionCount: countQuoteTbdSelections(),
                 grandTotal: parseFloat(document.getElementById('grandTotalDisplay')?.textContent.replace(/[^0-9.]/g, '')) || 0,
                 dividerSingular: dividerLabels.singular,
                 dividerPlural: dividerLabels.plural,
@@ -12734,6 +12965,7 @@ Example:
                 quoteAdjustment: getQuoteClientAdjustment(),
                 paymentsReceived: getQuotePaymentsReceived(),
                 taxEnabled: getQuoteTaxEnabled(),
+                priceTbdSelectionCount: countQuoteTbdSelections(),
                 grandTotal: parseFloat(document.getElementById('grandTotalDisplay').textContent.replace(/[^0-9.]/g, '')) || 0,
                 total: parseFloat(document.getElementById('grandTotalDisplay').textContent.replace(/[^0-9.]/g, '')) || 0,
                 status: 'draft',
@@ -12903,6 +13135,7 @@ Example:
                 quoteAdjustment: getQuoteClientAdjustment(),
                 paymentsReceived: getQuotePaymentsReceived(),
                 taxEnabled: getQuoteTaxEnabled(),
+                priceTbdSelectionCount: countQuoteTbdSelections(),
                 grandTotal: parseFloat(document.getElementById('grandTotalDisplay').textContent.replace(/[^0-9.]/g, '')) || 0,
                 savedAt: new Date().toISOString()
             };
@@ -16740,7 +16973,7 @@ Example:
                     }
                     var upgradePhotoRemoveBtn = e.target.closest('.upgrade-photo-remove-btn');
                     if (upgradePhotoRemoveBtn && typeof removeManageUpgradePhoto === 'function') {
-                        removeManageUpgradePhoto(upgradePhotoRemoveBtn.dataset.cat, upgradePhotoRemoveBtn.dataset.name, upgradePhotoRemoveBtn.dataset.upgradeGroupId, upgradePhotoRemoveBtn.dataset.upgradeOptionId);
+                        removeManageUpgradePhoto(upgradePhotoRemoveBtn.dataset.cat, upgradePhotoRemoveBtn.dataset.name, upgradePhotoRemoveBtn.dataset.upgradeGroupId, upgradePhotoRemoveBtn.dataset.upgradeOptionId, upgradePhotoRemoveBtn.dataset.photoIndex);
                         return;
                     }
                     var photoRemoveBtn = e.target.closest('.item-photo-remove-btn');

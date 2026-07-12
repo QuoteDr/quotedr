@@ -83,12 +83,16 @@ assert(
 assert(
   viewer.includes('function normalizeViewerPhotoFullList') &&
     viewer.includes('registerViewerPhoto(src, fullSrc)') &&
-    viewer.includes('viewerPhotoRegistry[key] = photos') &&
-    viewer.includes('openPhotoLightbox(photos)') &&
-    viewer.includes('renderViewerPhotoButton(option.photo') &&
-    viewer.includes('option.photoFull') &&
+    viewer.includes('viewerPhotoRegistry[key] = { photos: photos, fallbacks: fallbackPhotos }') &&
+    viewer.includes('openPhotoLightbox(entry.photos, entry.fallbacks)') &&
+    viewer.includes('renderViewerPhotoButton(option.photos || option.photo') &&
+    viewer.includes('option.photosFull || option.photoFull') &&
+    viewer.includes('function normalizeViewerPhotoFullSlots') &&
+    viewer.includes('viewerPhotoLightboxFallbackPhotos') &&
+    viewer.includes('img.onerror = function()') &&
     viewer.includes('getViewerItemPhotoFullList(item)') &&
-    viewer.includes('photoFull: option.photoFull') &&
+    viewer.includes('normalizeViewerPhotoFullList(option.photosFull, option.photoFull)') &&
+    viewer.includes('photosFull: photos.map') &&
     viewer.includes('function viewerFullResolutionPhotosEnabled') &&
     viewer.includes('quoteData.fullResolutionPhotosEnabled === true') &&
     viewer.includes('adminPreviewFullResolutionPhotosEnabled'),

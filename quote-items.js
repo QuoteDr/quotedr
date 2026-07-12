@@ -123,6 +123,43 @@
             return full.slice(0, MANAGE_ITEM_PHOTO_LIMIT);
         }
 
+        function normalizeManageUpgradePhotos(option) {
+            if (!option) return [];
+            var photos = [];
+            if (Array.isArray(option.photos)) {
+                option.photos.forEach(function(photo) {
+                    if (typeof photo === 'string' && photo.trim()) photos.push(photo);
+                });
+            }
+            if (!photos.length && typeof option.photo === 'string' && option.photo.trim()) {
+                photos.push(option.photo);
+            }
+            return photos.slice(0, MANAGE_ITEM_PHOTO_LIMIT);
+        }
+
+        function normalizeManageUpgradePhotosFull(option) {
+            if (!option) return [];
+            var full = [];
+            if (Array.isArray(option.photosFull)) {
+                option.photosFull.forEach(function(meta) {
+                    full.push(normalizeManageFullResPhotoMeta(meta));
+                });
+            }
+            if (!full.length && option.photoFull) {
+                full.push(normalizeManageFullResPhotoMeta(option.photoFull));
+            }
+            return full.slice(0, MANAGE_ITEM_PHOTO_LIMIT);
+        }
+
+        function parseManagePhotoJsonArray(value) {
+            try {
+                var parsed = JSON.parse(value || '[]');
+                return Array.isArray(parsed) ? parsed : [];
+            } catch(e) {
+                return [];
+            }
+        }
+
         function manageFullResPhotoIdentity(meta) {
             meta = normalizeManageFullResPhotoMeta(meta);
             return meta ? (meta.path || meta.url || '') : '';
@@ -139,8 +176,9 @@
             }
             normalizeManageItemUpgradeGroups(item).forEach(function(group) {
                 (group.options || []).forEach(function(option) {
-                    var meta = normalizeManageFullResPhotoMeta(option.photoFull);
-                    if (meta) out.push(meta);
+                    normalizeManageUpgradePhotosFull(option).forEach(function(meta) {
+                        if (meta) out.push(meta);
+                    });
                 });
             });
         }
@@ -310,17 +348,34 @@
             return (prefix || 'upg') + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
         }
 
+        function normalizeManagePricingMode(value, priceTbd) {
+            const clean = String(value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+            if (priceTbd === true || clean === 'tbd' || clean === 'price_tbd' || clean === 'to_be_determined') return 'tbd';
+            return 'fixed';
+        }
+
+        function isManagePriceTbd(item) {
+            return normalizeManagePricingMode(item && item.pricingMode, item && item.priceTbd) === 'tbd';
+        }
+
         function normalizeManageUpgradeOption(option, fallbackId) {
             option = option || {};
+            const photos = normalizeManageUpgradePhotos(option);
+            const photosFull = normalizeManageUpgradePhotosFull(option);
+            const priceTbd = isManagePriceTbd(option);
             return {
                 id: option.id || fallbackId || manageUpgradeGroupId('upo'),
                 name: option.name || option.sourceItemName || '',
                 unitType: option.unitType || option.unit || '',
-                rate: parseFloat(option.rate || 0) || 0,
+                rate: priceTbd ? 0 : (parseFloat(option.rate || 0) || 0),
                 materialCost: parseFloat(option.materialCost || option.material_cost || 0) || 0,
+                priceTbd: priceTbd,
+                pricingMode: priceTbd ? 'tbd' : 'fixed',
                 supplierUrl: option.supplierUrl || '',
-                photo: option.photo || '',
-                photoFull: normalizeManageFullResPhotoMeta(option.photoFull),
+                photo: photos[0] || '',
+                photos: photos,
+                photoFull: photosFull[0] || null,
+                photosFull: photos.map(function(_photo, index) { return normalizeManageFullResPhotoMeta(photosFull[index]); }),
                 description: option.description || option.itemDescription || '',
                 itemDescription: option.itemDescription || option.description || '',
                 upgradeType: normalizeManageUpgradeType(option.upgradeType || option.type || option.mode),
@@ -411,8 +466,10 @@
                         category: category,
                         name: item.name,
                         unitType: item.unitType || '',
-                        rate: parseFloat(item.rate || 0) || 0,
+                        rate: isManagePriceTbd(item) ? 0 : (parseFloat(item.rate || 0) || 0),
                         materialCost: parseFloat(item.materialCost || 0) || 0,
+                        priceTbd: isManagePriceTbd(item),
+                        pricingMode: isManagePriceTbd(item) ? 'tbd' : 'fixed',
                         supplierUrl: item.supplierUrl || '',
                         description: item.itemDescription || item.description || ''
                     });
@@ -431,6 +488,7 @@
                     'data-name="' + manageItemsAttr(item.name) + '" ' +
                     'data-unit="' + manageItemsAttr(item.unitType) + '" ' +
                     'data-rate="' + manageItemsAttr(item.rate) + '" ' +
+                    'data-price-tbd="' + (item.priceTbd ? '1' : '0') + '" ' +
                     'data-cost="' + manageItemsAttr(item.materialCost) + '" ' +
                     'data-supplier="' + manageItemsAttr(item.supplierUrl) + '" ' +
                     'data-description="' + manageItemsAttr(item.description) + '" ' +
@@ -612,15 +670,20 @@
 
                 group.options.forEach(function(option, optionIndex) {
                     const optionRequiresConsultation = isConsultationGroup || option.upgradeType === 'consultation' || option.requiresConsultation === true;
+                    const optionPriceTbd = isManagePriceTbd(option);
+                    const optionPhotos = normalizeManageUpgradePhotos(option);
+                    const optionPhotosFull = normalizeManageUpgradePhotosFull(option);
                     html += '<div class="manage-upgrade-option border rounded p-2 mt-2" data-upgrade-option-id="' + manageItemsAttr(option.id) + '">' +
-                        '<input type="hidden" class="upgrade-photo-value" value="' + manageItemsAttr(option.photo || '') + '">' +
-                        '<input type="hidden" class="upgrade-photo-full-value" value="' + manageItemsAttr(JSON.stringify(normalizeManageFullResPhotoMeta(option.photoFull) || null)) + '">' +
+                        '<input type="hidden" class="upgrade-photo-value" value="' + manageItemsAttr(optionPhotos[0] || '') + '">' +
+                        '<input type="hidden" class="upgrade-photo-full-value" value="' + manageItemsAttr(JSON.stringify(optionPhotosFull[0] || null)) + '">' +
+                        '<input type="hidden" class="upgrade-photos-value" value="' + manageItemsAttr(JSON.stringify(optionPhotos)) + '">' +
+                        '<input type="hidden" class="upgrade-photos-full-value" value="' + manageItemsAttr(JSON.stringify(optionPhotos.map(function(_photo, index) { return normalizeManageFullResPhotoMeta(optionPhotosFull[index]); }))) + '">' +
                         '<div class="row g-2 align-items-end">' +
                         '<div class="col-md-4"><label class="form-label" style="font-size:0.75em">Copy From Saved Item</label>' + renderManageUpgradeSourceSelect(option.sourceItemName, option.category) + '</div>' +
                         '<div class="col-md-4"><label class="form-label" style="font-size:0.75em">Upgrade Name</label><input type="text" class="form-control form-control-sm upgrade-name" value="' + manageItemsAttr(option.name) + '" placeholder="e.g., Post-to-post drink rail" oninput="markPricingDirty(this)"></div>' +
                         '<div class="col-md-2"><label class="form-label" style="font-size:0.75em">Unit</label>' + renderManageUnitSelect(option.unitType || baseUnitType || '', 'upgrade-unit-type') + '</div>' +
                         '<div class="col-md-2"><label class="form-label" style="font-size:0.75em">Type</label><select class="form-select form-select-sm upgrade-type" onchange="markPricingDirty(this)" ' + (isConsultationGroup ? 'disabled' : '') + '><option value="replacement" ' + (option.upgradeType === 'replacement' ? 'selected' : '') + '>Replacement</option><option value="add_on" ' + (option.upgradeType === 'add_on' ? 'selected' : '') + '>Add-on</option><option value="consultation" ' + (optionRequiresConsultation ? 'selected' : '') + '>Requires consultation</option></select></div>' +
-                        '<div class="col-md-2"><label class="form-label" style="font-size:0.75em">Rate</label><input type="number" class="form-control form-control-sm upgrade-rate" value="' + manageItemsAttr(optionRequiresConsultation ? '0.00' : option.rate.toFixed(2)) + '" step="0.01" min="0" placeholder="' + (optionRequiresConsultation ? 'Not priced' : '0.00') + '" ' + (optionRequiresConsultation ? 'disabled' : '') + ' oninput="markPricingDirty(this)"></div>' +
+                        '<div class="col-md-2"><div class="d-flex align-items-center gap-2 mb-1"><label class="form-label mb-0" style="font-size:0.75em">Rate</label><div class="form-check form-check-inline mb-0 price-tbd-inline"><input class="form-check-input upgrade-price-tbd" type="checkbox" ' + (optionPriceTbd ? 'checked' : '') + ' onchange="this.closest(&quot;.manage-upgrade-option&quot;).querySelector(&quot;.upgrade-rate&quot;).disabled=this.checked; markPricingDirty(this)"><label class="form-check-label small">Price TBD</label></div></div><input type="number" class="form-control form-control-sm upgrade-rate" value="' + manageItemsAttr((optionRequiresConsultation || optionPriceTbd) ? '0.00' : option.rate.toFixed(2)) + '" step="0.01" min="0" placeholder="' + (optionRequiresConsultation || optionPriceTbd ? 'Not priced' : '0.00') + '" ' + (optionRequiresConsultation || optionPriceTbd ? 'disabled' : '') + ' oninput="markPricingDirty(this)"></div>' +
                         '<div class="col-md-2"><label class="form-label" style="font-size:0.75em">Cost</label><input type="number" class="form-control form-control-sm upgrade-material-cost" value="' + manageItemsAttr(optionRequiresConsultation ? '0.00' : option.materialCost.toFixed(2)) + '" step="0.01" min="0" placeholder="' + (optionRequiresConsultation ? 'Not priced' : '0.00') + '" ' + (optionRequiresConsultation ? 'disabled' : '') + ' oninput="markPricingDirty(this)"></div>' +
                         '<div class="col-md-8"><label class="form-label" style="font-size:0.75em">Supplier URL</label><input type="url" class="form-control form-control-sm upgrade-supplier-url" value="' + manageItemsAttr(option.supplierUrl) + '" placeholder="https://..." oninput="markPricingDirty(this)"></div>' +
                         '<div class="col-12 description-refine-scope"><div class="d-flex justify-content-between align-items-center gap-2"><label class="form-label mb-0" style="font-size:0.75em">Upgrade Description</label><button type="button" class="btn btn-sm btn-outline-primary refine-desc-btn" style="font-size:0.75rem;padding:2px 8px;">AI Refine</button></div><input type="text" class="form-control form-control-sm upgrade-desc item-description-textarea mt-1" value="' + manageItemsAttr(option.description || '') + '" placeholder="e.g., Premium finishing upgrade" oninput="markPricingDirty(this)"></div>' +
@@ -647,17 +710,32 @@
                     const name = optionEl.querySelector('.upgrade-name')?.value.trim() || '';
                     if (!name) return null;
                     const requiresConsultation = groupType === 'consultation' || normalizeManageUpgradeType(optionEl.querySelector('.upgrade-type')?.value) === 'consultation';
+                    const priceTbd = optionEl.querySelector('.upgrade-price-tbd')?.checked === true;
+                    const upgradePhotos = parseManagePhotoJsonArray(optionEl.querySelector('.upgrade-photos-value')?.value).filter(function(photo) {
+                        return typeof photo === 'string' && photo.trim();
+                    }).slice(0, MANAGE_ITEM_PHOTO_LIMIT);
+                    if (!upgradePhotos.length && optionEl.querySelector('.upgrade-photo-value')?.value) {
+                        upgradePhotos.push(optionEl.querySelector('.upgrade-photo-value')?.value || '');
+                    }
+                    const upgradePhotosFull = parseManagePhotoJsonArray(optionEl.querySelector('.upgrade-photos-full-value')?.value).slice(0, MANAGE_ITEM_PHOTO_LIMIT);
+                    if (!upgradePhotosFull.length) {
+                        try { upgradePhotosFull.push(JSON.parse(optionEl.querySelector('.upgrade-photo-full-value')?.value || 'null')); } catch(e) {}
+                    }
                     return {
                         id: optionEl.dataset.upgradeOptionId || manageUpgradeGroupId('upo'),
                         name: name,
                         unitType: optionEl.querySelector('.upgrade-unit-type')?.value.trim() || '',
-                        rate: requiresConsultation ? 0 : (parseFloat(optionEl.querySelector('.upgrade-rate')?.value || 0) || 0),
+                        rate: (requiresConsultation || priceTbd) ? 0 : (parseFloat(optionEl.querySelector('.upgrade-rate')?.value || 0) || 0),
                         materialCost: requiresConsultation ? 0 : (parseFloat(optionEl.querySelector('.upgrade-material-cost')?.value || 0) || 0),
+                        priceTbd: priceTbd,
+                        pricingMode: priceTbd ? 'tbd' : 'fixed',
                         supplierUrl: optionEl.querySelector('.upgrade-supplier-url')?.value.trim() || '',
-                        photo: optionEl.querySelector('.upgrade-photo-value')?.value || '',
-                        photoFull: normalizeManageFullResPhotoMeta((function() {
-                            try { return JSON.parse(optionEl.querySelector('.upgrade-photo-full-value')?.value || 'null'); } catch(e) { return null; }
-                        })()),
+                        photo: upgradePhotos[0] || '',
+                        photos: upgradePhotos,
+                        photoFull: normalizeManageFullResPhotoMeta(upgradePhotosFull[0]),
+                        photosFull: upgradePhotos.map(function(_photo, index) {
+                            return normalizeManageFullResPhotoMeta(upgradePhotosFull[index]);
+                        }),
                         description: optionEl.querySelector('.upgrade-desc')?.value.trim() || '',
                         upgradeType: groupType === 'consultation' ? 'consultation' : normalizeManageUpgradeType(optionEl.querySelector('.upgrade-type')?.value),
                         requiresConsultation: requiresConsultation,
@@ -928,13 +1006,14 @@
                 options.map(function(option, optionIndex) {
                     option = normalizeManageUpgradeOption(option, 'wizard_' + optionIndex);
                     const optionRequiresConsultation = isConsultationGroup || option.requiresConsultation === true || option.upgradeType === 'consultation';
+                    const optionPriceTbd = isManagePriceTbd(option);
                     return '<div class="manage-upgrade-wizard-option manage-upgrade-wizard-option-card" data-upgrade-option-id="' + manageItemsAttr(option.id) + '">' +
                         '<div class="row g-2 align-items-end">' +
                         '<div class="col-md-4"><label class="form-label small mb-1">Copy From Saved Item</label>' + renderManageUpgradeSourceSelect(option.sourceItemName, option.category) + '</div>' +
                         '<div class="col-md-4"><label class="form-label small mb-1">Upgrade Name</label><input type="text" class="form-control form-control-sm upgrade-name" value="' + manageItemsAttr(option.name) + '" placeholder="e.g., Post-to-post drink rail"></div>' +
                         '<div class="col-md-2"><label class="form-label small mb-1">Unit</label>' + renderManageUnitSelect(option.unitType || state.baseUnitType || '', 'upgrade-unit-type') + '</div>' +
                         '<div class="col-md-2"><label class="form-label small mb-1">Type</label><select class="form-select form-select-sm upgrade-type" ' + (isConsultationGroup ? 'disabled' : '') + '><option value="replacement" ' + (option.upgradeType === 'replacement' ? 'selected' : '') + '>Replacement</option><option value="add_on" ' + (option.upgradeType === 'add_on' ? 'selected' : '') + '>Add-on</option><option value="consultation" ' + (optionRequiresConsultation ? 'selected' : '') + '>Requires consultation</option></select></div>' +
-                        '<div class="col-md-2"><label class="form-label small mb-1">Rate</label><input type="number" class="form-control form-control-sm upgrade-rate" value="' + manageItemsAttr(optionRequiresConsultation ? '0.00' : option.rate.toFixed(2)) + '" step="0.01" min="0" ' + (optionRequiresConsultation ? 'disabled' : '') + '></div>' +
+                        '<div class="col-md-2"><div class="d-flex align-items-center gap-2 mb-1"><label class="form-label small mb-0">Rate</label><div class="form-check form-check-inline mb-0 price-tbd-inline"><input class="form-check-input upgrade-price-tbd" type="checkbox" ' + (optionPriceTbd ? 'checked' : '') + ' onchange="this.closest(&quot;.manage-upgrade-wizard-option&quot;).querySelector(&quot;.upgrade-rate&quot;).disabled=this.checked"><label class="form-check-label small">Price TBD</label></div></div><input type="number" class="form-control form-control-sm upgrade-rate" value="' + manageItemsAttr((optionRequiresConsultation || optionPriceTbd) ? '0.00' : option.rate.toFixed(2)) + '" step="0.01" min="0" ' + (optionRequiresConsultation || optionPriceTbd ? 'disabled' : '') + '></div>' +
                         '<div class="col-md-2"><label class="form-label small mb-1">Cost</label><input type="number" class="form-control form-control-sm upgrade-material-cost" value="' + manageItemsAttr(optionRequiresConsultation ? '0.00' : option.materialCost.toFixed(2)) + '" step="0.01" min="0" ' + (optionRequiresConsultation ? 'disabled' : '') + '></div>' +
                         '<div class="col-md-7"><label class="form-label small mb-1">Supplier URL</label><input type="url" class="form-control form-control-sm upgrade-supplier-url" value="' + manageItemsAttr(option.supplierUrl || '') + '" placeholder="https://..."></div>' +
                         '<div class="col-md-1 d-flex align-items-end"><button type="button" class="btn btn-sm btn-outline-danger w-100" data-upgrade-wizard-action="remove-option" title="Remove option"><i class="fas fa-trash"></i></button></div>' +
@@ -956,7 +1035,7 @@
                     option = normalizeManageUpgradeOption(option, 'wizard_rule_' + optionIndex);
                     return '<div class="manage-upgrade-wizard-option manage-upgrade-wizard-option-card" data-upgrade-option-id="' + manageItemsAttr(option.id) + '">' +
                         '<div class="fw-bold">' + manageItemsEscape(option.name || 'Unnamed upgrade') + '</div>' +
-                        '<div class="small text-muted mb-2">' + manageItemsEscape(option.upgradeType === 'consultation' || option.requiresConsultation ? 'Requires consultation' : (option.upgradeType === 'replacement' ? 'Replacement' : 'Add-on')) + (option.requiresConsultation || option.upgradeType === 'consultation' ? '' : ' - ' + manageItemsEscape(option.unitType || 'unit not set') + ' @ $' + (parseFloat(option.rate) || 0).toFixed(2)) + '</div>' +
+                        '<div class="small text-muted mb-2">' + manageItemsEscape(option.upgradeType === 'consultation' || option.requiresConsultation ? 'Requires consultation' : (option.upgradeType === 'replacement' ? 'Replacement' : 'Add-on')) + (option.requiresConsultation || option.upgradeType === 'consultation' ? '' : (isManagePriceTbd(option) ? ' - Price TBD' : ' - ' + manageItemsEscape(option.unitType || 'unit not set') + ' @ $' + (parseFloat(option.rate) || 0).toFixed(2))) + '</div>' +
                         '<div class="row g-2">' +
                         '<div class="col-md-6">' + renderManageUpgradePathSelect(options, option.availableAfterOptionIds, option.id, 'upgrade-available-after', 'Available after') + '</div>' +
                         '<div class="col-md-6">' + renderManageUpgradePathSelect(options, option.blockedByOptionIds, option.id, 'upgrade-blocked-by', 'Blocked by') + '</div>' +
@@ -984,7 +1063,7 @@
                     if (quantityMode === 'multiplier') rules.push('Quantity multiplier x ' + (parseFloat(option.quantityMultiplier || 1) || 1));
                     if (quantityMode === 'override') rules.push('Fixed quantity ' + (parseFloat(option.quantityOverride || 0) || 0));
                     return '<div class="border rounded bg-white p-2 mb-2">' +
-                        '<div class="d-flex justify-content-between gap-2 flex-wrap"><strong>' + manageItemsEscape(option.name || 'Unnamed upgrade') + '</strong><span>' + (option.requiresConsultation || option.upgradeType === 'consultation' ? 'Requires consultation' : (manageItemsEscape(option.upgradeType === 'replacement' ? 'Replacement' : 'Add-on') + ' - $' + (parseFloat(option.rate) || 0).toFixed(2) + '/' + manageItemsEscape(option.unitType || 'unit'))) + '</span></div>' +
+                        '<div class="d-flex justify-content-between gap-2 flex-wrap"><strong>' + manageItemsEscape(option.name || 'Unnamed upgrade') + '</strong><span>' + (option.requiresConsultation || option.upgradeType === 'consultation' ? 'Requires consultation' : (isManagePriceTbd(option) ? 'Price TBD' : (manageItemsEscape(option.upgradeType === 'replacement' ? 'Replacement' : 'Add-on') + ' - $' + (parseFloat(option.rate) || 0).toFixed(2) + '/' + manageItemsEscape(option.unitType || 'unit')))) + '</span></div>' +
                         (option.description ? '<div class="small text-muted mt-1">' + manageItemsEscape(option.description) + '</div>' : '') +
                         (rules.length ? '<div class="small text-primary mt-1">' + manageItemsEscape(rules.join(' | ')) + '</div>' : '') +
                         '</div>';
@@ -1063,12 +1142,15 @@
                 };
                 const optionType = normalizeManageUpgradeType(optionEl.querySelector('.upgrade-type')?.value || previous.upgradeType);
                 const requiresConsultation = group.type === 'consultation' || optionType === 'consultation' || previous.requiresConsultation === true;
+                const priceTbd = optionEl.querySelector('.upgrade-price-tbd')?.checked === true;
                 return {
                     id: optionId,
                     name: getValue('.upgrade-name', previous.name),
                     unitType: getValue('.upgrade-unit-type', previous.unitType || manageUpgradeWizardState.baseUnitType),
-                    rate: requiresConsultation ? 0 : getNumber('.upgrade-rate', previous.rate),
+                    rate: (requiresConsultation || priceTbd) ? 0 : getNumber('.upgrade-rate', previous.rate),
                     materialCost: requiresConsultation ? 0 : getNumber('.upgrade-material-cost', previous.materialCost),
+                    priceTbd: priceTbd,
+                    pricingMode: priceTbd ? 'tbd' : 'fixed',
                     supplierUrl: getValue('.upgrade-supplier-url', previous.supplierUrl),
                     description: getValue('.upgrade-desc', previous.description),
                     upgradeType: group.type === 'consultation' ? 'consultation' : optionType,
@@ -1290,6 +1372,10 @@
             setValue('.upgrade-name', selected.dataset.name || '');
             setValue('.upgrade-unit-type', selected.dataset.unit || rowUnitTypeForDetails(selectEl.closest('.item-details-row')) || manageUpgradeWizardState?.baseUnitType || '');
             setValue('.upgrade-rate', selected.dataset.rate || '0');
+            const priceTbdBox = optionEl.querySelector('.upgrade-price-tbd');
+            const rateInput = optionEl.querySelector('.upgrade-rate');
+            if (priceTbdBox) priceTbdBox.checked = selected.dataset.priceTbd === '1';
+            if (rateInput) rateInput.disabled = selected.dataset.priceTbd === '1';
             setValue('.upgrade-material-cost', selected.dataset.cost || '0');
             setValue('.upgrade-supplier-url', selected.dataset.supplier || '');
             setValue('.upgrade-desc', selected.dataset.description || '');
@@ -1517,12 +1603,11 @@
             }) || null;
         }
 
-        function syncManageUpgradePhotoFromDetails(cat, name, groupId, optionId, photo) {
-            var detailsRow = getManageItemDetailsRow(cat, name);
-            if (!detailsRow) return false;
+        function findManageUpgradeOptionElement(detailsRow, groupId, optionId) {
             var targetGroupId = String(groupId || '');
             var targetOptionId = String(optionId || '');
             var optionEl = null;
+            if (!detailsRow) return null;
             Array.from(detailsRow.querySelectorAll('.manage-upgrade-group')).some(function(groupEl) {
                 if (String(groupEl.dataset.upgradeGroupId || '') !== targetGroupId) return false;
                 optionEl = Array.from(groupEl.querySelectorAll('.manage-upgrade-option')).find(function(candidate) {
@@ -1530,6 +1615,13 @@
                 }) || null;
                 return !!optionEl;
             });
+            return optionEl;
+        }
+
+        function syncManageUpgradePhotoFromDetails(cat, name, groupId, optionId, photo, photoIndex) {
+            var detailsRow = getManageItemDetailsRow(cat, name);
+            if (!detailsRow) return false;
+            var optionEl = findManageUpgradeOptionElement(detailsRow, groupId, optionId);
             if (!optionEl) return false;
             var hidden = optionEl.querySelector('.upgrade-photo-value');
             if (!hidden) {
@@ -1538,28 +1630,40 @@
                 hidden.className = 'upgrade-photo-value';
                 optionEl.insertBefore(hidden, optionEl.firstChild);
             }
-            hidden.value = photo || '';
+            var photosHidden = optionEl.querySelector('.upgrade-photos-value');
+            if (!photosHidden) {
+                photosHidden = document.createElement('input');
+                photosHidden.type = 'hidden';
+                photosHidden.className = 'upgrade-photos-value';
+                optionEl.insertBefore(photosHidden, optionEl.firstChild);
+            }
+            var photos = parseManagePhotoJsonArray(photosHidden.value).filter(function(existingPhoto) {
+                return typeof existingPhoto === 'string' && existingPhoto.trim();
+            }).slice(0, MANAGE_ITEM_PHOTO_LIMIT);
+            if (!photos.length && hidden.value) photos.push(hidden.value);
+            var index = parseInt(photoIndex, 10);
+            if (Number.isFinite(index) && index >= 0 && index < MANAGE_ITEM_PHOTO_LIMIT) {
+                photos[index] = photo || '';
+            } else if (photos.length < MANAGE_ITEM_PHOTO_LIMIT) {
+                photos.push(photo || '');
+            } else {
+                return false;
+            }
+            photos = photos.filter(Boolean).slice(0, MANAGE_ITEM_PHOTO_LIMIT);
+            hidden.value = photos[0] || '';
+            photosHidden.value = JSON.stringify(photos);
             var groups = collectManageItemUpgradeGroups(detailsRow, true);
             findManagePhotoItems(cat, name).forEach(function(item) {
                 item.upgradeGroups = groups;
-                setManageUpgradeOptionPhoto(item, groupId, optionId, photo);
+                setManageUpgradeOptionPhoto(item, groupId, optionId, photo, photoIndex);
             });
             return true;
         }
 
-        function syncManageUpgradePhotoFullFromDetails(cat, name, groupId, optionId, photoFull) {
+        function syncManageUpgradePhotoFullFromDetails(cat, name, groupId, optionId, photoFull, photoIndex) {
             var detailsRow = getManageItemDetailsRow(cat, name);
             if (!detailsRow) return false;
-            var targetGroupId = String(groupId || '');
-            var targetOptionId = String(optionId || '');
-            var optionEl = null;
-            Array.from(detailsRow.querySelectorAll('.manage-upgrade-group')).some(function(groupEl) {
-                if (String(groupEl.dataset.upgradeGroupId || '') !== targetGroupId) return false;
-                optionEl = Array.from(groupEl.querySelectorAll('.manage-upgrade-option')).find(function(candidate) {
-                    return String(candidate.dataset.upgradeOptionId || '') === targetOptionId;
-                }) || null;
-                return !!optionEl;
-            });
+            var optionEl = findManageUpgradeOptionElement(detailsRow, groupId, optionId);
             if (!optionEl) return false;
             var hidden = optionEl.querySelector('.upgrade-photo-full-value');
             if (!hidden) {
@@ -1568,11 +1672,32 @@
                 hidden.className = 'upgrade-photo-full-value';
                 optionEl.insertBefore(hidden, optionEl.firstChild);
             }
-            hidden.value = JSON.stringify(normalizeManageFullResPhotoMeta(photoFull) || null);
+            var fullHidden = optionEl.querySelector('.upgrade-photos-full-value');
+            if (!fullHidden) {
+                fullHidden = document.createElement('input');
+                fullHidden.type = 'hidden';
+                fullHidden.className = 'upgrade-photos-full-value';
+                optionEl.insertBefore(fullHidden, optionEl.firstChild);
+            }
+            var full = parseManagePhotoJsonArray(fullHidden.value).slice(0, MANAGE_ITEM_PHOTO_LIMIT);
+            if (!full.length) {
+                try { full.push(JSON.parse(hidden.value || 'null')); } catch(e) {}
+            }
+            var index = parseInt(photoIndex, 10);
+            if (Number.isFinite(index) && index >= 0 && index < MANAGE_ITEM_PHOTO_LIMIT) {
+                full[index] = normalizeManageFullResPhotoMeta(photoFull);
+            } else if (full.length < MANAGE_ITEM_PHOTO_LIMIT) {
+                full.push(normalizeManageFullResPhotoMeta(photoFull));
+            } else {
+                return false;
+            }
+            full = full.slice(0, MANAGE_ITEM_PHOTO_LIMIT);
+            hidden.value = JSON.stringify(normalizeManageFullResPhotoMeta(full[0]) || null);
+            fullHidden.value = JSON.stringify(full.map(function(meta) { return normalizeManageFullResPhotoMeta(meta); }));
             var groups = collectManageItemUpgradeGroups(detailsRow, true);
             findManagePhotoItems(cat, name).forEach(function(item) {
                 item.upgradeGroups = groups;
-                setManageUpgradeOptionPhotoFull(item, groupId, optionId, photoFull);
+                setManageUpgradeOptionPhotoFull(item, groupId, optionId, photoFull, photoIndex);
             });
             return true;
         }
@@ -1649,23 +1774,54 @@
             return null;
         }
 
-        function setManageUpgradeOptionPhoto(item, groupId, optionId, photo) {
+        function setManageUpgradeOptionPhoto(item, groupId, optionId, photo, photoIndex) {
             var target = findManageUpgradePhotoTarget(item, groupId, optionId);
             if (!target || !target.option) return false;
-            target.option.photo = photo || '';
-            if (target.legacy && item.upgrade) item.upgrade.photo = photo || '';
+            var photos = normalizeManageUpgradePhotos(target.option);
+            var index = parseInt(photoIndex, 10);
+            if (Number.isFinite(index) && index >= 0 && index < MANAGE_ITEM_PHOTO_LIMIT) {
+                photos[index] = photo || '';
+            } else if (photos.length < MANAGE_ITEM_PHOTO_LIMIT) {
+                photos.push(photo || '');
+            } else {
+                return false;
+            }
+            photos = photos.filter(Boolean).slice(0, MANAGE_ITEM_PHOTO_LIMIT);
+            target.option.photos = photos;
+            target.option.photo = photos[0] || '';
+            if (target.legacy && item.upgrade) {
+                item.upgrade.photos = photos;
+                item.upgrade.photo = target.option.photo;
+            }
             if (item.upgrade && item.upgrade.name && target.option.name && item.upgrade.name === target.option.name) {
-                item.upgrade.photo = photo || '';
+                item.upgrade.photos = photos;
+                item.upgrade.photo = target.option.photo;
             }
             return true;
         }
 
-        function setManageUpgradeOptionPhotoFull(item, groupId, optionId, photoFull) {
+        function setManageUpgradeOptionPhotoFull(item, groupId, optionId, photoFull, photoIndex) {
             var target = findManageUpgradePhotoTarget(item, groupId, optionId);
             if (!target || !target.option) return false;
-            target.option.photoFull = normalizeManageFullResPhotoMeta(photoFull);
-            if (target.legacy && item.upgrade) item.upgrade.photoFull = target.option.photoFull;
+            var photos = normalizeManageUpgradePhotos(target.option);
+            var full = normalizeManageUpgradePhotosFull(target.option);
+            var index = parseInt(photoIndex, 10);
+            if (Number.isFinite(index) && index >= 0 && index < MANAGE_ITEM_PHOTO_LIMIT) {
+                full[index] = normalizeManageFullResPhotoMeta(photoFull);
+            } else if (full.length < MANAGE_ITEM_PHOTO_LIMIT) {
+                full.push(normalizeManageFullResPhotoMeta(photoFull));
+            } else {
+                return false;
+            }
+            full = photos.map(function(_photo, index) { return normalizeManageFullResPhotoMeta(full[index]); });
+            target.option.photosFull = full;
+            target.option.photoFull = full[0] || null;
+            if (target.legacy && item.upgrade) {
+                item.upgrade.photosFull = full;
+                item.upgrade.photoFull = target.option.photoFull;
+            }
             if (item.upgrade && item.upgrade.name && target.option.name && item.upgrade.name === target.option.name) {
+                item.upgrade.photosFull = full;
                 item.upgrade.photoFull = target.option.photoFull;
             }
             return true;
@@ -1682,8 +1838,10 @@
                         groupName: group.name || 'Upgrade Options',
                         optionId: option.id || '',
                         optionName: option.name || '',
-                        photo: option.photo || '',
-                        photoFull: normalizeManageFullResPhotoMeta(option.photoFull),
+                        photos: normalizeManageUpgradePhotos(option),
+                        photosFull: normalizeManageUpgradePhotosFull(option),
+                        photo: normalizeManageUpgradePhotos(option)[0] || '',
+                        photoFull: normalizeManageUpgradePhotosFull(option)[0] || null,
                         upgradeType: option.upgradeType || ''
                     });
                 });
@@ -1693,18 +1851,48 @@
 
         function countManageUpgradePhotos(item) {
             return getManageUpgradePhotoTargets(item).filter(function(target) {
-                return !!target.photo;
-            }).length;
+                return normalizeManageUpgradePhotos(target).length > 0;
+            }).reduce(function(total, target) {
+                return total + normalizeManageUpgradePhotos(target).length;
+            }, 0);
         }
 
-        function removeManageUpgradePhoto(cat, name, groupId, optionId) {
+        function removeManageUpgradePhoto(cat, name, groupId, optionId, photoIndex) {
             if (!groupId && !optionId) return;
+            var index = parseInt(photoIndex, 10);
             pushUndoState();
             findManagePhotoItems(cat, name).forEach(function(item) {
                 var existingTarget = findManageUpgradePhotoTarget(item, groupId, optionId);
-                if (existingTarget && existingTarget.option) removeManageFullResPhotoMeta(existingTarget.option.photoFull);
-                setManageUpgradeOptionPhoto(item, groupId, optionId, '');
-                setManageUpgradeOptionPhotoFull(item, groupId, optionId, null);
+                if (!existingTarget || !existingTarget.option) return;
+                var photos = normalizeManageUpgradePhotos(existingTarget.option);
+                var photosFull = normalizeManageUpgradePhotosFull(existingTarget.option);
+                if (Number.isFinite(index) && index >= 0) {
+                    removeManageFullResPhotoMeta(photosFull[index]);
+                    photos.splice(index, 1);
+                    photosFull.splice(index, 1);
+                } else {
+                    photosFull.forEach(removeManageFullResPhotoMeta);
+                    photos = [];
+                    photosFull = [];
+                }
+                existingTarget.option.photos = photos.slice(0, MANAGE_ITEM_PHOTO_LIMIT);
+                existingTarget.option.photosFull = existingTarget.option.photos.map(function(_photo, photoIndex) {
+                    return normalizeManageFullResPhotoMeta(photosFull[photoIndex]);
+                });
+                existingTarget.option.photo = existingTarget.option.photos[0] || '';
+                existingTarget.option.photoFull = existingTarget.option.photosFull[0] || null;
+                if (existingTarget.legacy && item.upgrade) {
+                    item.upgrade.photos = existingTarget.option.photos;
+                    item.upgrade.photosFull = existingTarget.option.photosFull;
+                    item.upgrade.photo = existingTarget.option.photo;
+                    item.upgrade.photoFull = existingTarget.option.photoFull;
+                }
+                if (item.upgrade && item.upgrade.name && existingTarget.option.name && item.upgrade.name === existingTarget.option.name) {
+                    item.upgrade.photos = existingTarget.option.photos;
+                    item.upgrade.photosFull = existingTarget.option.photosFull;
+                    item.upgrade.photo = existingTarget.option.photo;
+                    item.upgrade.photoFull = existingTarget.option.photoFull;
+                }
             });
             setManageItemDetailSectionOpen(cat, name, 'photos', true);
             markRowDirty(manageItemsRowKey(cat, name));
@@ -2332,7 +2520,8 @@
                     if (firstPhotoItem) {
                         if (field === 'upgradePhoto') {
                             var existingTarget = findManageUpgradePhotoTarget(firstPhotoItem, upgradeGroupId, upgradeOptionId);
-                            existingFullMeta = existingTarget && existingTarget.option ? existingTarget.option.photoFull : null;
+                            var existingUpgradeFull = existingTarget && existingTarget.option ? normalizeManageUpgradePhotosFull(existingTarget.option) : [];
+                            existingFullMeta = Number.isFinite(requestedIndex) && requestedIndex >= 0 ? existingUpgradeFull[requestedIndex] : null;
                         } else {
                             var existingPhotosFull = normalizeManageItemPhotosFull(firstPhotoItem);
                             existingFullMeta = Number.isFinite(requestedIndex) && requestedIndex >= 0 ? existingPhotosFull[requestedIndex] : null;
@@ -2355,11 +2544,11 @@
                             : fullErrMessage;
                     }
                     var upgradePhotoSyncedFromDetails = field === 'upgradePhoto'
-                        ? syncManageUpgradePhotoFromDetails(cat, name, upgradeGroupId, upgradeOptionId, dataUrl)
+                        ? syncManageUpgradePhotoFromDetails(cat, name, upgradeGroupId, upgradeOptionId, dataUrl, requestedIndex)
                         : false;
                     var upgradePhotoSaved = upgradePhotoSyncedFromDetails;
                     if (field === 'upgradePhoto') {
-                        syncManageUpgradePhotoFullFromDetails(cat, name, upgradeGroupId, upgradeOptionId, fullMeta);
+                        syncManageUpgradePhotoFullFromDetails(cat, name, upgradeGroupId, upgradeOptionId, fullMeta, requestedIndex);
                     }
                     // Find item in customItems and pricingDatabase
                     var targets = [customItems, pricingDatabase];
@@ -2368,18 +2557,22 @@
                         var item = db[cat].find(function(it) { return it && it.name === name; });
                         if (!item) return;
                         if (field === 'upgradePhoto') {
-                            if (!setManageUpgradeOptionPhoto(item, upgradeGroupId, upgradeOptionId, dataUrl)) {
+                            if (upgradePhotoSyncedFromDetails) {
+                                upgradePhotoSaved = true;
+                                return;
+                            }
+                            if (!setManageUpgradeOptionPhoto(item, upgradeGroupId, upgradeOptionId, dataUrl, requestedIndex)) {
                                 var isLegacyUpgradePhoto = upgradeGroupId === 'legacy_upgrade' || upgradeOptionId === 'legacy_upgrade_option' || (!upgradeGroupId && !upgradeOptionId);
                                 if (isLegacyUpgradePhoto) {
                                     if (!item.upgrade) item.upgrade = {};
-                                    item.upgrade.photo = dataUrl;
-                                    item.upgrade.photoFull = normalizeManageFullResPhotoMeta(fullMeta);
+                                    setManageUpgradeOptionPhoto(item, 'legacy_upgrade', 'legacy_upgrade_option', dataUrl, requestedIndex);
+                                    setManageUpgradeOptionPhotoFull(item, 'legacy_upgrade', 'legacy_upgrade_option', fullMeta, requestedIndex);
                                     upgradePhotoSaved = true;
                                 }
                             } else {
                                 upgradePhotoSaved = true;
                             }
-                            setManageUpgradeOptionPhotoFull(item, upgradeGroupId, upgradeOptionId, fullMeta);
+                            setManageUpgradeOptionPhotoFull(item, upgradeGroupId, upgradeOptionId, fullMeta, requestedIndex);
                         } else {
                             var photos = normalizeManageItemPhotos(item);
                             var photosFull = normalizeManageItemPhotosFull(item);
@@ -2501,6 +2694,8 @@
                 const el = document.getElementById(id);
                 if (el) el.value = id === 'newItemUpgradeType' ? 'replacement' : '';
             });
+            if (document.getElementById('newItemUpgradePriceTbd')) document.getElementById('newItemUpgradePriceTbd').checked = false;
+            if (document.getElementById('newItemUpgradeRate')) document.getElementById('newItemUpgradeRate').disabled = false;
         }
 
         function toggleNewItemUpgradePanel(forceOpen) {
@@ -2837,7 +3032,8 @@
             const newName     = row.querySelector('input.item-name-input')?.value.trim() || name;
             const inputs      = row.querySelectorAll('input.item-input');
             const unitType    = row.querySelector('.item-unit-type-input')?.value.trim() || '';
-            const rate        = parseFloat(inputs[0]?.value) || 0;
+            const priceTbd    = row.querySelector('.manage-price-tbd')?.checked === true;
+            const rate        = priceTbd ? 0 : (parseFloat(inputs[0]?.value) || 0);
             const detailsRow  = document.getElementById('details_' + safeId);
             const detailMaterialInput = detailsRow?.querySelector('.item-detail-material-cost');
             const detailSupplierInput = detailsRow?.querySelector('.item-detail-supplier-url');
@@ -2858,12 +3054,13 @@
                 hasUpgradeEditor = true;
                 const upgName = collapseRow.querySelector('.upgrade-name')?.value.trim() || '';
                 const upgUnitType = collapseRow.querySelector('.upgrade-unit-type')?.value.trim() || '';
-                const upgRate = parseFloat(collapseRow.querySelector('.upgrade-rate')?.value) || 0;
+                const upgPriceTbd = collapseRow.querySelector('.upgrade-price-tbd')?.checked === true;
+                const upgRate = upgPriceTbd ? 0 : (parseFloat(collapseRow.querySelector('.upgrade-rate')?.value) || 0);
                 const upgMaterialCost = parseFloat(collapseRow.querySelector('.upgrade-material-cost')?.value) || 0;
                 const upgSupplierUrl = collapseRow.querySelector('.upgrade-supplier-url')?.value.trim() || '';
                 const upgDesc = collapseRow.querySelector('.upgrade-desc')?.value.trim() || '';
                 const upgType = normalizeManageUpgradeType(collapseRow.querySelector('.upgrade-type')?.value);
-                if (upgName) upgrade = { name: upgName, unitType: upgUnitType, rate: upgRate, materialCost: upgMaterialCost, supplierUrl: upgSupplierUrl, description: upgDesc, type: upgType };
+                if (upgName) upgrade = { name: upgName, unitType: upgUnitType, rate: upgRate, materialCost: upgMaterialCost, supplierUrl: upgSupplierUrl, description: upgDesc, type: upgType, priceTbd: upgPriceTbd, pricingMode: upgPriceTbd ? 'tbd' : 'fixed' };
             }
             const upgradeGroups = collectManageItemUpgradeGroups(detailsRow);
             if (!upgrade && upgradeGroups.length && upgradeGroups[0].options[0]) {
@@ -2875,7 +3072,9 @@
                     materialCost: firstUpgradeOption.materialCost,
                     supplierUrl: firstUpgradeOption.supplierUrl,
                     description: firstUpgradeOption.description,
-                    type: firstUpgradeOption.upgradeType
+                    type: firstUpgradeOption.upgradeType,
+                    priceTbd: firstUpgradeOption.priceTbd === true,
+                    pricingMode: firstUpgradeOption.priceTbd === true ? 'tbd' : 'fixed'
                 };
             }
 
@@ -2890,7 +3089,7 @@
                 const pi = pricingDatabase[cat]?.find(i => i.name === name);
                 if (pi) {
                     hadSavedItemForQuoteSync = true;
-                    ci = { name: pi.name, unitType: pi.unitType || '', rate: pi.rate || 0, materialCost: pi.materialCost || 0, supplierUrl: pi.supplierUrl || '', itemDescription: pi.itemDescription || '', photo: pi.photo || '', photos: normalizeManageItemPhotos(pi), photoFull: normalizeManageFullResPhotoMeta(pi.photoFull), photosFull: normalizeManageItemPhotosFull(pi), laborTime: normalizeManageLaborTime(pi.laborTime), upgrade: pi.upgrade || undefined, upgradeGroups: normalizeManageItemUpgradeGroups(pi) };
+                    ci = { name: pi.name, unitType: pi.unitType || '', rate: pi.rate || 0, materialCost: pi.materialCost || 0, priceTbd: isManagePriceTbd(pi), pricingMode: isManagePriceTbd(pi) ? 'tbd' : 'fixed', supplierUrl: pi.supplierUrl || '', itemDescription: pi.itemDescription || '', photo: pi.photo || '', photos: normalizeManageItemPhotos(pi), photoFull: normalizeManageFullResPhotoMeta(pi.photoFull), photosFull: normalizeManageItemPhotosFull(pi), laborTime: normalizeManageLaborTime(pi.laborTime), upgrade: pi.upgrade || undefined, upgradeGroups: normalizeManageItemUpgradeGroups(pi) };
                     syncManageItemPhotoCompatibility(ci);
                     customItems[cat].push(ci);
                 } else {
@@ -2906,6 +3105,8 @@
             ci.unitType        = unitType;
             ci.rate            = rate;
             ci.materialCost    = matCost;
+            ci.priceTbd        = priceTbd;
+            ci.pricingMode     = priceTbd ? 'tbd' : 'fixed';
             ci.supplierUrl     = supplierUrl;
             ci.itemDescription = itemDescription;
             ci.laborTime       = normalizeManageLaborTime(laborTime);
@@ -3317,9 +3518,10 @@
             // Event listeners handled via delegation on #customItemsList (see DOMContentLoaded)
         }
 
-        function renderManageMarginPill(rateValue, materialValue) {
+        function renderManageMarginPill(rateValue, materialValue, priceTbd) {
             const rate = parseFloat(rateValue || 0) || 0;
             const material = parseFloat(materialValue || 0) || 0;
+            if (priceTbd) return '<span class="manage-margin-pill manage-margin-warn"><i class="fas fa-circle-question"></i> Price TBD</span>';
             if (rate <= 0) return '<span class="manage-margin-pill manage-margin-warn"><i class="fas fa-exclamation-circle"></i> No rate</span>';
             if (material <= 0) return '<span class="manage-margin-pill manage-margin-warn"><i class="fas fa-box-open"></i> Cost missing</span>';
             const profit = rate - material;
@@ -3336,12 +3538,13 @@
             const rowKey = detailsRow.getAttribute('data-row-key') || '';
             const row = rowKey ? getManageRowByKey(rowKey) : null;
             const rowInputs = row ? row.querySelectorAll('input.item-input') : [];
+            const priceTbd = row?.querySelector('.manage-price-tbd')?.checked === true;
             const rate = parseFloat(rowInputs[0]?.value || 0) || 0;
             const material = parseFloat(detailsRow.querySelector('.item-detail-material-cost')?.value || rowInputs[1]?.value || 0) || 0;
             const target = detailsRow.querySelector('.manage-detail-margin-target');
-            if (target) target.innerHTML = renderManageMarginPill(rate, material);
+            if (target) target.innerHTML = renderManageMarginPill(rate, material, priceTbd);
             const rowTarget = row?.querySelector('.manage-row-margin-target');
-            if (rowTarget) rowTarget.innerHTML = renderManageMarginPill(rate, material);
+            if (rowTarget) rowTarget.innerHTML = renderManageMarginPill(rate, material, priceTbd);
         }
 
         function updateManageRowMargin(sourceEl) {
@@ -3350,10 +3553,11 @@
                 : sourceEl?.closest?.('.manage-items-row');
             if (!row) return;
             const inputs = row.querySelectorAll('input.item-input');
+            const priceTbd = row.querySelector('.manage-price-tbd')?.checked === true;
             const rate = parseFloat(inputs[0]?.value || 0) || 0;
             const material = parseFloat(inputs[1]?.value || 0) || 0;
             const target = row.querySelector('.manage-row-margin-target');
-            if (target) target.innerHTML = renderManageMarginPill(rate, material);
+            if (target) target.innerHTML = renderManageMarginPill(rate, material, priceTbd);
             const detailsId = row.dataset.detailsId || '';
             const detailsRow = detailsId ? document.getElementById(detailsId) : null;
             if (detailsRow) {
@@ -3443,6 +3647,7 @@
                     const safeId = manageItemsSafeId(cat, item.name);
                     const rowKey = manageItemsRowKey(cat, item.name);
                     const isCustom = !!item._custom;
+                    const itemPriceTbd = isManagePriceTbd(item);
                     const rate = parseFloat(item.rate || 0).toFixed(2);
                     const matCost = parseFloat(item.materialCost || 0).toFixed(2);
                     const laborTime = normalizeManageLaborTime(item.laborTime);
@@ -3481,10 +3686,10 @@
                                 <span class="manage-dirty-dot" title="Unsaved row"></span>
                                 <input type="text" class="form-control form-control-sm item-name-input" value="${manageItemsAttr(item.name)}" placeholder="Item name" oninput="markPricingDirty(this)">
                             </div>
-                            <div class="mt-1 d-flex flex-wrap gap-1 manage-items-portrait-optional manage-items-row-badges" data-manage-portrait-field="badges"><span class="manage-row-margin-target">${renderManageMarginPill(rate, matCost)}</span> ${renderManageLaborPill(laborTime, item.unitType || '')}</div>
+                            <div class="mt-1 d-flex flex-wrap gap-1 manage-items-portrait-optional manage-items-row-badges" data-manage-portrait-field="badges"><span class="manage-row-margin-target">${renderManageMarginPill(rate, matCost, itemPriceTbd)}</span> ${renderManageLaborPill(laborTime, item.unitType || '')}</div>
                         </td>
                         <td data-label="Unit" class="manage-items-portrait-optional" data-manage-portrait-field="unit">${renderManageUnitSelect(item.unitType || '')}</td>
-                        <td data-label="Rate" class="manage-items-portrait-optional" data-manage-portrait-field="rate"><input type="number" class="form-control form-control-sm item-input" value="${rate}" step="0.01" min="0" oninput="markPricingDirty(this); updateManageRowMargin(this)"></td>
+                        <td data-label="Rate" class="manage-items-portrait-optional" data-manage-portrait-field="rate"><div class="d-flex align-items-center gap-2 mb-1 price-tbd-inline"><span class="small text-muted">Rate</span><div class="form-check form-check-inline mb-0"><input class="form-check-input manage-price-tbd" type="checkbox" ${itemPriceTbd ? 'checked' : ''} onchange="this.closest(&quot;td&quot;).querySelector(&quot;.item-input&quot;).disabled=this.checked; markPricingDirty(this); updateManageRowMargin(this)"><label class="form-check-label small">TBD</label></div></div><input type="number" class="form-control form-control-sm item-input" value="${rate}" step="0.01" min="0" ${itemPriceTbd ? 'disabled' : ''} oninput="markPricingDirty(this); updateManageRowMargin(this)"></td>
                         <td data-label="Mat. Cost" class="manage-items-portrait-optional" data-manage-portrait-field="material"><input type="number" class="form-control form-control-sm item-input" value="${matCost}" step="0.01" min="0" oninput="markPricingDirty(this); updateManageRowMargin(this)"></td>
                         <td data-label="Supplier" class="manage-items-portrait-optional" data-manage-portrait-field="supplier">
                             <div class="input-group input-group-sm">
@@ -3565,7 +3770,7 @@
                                                     <input type="url" class="form-control form-control-sm item-detail-supplier-url" value="${supplier}" placeholder="https://..." oninput="syncManageDetailBaseField(this); markPricingDirty(this)">
                                                 </div>
                                             </div>
-                                            <div class="mt-2 manage-detail-margin-target">${renderManageMarginPill(rate, matCost)}</div>
+                                            <div class="mt-2 manage-detail-margin-target">${renderManageMarginPill(rate, matCost, itemPriceTbd)}</div>
                                         </div>
                                     </div>
                                     <div class="col-12 manage-detail-section" data-detail-section="upgrade" style="display:none;">
@@ -3603,17 +3808,24 @@
                                                         const optionNameE = manageItemsEscape(target.optionName);
                                                         const optionTitleE = manageItemsAttr(target.optionName);
                                                         const groupNameE = manageItemsEscape(target.groupName);
+                                                        const targetPhotos = normalizeManageUpgradePhotos(target);
+                                                        const targetPhotosFull = normalizeManageUpgradePhotosFull(target);
                                                         return `<div class="manage-upgrade-photo-target border rounded p-2 bg-white d-flex align-items-center justify-content-between gap-2 flex-wrap">
                                                             <div class="d-flex align-items-center gap-2 min-w-0">
-                                                                ${target.photo ? `<img src="${manageItemsAttr(target.photo)}" data-photo-src="${manageItemsAttr(target.photo)}" data-full-photo="${manageFullResPhotoDataAttr(target.photoFull)}" class="rounded border" style="width:70px;height:48px;object-fit:cover;cursor:pointer;" onclick="openManageItemPhotoLightbox(this)" title="Click to enlarge">` : '<span class="badge text-bg-light border text-secondary"><i class="fas fa-camera"></i></span>'}
+                                                                ${targetPhotos.length ? `<div class="d-flex align-items-start gap-1 flex-wrap">${targetPhotos.map(function(photo, index) { return `<div class="manage-upgrade-photo-thumb">
+                                                                    <img src="${manageItemsAttr(photo)}" data-photo-src="${manageItemsAttr(photo)}" data-full-photo="${manageFullResPhotoDataAttr(targetPhotosFull[index])}" class="rounded border d-block" style="width:70px;height:48px;object-fit:cover;cursor:pointer;" onclick="openManageItemPhotoLightbox(this)" title="Click to enlarge">
+                                                                    <div class="btn-group btn-group-sm mt-1 w-100">
+                                                                        <button type="button" class="btn btn-outline-primary item-photo-btn" data-cat="${catE}" data-name="${nameE}" data-field="upgradePhoto" data-photo-index="${index}" data-upgrade-group-id="${groupIdE}" data-upgrade-option-id="${optionIdE}" title="Replace photo ${index + 1} for ${optionTitleE}"><i class="fas fa-sync-alt"></i></button>
+                                                                        <button type="button" class="btn btn-outline-danger upgrade-photo-remove-btn" data-cat="${catE}" data-name="${nameE}" data-photo-index="${index}" data-upgrade-group-id="${groupIdE}" data-upgrade-option-id="${optionIdE}" title="Remove photo ${index + 1} from ${optionTitleE}"><i class="fas fa-times"></i></button>
+                                                                    </div>
+                                                                </div>`; }).join('')}</div>` : '<span class="badge text-bg-light border text-secondary"><i class="fas fa-camera"></i></span>'}
                                                                 <div class="min-w-0">
                                                                     <div class="fw-semibold text-truncate">${optionNameE}</div>
-                                                                    <div class="small text-muted text-truncate">${groupNameE}</div>
+                                                                    <div class="small text-muted text-truncate">${groupNameE}${targetPhotos.length ? ' (' + targetPhotos.length + '/' + MANAGE_ITEM_PHOTO_LIMIT + ')' : ''}</div>
                                                                 </div>
                                                             </div>
                                                             <div class="btn-group btn-group-sm">
-                                                                <button type="button" class="btn btn-outline-primary item-photo-btn" data-cat="${catE}" data-name="${nameE}" data-field="upgradePhoto" data-upgrade-group-id="${groupIdE}" data-upgrade-option-id="${optionIdE}" title="${target.photo ? 'Replace' : 'Add'} photo for ${optionTitleE}"><i class="fas fa-camera me-1"></i>${target.photo ? 'Replace' : 'Add'}</button>
-                                                                ${target.photo ? `<button type="button" class="btn btn-outline-danger upgrade-photo-remove-btn" data-cat="${catE}" data-name="${nameE}" data-upgrade-group-id="${groupIdE}" data-upgrade-option-id="${optionIdE}" title="Remove photo from ${optionTitleE}"><i class="fas fa-times"></i></button>` : ''}
+                                                                ${target.photos.length < MANAGE_ITEM_PHOTO_LIMIT ? `<button type="button" class="btn btn-outline-primary item-photo-btn" data-cat="${catE}" data-name="${nameE}" data-field="upgradePhoto" data-upgrade-group-id="${groupIdE}" data-upgrade-option-id="${optionIdE}" title="Add photo for ${optionTitleE}"><i class="fas fa-camera me-1"></i>Add Upgrade Photo</button>` : ''}
                                                             </div>
                                                         </div>`;
                                                     }).join('')}
@@ -3718,12 +3930,13 @@
             const name = document.getElementById('newItemUpgradeName')?.value.trim() || '';
             if (!name) return null;
             const unitType = document.getElementById('newItemUpgradeUnit')?.value.trim() || baseUnitType || '';
-            const rate = parseFloat(document.getElementById('newItemUpgradeRate')?.value || 0) || 0;
+            const priceTbd = document.getElementById('newItemUpgradePriceTbd')?.checked === true;
+            const rate = priceTbd ? 0 : (parseFloat(document.getElementById('newItemUpgradeRate')?.value || 0) || 0);
             const materialCost = parseFloat(document.getElementById('newItemUpgradeMaterialCost')?.value || 0) || 0;
             const supplierUrl = document.getElementById('newItemUpgradeSupplierUrl')?.value.trim() || '';
             const description = document.getElementById('newItemUpgradeDescription')?.value.trim() || '';
             const upgradeType = normalizeManageUpgradeType(document.getElementById('newItemUpgradeType')?.value);
-            return { name, unitType, rate, materialCost, supplierUrl, description, type: upgradeType };
+            return { name, unitType, rate, materialCost, supplierUrl, description, type: upgradeType, priceTbd, pricingMode: priceTbd ? 'tbd' : 'fixed' };
         }
 
         function collectNewItemUpgradeGroups(baseUnitType) {
@@ -3747,7 +3960,8 @@
             const category = document.getElementById('newItemCategory').value;
             const name = document.getElementById('newItemName').value.trim();
             const unitType = document.getElementById('newItemUnit').value.trim();
-            const rate = parseFloat(document.getElementById('newItemRate').value) || 0;
+            const priceTbd = document.getElementById('newItemPriceTbd')?.checked === true;
+            const rate = priceTbd ? 0 : (parseFloat(document.getElementById('newItemRate').value) || 0);
             const materialCost = parseFloat(document.getElementById('newItemMaterialCost').value) || 0;
             const supplierUrl = document.getElementById('newItemSupplierUrl').value.trim();
             const itemDescription = document.getElementById('newItemDescription')?.value.trim() || '';
@@ -3775,7 +3989,7 @@
                 return;
             }
 
-            const newItem = { name, unitType, rate, materialCost, supplierUrl, itemDescription, laborTime };
+            const newItem = { name, unitType, rate, materialCost, priceTbd, pricingMode: priceTbd ? 'tbd' : 'fixed', supplierUrl, itemDescription, laborTime };
             const upgrade = collectNewItemUpgrade(unitType);
             const upgradeGroups = collectNewItemUpgradeGroups(unitType);
             if (upgradeGroups.length) newItem.upgradeGroups = upgradeGroups;
@@ -3796,6 +4010,8 @@
             document.getElementById('newItemName').value = '';
             document.getElementById('newItemUnit').value = '';
             document.getElementById('newItemRate').value = '';
+            if (document.getElementById('newItemPriceTbd')) document.getElementById('newItemPriceTbd').checked = false;
+            if (document.getElementById('newItemRate')) document.getElementById('newItemRate').disabled = false;
             document.getElementById('newItemMaterialCost').value = '';
             document.getElementById('newItemSupplierUrl').value = '';
             if (document.getElementById('newItemLaborMode')) document.getElementById('newItemLaborMode').value = '';
@@ -3834,8 +4050,10 @@
                         name: item.name,
                         description: item.name,
                         unitType: item.unitType || item.unit || '',
-                        rate: parseFloat(item.rate) || 0,
+                        rate: isManagePriceTbd(item) ? 0 : (parseFloat(item.rate) || 0),
                         materialCost: parseFloat(item.materialCost) || 0,
+                        priceTbd: isManagePriceTbd(item),
+                        pricingMode: isManagePriceTbd(item) ? 'tbd' : 'fixed',
                         supplierUrl: item.supplierUrl || '',
                         photos: itemPhotos,
                         photo: itemPhotos[0] || item.photo || '',
@@ -3879,14 +4097,17 @@
 
         function normalizeChoiceGroupEnhancementOption(option, fallbackIndex) {
             option = option || {};
+            const priceTbd = isManagePriceTbd(option);
             return {
                 id: option.id || choiceGroupEnhancementId('cgeo_' + (fallbackIndex || 0)),
                 name: option.name || option.sourceItemName || option.description || 'Enhancement',
                 category: option.category || '',
                 sourceItemName: option.sourceItemName || option.name || '',
                 unitType: option.unitType || option.unit || '',
-                rate: parseFloat(option.rate) || 0,
+                rate: priceTbd ? 0 : (parseFloat(option.rate) || 0),
                 materialCost: parseFloat(option.materialCost) || 0,
+                priceTbd: isManagePriceTbd(option),
+                pricingMode: priceTbd ? 'tbd' : 'fixed',
                 supplierUrl: option.supplierUrl || '',
                 photo: option.photo || '',
                 photoFull: normalizeManageFullResPhotoMeta(option.photoFull),
@@ -3924,8 +4145,10 @@
                 category: item.category || '',
                 sourceItemName: item.name || item.description || '',
                 unitType: item.unitType || item.unit || '',
-                rate: parseFloat(item.rate) || 0,
+                rate: isManagePriceTbd(item) ? 0 : (parseFloat(item.rate) || 0),
                 materialCost: parseFloat(item.materialCost) || 0,
+                priceTbd: isManagePriceTbd(item),
+                pricingMode: isManagePriceTbd(item) ? 'tbd' : 'fixed',
                 supplierUrl: item.supplierUrl || '',
                 photo: item.photo || '',
                 photoFull: normalizeManageFullResPhotoMeta(item.photoFull),

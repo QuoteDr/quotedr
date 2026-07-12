@@ -58,7 +58,7 @@ assert(viewer.includes('data-viewer-photo-key'), 'Client viewer photo buttons sh
 assert(viewer.includes('Picture'), 'Client viewer should label compact line item photo buttons as Picture');
 assert(viewer.includes('Upgrade Picture'), 'Client viewer should label upgrade option photo buttons clearly');
 assert(viewer.includes('function normalizeViewerPhotoList'), 'Client viewer should normalize multi-photo arrays with legacy single-photo fallback');
-assert(viewer.includes('viewerPhotoRegistry[key] = photos'), 'Client viewer photo registry should store photo arrays for lightbox navigation');
+assert(viewer.includes('viewerPhotoRegistry[key] = { photos: photos, fallbacks: fallbackPhotos }'), 'Client viewer photo registry should store photo arrays and compressed fallbacks for lightbox navigation');
 assert(viewer.includes('viewer-line-photo-actions'), 'Client viewer should render line item photo buttons in a separate action row');
 assert(viewer.includes('viewer-line-title-actions'), 'Client viewer should place standard line item photo buttons beside the line item title area');
 assert(viewer.includes('viewer-choice-option-photo-actions'), 'Client viewer should give choice option photo buttons a protected action row before upgrade panels');
