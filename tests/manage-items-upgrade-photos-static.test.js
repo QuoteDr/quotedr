@@ -73,4 +73,31 @@ assert(
   'Legacy single upgrade photo buttons should still target the legacy upgrade slot explicitly'
 );
 
+assert(
+  items.includes("targetOptionId === 'legacy_upgrade_option' || (targetGroupId === 'legacy_upgrade' && !targetOptionId)"),
+  'A migrated legacy-named group with a modern option ID should target that option instead of the old single-upgrade photo field'
+);
+
+const targetLookup = items.slice(
+  items.indexOf('function findManageUpgradePhotoTarget'),
+  items.indexOf('function setManageUpgradeOptionPhoto')
+);
+assert(
+  targetLookup.indexOf('for (var g = 0; g < groups.length; g++)') < targetLookup.indexOf("targetOptionId === 'legacy_upgrade_option'"),
+  'Upgrade photo lookup should search real upgrade-group options before falling back to the legacy single-upgrade field'
+);
+
+assert(
+  items.includes("if (!group.id) group.id = manageUpgradeGroupId('upg')") &&
+    items.includes("if (!option.id) option.id = manageUpgradeGroupId('upo')"),
+  'Upgrade group and option IDs should be persisted so rendered photo controls target the underlying saved option'
+);
+
+assert(
+  items.includes('var removed = false;') &&
+    items.includes("if (!removed) {") &&
+    items.includes('That upgrade photo could not be removed.'),
+  'Upgrade photo removal should only report success after an underlying photo slot was actually removed'
+);
+
 console.log('manage item upgrade photo static checks passed');

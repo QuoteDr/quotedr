@@ -37,6 +37,26 @@ assert(
 );
 
 assert(
+  builder.includes('function syncCurrentQuotePhotosFromSavedItems') &&
+    builder.includes('syncQuoteItemPhotosFromSavedItem') &&
+    builder.includes('window._loadedQuoteData?.portal_visible === true'),
+  'Editable quotes should automatically refresh saved base-item and upgrade photos while portal-published quotes stay frozen'
+);
+
+assert(
+  builder.includes('target.photos = photos;') &&
+    builder.includes('syncQuoteUpgradeGroupPhotos') &&
+    builder.includes("target._basePhotos = photos.slice();"),
+  'Saved photo refresh should replace multi-photo arrays, upgrade photo slots, and cached base-photo state'
+);
+
+assert(
+  builder.includes('mergeQuoteItemUpgradeGroupRuntimeState(savedUpgradeGroups, previousUpgradeGroups)') &&
+    builder.includes('syncQuotePhotoFields(item, savedItem, true);'),
+  'Applying all saved-item changes should refresh upgrade groups and base multi-photo metadata'
+);
+
+assert(
   builder.includes('savedItemQuoteChangeFieldDiffs') &&
     builder.includes('Description changed') &&
     builder.includes('Name changed') &&

@@ -7321,10 +7321,12 @@ Example:
             item.priceTbd = isQuotePriceTbd(savedItem);
             item.pricingMode = item.priceTbd ? 'tbd' : 'fixed';
             item.supplierUrl = savedItem.supplierUrl || '';
-            item.photo = savedItem.photo || item.photo || '';
-            item.photoFull = savedItem.photoFull || item.photoFull || null;
-            item.photosFull = Array.isArray(savedItem.photosFull) ? savedItem.photosFull : (item.photosFull || []);
+            syncQuotePhotoFields(item, savedItem, true);
             item.laborTime = normalizeLaborTime(savedItem.laborTime);
+            var previousUpgradeGroups = normalizeQuoteItemUpgradeGroups(item);
+            var savedUpgradeGroups = normalizeQuoteItemUpgradeGroups(savedItem);
+            item.upgradeGroups = mergeQuoteItemUpgradeGroupRuntimeState(savedUpgradeGroups, previousUpgradeGroups);
+            item.selectedUpgradeOptionIds = getAllSelectedItemUpgradeOptionIds(item);
             if (savedItem.upgrade) {
                 item.upgrade = cloneSavedItemForQuoteSync(savedItem.upgrade);
             } else {
@@ -8029,6 +8031,147 @@ Example:
                 item.photosFull = saved.photosFull;
             }
             return item;
+        }
+
+        function quotePhotoArray(value, fallback) {
+            var photos = Array.isArray(value) ? value.filter(function(photo) {
+                return typeof photo === 'string' && photo.trim();
+            }) : [];
+            if (!photos.length && typeof fallback === 'string' && fallback.trim()) photos.push(fallback);
+            return photos.slice(0, 3);
+        }
+
+        function quoteFullPhotoArray(value, fallback, slotCount) {
+            var photosFull = Array.isArray(value) ? value.slice(0, 3) : [];
+            if (!photosFull.length && fallback) photosFull.push(fallback);
+            var count = Math.max(0, Math.min(3, parseInt(slotCount, 10) || 0));
+            return Array.from({ length: count }, function(_entry, index) {
+                return photosFull[index] || null;
+            });
+        }
+
+        function quotePhotoState(value) {
+            value = value || {};
+            return {
+                photo: value.photo || '',
+                photos: Array.isArray(value.photos) ? value.photos.slice() : [],
+                photoFull: value.photoFull || null,
+                photosFull: Array.isArray(value.photosFull) ? value.photosFull.slice() : []
+            };
+        }
+
+        function quoteUpgradeGroupsPhotoState(owner) {
+            return normalizeQuoteItemUpgradeGroups(owner || {}).map(function(group) {
+                return {
+                    id: group.id || '',
+                    name: group.name || '',
+                    options: (group.options || []).map(function(option) {
+                        return Object.assign({ id: option.id || '', name: option.name || '' }, quotePhotoState(option));
+                    })
+                };
+            });
+        }
+
+        function quoteItemSavedPhotoState(item) {
+            item = item || {};
+            return {
+                base: quotePhotoState(item),
+                baseCache: {
+                    photo: item._basePhoto || '',
+                    photos: Array.isArray(item._basePhotos) ? item._basePhotos.slice() : [],
+                    photoFull: item._basePhotoFull || null,
+                    photosFull: Array.isArray(item._basePhotosFull) ? item._basePhotosFull.slice() : []
+                },
+                upgrade: item.upgrade ? quotePhotoState(item.upgrade) : null,
+                upgradeGroups: quoteUpgradeGroupsPhotoState(item),
+                choiceOptions: item.choiceGroup && Array.isArray(item.choiceGroup.options) ? item.choiceGroup.options.map(function(option) {
+                    return {
+                        id: option.id || '',
+                        name: option.name || '',
+                        base: quotePhotoState(option),
+                        upgrade: option.upgrade ? quotePhotoState(option.upgrade) : null,
+                        upgradeGroups: quoteUpgradeGroupsPhotoState(option)
+                    };
+                }) : []
+            };
+        }
+
+        function syncQuotePhotoFields(target, source, syncBaseCache) {
+            if (!target || !source) return;
+            var photos = quotePhotoArray(source.photos, source.photo);
+            var photosFull = quoteFullPhotoArray(source.photosFull, source.photoFull, photos.length);
+            var hasActiveUpgradePhoto = syncBaseCache && (target.upgraded === true || normalizeQuoteItemUpgradeGroups(target).some(function(group) {
+                return Array.isArray(group.selectedOptionIds) && group.selectedOptionIds.length > 0;
+            }));
+            var hasActiveChoicePhoto = syncBaseCache && target.choiceGroup && Array.isArray(target.choiceGroup.selectedOptionIds) && target.choiceGroup.selectedOptionIds.length > 0;
+            if (!hasActiveUpgradePhoto && !hasActiveChoicePhoto) {
+                target.photo = photos[0] || '';
+                target.photos = photos;
+                target.photoFull = photosFull[0] || null;
+                target.photosFull = photosFull;
+            }
+            var shouldSyncBaseCache = syncBaseCache && (hasActiveUpgradePhoto || hasActiveChoicePhoto || target._itemUpgradeBaseCaptured === true ||
+                Object.prototype.hasOwnProperty.call(target, '_basePhoto') || Object.prototype.hasOwnProperty.call(target, '_basePhotos'));
+            if (shouldSyncBaseCache) {
+                target._basePhoto = photos[0] || '';
+                target._basePhotos = photos.slice();
+                target._basePhotoFull = photosFull[0] || null;
+                target._basePhotosFull = photosFull.slice();
+                if (Object.prototype.hasOwnProperty.call(target, '_choiceGroupBasePhoto')) target._choiceGroupBasePhoto = photos[0] || '';
+                if (Object.prototype.hasOwnProperty.call(target, '_choiceGroupBasePhotoFull')) target._choiceGroupBasePhotoFull = photosFull[0] || null;
+            }
+        }
+
+        function syncQuoteUpgradeGroupPhotos(targetOwner, savedOwner) {
+            if (!targetOwner || !savedOwner || !Array.isArray(targetOwner.upgradeGroups)) return;
+            var savedGroups = normalizeQuoteItemUpgradeGroups(savedOwner);
+            targetOwner.upgradeGroups.forEach(function(targetGroup) {
+                var savedGroup = savedGroups.find(function(candidate) {
+                    return candidate.id === targetGroup.id || normalizeSavedItemQuoteSyncText(candidate.name) === normalizeSavedItemQuoteSyncText(targetGroup.name);
+                });
+                if (!savedGroup) return;
+                (targetGroup.options || []).forEach(function(targetOption) {
+                    var savedOption = (savedGroup.options || []).find(function(candidate) {
+                        return candidate.id === targetOption.id ||
+                            normalizeSavedItemQuoteSyncText(candidate.name || candidate.sourceItemName) === normalizeSavedItemQuoteSyncText(targetOption.name || targetOption.sourceItemName);
+                    });
+                    if (savedOption) syncQuotePhotoFields(targetOption, savedOption, false);
+                });
+            });
+        }
+
+        function syncQuoteItemPhotosFromSavedItem(item, savedItem) {
+            if (!item || !savedItem) return false;
+            var before = JSON.stringify(quoteItemSavedPhotoState(item));
+            syncQuotePhotoFields(item, savedItem, true);
+            if (item.upgrade && savedItem.upgrade) syncQuotePhotoFields(item.upgrade, savedItem.upgrade, false);
+            syncQuoteUpgradeGroupPhotos(item, savedItem);
+
+            if (item.choiceGroup && Array.isArray(item.choiceGroup.options)) {
+                item.choiceGroup.options.forEach(function(option) {
+                    var optionMatch = findSavedItemForQuoteEdit({
+                        category: option.category || '',
+                        serviceName: option.sourceItemName || option.name || ''
+                    });
+                    if (!optionMatch || !optionMatch.item) return;
+                    syncQuotePhotoFields(option, optionMatch.item, false);
+                    if (option.upgrade && optionMatch.item.upgrade) syncQuotePhotoFields(option.upgrade, optionMatch.item.upgrade, false);
+                    syncQuoteUpgradeGroupPhotos(option, optionMatch.item);
+                });
+            }
+            return before !== JSON.stringify(quoteItemSavedPhotoState(item));
+        }
+
+        function syncCurrentQuotePhotosFromSavedItems() {
+            if (window._loadedQuoteData?.portal_visible === true) return false;
+            var changed = false;
+            (rooms || []).forEach(function(room) {
+                (room.items || []).forEach(function(item) {
+                    var savedMatch = findSavedItemForQuoteEdit(item);
+                    if (savedMatch && savedMatch.item && syncQuoteItemPhotosFromSavedItem(item, savedMatch.item)) changed = true;
+                });
+            });
+            return changed;
         }
 
         function buildSavedItemFromEditedLineItem(existingItem) {
@@ -11632,6 +11775,12 @@ Example:
         function renderRooms() {
             const container = document.getElementById('roomsContainer');
             ensureUniqueRoomIds();
+            const savedPhotosUpdated = syncCurrentQuotePhotosFromSavedItems();
+            if (savedPhotosUpdated) {
+                setTimeout(function() {
+                    if (typeof markUnsaved === 'function') markUnsaved();
+                }, 0);
+            }
             renderSavedItemQuoteChangeBanner();
             const showLineProfitDetails = isLineProfitDetailsVisible();
 
@@ -14886,7 +15035,7 @@ Example:
 
         // Manage Items behavior lives in quote-items.js.
     </script>
-    <script src="quote-items.js?v=1783269300"></script>
+    <script src="quote-items.js?v=1783269305"></script>
     <script src="quote-import.js?v=1780019801"></script>
     <script>
         // Load templates from localStorage on startup
@@ -16954,7 +17103,14 @@ Example:
             var manageItemsRoot = document.getElementById('manageItemsModal') || document.getElementById('customItemsList');
             if (manageItemsRoot) {
                 manageItemsRoot.addEventListener('hidden.bs.modal', function() {
-                    if (typeof renderSavedItemQuoteChangeBanner === 'function') renderSavedItemQuoteChangeBanner();
+                    var savedPhotosUpdated = typeof syncCurrentQuotePhotosFromSavedItems === 'function' && syncCurrentQuotePhotosFromSavedItems();
+                    if (savedPhotosUpdated) {
+                        renderRooms();
+                        calculateTotals();
+                        if (typeof markUnsaved === 'function') markUnsaved();
+                    } else if (typeof renderSavedItemQuoteChangeBanner === 'function') {
+                        renderSavedItemQuoteChangeBanner();
+                    }
                 });
                 manageItemsRoot.addEventListener('click', function(e) {
                     var saveBtn = e.target.closest('.item-save-btn');

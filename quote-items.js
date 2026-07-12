@@ -396,11 +396,14 @@
             const groups = Array.isArray(item.upgradeGroups) ? item.upgradeGroups : [];
             const normalized = groups.map(function(group, groupIndex) {
                 group = group || {};
+                if (!group.id) group.id = manageUpgradeGroupId('upg');
                 const options = Array.isArray(group.options) ? group.options.map(function(option, optionIndex) {
-                    return normalizeManageUpgradeOption(option, 'upo_' + groupIndex + '_' + optionIndex);
+                    option = option || {};
+                    if (!option.id) option.id = manageUpgradeGroupId('upo');
+                    return normalizeManageUpgradeOption(option, option.id || ('upo_' + groupIndex + '_' + optionIndex));
                 }).filter(function(option) { return String(option.name || '').trim(); }) : [];
                 return {
-                    id: group.id || manageUpgradeGroupId('upg'),
+                    id: group.id,
                     name: group.name || (groupIndex === 0 ? 'Upgrade Options' : 'Upgrade Group'),
                     note: group.note || '',
                     type: normalizeManageUpgradeGroupType(group.type),
@@ -1172,6 +1175,23 @@
             }
         }
 
+        function closeManageUpgradeWizard() {
+            const modalEl = document.getElementById('manageUpgradeWizardModal');
+            if (!modalEl) return;
+            try {
+                if (window.bootstrap && bootstrap.Modal) {
+                    bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+                    return;
+                }
+            } catch(e) {
+                console.warn('Bootstrap could not close the Upgrade Wizard:', e);
+            }
+            modalEl.classList.remove('show');
+            modalEl.style.display = 'none';
+            modalEl.setAttribute('aria-hidden', 'true');
+            modalEl.removeAttribute('aria-modal');
+        }
+
         function openManageUpgradeWizard(button) {
             const context = getManageUpgradeWizardContextFromButton(button);
             manageUpgradeWizardState = {
@@ -1246,23 +1266,23 @@
             } else {
                 groups.push(group);
             }
-            if (manageUpgradeWizardState.context === 'row') {
-                const detailsRow = getManageDetailsRowByKey(manageUpgradeWizardState.rowKey);
-                if (detailsRow) {
-                    refreshManageUpgradeGroupsEditor(detailsRow, groups);
-                    if (!saveManageUpgradeWizardRow(detailsRow)) {
-                        markPricingDirty(detailsRow);
+            try {
+                if (manageUpgradeWizardState.context === 'row') {
+                    const detailsRow = getManageDetailsRowByKey(manageUpgradeWizardState.rowKey);
+                    if (detailsRow) {
+                        refreshManageUpgradeGroupsEditor(detailsRow, groups);
+                        if (!saveManageUpgradeWizardRow(detailsRow)) {
+                            markPricingDirty(detailsRow);
+                        }
                     }
+                } else {
+                    manageNewItemWizardUpgradeGroups = normalizeManageItemUpgradeGroups({ upgradeGroups: groups });
+                    syncNewItemUpgradeWizardSummary();
                 }
-            } else {
-                manageNewItemWizardUpgradeGroups = normalizeManageItemUpgradeGroups({ upgradeGroups: groups });
-                syncNewItemUpgradeWizardSummary();
+            } finally {
+                manageUpgradeWizardState = null;
+                closeManageUpgradeWizard();
             }
-            const modalEl = document.getElementById('manageUpgradeWizardModal');
-            if (modalEl && window.bootstrap && bootstrap.Modal) {
-                bootstrap.Modal.getInstance(modalEl)?.hide();
-            }
-            manageUpgradeWizardState = null;
         }
 
         function syncNewItemUpgradeWizardSummary() {
@@ -1752,10 +1772,6 @@
             if (!item) return null;
             var targetGroupId = String(groupId || '');
             var targetOptionId = String(optionId || '');
-            if (targetGroupId === 'legacy_upgrade' || targetOptionId === 'legacy_upgrade_option') {
-                if (!item.upgrade) item.upgrade = {};
-                return { option: item.upgrade, legacy: true };
-            }
             var groups = Array.isArray(item.upgradeGroups) ? item.upgradeGroups : [];
             for (var g = 0; g < groups.length; g++) {
                 var group = groups[g] || {};
@@ -1767,6 +1783,10 @@
                         return { option: option, legacy: false };
                     }
                 }
+            }
+            if (targetOptionId === 'legacy_upgrade_option' || (targetGroupId === 'legacy_upgrade' && !targetOptionId)) {
+                if (!item.upgrade) item.upgrade = {};
+                return { option: item.upgrade, legacy: true };
             }
             if (!groups.length && item.upgrade && item.upgrade.name) {
                 return { option: item.upgrade, legacy: true };
@@ -1861,20 +1881,24 @@
             if (!groupId && !optionId) return;
             var index = parseInt(photoIndex, 10);
             pushUndoState();
+            var removed = false;
             findManagePhotoItems(cat, name).forEach(function(item) {
                 var existingTarget = findManageUpgradePhotoTarget(item, groupId, optionId);
                 if (!existingTarget || !existingTarget.option) return;
                 var photos = normalizeManageUpgradePhotos(existingTarget.option);
                 var photosFull = normalizeManageUpgradePhotosFull(existingTarget.option);
                 if (Number.isFinite(index) && index >= 0) {
+                    if (index >= photos.length) return;
                     removeManageFullResPhotoMeta(photosFull[index]);
                     photos.splice(index, 1);
                     photosFull.splice(index, 1);
                 } else {
+                    if (!photos.length) return;
                     photosFull.forEach(removeManageFullResPhotoMeta);
                     photos = [];
                     photosFull = [];
                 }
+                removed = true;
                 existingTarget.option.photos = photos.slice(0, MANAGE_ITEM_PHOTO_LIMIT);
                 existingTarget.option.photosFull = existingTarget.option.photos.map(function(_photo, photoIndex) {
                     return normalizeManageFullResPhotoMeta(photosFull[photoIndex]);
@@ -1894,6 +1918,10 @@
                     item.upgrade.photoFull = existingTarget.option.photoFull;
                 }
             });
+            if (!removed) {
+                showManageItemsToast('That upgrade photo could not be removed. Refresh Manage Items and try again.', false);
+                return;
+            }
             setManageItemDetailSectionOpen(cat, name, 'photos', true);
             markRowDirty(manageItemsRowKey(cat, name));
             renderAllItemsList();
@@ -2748,10 +2776,34 @@
             return await qdConfirm('You have unsaved changes, are you sure you want to exit?', {
                 title: 'Unsaved Changes',
                 okText: 'Exit Without Saving',
+                secondaryText: 'Save All and Exit',
+                secondaryValue: 'save_all_and_exit',
+                secondaryClass: 'btn-success',
                 cancelText: 'Keep Editing',
                 okClass: 'btn-warning',
                 type: 'warning'
             });
+        }
+
+        function finishManageItemsClose(choice) {
+            if (!choice) return false;
+            if (choice === 'save_all_and_exit') {
+                try {
+                    saveAllPricingRows();
+                } catch(e) {
+                    console.error('Could not save all Manage Items changes before closing:', e);
+                    qdAlert('QuoteDr could not save all item changes. The Manage Items window will stay open so you can try again.', {
+                        title: 'Save Failed',
+                        type: 'danger'
+                    });
+                    return false;
+                }
+            } else {
+                clearPricingDirty();
+            }
+            manageItemsCloseConfirmed = true;
+            hideManageItemsModal();
+            return true;
         }
 
         function bindManageItemsCloseGuard() {
@@ -2765,10 +2817,7 @@
                 manageItemsClosePromptOpen = true;
                 confirmDiscardManageItemsChanges().then(function(shouldExit) {
                     manageItemsClosePromptOpen = false;
-                    if (!shouldExit) return;
-                    clearPricingDirty();
-                    manageItemsCloseConfirmed = true;
-                    hideManageItemsModal();
+                    finishManageItemsClose(shouldExit);
                 }).catch(function() {
                     manageItemsClosePromptOpen = false;
                 });
@@ -2781,9 +2830,8 @@
 
         async function closeManageItemsModal() {
             if (hasUnsavedManageItemsChanges()) {
-                const shouldExit = await confirmDiscardManageItemsChanges();
-                if (!shouldExit) return false;
-                clearPricingDirty();
+                const closeChoice = await confirmDiscardManageItemsChanges();
+                return finishManageItemsClose(closeChoice);
             }
             manageItemsCloseConfirmed = true;
             hideManageItemsModal();
@@ -3226,7 +3274,15 @@
             if (authErr || !user) return { error: 'Not authenticated' };
             const snapshot = JSON.stringify(itemsObj || {});
             const payload = { user_id: user.id, client_name: '__ITEMS_BACKUP__', quote_number: '__ITEMS_BACKUP__', status: 'backup', data: { items_snapshot: snapshot, backed_up_at: new Date().toISOString() }, updated_at: new Date().toISOString() };
-            const { data, error } = await _supabase.from('quotes').upsert(payload, { onConflict: 'user_id,quote_number' }).select();
+            var timeoutId = null;
+            var cloudRequest = Promise.resolve(_supabase.from('quotes').upsert(payload, { onConflict: 'user_id,quote_number' }).select());
+            var timeoutResult = new Promise(function(resolve) {
+                timeoutId = setTimeout(function() {
+                    resolve({ data: null, error: { message: 'Cloud save timed out' } });
+                }, 12000);
+            });
+            const { data, error } = await Promise.race([cloudRequest, timeoutResult]);
+            if (timeoutId) clearTimeout(timeoutId);
             if (error) { console.error('[Backup] error:', error); return { error }; }
             console.log('[Backup] saved:', Object.keys(itemsObj || {}).length, 'categories');
             return { data };

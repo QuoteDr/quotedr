@@ -49,6 +49,17 @@ assert(items.includes('function readManageUpgradeOptionQuantityState(optionEl, p
 assert(wizardCollector.includes('...readManageUpgradeOptionQuantityState(optionEl, previous)'), 'Upgrade Wizard collection should preserve previous quantity behavior when a step omits quantity controls');
 assert(!manualCollector.includes('...readManageUpgradeOptionQuantityState(optionEl, previous)'), 'Manual upgrade collection should not reference wizard-only previous option state');
 assert(items.includes('saveManageUpgradeWizardRow(detailsRow)'), 'Upgrade Wizard Save should persist the edited Manage Items row immediately');
+assert(
+    items.includes('function closeManageUpgradeWizard()') &&
+    items.includes('bootstrap.Modal.getOrCreateInstance(modalEl).hide()') &&
+    /finally \{\s*manageUpgradeWizardState = null;\s*closeManageUpgradeWizard\(\);/.test(items),
+  'Upgrade Wizard Save should reliably close the wizard after committing the upgrade group'
+);
+assert(
+  items.includes("error: { message: 'Cloud save timed out' }") &&
+    items.includes('Promise.race([cloudRequest, timeoutResult])'),
+  'Manage Items cloud backup should settle instead of leaving the saving indicator pending indefinitely'
+);
 assert(items.includes('function bindManageItemsCloseGuard'), 'Manage Items should guard every modal close path against unsaved changes');
 assert(items.includes('You have unsaved changes, are you sure you want to exit?'), 'Manage Items close warning should use the clear unsaved changes message');
 assert(items.includes("modalEl.addEventListener('hide.bs.modal'"), 'Manage Items close guard should catch header X, backdrop, and ESC closes');
