@@ -63,4 +63,13 @@ assert(
   'manual upgrade quantity inputs should render a visible Set button beside the field'
 );
 
+assert(
+  builder.includes('function hasManualQuantityUpgradeForItem(item)') &&
+    builder.includes('findSavedItemForChoiceOption(option, item.category)') &&
+    builder.includes("normalizeQuoteItemUpgradeQuantityMode(option && option.quantityMode) === 'manual'") &&
+    builder.includes('quote-upgrade-manual-quantity-hint') &&
+    builder.includes('(Select an upgrade below to enter quantity)'),
+  'manual-quantity upgrade groups, including Pick One saved-option groups, should show a prominent instruction beside the Upgrade options heading'
+);
+
 console.log('quote-builder upgrade manual quantity static checks passed');

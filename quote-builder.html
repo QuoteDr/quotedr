@@ -206,6 +206,19 @@
         .quote-upgrade-title {
             color: var(--quote-upgrade-accent, #0d9488);
         }
+        .quote-upgrade-manual-quantity-hint {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            margin-left: 0.4rem;
+            padding: 0.15rem 0.45rem;
+            border: 1px solid #f59e0b;
+            border-radius: 4px;
+            background: #fffbeb;
+            color: #92400e;
+            font-weight: 700;
+            line-height: 1.25;
+        }
         .quote-upgrade-option-btn {
             border: 1px solid var(--quote-upgrade-accent, #0d9488);
             background: #ffffff;
@@ -3845,14 +3858,44 @@ Example:
             if (input && typeof input.blur === 'function') input.blur();
         }
 
+        function hasManualQuantityUpgradeForItem(item) {
+            if (!item) return false;
+            var groupSets = [Array.isArray(item.upgradeGroups) ? item.upgradeGroups : []];
+            if (item.choiceGroup && Array.isArray(item.choiceGroup.options)) {
+                var selectedOptionIds = Array.isArray(item.choiceGroup.selectedOptionIds)
+                    ? item.choiceGroup.selectedOptionIds
+                    : [];
+                item.choiceGroup.options.forEach(function(option) {
+                    if (!option || selectedOptionIds.indexOf(option.id) === -1) return;
+                    groupSets.push(Array.isArray(option.upgradeGroups) ? option.upgradeGroups : []);
+                    if (typeof findSavedItemForChoiceOption === 'function') {
+                        var savedItem = findSavedItemForChoiceOption(option, item.category);
+                        if (savedItem) groupSets.push(Array.isArray(savedItem.upgradeGroups) ? savedItem.upgradeGroups : []);
+                    }
+                });
+            }
+            return groupSets.some(function(groups) {
+                return groups.some(function(group) {
+                    return (group && Array.isArray(group.options) ? group.options : []).some(function(option) {
+                        return normalizeQuoteItemUpgradeQuantityMode(option && option.quantityMode) === 'manual';
+                    });
+                });
+            });
+        }
+
         function renderItemUpgradeGroups(roomId, itemIndex, item) {
             if (!item) return '';
             item.upgradeGroups = normalizeQuoteItemUpgradeGroups(item);
             clearInvalidItemUpgradeSelections(item);
             if (!item.upgradeGroups.length) return '';
             var selectedIds = getAllSelectedItemUpgradeOptionIds(item);
+            var hasManualQuantityUpgrade = hasManualQuantityUpgradeForItem(item);
             var html = '<div class="item-upgrade-groups quote-upgrade-groups mt-2 border rounded p-2">';
-            html += '<div class="small fw-bold quote-upgrade-title mb-1"><i class="fas fa-arrow-up me-1"></i>Upgrade options</div>';
+            html += '<div class="small fw-bold quote-upgrade-title mb-1"><i class="fas fa-arrow-up me-1"></i>Upgrade options';
+            if (hasManualQuantityUpgrade) {
+                html += '<span class="quote-upgrade-manual-quantity-hint"><i class="fas fa-circle-info" aria-hidden="true"></i>(Select an upgrade below to enter quantity)</span>';
+            }
+            html += '</div>';
             item.upgradeGroups.forEach(function(group) {
                 var compatible = (group.options || []).filter(function(option) {
                     return isItemUpgradeOptionCompatible(option, selectedIds.filter(function(id) { return id !== option.id; }));
