@@ -177,6 +177,42 @@
             return Array.isArray(saved.upgradeGroups) ? cloneQuoteStorageValue(saved.upgradeGroups) : [];
         }
 
+        function mergeQuoteStorageUpgradeGroupRuntimeState(targetGroups, previousGroups) {
+            targetGroups = Array.isArray(targetGroups) ? cloneQuoteStorageValue(targetGroups) : [];
+            previousGroups = Array.isArray(previousGroups) ? cloneQuoteStorageValue(previousGroups) : [];
+            if (typeof normalizeQuoteItemUpgradeGroups === 'function') {
+                targetGroups = normalizeQuoteItemUpgradeGroups({ upgradeGroups: targetGroups });
+                previousGroups = normalizeQuoteItemUpgradeGroups({ upgradeGroups: previousGroups });
+            }
+            var selectedIdsByGroup = {};
+            var quantityStateByGroupAndOption = {};
+            previousGroups.forEach(function(group) {
+                if (!group) return;
+                selectedIdsByGroup[group.id] = Array.isArray(group.selectedOptionIds) ? group.selectedOptionIds.slice() : [];
+                (group.options || []).forEach(function(option) {
+                    if (!option) return;
+                    quantityStateByGroupAndOption[group.id + '||' + option.id] = {
+                        manualQuantity: option.manualQuantity
+                    };
+                });
+            });
+            targetGroups.forEach(function(group) {
+                if (!group) return;
+                if (selectedIdsByGroup[group.id]) {
+                    group.selectedOptionIds = selectedIdsByGroup[group.id].filter(function(optionId) {
+                        return (group.options || []).some(function(option) { return option && option.id === optionId; });
+                    });
+                }
+                (group.options || []).forEach(function(option) {
+                    if (!option) return;
+                    var quantityState = quantityStateByGroupAndOption[group.id + '||' + option.id];
+                    if (!quantityState) return;
+                    option.manualQuantity = parseFloat(quantityState.manualQuantity || 0) || 0;
+                });
+            });
+            return targetGroups;
+        }
+
         function findSavedItemForChoiceOption(option, fallbackCategory) {
             if (!option) return null;
             var optionName = qdQuoteStorageTextKey(option.sourceItemName || option.name || option.description || option.serviceName || '');
@@ -207,6 +243,8 @@
 
         function hydrateChoiceGroupOptionsForSave(item) {
             if (!item || !item.choiceGroup || !Array.isArray(item.choiceGroup.options)) return;
+            var selectedChoiceOptionIds = Array.isArray(item.choiceGroup.selectedOptionIds) ? item.choiceGroup.selectedOptionIds.filter(Boolean) : [];
+            var liveUpgradeGroups = Array.isArray(item.upgradeGroups) ? cloneQuoteStorageValue(item.upgradeGroups) : [];
             item.choiceGroup.options.forEach(function(option) {
                 if (!option) return;
                 var saved = findSavedItemForChoiceOption(option, item.category);
@@ -218,7 +256,9 @@
                 }
                 var savedUpgradeGroups = quoteStorageSavedItemUpgradeGroups(saved);
                 if (savedUpgradeGroups.length) {
-                    option.upgradeGroups = cloneQuoteStorageValue(savedUpgradeGroups);
+                    option.upgradeGroups = selectedChoiceOptionIds.indexOf(option.id) !== -1 && liveUpgradeGroups.length
+                        ? mergeQuoteStorageUpgradeGroupRuntimeState(savedUpgradeGroups, liveUpgradeGroups)
+                        : cloneQuoteStorageValue(savedUpgradeGroups);
                 }
             });
         }

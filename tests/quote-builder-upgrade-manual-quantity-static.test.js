@@ -4,6 +4,8 @@ const assert = require('assert');
 
 const root = path.resolve(__dirname, '..');
 const builder = fs.readFileSync(path.join(root, 'quote-builder.html'), 'utf8');
+const storage = fs.readFileSync(path.join(root, 'quote-storage.js'), 'utf8');
+const viewer = fs.readFileSync(path.join(root, 'interactive-quote-viewer.html'), 'utf8');
 
 assert(
   builder.includes('function handleItemUpgradeManualQuantityKeydown'),
@@ -33,6 +35,22 @@ assert(
 assert(
   builder.includes('quantityStateByGroupAndOption'),
   'choice-group upgrade merge should preserve per-option manual quantity state, not only selected option ids'
+);
+
+assert(
+  builder.includes('syncChoiceGroupSelectedOptionUpgradeRuntimeState'),
+  'builder should sync manual upgrade quantities back to the selected choice option before saving or previewing'
+);
+
+assert(
+  storage.includes('mergeQuoteStorageUpgradeGroupRuntimeState'),
+  'quote storage should preserve live manual upgrade quantities when hydrating saved choice option upgrades'
+);
+
+assert(
+  viewer.includes('mergeViewerItemUpgradeGroupRuntimeState') &&
+    viewer.includes('quantityStateByGroupAndOption'),
+  'client viewer should preserve saved manual quantities when rebuilding choice option upgrade groups'
 );
 
 assert(

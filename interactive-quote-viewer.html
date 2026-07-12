@@ -2482,6 +2482,34 @@ if (location.search.includes('debug')) {
             return out;
         }
 
+        function mergeViewerItemUpgradeGroupRuntimeState(targetGroups, previousGroups) {
+            targetGroups = normalizeViewerItemUpgradeGroups({ upgradeGroups: targetGroups });
+            previousGroups = normalizeViewerItemUpgradeGroups({ upgradeGroups: previousGroups });
+            var selectedIdsByGroup = {};
+            var quantityStateByGroupAndOption = {};
+            previousGroups.forEach(function(group) {
+                selectedIdsByGroup[group.id] = Array.isArray(group.selectedOptionIds) ? group.selectedOptionIds.slice() : [];
+                (group.options || []).forEach(function(option) {
+                    quantityStateByGroupAndOption[group.id + '||' + option.id] = {
+                        manualQuantity: option.manualQuantity
+                    };
+                });
+            });
+            targetGroups.forEach(function(group) {
+                if (selectedIdsByGroup[group.id]) {
+                    group.selectedOptionIds = selectedIdsByGroup[group.id].filter(function(optionId) {
+                        return (group.options || []).some(function(option) { return option.id === optionId; });
+                    });
+                }
+                (group.options || []).forEach(function(option) {
+                    var quantityState = quantityStateByGroupAndOption[group.id + '||' + option.id];
+                    if (!quantityState) return;
+                    option.manualQuantity = viewerNumber(quantityState.manualQuantity);
+                });
+            });
+            return targetGroups;
+        }
+
         function applyViewerChoiceGroupToItem(item) {
             if (!item || !item.choiceGroup) return item;
             if (item._choiceGroupBasePhoto === undefined) item._choiceGroupBasePhoto = item.photo || '';
@@ -2518,25 +2546,13 @@ if (location.search.includes('debug')) {
             item.rate = group.type === 'single' && selected[0] ? (parseFloat(selected[0].rate) || 0) : rateSum;
             if (selectedEnhancements.length) item.rate = rateSum;
             item.choiceGroup.selectedOptionIds = selected.map(function(option) { return option.id; });
-            var priorUpgradeSelections = {};
-            normalizeViewerItemUpgradeGroups(item).forEach(function(upgradeGroup) {
-                priorUpgradeSelections[upgradeGroup.id] = Array.isArray(upgradeGroup.selectedOptionIds)
-                    ? upgradeGroup.selectedOptionIds.slice()
-                    : [];
-            });
+            var priorUpgradeGroups = normalizeViewerItemUpgradeGroups(item);
             var selectedBaseOption = selected[0] || null;
             item.photo = selectedBaseOption && selectedBaseOption.photo ? selectedBaseOption.photo : (item._choiceGroupBasePhoto || '');
             item.photoFull = selectedBaseOption && selectedBaseOption.photoFull ? selectedBaseOption.photoFull : (item._choiceGroupBasePhotoFull || null);
             if (replacement && replacement.photo) item.photo = replacement.photo;
             if (replacement && replacement.photoFull) item.photoFull = replacement.photoFull;
-            item.upgradeGroups = selectedBaseOption ? normalizeViewerItemUpgradeGroups(selectedBaseOption) : [];
-            item.upgradeGroups.forEach(function(upgradeGroup) {
-                if (priorUpgradeSelections[upgradeGroup.id]) {
-                    upgradeGroup.selectedOptionIds = priorUpgradeSelections[upgradeGroup.id].filter(function(optionId) {
-                        return (upgradeGroup.options || []).some(function(option) { return option.id === optionId; });
-                    });
-                }
-            });
+            item.upgradeGroups = selectedBaseOption ? mergeViewerItemUpgradeGroupRuntimeState(selectedBaseOption.upgradeGroups || [], priorUpgradeGroups) : [];
             resetViewerItemUpgradeBaseState(item);
             if (item.upgradeGroups.length) applyViewerItemUpgradeGroups(item);
             clearInvalidViewerChoiceGroupEnhancementSelections(group);

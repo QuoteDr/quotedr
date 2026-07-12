@@ -3717,6 +3717,7 @@ Example:
             if (!option) return;
             option.manualQuantity = parseFloat(event && event.currentTarget ? event.currentTarget.value : 0) || 0;
             applyItemUpgradeGroupsToItem(item);
+            syncChoiceGroupSelectedOptionUpgradeRuntimeState(item);
             if (options.render !== false) renderRooms();
             calculateTotals();
             markUnsaved();
@@ -8509,6 +8510,16 @@ Example:
                 });
             });
             return targetGroups;
+        }
+
+        function syncChoiceGroupSelectedOptionUpgradeRuntimeState(item) {
+            if (!item || !item.choiceGroup || !Array.isArray(item.choiceGroup.options)) return item;
+            var selectedOption = getChoiceGroupSelectedOptions(item.choiceGroup)[0] || null;
+            if (!selectedOption) return item;
+            var liveUpgradeGroups = normalizeQuoteItemUpgradeGroups(item);
+            if (!liveUpgradeGroups.length) return item;
+            selectedOption.upgradeGroups = mergeQuoteItemUpgradeGroupRuntimeState(selectedOption.upgradeGroups || [], liveUpgradeGroups);
+            return item;
         }
 
         function applyChoiceGroupEnhancementsToItem(item, baseState) {
