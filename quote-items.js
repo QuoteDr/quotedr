@@ -20,6 +20,9 @@
         var manageNewItemWizardUpgradeGroups = [];
         var manageUpgradeWizardState = null;
         var MANAGE_ITEM_PHOTO_LIMIT = 3;
+        var MANAGE_FULL_RES_PHOTO_BUCKET = 'item-full-res-photos';
+        var MANAGE_FULL_RES_PHOTO_FEATURE = 'full_resolution_photos';
+        var MANAGE_FULL_RES_PHOTO_ACCOUNT_LIMIT_BYTES = 10 * 1024 * 1024 * 1024;
         var manageOpenDetailSections = {};
         var dirtyPricingRows = new Set();
         var pricingOtherDirty = false;
@@ -50,6 +53,222 @@
 
         function manageItemsAttr(value) {
             return manageItemsEscape(value).replace(/`/g, '&#96;');
+        }
+
+        function manageFullResPhotoPricingUrl() {
+            return 'pricing.html?plan=pro&feature=' + encodeURIComponent(MANAGE_FULL_RES_PHOTO_FEATURE);
+        }
+
+        function renderManageFullResUpgradeNote() {
+            return '<div class="small text-muted manage-full-res-upgrade-note mt-1" style="display:none;"><a href="' + manageItemsAttr(manageFullResPhotoPricingUrl()) + '" class="fw-semibold">Upgrade to Pro to show full resolution</a>.</div>';
+        }
+
+        function normalizeManageFullResPhotoMeta(meta) {
+            if (!meta) return null;
+            if (typeof meta === 'string') {
+                var url = meta.trim();
+                return url ? { url: url, path: '', sizeBytes: 0 } : null;
+            }
+            var fullUrl = String(meta.url || meta.publicUrl || meta.fullUrl || '').trim();
+            var path = String(meta.path || meta.storagePath || '').trim();
+            if (!fullUrl && !path) return null;
+            return {
+                url: fullUrl,
+                path: path,
+                sizeBytes: Math.max(0, parseInt(meta.sizeBytes || meta.size || 0, 10) || 0),
+                width: Math.max(0, parseInt(meta.width || 0, 10) || 0),
+                height: Math.max(0, parseInt(meta.height || 0, 10) || 0),
+                mimeType: meta.mimeType || meta.type || '',
+                name: meta.name || '',
+                uploadedAt: meta.uploadedAt || meta.createdAt || ''
+            };
+        }
+
+        function manageFullResPhotoUrl(meta) {
+            meta = normalizeManageFullResPhotoMeta(meta);
+            return meta ? (meta.url || meta.publicUrl || '') : '';
+        }
+
+        function manageFullResPhotoDataAttr(meta) {
+            meta = normalizeManageFullResPhotoMeta(meta);
+            return meta ? manageItemsAttr(JSON.stringify(meta)) : '';
+        }
+
+        async function openManageItemPhotoLightbox(trigger) {
+            var src = trigger && trigger.getAttribute ? (trigger.getAttribute('data-photo-src') || trigger.getAttribute('src') || '') : '';
+            var rawFull = trigger && trigger.getAttribute ? (trigger.getAttribute('data-full-photo') || '') : '';
+            var fullMeta = null;
+            if (rawFull) {
+                try { fullMeta = JSON.parse(rawFull); } catch(e) { fullMeta = rawFull; }
+            }
+            var fullUrl = manageFullResPhotoUrl(fullMeta);
+            var useFull = false;
+            if (fullUrl) {
+                try { useFull = await manageCanUseFullResPhotos(); } catch(e) { useFull = false; }
+            }
+            if (typeof openPhotoLightbox === 'function') openPhotoLightbox(useFull && fullUrl ? fullUrl : src);
+        }
+
+        function normalizeManageItemPhotosFull(item) {
+            if (!item) return [];
+            var full = [];
+            if (Array.isArray(item.photosFull)) {
+                item.photosFull.forEach(function(meta) {
+                    full.push(normalizeManageFullResPhotoMeta(meta));
+                });
+            }
+            if (!full.length && item.photoFull) {
+                full.push(normalizeManageFullResPhotoMeta(item.photoFull));
+            }
+            return full.slice(0, MANAGE_ITEM_PHOTO_LIMIT);
+        }
+
+        function manageFullResPhotoIdentity(meta) {
+            meta = normalizeManageFullResPhotoMeta(meta);
+            return meta ? (meta.path || meta.url || '') : '';
+        }
+
+        function collectManageFullResPhotoMetasFromItem(item, out) {
+            if (!item || !out) return;
+            normalizeManageItemPhotosFull(item).forEach(function(meta) {
+                if (meta) out.push(meta);
+            });
+            if (item.upgrade && item.upgrade.photoFull) {
+                var legacyMeta = normalizeManageFullResPhotoMeta(item.upgrade.photoFull);
+                if (legacyMeta) out.push(legacyMeta);
+            }
+            normalizeManageItemUpgradeGroups(item).forEach(function(group) {
+                (group.options || []).forEach(function(option) {
+                    var meta = normalizeManageFullResPhotoMeta(option.photoFull);
+                    if (meta) out.push(meta);
+                });
+            });
+        }
+
+        function collectManageFullResPhotoMetas() {
+            var metas = [];
+            [customItems, pricingDatabase].forEach(function(db) {
+                if (!db) return;
+                Object.keys(db).forEach(function(cat) {
+                    if (cat === '__choiceGroupTemplates' || !Array.isArray(db[cat])) return;
+                    db[cat].forEach(function(item) {
+                        collectManageFullResPhotoMetasFromItem(item, metas);
+                    });
+                });
+            });
+            return metas;
+        }
+
+        function getManageFullResPhotoUsageBytes(excludeMeta) {
+            var excludeId = manageFullResPhotoIdentity(excludeMeta);
+            var seen = {};
+            return collectManageFullResPhotoMetas().reduce(function(total, meta) {
+                meta = normalizeManageFullResPhotoMeta(meta);
+                if (!meta) return total;
+                var id = manageFullResPhotoIdentity(meta);
+                if (!id || id === excludeId || seen[id]) return total;
+                seen[id] = true;
+                return total + (parseInt(meta.sizeBytes || 0, 10) || 0);
+            }, 0);
+        }
+
+        function canAddManageFullResPhotoBytes(sizeBytes, existingMeta) {
+            var nextUsageBytes = getManageFullResPhotoUsageBytes(existingMeta) + (parseInt(sizeBytes || 0, 10) || 0);
+            return {
+                allowed: nextUsageBytes <= MANAGE_FULL_RES_PHOTO_ACCOUNT_LIMIT_BYTES,
+                nextUsageBytes: nextUsageBytes,
+                limitBytes: MANAGE_FULL_RES_PHOTO_ACCOUNT_LIMIT_BYTES
+            };
+        }
+
+        function formatManagePhotoBytes(bytes) {
+            var value = parseInt(bytes || 0, 10) || 0;
+            if (value >= 1024 * 1024 * 1024) return (value / (1024 * 1024 * 1024)).toFixed(1).replace(/\.0$/, '') + ' GB';
+            if (value >= 1024 * 1024) return (value / (1024 * 1024)).toFixed(1).replace(/\.0$/, '') + ' MB';
+            if (value >= 1024) return Math.round(value / 1024) + ' KB';
+            return value + ' B';
+        }
+
+        async function manageCanUseFullResPhotos() {
+            try {
+                if (typeof hasFeature === 'function') return await hasFeature('full_resolution_photos');
+                if (typeof isCurrentUserPro === 'function') return await isCurrentUserPro();
+            } catch(e) {}
+            return false;
+        }
+
+        function safeManagePhotoPathPart(value) {
+            return String(value || 'photo').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'photo';
+        }
+
+        function managePhotoFileExtension(file) {
+            var name = file && file.name ? String(file.name) : '';
+            var match = name.match(/\.([a-z0-9]{2,5})$/i);
+            if (match) return match[1].toLowerCase();
+            var type = file && file.type ? String(file.type).toLowerCase() : '';
+            if (type.indexOf('png') !== -1) return 'png';
+            if (type.indexOf('webp') !== -1) return 'webp';
+            if (type.indexOf('gif') !== -1) return 'gif';
+            return 'jpg';
+        }
+
+        async function uploadManageFullResPhoto(file, context, existingMeta, dimensions) {
+            context = context || {};
+            if (!file || !String(file.type || '').toLowerCase().startsWith('image/')) return null;
+            var quota = canAddManageFullResPhotoBytes(file.size || 0, existingMeta);
+            if (!quota.allowed) {
+                throw new Error('Full-resolution photo storage is full. QuoteDr Pro includes ' + formatManagePhotoBytes(MANAGE_FULL_RES_PHOTO_ACCOUNT_LIMIT_BYTES) + ' for saved item photos.');
+            }
+            if (typeof _supabase === 'undefined' || !_supabase || !_supabase.auth || !_supabase.storage) {
+                throw new Error('Sign in to retain full-resolution photos.');
+            }
+            var current = typeof getCurrentUser === 'function' ? await getCurrentUser() : null;
+            if (!current) {
+                var userResult = await _supabase.auth.getUser();
+                current = userResult && userResult.data && userResult.data.user;
+            }
+            var userId = current && current.id;
+            if (!userId) throw new Error('Sign in to retain full-resolution photos.');
+            var extension = managePhotoFileExtension(file);
+            var path = [
+                userId,
+                safeManagePhotoPathPart(context.cat),
+                safeManagePhotoPathPart(context.name),
+                safeManagePhotoPathPart(context.field || 'photo'),
+                Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.' + extension
+            ].join('/');
+            var upload = await _supabase.storage.from(MANAGE_FULL_RES_PHOTO_BUCKET).upload(path, file, {
+                contentType: file.type || 'image/jpeg',
+                upsert: false
+            });
+            if (upload && upload.error) throw upload.error;
+            var publicUrl = _supabase.storage.from(MANAGE_FULL_RES_PHOTO_BUCKET).getPublicUrl(path).data.publicUrl;
+            return normalizeManageFullResPhotoMeta({
+                url: publicUrl,
+                path: path,
+                sizeBytes: file.size || 0,
+                width: dimensions && dimensions.width,
+                height: dimensions && dimensions.height,
+                mimeType: file.type || '',
+                name: file.name || '',
+                uploadedAt: new Date().toISOString()
+            });
+        }
+
+        function removeManageFullResPhotoMeta(meta) {
+            meta = normalizeManageFullResPhotoMeta(meta);
+            if (!meta || !meta.path || typeof _supabase === 'undefined' || !_supabase || !_supabase.storage) return;
+            _supabase.storage.from(MANAGE_FULL_RES_PHOTO_BUCKET).remove([meta.path]).catch(function(){});
+        }
+
+        function refreshManageFullResPhotoUpgradeNotes() {
+            var notes = Array.from(document.querySelectorAll('.manage-full-res-upgrade-note'));
+            if (!notes.length) return;
+            manageCanUseFullResPhotos().then(function(allowed) {
+                notes.forEach(function(note) {
+                    note.style.display = allowed ? 'none' : '';
+                });
+            });
         }
 
         function normalizeManageUpgradeType(value) {
@@ -101,6 +320,7 @@
                 materialCost: parseFloat(option.materialCost || option.material_cost || 0) || 0,
                 supplierUrl: option.supplierUrl || '',
                 photo: option.photo || '',
+                photoFull: normalizeManageFullResPhotoMeta(option.photoFull),
                 description: option.description || option.itemDescription || '',
                 itemDescription: option.itemDescription || option.description || '',
                 upgradeType: normalizeManageUpgradeType(option.upgradeType || option.type || option.mode),
@@ -394,6 +614,7 @@
                     const optionRequiresConsultation = isConsultationGroup || option.upgradeType === 'consultation' || option.requiresConsultation === true;
                     html += '<div class="manage-upgrade-option border rounded p-2 mt-2" data-upgrade-option-id="' + manageItemsAttr(option.id) + '">' +
                         '<input type="hidden" class="upgrade-photo-value" value="' + manageItemsAttr(option.photo || '') + '">' +
+                        '<input type="hidden" class="upgrade-photo-full-value" value="' + manageItemsAttr(JSON.stringify(normalizeManageFullResPhotoMeta(option.photoFull) || null)) + '">' +
                         '<div class="row g-2 align-items-end">' +
                         '<div class="col-md-4"><label class="form-label" style="font-size:0.75em">Copy From Saved Item</label>' + renderManageUpgradeSourceSelect(option.sourceItemName, option.category) + '</div>' +
                         '<div class="col-md-4"><label class="form-label" style="font-size:0.75em">Upgrade Name</label><input type="text" class="form-control form-control-sm upgrade-name" value="' + manageItemsAttr(option.name) + '" placeholder="e.g., Post-to-post drink rail" oninput="markPricingDirty(this)"></div>' +
@@ -434,6 +655,9 @@
                         materialCost: requiresConsultation ? 0 : (parseFloat(optionEl.querySelector('.upgrade-material-cost')?.value || 0) || 0),
                         supplierUrl: optionEl.querySelector('.upgrade-supplier-url')?.value.trim() || '',
                         photo: optionEl.querySelector('.upgrade-photo-value')?.value || '',
+                        photoFull: normalizeManageFullResPhotoMeta((function() {
+                            try { return JSON.parse(optionEl.querySelector('.upgrade-photo-full-value')?.value || 'null'); } catch(e) { return null; }
+                        })()),
                         description: optionEl.querySelector('.upgrade-desc')?.value.trim() || '',
                         upgradeType: groupType === 'consultation' ? 'consultation' : normalizeManageUpgradeType(optionEl.querySelector('.upgrade-type')?.value),
                         requiresConsultation: requiresConsultation,
@@ -1250,8 +1474,13 @@
         function syncManageItemPhotoCompatibility(item) {
             if (!item) return [];
             var photos = normalizeManageItemPhotos(item);
+            var photosFull = normalizeManageItemPhotosFull(item);
             item.photos = photos;
             item.photo = photos[0] || '';
+            item.photosFull = photos.map(function(_photo, index) {
+                return normalizeManageFullResPhotoMeta(photosFull[index]);
+            });
+            item.photoFull = item.photosFull[0] || null;
             return photos;
         }
 
@@ -1279,6 +1508,73 @@
         function findManagePhotoItem(cat, name) {
             var matches = findManagePhotoItems(cat, name);
             return matches[0] || null;
+        }
+
+        function getManageItemDetailsRow(cat, name) {
+            var rowKey = manageItemsRowKey(cat, name);
+            return Array.from(document.querySelectorAll('.item-details-row')).find(function(row) {
+                return row && row.dataset && row.dataset.rowKey === rowKey;
+            }) || null;
+        }
+
+        function syncManageUpgradePhotoFromDetails(cat, name, groupId, optionId, photo) {
+            var detailsRow = getManageItemDetailsRow(cat, name);
+            if (!detailsRow) return false;
+            var targetGroupId = String(groupId || '');
+            var targetOptionId = String(optionId || '');
+            var optionEl = null;
+            Array.from(detailsRow.querySelectorAll('.manage-upgrade-group')).some(function(groupEl) {
+                if (String(groupEl.dataset.upgradeGroupId || '') !== targetGroupId) return false;
+                optionEl = Array.from(groupEl.querySelectorAll('.manage-upgrade-option')).find(function(candidate) {
+                    return String(candidate.dataset.upgradeOptionId || '') === targetOptionId;
+                }) || null;
+                return !!optionEl;
+            });
+            if (!optionEl) return false;
+            var hidden = optionEl.querySelector('.upgrade-photo-value');
+            if (!hidden) {
+                hidden = document.createElement('input');
+                hidden.type = 'hidden';
+                hidden.className = 'upgrade-photo-value';
+                optionEl.insertBefore(hidden, optionEl.firstChild);
+            }
+            hidden.value = photo || '';
+            var groups = collectManageItemUpgradeGroups(detailsRow, true);
+            findManagePhotoItems(cat, name).forEach(function(item) {
+                item.upgradeGroups = groups;
+                setManageUpgradeOptionPhoto(item, groupId, optionId, photo);
+            });
+            return true;
+        }
+
+        function syncManageUpgradePhotoFullFromDetails(cat, name, groupId, optionId, photoFull) {
+            var detailsRow = getManageItemDetailsRow(cat, name);
+            if (!detailsRow) return false;
+            var targetGroupId = String(groupId || '');
+            var targetOptionId = String(optionId || '');
+            var optionEl = null;
+            Array.from(detailsRow.querySelectorAll('.manage-upgrade-group')).some(function(groupEl) {
+                if (String(groupEl.dataset.upgradeGroupId || '') !== targetGroupId) return false;
+                optionEl = Array.from(groupEl.querySelectorAll('.manage-upgrade-option')).find(function(candidate) {
+                    return String(candidate.dataset.upgradeOptionId || '') === targetOptionId;
+                }) || null;
+                return !!optionEl;
+            });
+            if (!optionEl) return false;
+            var hidden = optionEl.querySelector('.upgrade-photo-full-value');
+            if (!hidden) {
+                hidden = document.createElement('input');
+                hidden.type = 'hidden';
+                hidden.className = 'upgrade-photo-full-value';
+                optionEl.insertBefore(hidden, optionEl.firstChild);
+            }
+            hidden.value = JSON.stringify(normalizeManageFullResPhotoMeta(photoFull) || null);
+            var groups = collectManageItemUpgradeGroups(detailsRow, true);
+            findManagePhotoItems(cat, name).forEach(function(item) {
+                item.upgradeGroups = groups;
+                setManageUpgradeOptionPhotoFull(item, groupId, optionId, photoFull);
+            });
+            return true;
         }
 
         function shouldPromptManageItemPhotoReplacement(cat, name) {
@@ -1364,6 +1660,17 @@
             return true;
         }
 
+        function setManageUpgradeOptionPhotoFull(item, groupId, optionId, photoFull) {
+            var target = findManageUpgradePhotoTarget(item, groupId, optionId);
+            if (!target || !target.option) return false;
+            target.option.photoFull = normalizeManageFullResPhotoMeta(photoFull);
+            if (target.legacy && item.upgrade) item.upgrade.photoFull = target.option.photoFull;
+            if (item.upgrade && item.upgrade.name && target.option.name && item.upgrade.name === target.option.name) {
+                item.upgrade.photoFull = target.option.photoFull;
+            }
+            return true;
+        }
+
         function getManageUpgradePhotoTargets(item) {
             var groups = normalizeManageItemUpgradeGroups(item);
             var targets = [];
@@ -1376,6 +1683,7 @@
                         optionId: option.id || '',
                         optionName: option.name || '',
                         photo: option.photo || '',
+                        photoFull: normalizeManageFullResPhotoMeta(option.photoFull),
                         upgradeType: option.upgradeType || ''
                     });
                 });
@@ -1393,7 +1701,10 @@
             if (!groupId && !optionId) return;
             pushUndoState();
             findManagePhotoItems(cat, name).forEach(function(item) {
+                var existingTarget = findManageUpgradePhotoTarget(item, groupId, optionId);
+                if (existingTarget && existingTarget.option) removeManageFullResPhotoMeta(existingTarget.option.photoFull);
                 setManageUpgradeOptionPhoto(item, groupId, optionId, '');
+                setManageUpgradeOptionPhotoFull(item, groupId, optionId, null);
             });
             setManageItemDetailSectionOpen(cat, name, 'photos', true);
             markRowDirty(manageItemsRowKey(cat, name));
@@ -1407,10 +1718,15 @@
             pushUndoState();
             findManagePhotoItems(cat, name).forEach(function(item) {
                 var photos = normalizeManageItemPhotos(item);
+                var photosFull = normalizeManageItemPhotosFull(item);
                 if (index >= photos.length) return;
+                removeManageFullResPhotoMeta(photosFull[index]);
                 photos.splice(index, 1);
+                photosFull.splice(index, 1);
                 item.photos = photos;
+                item.photosFull = photosFull;
                 item.photo = photos[0] || '';
+                item.photoFull = photosFull[0] || null;
             });
             setManageItemDetailSectionOpen(cat, name, 'photos', true);
             markRowDirty(manageItemsRowKey(cat, name));
@@ -2000,7 +2316,7 @@
             var reader = new FileReader();
             reader.onload = function(e) {
                 var img = new Image();
-                img.onload = function() {
+                img.onload = async function() {
                     var maxDim = 600;
                     var w = img.width, h = img.height;
                     if (w > maxDim || h > maxDim) {
@@ -2011,6 +2327,40 @@
                     canvas.width = w; canvas.height = h;
                     canvas.getContext('2d').drawImage(img, 0, 0, w, h);
                     var dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                    var existingFullMeta = null;
+                    var firstPhotoItem = findManagePhotoItem(cat, name);
+                    if (firstPhotoItem) {
+                        if (field === 'upgradePhoto') {
+                            var existingTarget = findManageUpgradePhotoTarget(firstPhotoItem, upgradeGroupId, upgradeOptionId);
+                            existingFullMeta = existingTarget && existingTarget.option ? existingTarget.option.photoFull : null;
+                        } else {
+                            var existingPhotosFull = normalizeManageItemPhotosFull(firstPhotoItem);
+                            existingFullMeta = Number.isFinite(requestedIndex) && requestedIndex >= 0 ? existingPhotosFull[requestedIndex] : null;
+                        }
+                    }
+                    var fullMeta = null;
+                    var fullResWarning = '';
+                    try {
+                        fullMeta = await uploadManageFullResPhoto(file, {
+                            cat: cat,
+                            name: name,
+                            field: field,
+                            upgradeGroupId: upgradeGroupId,
+                            upgradeOptionId: upgradeOptionId
+                        }, existingFullMeta, { width: img.width, height: img.height });
+                    } catch(fullErr) {
+                        var fullErrMessage = fullErr && fullErr.message ? fullErr.message : 'Full-resolution photo was not saved.';
+                        fullResWarning = /bucket not found|not found/i.test(fullErrMessage)
+                            ? 'Full-resolution photo storage is not set up yet. The compressed thumbnail was saved.'
+                            : fullErrMessage;
+                    }
+                    var upgradePhotoSyncedFromDetails = field === 'upgradePhoto'
+                        ? syncManageUpgradePhotoFromDetails(cat, name, upgradeGroupId, upgradeOptionId, dataUrl)
+                        : false;
+                    var upgradePhotoSaved = upgradePhotoSyncedFromDetails;
+                    if (field === 'upgradePhoto') {
+                        syncManageUpgradePhotoFullFromDetails(cat, name, upgradeGroupId, upgradeOptionId, fullMeta);
+                    }
                     // Find item in customItems and pricingDatabase
                     var targets = [customItems, pricingDatabase];
                     targets.forEach(function(db) {
@@ -2019,26 +2369,55 @@
                         if (!item) return;
                         if (field === 'upgradePhoto') {
                             if (!setManageUpgradeOptionPhoto(item, upgradeGroupId, upgradeOptionId, dataUrl)) {
-                                if (!item.upgrade) item.upgrade = {};
-                                item.upgrade.photo = dataUrl;
+                                var isLegacyUpgradePhoto = upgradeGroupId === 'legacy_upgrade' || upgradeOptionId === 'legacy_upgrade_option' || (!upgradeGroupId && !upgradeOptionId);
+                                if (isLegacyUpgradePhoto) {
+                                    if (!item.upgrade) item.upgrade = {};
+                                    item.upgrade.photo = dataUrl;
+                                    item.upgrade.photoFull = normalizeManageFullResPhotoMeta(fullMeta);
+                                    upgradePhotoSaved = true;
+                                }
+                            } else {
+                                upgradePhotoSaved = true;
                             }
+                            setManageUpgradeOptionPhotoFull(item, upgradeGroupId, upgradeOptionId, fullMeta);
                         } else {
                             var photos = normalizeManageItemPhotos(item);
+                            var photosFull = normalizeManageItemPhotosFull(item);
+                            var oldFullMeta = null;
                             if (Number.isFinite(requestedIndex) && requestedIndex >= 0 && requestedIndex < MANAGE_ITEM_PHOTO_LIMIT) {
+                                oldFullMeta = photosFull[requestedIndex] || null;
                                 photos[requestedIndex] = dataUrl;
+                                photosFull[requestedIndex] = normalizeManageFullResPhotoMeta(fullMeta);
                             } else if (photos.length < MANAGE_ITEM_PHOTO_LIMIT) {
                                 photos.push(dataUrl);
+                                photosFull.push(normalizeManageFullResPhotoMeta(fullMeta));
                             } else {
                                 return;
                             }
+                            if (oldFullMeta && manageFullResPhotoIdentity(oldFullMeta) !== manageFullResPhotoIdentity(fullMeta)) {
+                                removeManageFullResPhotoMeta(oldFullMeta);
+                            }
                             item.photos = photos.filter(Boolean).slice(0, MANAGE_ITEM_PHOTO_LIMIT);
+                            item.photosFull = item.photos.map(function(_photo, index) {
+                                return normalizeManageFullResPhotoMeta(photosFull[index]);
+                            });
                             item.photo = item.photos[0] || '';
+                            item.photoFull = item.photosFull[0] || null;
                         }
                     });
+                    if (field === 'upgradePhoto' && existingFullMeta && manageFullResPhotoIdentity(existingFullMeta) !== manageFullResPhotoIdentity(fullMeta)) {
+                        removeManageFullResPhotoMeta(existingFullMeta);
+                    }
                     setManageItemDetailSectionOpen(cat, name, 'photos', true);
                     markRowDirty(manageItemsRowKey(cat, name));
                     renderAllItemsList();
-                    showManageItemsToast('Photo updated. Save changes when ready.', true);
+                    if (field === 'upgradePhoto' && !upgradePhotoSaved) {
+                        showManageItemsToast('Could not attach that upgrade photo. Reopen the upgrade details and try again.', false);
+                    } else if (fullResWarning) {
+                        showManageItemsToast('Photo updated as a compressed thumbnail. ' + fullResWarning, false);
+                    } else {
+                        showManageItemsToast(fullMeta ? 'Photo updated with full-resolution original. Save changes when ready.' : 'Photo updated. Save changes when ready.', true);
+                    }
                 };
                 img.src = e.target.result;
             };
@@ -2511,7 +2890,7 @@
                 const pi = pricingDatabase[cat]?.find(i => i.name === name);
                 if (pi) {
                     hadSavedItemForQuoteSync = true;
-                    ci = { name: pi.name, unitType: pi.unitType || '', rate: pi.rate || 0, materialCost: pi.materialCost || 0, supplierUrl: pi.supplierUrl || '', itemDescription: pi.itemDescription || '', photo: pi.photo || '', photos: normalizeManageItemPhotos(pi), laborTime: normalizeManageLaborTime(pi.laborTime), upgrade: pi.upgrade || undefined, upgradeGroups: normalizeManageItemUpgradeGroups(pi) };
+                    ci = { name: pi.name, unitType: pi.unitType || '', rate: pi.rate || 0, materialCost: pi.materialCost || 0, supplierUrl: pi.supplierUrl || '', itemDescription: pi.itemDescription || '', photo: pi.photo || '', photos: normalizeManageItemPhotos(pi), photoFull: normalizeManageFullResPhotoMeta(pi.photoFull), photosFull: normalizeManageItemPhotosFull(pi), laborTime: normalizeManageLaborTime(pi.laborTime), upgrade: pi.upgrade || undefined, upgradeGroups: normalizeManageItemUpgradeGroups(pi) };
                     syncManageItemPhotoCompatibility(ci);
                     customItems[cat].push(ci);
                 } else {
@@ -2538,7 +2917,9 @@
             if (upgrade !== null) {
                 // Preserve upgrade photo from previous state
                 var oldUpgPhoto = pricingDatabase[cat]?.find(function(i){return i.name===name||i.name===newName;})?.upgrade?.photo;
+                var oldUpgPhotoFull = pricingDatabase[cat]?.find(function(i){return i.name===name||i.name===newName;})?.upgrade?.photoFull;
                 if (!upgrade.photo && oldUpgPhoto) upgrade.photo = oldUpgPhoto;
+                if (!upgrade.photoFull && oldUpgPhotoFull) upgrade.photoFull = normalizeManageFullResPhotoMeta(oldUpgPhotoFull);
                 ci.upgrade = upgrade;
             } else if (hasUpgradeEditor) {
                 delete ci.upgrade;
@@ -2555,7 +2936,11 @@
             if (!currentPhotos.length) {
                 var oldPhotoItem = pricingDatabase[cat]?.find(function(i){return i.name===name||i.name===newName;});
                 currentPhotos = normalizeManageItemPhotos(oldPhotoItem);
-                if (currentPhotos.length) ci.photos = currentPhotos;
+                if (currentPhotos.length) {
+                    ci.photos = currentPhotos;
+                    ci.photosFull = normalizeManageItemPhotosFull(oldPhotoItem);
+                    ci.photoFull = ci.photosFull[0] || null;
+                }
             }
             syncManageItemPhotoCompatibility(ci);
             if (beforeQuoteSyncItem && typeof recordSavedItemQuoteChange === 'function' && typeof getSavedItemFingerprintForQuoteSync === 'function') {
@@ -2828,6 +3213,7 @@
                     const catE = cat.replace(/"/g,'&quot;');
                     const nameE = item.name.replace(/"/g,'&quot;');
                     const upg = item.upgrade || {};
+                    const itemPhotosFull = normalizeManageItemPhotosFull(item);
                     const upgName = (upg.name || '').replace(/"/g,'&quot;');
                     const upgUnitType = (upg.unitType || upg.unit || '').replace(/"/g,'&quot;');
                     const upgRate = parseFloat(upg.rate || 0).toFixed(2);
@@ -2859,7 +3245,7 @@
                                 <button class="btn btn-sm btn-success item-save-btn" data-cat="${catE}" data-name="${nameE}" title="Save this row" style="touch-action:manipulation"><i class="fas fa-save"></i></button>
                                 ${isCustom ? `<button class="btn btn-sm btn-danger item-delete-btn" data-cat="${catE}" data-name="${nameE}" title="Delete" style="touch-action:manipulation"><i class="fas fa-trash"></i></button>` : ''}
                             </div>
-                            ${item.photo ? `<img src="${item.photo}" class="mt-1 rounded" style="max-width:60px;max-height:40px;cursor:pointer;" onclick="openPhotoLightbox(this.src)" title="Click to enlarge">` : ''}
+                            ${item.photo ? `<img src="${manageItemsAttr(item.photo)}" data-photo-src="${manageItemsAttr(item.photo)}" data-full-photo="${manageFullResPhotoDataAttr(item.photoFull || itemPhotosFull[0])}" class="mt-1 rounded" style="max-width:60px;max-height:40px;cursor:pointer;" onclick="openManageItemPhotoLightbox(this)" title="Click to enlarge">` : ''}
                         </td>
                     </tr>
                     <tr id="desc_${safeId}" style="display:none; background:#e7f3ff;" data-cat="${catE}" data-name="${nameE}">
@@ -2916,7 +3302,7 @@
                                 </div>
                                 <div class="mt-2">
                                     <button class="btn btn-sm btn-outline-secondary item-photo-btn" data-cat="${catE}" data-name="${nameE}" data-field="upgradePhoto" data-upgrade-group-id="legacy_upgrade" data-upgrade-option-id="legacy_upgrade_option" title="Add upgrade photo" style="font-size:0.75em;"><i class="fas fa-camera me-1"></i>Upgrade Photo</button>
-                                    ${upg.photo ? `<img src="${upg.photo}" class="ms-2 rounded" style="max-width:80px;max-height:50px;cursor:pointer;vertical-align:middle;" onclick="openPhotoLightbox(this.src)" title="Click to enlarge">` : ''}
+                                    ${upg.photo ? `<img src="${manageItemsAttr(upg.photo)}" data-photo-src="${manageItemsAttr(upg.photo)}" data-full-photo="${manageFullResPhotoDataAttr(upg.photoFull)}" class="ms-2 rounded" style="max-width:80px;max-height:50px;cursor:pointer;vertical-align:middle;" onclick="openManageItemPhotoLightbox(this)" title="Click to enlarge">` : ''}
                                 </div>
                                 <small class="text-muted">Leave name blank to remove upgrade option. Save the row above to save upgrade too.</small>
                             </div>
@@ -3065,6 +3451,7 @@
                     const nameE = manageItemsAttr(item.name);
                     const upg = item.upgrade || {};
                     const itemPhotos = normalizeManageItemPhotos(item);
+                    const itemPhotosFull = normalizeManageItemPhotosFull(item);
                     const upgradeGroups = normalizeManageItemUpgradeGroups(item);
                     const upgradePhotoTargets = getManageUpgradePhotoTargets(item);
                     const upgradePhotoCount = upgradePhotoTargets.filter(function(target) { return !!target.photo; }).length;
@@ -3192,10 +3579,11 @@
                                                     <button class="btn btn-sm btn-outline-secondary item-photo-btn" data-cat="${catE}" data-name="${nameE}" data-field="photo" title="Add item photo"><i class="fas fa-camera me-1"></i>${itemPhotos.length >= MANAGE_ITEM_PHOTO_LIMIT ? 'Replace Item Photo' : 'Add Item Photo'} (${itemPhotos.length}/${MANAGE_ITEM_PHOTO_LIMIT})</button>
                                                     <small class="text-muted">Base item photos. Upgrade photos are selected below.</small>
                                                 </div>
+                                                ${renderManageFullResUpgradeNote()}
                                                 <div class="d-flex align-items-start gap-2 mt-2 flex-wrap">
                                                     ${itemPhotos.length ? itemPhotos.map(function(photo, index) {
                                                         return `<div class="manage-item-photo-thumb border rounded p-1 bg-white">
-                                                            <img src="${manageItemsAttr(photo)}" class="rounded d-block" style="width:88px;height:58px;object-fit:cover;cursor:pointer;" onclick="openPhotoLightbox(this.src)" title="Click to enlarge">
+                                                            <img src="${manageItemsAttr(photo)}" data-photo-src="${manageItemsAttr(photo)}" data-full-photo="${manageFullResPhotoDataAttr(itemPhotosFull[index])}" class="rounded d-block" style="width:88px;height:58px;object-fit:cover;cursor:pointer;" onclick="openManageItemPhotoLightbox(this)" title="Click to enlarge">
                                                             <div class="btn-group btn-group-sm mt-1 w-100">
                                                                 <button type="button" class="btn btn-outline-primary item-photo-btn" data-cat="${catE}" data-name="${nameE}" data-field="photo" data-photo-index="${index}" title="Replace photo ${index + 1}"><i class="fas fa-sync-alt"></i></button>
                                                                 <button type="button" class="btn btn-outline-danger item-photo-remove-btn" data-cat="${catE}" data-name="${nameE}" data-photo-index="${index}" title="Remove photo ${index + 1}"><i class="fas fa-times"></i></button>
@@ -3207,6 +3595,7 @@
                                             <div class="mt-3 pt-2 border-top">
                                                 <small class="text-secondary fw-bold"><i class="fas fa-images"></i> Upgrade photos</small>
                                                 <div class="small text-muted mb-2">Choose the upgrade option you want the photo attached to.</div>
+                                                ${renderManageFullResUpgradeNote()}
                                                 ${upgradePhotoTargets.length ? `<div class="d-flex flex-column gap-2">
                                                     ${upgradePhotoTargets.map(function(target) {
                                                         const groupIdE = manageItemsAttr(target.groupId);
@@ -3216,7 +3605,7 @@
                                                         const groupNameE = manageItemsEscape(target.groupName);
                                                         return `<div class="manage-upgrade-photo-target border rounded p-2 bg-white d-flex align-items-center justify-content-between gap-2 flex-wrap">
                                                             <div class="d-flex align-items-center gap-2 min-w-0">
-                                                                ${target.photo ? `<img src="${manageItemsAttr(target.photo)}" class="rounded border" style="width:70px;height:48px;object-fit:cover;cursor:pointer;" onclick="openPhotoLightbox(this.src)" title="Click to enlarge">` : '<span class="badge text-bg-light border text-secondary"><i class="fas fa-camera"></i></span>'}
+                                                                ${target.photo ? `<img src="${manageItemsAttr(target.photo)}" data-photo-src="${manageItemsAttr(target.photo)}" data-full-photo="${manageFullResPhotoDataAttr(target.photoFull)}" class="rounded border" style="width:70px;height:48px;object-fit:cover;cursor:pointer;" onclick="openManageItemPhotoLightbox(this)" title="Click to enlarge">` : '<span class="badge text-bg-light border text-secondary"><i class="fas fa-camera"></i></span>'}
                                                                 <div class="min-w-0">
                                                                     <div class="fw-semibold text-truncate">${optionNameE}</div>
                                                                     <div class="small text-muted text-truncate">${groupNameE}</div>
@@ -3244,6 +3633,7 @@
             applyManageItemsPortraitFieldSettings();
             filterItemsList();
             applyManageDetailSectionState();
+            refreshManageFullResPhotoUpgradeNotes();
             initManageCategorySortable();
         }
 
@@ -3449,6 +3839,8 @@
                         supplierUrl: item.supplierUrl || '',
                         photos: itemPhotos,
                         photo: itemPhotos[0] || item.photo || '',
+                        photosFull: normalizeManageItemPhotosFull(item),
+                        photoFull: normalizeManageFullResPhotoMeta(item.photoFull),
                         itemDescription: item.itemDescription || item.description || '',
                         laborTime: normalizeManageLaborTime(item.laborTime),
                         upgrade: item.upgrade ? JSON.parse(JSON.stringify(item.upgrade)) : null,
@@ -3497,6 +3889,7 @@
                 materialCost: parseFloat(option.materialCost) || 0,
                 supplierUrl: option.supplierUrl || '',
                 photo: option.photo || '',
+                photoFull: normalizeManageFullResPhotoMeta(option.photoFull),
                 description: option.description || option.itemDescription || option.name || '',
                 itemDescription: option.itemDescription || option.description || '',
                 laborTime: normalizeManageLaborTime(option.laborTime),
@@ -3535,6 +3928,7 @@
                 materialCost: parseFloat(item.materialCost) || 0,
                 supplierUrl: item.supplierUrl || '',
                 photo: item.photo || '',
+                photoFull: normalizeManageFullResPhotoMeta(item.photoFull),
                 description: item.itemDescription || item.description || item.name || '',
                 itemDescription: item.itemDescription || item.description || '',
                 laborTime: normalizeManageLaborTime(item.laborTime),
@@ -4523,7 +4917,10 @@
         window.handleCategoryChange = handleCategoryChange;
         window.handleItemPhotoUpload = handleItemPhotoUpload;
         window.normalizeManageItemPhotos = normalizeManageItemPhotos;
+        window.normalizeManageItemPhotosFull = normalizeManageItemPhotosFull;
         window.syncManageItemPhotoCompatibility = syncManageItemPhotoCompatibility;
+        window.getManageFullResPhotoUsageBytes = getManageFullResPhotoUsageBytes;
+        window.canAddManageFullResPhotoBytes = canAddManageFullResPhotoBytes;
         window.shouldPromptManageItemPhotoReplacement = shouldPromptManageItemPhotoReplacement;
         window.openManageItemPhotoReplacePicker = openManageItemPhotoReplacePicker;
         window.removeManageItemPhoto = removeManageItemPhoto;
@@ -4565,7 +4962,10 @@
         window.normalizeManageItemUpgradeGroups = normalizeManageItemUpgradeGroups;
         window.renderManageItemUpgradeGroupsEditor = renderManageItemUpgradeGroupsEditor;
         window.collectManageItemUpgradeGroups = collectManageItemUpgradeGroups;
+        window.manageFullResPhotoUrl = manageFullResPhotoUrl;
+        window.openManageItemPhotoLightbox = openManageItemPhotoLightbox;
         window.getManageUpgradePhotoTargets = getManageUpgradePhotoTargets;
+        window.setManageUpgradeOptionPhotoFull = setManageUpgradeOptionPhotoFull;
         window.removeManageUpgradePhoto = removeManageUpgradePhoto;
         window.handleManageUpgradeGroupAction = handleManageUpgradeGroupAction;
         window.handleManageUpgradeGroupTypeChange = handleManageUpgradeGroupTypeChange;

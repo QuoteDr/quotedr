@@ -20,6 +20,14 @@ assert(
 );
 
 assert(
+  items.includes('function syncManageUpgradePhotoFromDetails') &&
+    items.includes("hidden.value = photo || ''") &&
+    items.includes('collectManageItemUpgradeGroups(detailsRow, true)') &&
+    items.includes('upgradePhotoSyncedFromDetails'),
+  'Upgrade photo uploads should update the open details editor before re-rendering'
+);
+
+assert(
   items.includes('manage-upgrade-photo-target') &&
     items.includes('data-upgrade-group-id') &&
     items.includes('data-upgrade-option-id') &&

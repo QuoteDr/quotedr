@@ -1773,7 +1773,7 @@
 
 </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-v2.js?v=1779130000"></script>
+    <script src="supabase-v2.js?v=1783269300"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <!-- Eruda mobile console (only loads with ?debug in URL) -->
@@ -3417,6 +3417,7 @@ Example:
                 materialCost: parseFloat(option.materialCost || option.material_cost || 0) || 0,
                 supplierUrl: option.supplierUrl || '',
                 photo: option.photo || '',
+                photoFull: option.photoFull || null,
                 description: option.description || option.itemDescription || '',
                 itemDescription: option.itemDescription || option.description || '',
                 laborTime: normalizeLaborTime(option.laborTime),
@@ -3570,6 +3571,7 @@ Example:
             item._baseUnitType = item.unitType || item.unit || '';
             item._baseSupplierUrl = item.supplierUrl || '';
             item._basePhoto = item.photo || '';
+            item._basePhotoFull = item.photoFull || null;
             item._baseItemDescription = item.itemDescription || '';
             item._baseDescription = item.description || item.name || '';
             item._baseLaborTime = normalizeLaborTime(item.laborTime);
@@ -3591,6 +3593,7 @@ Example:
             var unitType = item._baseUnitType || item.unitType || '';
             var supplierUrl = item._baseSupplierUrl || '';
             var photo = item._basePhoto || item.photo || '';
+            var photoFull = item._basePhotoFull || item.photoFull || null;
             var itemDescription = item._baseItemDescription || '';
             var description = item._baseDescription || item.description || '';
             var laborTime = normalizeLaborTime(item._baseLaborTime || item.laborTime);
@@ -3612,6 +3615,7 @@ Example:
                     unitType = optionUnitType || unitType;
                     supplierUrl = option.supplierUrl || supplierUrl;
                     photo = option.photo || photo;
+                    photoFull = option.photoFull || photoFull;
                     itemDescription = option.itemDescription || option.description || itemDescription;
                     description = option.name || description;
                     lineTotal = optionQuantity * optionRate;
@@ -3633,6 +3637,7 @@ Example:
             item.unit = unitType;
             item.supplierUrl = supplierUrl;
             item.photo = photo;
+            item.photoFull = photoFull;
             item.itemDescription = itemDescription;
             item.description = description;
             item.laborTime = laborTime;
@@ -6898,6 +6903,7 @@ Example:
                 materialCost: parseFloat(item.upgrade.materialCost !== undefined ? item.upgrade.materialCost : item.upgrade.material_cost) || 0,
                 supplierUrl: item.upgrade.supplierUrl || '',
                 photo: item.upgrade.photo || '',
+                photoFull: item.upgrade.photoFull || null,
                 description: item.upgrade.description || item.upgrade.itemDescription || item.upgrade.notes || '',
                 type: normalizeQuoteUpgradeType(item.upgrade.type || item.upgrade.upgradeType || item.upgrade.mode),
                 laborTime: normalizeLaborTime(item.upgrade.laborTime)
@@ -6919,6 +6925,7 @@ Example:
                             materialCost: parseFloat(option.materialCost) || 0,
                             supplierUrl: option.supplierUrl || '',
                             photo: option.photo || '',
+                            photoFull: option.photoFull || null,
                             description: option.description || option.itemDescription || '',
                             upgradeType: normalizeQuoteUpgradeType(option.upgradeType || option.type || option.mode),
                             quantityMode: normalizeQuoteItemUpgradeQuantityMode(option.quantityMode),
@@ -6938,6 +6945,8 @@ Example:
                 supplierUrl: item.supplierUrl || '',
                 itemDescription: item.itemDescription || item.displayDescription || '',
                 photo: item.photo || '',
+                photoFull: item.photoFull || null,
+                photosFull: Array.isArray(item.photosFull) ? item.photosFull : [],
                 laborTime: normalizeLaborTime(item.laborTime),
                 upgrade: upgrade,
                 upgradeGroups: upgradeGroups
@@ -7141,6 +7150,8 @@ Example:
             item.materialCost = parseFloat(savedItem.materialCost !== undefined ? savedItem.materialCost : savedItem.material_cost) || 0;
             item.supplierUrl = savedItem.supplierUrl || '';
             item.photo = savedItem.photo || item.photo || '';
+            item.photoFull = savedItem.photoFull || item.photoFull || null;
+            item.photosFull = Array.isArray(savedItem.photosFull) ? savedItem.photosFull : (item.photosFull || []);
             item.laborTime = normalizeLaborTime(savedItem.laborTime);
             if (savedItem.upgrade) {
                 item.upgrade = cloneSavedItemForQuoteSync(savedItem.upgrade);
@@ -7830,11 +7841,17 @@ Example:
         }
 
         function hydrateQuoteLineItemPhotoFromSavedItem(item) {
-            if (!item || item.photo) return item;
+            if (!item) return item;
             const savedMatch = findSavedItemForQuoteEdit(item);
             const saved = savedMatch && savedMatch.item;
-            if (saved && saved.photo) {
+            if (saved && saved.photo && !item.photo) {
                 item.photo = saved.photo;
+            }
+            if (saved && saved.photoFull && !item.photoFull) {
+                item.photoFull = saved.photoFull;
+            }
+            if (saved && Array.isArray(saved.photosFull) && !Array.isArray(item.photosFull)) {
+                item.photosFull = saved.photosFull;
             }
             return item;
         }
@@ -7856,6 +7873,8 @@ Example:
                 itemDescription: itemDescription
             };
             if (existingSavedItem.photo || existingItem?.photo) savedItem.photo = existingSavedItem.photo || existingItem.photo;
+            if (existingSavedItem.photoFull || existingItem?.photoFull) savedItem.photoFull = existingSavedItem.photoFull || existingItem.photoFull;
+            if (Array.isArray(existingSavedItem.photosFull) || Array.isArray(existingItem?.photosFull)) savedItem.photosFull = Array.isArray(existingSavedItem.photosFull) ? existingSavedItem.photosFull : existingItem.photosFull;
             if (existingSavedItem.laborTime || existingItem?.laborTime) savedItem.laborTime = normalizeLaborTime(existingSavedItem.laborTime || existingItem.laborTime);
             if (existingSavedItem.upgrade || existingItem?.upgrade) savedItem.upgrade = cloneSavedItemForQuoteSync(existingSavedItem.upgrade || existingItem.upgrade);
             if (category) savedItem.category = category;
@@ -7968,7 +7987,7 @@ Example:
                 if (editingItemIndex !== null && rooms[roomIndex].items[editingItemIndex]) {
                     const item = rooms[roomIndex].items[editingItemIndex];
                     editedSavedItemData = buildSavedItemFromEditedLineItem(item);
-                    previousSavedItemSource = cloneSavedItemForQuoteSync(item.savedItemSource || savedItemQuoteSource(item.category, { name: item.serviceName || item.description, unitType: item.unitType, rate: item.rate, materialCost: item.materialCost, supplierUrl: item.supplierUrl, itemDescription: item.itemDescription, photo: item.photo, laborTime: item.laborTime, upgrade: item.upgrade }));
+                    previousSavedItemSource = cloneSavedItemForQuoteSync(item.savedItemSource || savedItemQuoteSource(item.category, { name: item.serviceName || item.description, unitType: item.unitType, rate: item.rate, materialCost: item.materialCost, supplierUrl: item.supplierUrl, itemDescription: item.itemDescription, photo: item.photo, photoFull: item.photoFull, photosFull: item.photosFull, laborTime: item.laborTime, upgrade: item.upgrade }));
                     savedDbChoice = await maybeConfirmSavedItemDatabaseUpdate(item, editedSavedItemData);
                     if (savedDbChoice === false) return;
                 }
@@ -8009,6 +8028,8 @@ Example:
                         if (savedUpdateResult && savedUpdateResult.item) {
                             item.serviceName = savedUpdateResult.item.name || item.serviceName;
                             item.photo = savedUpdateResult.item.photo || item.photo || '';
+                            item.photoFull = savedUpdateResult.item.photoFull || item.photoFull || null;
+                            item.photosFull = Array.isArray(savedUpdateResult.item.photosFull) ? savedUpdateResult.item.photosFull : (item.photosFull || []);
                             item.upgrade = savedUpdateResult.item.upgrade || null;
                             item.upgradeGroups = normalizeQuoteItemUpgradeGroups(savedUpdateResult.item);
                             item.selectedUpgradeOptionIds = [];
@@ -8017,6 +8038,8 @@ Example:
                         }
                     } else if (savedItemForEdit) {
                         item.photo = savedItemForEdit.photo || item.photo || '';
+                        item.photoFull = savedItemForEdit.photoFull || item.photoFull || null;
+                        item.photosFull = Array.isArray(savedItemForEdit.photosFull) ? savedItemForEdit.photosFull : (item.photosFull || []);
                         item.upgrade = savedItemForEdit.upgrade || null;
                         item.upgradeGroups = normalizeQuoteItemUpgradeGroups(savedItemForEdit);
                         item.selectedUpgradeOptionIds = [];
@@ -8042,6 +8065,8 @@ Example:
                         materialCost,
                         supplierUrl,
                         photo: dbItem?.photo || '',
+                        photoFull: dbItem?.photoFull || null,
+                        photosFull: Array.isArray(dbItem?.photosFull) ? dbItem.photosFull : [],
                         upgrade: dbItem?.upgrade || null,
                         upgradeGroups: normalizeQuoteItemUpgradeGroups(dbItem || {}),
                         selectedUpgradeOptionIds: [],
@@ -8346,6 +8371,8 @@ Example:
                 materialCost: parseFloat(item.materialCost) || 0,
                 supplierUrl: item.supplierUrl || '',
                 photo: item.photo || '',
+                photoFull: item.photoFull || null,
+                photosFull: Array.isArray(item.photosFull) ? item.photosFull : [],
                 itemDescription: item.itemDescription || item.description || '',
                 laborTime: normalizeLaborTime(item.laborTime),
                 upgrade: item.upgrade ? cloneSavedItemForQuoteSync(item.upgrade) : null,
@@ -8378,6 +8405,7 @@ Example:
                 materialCost: parseFloat(option.materialCost) || 0,
                 supplierUrl: option.supplierUrl || '',
                 photo: option.photo || '',
+                photoFull: option.photoFull || null,
                 description: option.description || option.itemDescription || option.name || '',
                 itemDescription: option.itemDescription || option.description || '',
                 laborTime: normalizeLaborTime(option.laborTime),
@@ -8500,6 +8528,7 @@ Example:
                 state.unitType = replacement.unitType || state.unitType;
                 state.supplierUrl = replacement.supplierUrl || state.supplierUrl;
                 state.photo = replacement.photo || state.photo || '';
+                state.photoFull = replacement.photoFull || state.photoFull || null;
                 state.itemDescription = replacement.itemDescription || replacement.description || state.itemDescription;
                 state.laborTime = normalizeLaborTime(replacement.laborTime || state.laborTime);
             }
@@ -8517,6 +8546,7 @@ Example:
         function applyChoiceGroupSelectionToItem(item) {
             if (!item || !item.choiceGroup) return item;
             if (item._choiceGroupBasePhoto === undefined) item._choiceGroupBasePhoto = item.photo || '';
+            if (item._choiceGroupBasePhotoFull === undefined) item._choiceGroupBasePhotoFull = item.photoFull || null;
             item.choiceGroup = hydrateChoiceGroupOptionsFromSavedItems(item.choiceGroup, item.category);
             var group = item.choiceGroup;
             group.enhancementGroups = normalizeChoiceGroupEnhancementGroups(group.enhancementGroups);
@@ -8532,6 +8562,7 @@ Example:
                 unitType: item.unitType || item.unit || '',
                 supplierUrl: item.supplierUrl || '',
                 photo: item._choiceGroupBasePhoto || '',
+                photoFull: item._choiceGroupBasePhotoFull || null,
                 itemDescription: item.itemDescription || '',
                 laborTime: normalizeLaborTime(item.laborTime)
             };
@@ -8551,6 +8582,7 @@ Example:
                     unitType: option.unitType || item.unitType || item.unit || '',
                     supplierUrl: option.supplierUrl || item.supplierUrl || '',
                     photo: option.photo || item._choiceGroupBasePhoto || '',
+                    photoFull: option.photoFull || item._choiceGroupBasePhotoFull || null,
                     itemDescription: option.itemDescription || option.description || item.itemDescription || '',
                     laborTime: normalizeLaborTime(option.laborTime || item.laborTime)
                 };
@@ -8566,6 +8598,7 @@ Example:
             item.materialCost = parseFloat(finalState.materialCost) || 0;
             item.supplierUrl = finalState.supplierUrl || item.supplierUrl || '';
             item.photo = finalState.photo || item.photo || '';
+            item.photoFull = finalState.photoFull || item.photoFull || null;
             item.itemDescription = finalState.itemDescription || item.itemDescription || '';
             item.laborTime = normalizeLaborTime(finalState.laborTime || item.laborTime);
             item.choiceGroup.selectedOptionIds = selectedOptions.map(function(option) { return option.id; });
@@ -8833,6 +8866,8 @@ Example:
                 var saved = savedMatch.item;
                 if (saved.upgrade && saved.upgrade.name) next.upgrade = cloneSavedItemForQuoteSync(saved.upgrade);
                 if (saved.photo && !next.photo) next.photo = saved.photo;
+                if (saved.photoFull && !next.photoFull) next.photoFull = saved.photoFull;
+                if (Array.isArray(saved.photosFull) && !Array.isArray(next.photosFull)) next.photosFull = saved.photosFull;
                 var savedUpgradeGroups = normalizeQuoteItemUpgradeGroups(saved);
                 if (savedUpgradeGroups.length) next.upgradeGroups = savedUpgradeGroups;
                 if (!next.category && savedMatch.category) next.category = savedMatch.category;
@@ -10661,20 +10696,37 @@ Example:
             lb.style.display = 'flex';
         }
 
-        function getQuoteLineItemPhoto(roomId, itemIndex) {
+        async function quoteBuilderFullResolutionPhotosEnabled() {
+            try {
+                return typeof hasFeature === 'function' ? await hasFeature('full_resolution_photos') : false;
+            } catch(e) {
+                return false;
+            }
+        }
+
+        function fullResolutionPhotoUrl(meta) {
+            if (!meta) return '';
+            return typeof meta === 'string' ? meta : (meta.url || meta.publicUrl || '');
+        }
+
+        function getQuoteLineItemPhoto(roomId, itemIndex, preferFull) {
             var room = rooms.find(function(candidate) { return candidate.id === roomId; });
             var item = room && room.items ? room.items[itemIndex] : null;
             if (!item) return '';
-            if (item.upgraded && item.upgrade && item.upgrade.photo && !(item.upgradeGroups && item.upgradeGroups.length)) return item.upgrade.photo;
+            if (item.upgraded && item.upgrade && item.upgrade.photo && !(item.upgradeGroups && item.upgradeGroups.length)) {
+                if (preferFull && item.upgrade.photoFull) return fullResolutionPhotoUrl(item.upgrade.photoFull);
+                return item.upgrade.photo;
+            }
+            if (preferFull && item.photoFull) return fullResolutionPhotoUrl(item.photoFull);
             return item.photo || '';
         }
 
-        function openQuoteLineItemPhoto(event, roomId, itemIndex) {
+        async function openQuoteLineItemPhoto(event, roomId, itemIndex) {
             if (event) {
                 event.preventDefault();
                 event.stopPropagation();
             }
-            var photo = getQuoteLineItemPhoto(roomId, itemIndex);
+            var photo = getQuoteLineItemPhoto(roomId, itemIndex, await quoteBuilderFullResolutionPhotosEnabled());
             if (photo) openPhotoLightbox(photo);
         }
 
@@ -14541,7 +14593,7 @@ Example:
 
         // Manage Items behavior lives in quote-items.js.
     </script>
-    <script src="quote-items.js?v=1783269100"></script>
+    <script src="quote-items.js?v=1783269300"></script>
     <script src="quote-import.js?v=1780019801"></script>
     <script>
         // Load templates from localStorage on startup

@@ -562,6 +562,14 @@ async function listQuotes() {
     return { data };
 }
 
+async function quoteFullResolutionPhotosEnabledForSave() {
+    try {
+        return typeof hasFeature === 'function' ? await hasFeature('full_resolution_photos') : false;
+    } catch (e) {
+        return false;
+    }
+}
+
 // Save a quote
 async function saveQuote(quoteData) {
     const user = await getCurrentUser();
@@ -601,6 +609,7 @@ async function saveQuote(quoteData) {
             projectAddress: projectAddress,
             clientEmail: clientEmail,
             clientPhone: clientPhone,
+            fullResolutionPhotosEnabled: await quoteFullResolutionPhotosEnabledForSave(),
             rooms: quoteData.rooms || [],
             terms: quoteData.terms || [],
             style: quoteData.style || {},
@@ -1148,6 +1157,7 @@ var loadQuoteFromSupabase = function(quoteId) {
 async function saveQuoteForSharing(quoteData) {
     const user = await getCurrentUser();
     const now = new Date().toISOString();
+    quoteData.fullResolutionPhotosEnabled = await quoteFullResolutionPhotosEnabledForSave();
     if ((quoteData.type === 'change_order' || quoteData.documentType === 'change_order') &&
         quoteData.supabaseId &&
         quoteData.parentQuoteId &&
@@ -1675,6 +1685,7 @@ const QUOTEDR_PLAN_FEATURES = {
         'labor_tracker',
         'floor_plan_scanner',
         'quote_upsells',
+        'full_resolution_photos',
         'profit_tracking',
         'payment_reminders',
         'quickbooks',
@@ -1688,6 +1699,7 @@ const QUOTEDR_PRO_FEATURE_LABELS = {
     labor_tracker: 'Labour Tracker',
     ai_refine: 'AI Refine',
     quote_import: 'Legacy Quote Import',
+    full_resolution_photos: 'Full-resolution item photos',
     quickbooks: 'QuickBooks sync',
     bank_card_sync: 'Bank/card sync'
 };
