@@ -8,6 +8,7 @@ const items = fs.readFileSync('quote-items.js', 'utf8');
 const viewer = fs.readFileSync('interactive-quote-viewer.html', 'utf8');
 const clientDocument = fs.readFileSync('supabase/functions/client-document/index.ts', 'utf8');
 const summaryMigration = fs.readFileSync('supabase/migrations/20260712180000_quote_dashboard_summaries.sql', 'utf8');
+const summaryCacheMigration = fs.readFileSync('supabase/migrations/20260712190000_quote_dashboard_summary_cache.sql', 'utf8');
 const photoOptimizer = fs.readFileSync('supabase/functions/optimize-photo-storage/index.ts', 'utf8');
 const builder = fs.readFileSync('quote-builder.html', 'utf8');
 const quoteImport = fs.readFileSync('quote-import.js', 'utf8');
@@ -25,6 +26,9 @@ assert(!supabase.includes('return listQuotes().then(function(result)'), 'Single 
 assert(supabase.includes('await prepareQuoteMediaForCloudSave(invoiceData)'), 'Invoice sharing should also migrate embedded thumbnails');
 assert(summaryMigration.includes('q.user_id = auth.uid()'), 'Summary RPC must be scoped to the signed-in user');
 assert(summaryMigration.includes("<> '__ITEMS_BACKUP__'"), 'Summary RPC must exclude the item backup pseudo-quote');
+assert(summaryCacheMigration.includes('create table if not exists public.quote_dashboard_summaries'), 'Dashboard summaries should be cached outside the photo-heavy quote JSON');
+assert(summaryCacheMigration.includes('quotedr_refresh_quote_dashboard_summary_trigger'), 'Cached summaries should stay synchronized with quote writes');
+assert(summaryCacheMigration.includes('from public.quote_dashboard_summaries summary'), 'Dashboard RPC should read only the compact cache');
 
 assert(items.includes('manage-items-render-mode'), 'Manage Items should distinguish collapsed and search render modes');
 assert(items.includes('clearManageItemsRenderedContent'), 'Manage Items should release its hidden row DOM after closing');
