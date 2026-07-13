@@ -2400,7 +2400,7 @@ if (location.search.includes('debug')) {
         function normalizeViewerChoiceGroupEnhancementOption(option, groupIndex, optionIndex) {
             option = option || {};
             var photos = normalizeViewerPhotoList(option.photos, option.photo);
-            var photosFull = normalizeViewerPhotoFullList(option.photosFull, option.photoFull);
+            var photosFull = normalizeViewerPhotoFullSlots(option.photosFull, option.photoFull, photos.length);
             var priceTbd = isViewerPriceTbd(option);
             return {
                 id: option.id || ('viewer_enh_' + groupIndex + '_' + optionIndex),
@@ -2632,7 +2632,7 @@ if (location.search.includes('debug')) {
             option = option || {};
             var upgradeType = normalizeViewerUpgradeType(option.upgradeType || option.type || option.mode);
             var photos = normalizeViewerPhotoList(option.photos, option.photo);
-            var photosFull = normalizeViewerPhotoFullList(option.photosFull, option.photoFull);
+            var photosFull = normalizeViewerPhotoFullSlots(option.photosFull, option.photoFull, photos.length);
             var priceTbd = isViewerPriceTbd(option);
             return {
                 id: option.id || fallbackId || ('viewer_upo_' + Math.random().toString(36).slice(2, 8)),

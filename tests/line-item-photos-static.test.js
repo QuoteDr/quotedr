@@ -49,9 +49,11 @@ assert(builder.includes('openQuoteLineItemPhoto'), 'Quote builder should open li
 
 const viewerUpgradeOption = sliceBetween(viewer, 'function normalizeViewerItemUpgradeOption', 'function isViewerConsultationUpgradeOption');
 assert(viewerUpgradeOption.includes('photo:'), 'Client viewer upgrade option normalization should preserve photos');
+assert(viewerUpgradeOption.includes('normalizeViewerPhotoFullSlots(option.photosFull, option.photoFull, photos.length)'), 'Client viewer upgrade photos should preserve full-resolution slot alignment');
 
 const viewerChoiceEnhancement = sliceBetween(viewer, 'function normalizeViewerChoiceGroupEnhancementOption', 'function normalizeViewerChoiceGroupEnhancementGroups');
 assert(viewerChoiceEnhancement.includes('photo:'), 'Client viewer choice enhancement option normalization should preserve photos');
+assert(viewerChoiceEnhancement.includes('normalizeViewerPhotoFullSlots(option.photosFull, option.photoFull, photos.length)'), 'Client viewer choice enhancement photos should preserve full-resolution slot alignment');
 
 assert(viewer.includes('renderViewerPhotoButton'), 'Client viewer should render reusable compact photo buttons');
 assert(viewer.includes('data-viewer-photo-key'), 'Client viewer photo buttons should use photo keys instead of inline data URLs');
