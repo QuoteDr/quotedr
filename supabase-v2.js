@@ -571,18 +571,27 @@ async function listQuoteSummaries() {
 
     const result = await _supabase.rpc('quotedr_list_quote_summaries');
     if (!result.error) {
+        var summaryRows = result.data || [];
+        if (summaryRows.length === 0) {
+            const emptyFallback = await listQuotes();
+            if (emptyFallback.error) return emptyFallback;
+            var existingRows = (emptyFallback.data || []).filter(function(row) {
+                return row.status !== 'backup' && row.quote_number !== '__ITEMS_BACKUP__';
+            });
+            if (existingRows.length > 0) {
+                console.warn('Quote summary query returned no rows; using compatibility fallback.');
+                return { data: existingRows };
+            }
+        }
         return {
-            data: (result.data || []).map(function(row) {
+            data: summaryRows.map(function(row) {
                 row._summaryOnly = true;
                 return row;
             })
         };
     }
 
-    var missingFunction = /quotedr_list_quote_summaries|could not find the function|schema cache/i.test(result.error.message || '');
-    if (!missingFunction) return { error: result.error };
-
-    // Keeps local branches usable before the accompanying migration is deployed.
+    console.warn('Quote summary query failed; using compatibility fallback:', result.error.message || result.error);
     const fallback = await listQuotes();
     if (fallback.error) return fallback;
     return {

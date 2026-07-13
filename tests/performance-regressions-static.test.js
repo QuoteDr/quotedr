@@ -13,6 +13,8 @@ const builder = fs.readFileSync('quote-builder.html', 'utf8');
 const quoteImport = fs.readFileSync('quote-import.js', 'utf8');
 
 assert(supabase.includes(".rpc('quotedr_list_quote_summaries')"), 'Supabase helpers should request compact quote summaries');
+assert(supabase.includes('Quote summary query failed; using compatibility fallback'), 'Dashboard summaries should fall back when the RPC fails');
+assert(supabase.includes('Quote summary query returned no rows; using compatibility fallback'), 'Dashboard summaries should recover from an incorrect empty RPC result');
 assert(dashboard.includes('listQuoteSummariesFromSupabase'), 'Dashboard should load quote summaries instead of every full quote');
 assert(storage.includes('listQuoteSummariesFromSupabase'), 'Save and Open dialogs should load quote summaries');
 assert(!builder.includes('var result = await listQuotes();'), 'Portal pickers should not download every full quote');
