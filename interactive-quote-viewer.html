@@ -1676,6 +1676,9 @@ if (location.search.includes('debug')) {
 
     <script>
         let quoteData = {};
+        const quoteStudioParams = new URLSearchParams(window.location.search);
+        const quoteStudioMode = quoteStudioParams.get('quote_studio') === '1';
+        const QUOTE_STUDIO_MESSAGE_VERSION = 1;
 
         const CATEGORY_ORDER = [
             'Demolition','Asbestos / Hazmat','Concrete & Masonry','Waterproofing',
@@ -1778,6 +1781,10 @@ if (location.search.includes('debug')) {
         }
 
         function printQuote() {
+            if (quoteStudioMode) {
+                qdAlert('Printing is disabled inside the live preview. Generate or open the quote preview to print it.');
+                return;
+            }
             logPortalDocumentActivity('pdf_opened', { metadata: { action: 'print_save_pdf' } });
             try {
                 if (window.QuoteDrAndroid && typeof window.QuoteDrAndroid.printCurrentPage === 'function') {
@@ -1808,73 +1815,52 @@ if (location.search.includes('debug')) {
             return quoteData && quoteData.style ? quoteData.style : {};
         }
 
-        // Initialize on page load
-        document.addEventListener('DOMContentLoaded', async function() {
-            // Load user's uploaded logo (check both key names, then try Supabase)
-            var savedLogo = localStorage.getItem('ald_company_logo') || localStorage.getItem('ald_logo');
-            if (savedLogo) {
-                var logoEl = document.getElementById('businessLogoImg');
-                if (logoEl) logoEl.src = savedLogo;
-            }
-            if (typeof loadLogoFromSupabase === 'function') {
-                loadLogoFromSupabase().then(function(logo) {
-                    if (logo) {
-                        var logoEl = document.getElementById('businessLogoImg');
-                        if (logoEl) logoEl.src = logo;
-                    }
-                });
-            }
-            // Load company name + tagline (try Supabase first)
-            var bizProfile = JSON.parse(localStorage.getItem('ald_business_profile') || '{}');
-            if (typeof loadBusinessProfile === 'function') {
-                loadBusinessProfile().then(function(p) { if (p && p.business_name) bizProfile = p; });
-            }
-            var nameEl = document.getElementById('companyNameDisplay');
-            var tagEl = document.getElementById('companyTaglineDisplay');
-            if (nameEl && bizProfile.business_name) nameEl.textContent = bizProfile.business_name;
-            if (tagEl && bizProfile.tagline) tagEl.textContent = bizProfile.tagline;
-            else if (tagEl && !bizProfile.tagline) tagEl.style.display = 'none';
-            await loadQuoteFromURL();
+        function applyViewerStyleTheme() {
             var viewerStyle = resolveViewerDocumentStyle();
-            // Apply quote style theme
-            if (quoteData && viewerStyle) {
-                var accent = viewerStyle.accent || '#ffffff';
-                var optionAccent = viewerStyle.optionAccent || viewerStyle.accent || '#1a56a0';
-                if (optionAccent === '#ffffff') optionAccent = accent && accent !== '#ffffff' ? accent : '#1a56a0';
-                var upgradeAccent = viewerStyle.upgradeAccent || '#0d9488';
-                var upgradeBg = viewerStyle.upgradeBg || '#f8fafc';
-                var bg = viewerStyle.bg || '#ffffff';
-                var bgOpacity = parseInt(viewerStyle.bgOpacity, 10);
-                if (!isFinite(bgOpacity)) bgOpacity = 100;
-                bgOpacity = Math.max(0, Math.min(bgOpacity, 100));
-                var headerStyle = viewerStyle.headerStyle || 'branded';
-                var headerEffect = viewerStyle.headerEffect || 'soft-gradient';
-                var headerOpacity = parseInt(viewerStyle.headerOpacity || 100, 10);
-                if (!isFinite(headerOpacity)) headerOpacity = 100;
-                headerOpacity = Math.max(20, Math.min(headerOpacity, 100));
-                var fontFeel = viewerStyle.fontFeel || 'clean';
-                var styleTag = document.createElement('style');
-                var effectiveAccent = accent === '#ffffff' ? '#1a56a0' : accent;
-                var headerBg = quoteHeaderBackgroundForEffect(accent, headerStyle, headerOpacity, headerEffect);
-                var headerColor = (headerStyle === 'light' || accent === '#ffffff' || headerOpacity < 55) ? '#1f3349' : '#ffffff';
-                var fontCSS = fontFeel === 'premium'
-                    ? 'body { font-family: Georgia, "Times New Roman", serif; } .btn, .badge, input, textarea, select { font-family: Arial, sans-serif; }'
-                    : (fontFeel === 'bold' ? 'body { font-weight: 500; } h1,h2,h3,h4,h5,h6,.fw-bold,strong { font-weight: 800 !important; }' : '');
-                var accentCSS = (accent && accent !== '#ffffff')
-                    ? '.card-header.bg-light { background: ' + accent + ' !important; color: white !important; }' +
-                      '.card-header.bg-light h6, .card-header.bg-light i { color: white !important; }'
-                    : '';
-                styleTag.textContent = ':root { --quote-accent: ' + effectiveAccent + '; --quote-option-accent: ' + optionAccent + '; --quote-option-accent-soft: ' + colorWithOpacity(optionAccent, 20) + '; --quote-option-accent-hover: ' + colorWithOpacity(optionAccent, 30) + '; --quote-upgrade-accent: ' + upgradeAccent + '; --quote-upgrade-bg: ' + upgradeBg + '; --quote-upgrade-accent-soft: ' + colorWithOpacity(upgradeAccent, 20) + '; --quote-upgrade-border: ' + colorWithOpacity(upgradeAccent, 35) + '; --change-order-accent: ' + effectiveAccent + '; --change-order-surface: ' + blendColorWithWhite(effectiveAccent, 8) + '; --change-order-surface-strong: ' + blendColorWithWhite(effectiveAccent, 14) + '; --change-order-border-soft: ' + colorWithOpacity(effectiveAccent, 24) + '; }' +
-                    'body { background: ' + blendColorWithWhite(bg, bgOpacity) + ' !important; }' +
-                    '.quote-header { background: ' + headerBg + ' !important; color: ' + headerColor + ' !important; }' +
-                    '.quote-header .brand-lockup h1, .quote-header .brand-lockup h2, .quote-header .brand-lockup p { color: ' + headerColor + ' !important; }' +
-                    '.quote-header .hero-total-panel, .quote-header .hero-total-panel div, .quote-header .proposal-detail, .quote-header .proposal-detail div { color: #102033 !important; }' +
-                    '.btn-success { background-color: ' + (accent === '#ffffff' ? '#198754' : accent) + ' !important; border-color: ' + (accent === '#ffffff' ? '#198754' : accent) + ' !important; }' +
-                    accentCSS + fontCSS;
+            if (!quoteData || !viewerStyle) return;
+            var accent = viewerStyle.accent || '#ffffff';
+            var optionAccent = viewerStyle.optionAccent || viewerStyle.accent || '#1a56a0';
+            if (optionAccent === '#ffffff') optionAccent = accent && accent !== '#ffffff' ? accent : '#1a56a0';
+            var upgradeAccent = viewerStyle.upgradeAccent || '#0d9488';
+            var upgradeBg = viewerStyle.upgradeBg || '#f8fafc';
+            var bg = viewerStyle.bg || '#ffffff';
+            var bgOpacity = parseInt(viewerStyle.bgOpacity, 10);
+            if (!isFinite(bgOpacity)) bgOpacity = 100;
+            bgOpacity = Math.max(0, Math.min(bgOpacity, 100));
+            var headerStyle = viewerStyle.headerStyle || 'branded';
+            var headerEffect = viewerStyle.headerEffect || 'soft-gradient';
+            var headerOpacity = parseInt(viewerStyle.headerOpacity || 100, 10);
+            if (!isFinite(headerOpacity)) headerOpacity = 100;
+            headerOpacity = Math.max(20, Math.min(headerOpacity, 100));
+            var fontFeel = viewerStyle.fontFeel || 'clean';
+            var styleTag = document.getElementById('quoteViewerDynamicStyle');
+            if (!styleTag) {
+                styleTag = document.createElement('style');
+                styleTag.id = 'quoteViewerDynamicStyle';
                 document.head.appendChild(styleTag);
             }
-            // Apply quote preferences
-            var prefs = JSON.parse(localStorage.getItem('ald_quote_prefs') || '{}');
+            var effectiveAccent = accent === '#ffffff' ? '#1a56a0' : accent;
+            var headerBg = quoteHeaderBackgroundForEffect(accent, headerStyle, headerOpacity, headerEffect);
+            var headerColor = (headerStyle === 'light' || accent === '#ffffff' || headerOpacity < 55) ? '#1f3349' : '#ffffff';
+            var fontCSS = fontFeel === 'premium'
+                ? 'body { font-family: Georgia, "Times New Roman", serif; } .btn, .badge, input, textarea, select { font-family: Arial, sans-serif; }'
+                : (fontFeel === 'bold' ? 'body { font-weight: 500; } h1,h2,h3,h4,h5,h6,.fw-bold,strong { font-weight: 800 !important; }' : '');
+            var accentCSS = (accent && accent !== '#ffffff')
+                ? '.card-header.bg-light { background: ' + accent + ' !important; color: white !important; }' +
+                  '.card-header.bg-light h6, .card-header.bg-light i { color: white !important; }'
+                : '';
+            styleTag.textContent = ':root { --quote-accent: ' + effectiveAccent + '; --quote-option-accent: ' + optionAccent + '; --quote-option-accent-soft: ' + colorWithOpacity(optionAccent, 20) + '; --quote-option-accent-hover: ' + colorWithOpacity(optionAccent, 30) + '; --quote-upgrade-accent: ' + upgradeAccent + '; --quote-upgrade-bg: ' + upgradeBg + '; --quote-upgrade-accent-soft: ' + colorWithOpacity(upgradeAccent, 20) + '; --quote-upgrade-border: ' + colorWithOpacity(upgradeAccent, 35) + '; --change-order-accent: ' + effectiveAccent + '; --change-order-surface: ' + blendColorWithWhite(effectiveAccent, 8) + '; --change-order-surface-strong: ' + blendColorWithWhite(effectiveAccent, 14) + '; --change-order-border-soft: ' + colorWithOpacity(effectiveAccent, 24) + '; }' +
+                'body { background: ' + blendColorWithWhite(bg, bgOpacity) + ' !important; }' +
+                '.quote-header { background: ' + headerBg + ' !important; color: ' + headerColor + ' !important; }' +
+                '.quote-header .brand-lockup h1, .quote-header .brand-lockup h2, .quote-header .brand-lockup p { color: ' + headerColor + ' !important; }' +
+                '.quote-header .hero-total-panel, .quote-header .hero-total-panel div, .quote-header .proposal-detail, .quote-header .proposal-detail div { color: #102033 !important; }' +
+                '.btn-success { background-color: ' + (accent === '#ffffff' ? '#198754' : accent) + ' !important; border-color: ' + (accent === '#ffffff' ? '#198754' : accent) + ' !important; }' +
+                accentCSS + fontCSS;
+        }
+
+        function applyViewerPreferences() {
+            var prefs = {};
+            try { prefs = JSON.parse(localStorage.getItem('ald_quote_prefs') || '{}'); } catch(e) {}
             var headingEl = document.getElementById('quoteHeadingDisplay');
             var numEl = document.getElementById('quoteNumberDisplay');
             if (headingEl && prefs.heading) headingEl.textContent = prefs.heading;
@@ -1884,16 +1870,112 @@ if (location.search.includes('debug')) {
                     ? 'Quote #' + prefs.prefix + '-' + qNum
                     : 'Quote #' + qNum;
             }
+            var profile = quoteData && quoteData.businessProfile;
+            if (profile && typeof profile === 'object') {
+                var nameEl = document.getElementById('companyNameDisplay');
+                var tagEl = document.getElementById('companyTaglineDisplay');
+                if (nameEl && (profile.business_name || profile.company_name)) nameEl.textContent = profile.business_name || profile.company_name;
+                if (tagEl) {
+                    tagEl.textContent = profile.tagline || '';
+                    tagEl.style.display = profile.tagline ? '' : 'none';
+                }
+            }
+        }
 
+        function renderViewerDocument(options) {
+            options = options || {};
+            var savedScrollTop = options.preserveScroll ? window.scrollY : 0;
+            applyViewerStyleTheme();
+            applyViewerPreferences();
             renderQuote();
             refreshAdminPreviewFullResolutionPhotos();
             applyCommitmentBanner();
             displayTerms();
             updateTotal();
             applyQuoteCompletionState();
+            setupMobileJumpVisibility();
+            if (quoteStudioMode) showExpiryNotice();
+            requestAnimationFrame(function() {
+                if (options.preserveScroll) {
+                    var maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+                    window.scrollTo(0, Math.min(savedScrollTop, maxScroll));
+                } else if (quoteStudioMode) {
+                    window.scrollTo(0, 0);
+                }
+            });
+        }
+
+        function postQuoteStudioMessage(type, details) {
+            if (!quoteStudioMode || window.parent === window) return;
+            window.parent.postMessage(Object.assign({
+                type: type,
+                version: QUOTE_STUDIO_MESSAGE_VERSION
+            }, details || {}), window.location.origin);
+        }
+
+        function initializeQuoteStudioMode() {
+            document.body.classList.add('quote-studio-preview-mode');
+            window.addEventListener('message', function(event) {
+                if (event.origin !== window.location.origin || event.source !== window.parent) return;
+                var data = event.data || {};
+                if (data.version !== QUOTE_STUDIO_MESSAGE_VERSION) return;
+                try {
+                    if (data.type === 'quotedr-quote-studio-document') {
+                        quoteData = data.quote && typeof data.quote === 'object' ? data.quote : {};
+                        quoteData.style = data.style && typeof data.style === 'object' ? data.style : (quoteData.style || {});
+                        window._quoteRow = null;
+                        renderViewerDocument({ preserveScroll: false });
+                        postQuoteStudioMessage('quotedr-quote-studio-rendered', { message: 'Live preview ready' });
+                    } else if (data.type === 'quotedr-quote-studio-style') {
+                        quoteData.style = data.style && typeof data.style === 'object' ? data.style : {};
+                        renderViewerDocument({ preserveScroll: true });
+                        postQuoteStudioMessage('quotedr-quote-studio-rendered', { message: 'Live preview updated' });
+                    }
+                } catch(error) {
+                    console.error('Quote studio preview render failed:', error);
+                    var container = document.getElementById('quoteContainer');
+                    if (container) container.innerHTML = '<div class="alert alert-danger">The live quote preview could not be rendered.</div>';
+                    postQuoteStudioMessage('quotedr-quote-studio-error', { message: error.message || 'The quote viewer could not render this preview.' });
+                }
+            });
+            postQuoteStudioMessage('quotedr-quote-studio-ready');
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', async function() {
+            var savedLogo = localStorage.getItem('ald_company_logo') || localStorage.getItem('ald_logo');
+            if (savedLogo) {
+                var logoEl = document.getElementById('businessLogoImg');
+                if (logoEl) logoEl.src = savedLogo;
+            }
+            if (!quoteStudioMode && typeof loadLogoFromSupabase === 'function') {
+                loadLogoFromSupabase().then(function(logo) {
+                    if (logo) {
+                        var logoEl = document.getElementById('businessLogoImg');
+                        if (logoEl) logoEl.src = logo;
+                    }
+                });
+            }
+            var bizProfile = {};
+            try { bizProfile = JSON.parse(localStorage.getItem('ald_business_profile') || '{}'); } catch(e) {}
+            if (!quoteStudioMode && typeof loadBusinessProfile === 'function') {
+                loadBusinessProfile().then(function(p) { if (p && p.business_name) bizProfile = p; });
+            }
+            var nameEl = document.getElementById('companyNameDisplay');
+            var tagEl = document.getElementById('companyTaglineDisplay');
+            if (nameEl && bizProfile.business_name) nameEl.textContent = bizProfile.business_name;
+            if (tagEl && bizProfile.tagline) tagEl.textContent = bizProfile.tagline;
+            else if (tagEl && !bizProfile.tagline) tagEl.style.display = 'none';
+
+            if (quoteStudioMode) {
+                initializeQuoteStudioMode();
+                return;
+            }
+
+            await loadQuoteFromURL();
+            renderViewerDocument();
             startViewerBackgroundTasks();
             showPaymentReturnNotice();
-            setupMobileJumpVisibility();
             showChangeOrderExplainer(false);
             printQuoteIfRequested();
         });
@@ -3862,6 +3944,26 @@ if (location.search.includes('debug')) {
             return '';
         }
 
+        var viewerBusinessProfileRequested = false;
+
+        function renderViewerBusinessInfo(profile) {
+            var bizEl = document.getElementById('businessInfoDisplay');
+            if (!bizEl || !profile || typeof profile !== 'object') return;
+            var hidden = Array.isArray(quoteData.hiddenProfileFields) ? quoteData.hiddenProfileFields : [];
+            if (!hidden.length) {
+                try { hidden = JSON.parse(localStorage.getItem('ald_hidden_profile_fields') || '[]'); } catch(e) { hidden = []; }
+            }
+            var lines = [];
+            if (!hidden.includes('businessName') && profile.business_name) lines.push('<strong>' + escapeHtml(profile.business_name) + '</strong>');
+            if (!hidden.includes('ownerName') && profile.owner_name) lines.push(escapeHtml(profile.owner_name));
+            if (!hidden.includes('address') && profile.address) lines.push(escapeHtml(profile.address));
+            if (!hidden.includes('cityRow') && profile.city) lines.push(escapeHtml(profile.city + (profile.province ? ', ' + profile.province : '') + (profile.postal_code ? ' ' + profile.postal_code : '')));
+            if (!hidden.includes('phone') && profile.phone) lines.push('Phone: ' + escapeHtml(profile.phone));
+            if (!hidden.includes('email') && profile.email) lines.push(escapeHtml(profile.email));
+            if (!hidden.includes('hst') && profile.hst_number) lines.push('HST: ' + escapeHtml(profile.hst_number));
+            bizEl.innerHTML = lines.map(function(line) { return '<div>' + line + '</div>'; }).join('');
+        }
+
         function applyCommitmentBanner() {
             var section = document.getElementById('warrantySection');
             if (!section) return;
@@ -3918,23 +4020,12 @@ if (location.search.includes('debug')) {
                 quoteNumEl.textContent = 'Quote #' + qNum;
             }
 
-            // Load business profile from Supabase
-            if (typeof getBusinessProfile === 'function') {
+            if (quoteData.businessProfile && typeof quoteData.businessProfile === 'object') {
+                renderViewerBusinessInfo(quoteData.businessProfile);
+            } else if (!viewerBusinessProfileRequested && typeof getBusinessProfile === 'function') {
+                viewerBusinessProfileRequested = true;
                 getBusinessProfile().then(function(result) {
-                    var bizEl = document.getElementById('businessInfoDisplay');
-                    if (bizEl && result.data) {
-                        var b = result.data;
-                        var hidden = JSON.parse(localStorage.getItem('ald_hidden_profile_fields') || '[]');
-                        var lines = [];
-                        if (!hidden.includes('businessName') && b.business_name) lines.push('<strong>' + b.business_name + '</strong>');
-                        if (!hidden.includes('ownerName') && b.owner_name) lines.push(b.owner_name);
-                        if (!hidden.includes('address') && b.address) lines.push(b.address);
-                        if (!hidden.includes('cityRow') && b.city) lines.push(b.city + (b.province ? ', ' + b.province : '') + (b.postal_code ? ' ' + b.postal_code : ''));
-                        if (!hidden.includes('phone') && b.phone) lines.push('Phone: ' + b.phone);
-                        if (!hidden.includes('email') && b.email) lines.push(b.email);
-                        if (!hidden.includes('hst') && b.hst_number) lines.push('HST: ' + b.hst_number);
-                        bizEl.innerHTML = lines.map(function(l) { return '<div>' + l + '</div>'; }).join('');
-                    }
+                    if (result && result.data) renderViewerBusinessInfo(result.data);
                 });
             }
 
@@ -4508,6 +4599,10 @@ if (location.search.includes('debug')) {
         }
 
         async function downloadQuotePdf() {
+            if (quoteStudioMode) {
+                qdAlert('PDF download is disabled inside the live preview.');
+                return;
+            }
             updateTotal();
             var shouldPrint = await showQuotePdfPrintTip();
             if (!shouldPrint) return;
@@ -4829,7 +4924,10 @@ if (location.search.includes('debug')) {
             var el = document.getElementById('quoteExpiry');
             if (!el) return;
             var raw = resolveViewerDocumentStyle().expiryDate || quoteData.valid_until || quoteData.validUntil || quoteData.validUntilDate;
-            if (!raw) return;
+            if (!raw) {
+                el.innerHTML = '';
+                return;
+            }
             var d = new Date(raw);
             var now = new Date(); now.setHours(0,0,0,0);
             var dateStr = d.toLocaleDateString('en-CA', { year:'numeric', month:'long', day:'numeric' });
@@ -5056,6 +5154,10 @@ if (location.search.includes('debug')) {
         }
 
         function submitUpgrades(event) {
+            if (isContractorPreviewView()) {
+                showContractorPreviewSignBlockedMessage();
+                return;
+            }
             // Build upgrade summary for Supabase
             var _clientUpgrades = [];
             var _clientRemovals = [];
@@ -5102,6 +5204,10 @@ if (location.search.includes('debug')) {
 
         async function declineChangeOrder() {
             if (!(window.QuoteDrChangeOrders && QuoteDrChangeOrders.isChangeOrder(quoteData))) return;
+            if (isContractorPreviewView()) {
+                qdAlert('Declining is disabled inside the contractor preview.');
+                return;
+            }
             if (!await qdConfirm('Decline this change order? Your contractor will see it as declined.', {
                 title: 'Decline Change Order',
                 okText: 'Decline',
@@ -5186,6 +5292,10 @@ if (location.search.includes('debug')) {
         }
 
         async function handleDepositPayment() {
+            if (isContractorPreviewView()) {
+                qdAlert('Payments are disabled inside the contractor preview.');
+                return;
+            }
             if (!_paymentSettings || !_quoteTotal) return;
             logPortalDocumentActivity('payment_clicked', { metadata: { payment_type: 'deposit' } });
             var pct = _paymentSettings.deposit_default_pct || 50;

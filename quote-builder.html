@@ -961,22 +961,173 @@
         .quote-style-preset.selected { border-color: #1a56a0; box-shadow: 0 0 0 2px rgba(26,86,160,0.16); }
         .quote-style-preset .preset-dots { display:flex; gap:5px; margin-bottom:8px; }
         .quote-style-preset .preset-dot { width:18px; height:18px; border-radius:50%; border:1px solid rgba(0,0,0,0.08); }
-        .quote-style-preview {
-            border: 1px solid #dbe4ef;
-            border-radius: 10px;
+        #quoteStyleModal .modal-dialog {
+            width: 96vw;
+            max-width: 96vw;
+            height: 94dvh;
+            margin: 3dvh auto;
+        }
+        #quoteStyleModal .modal-content {
+            height: 100%;
+            min-height: 0;
             overflow: hidden;
-            background: #fff;
+            border-radius: 8px;
         }
-        .quote-style-preview-header {
-            padding: 12px 14px;
-            color: #fff;
+        #quoteStyleModal .modal-header,
+        #quoteStyleModal .modal-footer {
+            flex: 0 0 auto;
+        }
+        body.quote-style-studio-open #qdAiBtn {
+            display: none !important;
+        }
+        #quoteStyleModal .quote-style-studio-body {
+            min-height: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #eef4fb;
+        }
+        .quote-style-studio-layout {
+            display: grid;
+            grid-template-columns: minmax(400px, 500px) minmax(0, 1fr);
+            height: 100%;
+            min-height: 0;
+        }
+        .quote-style-controls-pane {
+            min-width: 0;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            padding: 16px;
+            border-right: 1px solid #d8e2ed;
+            background: #ffffff;
+        }
+        .quote-style-controls-pane #stylePresets > [class*="col-"] {
+            flex: 0 0 50%;
+            max-width: 50%;
+        }
+        .quote-style-preview-pane {
+            display: flex;
+            min-width: 0;
+            min-height: 0;
+            flex-direction: column;
+            background: #eef4fb;
+        }
+        .quote-style-preview-toolbar {
+            display: flex;
+            flex: 0 0 auto;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 12px;
+            border-bottom: 1px solid #d8e2ed;
+            background: #ffffff;
+        }
+        .quote-style-preview-toolbar-title {
+            color: #17324d;
             font-weight: 700;
-            display:flex;
-            justify-content:space-between;
-            gap:12px;
         }
-        .quote-style-preview-body { padding: 14px; }
-        .quote-style-preview-line { height: 10px; border-radius: 999px; background: rgba(15,23,42,0.12); margin-bottom: 8px; }
+        .quote-style-preview-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: #64748b;
+            font-size: 0.78rem;
+        }
+        .quote-style-preview-status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #94a3b8;
+        }
+        .quote-style-preview-status.is-ready .quote-style-preview-status-dot { background: #16a34a; }
+        .quote-style-preview-status.is-error .quote-style-preview-status-dot { background: #dc2626; }
+        .quote-style-preview-frame-wrap {
+            position: relative;
+            flex: 1 1 auto;
+            min-height: 0;
+            margin: 12px;
+            overflow: hidden;
+            border: 1px solid #cbd8e6;
+            border-radius: 8px;
+            background: #ffffff;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+        }
+        #quoteStylePreviewFrame {
+            display: block;
+            width: 100%;
+            height: 100%;
+            border: 0;
+            background: #ffffff;
+        }
+        .quote-style-preview-state {
+            position: absolute;
+            inset: 0;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: #ffffff;
+            color: #475569;
+            text-align: center;
+        }
+        .quote-style-preview-state[hidden] { display: none; }
+        .quote-style-studio-mobile-switch { display: none; }
+        @media (max-width: 991.98px) {
+            #quoteStyleModal .modal-dialog {
+                width: 100%;
+                max-width: 100%;
+                height: 100dvh;
+                margin: 0;
+            }
+            #quoteStyleModal .modal-content {
+                border: 0;
+                border-radius: 0;
+            }
+            #quoteStyleModal .modal-header { padding: 10px 12px; }
+            #quoteStyleModal .modal-footer { padding: 8px 10px; }
+            #quoteStyleModal .quote-style-studio-body {
+                display: flex;
+                flex-direction: column;
+            }
+            .quote-style-studio-mobile-switch {
+                display: grid;
+                flex: 0 0 auto;
+                grid-template-columns: 1fr 1fr;
+                gap: 4px;
+                padding: 8px;
+                border-bottom: 1px solid #d8e2ed;
+                background: #ffffff;
+            }
+            .quote-style-studio-mobile-switch .btn {
+                min-height: 38px;
+                border-radius: 6px;
+            }
+            .quote-style-studio-layout {
+                display: block;
+                flex: 1 1 auto;
+                min-height: 0;
+            }
+            .quote-style-controls-pane,
+            .quote-style-preview-pane {
+                width: 100%;
+                height: 100%;
+                border-right: 0;
+            }
+            .quote-style-studio-body[data-mobile-pane="controls"] .quote-style-preview-pane,
+            .quote-style-studio-body[data-mobile-pane="preview"] .quote-style-controls-pane {
+                display: none;
+            }
+            .quote-style-preview-toolbar { padding: 8px 10px; }
+            .quote-style-preview-frame-wrap { margin: 8px; }
+        }
+        @media (max-width: 575.98px) {
+            .quote-style-controls-pane { padding: 12px; }
+            .quote-style-controls-pane #stylePresets > [class*="col-"] {
+                flex-basis: 100%;
+                max-width: 100%;
+            }
+            #quoteStyleModal .modal-footer .form-check-label { max-width: 180px; }
+        }
         .send-settings-card {
             border:1px solid #e5edf5;
             border-radius:8px;
@@ -17462,17 +17613,27 @@ Example:
     <script src="quote-clients.js?v=1777660402"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
     <script src="ikea-quote.js?v=1778059000"></script>
-<script src="quote-style.js?v=1778060700"></script>
+<script src="quote-style.js?v=2026071301"></script>
 
     <!-- Quote Style Modal -->
     <div class="modal fade" id="quoteStyleModal" tabindex="-1">
-        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header" style="background:linear-gradient(135deg,#1a56a0,#0f3460);color:white;">
                     <h5 class="modal-title"><i class="fas fa-share-square me-2"></i>Send Quote Settings</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
+                <div class="modal-body quote-style-studio-body" id="quoteStyleStudioBody" data-mobile-pane="controls">
+                    <div class="quote-style-studio-mobile-switch" role="tablist" aria-label="Quote studio view">
+                        <button type="button" class="btn btn-primary" id="quoteStyleMobileControlsBtn" role="tab" aria-selected="true" onclick="showQuoteStyleStudioPane('controls')">
+                            <i class="fas fa-sliders me-1"></i>Controls
+                        </button>
+                        <button type="button" class="btn btn-outline-primary" id="quoteStyleMobilePreviewBtn" role="tab" aria-selected="false" onclick="showQuoteStyleStudioPane('preview')">
+                            <i class="fas fa-eye me-1"></i>Preview
+                        </button>
+                    </div>
+                    <div class="quote-style-studio-layout">
+                    <section class="quote-style-controls-pane" id="quoteStyleControlsPane" aria-label="Quote appearance controls">
                     <p class="text-muted small mb-3">Choose how the client quote should look and what details the client can see.</p>
 
                     <ul class="nav nav-pills nav-fill mb-3" id="quoteStyleTabs" role="tablist">
@@ -17768,24 +17929,43 @@ Example:
                             </div>
                         </div>
                     </div>
-
-                    <hr>
-                    <label class="form-label fw-bold">Client Preview</label>
-                    <div id="stylePreview" class="quote-style-preview">
-                        <div id="previewHeader" class="quote-style-preview-header">
-                            <span>Quote Preview</span>
-                            <span id="previewHeaderMode" class="small fw-normal">Client-ready estimate</span>
-                        </div>
-                        <div class="quote-style-preview-body">
-                            <div class="text-muted small mb-2" id="previewClientLine">Client Name - Project Address</div>
-                            <div id="previewMessage" class="small mb-3" style="display:none;"></div>
-                            <div class="quote-style-preview-line" style="width:78%;"></div>
-                            <div class="quote-style-preview-line" style="width:58%;"></div>
-                            <div class="d-flex justify-content-between align-items-center mt-3">
-                                <span class="fw-semibold" id="previewPricingLabel">Full itemized quote</span>
-                                <span id="previewTotal" class="badge rounded-pill px-3 py-2">Total: $12,450.00</span>
+                    </section>
+                    <section class="quote-style-preview-pane" id="quoteStylePreviewPane" aria-label="Live client quote preview">
+                        <div class="quote-style-preview-toolbar">
+                            <div class="min-w-0">
+                                <div class="quote-style-preview-toolbar-title"><i class="fas fa-eye me-1"></i>Live Client Preview</div>
+                                <div class="quote-style-preview-status" id="quoteStylePreviewStatus" aria-live="polite">
+                                    <span class="quote-style-preview-status-dot" aria-hidden="true"></span>
+                                    <span id="quoteStylePreviewStatusText">Waiting to load</span>
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge text-bg-light border d-none d-sm-inline">Preview interactions are not saved</span>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="resetQuoteStylePreview()" title="Reset preview interactions" aria-label="Reset preview interactions">
+                                    <i class="fas fa-rotate-left"></i>
+                                </button>
                             </div>
                         </div>
+                        <div class="quote-style-preview-frame-wrap">
+                            <div class="quote-style-preview-state" id="quoteStylePreviewState">
+                                <div>
+                                    <div class="mb-2"><i class="fas fa-spinner fa-spin fa-lg text-primary" id="quoteStylePreviewStateIcon"></i></div>
+                                    <div class="fw-semibold" id="quoteStylePreviewStateTitle">Preparing client preview...</div>
+                                    <div class="small text-muted mt-1" id="quoteStylePreviewStateMessage">The real quote viewer will appear here.</div>
+                                    <button type="button" class="btn btn-outline-primary btn-sm mt-3" id="quoteStylePreviewRetryBtn" onclick="retryQuoteStylePreview()" hidden>
+                                        <i class="fas fa-rotate me-1"></i>Retry
+                                    </button>
+                                </div>
+                            </div>
+                            <iframe
+                                id="quoteStylePreviewFrame"
+                                title="Live client quote preview"
+                                data-src="interactive-quote-viewer.html?quote_studio=1&amp;preview=1&amp;admin_preview=1&amp;studio_v=2026071301"
+                                src="about:blank"
+                                referrerpolicy="same-origin"
+                            ></iframe>
+                        </div>
+                    </section>
                     </div>
                 </div>
                 <div class="modal-footer justify-content-between gap-2 flex-wrap">

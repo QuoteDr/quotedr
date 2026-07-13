@@ -37,8 +37,210 @@
             clientMessage: ''
         };
 
+        var QUOTE_STUDIO_MESSAGE_VERSION = 1;
+        var _quoteStudioFrameReady = false;
+        var _quoteStudioSnapshot = null;
+        var _quoteStudioStyleTimer = null;
+        var _quoteStudioLoadTimer = null;
+        var _quoteStudioMessagingBound = false;
+
         function syncQuoteStyleGlobal() {
             window._quoteStyle = _quoteStyle;
+        }
+
+        function quoteStudioClone(value) {
+            try { return JSON.parse(JSON.stringify(value)); } catch(e) { return value; }
+        }
+
+        function quoteStudioModalIsOpen() {
+            return document.getElementById('quoteStyleModal')?.classList.contains('show') === true;
+        }
+
+        function getQuoteStudioFrame() {
+            return document.getElementById('quoteStylePreviewFrame');
+        }
+
+        function setQuoteStudioPreviewState(state, message) {
+            var status = document.getElementById('quoteStylePreviewStatus');
+            var statusText = document.getElementById('quoteStylePreviewStatusText');
+            var overlay = document.getElementById('quoteStylePreviewState');
+            var title = document.getElementById('quoteStylePreviewStateTitle');
+            var detail = document.getElementById('quoteStylePreviewStateMessage');
+            var icon = document.getElementById('quoteStylePreviewStateIcon');
+            var retry = document.getElementById('quoteStylePreviewRetryBtn');
+
+            if (status) {
+                status.classList.toggle('is-ready', state === 'ready');
+                status.classList.toggle('is-error', state === 'error');
+            }
+            if (statusText) statusText.textContent = message || (state === 'ready' ? 'Live preview ready' : (state === 'error' ? 'Preview unavailable' : 'Preparing preview'));
+            if (!overlay) return;
+
+            overlay.hidden = state === 'ready';
+            if (retry) retry.hidden = state !== 'error';
+            if (icon) {
+                icon.className = state === 'error'
+                    ? 'fas fa-triangle-exclamation fa-lg text-danger'
+                    : 'fas fa-spinner fa-spin fa-lg text-primary';
+            }
+            if (title) title.textContent = state === 'error' ? 'Could not load the client preview' : 'Preparing client preview...';
+            if (detail) detail.textContent = state === 'error'
+                ? (message || 'Refresh the preview and try again.')
+                : 'The real quote viewer will appear here.';
+        }
+
+        function startQuoteStudioLoadTimeout() {
+            if (_quoteStudioLoadTimer) clearTimeout(_quoteStudioLoadTimer);
+            _quoteStudioLoadTimer = setTimeout(function() {
+                _quoteStudioLoadTimer = null;
+                setQuoteStudioPreviewState('error', 'The preview took too long to respond.');
+            }, 15000);
+        }
+
+        function clearQuoteStudioLoadTimeout() {
+            if (_quoteStudioLoadTimer) clearTimeout(_quoteStudioLoadTimer);
+            _quoteStudioLoadTimer = null;
+        }
+
+        function buildQuoteStudioSnapshot() {
+            var quote = typeof collectQuoteData === 'function'
+                ? collectQuoteData()
+                : { rooms: quoteStudioClone(typeof rooms !== 'undefined' ? rooms : []) };
+            var loaded = window._loadedQuoteData || window._currentQuoteData || {};
+            [
+                'changeOrderContext', 'fullResolutionPhotosEnabled', 'data', '_roomNotes',
+                '_clientUpgrades', '_clientRemovals', 'signature_url', 'signed_at',
+                'approved_at', 'accepted_at', 'signed_by', 'approved_by', 'accepted_by',
+                'deposit_paid', 'paymentStatus', 'payments'
+            ].forEach(function(key) {
+                if (loaded[key] !== undefined && quote[key] === undefined) quote[key] = quoteStudioClone(loaded[key]);
+            });
+            quote.style = quoteStudioClone(_quoteStyle);
+            return quote;
+        }
+
+        function postQuoteStudioDocument() {
+            var frame = getQuoteStudioFrame();
+            if (!frame || !frame.contentWindow || !_quoteStudioFrameReady || !_quoteStudioSnapshot || !quoteStudioModalIsOpen()) return;
+            setQuoteStudioPreviewState('loading', 'Rendering current quote...');
+            startQuoteStudioLoadTimeout();
+            frame.contentWindow.postMessage({
+                type: 'quotedr-quote-studio-document',
+                version: QUOTE_STUDIO_MESSAGE_VERSION,
+                quote: quoteStudioClone(_quoteStudioSnapshot),
+                style: quoteStudioClone(_quoteStyle)
+            }, window.location.origin);
+        }
+
+        function postQuoteStudioStyle() {
+            var frame = getQuoteStudioFrame();
+            if (!frame || !frame.contentWindow || !_quoteStudioFrameReady || !quoteStudioModalIsOpen()) return;
+            var statusText = document.getElementById('quoteStylePreviewStatusText');
+            if (statusText) statusText.textContent = 'Updating preview...';
+            startQuoteStudioLoadTimeout();
+            frame.contentWindow.postMessage({
+                type: 'quotedr-quote-studio-style',
+                version: QUOTE_STUDIO_MESSAGE_VERSION,
+                style: quoteStudioClone(_quoteStyle)
+            }, window.location.origin);
+        }
+
+        function queueQuoteStudioStyleUpdate() {
+            if (!quoteStudioModalIsOpen()) return;
+            if (_quoteStudioStyleTimer) clearTimeout(_quoteStudioStyleTimer);
+            _quoteStudioStyleTimer = setTimeout(function() {
+                _quoteStudioStyleTimer = null;
+                postQuoteStudioStyle();
+            }, 100);
+        }
+
+        function bindQuoteStudioMessaging() {
+            if (_quoteStudioMessagingBound) return;
+            window.addEventListener('message', function(event) {
+                var frame = getQuoteStudioFrame();
+                if (!frame || event.origin !== window.location.origin || event.source !== frame.contentWindow) return;
+                var data = event.data || {};
+                if (data.version !== QUOTE_STUDIO_MESSAGE_VERSION) return;
+                if (data.type === 'quotedr-quote-studio-ready') {
+                    _quoteStudioFrameReady = true;
+                    postQuoteStudioDocument();
+                } else if (data.type === 'quotedr-quote-studio-rendered') {
+                    clearQuoteStudioLoadTimeout();
+                    setQuoteStudioPreviewState('ready', data.message || 'Live preview ready');
+                } else if (data.type === 'quotedr-quote-studio-error') {
+                    clearQuoteStudioLoadTimeout();
+                    setQuoteStudioPreviewState('error', data.message || 'The quote viewer could not render this preview.');
+                }
+            });
+            var modalEl = document.getElementById('quoteStyleModal');
+            if (modalEl) {
+                modalEl.addEventListener('hidden.bs.modal', function() {
+                    if (_quoteStudioStyleTimer) clearTimeout(_quoteStudioStyleTimer);
+                    _quoteStudioStyleTimer = null;
+                    clearQuoteStudioLoadTimeout();
+                    document.body?.classList.remove('quote-style-studio-open');
+                });
+            }
+            _quoteStudioMessagingBound = true;
+        }
+
+        function ensureQuoteStudioFrame() {
+            bindQuoteStudioMessaging();
+            var frame = getQuoteStudioFrame();
+            if (!frame) return;
+            var currentSrc = frame.getAttribute('src') || '';
+            if (!currentSrc || currentSrc === 'about:blank') {
+                _quoteStudioFrameReady = false;
+                setQuoteStudioPreviewState('loading', 'Loading the client viewer...');
+                startQuoteStudioLoadTimeout();
+                frame.src = frame.getAttribute('data-src');
+                return;
+            }
+            if (_quoteStudioFrameReady) postQuoteStudioDocument();
+        }
+
+        function prepareQuoteStyleStudio() {
+            bindQuoteStudioMessaging();
+            document.body?.classList.add('quote-style-studio-open');
+            _quoteStudioSnapshot = buildQuoteStudioSnapshot();
+            showQuoteStyleStudioPane('controls');
+            ensureQuoteStudioFrame();
+        }
+
+        function retryQuoteStylePreview() {
+            var frame = getQuoteStudioFrame();
+            if (!frame) return;
+            _quoteStudioFrameReady = false;
+            setQuoteStudioPreviewState('loading', 'Reloading the client viewer...');
+            startQuoteStudioLoadTimeout();
+            var base = new URL(frame.getAttribute('data-src'), window.location.href);
+            base.searchParams.set('studio_reload', String(Date.now()));
+            frame.src = base.toString();
+        }
+
+        function resetQuoteStylePreview() {
+            if (!_quoteStudioSnapshot) _quoteStudioSnapshot = buildQuoteStudioSnapshot();
+            if (_quoteStudioFrameReady) postQuoteStudioDocument();
+            else ensureQuoteStudioFrame();
+        }
+
+        function showQuoteStyleStudioPane(pane) {
+            pane = pane === 'preview' ? 'preview' : 'controls';
+            var body = document.getElementById('quoteStyleStudioBody');
+            var controlsBtn = document.getElementById('quoteStyleMobileControlsBtn');
+            var previewBtn = document.getElementById('quoteStyleMobilePreviewBtn');
+            if (body) body.setAttribute('data-mobile-pane', pane);
+            if (controlsBtn) {
+                controlsBtn.classList.toggle('btn-primary', pane === 'controls');
+                controlsBtn.classList.toggle('btn-outline-primary', pane !== 'controls');
+                controlsBtn.setAttribute('aria-selected', pane === 'controls' ? 'true' : 'false');
+            }
+            if (previewBtn) {
+                previewBtn.classList.toggle('btn-primary', pane === 'preview');
+                previewBtn.classList.toggle('btn-outline-primary', pane !== 'preview');
+                previewBtn.setAttribute('aria-selected', pane === 'preview' ? 'true' : 'false');
+            }
+            if (pane === 'preview') ensureQuoteStudioFrame();
         }
 
         async function saveQuoteStyleDefaultsToCloud(style) {
@@ -356,42 +558,13 @@
             _quoteStyle = readQuoteStyleFromControls();
             syncQuoteStyleGlobal();
             applyQuoteUpgradeTheme(_quoteStyle);
-            var prev = document.getElementById('stylePreview');
-            var hdr = document.getElementById('previewHeader');
-            var tot = document.getElementById('previewTotal');
-            var msg = document.getElementById('previewMessage');
-            var pricing = document.getElementById('previewPricingLabel');
-            var mode = document.getElementById('previewHeaderMode');
-            var accent = _quoteStyle.accent || '#1a56a0';
             var headerOpacity = Math.max(20, Math.min(parseInt(_quoteStyle.headerOpacity || 100, 10), 100));
             updateHeaderOpacityLabel(headerOpacity);
             var bgOpacity = parseInt(_quoteStyle.bgOpacity, 10);
             if (!isFinite(bgOpacity)) bgOpacity = 100;
             bgOpacity = Math.max(0, Math.min(bgOpacity, 100));
             updateBgOpacityLabel(bgOpacity);
-            var previewBg = blendColorWithWhite(_quoteStyle.bg || '#ffffff', bgOpacity);
-            var isLight = _quoteStyle.headerStyle === 'light' || accent === '#ffffff' || headerOpacity < 55;
-            if (prev) prev.style.background = previewBg;
-            if (hdr) {
-                var headerBg = quoteHeaderBackgroundForEffect(accent, _quoteStyle.headerStyle, headerOpacity, _quoteStyle.headerEffect || 'soft-gradient');
-                hdr.style.background = headerBg;
-                hdr.style.color = isLight ? '#1f3349' : '#ffffff';
-                hdr.style.borderBottom = isLight ? '1px solid #dbe4ef' : 'none';
-            }
-            if (tot) {
-                tot.style.background = accent === '#ffffff' ? '#1a56a0' : accent;
-                tot.style.color = '#ffffff';
-            }
-            if (msg) {
-                msg.style.display = _quoteStyle.clientMessage ? 'block' : 'none';
-                msg.textContent = _quoteStyle.clientMessage;
-            }
-            if (pricing) {
-                var labels = { full: 'Full itemized quote', category: 'Category subtotals only', total: 'Total only' };
-                var depositNote = _quoteStyle.depositMode === 'show' ? ' | ' + (_quoteStyle.depositPercent || 50) + '% deposit shown' : '';
-                pricing.textContent = (labels[_quoteStyle.pricingMode] || labels.full) + depositNote;
-            }
-            if (mode) mode.textContent = _quoteStyle.approvalMode === 'review' ? 'Review-only link' : 'Client-ready estimate';
+            queueQuoteStudioStyleUpdate();
         }
 
         function hexToRgb(hex) {
@@ -776,7 +949,9 @@
                     ? '<i class="fas fa-check me-1"></i>Done'
                     : '<i class="fas fa-share-square me-1"></i>' + (isChangeOrder ? 'Send Change Order' : 'Generate Quote Link');
             }
-            var modal = new bootstrap.Modal(document.getElementById('quoteStyleModal'));
+            var modalEl = document.getElementById('quoteStyleModal');
+            var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modalEl.addEventListener('shown.bs.modal', prepareQuoteStyleStudio, { once: true });
             modal.show();
         }
 
@@ -1016,4 +1191,7 @@
         window.previewInteractiveQuote = previewInteractiveQuote;
         window.showQuoteGenerationProgress = showQuoteGenerationProgress;
         window.hideQuoteGenerationProgress = hideQuoteGenerationProgress;
+        window.showQuoteStyleStudioPane = showQuoteStyleStudioPane;
+        window.resetQuoteStylePreview = resetQuoteStylePreview;
+        window.retryQuoteStylePreview = retryQuoteStylePreview;
 })();
