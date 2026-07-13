@@ -219,6 +219,28 @@
             font-weight: 700;
             line-height: 1.25;
         }
+        .quote-generation-progress {
+            position: fixed;
+            z-index: 1095;
+            width: min(360px, calc(100vw - 24px));
+            padding: 0.9rem 1rem;
+            border: 1px solid rgba(26, 86, 160, 0.3);
+            border-left: 5px solid #1a56a0;
+            border-radius: 6px;
+            background: #ffffff;
+            color: #17324d;
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.22);
+        }
+        .quote-generation-progress-title {
+            font-weight: 700;
+            color: #1a56a0;
+        }
+        .quote-generation-progress-detail {
+            margin-top: 0.2rem;
+            color: #475569;
+            font-size: 0.875rem;
+            line-height: 1.35;
+        }
         .quote-upgrade-option-btn {
             border: 1px solid var(--quote-upgrade-accent, #0d9488);
             background: #ffffff;

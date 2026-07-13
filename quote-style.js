@@ -697,6 +697,60 @@
             });
         }
 
+        function getQuoteGenerationProgressAnchor(preferredAnchor) {
+            if (preferredAnchor && typeof preferredAnchor.getClientRects === 'function' && preferredAnchor.getClientRects().length) {
+                return preferredAnchor;
+            }
+            return document.querySelector('.quote-actions-dropdown > button');
+        }
+
+        function showQuoteGenerationProgress(preferredAnchor, title) {
+            if (document.getElementById('quoteGenerationProgress')) return false;
+            var anchor = getQuoteGenerationProgressAnchor(preferredAnchor);
+            var panel = document.createElement('div');
+            panel.id = 'quoteGenerationProgress';
+            panel.className = 'quote-generation-progress';
+            panel.setAttribute('role', 'status');
+            panel.setAttribute('aria-live', 'assertive');
+            panel.innerHTML = '<div class="d-flex align-items-start gap-2">' +
+                '<i class="fas fa-spinner fa-spin mt-1" aria-hidden="true"></i>' +
+                '<div><div class="quote-generation-progress-title">' + (title || 'Preparing your quote...') + '</div>' +
+                '<div class="quote-generation-progress-detail">Uploading photos and building the client view. Quotes with photos may take a little longer.</div></div>' +
+                '</div>';
+            document.body.appendChild(panel);
+
+            var panelWidth = panel.offsetWidth || 360;
+            var panelHeight = panel.offsetHeight || 100;
+            if (anchor && typeof anchor.getBoundingClientRect === 'function') {
+                var rect = anchor.getBoundingClientRect();
+                var left = Math.max(12, Math.min(window.innerWidth - panelWidth - 12, rect.right - panelWidth));
+                var above = rect.top - panelHeight - 12;
+                var top = above >= 12 ? above : Math.min(window.innerHeight - panelHeight - 12, rect.bottom + 12);
+                panel.style.left = left + 'px';
+                panel.style.top = Math.max(12, top) + 'px';
+            } else {
+                panel.style.right = '12px';
+                panel.style.top = '72px';
+            }
+            if (anchor && 'disabled' in anchor) {
+                anchor.dataset.quoteGenerationWasDisabled = anchor.disabled ? '1' : '0';
+                anchor.disabled = true;
+            }
+            panel._quoteGenerationAnchor = anchor;
+            return true;
+        }
+
+        function hideQuoteGenerationProgress() {
+            var panel = document.getElementById('quoteGenerationProgress');
+            if (!panel) return;
+            var anchor = panel._quoteGenerationAnchor;
+            if (anchor && 'disabled' in anchor) {
+                anchor.disabled = anchor.dataset.quoteGenerationWasDisabled === '1';
+                delete anchor.dataset.quoteGenerationWasDisabled;
+            }
+            panel.remove();
+        }
+
         async function generateInteractiveLink() {
             if (rooms.length === 0) {
                 alert('Please add at least one room before generating an interactive quote.');
@@ -764,18 +818,19 @@
                 if (styleModal) styleModal.hide();
                 return;
             }
+            var generateBtn = document.getElementById('quoteStyleGenerateBtn');
+            if (!showQuoteGenerationProgress(generateBtn, 'Generating your quote...')) return;
             var skipSettingsOnGenerate = document.getElementById('quoteSkipSettingsOnGenerate')?.checked === true;
-            await saveQuoteStyleSkipPreference(skipSettingsOnGenerate);
-            if (styleModal) styleModal.hide();
-
-            // Show saving indicator
             var saveStatus = document.getElementById('saveStatus');
-            if (saveStatus) saveStatus.innerHTML = '<span style="color:#1a56a0;"><i class="fas fa-spinner fa-spin"></i> Saving quote...</span>';
 
             try {
+                await saveQuoteStyleSkipPreference(skipSettingsOnGenerate);
+                if (styleModal) styleModal.hide();
+                if (saveStatus) saveStatus.innerHTML = '<span style="color:#1a56a0;"><i class="fas fa-spinner fa-spin"></i> Saving quote...</span>';
                 const viewerUrl = await createInteractiveQuoteLink();
 
                 if (saveStatus) saveStatus.innerHTML = '<span style="color:green;"><i class="fas fa-check"></i> Quote saved!</span>';
+                hideQuoteGenerationProgress();
 
                 // Show the link modal
                 let modal = document.getElementById('interactiveLinkModal');
@@ -850,6 +905,7 @@
                 linkModal.show();
 
             } catch(err) {
+                hideQuoteGenerationProgress();
                 if (isChangeOrderReasonRequiredError(err)) {
                     promptForChangeOrderReason();
                     return;
@@ -909,6 +965,7 @@
                 return;
             }
             markQuoteNumberUsed(document.getElementById('quoteNumber')?.value);
+            if (!showQuoteGenerationProgress(null, 'Preparing your preview...')) return;
             var saveStatus = document.getElementById('saveStatus');
             if (saveStatus) saveStatus.innerHTML = '<span style="color:#1a56a0;"><i class="fas fa-spinner fa-spin"></i> Preparing preview...</span>';
             try {
@@ -922,8 +979,10 @@
                 if (typeof qdToast === 'function') {
                     qdToast({ title: 'Preview Ready', message: 'Opening the client quote view.', type: 'success' });
                 }
+                hideQuoteGenerationProgress();
                 window.location.href = previewUrl.toString();
             } catch(err) {
+                hideQuoteGenerationProgress();
                 console.error('Failed to preview quote:', err);
                 alert('Failed to prepare quote preview: ' + (err.message || err));
                 if (saveStatus) saveStatus.innerHTML = '<span style="color:red;"><i class="fas fa-times"></i> Preview failed</span>';
@@ -955,4 +1014,6 @@
         window.confirmGenerateQuote = confirmGenerateQuote;
         window.createInteractiveQuoteLink = createInteractiveQuoteLink;
         window.previewInteractiveQuote = previewInteractiveQuote;
+        window.showQuoteGenerationProgress = showQuoteGenerationProgress;
+        window.hideQuoteGenerationProgress = hideQuoteGenerationProgress;
 })();
