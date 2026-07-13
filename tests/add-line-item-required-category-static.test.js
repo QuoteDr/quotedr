@@ -19,6 +19,15 @@ assert(
   'Add Line Item should validate category and item name, highlight missing fields, and explain what is missing'
 );
 
+assert(
+  builder.includes('<input type="hidden" id="lineDescription">') &&
+    !builder.includes('<label><strong>Item Name:</strong></label>') &&
+    builder.includes('function handleItemQuickSearchInput()') &&
+    builder.includes("description.value = quickSearch ? quickSearch.value : ''") &&
+    builder.includes("quickSearch.classList.add('is-invalid')"),
+  'Quick Search should supply the hidden line item name and display missing-name validation'
+);
+
 const confirmBlock = builder.slice(
   builder.indexOf('async function confirmAddLine()'),
   builder.indexOf('function checkIfNewItem()')

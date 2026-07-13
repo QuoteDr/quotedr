@@ -23,3 +23,9 @@ assert(
     source.includes('quickSearch.focus()'),
   'Opening Add Line Item should focus Quick Search after the modal is ready for keyboard input'
 );
+
+assert(
+  source.includes('<label><strong>Quick Search:</strong></label>') &&
+    !source.includes('New Item or Quick Search:'),
+  'Quick Search should not be labeled as the new-item name field'
+);

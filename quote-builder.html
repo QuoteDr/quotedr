@@ -2820,10 +2820,10 @@ Example:
                     <input type="hidden" id="currentRoomId">
                     <div id="addLineItemValidation" class="alert alert-warning py-2 px-3 mb-3" style="display:none;" role="alert"></div>
 
-                    <!-- New item or quick search across all items -->
+                    <!-- Quick search across saved items -->
                     <div class="mb-3 position-relative">
-                        <label><strong>New Item or Quick Search:</strong> <small class="text-muted">type to find any service instantly</small></label>
-                        <input type="text" id="itemQuickSearch" class="form-control" placeholder="e.g., drywall, tile, baseboard..." oninput="showItemSearchResults()" onblur="hideItemSearchDropdown()" autocomplete="off">
+                        <label><strong>Quick Search:</strong></label>
+                        <input type="text" id="itemQuickSearch" class="form-control" placeholder="e.g., drywall, tile, baseboard..." oninput="handleItemQuickSearchInput()" onblur="hideItemSearchDropdown()" autocomplete="off">
                         <div id="itemSearchDropdown" style="display:none; position:absolute; left:0; right:0; z-index:2000; background:white; border:1px solid #dee2e6; border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.15); max-height:220px; overflow-y:auto;"></div>
                         <div id="lineItemQuickSearchTip" class="alert alert-info py-2 px-3 mt-2 mb-0 small d-flex align-items-start gap-2">
                             <button type="button" id="lineItemQuickSearchTipToggle" class="btn btn-sm btn-outline-primary rounded-circle flex-shrink-0" style="width:24px;height:24px;padding:0;line-height:1;" aria-label="Hide saved items tip" aria-expanded="true" title="Hide saved items tip" onclick="toggleLineItemQuickSearchTip()">
@@ -2850,8 +2850,7 @@ Example:
                         </div>
                     </div>
 
-                    <label><strong>Item Name:</strong></label>
-                    <input type="text" id="lineDescription" class="form-control mb-2" placeholder="e.g., 2x4 Wall Framing, Drywall Hang & Finish" spellcheck="true" oninput="clearAddLineItemValidationField('lineDescription'); checkIfNewItem()">
+                    <input type="hidden" id="lineDescription">
 
                     <label><strong>Reusable Item Description (Optional):</strong></label>
                     <textarea id="lineItemDescription" class="form-control mb-3" rows="2" placeholder="Describe the reusable scope shown to clients. This saves with the item database, unlike the job note below." spellcheck="true"></textarea>
@@ -6449,6 +6448,15 @@ Example:
             notifyBuilderGuideRoomCreated();
         }
 
+        function handleItemQuickSearchInput() {
+            const quickSearch = document.getElementById('itemQuickSearch');
+            const description = document.getElementById('lineDescription');
+            if (description) description.value = quickSearch ? quickSearch.value : '';
+            clearAddLineItemValidationField('lineDescription');
+            checkIfNewItem();
+            showItemSearchResults();
+        }
+
         function showItemSearchResults() {
             const q = (document.getElementById('itemQuickSearch')?.value || '').toLowerCase().trim();
             const dropdown = document.getElementById('itemSearchDropdown');
@@ -6591,6 +6599,10 @@ Example:
         function clearAddLineItemValidationField(fieldId) {
             const field = document.getElementById(fieldId);
             if (field) field.classList.remove('is-invalid');
+            if (fieldId === 'lineDescription') {
+                const quickSearch = document.getElementById('itemQuickSearch');
+                if (quickSearch) quickSearch.classList.remove('is-invalid');
+            }
             const category = document.getElementById('lineCategory');
             const description = document.getElementById('lineDescription');
             const alert = document.getElementById('addLineItemValidation');
@@ -6634,9 +6646,11 @@ Example:
             }
             if (!descriptionInput || !descriptionInput.value.trim()) {
                 missing.push('Enter an item name');
-                if (descriptionInput) descriptionInput.classList.add('is-invalid');
+                const quickSearch = document.getElementById('itemQuickSearch');
+                if (quickSearch) quickSearch.classList.add('is-invalid');
             } else {
-                descriptionInput.classList.remove('is-invalid');
+                const quickSearch = document.getElementById('itemQuickSearch');
+                if (quickSearch) quickSearch.classList.remove('is-invalid');
             }
             if (missing.length) {
                 if (alert) {
@@ -7015,6 +7029,8 @@ Example:
                 if (selectedOption.value !== 'custom') {
                     document.getElementById('lineDescription').value = selectedOption.text;
                 }
+                clearAddLineItemValidationField('lineDescription');
+                checkIfNewItem();
                 document.getElementById('lineItemDescription').value = selectedOption.dataset.itemDescription || '';
                 // Pre-fill material cost if saved
                 const matCost = selectedOption.dataset.materialCost || 0;
@@ -7904,6 +7920,7 @@ Example:
             // Populate form with existing data
             document.getElementById('currentRoomId').value = roomId;
             document.getElementById('lineDescription').value = item.description;
+            document.getElementById('itemQuickSearch').value = item.description;
             document.getElementById('lineItemDescription').value = item.itemDescription || '';
             populateCategoryDropdown(item.category);
             updatePricingOptions();
