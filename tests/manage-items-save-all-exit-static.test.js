@@ -24,7 +24,7 @@ assert(
 );
 
 assert(
-  builder.includes('quote-items.js?v=1783269305'),
+  builder.includes('quote-items.js?v=1783269306'),
   'Quote Builder should cache-bust the Manage Items script so the new exit action loads immediately'
 );
 

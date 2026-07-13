@@ -2938,8 +2938,8 @@ Example:
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-outline-success" id="saveNewItemBtn" onclick="saveLineItemToDatabase()" style="display:none;" title="Save this item to your database for future use">
-                        <i class="fas fa-bookmark me-1"></i>Save New Item
+                    <button type="button" class="btn btn-outline-success" id="saveNewItemBtn" onclick="saveLineItemToDatabase()" title="Save this item to your database for future use">
+                        <i class="fas fa-database me-1"></i>Save To Database
                     </button>
                     <button type="button" class="btn btn-primary" id="addLineItemBtn" onclick="confirmAddLine()">Add Line Item</button>
                 </div>
@@ -6892,6 +6892,7 @@ Example:
             // Populate category dropdown dynamically - no pre-selection so placeholder shows
             populateCategoryDropdown(null);
             clearAddLineItemValidation();
+            checkIfNewItem();
             // Don't call updatePricingOptions() here - let user pick category first
 
             modalEl.addEventListener('shown.bs.modal', function focusLineItemQuickSearch() {
@@ -7951,6 +7952,7 @@ Example:
 
             // Set editing flag
             editingItemIndex = itemIndex;
+            checkIfNewItem();
 
             // Show modal
             const modal = new bootstrap.Modal(document.getElementById('addLineModal'));
@@ -8194,10 +8196,12 @@ Example:
                 itemDescription: itemDescription
             };
             if (existingSavedItem.photo || existingItem?.photo) savedItem.photo = existingSavedItem.photo || existingItem.photo;
+            if (Array.isArray(existingSavedItem.photos) || Array.isArray(existingItem?.photos)) savedItem.photos = Array.isArray(existingSavedItem.photos) ? existingSavedItem.photos.slice() : existingItem.photos.slice();
             if (existingSavedItem.photoFull || existingItem?.photoFull) savedItem.photoFull = existingSavedItem.photoFull || existingItem.photoFull;
             if (Array.isArray(existingSavedItem.photosFull) || Array.isArray(existingItem?.photosFull)) savedItem.photosFull = Array.isArray(existingSavedItem.photosFull) ? existingSavedItem.photosFull : existingItem.photosFull;
             if (existingSavedItem.laborTime || existingItem?.laborTime) savedItem.laborTime = normalizeLaborTime(existingSavedItem.laborTime || existingItem.laborTime);
             if (existingSavedItem.upgrade || existingItem?.upgrade) savedItem.upgrade = cloneSavedItemForQuoteSync(existingSavedItem.upgrade || existingItem.upgrade);
+            if (Array.isArray(existingSavedItem.upgradeGroups) || Array.isArray(existingItem?.upgradeGroups)) savedItem.upgradeGroups = cloneSavedItemForQuoteSync(Array.isArray(existingSavedItem.upgradeGroups) ? existingSavedItem.upgradeGroups : existingItem.upgradeGroups);
             if (category) savedItem.category = category;
             return savedItem;
         }
@@ -8277,7 +8281,12 @@ Example:
                 pricingDatabase[nextCategory].push(Object.assign({}, nextItem, { _custom: true }));
             }
 
-            localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
+            if (typeof persistManageItemsLocalSnapshot === 'function') {
+                persistManageItemsLocalSnapshot(customItems);
+            } else {
+                localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
+                localStorage.setItem('ald_custom_items_updated_at', new Date().toISOString());
+            }
             if (typeof recordSavedItemQuoteChange === 'function') {
                 recordSavedItemQuoteChange(previousSavedItemSource.category || previousCategory, previousSavedItemSource.name || previousName, beforeItem, nextItem);
             }
@@ -8314,7 +8323,7 @@ Example:
                     if (savedDbChoice === false) return;
                 }
                 const savNewItemBtn = document.getElementById('saveNewItemBtn');
-                const shouldAskToSaveNewItem = editingItemIndex === null && !isLineItemOneTimeCategory() && savNewItemBtn && savNewItemBtn.style.display !== 'none';
+                const shouldAskToSaveNewItem = editingItemIndex === null && !isLineItemOneTimeCategory() && savNewItemBtn && savNewItemBtn.dataset.databaseState === 'new';
                 if (shouldAskToSaveNewItem) {
                     const saveChoice = await qdConfirm('Save "' + description + '" to your item database for next time?', {
                         title: 'Save New Item',
@@ -8434,28 +8443,40 @@ Example:
         function checkIfNewItem() {
             const desc = document.getElementById('lineDescription').value.trim().toLowerCase();
             const saveNewItemBtn = document.getElementById('saveNewItemBtn');
-            if (!saveNewItemBtn || !desc) { if (saveNewItemBtn) saveNewItemBtn.style.display = 'none'; return; }
+            if (!saveNewItemBtn) return;
             // Check if this description matches any saved item name
             let found = false;
             try {
                 const items = JSON.parse(localStorage.getItem('ald_custom_items') || '{}');
-                for (const cat of Object.values(items)) {
-                    if (Array.isArray(cat) && cat.some(i => i.name && i.name.toLowerCase() === desc)) {
-                        found = true; break;
-                    }
-                }
+                const category = normalizeLineItemCategoryValue(document.getElementById('lineCategory'));
+                const categoryItems = category && Array.isArray(items[category]) ? items[category] : [];
+                found = categoryItems.some(function(item) { return item && item.name && item.name.toLowerCase() === desc; });
             } catch(e) {}
-            saveNewItemBtn.style.display = found ? 'none' : 'inline-block';
+            saveNewItemBtn.style.display = '';
+            saveNewItemBtn.disabled = !desc || isLineItemOneTimeCategory();
+            saveNewItemBtn.dataset.databaseState = found ? 'existing' : 'new';
+            saveNewItemBtn.innerHTML = found
+                ? '<i class="fas fa-database me-1"></i>Update Database'
+                : '<i class="fas fa-database me-1"></i>Save To Database';
+            saveNewItemBtn.title = found ? 'Update this saved item using the values above' : 'Save this item to your database for future use';
         }
 
-        function saveLineItemToDatabase() {
-            if (!validateAddLineItemRequiredFields()) return;
+        function showLineItemDatabaseSaveToast(message, ok) {
+            if (typeof qdToast === 'function') {
+                qdToast({ message: message, type: ok ? 'success' : 'warning', title: 'Item Database' });
+            } else if (typeof showToast === 'function') {
+                showToast(message, ok ? 'success' : 'warning');
+            }
+        }
+
+        async function saveLineItemToDatabase() {
+            if (!validateAddLineItemRequiredFields()) return false;
             if (isLineItemOneTimeCategory()) {
                 qdAlert('Use Once categories are not saved to your item database. To save this item for reuse, choose Save in the New Category prompt or select a saved category first.', {
                     title: 'Use Once Category',
                     type: 'info'
                 });
-                return;
+                return false;
             }
             const desc = document.getElementById('lineDescription').value.trim();
             const itemDescription = document.getElementById('lineItemDescription').value.trim();
@@ -8466,18 +8487,44 @@ Example:
             const materialCost = parseFloat(document.getElementById('lineMaterialCost').value) || 0;
             const supplierLinkBtn = document.getElementById('supplierLinkBtn');
             const supplierUrl = (supplierLinkBtn && supplierLinkBtn.style.display !== 'none' && supplierLinkBtn.href !== '#') ? supplierLinkBtn.href : '';
-            if (!desc) return;
+            if (!desc) return false;
+            const saveNewItemBtn = document.getElementById('saveNewItemBtn');
+            if (saveNewItemBtn) {
+                saveNewItemBtn.disabled = true;
+                saveNewItemBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving';
+            }
+            var savedLocally = false;
             try {
                 if (!customItems || typeof customItems !== 'object') customItems = {};
                 if (!customItems[category]) customItems[category] = [];
-                var newItem = { name: desc, unitType: unitType, rate: rate, materialCost: materialCost, priceTbd: priceTbd, pricingMode: priceTbd ? 'tbd' : 'fixed', supplierUrl: supplierUrl, itemDescription: itemDescription, upgrade: null };
+                var activeQuoteItem = null;
+                var roomId = parseInt(document.getElementById('currentRoomId').value, 10);
+                var activeRoom = rooms.find(function(room) { return room.id === roomId; });
+                if (editingItemIndex !== null && activeRoom && activeRoom.items) activeQuoteItem = activeRoom.items[editingItemIndex] || null;
+                var newItem = buildSavedItemFromEditedLineItem(activeQuoteItem);
+                newItem.name = desc;
+                newItem.unitType = unitType;
+                newItem.rate = rate;
+                newItem.materialCost = materialCost;
+                newItem.priceTbd = priceTbd;
+                newItem.pricingMode = priceTbd ? 'tbd' : 'fixed';
+                newItem.supplierUrl = supplierUrl;
+                newItem.itemDescription = itemDescription;
+                delete newItem.category;
                 var existingCustom = customItems[category].find(function(i) { return i && i.name === desc; });
                 if (existingCustom) {
                     Object.assign(existingCustom, newItem);
                 } else {
                     customItems[category].push(newItem);
                 }
-                localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
+                if (typeof persistManageItemsLocalSnapshot === 'function') {
+                    persistManageItemsLocalSnapshot(customItems);
+                } else {
+                    localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
+                    localStorage.setItem('ald_custom_items_updated_at', new Date().toISOString());
+                }
+                savedLocally = true;
+                if (saveNewItemBtn) saveNewItemBtn.innerHTML = '<i class="fas fa-check me-1"></i>Saved Locally - Syncing';
                 // Update pricingDatabase in memory
                 if (!pricingDatabase[category]) pricingDatabase[category] = [];
                 var existingPricingItem = pricingDatabase[category].find(function(i) { return i && i.name === desc; });
@@ -8487,14 +8534,24 @@ Example:
                     pricingDatabase[category].push(Object.assign({}, newItem, { _custom: true }));
                 }
                 // Save the real item database snapshot to cloud so pricing and descriptions survive reloads/devices.
+                var cloudResult = null;
                 if (typeof _doBackupItemsToCloud === 'function') {
-                    _doBackupItemsToCloud(customItems).catch(function(){});
+                    cloudResult = await _doBackupItemsToCloud(customItems);
                 } else if (typeof backupItemsToCloud === 'function') {
-                    backupItemsToCloud(customItems).catch(function(){});
+                    cloudResult = await backupItemsToCloud(customItems);
                 }
-            } catch(e) { console.error('Error saving item:', e); }
-            const saveNewItemBtn = document.getElementById('saveNewItemBtn');
-            if (saveNewItemBtn) { saveNewItemBtn.style.display = 'none'; saveNewItemBtn.innerHTML = '<i class="fas fa-check me-1"></i>Saved!'; setTimeout(function(){ saveNewItemBtn.innerHTML = '<i class="fas fa-bookmark me-1"></i>Save New Item'; }, 1500); }
+                showLineItemDatabaseSaveToast(cloudResult && cloudResult.error ? 'Saved locally. Cloud sync will retry.' : 'Item saved to database.', !(cloudResult && cloudResult.error));
+            } catch(e) {
+                console.error('Error saving item:', e);
+                if (savedLocally) {
+                    showLineItemDatabaseSaveToast('Saved locally. Cloud sync will retry.', false);
+                } else {
+                    qdAlert('QuoteDr could not save this item to the database. Please review the item fields and try again.', { title: 'Save Failed', type: 'danger' });
+                }
+            } finally {
+                checkIfNewItem();
+            }
+            return savedLocally;
         }
 
         function toggleDepositSection() {
@@ -15035,7 +15092,7 @@ Example:
 
         // Manage Items behavior lives in quote-items.js.
     </script>
-    <script src="quote-items.js?v=1783269305"></script>
+    <script src="quote-items.js?v=1783269306"></script>
     <script src="quote-import.js?v=1780019801"></script>
     <script>
         // Load templates from localStorage on startup

@@ -2342,7 +2342,22 @@
             renameManageItemsCategory(catSelect.value);
         }
 
-                function _injectItemsIntoPricingDB(itemsObj) {
+        const MANAGE_ITEMS_LOCAL_UPDATED_AT_KEY = 'ald_custom_items_updated_at';
+
+        function getManageItemsLocalUpdatedAt() {
+            var value = Date.parse(localStorage.getItem(MANAGE_ITEMS_LOCAL_UPDATED_AT_KEY) || '');
+            return Number.isFinite(value) ? value : 0;
+        }
+
+        function persistManageItemsLocalSnapshot(itemsObj, options) {
+            options = options || {};
+            localStorage.setItem('ald_custom_items', JSON.stringify(itemsObj || {}));
+            var updatedAt = options.updatedAt || new Date().toISOString();
+            localStorage.setItem(MANAGE_ITEMS_LOCAL_UPDATED_AT_KEY, updatedAt);
+            return updatedAt;
+        }
+
+        function _injectItemsIntoPricingDB(itemsObj) {
             for (var cat in itemsObj) {
                 if (cat === '__choiceGroupTemplates') continue;
                 if (!Array.isArray(itemsObj[cat])) continue; // skip corrupted entries
@@ -2365,10 +2380,18 @@
 
             var localIsEmpty = Object.keys(customItems).length === 0;
 
-            // Always sync from cloud on load - cloud is source of truth
+            // Prefer whichever snapshot was saved most recently. A failed cloud sync must not
+            // erase newer local edits on the next refresh.
             _doRestoreItemsFromCloud().then(function(result) {
                 if (!result.error && result.data && Object.keys(result.data).length > 0) {
                     var cloudItems = normalizeManageItemPhotoCollections(result.data);
+                    var localUpdatedAt = getManageItemsLocalUpdatedAt();
+                    var cloudUpdatedAt = Date.parse(result.updatedAt || '') || 0;
+                    if (!localIsEmpty && localUpdatedAt > cloudUpdatedAt) {
+                        console.warn('[Restore] Kept newer local item database and queued another cloud sync.');
+                        _doBackupItemsToCloud(customItems).catch(function(){});
+                        return;
+                    }
                     var changed = false;
                     // Merge: cloud categories win, but keep any local-only categories
                     Object.keys(cloudItems).forEach(function(cat) {
@@ -2379,7 +2402,7 @@
                     });
                     if (changed) {
                         console.log('[Restore] Synced from cloud:', Object.keys(cloudItems).length, 'categories');
-                        localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
+                        persistManageItemsLocalSnapshot(customItems, { updatedAt: result.updatedAt || new Date().toISOString() });
                         Object.keys(pricingDatabase).forEach(function(k) { delete pricingDatabase[k]; });
                         _injectItemsIntoPricingDB(customItems);
                         if (localIsEmpty) {
@@ -2427,7 +2450,7 @@
 
         function saveCustomItems(showToast) {
             normalizeManageItemPhotoCollections(customItems);
-            localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
+            persistManageItemsLocalSnapshot(customItems);
             localStorage.setItem('ald_category_styles', JSON.stringify(categoryStyles));
             _saveCategoryStylesToCloud().catch(function(){});
             // Backup using inline function (guaranteed available)
@@ -3206,7 +3229,7 @@
             }
 
             // Save to localStorage
-            localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
+            persistManageItemsLocalSnapshot(customItems);
 
             // Flash row green
             if (options.flash !== false) {
@@ -3241,7 +3264,7 @@
             pushUndoState();
             const saved = saveItemRowCore(saveBtn.dataset.cat, saveBtn.dataset.name, { backup: false, flash: false });
             if (!saved) return false;
-            localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
+            persistManageItemsLocalSnapshot(customItems);
             _doBackupItemsToCloud(customItems).then(function(result) {
                 const ok = result && !result.error;
                 showManageItemsToast(ok ? 'Upgrade group saved.' : 'Saved locally - cloud sync failed.', ok);
@@ -3262,7 +3285,7 @@
             if (!error && data) {
                 try {
                     const snapshot = JSON.parse(data.data.items_snapshot || '{}');
-                    if (Object.keys(snapshot).length > 0) return { data: snapshot };
+                    if (Object.keys(snapshot).length > 0) return { data: snapshot, updatedAt: data.updated_at || data.data.backed_up_at || '' };
                 } catch(e) {}
             }
             return { error: 'No backup found' };
@@ -3312,7 +3335,9 @@
                 });
             }
             clearPricingDirty();
-            localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
+            persistManageItemsLocalSnapshot(customItems);
+            spinnerToast.style.background = '#1a56a0';
+            spinnerToast.innerHTML = '<i class="fas fa-check-circle"></i> Saved locally - syncing cloud...';
             // Start cloud save — clear spinner on success, only show failure if it actually errors
             var failureShown = false;
             const failureTimeout = setTimeout(function() {
@@ -3942,7 +3967,7 @@
                 }
             });
             pricingOtherDirty = false;
-            localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
+            persistManageItemsLocalSnapshot(customItems);
             _doBackupItemsToCloud(customItems).then(function(result) {
                 const ok = result && !result.error;
                 clearPricingDirty();
@@ -5224,6 +5249,7 @@
         window.saveItemRowCore = saveItemRowCore;
         window._doRestoreItemsFromCloud = _doRestoreItemsFromCloud;
         window._doBackupItemsToCloud = _doBackupItemsToCloud;
+        window.persistManageItemsLocalSnapshot = persistManageItemsLocalSnapshot;
         window.saveAllPricingRows = saveAllPricingRows;
         window.saveChangedPricingRows = saveChangedPricingRows;
         window.whizzScroll = whizzScroll;
