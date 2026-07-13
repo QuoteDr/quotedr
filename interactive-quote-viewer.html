@@ -1671,15 +1671,6 @@ if (location.search.includes('debug')) {
     <script src="quote-dialogs.js?v=1777660407"></script>
     <script src="quote-discounts.js?v=1783218460"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script>
-        // Initialize Supabase for status tracking (read-only anon key)
-        try {
-            window._supabaseClient = supabase.createClient(
-                'https://axmoffknvblluibuitrq.supabase.co',
-                'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso'
-            );
-        } catch(e) { console.warn('Supabase init failed:', e); }
-    </script>
     <script src="supabase-v2.js?v=1783269300"></script>
     <script src="change-orders.js?v=1778152100"></script>
 
@@ -1900,6 +1891,7 @@ if (location.search.includes('debug')) {
             displayTerms();
             updateTotal();
             applyQuoteCompletionState();
+            startViewerBackgroundTasks();
             showPaymentReturnNotice();
             setupMobileJumpVisibility();
             showChangeOrderExplainer(false);
@@ -1947,6 +1939,55 @@ if (location.search.includes('debug')) {
             }
         }
 
+        async function reconcileQuotePaymentState(quoteId) {
+            if (!quoteId) return;
+            try {
+                var resp = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/stripe-deposit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'reconcile_quote_payments', quoteId: quoteId })
+                });
+                var result = await resp.json();
+                if (!resp.ok || !result.paid) return;
+                quoteData.paymentStatus = result.paymentType === 'invoice_full' ? 'paid' : 'partially_paid';
+                quoteData.deposit_paid = result.paymentType === 'deposit' ? true : quoteData.deposit_paid;
+                quoteData.deposit_paid_at = quoteData.deposit_paid_at || new Date().toISOString();
+                quoteData.payments = Array.isArray(quoteData.payments) ? quoteData.payments : [];
+                if (result.amountCents && !quoteData.payments.some(function(payment) { return payment.type === result.paymentType && payment.amount_cents === result.amountCents; })) {
+                    quoteData.payments.push({
+                        type: result.paymentType || 'deposit',
+                        amount_cents: result.amountCents,
+                        paid_at: new Date().toISOString()
+                    });
+                }
+            } catch (error) {
+                console.warn('Could not reconcile quote payment state:', error);
+            }
+        }
+
+        function startViewerBackgroundTasks() {
+            var params = new URLSearchParams(window.location.search);
+            var quoteId = params.get('id') || '';
+            var shareToken = params.get('token') || '';
+            var portalAnchorId = params.get('portal_anchor') || '';
+            if (!quoteId || !shareToken) return;
+
+            initPortalDocumentActivityTracking(quoteId, shareToken, portalAnchorId);
+            var contractorId = window._quoteRow && window._quoteRow.user_id;
+            var quoteTotal = quoteData.grandTotal || quoteData.total || 0;
+            if (contractorId && quoteTotal && resolveViewerDocumentStyle().depositMode !== 'hide') {
+                initPaymentSection(contractorId, quoteTotal);
+            }
+
+            Promise.allSettled([
+                markQuoteViewed(quoteId),
+                reconcileQuotePaymentState(quoteId)
+            ]).then(function() {
+                updateTotal();
+                applyQuoteCompletionState();
+            });
+        }
+
         async function loadQuoteFromURL() {
             const params = new URLSearchParams(window.location.search);
             const quoteId = params.get('id');
@@ -1968,15 +2009,7 @@ if (location.search.includes('debug')) {
                     if (window.QuoteDrChangeOrders && QuoteDrChangeOrders.isChangeOrder(result.data)) {
                         quoteData.changeOrderContext = await QuoteDrChangeOrders.fetchContext(window._supabaseClient || window._supabase, result.data);
                     }
-                    console.log('Loaded quote from Supabase:', quoteData);
                     showExpiryNotice();
-                    // Init payment section after quote loads
-                    var contractorId = result.data.user_id;
-                    var quoteTotal = quoteData.grandTotal || quoteData.total || 0;
-                    await markQuoteViewed(supabaseId);
-                    initPortalDocumentActivityTracking(supabaseId, shareToken, portalAnchorId);
-                    await reconcileQuotePaymentState(supabaseId);
-                    if (contractorId && quoteTotal && resolveViewerDocumentStyle().depositMode !== 'hide') initPaymentSection(contractorId, quoteTotal);
                     return;
                 } else {
                     qdAlert('Quote not found or could not be loaded. The link may be invalid.');
@@ -2006,32 +2039,6 @@ if (location.search.includes('debug')) {
                 return;
         }
 
-        async function reconcileQuotePaymentState(quoteId) {
-            if (!quoteId) return;
-            try {
-                var resp = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/stripe-deposit', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'reconcile_quote_payments', quoteId: quoteId })
-                });
-                var result = await resp.json();
-                if (!resp.ok || !result.paid) return;
-                quoteData.paymentStatus = result.paymentType === 'invoice_full' ? 'paid' : 'partially_paid';
-                quoteData.deposit_paid = result.paymentType === 'deposit' ? true : quoteData.deposit_paid;
-                quoteData.deposit_paid_at = quoteData.deposit_paid_at || new Date().toISOString();
-                quoteData.payments = Array.isArray(quoteData.payments) ? quoteData.payments : [];
-                if (result.amountCents && !quoteData.payments.some(function(payment) { return payment.type === result.paymentType && payment.amount_cents === result.amountCents; })) {
-                    quoteData.payments.push({
-                        type: result.paymentType || 'deposit',
-                        amount_cents: result.amountCents,
-                        paid_at: new Date().toISOString()
-                    });
-                }
-            } catch (error) {
-                console.warn('Could not reconcile quote payment state:', error);
-            }
-        }
-
         // Legacy fallback: load from localStorage by ?quote= param
             let legacyQuoteId = params.get('quote');
             if (!legacyQuoteId) {
@@ -2044,7 +2051,6 @@ if (location.search.includes('debug')) {
             const storedQuote = localStorage.getItem(legacyQuoteId);
             if (storedQuote) {
                 quoteData = JSON.parse(storedQuote);
-                console.log('Loaded quote from localStorage:', quoteData);
             } else {
                 qdAlert('Quote not found. The link may be expired or invalid.');
             }
@@ -3040,7 +3046,7 @@ if (location.search.includes('debug')) {
             var key = 'photo_' + viewerPhotoCounter;
             viewerPhotoRegistry[key] = { photos: photos, fallbacks: photos.slice() };
             return photos.map(function(photo, index) {
-                return '<img src="' + escapeHtml(photo) + '" data-viewer-photo-key="' + escapeHtml(key) + '" data-viewer-photo-index="' + index + '" style="height:120px;width:160px;object-fit:cover;border-radius:8px;border:1px solid #dee2e6;cursor:pointer;" onclick="openViewerPhotoThumbnail(event, this)" title="Click to view full size">';
+                return '<img src="' + escapeHtml(photo) + '" data-viewer-photo-key="' + escapeHtml(key) + '" data-viewer-photo-index="' + index + '" loading="lazy" decoding="async" style="height:120px;width:160px;object-fit:cover;border-radius:8px;border:1px solid #dee2e6;cursor:pointer;" onclick="openViewerPhotoThumbnail(event, this)" title="Click to view full size">';
             }).join('');
         }
 

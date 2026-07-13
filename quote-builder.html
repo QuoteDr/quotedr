@@ -1787,8 +1787,7 @@
 </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-v2.js?v=1783269300"></script>
-    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="quote-media.js?v=20260712"></script>
 <!-- Eruda mobile console (only loads with ?debug in URL) -->
 <script>
 if (location.search.includes('debug')) {
@@ -3263,8 +3262,6 @@ Example:
     <script src="quote-discounts.js?v=1783218460"></script>
     <script src="app-broadcasts.js?v=1779131000"></script>
     <script src="quote-template-files.js?v=1778012600"></script>
-    <script>window.initMeasureMap = window.initMeasureMap || function(){ window._mapInited = true; };</script>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD7acqRI6KsoUDTEkyMx36eDNRuuPXdqIA&libraries=drawing,geometry,places&callback=initMeasureMap" async defer></script>
 
     <script>
         // Pricing Database - Adam's Rates (ALD Direct Inc. 2026)
@@ -7437,8 +7434,8 @@ Example:
 
         async function syncQuoteNumberFromCloud() {
             try {
-                if (typeof listQuotesFromSupabase !== 'function') return;
-                const quotesResult = await listQuotesFromSupabase();
+                if (typeof listQuoteSummariesFromSupabase !== 'function') return;
+                const quotesResult = await listQuoteSummariesFromSupabase();
                 if (quotesResult.error || !quotesResult.data || quotesResult.data.length === 0) return;
                 var maxNum = 0;
                 quotesResult.data.forEach(function(q) {
@@ -10526,7 +10523,7 @@ Example:
 
         // -- Google Maps Measurement -----------------------------------------
         var _map = null, _mapShapes = [], _mapInited = false, _mapsLoadingPromise = null, _mapSelectedShapeIndex = -1;
-        var _mapsApiUrl = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyD7acqRI6KsoUDTEkyMx36eDNRuuPXdqIA&libraries=drawing,geometry,places&callback=initMeasureMap';
+        var _mapsApiUrl = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyD7acqRI6KsoUDTEkyMx36eDNRuuPXdqIA&libraries=drawing,geometry,places&loading=async&callback=initMeasureMap';
         var _mapTradePresets = {
             roofing:   { category: 'Roofing', item: 'Roof area', mode: 'roofArea', draw: 'polygon', waste: 10, height: 9, openings: 0, gates: 0, gateWidth: 4, room: 'Roof', hint: 'Trace each roof plane. Pitch and waste are stored per roof shape.' },
             siding:    { category: 'Siding', item: 'Siding install', mode: 'wallArea', draw: 'polygon', waste: 5, height: 9, openings: 120, gates: 0, gateWidth: 4, room: 'Exterior Siding', hint: 'Trace the building footprint. Quantity uses perimeter x height, minus openings, plus waste.' },
@@ -12838,8 +12835,8 @@ Example:
         async function loadInvoicePortalCandidates() {
             window._invoicePortalRows = [];
             window._invoicePortalRegistry = [];
-            if (typeof listQuotes !== 'function') return [];
-            var result = await listQuotes();
+            if (typeof listQuoteSummariesFromSupabase !== 'function') return [];
+            var result = await listQuoteSummariesFromSupabase();
             if (result && result.error) throw new Error(result.error.message || result.error || 'Could not load client portals.');
             window._invoicePortalRows = result && result.data || [];
             window._invoicePortalRegistry = buildInvoicePortalRegistry(window._invoicePortalRows);
@@ -12927,6 +12924,9 @@ Example:
             for (var i = 0; i < portal.quoteIds.length; i++) {
                 var row = rows.find(function(q) { return q.id === portal.quoteIds[i]; });
                 if (!row) continue;
+                var fullResult = await loadQuoteFromSupabase(row.id);
+                if (fullResult && fullResult.error) throw fullResult.error;
+                row = fullResult && fullResult.data ? fullResult.data : row;
                 var data = Object.assign({}, row.data || {}, {
                     portal_visible: true,
                     portal_id: durablePortalId,

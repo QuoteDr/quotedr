@@ -356,6 +356,16 @@ function sanitizeQuoteRow(row: QuoteRow) {
   };
 }
 
+function compactDocumentResult(row: QuoteRow) {
+  return {
+    id: row.id,
+    status: row.status || "",
+    type: row.type || rowData(row).documentType || rowData(row).type || "quote",
+    total: row.total || 0,
+    updated_at: row.updated_at || null,
+  };
+}
+
 function sanitizePortalJobAssetRow(row: PortalJobAssetRow, urls: Record<string, string>) {
   return {
     id: row.id,
@@ -451,6 +461,17 @@ async function fetchQuoteById(id: string) {
   return data as QuoteRow | null;
 }
 
+async function fetchQuoteOwnershipById(id: string) {
+  const supabase = adminClient();
+  const { data, error } = await supabase
+    .from("quotes")
+    .select("id,user_id")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  return data as Pick<QuoteRow, "id" | "user_id"> | null;
+}
+
 async function assertTokenAccess(documentId: string, token: string, portalAnchorId?: string) {
   if (!documentId || !token) throw new Error("Missing secure document token");
   const target = await fetchQuoteById(documentId);
@@ -485,7 +506,7 @@ async function createLink(req: Request, body: Record<string, unknown>) {
   const mode = String(body.mode || "document");
   if (!documentId) return json({ error: "Missing document id" }, 400);
 
-  const row = await fetchQuoteById(documentId);
+  const row = await fetchQuoteOwnershipById(documentId);
   if (!row || row.user_id !== user.id) return json({ error: "Document not found" }, 404);
 
   const token = createShareToken();
@@ -529,16 +550,20 @@ async function portalDocuments(body: Record<string, unknown>) {
   const token = String(body.token || "").trim();
   const { target: anchor } = await assertTokenAccess(documentId, token, documentId);
   const supabase = adminClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("quotes")
     .select("*")
     .eq("user_id", anchor.user_id)
+    .neq("quote_number", "__ITEMS_BACKUP__")
     .order("created_at", { ascending: false });
+  const activePortalId = portalId(anchor);
+  if (activePortalId) query = query.eq("data->>portal_id", activePortalId);
+  const { data, error } = await query;
   if (error) throw error;
   const docs = (data as QuoteRow[] || [])
     .filter((row) => row.id === anchor.id || (portalVisible(row) && samePortalGroup(anchor, row)))
     .map(sanitizeQuoteRow);
-  return json({ anchor: sanitizeQuoteRow(anchor), documents: docs });
+  return json({ anchor: compactDocumentResult(anchor), documents: docs });
 }
 
 async function signedStorageUrl(path: string | null | undefined) {
@@ -627,12 +652,12 @@ async function logDocumentEvent(req: Request, body: Record<string, unknown>) {
 
   const { target, anchor } = await assertTokenAccess(documentId, token, portalAnchorId);
   if (isAdminPreviewActivityRequest(body)) {
-    return json({ document: sanitizeQuoteRow(target), event: null, skipped: "admin_preview_activity" });
+    return json({ result: compactDocumentResult(target), event: null, skipped: "admin_preview_activity" });
   }
 
   const signedInUser = await userFromAuthHeader(req);
   if (signedInUser?.id && signedInUser.id === target.user_id) {
-    return json({ document: sanitizeQuoteRow(target), event: null, skipped: "owner_activity" });
+    return json({ result: compactDocumentResult(target), event: null, skipped: "owner_activity" });
   }
 
   const sessionId = sanitizeSessionId(body.sessionId || body.session_id);
@@ -668,7 +693,7 @@ async function logDocumentEvent(req: Request, body: Record<string, unknown>) {
       },
     });
   }
-  return json({ event: sanitizePortalDocumentEventRow(loggedEvent), document: sanitizeQuoteRow(target) });
+  return json({ event: sanitizePortalDocumentEventRow(loggedEvent), result: compactDocumentResult(target) });
 }
 
 async function documentActivity(req: Request, body: Record<string, unknown>) {
@@ -712,7 +737,7 @@ async function updateDocument(req: Request, body: Record<string, unknown>) {
 
   if (action === "mark_viewed") {
     if (signedInUser?.id && signedInUser.id === target.user_id) {
-      return json({ document: sanitizeQuoteRow(target), unchanged: true, skipped: "owner_view" });
+      return json({ result: compactDocumentResult(target), unchanged: true, skipped: "owner_view" });
     }
     if (!target.status || ["draft", "sent"].includes(String(target.status))) {
       update.status = "viewed";
@@ -747,17 +772,16 @@ async function updateDocument(req: Request, body: Record<string, unknown>) {
         },
       });
     }
-    return json({ document: sanitizeQuoteRow(target), unchanged: true });
+    return json({ result: compactDocumentResult(target), unchanged: true });
   }
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("quotes")
     .update(update)
     .eq("id", target.id)
-    .select("*")
-    .maybeSingle();
+    .eq("user_id", target.user_id);
   if (error) throw error;
-  const updatedRow = data as QuoteRow;
+  const updatedRow = { ...target, ...update } as QuoteRow;
 
   if (action === "mark_viewed") {
     await recordClientActivity(supabase, updatedRow, "viewed", { metadata: { viewed_at: now } });
@@ -781,7 +805,7 @@ async function updateDocument(req: Request, body: Record<string, unknown>) {
     await recordClientActivity(supabase, updatedRow, "declined", { metadata: { declined_at: now } });
   }
 
-  return json({ document: sanitizeQuoteRow(updatedRow) });
+  return json({ result: compactDocumentResult(updatedRow) });
 }
 
 serve(async (req) => {

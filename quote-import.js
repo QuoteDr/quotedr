@@ -11,6 +11,27 @@
         debugText: '',
         debugFileName: ''
     };
+    var _quoteImportScriptPromises = {};
+
+    function loadQuoteImportScript(globalName, src) {
+        if (global[globalName]) return Promise.resolve(global[globalName]);
+        if (_quoteImportScriptPromises[globalName]) return _quoteImportScriptPromises[globalName];
+        _quoteImportScriptPromises[globalName] = new Promise(function(resolve, reject) {
+            var script = document.createElement('script');
+            script.src = src;
+            script.async = true;
+            script.onload = function() {
+                if (global[globalName]) resolve(global[globalName]);
+                else reject(new Error(globalName + ' did not initialize.'));
+            };
+            script.onerror = function() { reject(new Error('Could not load the file reader.')); };
+            document.head.appendChild(script);
+        }).catch(function(error) {
+            delete _quoteImportScriptPromises[globalName];
+            throw error;
+        });
+        return _quoteImportScriptPromises[globalName];
+    }
 
     function asArray(value) {
         return Array.isArray(value) ? value : [];
@@ -538,7 +559,7 @@
     }
 
     async function extractPdfText(file) {
-        if (!global.pdfjsLib) throw new Error('PDF reader is not loaded yet.');
+        await loadQuoteImportScript('pdfjsLib', 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js');
         if (global.pdfjsLib.GlobalWorkerOptions && !global.pdfjsLib.GlobalWorkerOptions.workerSrc) {
             global.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
         }
@@ -700,7 +721,7 @@
     }
 
     async function extractXlsxText(file) {
-        if (!global.XLSX) throw new Error('Excel reader is still loading. Try again in a moment.');
+        await loadQuoteImportScript('XLSX', 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
         var buffer = await readFileAsArrayBuffer(file);
         var workbook = global.XLSX.read(buffer, { type: 'array' });
         return workbook.SheetNames.map(function(sheetName) {

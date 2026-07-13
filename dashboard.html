@@ -611,11 +611,35 @@
             return quote && quote.data ? quote.data : {};
         }
 
+        var dashboardFullQuoteRows = Object.create(null);
+
+        async function loadDashboardFullQuote(quoteOrId) {
+            var quote = typeof quoteOrId === 'object'
+                ? quoteOrId
+                : (allQuotes || []).concat(junkQuotes || []).find(function(row) { return row.id === quoteOrId; });
+            var quoteId = quote && quote.id ? quote.id : quoteOrId;
+            if (!quoteId) throw new Error('Quote not found');
+            if (dashboardFullQuoteRows[quoteId]) return dashboardFullQuoteRows[quoteId];
+            if (quote && quote._summaryOnly !== true) {
+                dashboardFullQuoteRows[quoteId] = quote;
+                return quote;
+            }
+
+            var result = await _supabase.from('quotes').select('*').eq('id', quoteId).single();
+            if (result.error || !result.data) throw result.error || new Error('Quote not found');
+            var fullQuote = result.data;
+            fullQuote._summaryOnly = false;
+            if (quote) Object.assign(quote, fullQuote);
+            dashboardFullQuoteRows[quoteId] = quote || fullQuote;
+            return dashboardFullQuoteRows[quoteId];
+        }
+
         function quoteIsJunked(quote) {
             return !!(quoteData(quote).junk_deleted_at);
         }
 
         async function setDashboardQuotesFromCloud(rows) {
+            dashboardFullQuoteRows = Object.create(null);
             var currentRows = await purgeExpiredJunkQuotes(rows || []);
             junkQuotes = currentRows.filter(quoteIsJunked).sort(function(a, b) {
                 return new Date(quoteData(b).junk_deleted_at || 0) - new Date(quoteData(a).junk_deleted_at || 0);
@@ -623,6 +647,35 @@
             allQuotes = autocleanDuplicates(currentRows.filter(function(q) { return !quoteIsJunked(q); }));
             updateJunkBadge();
             return allQuotes;
+        }
+
+        var dashboardPhotoOptimizationScheduled = false;
+
+        function schedulePhotoStorageOptimization() {
+            if (dashboardPhotoOptimizationScheduled || typeof optimizeStoredPhotoBatch !== 'function' || !window.currentUser) return;
+            dashboardPhotoOptimizationScheduled = true;
+            var versionKey = 'quotedr_photo_optimization_v1_' + window.currentUser.id;
+            var cursorKey = versionKey + '_cursor';
+            if (localStorage.getItem(versionKey) === 'complete') return;
+
+            async function runNextBatch() {
+                var cursor = Math.max(0, parseInt(localStorage.getItem(cursorKey) || '0', 10) || 0);
+                var result = await optimizeStoredPhotoBatch(cursor, 1);
+                if (!result || result.error || !result.data) return;
+                localStorage.setItem(cursorKey, String(result.data.nextCursor || cursor));
+                if (result.data.done) {
+                    localStorage.setItem(versionKey, 'complete');
+                    localStorage.removeItem(cursorKey);
+                    return;
+                }
+                setTimeout(runNextBatch, 250);
+            }
+
+            if (typeof requestIdleCallback === 'function') {
+                requestIdleCallback(runNextBatch, { timeout: 3000 });
+            } else {
+                setTimeout(runNextBatch, 1500);
+            }
         }
 
         async function purgeExpiredJunkQuotes(rows) {
@@ -678,11 +731,11 @@
 
         async function refreshQuotes() {
             try {
-                const { data, error } = await listQuotesFromSupabase();
+                const { data, error } = await listQuoteSummariesFromSupabase();
                 if (error === 'Not authenticated') {
                     // Retry after delay - session may not be ready yet
                     setTimeout(async function() {
-                        const retry = await listQuotesFromSupabase();
+                        const retry = await listQuoteSummariesFromSupabase();
                         if (!retry.error) {
                             await setDashboardQuotesFromCloud(retry.data || []);
                             renderDashboardResults();
@@ -1188,6 +1241,7 @@
             var quote = (allQuotes || []).find(function(q) { return q.id === quoteId; });
             if (!quote) return;
             try {
+                quote = await loadDashboardFullQuote(quote);
                 var data = clearPortalAssignmentForEdit(quote.data || {});
                 var result = await _supabase.from('quotes').update({ data: data, updated_at: new Date().toISOString() }).eq('id', quoteId);
                 if (result.error) throw result.error;
@@ -1202,6 +1256,7 @@
             var quote = (allQuotes || []).find(function(q) { return q.id === quoteId; });
             if (!quote) return;
             try {
+                quote = await loadDashboardFullQuote(quote);
                 var data = clearPortalAssignmentForEdit(quote.data || {});
                 var now = new Date().toISOString();
                 var revisionTitle = (title || getQuoteDisplayTitle(quote) || 'Quote') + ' - Revision';
@@ -1432,6 +1487,7 @@
             for (var i = 0; i < (rows || []).length; i++) {
                 var row = rows[i];
                 if (!row || !row.id) continue;
+                row = await loadDashboardFullQuote(row);
                 var data = applyPortalStableShareToData(row.data || {}, share);
                 row.data = data;
                 var result = await _supabase.from('quotes').update({ data: data }).eq('id', row.id);
@@ -1717,6 +1773,7 @@
                 for (var i = 0; i < portal.quoteIds.length; i++) {
                     var row = (allQuotes || []).find(function(q) { return q.id === portal.quoteIds[i]; });
                     if (!row) continue;
+                    row = await loadDashboardFullQuote(row);
                     var data = Object.assign({}, row.data || {}, { portal_pin: newPin });
                     var result = await _supabase.from('quotes').update({ data: data }).eq('id', row.id);
                     if (result.error) throw result.error;
@@ -1789,8 +1846,14 @@
             return false;
         }
 
-        function togglePortalThemeEditor(portalId) {
+        async function togglePortalThemeEditor(portalId) {
             window._portalThemeEditorId = window._portalThemeEditorId === portalId ? '' : portalId;
+            if (window._portalThemeEditorId) {
+                var portal = buildPortalRegistry(allQuotes).find(function(item) { return item.id === portalId; });
+                if (portal && portal.quotes && portal.quotes[0]) {
+                    try { await loadDashboardFullQuote(portal.quotes[0]); } catch (err) { console.warn('Could not load portal theme details:', err); }
+                }
+            }
             renderPortalAssignmentList();
         }
 
@@ -1998,6 +2061,7 @@
                 for (var i = 0; i < portal.quoteIds.length; i++) {
                     var row = (allQuotes || []).find(function(q) { return q.id === portal.quoteIds[i]; });
                     if (!row) continue;
+                    row = await loadDashboardFullQuote(row);
                     var data = Object.assign({}, row.data || {});
                     if (theme) {
                         data.portal_theme = theme;
@@ -2088,6 +2152,7 @@
             var message = 'Merge ' + selectedPortals.length + ' portals into "' + targetPortal.name + '"? This will move ' + docCount + ' document' + (docCount === 1 ? '' : 's') + ' from: ' + names + '. This cannot be undone.';
             if (!(await qdConfirm(message))) return;
 
+            if (targetPortal.quotes && targetPortal.quotes[0]) await loadDashboardFullQuote(targetPortal.quotes[0]);
             var durablePortalId = targetPortal.legacy ? makePortalId(targetPortal.name) : targetPortal.id;
             var targetPin = targetPortal.pin || Math.floor(1000 + Math.random() * 9000).toString();
             var targetTheme = portalThemeForDashboard(targetPortal);
@@ -2105,7 +2170,7 @@
             try {
                 for (var id in rowsById) {
                     var item = rowsById[id];
-                    var row = item.row;
+                    var row = await loadDashboardFullQuote(item.row);
                     var originalData = row.data || {};
                     var isSourcePlaceholder = originalData.portal_placeholder && String(item.sourcePortalId) !== String(targetPortal.id);
                     var data = Object.assign({}, originalData, {
@@ -2145,6 +2210,8 @@
             var target = (allQuotes || []).find(function(q) { return q.id === quoteId; });
             var portal = buildPortalRegistry(allQuotes).find(function(p) { return p.id === portalId; });
             if (!target || !portal) return;
+            target = await loadDashboardFullQuote(target);
+            if (portal.quotes && portal.quotes[0]) await loadDashboardFullQuote(portal.quotes[0]);
             var durablePortalId = portal.legacy ? makePortalId(portal.name) : portal.id;
             var pin = portal.pin || Math.floor(1000 + Math.random() * 9000).toString();
             var portalTheme = portalThemeForDashboard(portal);
@@ -2159,6 +2226,7 @@
                 for (var i = 0; i < idsToUpdate.length; i++) {
                     var row = (allQuotes || []).find(function(q) { return q.id === idsToUpdate[i]; });
                     if (!row) continue;
+                    row = await loadDashboardFullQuote(row);
                     if (duplicateInPortal && row.id === duplicateInPortal.id) {
                         var duplicateData = clearPortalAssignmentForEdit(row.data || {});
                         var duplicateUpdate = { data: duplicateData };
@@ -2218,6 +2286,7 @@
             var pin = Math.floor(1000 + Math.random() * 9000).toString();
             try {
                 if (target) {
+                    target = await loadDashboardFullQuote(target);
                     var data = Object.assign({}, target.data || {}, {
                         portal_visible: true,
                         portal_id: portalId,
@@ -2290,8 +2359,9 @@
             if (!target) return;
             var confirmed = await confirmRemoveDocumentFromPortal(target);
             if (!confirmed) return;
-            var data = clearPortalAssignmentForEdit(target.data || {});
             try {
+                target = await loadDashboardFullQuote(target);
+                var data = clearPortalAssignmentForEdit(target.data || {});
                 var result = await _supabase.from('quotes').update({ data: data }).eq('id', quoteId);
                 if (result.error) throw result.error;
                 await refreshQuotes();
@@ -2311,6 +2381,7 @@
                 for (var i = 0; i < portal.quoteIds.length; i++) {
                     var row = (allQuotes || []).find(function(q) { return q.id === portal.quoteIds[i]; });
                     if (!row) continue;
+                    row = await loadDashboardFullQuote(row);
                     var data = Object.assign({}, row.data || {}, { portal_name: newName });
                     var result = await _supabase.from('quotes').update({ data: data }).eq('id', row.id);
                     if (result.error) throw result.error;
@@ -2331,6 +2402,7 @@
                 for (var i = 0; i < portal.quoteIds.length; i++) {
                     var row = (allQuotes || []).find(function(q) { return q.id === portal.quoteIds[i]; });
                     if (!row) continue;
+                    row = await loadDashboardFullQuote(row);
                     var data = clearPortalAssignmentForEdit(row.data || {});
                     var result = await _supabase.from('quotes').update({ data: data }).eq('id', row.id);
                     if (result.error) throw result.error;
@@ -2717,6 +2789,7 @@
                 var data = await res.json();
                 if (data.error) throw new Error(data.error);
 
+                quote = await loadDashboardFullQuote(quote);
                 var now = new Date().toISOString();
                 var updatedData = Object.assign({}, quote.data || {}, {
                     review_request_sent_at: now,
@@ -2738,11 +2811,12 @@
             var quote = allQuotes.find(function(q) { return q.id === quoteId; });
             if (!quote) return;
             var now = new Date().toISOString();
-            var updatedData = Object.assign({}, quote.data || {}, {
-                review_request_nudge_ignored: true,
-                review_request_nudge_ignored_at: now
-            });
             try {
+                quote = await loadDashboardFullQuote(quote);
+                var updatedData = Object.assign({}, quote.data || {}, {
+                    review_request_nudge_ignored: true,
+                    review_request_nudge_ignored_at: now
+                });
                 var update = await _supabase.from('quotes').update({ data: updatedData, updated_at: now }).eq('id', quoteId);
                 if (update.error) throw update.error;
                 quote.data = updatedData;
@@ -2786,6 +2860,7 @@
                 type: 'danger'
             })) return;
 
+            quote = await loadDashboardFullQuote(quote);
             var now = new Date();
             var data = Object.assign({}, quote.data || {});
             data.junk_deleted_at = now.toISOString();
@@ -2842,6 +2917,7 @@
         async function restoreQuoteFromJunk(quoteId) {
             var quote = junkQuotes.find(function(q) { return q.id === quoteId; });
             if (!quote) return;
+            quote = await loadDashboardFullQuote(quote);
             var data = Object.assign({}, quote.data || {});
             var wasPortalVisible = data.junk_was_portal_visible === true;
             delete data.junk_deleted_at;
@@ -2915,7 +2991,7 @@
             var attempts = 0;
             async function loadWithRetry() {
                 attempts++;
-                var result = await listQuotesFromSupabase();
+                var result = await listQuoteSummariesFromSupabase();
                 if (result.error === 'Not authenticated' && attempts < 3) {
                     setTimeout(loadWithRetry, 800 * attempts);
                 } else if (!result.error) {
@@ -2923,6 +2999,7 @@
                     renderDashboardResults();
                     updateStats(allQuotes);
                     applyDashboardDefaultView();
+                    schedulePhotoStorageOptimization();
                 } else {
                     document.getElementById('quotesList').innerHTML = '<div class="alert alert-warning">Please <a href="login.html">log in</a> to see your quotes.</div>';
                 }

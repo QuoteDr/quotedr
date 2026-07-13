@@ -30,3 +30,6 @@ verify_jwt = false
 
 [functions.labor-checkin-submit]
 verify_jwt = true
+
+[functions.optimize-photo-storage]
+verify_jwt = true

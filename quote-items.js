@@ -2543,7 +2543,7 @@
             }
         }
 
-        function handleItemPhotoUpload(input) {
+        async function handleItemPhotoUpload(input) {
             var file = input.files[0];
             if (!file) return;
             var cat = input.dataset.cat, name = input.dataset.name, field = input.dataset.field || 'photo';
@@ -2552,20 +2552,24 @@
             var requestedIndex = input.dataset.photoIndex === undefined || input.dataset.photoIndex === ''
                 ? -1
                 : parseInt(input.dataset.photoIndex, 10);
-            var reader = new FileReader();
-            reader.onload = function(e) {
-                var img = new Image();
-                img.onload = async function() {
-                    var maxDim = 600;
-                    var w = img.width, h = img.height;
-                    if (w > maxDim || h > maxDim) {
-                        if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
-                        else { w = Math.round(w * maxDim / h); h = maxDim; }
+            try {
+                    if (!window.QuoteDrMedia) throw new Error('Photo tools are unavailable. Refresh the page and try again.');
+                    var thumbnail = await QuoteDrMedia.createThumbnailBlob(file);
+                    var thumbnailUrl = '';
+                    var thumbnailWarning = '';
+                    try {
+                        thumbnailUrl = await QuoteDrMedia.uploadThumbnailBlob(thumbnail.blob, {
+                            cat: cat,
+                            name: name,
+                            field: field,
+                            upgradeGroupId: upgradeGroupId,
+                            upgradeOptionId: upgradeOptionId
+                        });
+                    } catch(thumbErr) {
+                        thumbnailUrl = await QuoteDrMedia.blobToDataUrl(thumbnail.blob);
+                        thumbnailWarning = 'The thumbnail is temporarily stored in this quote and will be moved to photo storage on the next cloud save.';
                     }
-                    var canvas = document.createElement('canvas');
-                    canvas.width = w; canvas.height = h;
-                    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-                    var dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                    var dataUrl = thumbnailUrl;
                     var existingFullMeta = null;
                     var firstPhotoItem = findManagePhotoItem(cat, name);
                     if (firstPhotoItem) {
@@ -2587,15 +2591,16 @@
                             field: field,
                             upgradeGroupId: upgradeGroupId,
                             upgradeOptionId: upgradeOptionId
-                        }, existingFullMeta, { width: img.width, height: img.height });
+                        }, existingFullMeta, { width: thumbnail.sourceWidth, height: thumbnail.sourceHeight });
                     } catch(fullErr) {
                         var fullErrMessage = fullErr && fullErr.message ? fullErr.message : 'Full-resolution photo was not saved.';
                         fullResWarning = /bucket not found|not found/i.test(fullErrMessage)
                             ? 'Full-resolution photo storage is not set up yet. The compressed thumbnail was saved.'
                             : fullErrMessage;
                     }
+                    if (thumbnailWarning) fullResWarning = fullResWarning ? (thumbnailWarning + ' ' + fullResWarning) : thumbnailWarning;
                     var upgradePhotoSyncedFromDetails = field === 'upgradePhoto'
-                        ? syncManageUpgradePhotoFromDetails(cat, name, upgradeGroupId, upgradeOptionId, dataUrl, requestedIndex)
+                        ? syncManageUpgradePhotoFromDetails(cat, name, upgradeGroupId, upgradeOptionId, thumbnailUrl, requestedIndex)
                         : false;
                     var upgradePhotoSaved = upgradePhotoSyncedFromDetails;
                     if (field === 'upgradePhoto') {
@@ -2612,7 +2617,7 @@
                                 upgradePhotoSaved = true;
                                 return;
                             }
-                            if (!setManageUpgradeOptionPhoto(item, upgradeGroupId, upgradeOptionId, dataUrl, requestedIndex)) {
+                            if (!setManageUpgradeOptionPhoto(item, upgradeGroupId, upgradeOptionId, thumbnailUrl, requestedIndex)) {
                                 var isLegacyUpgradePhoto = upgradeGroupId === 'legacy_upgrade' || upgradeOptionId === 'legacy_upgrade_option' || (!upgradeGroupId && !upgradeOptionId);
                                 if (isLegacyUpgradePhoto) {
                                     if (!item.upgrade) item.upgrade = {};
@@ -2630,10 +2635,10 @@
                             var oldFullMeta = null;
                             if (Number.isFinite(requestedIndex) && requestedIndex >= 0 && requestedIndex < MANAGE_ITEM_PHOTO_LIMIT) {
                                 oldFullMeta = photosFull[requestedIndex] || null;
-                                photos[requestedIndex] = dataUrl;
+                                photos[requestedIndex] = thumbnailUrl;
                                 photosFull[requestedIndex] = normalizeManageFullResPhotoMeta(fullMeta);
                             } else if (photos.length < MANAGE_ITEM_PHOTO_LIMIT) {
-                                photos.push(dataUrl);
+                                photos.push(thumbnailUrl);
                                 photosFull.push(normalizeManageFullResPhotoMeta(fullMeta));
                             } else {
                                 return;
@@ -2662,10 +2667,11 @@
                     } else {
                         showManageItemsToast(fullMeta ? 'Photo updated with full-resolution original. Save changes when ready.' : 'Photo updated. Save changes when ready.', true);
                     }
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
+            } catch(err) {
+                showManageItemsToast('Could not prepare that photo: ' + (err && err.message ? err.message : err), false);
+            } finally {
+                input.value = '';
+            }
         }
 
         function openManageItemsModal() {
@@ -2679,6 +2685,11 @@
             applyManageCategoryRenames();
             const catSelect = document.getElementById('newItemCategory');
             if (!catSelect) { console.error('newItemCategory not found'); return; }
+            const manageItemsModal = document.getElementById('manageItemsModal');
+            if (manageItemsModal && !manageItemsModal._renderCleanupBound) {
+                manageItemsModal._renderCleanupBound = true;
+                manageItemsModal.addEventListener('hidden.bs.modal', clearManageItemsRenderedContent);
+            }
             loadManageItemsCategoryState();
             populateNewItemCategorySelect(catSelect.value);
             document.getElementById('newItemName').value = '';
@@ -3422,12 +3433,25 @@
             const q = (document.getElementById('itemSearchFilter')?.value || '').toLowerCase().trim();
             const container = document.getElementById('customItemsList');
             if (!container) return;
+            const hasActiveSearchOrFilter = !!q || manageItemsFilter !== 'all';
+            const desiredRenderMode = hasActiveSearchOrFilter ? 'search' : 'collapsed';
+            if (container.dataset.manageItemsRenderMode !== desiredRenderMode ||
+                container.dataset.manageItemsRenderQuery !== q ||
+                container.dataset.manageItemsRenderFilter !== manageItemsFilter) {
+                renderAllItemsList();
+                return;
+            }
             let visibleRows = 0;
 
             container.querySelectorAll('.manage-items-category').forEach(function(section) {
                 let anyVisible = false;
                 const body = section.querySelector('.manage-items-category-body');
-                const hasActiveSearchOrFilter = !!q || manageItemsFilter !== 'all';
+                if (!hasActiveSearchOrFilter) {
+                    section.style.display = '';
+                    if (body) body.style.display = getManageItemsCategoryOpen(section.dataset.category) ? '' : 'none';
+                    visibleRows += section.querySelectorAll('tr.manage-items-row').length;
+                    return;
+                }
                 section.querySelectorAll('tr.manage-items-row').forEach(function(row) {
                     const show = rowMatchesManageFilter(row, q);
                     const details = document.getElementById(row.dataset.detailsId || '');
@@ -3686,6 +3710,13 @@
 
         function renderAllItemsList() {
             const container = document.getElementById('customItemsList');
+            if (!container) return;
+            const q = (document.getElementById('itemSearchFilter')?.value || '').toLowerCase().trim();
+            const hasActiveSearchOrFilter = !!q || manageItemsFilter !== 'all';
+            container.dataset.manageItemsRenderMode = hasActiveSearchOrFilter ? 'search' : 'collapsed';
+            container.dataset.manageItemsRenderQuery = q;
+            container.dataset.manageItemsRenderFilter = manageItemsFilter;
+            container.classList.add('manage-items-render-mode');
             let html = '';
 
             const orderedCategories = getOrderedManageCategories();
@@ -3720,8 +3751,14 @@
                             <i class="fas fa-palette me-1"></i>Style
                         </button>
                     </div>
-                    <div class="manage-items-category-body" id="cat_body_${catSafeId}" style="${isOpen ? '' : 'display:none;'}">
-                    <table class="table table-sm table-bordered mb-2 manage-items-table"><thead class="table-light"><tr><th>Name</th><th style="width:90px">Unit</th><th style="width:100px">Rate ($)</th><th style="width:115px">Mat. Cost ($)</th><th>Supplier URL <button type="button" class="qd-inline-help-btn" title="Help with supplier URLs" aria-label="Help with supplier URLs" onclick="if(window.QuoteDrModalHelp){QuoteDrModalHelp.openInline(&quot;supplierUrl&quot;);} return false;"><i class="fas fa-question"></i></button></th><th style="width:138px"></th></tr></thead><tbody>`;
+                    <div class="manage-items-category-body" id="cat_body_${catSafeId}" style="${isOpen || hasActiveSearchOrFilter ? '' : 'display:none;'}">`;
+
+                if (!isOpen && !hasActiveSearchOrFilter) {
+                    html += '</div></section>';
+                    return;
+                }
+
+                html += `<table class="table table-sm table-bordered mb-2 manage-items-table"><thead class="table-light"><tr><th>Name</th><th style="width:90px">Unit</th><th style="width:100px">Rate ($)</th><th style="width:115px">Mat. Cost ($)</th><th>Supplier URL <button type="button" class="qd-inline-help-btn" title="Help with supplier URLs" aria-label="Help with supplier URLs" onclick="if(window.QuoteDrModalHelp){QuoteDrModalHelp.openInline(&quot;supplierUrl&quot;);} return false;"><i class="fas fa-question"></i></button></th><th style="width:138px"></th></tr></thead><tbody>`;
 
                 items.forEach(item => {
                     if (!item || !item.name) return;
@@ -3759,6 +3796,16 @@
                             return [option.name, option.unitType, option.supplierUrl, option.description, option.sourceItemName, option.category].filter(Boolean).join(' ');
                         }).join(' ')
                     ].filter(Boolean).join(' ').toLowerCase();
+                    if (hasActiveSearchOrFilter) {
+                        const matchesSearch = !q || searchBlob.includes(q);
+                        const matchesFilter = manageItemsFilter === 'all' ||
+                            (manageItemsFilter === 'unsaved' && isDirty) ||
+                            (manageItemsFilter === 'custom' && isCustom) ||
+                            (manageItemsFilter === 'has-upgrade' && hasUpgrade) ||
+                            (manageItemsFilter === 'missing-material' && missingMaterial) ||
+                            (manageItemsFilter === 'no-description' && noDescription);
+                        if (!matchesSearch || !matchesFilter) return;
+                    }
                     const rowMeta = `data-row-key="${manageItemsAttr(rowKey)}" data-details-id="${detailsId}" data-search="${manageItemsAttr(searchBlob)}" data-custom="${isCustom ? '1' : '0'}" data-has-upgrade="${hasUpgrade ? '1' : '0'}" data-missing-material="${missingMaterial ? '1' : '0'}" data-no-description="${noDescription ? '1' : '0'}"`;
 
                     html += `<tr id="row_${safeId}" class="manage-items-row ${isDirty ? 'manage-item-dirty' : ''}" ${rowMeta}>
@@ -3869,7 +3916,7 @@
                                                 <div class="d-flex align-items-start gap-2 mt-2 flex-wrap">
                                                     ${itemPhotos.length ? itemPhotos.map(function(photo, index) {
                                                         return `<div class="manage-item-photo-thumb border rounded p-1 bg-white">
-                                                            <img src="${manageItemsAttr(photo)}" data-photo-src="${manageItemsAttr(photo)}" data-full-photo="${manageFullResPhotoDataAttr(itemPhotosFull[index])}" class="rounded d-block" style="width:88px;height:58px;object-fit:cover;cursor:pointer;" onclick="openManageItemPhotoLightbox(this)" title="Click to enlarge">
+                                                            <img src="${manageItemsAttr(photo)}" data-photo-src="${manageItemsAttr(photo)}" data-full-photo="${manageFullResPhotoDataAttr(itemPhotosFull[index])}" loading="lazy" decoding="async" class="rounded d-block" style="width:88px;height:58px;object-fit:cover;cursor:pointer;" onclick="openManageItemPhotoLightbox(this)" title="Click to enlarge">
                                                             <div class="btn-group btn-group-sm mt-1 w-100">
                                                                 <button type="button" class="btn btn-outline-primary item-photo-btn" data-cat="${catE}" data-name="${nameE}" data-field="photo" data-photo-index="${index}" title="Replace photo ${index + 1}"><i class="fas fa-sync-alt"></i></button>
                                                                 <button type="button" class="btn btn-outline-danger item-photo-remove-btn" data-cat="${catE}" data-name="${nameE}" data-photo-index="${index}" title="Remove photo ${index + 1}"><i class="fas fa-times"></i></button>
@@ -3894,7 +3941,7 @@
                                                         return `<div class="manage-upgrade-photo-target border rounded p-2 bg-white d-flex align-items-center justify-content-between gap-2 flex-wrap">
                                                             <div class="d-flex align-items-center gap-2 min-w-0">
                                                                 ${targetPhotos.length ? `<div class="d-flex align-items-start gap-1 flex-wrap">${targetPhotos.map(function(photo, index) { return `<div class="manage-upgrade-photo-thumb">
-                                                                    <img src="${manageItemsAttr(photo)}" data-photo-src="${manageItemsAttr(photo)}" data-full-photo="${manageFullResPhotoDataAttr(targetPhotosFull[index])}" class="rounded border d-block" style="width:70px;height:48px;object-fit:cover;cursor:pointer;" onclick="openManageItemPhotoLightbox(this)" title="Click to enlarge">
+                                                                    <img src="${manageItemsAttr(photo)}" data-photo-src="${manageItemsAttr(photo)}" data-full-photo="${manageFullResPhotoDataAttr(targetPhotosFull[index])}" loading="lazy" decoding="async" class="rounded border d-block" style="width:70px;height:48px;object-fit:cover;cursor:pointer;" onclick="openManageItemPhotoLightbox(this)" title="Click to enlarge">
                                                                     <div class="btn-group btn-group-sm mt-1 w-100">
                                                                         <button type="button" class="btn btn-outline-primary item-photo-btn" data-cat="${catE}" data-name="${nameE}" data-field="upgradePhoto" data-photo-index="${index}" data-upgrade-group-id="${groupIdE}" data-upgrade-option-id="${optionIdE}" title="Replace photo ${index + 1} for ${optionTitleE}"><i class="fas fa-sync-alt"></i></button>
                                                                         <button type="button" class="btn btn-outline-danger upgrade-photo-remove-btn" data-cat="${catE}" data-name="${nameE}" data-photo-index="${index}" data-upgrade-group-id="${groupIdE}" data-upgrade-option-id="${optionIdE}" title="Remove photo ${index + 1} from ${optionTitleE}"><i class="fas fa-times"></i></button>
@@ -3934,14 +3981,17 @@
             const current = getManageItemsCategoryOpen(cat);
             manageItemsCategoryState[cat] = !current;
             saveManageItemsCategoryState();
-            const section = Array.from(document.querySelectorAll('.manage-items-category')).find(function(el) {
-                return el.dataset.category === cat;
-            });
-            if (!section) return;
-            const body = section.querySelector('.manage-items-category-body');
-            const icon = section.querySelector('.manage-items-category-toggle i');
-            if (body) body.style.display = manageItemsCategoryState[cat] === false ? 'none' : '';
-            if (icon) icon.className = manageItemsCategoryState[cat] === false ? 'fas fa-chevron-right' : 'fas fa-chevron-down';
+            renderAllItemsList();
+        }
+
+        function clearManageItemsRenderedContent() {
+            const container = document.getElementById('customItemsList');
+            if (!container) return;
+            container.innerHTML = '';
+            container.classList.remove('manage-items-render-mode');
+            delete container.dataset.manageItemsRenderMode;
+            delete container.dataset.manageItemsRenderQuery;
+            delete container.dataset.manageItemsRenderFilter;
         }
 
         function showManageItemsToast(message, ok) {
@@ -5259,6 +5309,7 @@
         window.applyManageItemsPortraitFieldSettings = applyManageItemsPortraitFieldSettings;
         window.filterItemsList = filterItemsList;
         window.renderAllItemsList = renderAllItemsList;
+        window.clearManageItemsRenderedContent = clearManageItemsRenderedContent;
         window.saveItemFieldEdit = saveItemFieldEdit;
         window.handleManageUnitTypeChange = handleManageUnitTypeChange;
         window.syncManageDetailBaseField = syncManageDetailBaseField;

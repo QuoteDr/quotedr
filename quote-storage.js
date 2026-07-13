@@ -540,8 +540,9 @@ async function saveQuote() {
             var modal = bootstrap.Modal.getInstance(saveModalEl) || new bootstrap.Modal(saveModalEl);
             modal.show();
             // Fetch quotes
-            if (typeof listQuotesFromSupabase === 'function') {
-                var result = await listQuotesFromSupabase();
+            if (typeof listQuoteSummariesFromSupabase === 'function' || typeof listQuotesFromSupabase === 'function') {
+                var listSavedQuotes = typeof listQuoteSummariesFromSupabase === 'function' ? listQuoteSummariesFromSupabase : listQuotesFromSupabase;
+                var result = await listSavedQuotes();
                 var quotes = (result && result.data) ? result.data : [];
                 if (!listEl) return;
                 if (!quotes.length) {
@@ -751,8 +752,9 @@ async function saveQuote() {
 
             // Fetch cloud quotes
             var listEl = document.getElementById('loadQuoteList');
-            if (typeof listQuotesFromSupabase === 'function') {
-                var result = await listQuotesFromSupabase();
+            if (typeof listQuoteSummariesFromSupabase === 'function' || typeof listQuotesFromSupabase === 'function') {
+                var listCloudQuotes = typeof listQuoteSummariesFromSupabase === 'function' ? listQuoteSummariesFromSupabase : listQuotesFromSupabase;
+                var result = await listCloudQuotes();
                 var quotes = quoteStorageActiveRows((result && result.data) ? result.data : []);
                 if (!quotes.length) {
                     listEl.innerHTML = '<div class="text-muted small text-center py-3">No saved cloud quotes yet.<br>Save a quote first using the Save button.</div>';

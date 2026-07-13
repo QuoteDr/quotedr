@@ -15,6 +15,8 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 // Initialize Supabase client
 const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+window._supabase = _supabase;
+window._supabaseClient = _supabase;
 
 // Current user state
 let currentUser = null;
@@ -125,7 +127,7 @@ async function updateSecureClientDocument(documentId, token, updateAction, paylo
             if (!response.ok || data.error) throw new Error(data.error || 'Secure client document request failed');
             return data;
         });
-        return { data: data.document, unchanged: data.unchanged };
+        return { data: data.document || data.result || null, unchanged: data.unchanged, status: data.status || '' };
     } catch (error) {
         return { error: error };
     }
@@ -562,6 +564,44 @@ async function listQuotes() {
     return { data };
 }
 
+// Compact rows for dashboards and quote pickers. Full quote JSON is fetched by id only when needed.
+async function listQuoteSummaries() {
+    const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+
+    const result = await _supabase.rpc('quotedr_list_quote_summaries');
+    if (!result.error) {
+        return {
+            data: (result.data || []).map(function(row) {
+                row._summaryOnly = true;
+                return row;
+            })
+        };
+    }
+
+    var missingFunction = /quotedr_list_quote_summaries|could not find the function|schema cache/i.test(result.error.message || '');
+    if (!missingFunction) return { error: result.error };
+
+    // Keeps local branches usable before the accompanying migration is deployed.
+    const fallback = await listQuotes();
+    if (fallback.error) return fallback;
+    return {
+        data: (fallback.data || []).filter(function(row) {
+            return row.status !== 'backup' && row.quote_number !== '__ITEMS_BACKUP__';
+        })
+    };
+}
+
+async function prepareQuoteMediaForCloudSave(quoteData) {
+    if (!quoteData || !window.QuoteDrMedia || typeof QuoteDrMedia.prepareQuoteForCloud !== 'function') {
+        return { data: quoteData, replacements: [], bytesRemoved: 0 };
+    }
+    if (typeof QuoteDrMedia.countEmbeddedPhotos === 'function' && QuoteDrMedia.countEmbeddedPhotos(quoteData) === 0) {
+        return { data: quoteData, replacements: [], bytesRemoved: 0 };
+    }
+    return await QuoteDrMedia.prepareQuoteForCloud(quoteData);
+}
+
 async function quoteFullResolutionPhotosEnabledForSave() {
     try {
         return typeof hasFeature === 'function' ? await hasFeature('full_resolution_photos') : false;
@@ -574,6 +614,13 @@ async function quoteFullResolutionPhotosEnabledForSave() {
 async function saveQuote(quoteData) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
+
+    try {
+        await prepareQuoteMediaForCloudSave(quoteData);
+    } catch (error) {
+        console.error('Quote photo preparation error:', error);
+        return { error: error };
+    }
 
     const now = new Date().toISOString();
     if ((quoteData.type === 'change_order' || quoteData.documentType === 'change_order') &&
@@ -669,14 +716,14 @@ async function saveQuote(quoteData) {
             .update(savePayload)
             .eq('id', quoteData.supabaseId)
             .eq('user_id', user.id)
-            .select();
+            .select('id,user_id,status,type,quote_number,updated_at');
     } else {
         // Insert new quote
         savePayload.created_at = new Date().toISOString();
         return await _supabase
             .from('quotes')
             .insert(savePayload)
-            .select();
+            .select('id,user_id,status,type,quote_number,updated_at');
     }
     }
     ({ data, error } = await runSave(payload));
@@ -737,10 +784,17 @@ function qdCanonicalInvoiceNumber(value) {
 
 async function saveInvoiceForSharing(invoiceData) {
     const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    try {
+        await prepareQuoteMediaForCloudSave(invoiceData);
+    } catch (error) {
+        console.error('Invoice photo preparation error:', error);
+        return { error: error };
+    }
     const now = new Date().toISOString();
     const invoiceQuoteNumber = qdCanonicalInvoiceNumber(invoiceData.quoteNumber || invoiceData.quote_number || '');
     const payload = {
-        user_id: user ? user.id : null,
+        user_id: user.id,
         data: {
             ...invoiceData,
             quoteNumber: invoiceQuoteNumber,
@@ -761,17 +815,17 @@ async function saveInvoiceForSharing(invoiceData) {
     let data, error;
     if (invoiceData.supabaseId) {
         // Update existing invoice row
-        ({ data, error } = await _supabase.from('quotes').update(payload).eq('id', invoiceData.supabaseId).select().single());
+        ({ data, error } = await _supabase.from('quotes').update(payload).eq('id', invoiceData.supabaseId).eq('user_id', user.id).select('id,user_id,status,type,quote_number,updated_at').single());
     } else {
         // Insert new invoice row
         payload.created_at = now;
-        ({ data, error } = await _supabase.from('quotes').insert(payload).select().single());
+        ({ data, error } = await _supabase.from('quotes').insert(payload).select('id,user_id,status,type,quote_number,updated_at').single());
         // If unique constraint hit (same quote number), update existing instead
         if (error && error.code === '23505') {
             console.warn('Invoice row exists, updating instead...');
             var existing = await _supabase.from('quotes').select('id').eq('user_id', payload.user_id).eq('quote_number', payload.quote_number).single();
             if (existing.data) {
-                ({ data, error } = await _supabase.from('quotes').update(payload).eq('id', existing.data.id).select().single());
+                ({ data, error } = await _supabase.from('quotes').update(payload).eq('id', existing.data.id).eq('user_id', user.id).select('id,user_id,status,type,quote_number,updated_at').single());
             }
         }
     }
@@ -1136,6 +1190,7 @@ async function listLaborProductionRates(options) {
 
 // Aliases for consistent naming
 var listQuotesFromSupabase = listQuotes;
+var listQuoteSummariesFromSupabase = listQuoteSummaries;
 var listInvoicesFromSupabase = listInvoices;
 var listTemplatesFromSupabase = listTemplates;
 var listTermsFromSupabase = listTerms;
@@ -1145,17 +1200,18 @@ var listItemsFromSupabase = listItems;
 var saveQuoteToSupabase = saveQuote;
 var saveInvoice = saveInvoiceForSharing; // alias — saveInvoice was missing from v2
 var saveInvoiceToSupabase = saveInvoice;
-var loadQuoteFromSupabase = function(quoteId) {
-    return listQuotes().then(function(result) {
-        if (result.error) return { error: result.error };
-        var found = (result.data || []).find(function(q) { return q.id === quoteId || (q.data && q.data.id === quoteId); });
-        return { data: found || null };
-    });
-};
+var loadQuoteFromSupabase = loadQuoteByIdFromSupabase;
 
 // Save a quote to Supabase for sharing
 async function saveQuoteForSharing(quoteData) {
     const user = await getCurrentUser();
+    if (!user) return { error: 'Not authenticated' };
+    try {
+        await prepareQuoteMediaForCloudSave(quoteData);
+    } catch (error) {
+        console.error('Quote photo preparation error:', error);
+        return { error: error };
+    }
     const now = new Date().toISOString();
     quoteData.fullResolutionPhotosEnabled = await quoteFullResolutionPhotosEnabledForSave();
     if ((quoteData.type === 'change_order' || quoteData.documentType === 'change_order') &&
@@ -1166,7 +1222,7 @@ async function saveQuoteForSharing(quoteData) {
     }
     const payload = {
             id: quoteData.supabaseId || undefined,
-            user_id: user ? user.id : null,
+            user_id: user.id,
             client_name: quoteData.clientName || '',
             quote_number: quoteData.quoteNumber || '',
             total: quoteData.grandTotal || quoteData.total || 0,
@@ -1181,7 +1237,7 @@ async function saveQuoteForSharing(quoteData) {
     ({ data, error } = await _supabase
         .from('quotes')
         .upsert(payload, { onConflict: 'id' })
-        .select()
+        .select('id,user_id,status,type,quote_number,updated_at')
         .single());
     if (error && /type|parent_quote_id|change_order_number|schema cache/i.test(error.message || '')) {
         delete payload.type;
@@ -1190,7 +1246,7 @@ async function saveQuoteForSharing(quoteData) {
         ({ data, error } = await _supabase
             .from('quotes')
             .upsert(payload, { onConflict: 'id' })
-            .select()
+            .select('id,user_id,status,type,quote_number,updated_at')
             .single());
     }
     return { data, error };
@@ -1216,7 +1272,7 @@ async function deleteQuoteFromSupabase(quoteId) {
 
 // Load a quote from Supabase for viewing
 // Load a quote for editing in the quote builder
-async function loadQuoteFromSupabase(supabaseId) {
+async function loadQuoteByIdFromSupabase(supabaseId) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
     const { data, error } = await _supabase
@@ -1241,6 +1297,11 @@ async function loadQuoteForViewing(supabaseId) {
 async function saveItemsToSupabase(itemsData) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not logged in' };
+    try {
+        await prepareQuoteMediaForCloudSave(itemsData);
+    } catch (error) {
+        return { error: error };
+    }
     // Check if row exists
     const { data: existing } = await _supabase
         .from('items')
@@ -1308,6 +1369,24 @@ async function saveBusinessProfile(profile) {
         .upsert({ user_id: user.id, key: 'business_profile', value: profile, updated_at: new Date().toISOString() }, { onConflict: 'user_id,key' });
     if (!result.error) localStorage.setItem('ald_business_profile', JSON.stringify(profile));
     return result;
+}
+
+async function optimizeStoredPhotoBatch(cursor, batchSize) {
+    try {
+        const response = await fetch(SUPABASE_URL + '/functions/v1/optimize-photo-storage', {
+            method: 'POST',
+            headers: await getSupabaseFunctionAuthHeaders(),
+            body: JSON.stringify({
+                cursor: Math.max(0, parseInt(cursor || 0, 10) || 0),
+                batchSize: Math.max(1, Math.min(3, parseInt(batchSize || 1, 10) || 1))
+            })
+        });
+        const data = await response.json().catch(function() { return {}; });
+        if (!response.ok || data.error) throw new Error(data.error || 'Stored photo optimization failed');
+        return { data: data };
+    } catch (error) {
+        return { error: error };
+    }
 }
 
 async function loadBusinessProfile() {
@@ -2467,6 +2546,12 @@ async function backupItemsToCloud(customItems) {
     // Use getUser() directly to ensure fresh session token is used
     const { data: { user }, error: authErr } = await _supabase.auth.getUser();
     if (authErr || !user) return { error: 'Not authenticated' };
+    try {
+        await prepareQuoteMediaForCloudSave(customItems);
+        if (typeof persistManageItemsLocalSnapshot === 'function') persistManageItemsLocalSnapshot(customItems);
+    } catch (error) {
+        return { error: error };
+    }
     const snapshot = JSON.stringify(customItems || {});
     const payload = {
         user_id: user.id,
