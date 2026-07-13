@@ -1,5 +1,7 @@
 begin;
 
+set local statement_timeout = '120s';
+
 create table if not exists public.quote_dashboard_summaries (
   id uuid primary key references public.quotes(id) on delete cascade,
   user_id uuid not null,
