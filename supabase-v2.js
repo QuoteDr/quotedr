@@ -66,6 +66,40 @@ function qdDurableVersionsMatch(left, right) {
     return Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime === rightTime;
 }
 
+function qdDurableSaveMetaMatches(operation, saveMeta) {
+    if (!operation || !saveMeta || saveMeta.revision !== operation.revision) return false;
+    return !saveMeta.operationId || !operation.operationId || saveMeta.operationId === operation.operationId;
+}
+
+async function qdDurableAcknowledgementMatches(operation, target, acknowledged) {
+    if (!operation || !target || !acknowledged) return false;
+    var versionColumn = target.verifyVersionColumn || 'updated_at';
+    if (target.verifyVersionValue !== undefined && target.verifyVersionValue !== null &&
+        qdDurableVersionsMatch(acknowledged[versionColumn], target.verifyVersionValue)) {
+        return true;
+    }
+    var returnedMeta = acknowledged.data && acknowledged.data._saveMeta;
+    if (qdDurableSaveMetaMatches(operation, returnedMeta)) return true;
+
+    // Lightweight quote responses omit `data`, so verify the marker that was
+    // actually stored before treating a server-adjusted timestamp as failure.
+    if (target.versionRead) {
+        var storedVersion = await qdReadDurableSupabaseVersion(operation);
+        if (storedVersion && typeof storedVersion === 'object' &&
+            qdDurableSaveMetaMatches(operation, storedVersion)) {
+            return true;
+        }
+        return false;
+    }
+
+    // Inserts have no stable row id to read before their first acknowledgement.
+    if (target.selectQuoteMetadata === true && target.action === 'insert' && acknowledged.id) {
+        var expectedId = target.values && target.values.id;
+        return !expectedId || String(expectedId) === String(acknowledged.id);
+    }
+    return false;
+}
+
 function qdApplyDurableFilters(query, filters) {
     (filters || []).forEach(function(filter) {
         if (!filter || !filter.column || filter.column === 'user_id') return;
@@ -155,11 +189,7 @@ async function qdExecuteDurableSupabaseTarget(operation) {
     }
     if (target.verifyRevision) {
         var acknowledged = Array.isArray(result.data) ? result.data[0] : result.data;
-        var versionColumn = target.verifyVersionColumn || 'updated_at';
-        var versionAcknowledged = target.verifyVersionValue !== undefined && target.verifyVersionValue !== null &&
-            acknowledged && qdDurableVersionsMatch(acknowledged[versionColumn], target.verifyVersionValue);
-        var acknowledgedRevision = acknowledged && acknowledged.data && acknowledged.data._saveMeta && acknowledged.data._saveMeta.revision;
-        if (!versionAcknowledged && (!acknowledgedRevision || acknowledgedRevision !== operation.revision)) {
+        if (!await qdDurableAcknowledgementMatches(operation, target, acknowledged)) {
             throw new Error('Cloud save acknowledgement did not match the local revision.');
         }
     }

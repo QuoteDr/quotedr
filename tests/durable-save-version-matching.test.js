@@ -28,6 +28,52 @@ assert.strictEqual(
   'Different cloud timestamps should remain different revisions'
 );
 
+(async () => {
+  const operation = {
+    operationId: 'stable-operation',
+    revision: 'new-local-revision'
+  };
+  const target = {
+    verifyVersionColumn: 'updated_at',
+    verifyVersionValue: '2026-07-14T11:10:59.123Z',
+    versionRead: { table: 'quotes' }
+  };
+  supabaseContext.qdReadDurableSupabaseVersion = async () => ({
+    version: '2026-07-14T11:11:00.000Z',
+    revision: 'new-local-revision',
+    operationId: 'stable-operation'
+  });
+  const storedRevisionMatches = await supabaseContext.qdDurableAcknowledgementMatches(
+    operation,
+    target,
+    { id: 'quote-id', updated_at: '2026-07-14T11:11:00.000Z' }
+  );
+  assert.strictEqual(
+    storedRevisionMatches,
+    true,
+    'A lightweight write response should be acknowledged after the stored revision marker is verified'
+  );
+
+  supabaseContext.qdReadDurableSupabaseVersion = async () => ({
+    version: '2026-07-14T11:11:00.000Z',
+    revision: 'other-device-revision',
+    operationId: 'other-device-operation'
+  });
+  const otherDeviceRevision = await supabaseContext.qdDurableAcknowledgementMatches(
+    operation,
+    target,
+    { id: 'quote-id', updated_at: '2026-07-14T11:11:00.000Z' }
+  );
+  assert.strictEqual(
+    otherDeviceRevision,
+    false,
+    'A different stored revision must not acknowledge the local save'
+  );
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+
 const coordinatorContext = {
   withTimeout: promise => promise
 };
@@ -106,10 +152,10 @@ assert(
 ].forEach(file => {
   const html = fs.readFileSync(file, 'utf8');
   if (html.includes('supabase-v2.js')) {
-    assert(html.includes('supabase-v2.js?v=2026071401'), `${file} should load the fixed Supabase adapter`);
+    assert(html.includes('supabase-v2.js?v=2026071402'), `${file} should load the fixed Supabase adapter`);
   }
   if (html.includes('save-coordinator.js')) {
-    assert(html.includes('save-coordinator.js?v=2026071401'), `${file} should load the fixed save coordinator`);
+    assert(html.includes('save-coordinator.js?v=2026071402'), `${file} should load the fixed save coordinator`);
   }
 });
 
