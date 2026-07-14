@@ -12,11 +12,14 @@
     <title>Your Quote - QuoteDr</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="brand-theme.css?v=1777661601">
+    <link rel="stylesheet" href="brand-theme.css?v=2026071302">
+    <script src="recording-privacy.js?v=2026071301"></script>
     <style>
         :root {
             --quote-upgrade-accent: #0d9488;
+            --quote-upgrade-accent-contrast: #ffffff;
             --quote-upgrade-bg: #f8fafc;
+            --quote-upgrade-bg-contrast: #334155;
             --quote-upgrade-accent-soft: rgba(13, 148, 136, 0.20);
             --quote-upgrade-border: rgba(13, 148, 136, 0.35);
         }
@@ -964,7 +967,7 @@
         .choice-option-btn.choice-option-selected:focus {
             background: var(--quote-option-accent, var(--quote-accent, #1a56a0));
             border-color: var(--quote-option-accent, var(--quote-accent, #1a56a0));
-            color: #fff;
+            color: var(--quote-option-accent-contrast, #fff);
         }
         .choice-option-btn.choice-option-selected .opacity-75 {
             opacity: 0.9 !important;
@@ -985,7 +988,7 @@
             border-left: 4px solid var(--quote-upgrade-accent, #0d9488);
             border-radius: 8px;
             padding: 10px 12px;
-            color: #334155;
+            color: var(--quote-upgrade-bg-contrast, #334155);
             line-height: 1.45;
         }
         .quote-upgrade-title {
@@ -1012,7 +1015,7 @@
         .quote-upgrade-option-btn.is-selected:focus {
             background: var(--quote-upgrade-accent, #0d9488);
             border-color: var(--quote-upgrade-accent, #0d9488);
-            color: #ffffff;
+            color: var(--quote-upgrade-accent-contrast, #ffffff);
         }
         .quote-upgrade-option-btn i {
             transition: transform 0.15s ease;
@@ -1822,6 +1825,12 @@ if (location.search.includes('debug')) {
             var accent = viewerStyle.accent || '#ffffff';
             var optionAccent = viewerStyle.optionAccent || viewerStyle.accent || '#1a56a0';
             if (optionAccent === '#ffffff') optionAccent = accent && accent !== '#ffffff' ? accent : '#1a56a0';
+            var accentStrength = parseInt(viewerStyle.accentStrength, 10);
+            if (!isFinite(accentStrength)) accentStrength = 100;
+            accentStrength = Math.max(20, Math.min(accentStrength, 100));
+            var optionAccentStrength = parseInt(viewerStyle.optionAccentStrength, 10);
+            if (!isFinite(optionAccentStrength)) optionAccentStrength = 100;
+            optionAccentStrength = Math.max(20, Math.min(optionAccentStrength, 100));
             var upgradeAccent = viewerStyle.upgradeAccent || '#0d9488';
             var upgradeBg = viewerStyle.upgradeBg || '#f8fafc';
             var bg = viewerStyle.bg || '#ffffff';
@@ -1840,22 +1849,31 @@ if (location.search.includes('debug')) {
                 styleTag.id = 'quoteViewerDynamicStyle';
                 document.head.appendChild(styleTag);
             }
-            var effectiveAccent = accent === '#ffffff' ? '#1a56a0' : accent;
-            var headerBg = quoteHeaderBackgroundForEffect(accent, headerStyle, headerOpacity, headerEffect);
-            var headerColor = (headerStyle === 'light' || accent === '#ffffff' || headerOpacity < 55) ? '#1f3349' : '#ffffff';
+            var accentBase = accent === '#ffffff' ? '#1a56a0' : accent;
+            var effectiveAccent = blendColorWithWhite(accentBase, accentStrength);
+            var effectiveOptionAccent = blendColorWithWhite(optionAccent, optionAccentStrength);
+            var accentContrast = readableTextColor(effectiveAccent);
+            var optionAccentContrast = readableTextColor(effectiveOptionAccent);
+            var upgradeAccentContrast = readableTextColor(upgradeAccent);
+            var upgradeBgContrast = readableTextColor(upgradeBg);
+            var headerBg = quoteHeaderBackgroundForEffect(effectiveAccent, headerStyle, headerOpacity, headerEffect);
+            var headerColor = headerStyle === 'light' || accent === '#ffffff' || headerOpacity < 55
+                ? '#1f3349'
+                : (headerStyle === 'dark' ? '#ffffff' : accentContrast);
             var fontCSS = fontFeel === 'premium'
                 ? 'body { font-family: Georgia, "Times New Roman", serif; } .btn, .badge, input, textarea, select { font-family: Arial, sans-serif; }'
                 : (fontFeel === 'bold' ? 'body { font-weight: 500; } h1,h2,h3,h4,h5,h6,.fw-bold,strong { font-weight: 800 !important; }' : '');
             var accentCSS = (accent && accent !== '#ffffff')
-                ? '.card-header.bg-light { background: ' + accent + ' !important; color: white !important; }' +
-                  '.card-header.bg-light h6, .card-header.bg-light i { color: white !important; }'
+                ? '.card-header.bg-light { background: ' + effectiveAccent + ' !important; color: ' + accentContrast + ' !important; }' +
+                  '.card-header.bg-light h6, .card-header.bg-light i { color: ' + accentContrast + ' !important; }'
                 : '';
-            styleTag.textContent = ':root { --quote-accent: ' + effectiveAccent + '; --quote-option-accent: ' + optionAccent + '; --quote-option-accent-soft: ' + colorWithOpacity(optionAccent, 20) + '; --quote-option-accent-hover: ' + colorWithOpacity(optionAccent, 30) + '; --quote-upgrade-accent: ' + upgradeAccent + '; --quote-upgrade-bg: ' + upgradeBg + '; --quote-upgrade-accent-soft: ' + colorWithOpacity(upgradeAccent, 20) + '; --quote-upgrade-border: ' + colorWithOpacity(upgradeAccent, 35) + '; --change-order-accent: ' + effectiveAccent + '; --change-order-surface: ' + blendColorWithWhite(effectiveAccent, 8) + '; --change-order-surface-strong: ' + blendColorWithWhite(effectiveAccent, 14) + '; --change-order-border-soft: ' + colorWithOpacity(effectiveAccent, 24) + '; }' +
+            styleTag.textContent = ':root { --quote-accent: ' + effectiveAccent + '; --quote-accent-contrast: ' + accentContrast + '; --quote-option-accent: ' + effectiveOptionAccent + '; --quote-option-accent-contrast: ' + optionAccentContrast + '; --quote-option-accent-soft: ' + colorWithOpacity(effectiveOptionAccent, 20) + '; --quote-option-accent-hover: ' + colorWithOpacity(effectiveOptionAccent, 30) + '; --quote-upgrade-accent: ' + upgradeAccent + '; --quote-upgrade-accent-contrast: ' + upgradeAccentContrast + '; --quote-upgrade-bg: ' + upgradeBg + '; --quote-upgrade-bg-contrast: ' + upgradeBgContrast + '; --quote-upgrade-accent-soft: ' + colorWithOpacity(upgradeAccent, 20) + '; --quote-upgrade-border: ' + colorWithOpacity(upgradeAccent, 35) + '; --change-order-accent: ' + effectiveAccent + '; --change-order-surface: ' + blendColorWithWhite(effectiveAccent, 8) + '; --change-order-surface-strong: ' + blendColorWithWhite(effectiveAccent, 14) + '; --change-order-border-soft: ' + colorWithOpacity(effectiveAccent, 24) + '; }' +
                 'body { background: ' + blendColorWithWhite(bg, bgOpacity) + ' !important; }' +
                 '.quote-header { background: ' + headerBg + ' !important; color: ' + headerColor + ' !important; }' +
                 '.quote-header .brand-lockup h1, .quote-header .brand-lockup h2, .quote-header .brand-lockup p { color: ' + headerColor + ' !important; }' +
                 '.quote-header .hero-total-panel, .quote-header .hero-total-panel div, .quote-header .proposal-detail, .quote-header .proposal-detail div { color: #102033 !important; }' +
-                '.btn-success { background-color: ' + (accent === '#ffffff' ? '#198754' : accent) + ' !important; border-color: ' + (accent === '#ffffff' ? '#198754' : accent) + ' !important; }' +
+                '.btn-success { background-color: ' + effectiveAccent + ' !important; border-color: ' + effectiveAccent + ' !important; color: ' + accentContrast + ' !important; }' +
+                '.quote-sticky-nav-toggle { color: ' + accentContrast + ' !important; }' +
                 accentCSS + fontCSS;
         }
 
@@ -2193,7 +2211,16 @@ if (location.search.includes('debug')) {
         }
 
         function hexToRgb(hex) {
-            var value = String(hex || '').replace('#', '').trim();
+            var raw = String(hex || '').trim();
+            var rgbMatch = raw.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+            if (rgbMatch) {
+                return {
+                    r: Math.max(0, Math.min(255, parseInt(rgbMatch[1], 10))),
+                    g: Math.max(0, Math.min(255, parseInt(rgbMatch[2], 10))),
+                    b: Math.max(0, Math.min(255, parseInt(rgbMatch[3], 10)))
+                };
+            }
+            var value = raw.replace('#', '');
             if (value.length === 3) value = value.split('').map(function(ch) { return ch + ch; }).join('');
             if (!/^[0-9a-f]{6}$/i.test(value)) return null;
             return {
@@ -2268,6 +2295,16 @@ if (location.search.includes('debug')) {
             var g = Math.round(255 + (rgb.g - 255) * alpha);
             var b = Math.round(255 + (rgb.b - 255) * alpha);
             return 'rgb(' + r + ', ' + g + ', ' + b + ')';
+        }
+
+        function readableTextColor(color) {
+            var match = String(color || '').match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+            var rgb = match
+                ? { r: parseInt(match[1], 10), g: parseInt(match[2], 10), b: parseInt(match[3], 10) }
+                : hexToRgb(color);
+            if (!rgb) return '#ffffff';
+            var luminance = (0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b) / 255;
+            return luminance > 0.62 ? '#102033' : '#ffffff';
         }
 
         function renderExpandableDescription(text, id) {
@@ -2664,30 +2701,57 @@ if (location.search.includes('debug')) {
             return out;
         }
 
+        function viewerUpgradeRuntimeTextKey(value) {
+            return String(value || '')
+                .trim()
+                .toLowerCase()
+                .replace(/\s+/g, ' ');
+        }
+
+        function findViewerUpgradeRuntimeGroup(groups, targetGroup) {
+            groups = Array.isArray(groups) ? groups : [];
+            targetGroup = targetGroup || {};
+            var exact = targetGroup.id ? groups.find(function(group) {
+                return group && group.id === targetGroup.id;
+            }) : null;
+            if (exact) return exact;
+            var targetName = viewerUpgradeRuntimeTextKey(targetGroup.name);
+            return targetName ? groups.find(function(group) {
+                return viewerUpgradeRuntimeTextKey(group && group.name) === targetName;
+            }) : null;
+        }
+
+        function findViewerUpgradeRuntimeOption(group, targetOption) {
+            var options = group && Array.isArray(group.options) ? group.options : [];
+            targetOption = targetOption || {};
+            var exact = targetOption.id ? options.find(function(option) {
+                return option && option.id === targetOption.id;
+            }) : null;
+            if (exact) return exact;
+            var targetName = viewerUpgradeRuntimeTextKey(targetOption.name || targetOption.sourceItemName || targetOption.description);
+            var targetUnit = viewerUpgradeRuntimeTextKey(targetOption.unitType || targetOption.unit);
+            return targetName ? options.find(function(option) {
+                var optionName = viewerUpgradeRuntimeTextKey(option && (option.name || option.sourceItemName || option.description));
+                var optionUnit = viewerUpgradeRuntimeTextKey(option && (option.unitType || option.unit));
+                return optionName === targetName && (!targetUnit || !optionUnit || optionUnit === targetUnit);
+            }) : null;
+        }
+
         function mergeViewerItemUpgradeGroupRuntimeState(targetGroups, previousGroups) {
             targetGroups = normalizeViewerItemUpgradeGroups({ upgradeGroups: targetGroups });
             previousGroups = normalizeViewerItemUpgradeGroups({ upgradeGroups: previousGroups });
-            var selectedIdsByGroup = {};
-            var quantityStateByGroupAndOption = {};
-            previousGroups.forEach(function(group) {
-                selectedIdsByGroup[group.id] = Array.isArray(group.selectedOptionIds) ? group.selectedOptionIds.slice() : [];
-                (group.options || []).forEach(function(option) {
-                    quantityStateByGroupAndOption[group.id + '||' + option.id] = {
-                        manualQuantity: option.manualQuantity
-                    };
-                });
-            });
             targetGroups.forEach(function(group) {
-                if (selectedIdsByGroup[group.id]) {
-                    group.selectedOptionIds = selectedIdsByGroup[group.id].filter(function(optionId) {
-                        return (group.options || []).some(function(option) { return option.id === optionId; });
-                    });
-                }
+                var previousGroup = findViewerUpgradeRuntimeGroup(previousGroups, group);
+                if (!previousGroup) return;
+                var previousSelectedIds = Array.isArray(previousGroup.selectedOptionIds) ? previousGroup.selectedOptionIds : [];
+                var nextSelectedIds = [];
                 (group.options || []).forEach(function(option) {
-                    var quantityState = quantityStateByGroupAndOption[group.id + '||' + option.id];
-                    if (!quantityState) return;
-                    option.manualQuantity = viewerNumber(quantityState.manualQuantity);
+                    var previousOption = findViewerUpgradeRuntimeOption(previousGroup, option);
+                    if (!previousOption) return;
+                    option.manualQuantity = viewerNumber(previousOption.manualQuantity);
+                    if (previousSelectedIds.indexOf(previousOption.id) !== -1) nextSelectedIds.push(option.id);
                 });
+                group.selectedOptionIds = group.type === 'multiple' ? nextSelectedIds : nextSelectedIds.slice(0, 1);
             });
             return targetGroups;
         }
@@ -5420,3 +5484,4 @@ if (location.search.includes('debug')) {
     </div>
 </body>
 </html>
+
