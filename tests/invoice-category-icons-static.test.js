@@ -11,7 +11,8 @@ assert(
 );
 
 assert(
-  storage.includes('categoryStyles: JSON.parse(JSON.stringify(categoryStyles || {}))'),
+  storage.includes('function getQuoteCategoryStylesSnapshot()') &&
+    storage.includes('categoryStyles: getQuoteCategoryStylesSnapshot()'),
   'Saved quote data should preserve categoryStyles for later invoice generation'
 );
 

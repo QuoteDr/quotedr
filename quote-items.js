@@ -2558,8 +2558,8 @@
             } catch (e) {
                 categoryStyles = {};
             }
-            // Restore from cloud (fire and forget)
-            _restoreCategoryStylesFromCloud().catch(function(){});
+            // Quote previews and share links can wait for this without delaying the rest of startup.
+            window._categoryStylesReadyPromise = _restoreCategoryStylesFromCloud().catch(function(){});
             _restoreHiddenCategoriesFromCloud().catch(function(){});
             loadManageCategoryRenames();
             _restoreCategoryRenamesFromCloud().catch(function(){});
@@ -2839,7 +2839,6 @@
             if (searchEl) searchEl.value = '';
             setManageItemsFilter('all', { skipFilter: true });
             renderAllItemsList();
-            toggleManageItemsTopBar(false);
             toggleManageItemsBottomBar(false);
             initManageItemsFooterSwipe();
             bindManageItemsFooterButtons();
@@ -3034,23 +3033,6 @@
                     btn.style.lineHeight = '1.2';
                 }
             });
-        }
-        function toggleManageItemsTopBar(hidden) {
-            const topBar = document.getElementById('manageItemsTopBar');
-            const addShell = document.querySelector('#manageItemsModal .manage-items-add-shell');
-            const itemToolbar = document.getElementById('itemListTopAnchor');
-            const itemList = document.getElementById('customItemsList');
-            const footerUndo = document.getElementById('undoManageItemsFooterBtn');
-            const showTopBarBtn = document.getElementById('showManageItemsTopBarBtn');
-            const modal = document.getElementById('manageItemsModal');
-            if (topBar) topBar.style.display = hidden ? 'none' : '';
-            if (addShell) addShell.style.display = hidden ? 'none' : '';
-            if (itemToolbar) itemToolbar.style.display = hidden ? 'none' : '';
-            if (itemList) itemList.style.maxHeight = hidden ? 'calc(80vh - 110px)' : '460px';
-            if (footerUndo) footerUndo.style.display = hidden ? '' : 'none';
-            if (showTopBarBtn) showTopBarBtn.style.display = hidden ? '' : 'none';
-            if (modal) modal.classList.toggle('manage-items-top-hidden', hidden);
-            syncManageItemsUndoButtons();
         }
         function toggleManageItemsBottomBar(hidden) {
             const footer = document.getElementById('manageItemsFooterBar');
@@ -5404,7 +5386,6 @@
         window.pushUndoState = pushUndoState;
         window.undoManageItems = undoManageItems;
         window.syncManageItemsUndoButtons = syncManageItemsUndoButtons;
-        window.toggleManageItemsTopBar = toggleManageItemsTopBar;
         window.toggleManageItemsBottomBar = toggleManageItemsBottomBar;
         window.toggleManageNewItemPanel = toggleManageNewItemPanel;
         window.toggleNewItemUpgradePanel = toggleNewItemUpgradePanel;

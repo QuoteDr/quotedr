@@ -278,6 +278,20 @@
             return clonedRooms;
         }
 
+        function getQuoteCategoryStylesSnapshot() {
+            var snapshot = {};
+            try {
+                var savedStyles = JSON.parse(localStorage.getItem('ald_category_styles') || '{}');
+                if (savedStyles && typeof savedStyles === 'object' && !Array.isArray(savedStyles)) {
+                    Object.assign(snapshot, savedStyles);
+                }
+            } catch (e) {}
+            if (typeof categoryStyles !== 'undefined' && categoryStyles && typeof categoryStyles === 'object') {
+                Object.assign(snapshot, categoryStyles);
+            }
+            return JSON.parse(JSON.stringify(snapshot));
+        }
+
         function collectQuoteData() {
             var grandTotal = parseQuoteMoney(document.getElementById('grandTotalDisplay')?.textContent || '0');
             var isChangeOrder = window._quoteDocumentType === 'change_order';
@@ -315,7 +329,7 @@
                 dividerPlural: dividerLabels.plural,
                 quoteDividerLabels: { singular: dividerLabels.singular, plural: dividerLabels.plural },
                 rooms: sanitizeQuoteRoomsForSave(rooms),
-                categoryStyles: JSON.parse(JSON.stringify(categoryStyles || {})),
+                categoryStyles: getQuoteCategoryStylesSnapshot(),
                 roomCounter: roomCounter,
                 quoteAdjustment: getQuoteClientAdjustment(),
                 paymentsReceived: getQuotePaymentsReceived(),

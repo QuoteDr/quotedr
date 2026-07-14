@@ -23,6 +23,8 @@
             expiryDate: '',
             showUpgrades: true,
             showScopeNotes: true,
+            descriptionPreviewLength: 260,
+            alwaysShowFullDescriptions: false,
             showCommitment: true,
             skipSettingsOnGenerate: false,
             commitment: {
@@ -43,6 +45,9 @@
         var _quoteStudioStyleTimer = null;
         var _quoteStudioLoadTimer = null;
         var _quoteStudioMessagingBound = false;
+        var QUOTE_DESCRIPTION_PREVIEW_DEFAULT = 260;
+        var QUOTE_DESCRIPTION_PREVIEW_MIN = 120;
+        var QUOTE_DESCRIPTION_PREVIEW_MAX = 600;
 
         function syncQuoteStyleGlobal() {
             window._quoteStyle = _quoteStyle;
@@ -199,9 +204,12 @@
             if (_quoteStudioFrameReady) postQuoteStudioDocument();
         }
 
-        function prepareQuoteStyleStudio() {
+        async function prepareQuoteStyleStudio() {
             bindQuoteStudioMessaging();
             document.body?.classList.add('quote-style-studio-open');
+            if (window._categoryStylesReadyPromise) {
+                try { await window._categoryStylesReadyPromise; } catch(e) {}
+            }
             _quoteStudioSnapshot = buildQuoteStudioSnapshot();
             showQuoteStyleStudioPane('controls');
             ensureQuoteStudioFrame();
@@ -375,6 +383,25 @@
             else el.value = value || '';
         }
 
+        function normalizeDescriptionPreviewLength(value) {
+            var parsed = parseInt(value, 10);
+            if (!isFinite(parsed)) parsed = QUOTE_DESCRIPTION_PREVIEW_DEFAULT;
+            return Math.max(QUOTE_DESCRIPTION_PREVIEW_MIN, Math.min(parsed, QUOTE_DESCRIPTION_PREVIEW_MAX));
+        }
+
+        function updateDescriptionPreviewControls() {
+            var slider = document.getElementById('quoteDescriptionPreviewLength');
+            var showFull = document.getElementById('quoteAlwaysShowFullDescriptions');
+            var valueLabel = document.getElementById('quoteDescriptionPreviewLengthValue');
+            var alwaysShowFull = showFull?.checked === true;
+            if (slider) slider.disabled = alwaysShowFull;
+            if (valueLabel) {
+                valueLabel.textContent = alwaysShowFull
+                    ? 'Full text'
+                    : normalizeDescriptionPreviewLength(slider?.value) + ' characters';
+            }
+        }
+
         function bindStyleSwatchGroup(containerId, attrName, fieldId, styleKey) {
             var container = document.getElementById(containerId);
             if (!container || container.dataset.styleSwatchBound) return;
@@ -470,6 +497,8 @@
             style.expiryDate = document.getElementById('quoteExpiryDate')?.value || '';
             style.showUpgrades = document.getElementById('quoteShowUpgrades')?.checked !== false;
             style.showScopeNotes = document.getElementById('quoteShowScopeNotes')?.checked !== false;
+            style.descriptionPreviewLength = normalizeDescriptionPreviewLength(document.getElementById('quoteDescriptionPreviewLength')?.value || style.descriptionPreviewLength);
+            style.alwaysShowFullDescriptions = document.getElementById('quoteAlwaysShowFullDescriptions')?.checked === true;
             style.showCommitment = document.getElementById('quoteShowCommitment')?.checked !== false;
             style.skipSettingsOnGenerate = document.getElementById('quoteSkipSettingsOnGenerate')?.checked === true;
             var commitmentItems = defaultCommitmentItemsForModal().map(function(item, i) {
@@ -493,6 +522,8 @@
             _quoteStyle = Object.assign({}, _quoteStyle, style || {});
             if (!isFinite(parseInt(_quoteStyle.headerOpacity, 10))) _quoteStyle.headerOpacity = 100;
             if (!isFinite(parseInt(_quoteStyle.bgOpacity, 10))) _quoteStyle.bgOpacity = 100;
+            _quoteStyle.descriptionPreviewLength = normalizeDescriptionPreviewLength(_quoteStyle.descriptionPreviewLength);
+            _quoteStyle.alwaysShowFullDescriptions = _quoteStyle.alwaysShowFullDescriptions === true;
             syncQuoteStyleGlobal();
             setFieldValue('quoteHeaderStyle', _quoteStyle.headerStyle);
             setFieldValue('quoteHeaderEffect', _quoteStyle.headerEffect || 'soft-gradient');
@@ -511,6 +542,9 @@
             setFieldValue('quoteExpiryDate', _quoteStyle.expiryDate);
             setFieldValue('quoteShowUpgrades', _quoteStyle.showUpgrades);
             setFieldValue('quoteShowScopeNotes', _quoteStyle.showScopeNotes);
+            setFieldValue('quoteDescriptionPreviewLength', _quoteStyle.descriptionPreviewLength);
+            setFieldValue('quoteAlwaysShowFullDescriptions', _quoteStyle.alwaysShowFullDescriptions);
+            updateDescriptionPreviewControls();
             setFieldValue('quoteShowCommitment', _quoteStyle.showCommitment !== false);
             setFieldValue('quoteSkipSettingsOnGenerate', _quoteStyle.skipSettingsOnGenerate === true);
             var commitment = _quoteStyle.commitment || {};
@@ -559,6 +593,7 @@
             if (!isFinite(bgOpacity)) bgOpacity = 100;
             bgOpacity = Math.max(0, Math.min(bgOpacity, 100));
             updateBgOpacityLabel(bgOpacity);
+            updateDescriptionPreviewControls();
             queueQuoteStudioStyleUpdate();
         }
 
@@ -851,7 +886,7 @@
             });
             bindStyleSwatchGroup('upgradeAccentSwatches', 'data-upgrade-accent', 'quoteUpgradeAccent', 'upgradeAccent');
             bindStyleSwatchGroup('upgradeBgSwatches', 'data-upgrade-bg', 'quoteUpgradeBg', 'upgradeBg');
-            ['quoteHeaderStyle','quoteHeaderEffect','quoteHeaderOpacity','quoteBgOpacity','quoteFontFeel','quoteOptionAccent','quoteUpgradeAccent','quoteUpgradeBg','quotePricingMode','quoteDepositMode','quoteDepositPercent','quoteApprovalMode','quoteExpiryDate','quoteShowUpgrades','quoteShowScopeNotes','quoteShowCommitment','quoteSkipSettingsOnGenerate','commitmentTitleInput','commitmentIcon1','commitmentImage1','commitmentLabel1','commitmentText1','commitmentIcon2','commitmentImage2','commitmentLabel2','commitmentText2','commitmentIcon3','commitmentImage3','commitmentLabel3','commitmentText3','commitmentIcon4','commitmentImage4','commitmentLabel4','commitmentText4','quoteClientMessage'].forEach(function(id) {
+            ['quoteHeaderStyle','quoteHeaderEffect','quoteHeaderOpacity','quoteBgOpacity','quoteFontFeel','quoteOptionAccent','quoteUpgradeAccent','quoteUpgradeBg','quotePricingMode','quoteDepositMode','quoteDepositPercent','quoteApprovalMode','quoteExpiryDate','quoteShowUpgrades','quoteShowScopeNotes','quoteDescriptionPreviewLength','quoteAlwaysShowFullDescriptions','quoteShowCommitment','quoteSkipSettingsOnGenerate','commitmentTitleInput','commitmentIcon1','commitmentImage1','commitmentLabel1','commitmentText1','commitmentIcon2','commitmentImage2','commitmentLabel2','commitmentText2','commitmentIcon3','commitmentImage3','commitmentLabel3','commitmentText3','commitmentIcon4','commitmentImage4','commitmentLabel4','commitmentText4','quoteClientMessage'].forEach(function(id) {
                 var el = document.getElementById(id);
                 if (el && !el.dataset.styleBound) {
                     el.addEventListener('input', updateStylePreview);
@@ -1091,6 +1126,10 @@
             syncQuoteStyleGlobal();
             if (document.getElementById('quoteSaveDefaultStyle')?.checked) {
                 await saveQuoteStyleDefaults(false);
+            }
+
+            if (window._categoryStylesReadyPromise) {
+                try { await window._categoryStylesReadyPromise; } catch(e) {}
             }
 
             const quoteData = collectQuoteData();

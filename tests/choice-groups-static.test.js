@@ -81,9 +81,10 @@ assert(builder.includes('changeQuoteChoiceGroupDefault'), 'quote builder should 
 assert(builder.includes('data-quote-choice-option'), 'quote Pick One picker should render clickable option rows');
 assert(builder.includes('Choose Pick One Option'), 'quote Pick One picker should explain that the user is choosing the visible/base option');
 assert(builder.includes("var manageItemsRoot = document.getElementById('manageItemsModal')"), 'Manage Items delegated actions should include the top New Item form');
-assert(items.includes("document.querySelector('#manageItemsModal .manage-items-add-shell')"), 'Manage Items Hide should collapse the New Item panel shell');
-assert(items.includes("document.getElementById('itemListTopAnchor')"), 'Manage Items Hide should collapse the All Items toolbar');
-assert(items.includes("calc(80vh - 110px)"), 'Manage Items Hide should expand the item list after the control band is collapsed');
+assert(!builder.includes('hideManageItemsTopBarBtn') && !builder.includes('showManageItemsTopBarBtn'), 'Manage Items should not include Hide or Show top-bar controls');
+assert(!items.includes('function toggleManageItemsTopBar'), 'Manage Items should not retain the removed top-bar hiding behavior');
+assert(!builder.includes("whizzScroll('customItemsList', 'top')") && !builder.includes("whizzScroll('customItemsList', 'bottom')"), 'Manage Items should not include Top or Bottom jump buttons');
+assert(builder.includes('max-height: none !important') && builder.includes('overflow-y: visible !important'), 'Manage Items should use the modal page scroll on mobile instead of an internal list scroller');
 assert(items.includes('details-section-menu'), 'Manage Items Details should open a section picker menu');
 assert(items.includes('data-detail-section-toggle'), 'Manage Items Details picker should use checkable section toggles');
 assert(items.includes('data-detail-section="description"'), 'Manage Items Details picker should expose Description as its own section');
