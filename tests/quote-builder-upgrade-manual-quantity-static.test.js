@@ -33,8 +33,10 @@ assert(
 );
 
 assert(
-  builder.includes('quantityStateByGroupAndOption'),
-  'choice-group upgrade merge should preserve per-option manual quantity state, not only selected option ids'
+  builder.includes('findQuoteUpgradeRuntimeGroup') &&
+    builder.includes('findQuoteUpgradeRuntimeOption') &&
+    builder.includes('previousOption.manualQuantity'),
+  'choice-group upgrade merge should preserve per-option manual quantity state by stable identity, not only internal ids'
 );
 
 assert(
@@ -48,8 +50,19 @@ assert(
 );
 
 assert(
+  builder.includes('mergeQuoteItemUpgradeGroupRuntimeState(savedUpgradeGroups, next.upgradeGroups || [])'),
+  'saved-item rehydration should merge definitions into quote runtime quantities instead of replacing them'
+);
+
+assert(
+  storage.includes('var optionRuntimeGroups = Array.isArray(option.upgradeGroups) ? option.upgradeGroups : []') &&
+    storage.includes('mergeQuoteStorageUpgradeGroupRuntimeState(savedUpgradeGroups, optionRuntimeGroups)'),
+  'quote save sanitization should retain per-option quantities even while a different Pick One parent is selected'
+);
+
+assert(
   viewer.includes('mergeViewerItemUpgradeGroupRuntimeState') &&
-    viewer.includes('quantityStateByGroupAndOption'),
+    viewer.includes('findViewerUpgradeRuntimeOption'),
   'client viewer should preserve saved manual quantities when rebuilding choice option upgrade groups'
 );
 
