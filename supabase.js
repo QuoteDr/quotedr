@@ -38,17 +38,6 @@ async function signInWithEmail(email, password) {
     return data;
 }
 
-// Sign up with email and password
-async function signUpWithEmail(email, password) {
-    const { data, error } = await _supabase.auth.signUp({
-        email: email,
-        password: password
-    });
-    if (error) throw error;
-    currentUser = data.user;
-    return data;
-}
-
 // Sign out
 async function signOut() {
     const { error } = await _supabase.auth.signOut();
