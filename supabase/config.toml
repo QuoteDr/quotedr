@@ -1,3 +1,10 @@
+[auth]
+enable_signup = false
+enable_anonymous_sign_ins = false
+
+[auth.email]
+enable_signup = false
+
 [functions.qb-oauth]
 verify_jwt = false
 
@@ -5,7 +12,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.stripe-checkout]
-verify_jwt = false
+verify_jwt = true
 
 [functions.stripe-deposit]
 verify_jwt = false
