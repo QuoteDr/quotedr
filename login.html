@@ -13,6 +13,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="brand-theme.css?v=1777661601">
+    <link rel="stylesheet" href="signup-gate.css?v=20260713">
     <style>
         body {
             background: linear-gradient(135deg, #1a56a0 0%, #0f3460 100%);
@@ -49,26 +50,10 @@
             font-weight: 600;
         }
         .btn-primary:hover { background: linear-gradient(135deg, #154a8a, #0d2d50); }
-        .tab-nav {
-            display: flex;
-            margin-bottom: 1.5rem;
-            border-bottom: 2px solid #eee;
-        }
-        .tab-btn {
-            flex: 1;
-            padding: 0.75rem;
-            border: none;
-            background: none;
-            font-weight: 600;
-            color: #999;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .tab-btn.active {
-            color: #1a56a0;
-            border-bottom: 2px solid #1a56a0;
-            margin-bottom: -2px;
-        }
+        .signin-heading { margin: 0 0 1.4rem; text-align: center; }
+        .signin-heading h1 { margin: 0; color: #0f3460; font-size: 1.45rem; font-weight: 800; letter-spacing: 0; }
+        .signin-heading p { margin: 0.4rem 0 0; color: #64748b; font-size: 0.9rem; }
+        .early-access-link { margin-top: 1rem; text-align: center; font-size: 0.88rem; }
         .alert { margin-top: 1rem; }
         .input-group .btn-outline-secondary { border-color: #dee2e6; color: #666; }
         .input-group .btn-outline-secondary:hover { background: #f8f9fa; color: #333; }
@@ -142,13 +127,13 @@ if (location.search.includes('debug')) {
             </script>
         </div>
 
-        <div class="tab-nav">
-            <button type="button" class="tab-btn active" id="tabSignin" onclick="showTab('signin')">Sign In</button>
-            <button type="button" class="tab-btn" id="tabSignup" onclick="showTab('signup')">Sign Up</button>
+        <div class="signin-heading">
+            <h1>Existing Member Sign In</h1>
+            <p>Use the account you already created.</p>
         </div>
 
         <!-- Sign In Form -->
-        <div id="signinForm">
+        <form id="signinForm">
             <div class="mb-3">
                 <label class="form-label">Email</label>
                 <input type="email" class="form-control" id="signinEmail" placeholder="you@example.com">
@@ -156,7 +141,7 @@ if (location.search.includes('debug')) {
             <div class="mb-3">
                 <label class="form-label">Password</label>
                 <div class="input-group">
-                    <input type="password" class="form-control" id="signinPassword" placeholder="Enter your password" onkeypress="if(event.key==='Enter') handleSignIn();">
+                    <input type="password" class="form-control" id="signinPassword" placeholder="Enter your password">
                     <button type="button" class="btn btn-outline-secondary" onclick="togglePassword('signinPassword', this)" tabindex="-1">
                         <i class="fas fa-eye"></i>
                     </button>
@@ -169,40 +154,11 @@ if (location.search.includes('debug')) {
                 <input class="form-check-input" type="checkbox" id="rememberMe" style="cursor:pointer;">
                 <label class="form-check-label text-muted" for="rememberMe" style="font-size:0.9rem;">Remember me</label>
             </div>
-            <button type="button" class="btn btn-primary w-100" id="signinBtn" onclick="handleSignIn()">Sign In</button>
+            <button type="submit" class="btn btn-primary w-100" id="signinBtn">Sign In</button>
             <div id="signinMessage"></div>
-        </div>
-
-        <!-- Sign Up Form -->
-        <div id="signupForm" style="display:none">
-            <div class="mb-3">
-                <label class="form-label">Email</label>
-                <input type="email" class="form-control" id="signupEmail" placeholder="you@example.com">
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Password</label>
-                <div class="input-group">
-                    <input type="password" class="form-control" id="signupPassword" placeholder="Min 6 characters" oninput="updateStrength(this.value)">
-                    <button type="button" class="btn btn-outline-secondary" onclick="togglePassword('signupPassword', this)" tabindex="-1">
-                        <i class="fas fa-eye"></i>
-                    </button>
-                </div>
-                <div class="mt-1" style="height:4px; border-radius:2px; background:#eee; overflow:hidden;">
-                    <div id="strengthFill" style="height:100%; width:0%; transition:all 0.3s;"></div>
-                </div>
-                <small id="strengthLabel" class="text-muted"></small>
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Confirm Password</label>
-                <div class="input-group">
-                    <input type="password" class="form-control" id="signupConfirm" placeholder="Confirm password">
-                    <button type="button" class="btn btn-outline-secondary" onclick="togglePassword('signupConfirm', this)" tabindex="-1">
-                        <i class="fas fa-eye"></i>
-                    </button>
-                </div>
-            </div>
-            <button type="button" class="btn btn-primary w-100" id="signupBtn" onclick="handleSignUp()">Create Account</button>
-            <div id="signupMessage"></div>
+        </form>
+        <div class="early-access-link">
+            New to QuoteDr? <a href="login.html?signup=1" data-qd-signup-source="login_early_access">View early access details</a>
         </div>
     </div>
 
@@ -213,8 +169,6 @@ if (location.search.includes('debug')) {
 
         // Only auto-redirect if URL has ?redirect=1 (i.e. came here intentionally, not directly)
         const urlParams = new URLSearchParams(window.location.search);
-        // Auto-switch to signup tab if ?signup=1
-        if (urlParams.has('signup')) { showTab('signup'); }
         if (!urlParams.has('noredirect')) {
             _supabase.auth.getSession().then(async ({ data: { session } }) => {
                 if (session) {
@@ -258,13 +212,6 @@ if (location.search.includes('debug')) {
             });
         }
 
-        function showTab(tab) {
-            document.getElementById('signinForm').style.display = tab === 'signin' ? 'block' : 'none';
-            document.getElementById('signupForm').style.display = tab === 'signup' ? 'block' : 'none';
-            document.getElementById('tabSignin').classList.toggle('active', tab === 'signin');
-            document.getElementById('tabSignup').classList.toggle('active', tab === 'signup');
-        }
-
         function showMessage(elId, msg, type) {
             document.getElementById(elId).innerHTML = '<div class="alert alert-' + (type || 'danger') + '">' + msg + '</div>';
         }
@@ -283,38 +230,13 @@ if (location.search.includes('debug')) {
             }
         }
 
-        function updateStrength(val) {
-            var fill = document.getElementById('strengthFill');
-            var label = document.getElementById('strengthLabel');
-            if (!fill || !label) return;
-            var score = 0;
-            if (val.length >= 6) score++;
-            if (val.length >= 10) score++;
-            if (/[A-Z]/.test(val)) score++;
-            if (/[0-9]/.test(val)) score++;
-            if (/[^A-Za-z0-9]/.test(val)) score++;
-            var levels = [
-                { pct: '0%',   color: '#eee',     text: '' },
-                { pct: '25%',  color: '#dc3545',  text: 'Weak' },
-                { pct: '50%',  color: '#fd7e14',  text: 'Fair' },
-                { pct: '75%',  color: '#ffc107',  text: 'Good' },
-                { pct: '100%', color: '#198754',  text: 'Strong' },
-                { pct: '100%', color: '#198754',  text: 'Strong' }
-            ];
-            var l = levels[score] || levels[0];
-            fill.style.width = l.pct;
-            fill.style.background = l.color;
-            label.textContent = l.text;
-            label.style.color = l.color;
-        }
-
         function setLoading(btnId, loading) {
             var btn = document.getElementById(btnId);
             if (!btn) return;
             btn.disabled = loading;
             btn.innerHTML = loading
                 ? '<span class="spinner-border spinner-border-sm me-2"></span>Please wait...'
-                : (btnId === 'signinBtn' ? 'Sign In' : 'Create Account');
+                : 'Sign In';
         }
 
         // Brute force protection — 5 attempts per session, 15 min lockout
@@ -439,29 +361,6 @@ if (location.search.includes('debug')) {
             } catch(e) { console.warn('Preload error:', e); }
         }
 
-        async function handleSignUp() {
-            var email = document.getElementById('signupEmail').value.trim();
-            var password = document.getElementById('signupPassword').value;
-            var confirm = document.getElementById('signupConfirm').value;
-            if (!email || !password) { showMessage('signupMessage', 'Please fill in all fields.'); return; }
-            if (password !== confirm) { showMessage('signupMessage', 'Passwords do not match.'); return; }
-            if (password.length < 6) { showMessage('signupMessage', 'Password must be at least 6 characters.'); return; }
-            setLoading('signupBtn', true);
-            var result = await _supabase.auth.signUp({ email: email, password: password });
-            setLoading('signupBtn', false);
-            if (result.error) { showMessage('signupMessage', result.error.message); return; }
-            showMessage('signupMessage', 'Account created! Check your email to verify, then sign in.', 'success');
-            // Send welcome email (fire and forget)
-            fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/send-welcome-email', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso'
-                },
-                body: JSON.stringify({ email: email, name: email.split('@')[0] })
-            }).catch(function() {}); // Silent fail — don't block signup on email failure
-        }
-
         async function handleForgotPassword() {
             var email = document.getElementById('signinEmail').value.trim();
             if (!email) { showMessage('signinMessage', 'Enter your email above first, then click Forgot password.', 'warning'); return; }
@@ -484,13 +383,12 @@ if (location.search.includes('debug')) {
             if (rememberEl) rememberEl.checked = true;
         }
 
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                var signinVisible = document.getElementById('signinForm').style.display !== 'none';
-                if (signinVisible) handleSignIn(); else handleSignUp();
-            }
+        document.getElementById('signinForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            handleSignIn();
         });
     </script>
+<script src="signup-gate.js?v=20260713"></script>
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
