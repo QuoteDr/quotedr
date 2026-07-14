@@ -386,6 +386,39 @@
             };
         }
 
+        function applyQuoteCloudAcknowledgement(event) {
+            var detail = event && event.detail || {};
+            var operation = detail.operation || {};
+            if (operation.entityType !== 'quote' || operation.action === 'delete') return;
+
+            var resultData = detail.result && detail.result.data;
+            var saved = Array.isArray(resultData) ? resultData[0] : resultData;
+            var currentId = String(window._supabaseQuoteId || '');
+            var operationId = String(operation.entityId || '');
+            var savedId = String(saved && saved.id || '');
+            var currentQuoteNumber = String(document.getElementById('quoteNumber')?.value || '');
+            var operationQuoteNumber = String(operation.payload && operation.payload.quoteNumber || '');
+            var belongsToCurrentQuote = currentId
+                ? operationId === currentId || savedId === currentId
+                : operationQuoteNumber && operationQuoteNumber === currentQuoteNumber;
+            if (!belongsToCurrentQuote) return;
+
+            if (savedId) {
+                window._supabaseQuoteId = savedId;
+                localStorage.setItem('ald_active_quote_id', savedId);
+            }
+            var cloudVersion = detail.version || saved && saved.updated_at ||
+                operation.target && operation.target.verifyVersionValue || null;
+            if (!cloudVersion) return;
+            window._quoteServerUpdatedAt = cloudVersion;
+            if (window._loadedQuoteData) {
+                window._loadedQuoteData._serverUpdatedAt = cloudVersion;
+                window._loadedQuoteData.updated_at = cloudVersion;
+            }
+        }
+
+        window.addEventListener('quotedr-save-acknowledged', applyQuoteCloudAcknowledgement);
+
         function toggleClientInfo() {
             var body = document.getElementById('clientInfoBody');
             var btn = document.getElementById('clientInfoToggleBtn');

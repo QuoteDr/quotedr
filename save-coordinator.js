@@ -305,10 +305,14 @@
     }
 
     async function markAcknowledged(operation, result) {
+        var cloudVersion = acknowledgedVersion(result, operation);
+        window.dispatchEvent(new CustomEvent('quotedr-save-acknowledged', {
+            detail: { operation: operation, result: result, version: cloudVersion }
+        }));
         var current = await getStoreValue(OUTBOX_STORE, operation.key);
         if (!current || current.operationId !== operation.operationId || current.revision !== operation.revision) {
             if (current && current.operationId === operation.operationId && current.revision !== operation.revision) {
-                current.baseVersion = acknowledgedVersion(result, operation) || current.baseVersion || null;
+                current.baseVersion = cloudVersion || current.baseVersion || null;
                 current.state = 'local_pending';
                 current.attempts = 0;
                 current.lastError = null;
@@ -334,7 +338,6 @@
         else await putStoreValue(SNAPSHOT_STORE, snapshot);
         await deleteStoreValue(OUTBOX_STORE, operation.key);
         await putStoreValue(META_STORE, { key: 'lastCloudAckAt', value: snapshot.cloudAckAt });
-        window.dispatchEvent(new CustomEvent('quotedr-save-acknowledged', { detail: { operation: operation, result: result } }));
         resolveVaultIncident(operation).catch(function() {});
         await notify();
         return publicResult('cloud_saved', operation, result, null);
@@ -360,6 +363,10 @@
 
     async function checkConflict(operation, adapter) {
         if (operation.forceConflictOverwrite === true) return null;
+        // Quotes historically use last-write-wins. Their payload is a whole
+        // document, so timestamp blocking makes normal multi-device editing
+        // unusable without a field-level merge engine.
+        if (operation.entityType === 'quote') return null;
         if (!operation.baseVersion || !adapter || typeof adapter.readVersion !== 'function') return null;
         var serverVersion = await withTimeout(adapter.readVersion(operation), operation.timeoutMs);
         if (serverVersion && typeof serverVersion === 'object') {
@@ -415,7 +422,7 @@
         var results = [];
         for (var i = 0; i < operations.length; i++) {
             var operation = operations[i];
-            if (!options.force && operation.state === 'conflict') continue;
+            if (!options.force && operation.state === 'conflict' && operation.entityType !== 'quote') continue;
             results.push(await flushOperation(operation, options));
         }
         await notify();

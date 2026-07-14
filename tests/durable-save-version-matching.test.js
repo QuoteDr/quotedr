@@ -116,6 +116,16 @@ vm.runInContext('async ' + extractFunction(coordinator, 'checkConflict', 'flushO
     }
   });
   assert.strictEqual(explicitLocalChoice, null, 'Use This Device should explicitly bypass the resolved conflict');
+
+  const quoteLastWriteWins = await coordinatorContext.checkConflict({
+    ...operation,
+    entityType: 'quote'
+  }, {
+    readVersion: async () => {
+      throw new Error('Quote saves should not be blocked by another device timestamp');
+    }
+  });
+  assert.strictEqual(quoteLastWriteWins, null, 'quotes should retain their historical last-write-wins behavior');
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;
@@ -130,12 +140,26 @@ assert(
 );
 
 assert(
+  coordinator.includes("if (operation.entityType === 'quote') return null;") &&
+    coordinator.includes('detail: { operation: operation, result: result, version: cloudVersion }') &&
+    coordinator.includes("operation.state === 'conflict' && operation.entityType !== 'quote'"),
+  'Quote acknowledgements should expose the confirmed cloud version without blocking multi-device saves'
+);
+
+const quoteStorage = fs.readFileSync('quote-storage.js', 'utf8');
+assert(
+  quoteStorage.includes("window.addEventListener('quotedr-save-acknowledged', applyQuoteCloudAcknowledgement)") &&
+    quoteStorage.includes('window._quoteServerUpdatedAt = cloudVersion'),
+  'The quote builder should adopt cloud versions acknowledged by recovery saves'
+);
+
+assert(
   supabase.includes('operationId: saveMeta && saveMeta.operationId'),
   'Cloud version reads should return the stable operation id so a coalesced save is not mistaken for another device'
 );
 
 assert(
-  coordinator.includes('current.baseVersion = acknowledgedVersion(result, operation)') &&
+  coordinator.includes('current.baseVersion = cloudVersion || current.baseVersion || null') &&
     coordinator.includes("return publicResult('local_pending', current, result, null)"),
   'A coalesced successor should be rebased when its preceding cloud write is acknowledged'
 );
@@ -166,8 +190,13 @@ assert(
     assert(html.includes('supabase-v2.js?v=2026071402'), `${file} should load the fixed Supabase adapter`);
   }
   if (html.includes('save-coordinator.js')) {
-    assert(html.includes('save-coordinator.js?v=2026071403'), `${file} should load the fixed save coordinator`);
+    assert(html.includes('save-coordinator.js?v=2026071404'), `${file} should load the fixed save coordinator`);
   }
 });
+
+assert(
+  fs.readFileSync('quote-builder.html', 'utf8').includes('quote-storage.js?v=2026071402'),
+  'Quote Builder should load the cloud acknowledgement listener immediately'
+);
 
 console.log('durable save version matching checks passed');
