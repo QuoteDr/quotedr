@@ -269,6 +269,9 @@
         function hydrateChoiceGroupOptionsForSave(item) {
             if (!item || !item.choiceGroup || !Array.isArray(item.choiceGroup.options)) return;
             var selectedChoiceOptionIds = Array.isArray(item.choiceGroup.selectedOptionIds) ? item.choiceGroup.selectedOptionIds.filter(Boolean) : [];
+            if (!selectedChoiceOptionIds.length && item.choiceGroup.type === 'single' && item.choiceGroup.defaultOptionId) {
+                selectedChoiceOptionIds = [item.choiceGroup.defaultOptionId];
+            }
             var liveUpgradeGroups = Array.isArray(item.upgradeGroups) ? cloneQuoteStorageValue(item.upgradeGroups) : [];
             item.choiceGroup.options.forEach(function(option) {
                 if (!option) return;
@@ -1425,4 +1428,3 @@ async function saveQuote() {
             }
             openBuilderHashTarget();
         });
-
