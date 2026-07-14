@@ -59,7 +59,7 @@ ${entry.cta}`).join('\n\n')}
 
 ${tip}
 
-Start free: https://quotedr.io/login.html?signup=1
+Early access details: https://quotedr.io/login.html?signup=1
 
 Feedback: support@quotedr.io
 
@@ -95,7 +95,7 @@ const html = `<!DOCTYPE html>
             <p style="font-size:15px;line-height:1.6;margin:0;">${escapeHtml(tip)}</p>
           </div>
           <p style="text-align:center;margin:26px 0;">
-            <a href="https://quotedr.io/login.html?signup=1" style="display:inline-block;background:#e87e2a;color:#ffffff;text-decoration:none;font-weight:800;padding:13px 24px;border-radius:999px;">Start Free</a>
+            <a href="https://quotedr.io/login.html?signup=1" style="display:inline-block;background:#e87e2a;color:#ffffff;text-decoration:none;font-weight:800;padding:13px 24px;border-radius:999px;">Early Access Details</a>
           </p>
           <p style="color:#64748b;font-size:13px;line-height:1.5;margin:24px 0 0;">Feedback goes to support@quotedr.io. Unsubscribe: include the subscriber unsubscribe link before sending this campaign.</p>
         </td></tr>
