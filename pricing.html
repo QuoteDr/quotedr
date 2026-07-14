@@ -8,6 +8,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="brand-theme.css?v=1777661601">
+    <link rel="stylesheet" href="signup-gate.css?v=20260713">
     <style>
         body { background: #f8fafc; font-family: 'Segoe UI', sans-serif; }
         .navbar { min-height: 78px; overflow: visible; }
@@ -34,6 +35,12 @@
         .btn-pro:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(232,126,42,0.45); }
         button:disabled { opacity: 0.65; transform: none !important; cursor: default; }
         .trial-note { text-align: center; color: #888; font-size: 0.82rem; margin-top: 10px; }
+        .billing-switch-wrap { display: flex; justify-content: center; margin-bottom: 24px; position: relative; z-index: 2; }
+        .billing-switch { display: inline-flex; gap: 4px; padding: 4px; background: #e2e8f0; border: 1px solid #cbd5e1; border-radius: 8px; }
+        .billing-option { min-width: 130px; min-height: 42px; border: 0; border-radius: 6px; background: transparent; color: #475569; font-weight: 750; padding: 8px 14px; }
+        .billing-option.active { background: #ffffff; color: #0f3460; box-shadow: 0 2px 8px rgba(15, 52, 96, 0.14); }
+        .billing-option small { display: block; color: #15803d; font-size: 0.7rem; font-weight: 800; }
+        .price-currency { margin-top: 8px; color: #64748b; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0; }
         .play-day-pricing-nudge { display:none; max-width:760px; margin:-72px auto 28px; background:#fff7ed; border:1px solid #fed7aa; border-radius:14px; padding:16px 20px; color:#7c2d12; box-shadow:0 10px 28px rgba(124,45,18,0.14); position:relative; z-index:2; }
         .play-day-pricing-nudge strong { color:#9a3412; }
         .compare-tag { background: #f0f9ff; border-left: 3px solid #1a56a0; padding: 10px 16px; border-radius: 0 8px 8px 0; font-size: 0.85rem; color: #1a56a0; margin-bottom: 20px; }
@@ -56,6 +63,8 @@
             .navbar { min-height: 72px; }
             .brand-logo { height: 54px; width: 54px; transform: scale(1.55); }
             .hero h1 { font-size: 2rem; }
+            .billing-switch { width: 100%; }
+            .billing-option { min-width: 0; flex: 1; }
         }
     </style>
     <script src="analytics.js?v=1778059000"></script>
@@ -74,7 +83,7 @@
 <div class="hero">
     <div class="container">
         <h1>Simple or AI-Powered.<br>You Choose.</h1>
-        <p>Start free. Upgrade when you're ready. 14-day free trial &middot; Cancel anytime.</p>
+        <p>Choose monthly or annual billing. Every amount below is in Canadian dollars.</p>
     </div>
 </div>
 
@@ -86,13 +95,20 @@
 </div>
 
 <div class="container plans-row">
+    <div class="billing-switch-wrap">
+        <div class="billing-switch" role="group" aria-label="Billing frequency">
+            <button type="button" class="billing-option active" data-billing-interval="month" aria-pressed="true">Monthly</button>
+            <button type="button" class="billing-option" data-billing-interval="year" aria-pressed="false">Annual<small>Save 2 months</small></button>
+        </div>
+    </div>
     <div class="row g-4 justify-content-center">
         <!-- BASIC -->
         <div class="col-md-5">
             <div class="plan-card">
                 <div class="plan-name">Basic</div>
                 <div class="plan-tagline">Everything you need to quote, invoice, and track jobs</div>
-                <div class="price">$29<span>/mo</span></div>
+                <div class="price" id="basicPrice">$39<span>/month</span></div>
+                <div class="price-currency">CAD</div>
                 <ul class="feature-list mt-3">
                     <li><i class="fas fa-check-circle"></i> Unlimited quotes, invoices, and client links</li>
                     <li><i class="fas fa-check-circle"></i> Professional themes and custom branding</li>
@@ -104,8 +120,8 @@
                     <li><i class="fas fa-check-circle"></i> Quote follow-ups and payment reminders</li>
                     <li><i class="fas fa-check-circle"></i> Custom price list import and cross-device sync</li>
                 </ul>
-                <button class="btn-starter" id="basicBtn" onclick="startCheckout('basic')">Start Free Trial</button>
-                <p class="trial-note">14-day free trial &middot; Cancel anytime</p>
+                <button class="btn-starter" id="basicBtn" onclick="startCheckout('basic')">Choose Basic</button>
+                <p class="trial-note" id="basicTrialNote">14-day free trial &middot; Then billed monthly</p>
             </div>
         </div>
         <!-- PRO -->
@@ -114,7 +130,8 @@
                 <div class="badge-popular">⚡ MOST POPULAR</div>
                 <div class="plan-name" style="color:#e87e2a;">Pro</div>
                 <div class="plan-tagline">Everything in Basic, plus the fastest AI quoting tools</div>
-                <div class="price" style="color:#e87e2a;">$55<span>/mo</span></div>
+                <div class="price" id="proPrice" style="color:#e87e2a;">$99<span>/month</span></div>
+                <div class="price-currency">CAD</div>
                 <div class="compare-tag mt-3">💡 Competitors charge $500–$1,000/mo for less</div>
                 <ul class="feature-list">
                     <li><i class="fas fa-check-circle"></i> Everything in Basic</li>
@@ -127,8 +144,8 @@
                     <li><i class="fas fa-check-circle"></i> Profit margin tracking and smarter job reporting</li>
                     <li><i class="fas fa-check-circle"></i> Priority support</li>
                 </ul>
-                <button class="btn-pro" id="proBtn" onclick="startCheckout('pro')">🚀 Get Started with Pro</button>
-                <p class="trial-note">14-day free trial &middot; Cancel anytime</p>
+                <button class="btn-pro" id="proBtn" onclick="startCheckout('pro')">Choose Pro</button>
+                <p class="trial-note" id="proTrialNote">14-day free trial &middot; Then billed monthly</p>
             </div>
         </div>
     </div>
@@ -192,6 +209,9 @@
     <p>&copy; 2025 QuoteDr &middot; <a href="landing.html">Home</a> &middot; <a href="login.html">Sign In</a></p>
 </footer>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-v2.js?v=20260713"></script>
+<script src="signup-gate.js?v=20260713"></script>
 <script>
 const testimonialReviews = [
     [
@@ -294,33 +314,104 @@ function showPlayDayPricingNudge() {
     } catch(e) {}
 }
 
+var selectedBillingInterval = 'month';
+var pricingCatalog = {
+    month: {
+        basic: { amount: '$39', suffix: '/month' },
+        pro: { amount: '$99', suffix: '/month' },
+        note: '14-day free trial &middot; Then billed monthly'
+    },
+    year: {
+        basic: { amount: '$390', suffix: '/year' },
+        pro: { amount: '$990', suffix: '/year' },
+        note: '14-day free trial &middot; Then billed annually'
+    }
+};
+
+function setBillingInterval(interval) {
+    if (!pricingCatalog[interval]) interval = 'month';
+    selectedBillingInterval = interval;
+    document.querySelectorAll('[data-billing-interval]').forEach(function(button) {
+        var active = button.getAttribute('data-billing-interval') === interval;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+
+    ['basic', 'pro'].forEach(function(plan) {
+        var price = pricingCatalog[interval][plan];
+        var priceEl = document.getElementById(plan + 'Price');
+        var noteEl = document.getElementById(plan + 'TrialNote');
+        if (priceEl) priceEl.innerHTML = price.amount + '<span>' + price.suffix + '</span>';
+        if (noteEl) noteEl.innerHTML = pricingCatalog[interval].note;
+    });
+}
+
+function resetCheckoutButton(plan) {
+    var btn = document.getElementById(plan === 'pro' ? 'proBtn' : 'basicBtn');
+    if (!btn) return;
+    btn.disabled = false;
+    btn.textContent = plan === 'pro' ? 'Choose Pro' : 'Choose Basic';
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     startTestimonials();
     showPlayDayPricingNudge();
+    document.querySelectorAll('[data-billing-interval]').forEach(function(button) {
+        button.addEventListener('click', function() {
+            setBillingInterval(button.getAttribute('data-billing-interval'));
+        });
+    });
+    var requestedInterval = new URLSearchParams(window.location.search).get('billing');
+    setBillingInterval(requestedInterval === 'year' ? 'year' : 'month');
 });
 
 async function startCheckout(plan) {
+    if (plan !== 'basic' && plan !== 'pro') return;
     var btn = document.getElementById(plan === 'pro' ? 'proBtn' : 'basicBtn');
     btn.disabled = true;
-    btn.textContent = 'Loading...';
+    btn.textContent = 'Opening secure checkout...';
     try {
-        var authKey = 'sb-axmoffknvblluibuitrq-auth-token';
-        var auth = JSON.parse(localStorage.getItem(authKey) || '{}');
-        var email = auth.user && auth.user.email ? auth.user.email : '';
-        var userId = auth.user && auth.user.id ? auth.user.id : '';
-        if (!email) { window.location.href = 'login.html?redirect=pricing.html'; return; }
-        var res = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/stripe-checkout', {
+        var sessionResult = await _supabase.auth.getSession();
+        var session = sessionResult && sessionResult.data ? sessionResult.data.session : null;
+        if (sessionResult.error) throw sessionResult.error;
+        if (!session || !session.access_token) {
+            resetCheckoutButton(plan);
+            if (window.QuoteDrSignupGate) {
+                window.QuoteDrSignupGate.open('pricing_' + plan + '_' + selectedBillingInterval);
+            } else {
+                window.location.href = 'login.html?signup=1';
+            }
+            return;
+        }
+
+        var cancelUrl = new URL('pricing.html?billing=' + selectedBillingInterval, window.location.href).href;
+        var res = await fetch(SUPABASE_URL + '/functions/v1/stripe-checkout', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso' },
-            body: JSON.stringify({ email: email, userId: userId, plan: plan, successUrl: window.location.origin + '/quote-builder.html?subscribed=1', cancelUrl: window.location.href })
+            headers: {
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': 'Bearer ' + session.access_token
+            },
+            body: JSON.stringify({
+                plan: plan,
+                billingInterval: selectedBillingInterval,
+                successUrl: window.location.origin + '/quote-builder.html?subscribed=1',
+                cancelUrl: cancelUrl
+            })
         });
-        var data = await res.json();
-        if (data.error) throw new Error(data.error);
+        var data = await res.json().catch(function() { return {}; });
+        if (!res.ok || data.error) throw new Error(data.error || 'Could not open Stripe checkout.');
+        if (!data.url) throw new Error('Stripe checkout did not return a secure URL.');
+        if (window.QuoteDrAnalytics) {
+            window.QuoteDrAnalytics.capture('subscription_checkout_started', {
+                plan: plan,
+                billing_interval: selectedBillingInterval
+            });
+        }
         window.location.href = data.url;
     } catch(e) {
-        btn.disabled = false;
-        btn.textContent = plan === 'pro' ? '🚀 Get Started with Pro' : 'Start Free Trial';
-        alert('Error: ' + e.message);
+        resetCheckoutButton(plan);
+        alert('Checkout could not be opened: ' + e.message);
     }
 }
 </script>
