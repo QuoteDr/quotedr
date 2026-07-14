@@ -13,7 +13,8 @@
     <title>QuoteDr - Quote Builder</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="brand-theme.css?v=1777661601">
+    <link rel="stylesheet" href="brand-theme.css?v=2026071302">
+    <script src="recording-privacy.js?v=2026071301"></script>
     <style>
         :root {
             --change-order-accent: var(--qd-blue, #1a56a0);
@@ -21,7 +22,9 @@
             --change-order-surface-strong: rgba(26, 86, 160, 0.12);
             --change-order-border-soft: rgba(26, 86, 160, 0.24);
             --quote-upgrade-accent: #0d9488;
+            --quote-upgrade-accent-contrast: #ffffff;
             --quote-upgrade-bg: #f8fafc;
+            --quote-upgrade-bg-contrast: #334155;
             --quote-upgrade-accent-soft: rgba(13, 148, 136, 0.14);
             --quote-upgrade-border: rgba(13, 148, 136, 0.35);
         }
@@ -201,7 +204,7 @@
             background: var(--quote-upgrade-bg, #f8fafc) !important;
             border-color: var(--quote-upgrade-border, rgba(13, 148, 136, 0.35)) !important;
             border-left: 4px solid var(--quote-upgrade-accent, #0d9488) !important;
-            color: #334155;
+            color: var(--quote-upgrade-bg-contrast, #334155);
         }
         .quote-upgrade-title {
             color: var(--quote-upgrade-accent, #0d9488);
@@ -262,7 +265,7 @@
         .quote-upgrade-option-btn.is-selected:focus {
             background: var(--quote-upgrade-accent, #0d9488);
             border-color: var(--quote-upgrade-accent, #0d9488);
-            color: #ffffff;
+            color: var(--quote-upgrade-accent-contrast, #ffffff);
         }
         .quote-upgrade-option-btn i {
             transition: transform 0.15s ease;
@@ -945,9 +948,92 @@
                 display: none !important;
             }
         }
-        .style-swatch { width:36px;height:36px;border-radius:50%;cursor:pointer;border:3px solid transparent;transition:all 0.15s;padding:0;appearance:none; }
+        .style-swatch { width:36px;height:36px;border-radius:50%;cursor:pointer;border:3px solid transparent;transition:all 0.15s;padding:0;appearance:none;flex:0 0 36px; }
         .style-swatch.selected { border-color:#333;transform:scale(1.15); }
         .style-swatch:hover { transform:scale(1.1); }
+        .quote-style-colour-wheel {
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            border:1px solid #b7c5d6;
+            background:#fff;
+            color:#1a56a0;
+            font-size:0.9rem;
+        }
+        .quote-style-colour-wheel[aria-expanded="true"] {
+            border-color:#1a56a0;
+            box-shadow:0 0 0 3px rgba(26,86,160,0.16);
+        }
+        .quote-style-colour-panel {
+            margin-top:10px;
+            border:1px solid #cfdbea;
+            border-radius:8px;
+            padding:10px;
+            background:#f8fbff;
+        }
+        .quote-style-colour-panel[hidden] { display:none; }
+        .quote-style-colour-favourites {
+            display:grid;
+            gap:6px;
+            margin-top:7px;
+        }
+        .quote-style-colour-favourite {
+            display:grid;
+            grid-template-columns:minmax(0,1fr) 34px;
+            gap:6px;
+        }
+        .quote-style-colour-favourite-use {
+            display:flex;
+            min-width:0;
+            align-items:center;
+            gap:8px;
+            border:1px solid #d4deea;
+            border-radius:6px;
+            padding:5px 8px;
+            background:#fff;
+            color:#24364b;
+            font-size:0.78rem;
+            font-weight:650;
+            text-align:left;
+        }
+        .quote-style-colour-favourite-use.selected {
+            border-color:#1a56a0;
+            box-shadow:0 0 0 2px rgba(26,86,160,0.14);
+        }
+        .quote-style-colour-favourite-dot {
+            width:22px;
+            height:22px;
+            flex:0 0 22px;
+            border:1px solid rgba(15,23,42,0.18);
+            border-radius:50%;
+        }
+        .quote-style-colour-favourite-delete {
+            width:34px;
+            height:34px;
+            padding:0;
+            border-radius:6px;
+        }
+        .quote-style-colour-empty,
+        .quote-style-colour-status {
+            color:#64748b;
+            font-size:0.76rem;
+        }
+        .quote-style-colour-status.is-warning { color:#9a6700; }
+        .quote-style-colour-exact {
+            display:grid;
+            grid-template-columns:52px minmax(0,1fr);
+            gap:8px;
+            align-items:end;
+            margin-top:9px;
+            padding-top:9px;
+            border-top:1px solid #dbe4ef;
+        }
+        .quote-style-colour-exact .form-control-color {
+            width:52px;
+            min-width:52px;
+            height:36px;
+            padding:3px;
+        }
         .quote-style-preset {
             border: 1px solid #dbe4ef;
             border-radius: 8px;
@@ -4155,6 +4241,7 @@ Example:
             group.selectedOptionIds = selected;
             item.selectedUpgradeOptionIds = getAllSelectedItemUpgradeOptionIds(item);
             applyItemUpgradeGroupsToItem(item);
+            syncChoiceGroupSelectedOptionUpgradeRuntimeState(item);
             renderRooms();
             calculateTotals();
             markUnsaved();
@@ -9124,30 +9211,57 @@ Example:
             return out;
         }
 
+        function quoteUpgradeRuntimeTextKey(value) {
+            return String(value || '')
+                .trim()
+                .toLowerCase()
+                .replace(/\s+/g, ' ');
+        }
+
+        function findQuoteUpgradeRuntimeGroup(groups, targetGroup) {
+            groups = Array.isArray(groups) ? groups : [];
+            targetGroup = targetGroup || {};
+            var exact = targetGroup.id ? groups.find(function(group) {
+                return group && group.id === targetGroup.id;
+            }) : null;
+            if (exact) return exact;
+            var targetName = quoteUpgradeRuntimeTextKey(targetGroup.name);
+            return targetName ? groups.find(function(group) {
+                return quoteUpgradeRuntimeTextKey(group && group.name) === targetName;
+            }) : null;
+        }
+
+        function findQuoteUpgradeRuntimeOption(group, targetOption) {
+            var options = group && Array.isArray(group.options) ? group.options : [];
+            targetOption = targetOption || {};
+            var exact = targetOption.id ? options.find(function(option) {
+                return option && option.id === targetOption.id;
+            }) : null;
+            if (exact) return exact;
+            var targetName = quoteUpgradeRuntimeTextKey(targetOption.name || targetOption.sourceItemName || targetOption.description);
+            var targetUnit = quoteUpgradeRuntimeTextKey(targetOption.unitType || targetOption.unit);
+            return targetName ? options.find(function(option) {
+                var optionName = quoteUpgradeRuntimeTextKey(option && (option.name || option.sourceItemName || option.description));
+                var optionUnit = quoteUpgradeRuntimeTextKey(option && (option.unitType || option.unit));
+                return optionName === targetName && (!targetUnit || !optionUnit || optionUnit === targetUnit);
+            }) : null;
+        }
+
         function mergeQuoteItemUpgradeGroupRuntimeState(targetGroups, previousGroups) {
             targetGroups = normalizeQuoteItemUpgradeGroups({ upgradeGroups: targetGroups });
             previousGroups = normalizeQuoteItemUpgradeGroups({ upgradeGroups: previousGroups });
-            var selectedIdsByGroup = {};
-            var quantityStateByGroupAndOption = {};
-            previousGroups.forEach(function(group) {
-                selectedIdsByGroup[group.id] = Array.isArray(group.selectedOptionIds) ? group.selectedOptionIds.slice() : [];
-                (group.options || []).forEach(function(option) {
-                    quantityStateByGroupAndOption[group.id + '||' + option.id] = {
-                        manualQuantity: option.manualQuantity
-                    };
-                });
-            });
             targetGroups.forEach(function(group) {
-                if (selectedIdsByGroup[group.id]) {
-                    group.selectedOptionIds = selectedIdsByGroup[group.id].filter(function(optionId) {
-                        return (group.options || []).some(function(option) { return option.id === optionId; });
-                    });
-                }
+                var previousGroup = findQuoteUpgradeRuntimeGroup(previousGroups, group);
+                if (!previousGroup) return;
+                var previousSelectedIds = Array.isArray(previousGroup.selectedOptionIds) ? previousGroup.selectedOptionIds : [];
+                var nextSelectedIds = [];
                 (group.options || []).forEach(function(option) {
-                    var quantityState = quantityStateByGroupAndOption[group.id + '||' + option.id];
-                    if (!quantityState) return;
-                    option.manualQuantity = parseFloat(quantityState.manualQuantity || 0) || 0;
+                    var previousOption = findQuoteUpgradeRuntimeOption(previousGroup, option);
+                    if (!previousOption) return;
+                    option.manualQuantity = parseFloat(previousOption.manualQuantity || 0) || 0;
+                    if (previousSelectedIds.indexOf(previousOption.id) !== -1) nextSelectedIds.push(option.id);
                 });
+                group.selectedOptionIds = group.type === 'multiple' ? nextSelectedIds : nextSelectedIds.slice(0, 1);
             });
             return targetGroups;
         }
@@ -9307,6 +9421,7 @@ Example:
             item.upgradeGroups = optionUpgradeGroups;
             delete item._itemUpgradeBaseCaptured;
             if (item.upgradeGroups.length) applyItemUpgradeGroupsToItem(item);
+            syncChoiceGroupSelectedOptionUpgradeRuntimeState(item);
             clearInvalidChoiceGroupEnhancementSelections(item.choiceGroup);
             return item;
         }
@@ -9415,6 +9530,7 @@ Example:
             var selectedOption = await openQuoteChoiceGroupOptionPicker(item);
             if (!selectedOption) return;
             _pushUndo();
+            syncChoiceGroupSelectedOptionUpgradeRuntimeState(item);
             item.choiceGroup.defaultOptionId = selectedOption.id;
             item.choiceGroup.selectedOptionIds = [selectedOption.id];
             moveChoiceGroupOptionToFront(item.choiceGroup, selectedOption.id);
@@ -9567,7 +9683,9 @@ Example:
                 if (saved.photoFull && !next.photoFull) next.photoFull = saved.photoFull;
                 if (Array.isArray(saved.photosFull) && !Array.isArray(next.photosFull)) next.photosFull = saved.photosFull;
                 var savedUpgradeGroups = normalizeQuoteItemUpgradeGroups(saved);
-                if (savedUpgradeGroups.length) next.upgradeGroups = savedUpgradeGroups;
+                if (savedUpgradeGroups.length) {
+                    next.upgradeGroups = mergeQuoteItemUpgradeGroupRuntimeState(savedUpgradeGroups, next.upgradeGroups || []);
+                }
                 if (!next.category && savedMatch.category) next.category = savedMatch.category;
                 return next;
             });
@@ -17786,7 +17904,7 @@ Example:
                             <div class="row g-3">
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold">Accent Colour</label>
-                                    <div class="d-flex flex-wrap gap-2" id="accentSwatches">
+                                    <div class="d-flex flex-wrap gap-2" id="accentSwatches" data-style-colour-area="accent">
                                         <div class="style-swatch" data-accent="#ffffff" style="background:#ffffff;border:1px solid #ddd;" title="Default"></div>
                                         <div class="style-swatch selected" data-accent="#1a56a0" style="background:#1a56a0;" title="Classic Blue"></div>
                                         <div class="style-swatch" data-accent="#0f7b5e" style="background:#0f7b5e;" title="Forest Green"></div>
@@ -17797,10 +17915,15 @@ Example:
                                         <div class="style-swatch" data-accent="#374151" style="background:#374151;" title="Charcoal"></div>
                                         <div class="style-swatch" data-accent="#e87e2a" style="background:#e87e2a;" title="Orange"></div>
                                     </div>
+                                    <div class="d-flex justify-content-between align-items-center mt-2">
+                                        <label class="form-label small fw-semibold mb-0" for="quoteAccentStrength">Accent Colour Strength</label>
+                                        <span id="quoteAccentStrengthValue" class="text-muted small fw-semibold">100%</span>
+                                    </div>
+                                    <input type="range" id="quoteAccentStrength" class="form-range" min="20" max="100" step="5" value="100">
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold">Option Group Colour</label>
-                                    <div class="d-flex flex-wrap gap-2" id="optionAccentSwatches">
+                                    <div class="d-flex flex-wrap gap-2" id="optionAccentSwatches" data-style-colour-area="optionAccent">
                                         <div class="style-swatch option-swatch selected" data-option-accent="#1a56a0" style="background:#1a56a0;" title="Classic Blue"></div>
                                         <div class="style-swatch option-swatch" data-option-accent="#0f7b5e" style="background:#0f7b5e;" title="Forest Green"></div>
                                         <div class="style-swatch option-swatch" data-option-accent="#7c3aed" style="background:#7c3aed;" title="Violet"></div>
@@ -17811,7 +17934,11 @@ Example:
                                         <div class="style-swatch option-swatch" data-option-accent="#e87e2a" style="background:#e87e2a;" title="Orange"></div>
                                     </div>
                                     <input type="hidden" id="quoteOptionAccent" value="#1a56a0">
-                                    <div class="text-muted small mt-2">Controls the colour of grouped choice cards in the client quote.</div>
+                                    <div class="d-flex justify-content-between align-items-center mt-2">
+                                        <label class="form-label small fw-semibold mb-0" for="quoteOptionAccentStrength">Option Group Colour Strength</label>
+                                        <span id="quoteOptionAccentStrengthValue" class="text-muted small fw-semibold">100%</span>
+                                    </div>
+                                    <input type="range" id="quoteOptionAccentStrength" class="form-range" min="20" max="100" step="5" value="100">
                                 </div>
                                 <div class="col-12">
                                     <div class="send-settings-card">
@@ -17824,7 +17951,7 @@ Example:
                                         <div class="row g-3 mt-1">
                                             <div class="col-md-6">
                                                 <label class="form-label fw-semibold">Upgrade Options Colour</label>
-                                                <div class="d-flex flex-wrap gap-2" id="upgradeAccentSwatches">
+                                                <div class="d-flex flex-wrap gap-2" id="upgradeAccentSwatches" data-style-colour-area="upgradeAccent">
                                                     <button type="button" class="style-swatch upgrade-swatch selected" data-upgrade-accent="#0d9488" style="background:#0d9488;" title="Modern Teal" aria-label="Modern Teal"></button>
                                                     <button type="button" class="style-swatch upgrade-swatch" data-upgrade-accent="#15803d" style="background:#15803d;" title="Sage Green" aria-label="Sage Green"></button>
                                                     <button type="button" class="style-swatch upgrade-swatch" data-upgrade-accent="#4f46e5" style="background:#4f46e5;" title="Luxury Indigo" aria-label="Luxury Indigo"></button>
@@ -17835,7 +17962,7 @@ Example:
                                             </div>
                                             <div class="col-md-6">
                                                 <label class="form-label fw-semibold">Upgrade Card Background</label>
-                                                <div class="d-flex flex-wrap gap-2" id="upgradeBgSwatches">
+                                                <div class="d-flex flex-wrap gap-2" id="upgradeBgSwatches" data-style-colour-area="upgradeBg">
                                                     <button type="button" class="style-swatch upgrade-bg-swatch selected" data-upgrade-bg="#f8fafc" style="background:#f8fafc;" title="Light Slate" aria-label="Light Slate"></button>
                                                     <button type="button" class="style-swatch upgrade-bg-swatch" data-upgrade-bg="#ecfdf5" style="background:#ecfdf5;" title="Soft Teal" aria-label="Soft Teal"></button>
                                                     <button type="button" class="style-swatch upgrade-bg-swatch" data-upgrade-bg="#eef2ff" style="background:#eef2ff;" title="Soft Indigo" aria-label="Soft Indigo"></button>
@@ -17849,7 +17976,7 @@ Example:
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold">Background Tint</label>
-                                    <div class="d-flex flex-wrap gap-2" id="bgSwatches">
+                                    <div class="d-flex flex-wrap gap-2" id="bgSwatches" data-style-colour-area="bg">
                                         <div class="style-swatch bg-swatch" data-bg="#ffffff" style="background:#ffffff;border:1px solid #ddd;" title="White"></div>
                                         <div class="style-swatch bg-swatch selected" data-bg="#f7fbff" style="background:#f7fbff;" title="Cool Blue"></div>
                                         <div class="style-swatch bg-swatch" data-bg="#f0fdf4" style="background:#f0fdf4;" title="Soft Green"></div>
@@ -19102,3 +19229,4 @@ if ('serviceWorker' in navigator) {
 </script>
 </body>
 </html>
+
