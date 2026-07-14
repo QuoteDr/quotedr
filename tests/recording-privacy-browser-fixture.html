@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recording Privacy Fixture</title>
+    <link rel="stylesheet" href="../brand-theme.css?v=2026071302">
+    <script src="../admin-access.js?v=2026071301"></script>
+    <script src="../recording-privacy.js?v=2026071301"></script>
+    <style>
+        body { padding: 2rem; background: #eef4fb; }
+        main { max-width: 760px; margin: 0 auto; }
+        .fixture-row { display: flex; justify-content: space-between; gap: 1rem; padding: 0.75rem 0; border-bottom: 1px solid #d8e4f2; }
+    </style>
+</head>
+<body>
+    <main class="card p-4">
+        <h1 class="h4">Recording Privacy Fixture</h1>
+        <div class="d-flex gap-2 mb-3">
+            <button id="enablePrivacy" class="btn btn-primary" type="button" onclick="QuoteDrRecordingPrivacy.setEnabled(true)">Enable</button>
+            <button id="disablePrivacy" class="btn btn-outline-secondary" type="button" onclick="QuoteDrRecordingPrivacy.setEnabled(false)">Disable</button>
+        </div>
+        <div class="fixture-row" id="mixedQuoteLine"><span>Deck boards</span><span>24 LF @ $125.00 = $3,000.00</span></div>
+        <div class="fixture-row"><span>Tax rate</span><strong id="taxRateText">HST (13%)</strong></div>
+        <div class="fixture-row"><span>Private margin</span><strong id="marginText">75% margin</strong></div>
+        <div class="fixture-row" id="alternateCurrencies"><span>Other currencies</span><strong>&pound;90.00 / &euro;105.00 / 250.00 CAD</strong></div>
+        <div class="row g-3 mt-1">
+            <div class="col-sm-6">
+                <label class="form-label" for="lineQuantity">Quantity</label>
+                <input id="lineQuantity" class="form-control" type="number" value="24">
+            </div>
+            <div class="col-sm-6">
+                <label class="form-label" for="lineRate">Rate ($)</label>
+                <input id="lineRate" class="form-control" type="number" value="125.00">
+            </div>
+        </div>
+        <div id="dynamicPrice" class="fixture-row mt-3"><span>Dynamic total</span><strong>Waiting...</strong></div>
+        <div class="small text-muted mt-3" id="adminResults"></div>
+    </main>
+    <script>
+        document.getElementById('dynamicPrice').querySelector('strong').textContent = 'Balance due: CA$2,875.00';
+        document.getElementById('adminResults').textContent = [
+            QuoteDrAdmin.isAdminUser({ email: 'info@alddirect.ca' }),
+            QuoteDrAdmin.isAdminUser({ email: 'Ald.direct.contracting@gmail.com' }),
+            QuoteDrAdmin.isAdminUser({ email: 'client@example.com' })
+        ].join(',');
+    </script>
+</body>
+</html>
