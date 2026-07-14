@@ -58,6 +58,14 @@ function qdDurableSaveError(error, fallback) {
     return wrapped;
 }
 
+function qdDurableVersionsMatch(left, right) {
+    if (left === undefined || left === null || right === undefined || right === null) return false;
+    if (String(left) === String(right)) return true;
+    var leftTime = Date.parse(String(left));
+    var rightTime = Date.parse(String(right));
+    return Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime === rightTime;
+}
+
 function qdApplyDurableFilters(query, filters) {
     (filters || []).forEach(function(filter) {
         if (!filter || !filter.column || filter.column === 'user_id') return;
@@ -149,7 +157,7 @@ async function qdExecuteDurableSupabaseTarget(operation) {
         var acknowledged = Array.isArray(result.data) ? result.data[0] : result.data;
         var versionColumn = target.verifyVersionColumn || 'updated_at';
         var versionAcknowledged = target.verifyVersionValue !== undefined && target.verifyVersionValue !== null &&
-            acknowledged && String(acknowledged[versionColumn] || '') === String(target.verifyVersionValue);
+            acknowledged && qdDurableVersionsMatch(acknowledged[versionColumn], target.verifyVersionValue);
         var acknowledgedRevision = acknowledged && acknowledged.data && acknowledged.data._saveMeta && acknowledged.data._saveMeta.revision;
         if (!versionAcknowledged && (!acknowledgedRevision || acknowledgedRevision !== operation.revision)) {
             throw new Error('Cloud save acknowledgement did not match the local revision.');
@@ -170,9 +178,11 @@ async function qdReadDurableSupabaseVersion(operation) {
     if (result.error) throw qdDurableSaveError(result.error, 'Could not verify the cloud revision.');
     if (!result.data) return null;
     if (operation.target && operation.target.verifyRevision) {
+        var saveMeta = result.data.data && result.data.data._saveMeta;
         return {
             version: result.data[versionColumn],
-            revision: result.data.data && result.data.data._saveMeta && result.data.data._saveMeta.revision
+            revision: saveMeta && saveMeta.revision,
+            operationId: saveMeta && saveMeta.operationId
         };
     }
     return result.data[versionColumn];

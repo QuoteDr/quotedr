@@ -19,10 +19,34 @@ assert(
 );
 
 assert(
-  source.includes('maybeConfirmSavedItemDatabaseUpdate(item, editedSavedItemData)') &&
-    source.includes("if (savedDbChoice === false) return;") &&
+  source.includes('maybeConfirmSavedItemDatabaseUpdate(editedQuoteItem, editedSavedItemData)') &&
+    source.includes("await _hideBootstrapModalAndWait('addLineModal')") &&
     source.includes("if (savedDbChoice === 'update_saved_item')"),
-  'The edit save path should prompt before committing and branch on the saved-item update choice'
+  'The edit save path should commit and close the quote editor before prompting for the saved-item update choice'
+);
+
+const confirmAddLineBlock = source.slice(
+  source.indexOf('async function confirmAddLine()'),
+  source.indexOf('function checkIfNewItem()')
+);
+
+assert(
+  confirmAddLineBlock.indexOf('item.rate = rate;') < confirmAddLineBlock.indexOf("await _hideBootstrapModalAndWait('addLineModal')") &&
+    confirmAddLineBlock.indexOf("await _hideBootstrapModalAndWait('addLineModal')") < confirmAddLineBlock.indexOf('maybeConfirmSavedItemDatabaseUpdate(editedQuoteItem, editedSavedItemData)'),
+  'Saving an edit should update the quote rate first, close the editor, and only then open the optional database prompt'
+);
+
+assert(
+  source.includes('function syncEditedItemUpgradeBaseState(item, values)') &&
+    source.includes('item._baseRate = values.priceTbd ? 0') &&
+    confirmAddLineBlock.includes('syncEditedItemUpgradeBaseState(item, {'),
+  'Editing an item with active upgrades should update the hidden base rate before the quote rerenders'
+);
+
+assert(
+  source.includes('if (itemOrSource && itemOrSource.savedItemSource)') &&
+    source.includes('serviceName: itemOrSource.serviceName || itemOrSource.description'),
+  'Saved item lookup should fall back to the current quote line when older source metadata is stale'
 );
 
 assert(

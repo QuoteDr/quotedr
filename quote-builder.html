@@ -1962,8 +1962,8 @@
 
 </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-v2.js?v=2026071301"></script>
-    <script src="save-coordinator.js?v=2026071301"></script>
+    <script src="supabase-v2.js?v=2026071401"></script>
+    <script src="save-coordinator.js?v=2026071401"></script>
     <script src="quote-media.js?v=2026071202"></script>
 <!-- Eruda mobile console (only loads with ?debug in URL) -->
 <script>
@@ -3825,6 +3825,22 @@ Example:
             item._baseItemDescription = item.itemDescription || '';
             item._baseDescription = item.description || item.name || '';
             item._baseLaborTime = normalizeLaborTime(item.laborTime);
+            item._itemUpgradeBaseCaptured = true;
+        }
+
+        function syncEditedItemUpgradeBaseState(item, values) {
+            if (!item || !values) return;
+            var hasUpgradeBase = item._itemUpgradeBaseCaptured === true || normalizeQuoteItemUpgradeGroups(item).length > 0;
+            if (!hasUpgradeBase) return;
+            item._baseRate = values.priceTbd ? 0 : (parseFloat(values.rate) || 0);
+            item._basePriceTbd = values.priceTbd === true;
+            item._baseMaterialCost = parseFloat(values.materialCost) || 0;
+            item._baseQuantity = parseFloat(values.quantity) || 0;
+            item._baseUnitType = values.unitType || '';
+            item._baseSupplierUrl = values.supplierUrl || '';
+            item._baseItemDescription = values.itemDescription || '';
+            item._baseDescription = values.description || '';
+            item._baseLaborTime = normalizeLaborTime(values.laborTime);
             item._itemUpgradeBaseCaptured = true;
         }
 
@@ -5899,7 +5915,32 @@ Example:
             { color: '#e8eaf6', label: 'Indigo' },
             { color: '#f1f8e9', label: 'Lime' },
             { color: '#ffffff', label: 'White' },
+            { color: '#212529', label: 'Charcoal' },
+            { color: '#475569', label: 'Slate' },
+            { color: '#1e3a5f', label: 'Navy' },
+            { color: '#285943', label: 'Forest' },
+            { color: '#7a3346', label: 'Burgundy' },
         ];
+
+        function getCategoryStyleTheme(background) {
+            var hex = String(background || '').trim().replace('#', '');
+            if (hex.length === 3) hex = hex.split('').map(function(ch) { return ch + ch; }).join('');
+            var validHex = /^[0-9a-f]{6}$/i.test(hex);
+            var red = validHex ? parseInt(hex.slice(0, 2), 16) : 240;
+            var green = validHex ? parseInt(hex.slice(2, 4), 16) : 244;
+            var blue = validHex ? parseInt(hex.slice(4, 6), 16) : 255;
+            var luminance = (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255;
+            var dark = luminance < 0.48;
+            return {
+                dark: dark,
+                text: dark ? '#ffffff' : '#1a56a0',
+                bodyText: dark ? '#ffffff' : '#495057',
+                icon: dark ? 'rgba(255,255,255,0.9)' : '#495057',
+                border: dark ? 'rgba(255,255,255,0.48)' : 'rgba(148,163,184,0.45)',
+                controlBackground: dark ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.75)',
+                badgeBackground: dark ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.82)'
+            };
+        }
 
         var _catPickerOpen = null;
 
@@ -8199,6 +8240,12 @@ Example:
                     return { category: cat, item: list[index], index: index, source: 'pricingDatabase' };
                 }
             }
+            if (itemOrSource && itemOrSource.savedItemSource) {
+                return findSavedItemForQuoteEdit({
+                    category: itemOrSource.category || '',
+                    serviceName: itemOrSource.serviceName || itemOrSource.description || ''
+                });
+            }
             return null;
         }
 
@@ -8495,15 +8542,14 @@ Example:
             const materialCost = parseFloat(document.getElementById('lineMaterialCost').value) || 0;
             const roomIndex = rooms.findIndex(r => r.id === roomId);
             if (roomIndex !== -1) {
-                let savedDbChoice = 'quote_only';
                 let previousSavedItemSource = null;
                 let editedSavedItemData = null;
+                let editedQuoteItem = null;
                 if (editingItemIndex !== null && rooms[roomIndex].items[editingItemIndex]) {
                     const item = rooms[roomIndex].items[editingItemIndex];
                     editedSavedItemData = buildSavedItemFromEditedLineItem(item);
                     previousSavedItemSource = cloneSavedItemForQuoteSync(item.savedItemSource || savedItemQuoteSource(item.category, { name: item.serviceName || item.description, unitType: item.unitType, rate: item.rate, materialCost: item.materialCost, priceTbd: item.priceTbd, pricingMode: item.pricingMode, supplierUrl: item.supplierUrl, itemDescription: item.itemDescription, photo: item.photo, photos: item.photos, photoFull: item.photoFull, photosFull: item.photosFull, laborTime: item.laborTime, upgrade: item.upgrade }));
-                    savedDbChoice = await maybeConfirmSavedItemDatabaseUpdate(item, editedSavedItemData);
-                    if (savedDbChoice === false) return;
+                    editedQuoteItem = item;
                 }
                 const savNewItemBtn = document.getElementById('saveNewItemBtn');
                 const shouldAskToSaveNewItem = editingItemIndex === null && !isLineItemOneTimeCategory() && savNewItemBtn && savNewItemBtn.dataset.databaseState === 'new';
@@ -8539,20 +8585,18 @@ Example:
                     item.materialCost = materialCost;
                     item.supplierUrl = getLineItemSupplierUrlFromForm();
                     item.laborTime = normalizeLaborTime(item.laborTime);
-                    if (savedDbChoice === 'update_saved_item') {
-                        const savedUpdateResult = await saveEditedLineItemToDatabase(previousSavedItemSource, editedSavedItemData);
-                        if (savedUpdateResult && savedUpdateResult.item) {
-                            item.serviceName = savedUpdateResult.item.name || item.serviceName;
-                            item.photo = savedUpdateResult.item.photo || item.photo || '';
-                            item.photoFull = savedUpdateResult.item.photoFull || item.photoFull || null;
-                            item.photosFull = Array.isArray(savedUpdateResult.item.photosFull) ? savedUpdateResult.item.photosFull : (item.photosFull || []);
-                            item.upgrade = savedUpdateResult.item.upgrade || null;
-                            item.upgradeGroups = normalizeQuoteItemUpgradeGroups(savedUpdateResult.item);
-                            item.selectedUpgradeOptionIds = [];
-                            item.savedItemSource = savedItemQuoteSource(savedUpdateResult.category, savedUpdateResult.item);
-                            item.savedItemFingerprint = getSavedItemFingerprintForQuoteSync(savedUpdateResult.item);
-                        }
-                    } else if (savedItemForEdit) {
+                    syncEditedItemUpgradeBaseState(item, {
+                        description: description,
+                        unitType: unitType,
+                        quantity: quantity,
+                        rate: rate,
+                        priceTbd: priceTbd,
+                        materialCost: materialCost,
+                        supplierUrl: item.supplierUrl,
+                        itemDescription: itemDescription,
+                        laborTime: item.laborTime
+                    });
+                    if (savedItemForEdit) {
                         item.photo = savedItemForEdit.photo || item.photo || '';
                         item.photoFull = savedItemForEdit.photoFull || item.photoFull || null;
                         item.photosFull = Array.isArray(savedItemForEdit.photosFull) ? savedItemForEdit.photosFull : (item.photosFull || []);
@@ -8616,10 +8660,28 @@ Example:
                     updateBuilderGuide();
                 }
 
-                // Close modal
-                const modalEl = document.getElementById('addLineModal');
-                const modal = bootstrap.Modal.getInstance(modalEl);
-                modal.hide();
+                // Commit and display the quote edit before asking about the reusable database item.
+                // This keeps a nested Bootstrap dialog from blocking the primary quote save.
+                await _hideBootstrapModalAndWait('addLineModal');
+
+                if (editedQuoteItem && editedSavedItemData) {
+                    const savedDbChoice = await maybeConfirmSavedItemDatabaseUpdate(editedQuoteItem, editedSavedItemData);
+                    if (savedDbChoice === 'update_saved_item') {
+                        const savedUpdateResult = await saveEditedLineItemToDatabase(previousSavedItemSource, editedSavedItemData);
+                        if (savedUpdateResult && savedUpdateResult.item) {
+                            editedQuoteItem.serviceName = savedUpdateResult.item.name || editedQuoteItem.serviceName;
+                            editedQuoteItem.photo = savedUpdateResult.item.photo || editedQuoteItem.photo || '';
+                            editedQuoteItem.photoFull = savedUpdateResult.item.photoFull || editedQuoteItem.photoFull || null;
+                            editedQuoteItem.photosFull = Array.isArray(savedUpdateResult.item.photosFull) ? savedUpdateResult.item.photosFull : (editedQuoteItem.photosFull || []);
+                            editedQuoteItem.upgrade = savedUpdateResult.item.upgrade || null;
+                            editedQuoteItem.upgradeGroups = normalizeQuoteItemUpgradeGroups(savedUpdateResult.item);
+                            editedQuoteItem.selectedUpgradeOptionIds = [];
+                            editedQuoteItem.savedItemSource = savedItemQuoteSource(savedUpdateResult.category, savedUpdateResult.item);
+                            editedQuoteItem.savedItemFingerprint = getSavedItemFingerprintForQuoteSync(savedUpdateResult.item);
+                            renderRooms();
+                        }
+                    }
+                }
             }
         }
 
@@ -12233,9 +12295,10 @@ Example:
                         var catStyle = categoryStyles[cat] || {};
                         var catIcon = catStyle.icon || 'fa-tag';
                         var catBg = catStyle.color || '#f0f4ff';
-                        html += '<div class="cat-group-header" style="background:' + catBg + '; padding:4px 8px; font-size:0.78rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#495057; border-bottom:1px solid #dee2e6;">';
-                        html += '<span class="cat-drag-handle" title="Drag to reorder category">&#8801;</span>';
-                        html += renderCategoryIconMarkup(catIcon, 'me-1', 'color:#6c757d;') + catDisplay;
+                        var catTheme = getCategoryStyleTheme(catBg);
+                        html += '<div class="cat-group-header" style="background:' + catBg + '; padding:4px 8px; font-size:0.78rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:' + catTheme.bodyText + '; border-bottom:1px solid ' + catTheme.border + ';">';
+                        html += '<span class="cat-drag-handle" title="Drag to reorder category" style="color:' + catTheme.icon + ';">&#8801;</span>';
+                        html += renderCategoryIconMarkup(catIcon, 'me-1', 'color:' + catTheme.icon + ';') + catDisplay;
                         html += '</div>';
                         var quoteItemTableColgroup = '<col style="width:32px"><col style="width:34px"><col><col style="width:96px"><col style="width:86px"><col style="width:100px">';
                         if (showLineProfitDetails) quoteItemTableColgroup += '<col style="width:118px">';

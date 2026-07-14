@@ -42,7 +42,10 @@ assert(builder.includes('hydrateQuoteLineItemPhotoFromSavedItem(item);'), 'Quote
 const confirmAddLine = sliceBetween(builder, 'async function confirmAddLine', 'function saveLineItemToDatabase');
 assert(confirmAddLine.includes('photo: dbItem?.photo'), 'New quote lines added from saved items should copy the saved item photo');
 assert(confirmAddLine.includes('item.photo = savedItemForEdit.photo'), 'Existing quote lines refreshed from saved items should copy the saved item photo');
-assert(confirmAddLine.includes('item.photo = savedUpdateResult.item.photo'), 'Existing quote lines refreshed after updating a saved item should copy the updated saved item photo');
+assert(
+  confirmAddLine.includes('editedQuoteItem.photo = savedUpdateResult.item.photo'),
+  'Existing quote lines refreshed after updating a saved item should copy the updated saved item photo'
+);
 
 assert(builder.includes('quote-line-photo-btn'), 'Quote builder rows should render a compact line item photo button');
 assert(builder.includes('openQuoteLineItemPhoto'), 'Quote builder should open line item photos without inline data URLs');

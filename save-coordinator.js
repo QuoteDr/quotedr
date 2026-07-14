@@ -219,6 +219,22 @@
         };
     }
 
+    function versionsMatch(left, right) {
+        if (left === undefined || left === null || right === undefined || right === null) return false;
+        if (String(left) === String(right)) return true;
+        var leftTime = Date.parse(String(left));
+        var rightTime = Date.parse(String(right));
+        return Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime === rightTime;
+    }
+
+    function acknowledgedVersion(result, operation) {
+        var data = result && Object.prototype.hasOwnProperty.call(result, 'data') ? result.data : result;
+        var row = Array.isArray(data) ? data[0] : data;
+        var column = operation && operation.target && operation.target.verifyVersionColumn || 'updated_at';
+        return row && (row[column] || row.updated_at || row.updatedAt || row.version) ||
+            operation && operation.target && operation.target.verifyVersionValue || null;
+    }
+
     function isConflictError(error) {
         var normalized = errorObject(error);
         return String(normalized.code) === '409' || /conflict|newer revision|stale write/i.test(normalized.message);
@@ -291,6 +307,22 @@
     async function markAcknowledged(operation, result) {
         var current = await getStoreValue(OUTBOX_STORE, operation.key);
         if (!current || current.operationId !== operation.operationId || current.revision !== operation.revision) {
+            if (current && current.operationId === operation.operationId && current.revision !== operation.revision) {
+                current.baseVersion = acknowledgedVersion(result, operation) || current.baseVersion || null;
+                current.state = 'local_pending';
+                current.attempts = 0;
+                current.lastError = null;
+                current.nextAttemptAt = 0;
+                await putStoreValue(OUTBOX_STORE, current);
+                var successorSnapshot = await getStoreValue(SNAPSHOT_STORE, current.key) || {};
+                successorSnapshot.state = 'local_pending';
+                successorSnapshot.lastError = null;
+                successorSnapshot.cloudBaseVersion = current.baseVersion;
+                await putStoreValue(SNAPSHOT_STORE, successorSnapshot);
+                await notify();
+                setTimeout(function() { flushSavedOperation(current, { force: true }); }, 0);
+                return publicResult('local_pending', current, result, null);
+            }
             return publicResult('cloud_saved', operation, result, null);
         }
         var snapshot = await getStoreValue(SNAPSHOT_STORE, operation.key) || {};
@@ -331,9 +363,11 @@
         var serverVersion = await withTimeout(adapter.readVersion(operation), operation.timeoutMs);
         if (serverVersion && typeof serverVersion === 'object') {
             if (serverVersion.revision && serverVersion.revision === operation.revision) return null;
+            if (serverVersion.operationId && serverVersion.operationId === operation.operationId) return null;
             serverVersion = serverVersion.version;
         }
-        if (!serverVersion || String(serverVersion) === String(operation.baseVersion)) return null;
+        var expectedVersion = operation.target && operation.target.verifyVersionValue;
+        if (!serverVersion || versionsMatch(serverVersion, operation.baseVersion) || versionsMatch(serverVersion, expectedVersion)) return null;
         var error = new Error('A newer revision already exists in the cloud. Review the conflict before overwriting it.');
         error.code = 'QD_SAVE_CONFLICT';
         error.serverVersion = serverVersion;
@@ -425,7 +459,7 @@
             action: options.action || 'upsert',
             payload: payload,
             target: options.target ? cloneValue(options.target) : null,
-            baseVersion: options.baseVersion || null,
+            baseVersion: existing ? (existing.baseVersion || options.baseVersion || null) : (options.baseVersion || null),
             state: 'local_pending',
             attempts: existing ? existing.attempts || 0 : 0,
             createdAt: existing ? existing.createdAt : now,
@@ -522,6 +556,40 @@
 
     async function getSnapshot(entityType, entityId, ownerId) {
         return getStoreValue(SNAPSHOT_STORE, entityKey(await currentUserId(ownerId), entityType, String(entityId)));
+    }
+
+    async function resolveConflict(key, strategy) {
+        var operation = await getStoreValue(OUTBOX_STORE, key);
+        if (!operation || operation.state !== 'conflict') return { state: 'missing' };
+        if (strategy === 'use_local') {
+            operation.baseVersion = null;
+            operation.state = 'local_pending';
+            operation.attempts = 0;
+            operation.lastError = null;
+            operation.nextAttemptAt = 0;
+            await putStoreValue(OUTBOX_STORE, operation);
+            await notify();
+            return flushSavedOperation(operation, { force: true });
+        }
+        if (strategy === 'use_cloud') {
+            var snapshot = await getStoreValue(SNAPSHOT_STORE, key) || {};
+            snapshot.state = 'superseded_by_cloud';
+            snapshot.supersededAt = new Date().toISOString();
+            snapshot.lastError = null;
+            await putStoreValue(SNAPSHOT_STORE, snapshot);
+            await deleteStoreValue(OUTBOX_STORE, key);
+            resolveVaultIncident(operation).catch(function() {});
+            await notify();
+            if (operation.entityType === 'quote' && operation.entityId && operation.entityId.indexOf('quote-number:') !== 0) {
+                var url = new URL(window.location.href);
+                url.searchParams.set('load', operation.entityId);
+                window.location.replace(url.toString());
+            } else {
+                window.location.reload();
+            }
+            return { state: 'cloud_selected' };
+        }
+        return { state: 'unchanged' };
     }
 
     function registerAdapter(entityType, adapter) {
@@ -758,10 +826,13 @@
         overlay.id = 'qdSaveRecoveryOverlay';
         var rows = status.operations.length ? status.operations.map(function(operation) {
             var lastError = operation.lastError && operation.lastError.message ? operation.lastError.message : '';
+            var conflictActions = operation.state === 'conflict' ? '<div class="qd-recovery-actions mt-2"><button type="button" class="btn btn-sm btn-primary" data-qd-use-local data-qd-operation-key="' + escapeHtml(operation.key) + '"><i class="fas fa-mobile-screen-button me-1"></i>Use This Device</button>' +
+                (operation.entityType === 'quote' ? '<button type="button" class="btn btn-sm btn-outline-primary" data-qd-use-cloud data-qd-operation-key="' + escapeHtml(operation.key) + '"><i class="fas fa-cloud-arrow-down me-1"></i>Load Cloud Copy</button>' : '') + '</div>' : '';
             return '<div class="qd-recovery-row">' +
                 '<div class="qd-recovery-title">' + escapeHtml(operation.entityLabel || operation.entityType) + '</div>' +
                 '<div class="qd-recovery-meta">' + escapeHtml(operation.state || 'local_pending') + ' | Saved locally ' + escapeHtml(new Date(operation.localSavedAt).toLocaleString()) + ' | Attempts: ' + escapeHtml(operation.attempts || 0) + '</div>' +
                 (lastError ? '<div class="qd-recovery-error">' + escapeHtml(lastError) + '</div>' : '') +
+                conflictActions +
                 '</div>';
         }).join('') : (status.lastLocalFailure
             ? '<div class="qd-recovery-row"><div class="qd-recovery-title text-danger">This change is not safely retained</div><div class="qd-recovery-error">' + escapeHtml(status.lastLocalFailure.message || 'Local browser storage failed.') + '</div><div class="qd-recovery-meta">Export a recovery file now. For a file larger than 50 MB, keep the original selected file available for re-upload.</div></div>'
@@ -773,6 +844,36 @@
             '</div>';
         overlay.addEventListener('click', function(event) {
             if (event.target === overlay || event.target.closest('[data-qd-close]')) overlay.remove();
+        });
+        overlay.querySelectorAll('[data-qd-use-local]').forEach(function(button) {
+            button.addEventListener('click', async function() {
+                overlay.style.display = 'none';
+                var confirmed = typeof qdConfirm === 'function' ? await qdConfirm('Use the quote saved on this device and replace the newer cloud copy? Close the quote on your other device first so it does not save over this choice again.', {
+                    title: 'Use This Device?', okText: 'Use This Device', cancelText: 'Cancel', type: 'warning'
+                }) : window.confirm('Use this device and replace the newer cloud copy?');
+                if (!confirmed) {
+                    overlay.style.display = '';
+                    return;
+                }
+                button.disabled = true;
+                var result = await resolveConflict(button.getAttribute('data-qd-operation-key'), 'use_local');
+                overlay.remove();
+                if (!result || result.state !== 'cloud_saved') openRecoveryCenter();
+            });
+        });
+        overlay.querySelectorAll('[data-qd-use-cloud]').forEach(function(button) {
+            button.addEventListener('click', async function() {
+                overlay.style.display = 'none';
+                var confirmed = typeof qdConfirm === 'function' ? await qdConfirm('Load the newest cloud copy and stop retrying this device\'s pending version? The local recovery snapshot will be retained.', {
+                    title: 'Load Cloud Copy?', okText: 'Load Cloud Copy', cancelText: 'Cancel', type: 'warning'
+                }) : window.confirm('Load the newest cloud copy?');
+                if (!confirmed) {
+                    overlay.style.display = '';
+                    return;
+                }
+                button.disabled = true;
+                await resolveConflict(button.getAttribute('data-qd-operation-key'), 'use_cloud');
+            });
         });
         overlay.querySelector('[data-qd-export]').addEventListener('click', exportRecovery);
         overlay.querySelector('[data-qd-retry]').addEventListener('click', async function(event) {
@@ -847,7 +948,7 @@
             if (typeof window.qdRegisterAllDurableSaveAdapters === 'function') window.qdRegisterAllDurableSaveAdapters();
             requestPersistentStorage();
             await notify();
-            await flush();
+            await flush({ force: true });
         } catch (error) {
             lastLocalFailure = errorObject(error);
             updateIndicator(await getStatus());
@@ -878,6 +979,7 @@
         subscribe: subscribe,
         getStatus: getStatus,
         getSnapshot: getSnapshot,
+        resolveConflict: resolveConflict,
         exportRecovery: exportRecovery,
         openRecoveryCenter: openRecoveryCenter,
         captureIncident: captureVaultIncident,

@@ -37,7 +37,7 @@ assert(
   coordinator.includes('operationId: existing ? existing.operationId') &&
     coordinator.includes('revision: revision') &&
     coordinator.includes('payloadHash: await payloadHash(payload)') &&
-    coordinator.includes('baseVersion: options.baseVersion || null'),
+    coordinator.includes('baseVersion: existing ? (existing.baseVersion || options.baseVersion || null) : (options.baseVersion || null)'),
   'Outbox operations should carry stable ids, revisions, hashes, and base server versions'
 );
 

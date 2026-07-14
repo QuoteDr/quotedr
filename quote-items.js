@@ -3597,14 +3597,17 @@
                 const catSty = categoryStyles[cat] || {};
                 const cIcon = catSty.icon || 'fa-tag';
                 const cColor = catSty.color || '#f0f4ff';
+                const cTheme = typeof getCategoryStyleTheme === 'function'
+                    ? getCategoryStyleTheme(cColor)
+                    : { text: '#1a56a0', icon: '#495057', border: '#6c757d', controlBackground: 'transparent' };
                 const catEsc = cat.replace(/'/g, "\\'");
                 const catIconMarkup = typeof renderCategoryIconMarkup === 'function'
-                    ? renderCategoryIconMarkup(cIcon, '', 'color:#495057;')
-                    : `<i class="fas ${cIcon}" style="color:#495057;"></i>`;
-                html += `<div class="d-flex align-items-center gap-2 mt-3 mb-1 px-2 py-1 rounded" style="background:${cColor};">
+                    ? renderCategoryIconMarkup(cIcon, '', `color:${cTheme.icon};`)
+                    : `<i class="fas ${cIcon}" style="color:${cTheme.icon};"></i>`;
+                html += `<div class="d-flex align-items-center gap-2 mt-3 mb-1 px-2 py-1 rounded" style="background:${cColor};color:${cTheme.text};">
                   ${catIconMarkup}
-                  <h6 class="fw-bold mb-0 text-primary" style="flex:1;">${cat}</h6>
-                  <button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem; padding:1px 8px;" onclick="openCategoryStylePicker('${catEsc}', this)" title="Customize icon &amp; colour">
+                  <h6 class="fw-bold mb-0" style="flex:1;color:${cTheme.text};">${cat}</h6>
+                  <button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;padding:1px 8px;color:${cTheme.text};border-color:${cTheme.border};background:${cTheme.controlBackground};" onclick="openCategoryStylePicker('${catEsc}', this)" title="Customize icon &amp; colour">
                     <i class="fas fa-palette me-1"></i>Style
                   </button>
                 </div>`;
@@ -3826,28 +3829,31 @@
                 const catSty = categoryStyles[cat] || {};
                 const cIcon = catSty.icon || 'fa-tag';
                 const cColor = catSty.color || '#f0f4ff';
+                const cTheme = typeof getCategoryStyleTheme === 'function'
+                    ? getCategoryStyleTheme(cColor)
+                    : { text: '#1a56a0', icon: '#495057', border: '#6c757d', controlBackground: 'rgba(255,255,255,0.75)', badgeBackground: 'rgba(255,255,255,0.82)' };
                 const catJs = manageItemsAttr(JSON.stringify(cat));
                 const catSafeId = manageItemsSafeId(cat, 'category');
                 const isOpen = getManageItemsCategoryOpen(cat);
                 const catIconMarkup = typeof renderCategoryIconMarkup === 'function'
-                    ? renderCategoryIconMarkup(cIcon, '', 'color:#495057;')
-                    : `<i class="fas ${manageItemsAttr(cIcon)}" style="color:#495057;"></i>`;
+                    ? renderCategoryIconMarkup(cIcon, '', `color:${cTheme.icon};`)
+                    : `<i class="fas ${manageItemsAttr(cIcon)}" style="color:${cTheme.icon};"></i>`;
 
                 html += `<section class="manage-items-category" data-category="${manageItemsAttr(cat)}">
-                    <div class="manage-items-category-header" style="background:${manageItemsAttr(cColor)};">
-                        <button type="button" class="manage-items-category-toggle" onclick="toggleManageItemsCategory(${catJs})" title="Collapse or expand ${manageItemsAttr(cat)}">
+                    <div class="manage-items-category-header" style="background:${manageItemsAttr(cColor)};color:${cTheme.text};">
+                        <button type="button" class="manage-items-category-toggle" onclick="toggleManageItemsCategory(${catJs})" title="Collapse or expand ${manageItemsAttr(cat)}" style="color:${cTheme.text};border-color:${cTheme.border};background:${cTheme.controlBackground};">
                             <i class="fas ${isOpen ? 'fa-chevron-down' : 'fa-chevron-right'}"></i>
                         </button>
-                        <button type="button" class="manage-category-drag-handle" title="Drag to reorder category" style="${getManageItemsCategoryOrderMode() === 'custom' ? '' : 'display:none;'}">
+                        <button type="button" class="manage-category-drag-handle" title="Drag to reorder category" style="${getManageItemsCategoryOrderMode() === 'custom' ? '' : 'display:none;'}color:${cTheme.text};border-color:${cTheme.border};background:${cTheme.controlBackground};">
                             <i class="fas fa-grip-vertical"></i>
                         </button>
                         ${catIconMarkup}
-                        <h6 class="fw-bold mb-0 text-primary" style="flex:1;">${manageItemsEscape(cat)}</h6>
-                        <span class="manage-items-category-count">${items.length}</span>
-                        <button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem; padding:1px 8px;" onclick="renameManageItemsCategory(${catJs})" title="Rename category">
+                        <h6 class="fw-bold mb-0" style="flex:1;color:${cTheme.text};">${manageItemsEscape(cat)}</h6>
+                        <span class="manage-items-category-count" style="color:${cTheme.text};background:${cTheme.badgeBackground};border-color:${cTheme.border};">${items.length}</span>
+                        <button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;padding:1px 8px;color:${cTheme.text};border-color:${cTheme.border};background:${cTheme.controlBackground};" onclick="renameManageItemsCategory(${catJs})" title="Rename category">
                             <i class="fas fa-pen me-1"></i>Rename
                         </button>
-                        <button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem; padding:1px 8px;" onclick="openCategoryStylePicker(${catJs}, this)" title="Customize icon and colour">
+                        <button class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;padding:1px 8px;color:${cTheme.text};border-color:${cTheme.border};background:${cTheme.controlBackground};" onclick="openCategoryStylePicker(${catJs}, this)" title="Customize icon and colour">
                             <i class="fas fa-palette me-1"></i>Style
                         </button>
                     </div>
