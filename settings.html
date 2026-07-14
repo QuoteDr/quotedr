@@ -12,7 +12,9 @@
 	<title>QuoteDr - Settings</title>
 	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 	<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-	<link rel="stylesheet" href="brand-theme.css?v=1777661601">
+	<link rel="stylesheet" href="brand-theme.css?v=2026071302">
+	<script src="admin-access.js?v=2026071301"></script>
+	<script src="recording-privacy.js?v=2026071301"></script>
 	<style>
 		body {
 			background: #eef4fb;
@@ -50,6 +52,29 @@
 			display: none;
 			color: #198754;
 			font-size: 0.9rem;
+		}
+		.admin-settings-heading {
+			padding: 0 0.65rem 0.45rem;
+			color: #64748b;
+			font-size: 0.72rem;
+			font-weight: 800;
+			text-transform: uppercase;
+		}
+		.recording-privacy-preview {
+			display: grid;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			gap: 0.75rem;
+			padding: 1rem;
+			border: 1px solid #d8e4f2;
+			border-radius: 8px;
+			background: #f8fbff;
+		}
+		.recording-privacy-preview > div {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 0.75rem;
+			min-width: 0;
 		}
 		.portal-layout-preview #portalPreviewMiniHeader {
 			display: flex;
@@ -354,6 +379,11 @@
 				max-height: none;
 			}
 		}
+		@media (max-width: 575.98px) {
+			.recording-privacy-preview {
+				grid-template-columns: 1fr;
+			}
+		}
 	</style>
 <!-- Eruda mobile console (only loads with ?debug in URL) -->
 <script>
@@ -406,20 +436,26 @@ if (location.search.includes('debug')) {
 		<div class="row g-4" id="settingsMain">
 			<!-- Sidebar -->
 			<div class="col-lg-3">
-				<div class="list-group shadow-sm" id="settingsTabs">
-					<a href="#" class="list-group-item list-group-item-action active fw-semibold" onclick="showTab('business',this);return false;"><i class="fas fa-building me-2" style="color:#1a56a0"></i>Business</a>
-					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('quotes',this);return false;"><i class="fas fa-file-invoice me-2" style="color:#1a56a0"></i>Quotes</a>
-					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('pricing',this);return false;"><i class="fas fa-boxes me-2" style="color:#1a56a0"></i>Pricing &amp; Data</a>
-					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('notifications',this);return false;"><i class="fas fa-bell me-2" style="color:#e87e2a"></i>Notifications</a>
-					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('payments',this);return false;"><i class="fas fa-credit-card me-2" style="color:#28a745"></i>Payments</a>
-					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('portal',this);return false;"><i class="fas fa-paint-brush me-2" style="color:#e87e2a"></i>Portal Theme</a>
-					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('integrations',this);return false;"><i class="fas fa-plug me-2" style="color:#2b6cb0"></i>Integrations</a>
-					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('help',this);return false;"><i class="fas fa-circle-question me-2" style="color:#1a56a0"></i>Help</a>
-					<a href="#" id="analyticsBriefTabLink" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('analytics',this);return false;" style="display:none;"><i class="fas fa-chart-line me-2" style="color:#198754"></i>Analytics Brief</a>
-					<a href="#" id="userMessagesTabLink" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('user-messages',this);return false;" style="display:none;"><i class="fas fa-bullhorn me-2" style="color:#f97316"></i>User Messages</a>
-					<a href="#" id="saveIncidentsTabLink" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('save-incidents',this);return false;" style="display:none;"><i class="fas fa-shield-halved me-2" style="color:#dc3545"></i>Save Incidents <span id="saveIncidentsNavBadge" class="badge bg-danger ms-1" style="display:none;">0</span></a>
-					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('account',this);return false;"><i class="fas fa-user-circle me-2" style="color:#6f42c1"></i>Account</a>
-					<a href="#" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('feedback',this);return false;"><i class="fas fa-comment-alt me-2" style="color:#28a745"></i>Feedback</a>
+				<div class="list-group shadow-sm settings-tab-list" id="settingsTabs">
+					<a href="#" data-settings-tab="business" class="list-group-item list-group-item-action active fw-semibold" onclick="showTab('business',this);return false;"><i class="fas fa-building me-2" style="color:#1a56a0"></i>Business</a>
+					<a href="#" data-settings-tab="quotes" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('quotes',this);return false;"><i class="fas fa-file-invoice me-2" style="color:#1a56a0"></i>Quotes</a>
+					<a href="#" data-settings-tab="pricing" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('pricing',this);return false;"><i class="fas fa-boxes me-2" style="color:#1a56a0"></i>Pricing &amp; Data</a>
+					<a href="#" data-settings-tab="notifications" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('notifications',this);return false;"><i class="fas fa-bell me-2" style="color:#e87e2a"></i>Notifications</a>
+					<a href="#" data-settings-tab="payments" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('payments',this);return false;"><i class="fas fa-credit-card me-2" style="color:#28a745"></i>Payments</a>
+					<a href="#" data-settings-tab="portal" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('portal',this);return false;"><i class="fas fa-paint-brush me-2" style="color:#e87e2a"></i>Portal Theme</a>
+					<a href="#" data-settings-tab="integrations" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('integrations',this);return false;"><i class="fas fa-plug me-2" style="color:#2b6cb0"></i>Integrations</a>
+					<a href="#" data-settings-tab="help" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('help',this);return false;"><i class="fas fa-circle-question me-2" style="color:#1a56a0"></i>Help</a>
+					<a href="#" data-settings-tab="account" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('account',this);return false;"><i class="fas fa-user-circle me-2" style="color:#6f42c1"></i>Account</a>
+					<a href="#" data-settings-tab="feedback" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('feedback',this);return false;"><i class="fas fa-comment-alt me-2" style="color:#28a745"></i>Feedback</a>
+				</div>
+				<div id="adminSettingsGroup" class="mt-3" style="display:none;">
+					<div class="admin-settings-heading"><i class="fas fa-shield-halved me-1"></i>Administrator</div>
+					<div class="list-group shadow-sm settings-tab-list" id="adminSettingsTabs">
+						<a href="#" id="analyticsBriefTabLink" data-settings-tab="analytics" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('analytics',this);return false;"><i class="fas fa-chart-line me-2" style="color:#198754"></i>Analytics Brief</a>
+						<a href="#" id="userMessagesTabLink" data-settings-tab="user-messages" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('user-messages',this);return false;"><i class="fas fa-bullhorn me-2" style="color:#f97316"></i>User Messages</a>
+						<a href="#" id="adminControlsTabLink" data-settings-tab="admin-controls" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('admin-controls',this);return false;"><i class="fas fa-sliders me-2" style="color:#1a56a0"></i>Admin Controls</a>
+						<a href="#" id="saveIncidentsTabLink" data-settings-tab="save-incidents" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('save-incidents',this);return false;"><i class="fas fa-shield-halved me-2" style="color:#dc3545"></i>Save Incidents <span id="saveIncidentsNavBadge" class="badge bg-danger ms-1" style="display:none;">0</span></a>
+					</div>
 				</div>
 			</div>
 
@@ -1537,7 +1573,7 @@ Sarah Jones, 905-555-5678"></textarea>
 									</div>
 								</div>
 								<div class="alert alert-light border small mt-3 mb-0">
-									<i class="fas fa-lock me-1 text-success"></i>Only info@alddirect.ca can manage messages. You will see active messages too, so previews and live tests work from your account.
+									<i class="fas fa-lock me-1 text-success"></i>Only approved QuoteDr administrator accounts can manage messages. Administrators also see active messages for previews and live tests.
 								</div>
 							</div>
 						</div>
@@ -1555,6 +1591,32 @@ Sarah Jones, 905-555-5678"></textarea>
 						<div id="broadcastMessagesList" class="small text-muted">Loading messages...</div>
 					</div>
 				</div><!-- /tab-user-messages -->
+
+				<div id="tab-admin-controls" style="display:none;">
+					<div class="settings-card">
+						<div class="d-flex align-items-start justify-content-between gap-3 flex-wrap mb-3">
+							<div>
+								<h5 class="mb-1"><i class="fas fa-video me-2" style="color:#1a56a0"></i>Recording Privacy</h5>
+								<p class="text-muted small mb-0">Conceal business pricing in tutorials, demonstrations, and advertising captures.</p>
+							</div>
+							<div class="form-check form-switch fs-5">
+								<input class="form-check-input" type="checkbox" role="switch" id="recordingPrivacyToggle" onchange="setRecordingPrivacyMode(this.checked)">
+								<label class="form-check-label fs-6 fw-semibold" for="recordingPrivacyToggle">Hide pricing</label>
+							</div>
+						</div>
+						<div class="recording-privacy-preview mb-3" aria-label="Recording privacy preview">
+							<div><span class="text-muted">Quantity</span><strong>24 LF</strong></div>
+							<div><span class="text-muted">Client price</span><strong data-qd-private-price="preview">$2,450.00</strong></div>
+						</div>
+						<div class="alert alert-light border mb-0 d-flex align-items-start gap-2">
+							<i class="fas fa-display mt-1 text-primary"></i>
+							<div>
+								<div class="fw-semibold" id="recordingPrivacyStatus">Pricing is visible on this browser.</div>
+								<div class="small text-muted">The setting applies immediately to QuoteDr tabs on this browser. Quantities, dimensions, units, and saved calculations are unchanged.</div>
+							</div>
+						</div>
+					</div>
+				</div><!-- /tab-admin-controls -->
 
 				<div id="tab-save-incidents" style="display:none;">
 					<div class="settings-card">
@@ -1936,10 +1998,14 @@ Sarah Jones, 905-555-5678"></textarea>
 
 		document.addEventListener('DOMContentLoaded', loadManageItemsPortraitSettings);
 
-		const QUOTEDR_ADMIN_EMAILS = ['info@alddirect.ca'];
+		const QUOTEDR_ADMIN_EMAILS = window.QuoteDrAdmin
+			? Array.from(window.QuoteDrAdmin.emails)
+			: ['info@alddirect.ca', 'ald.direct.contracting@gmail.com'];
 		const QUOTEDR_ANALYTICS_ADMIN_EMAILS = QUOTEDR_ADMIN_EMAILS;
+			const QUOTEDR_ADMIN_TABS = ['analytics', 'user-messages', 'admin-controls', 'save-incidents'];
 
 		function isQuoteDrAdminUser(user) {
+			if (window.QuoteDrAdmin) return window.QuoteDrAdmin.isAdminUser(user);
 			var email = String((user && user.email) || '').trim().toLowerCase();
 			return QUOTEDR_ADMIN_EMAILS.indexOf(email) !== -1;
 		}
@@ -1948,23 +2014,51 @@ Sarah Jones, 905-555-5678"></textarea>
 			return isQuoteDrAdminUser(user);
 		}
 
-		function applyAnalyticsAdminVisibility(user) {
-			var isAdmin = isQuoteDrAdminUser(user);
-			['analyticsBriefTabLink', 'userMessagesTabLink', 'saveIncidentsTabLink'].forEach(function(id) {
-				var tabLink = document.getElementById(id);
-				if (tabLink) tabLink.style.display = isAdmin ? '' : 'none';
-			});
-			['tab-analytics', 'tab-user-messages', 'tab-save-incidents'].forEach(function(id) {
-				var tabPanel = document.getElementById(id);
-				if (!isAdmin && tabPanel) tabPanel.style.display = 'none';
-			});
-			if (!isAdmin) {
-				if (['analytics', 'user-messages', 'save-incidents'].indexOf(localStorage.getItem('ald_settings_tab')) !== -1) {
-					localStorage.setItem('ald_settings_tab', 'business');
-				}
+			function applyAdminSettingsVisibility(user) {
+				var isAdmin = isQuoteDrAdminUser(user);
+				var adminGroup = document.getElementById('adminSettingsGroup');
+				if (adminGroup) adminGroup.style.display = isAdmin ? '' : 'none';
+				['analyticsBriefTabLink', 'userMessagesTabLink', 'adminControlsTabLink', 'saveIncidentsTabLink'].forEach(function(id) {
+					var tabLink = document.getElementById(id);
+					if (tabLink) tabLink.style.display = isAdmin ? '' : 'none';
+				});
+				['tab-analytics', 'tab-user-messages', 'tab-admin-controls', 'tab-save-incidents'].forEach(function(id) {
+					var tabPanel = document.getElementById(id);
+					if (!isAdmin && tabPanel) tabPanel.style.display = 'none';
+				});
+				if (!isAdmin) {
+					if (QUOTEDR_ADMIN_TABS.indexOf(localStorage.getItem('ald_settings_tab')) !== -1) {
+						localStorage.setItem('ald_settings_tab', 'business');
+					}
 			}
 			return isAdmin;
 		}
+
+		function applyAnalyticsAdminVisibility(user) {
+			return applyAdminSettingsVisibility(user);
+		}
+
+		function findSettingsTabLink(name) {
+			return document.querySelector('[data-settings-tab="' + String(name || '') + '"]');
+		}
+
+		function syncRecordingPrivacyControls() {
+			var enabled = !!(window.QuoteDrRecordingPrivacy && window.QuoteDrRecordingPrivacy.isEnabled());
+			var toggle = document.getElementById('recordingPrivacyToggle');
+			var status = document.getElementById('recordingPrivacyStatus');
+			if (toggle) toggle.checked = enabled;
+			if (status) status.textContent = enabled
+				? 'Pricing is concealed on this browser.'
+				: 'Pricing is visible on this browser.';
+		}
+
+		function setRecordingPrivacyMode(enabled) {
+			if (!isQuoteDrAdminUser(window.currentUser)) return;
+			if (window.QuoteDrRecordingPrivacy) window.QuoteDrRecordingPrivacy.setEnabled(!!enabled);
+			syncRecordingPrivacyControls();
+		}
+
+		window.addEventListener('quotedr:recording-privacy-changed', syncRecordingPrivacyControls);
 
 		function escapeAnalyticsHtml(value) {
 			return String(value === undefined || value === null ? '' : value)
@@ -2383,20 +2477,21 @@ Sarah Jones, 905-555-5678"></textarea>
 			}
 		}
 
-		function showTab(name, el) {
-			if ((name === 'analytics' || name === 'user-messages' || name === 'save-incidents') && !isQuoteDrAdminUser(window.currentUser)) {
-				name = 'business';
-				el = document.querySelector("#settingsTabs [onclick*=\"'business'\"]");
+			function showTab(name, el) {
+				if (QUOTEDR_ADMIN_TABS.indexOf(name) !== -1 && !isQuoteDrAdminUser(window.currentUser)) {
+					name = 'business';
+					el = findSettingsTabLink('business');
 			}
 			document.querySelectorAll('[id^="tab-"]').forEach(function(t) { t.style.display = 'none'; });
 			var tab = document.getElementById('tab-' + name);
 			if (tab) tab.style.display = '';
-			document.querySelectorAll('#settingsTabs .list-group-item').forEach(function(a) { a.classList.remove('active'); });
-			if (el) el.classList.add('active');
-			localStorage.setItem('ald_settings_tab', name);
-			if (name === 'user-messages') loadBroadcastAdminMessages();
-			if (name === 'save-incidents') loadSaveRecoveryIncidents();
-			if (name === 'help') {
+			document.querySelectorAll('.settings-tab-list .list-group-item').forEach(function(a) { a.classList.remove('active'); });
+				if (el) el.classList.add('active');
+				localStorage.setItem('ald_settings_tab', name);
+				if (name === 'user-messages') loadBroadcastAdminMessages();
+				if (name === 'admin-controls') syncRecordingPrivacyControls();
+				if (name === 'save-incidents') loadSaveRecoveryIncidents();
+				if (name === 'help') {
 				loadQuoteTipsSettingsUI();
 				renderBuilderTutorialSettingsUI();
 			}
@@ -2417,7 +2512,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			var tab = getRequestedSettingsTab();
 			var section = params.get('section') || (window.location.hash || '').replace(/^#/, '');
 			if (tab) {
-				var tabEl = document.querySelector('#settingsTabs [onclick*="\'' + tab + '\'"]');
+				var tabEl = findSettingsTabLink(tab);
 				showTab(tab, tabEl);
 			}
 			if (section === 'terms') {
@@ -2437,7 +2532,9 @@ Sarah Jones, 905-555-5678"></textarea>
 			{ tab: 'feedback', keywords: ['bug','report','feature','request','feedback','idea','problem','issue','broken'], label: 'Feedback & Bug Reports' },
 			{ tab: 'payments', keywords: ['payment','stripe','deposit','credit card','pay','invoice payment','checkout'], label: 'Payments' },
 			{ tab: 'help', keywords: ['help','tips','tip','tutorial','guide','onboarding','youtube','video','learn','support'], label: 'Help, Tips & Tutorial' },
-			{ tab: 'analytics', keywords: ['analytics','posthog','brief','report','summary','funnel','conversion','session','rage click','users'], label: 'AI Analytics Brief' },
+			{ tab: 'analytics', adminOnly: true, keywords: ['analytics','posthog','brief','report','summary','funnel','conversion','session','rage click','users'], label: 'AI Analytics Brief' },
+			{ tab: 'user-messages', adminOnly: true, keywords: ['user messages','broadcast','announcement','maintenance','message users','admin'], label: 'User Messages' },
+			{ tab: 'admin-controls', adminOnly: true, keywords: ['admin','recording','privacy','hide','mask','blur','price','pricing','tutorial','video'], label: 'Admin Controls' },
 			{ tab: 'account', keywords: ['account','subscription','billing','plan','upgrade','pro'], label: 'Account' },
 		];
 
@@ -2456,6 +2553,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			mainEl.style.display = 'none';
 			resultsEl.style.display = '';
 			var matches = settingsIndex.filter(function(s) {
+				if (s.adminOnly && !isQuoteDrAdminUser(window.currentUser)) return false;
 				return s.keywords.some(function(k) { return k.includes(q) || q.includes(k); });
 			});
 			if (matches.length === 0) {
@@ -2476,7 +2574,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			var btn = document.getElementById('searchClearBtn');
 			if (btn) btn.style.display = 'none';
 			if (tab) {
-				var tabEl = document.querySelector('#settingsTabs [onclick*="\'' + tab + '\'"]');
+				var tabEl = findSettingsTabLink(tab);
 				showTab(tab, tabEl);
 			}
 		}
@@ -2607,11 +2705,11 @@ Sarah Jones, 905-555-5678"></textarea>
 			if (isQuoteDrAdminUser(window.currentUser)) loadSaveRecoveryIncidents();
 			// Restore last active tab, unless the URL asks for a specific settings area.
 			var hashTab = (window.location.hash || '').replace(/^#/, '');
-			var allowedHashTabs = ['business', 'quotes', 'pricing', 'notifications', 'payments', 'portal', 'integrations', 'help', 'analytics', 'user-messages', 'save-incidents', 'account', 'feedback'];
+			var allowedHashTabs = ['business', 'quotes', 'pricing', 'notifications', 'payments', 'portal', 'integrations', 'help', 'analytics', 'user-messages', 'admin-controls', 'save-incidents', 'account', 'feedback'];
 			var requestedTab = getRequestedSettingsTab();
 			var lastTab = requestedTab || (allowedHashTabs.indexOf(hashTab) !== -1 ? hashTab : (localStorage.getItem('ald_settings_tab') || 'business'));
-			if ((lastTab === 'analytics' || lastTab === 'user-messages' || lastTab === 'save-incidents') && !isQuoteDrAdminUser(window.currentUser)) lastTab = 'business';
-			var tabEl = document.querySelector('#settingsTabs [onclick*="\'' + lastTab + '\'"]');
+			if (QUOTEDR_ADMIN_TABS.indexOf(lastTab) !== -1 && !isQuoteDrAdminUser(window.currentUser)) lastTab = 'business';
+			var tabEl = findSettingsTabLink(lastTab);
 			showTab(lastTab, tabEl);
 			openSettingsDeepLink();
 			// Load notification settings
