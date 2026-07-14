@@ -56,9 +56,10 @@ assert(
   'Upgrade Wizard Save should reliably close the wizard after committing the upgrade group'
 );
 assert(
-  items.includes("error: { message: 'Cloud save timed out' }") &&
-    items.includes('Promise.race([cloudRequest, timeoutResult])'),
-  'Manage Items cloud backup should settle instead of leaving the saving indicator pending indefinitely'
+  items.includes('return backupItemsToCloud(itemsObj);') &&
+    fs.readFileSync(path.join(root, 'save-coordinator.js'), 'utf8').includes("new Error('Cloud save timed out')") &&
+    fs.readFileSync(path.join(root, 'save-coordinator.js'), 'utf8').includes(']).finally(function() { clearTimeout(timeoutId); })'),
+  'Manage Items cloud backup should use the shared timed coordinator instead of leaving the saving indicator pending indefinitely'
 );
 assert(items.includes('function bindManageItemsCloseGuard'), 'Manage Items should guard every modal close path against unsaved changes');
 assert(items.includes('You have unsaved changes, are you sure you want to exit?'), 'Manage Items close warning should use the clear unsaved changes message');

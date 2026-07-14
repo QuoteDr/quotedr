@@ -245,13 +245,8 @@
 
         async function saveQuoteStyleDefaultsToCloud(style) {
             try {
-                if (typeof _supabase === 'undefined') return;
-                var user = await _supabase.auth.getUser();
-                if (!user.data || !user.data.user) return;
-                await _supabase.from('user_data').upsert(
-                    { user_id: user.data.user.id, key: 'quote_send_style', value: style, updated_at: new Date().toISOString() },
-                    { onConflict: 'user_id,key' }
-                );
+                if (typeof saveUserDataValue !== 'function') return;
+                await saveUserDataValue('quote_send_style', style, { entityType: 'quote_style', entityLabel: 'Quote send style', localStorageKey: 'ald_quote_send_style' });
             } catch(e) {
                 console.warn('Quote send defaults cloud save failed:', e);
             }

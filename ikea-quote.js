@@ -78,12 +78,7 @@
                 pricing[f.key] = el ? (parseFloat(el.value) || 0) : f.defaultRate;
             });
             localStorage.setItem('ald_ikea_pricing', JSON.stringify(pricing));
-            if (typeof getCurrentUser !== 'undefined') {
-                getCurrentUser().then(function(u) {
-                    if (u && typeof _supabase !== 'undefined')
-                        _supabase.from('user_data').upsert({ user_id: u.id, key: 'ikea_pricing', value: pricing, updated_at: new Date().toISOString() }, { onConflict: 'user_id,key' });
-                });
-            }
+            if (typeof saveUserDataValue === 'function') saveUserDataValue('ikea_pricing', pricing, { entityType: 'quote_preferences', entityLabel: 'IKEA estimator pricing', localStorageKey: 'ald_ikea_pricing', background: true });
             var badge = document.getElementById('ikeaPricingSaved');
             if (badge) { badge.style.display = 'inline'; setTimeout(function() { badge.style.display = 'none'; }, 2500); }
         }

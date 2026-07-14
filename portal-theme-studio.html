@@ -396,7 +396,8 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="supabase-v2.js?v=1778194800"></script>
+  <script src="supabase-v2.js?v=1783272000"></script>
+  <script src="save-coordinator.js?v=1783272000"></script>
   <script src="quote-dialogs.js?v=1777660407"></script>
   <script>
     let portalThemePresets = [];
@@ -588,10 +589,7 @@
     async function persistPortalThemePresets() {
       const user = window.currentUser;
       if (!user) return { error: new Error('No user') };
-      return _supabase.from('user_data').upsert(
-        { user_id: user.id, key: 'portal_theme_presets', value: portalThemePresets, updated_at: new Date().toISOString() },
-        { onConflict: 'user_id,key' }
-      );
+      return saveUserDataValue('portal_theme_presets', portalThemePresets, { entityType: 'portal_theme', entityLabel: 'Portal theme presets' });
     }
 
     function applyPortalThemeStartPoint(layoutStyle) {
@@ -660,10 +658,7 @@
       }
       const theme = portalThemeObjectFromControls();
       setPortalThemeDefaultSaveState('saving', 'Saving default portal theme...');
-      const { error } = await _supabase.from('user_data').upsert(
-        { user_id: user.id, key: 'portal_theme', value: theme, updated_at: new Date().toISOString() },
-        { onConflict: 'user_id,key' }
-      );
+      const { error } = await saveUserDataValue('portal_theme', theme, { entityType: 'portal_theme', entityLabel: 'Default portal theme', localStorageKey: 'portal-theme-studio-draft' });
       if (!error) {
         lastLoadedPortalTheme = Object.assign({}, theme);
         setPortalThemeDefaultSaveState('saved', 'Default portal theme saved. Portals using the default will update.');

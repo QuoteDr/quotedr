@@ -309,7 +309,8 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script src="supabase-v2.js?v=1778194800"></script>
+    <script src="supabase-v2.js?v=1783272000"></script>
+    <script src="save-coordinator.js?v=1783272000"></script>
     <script src="app-broadcasts.js?v=1779131000"></script>
     <script>
         const STORE_KEY = 'quotedr_project_tracker_v1';
@@ -359,16 +360,8 @@
 
         async function syncTrackerToCloud() {
             try {
-                const user = await getCurrentUser();
-                if (!user) return;
-                await _supabase
-                    .from('user_data')
-                    .upsert({
-                        user_id: user.id,
-                        key: CLOUD_KEY,
-                        value: tracker,
-                        updated_at: new Date().toISOString()
-                    }, { onConflict: 'user_id,key' });
+                if (typeof saveUserDataValue !== 'function') return;
+                await saveUserDataValue(CLOUD_KEY, tracker, { entityType: 'user_data', entityLabel: 'Project tracker', localStorageKey: STORE_KEY, background: true });
             } catch (e) {
                 console.warn('Project tracker cloud save skipped', e);
             }

@@ -250,12 +250,66 @@
             return 'jpg';
         }
 
+        async function executeManageFullResPhotoUpload(operation) {
+            var payload = operation && operation.payload || {};
+            var file = payload.file;
+            if (!file || !payload.path) throw new Error('The retained photo upload is incomplete.');
+            var upload = await _supabase.storage.from(MANAGE_FULL_RES_PHOTO_BUCKET).upload(payload.path, file, {
+                contentType: payload.mimeType || file.type || 'image/jpeg',
+                upsert: true
+            });
+            if (upload && upload.error) throw upload.error;
+            var publicUrl = _supabase.storage.from(MANAGE_FULL_RES_PHOTO_BUCKET).getPublicUrl(payload.path).data.publicUrl;
+            return { data: normalizeManageFullResPhotoMeta({
+                url: publicUrl,
+                path: payload.path,
+                sizeBytes: payload.sizeBytes || file.size || 0,
+                width: payload.width,
+                height: payload.height,
+                mimeType: payload.mimeType || file.type || '',
+                name: payload.fileName || file.name || '',
+                uploadedAt: payload.uploadedAt || new Date().toISOString()
+            }), error: null };
+        }
+
+        async function executeManageFullResPhotoDelete(operation) {
+            var path = operation && operation.payload && operation.payload.path;
+            if (!path) return { data: [], error: null };
+            var removed = await _supabase.storage.from(MANAGE_FULL_RES_PHOTO_BUCKET).remove([path]);
+            if (removed && removed.error) throw removed.error;
+            return { data: removed.data || [], error: null };
+        }
+
+        function registerManagePhotoSaveAdapters() {
+            if (!window.QuoteDrSave || window._qdManagePhotoAdaptersRegistered) return;
+            window.QuoteDrSave.registerAdapter('item_photo_upload', {
+                write: executeManageFullResPhotoUpload,
+                verify: function(result) { return !!(result && result.data && result.data.url && result.data.path); },
+                redact: function(payload) {
+                    return {
+                        path: payload.path,
+                        sizeBytes: payload.sizeBytes,
+                        width: payload.width,
+                        height: payload.height,
+                        mimeType: payload.mimeType,
+                        fileName: payload.fileName,
+                        context: payload.context
+                    };
+                }
+            });
+            window.QuoteDrSave.registerAdapter('item_photo_delete', {
+                write: executeManageFullResPhotoDelete,
+                verify: function(result) { return !!result && !result.error; }
+            });
+            window._qdManagePhotoAdaptersRegistered = true;
+        }
+
         async function uploadManageFullResPhoto(file, context, existingMeta, dimensions) {
             context = context || {};
             if (!file || !String(file.type || '').toLowerCase().startsWith('image/')) return null;
             var quota = canAddManageFullResPhotoBytes(file.size || 0, existingMeta);
             if (!quota.allowed) {
-                throw new Error('Full-resolution photo storage is full. QuoteDr Pro includes ' + formatManagePhotoBytes(MANAGE_FULL_RES_PHOTO_ACCOUNT_LIMIT_BYTES) + ' for saved item photos.');
+                throw new Error('Full-resolution photo storage is full. This account includes ' + formatManagePhotoBytes(MANAGE_FULL_RES_PHOTO_ACCOUNT_LIMIT_BYTES) + ' for saved item photos.');
             }
             if (typeof _supabase === 'undefined' || !_supabase || !_supabase.auth || !_supabase.storage) {
                 throw new Error('Sign in to retain full-resolution photos.');
@@ -275,28 +329,109 @@
                 safeManagePhotoPathPart(context.field || 'photo'),
                 Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.' + extension
             ].join('/');
-            var upload = await _supabase.storage.from(MANAGE_FULL_RES_PHOTO_BUCKET).upload(path, file, {
-                contentType: file.type || 'image/jpeg',
-                upsert: false
-            });
-            if (upload && upload.error) throw upload.error;
-            var publicUrl = _supabase.storage.from(MANAGE_FULL_RES_PHOTO_BUCKET).getPublicUrl(path).data.publicUrl;
-            return normalizeManageFullResPhotoMeta({
-                url: publicUrl,
+            var uploadPayload = {
+                file: file,
                 path: path,
                 sizeBytes: file.size || 0,
                 width: dimensions && dimensions.width,
                 height: dimensions && dimensions.height,
                 mimeType: file.type || '',
-                name: file.name || '',
-                uploadedAt: new Date().toISOString()
-            });
+                fileName: file.name || '',
+                uploadedAt: new Date().toISOString(),
+                context: context
+            };
+            if (window.QuoteDrSave) {
+                registerManagePhotoSaveAdapters();
+                var result = await window.QuoteDrSave.save({
+                    entityType: 'upload_metadata',
+                    adapterType: 'item_photo_upload',
+                    entityId: path,
+                    entityLabel: file.name || 'Full-resolution item photo',
+                    ownerId: userId,
+                    action: 'insert',
+                    payload: uploadPayload,
+                    snapshotPayload: {
+                        path: uploadPayload.path,
+                        sizeBytes: uploadPayload.sizeBytes,
+                        width: uploadPayload.width,
+                        height: uploadPayload.height,
+                        mimeType: uploadPayload.mimeType,
+                        fileName: uploadPayload.fileName,
+                        uploadedAt: uploadPayload.uploadedAt,
+                        context: uploadPayload.context
+                    },
+                    timeoutMs: 30000
+                });
+                if (result.state === 'cloud_saved' && result.data) return normalizeManageFullResPhotoMeta(result.data);
+                if (result.state === 'local_failed') throw new Error((result.error && result.error.message) || 'The original photo could not be stored safely on this device.');
+                throw new Error('The full-resolution original is retained on this device and will upload automatically when cloud storage is available.');
+            }
+            return (await executeManageFullResPhotoUpload({ payload: uploadPayload })).data;
         }
 
         function removeManageFullResPhotoMeta(meta) {
             meta = normalizeManageFullResPhotoMeta(meta);
             if (!meta || !meta.path || typeof _supabase === 'undefined' || !_supabase || !_supabase.storage) return;
+            if (window.QuoteDrSave) {
+                registerManagePhotoSaveAdapters();
+                window.QuoteDrSave.save({
+                    entityType: 'upload_metadata',
+                    adapterType: 'item_photo_delete',
+                    entityId: meta.path,
+                    entityLabel: meta.name || 'Deleted full-resolution item photo',
+                    action: 'delete',
+                    payload: { path: meta.path, meta: meta },
+                    background: true
+                });
+                return;
+            }
             _supabase.storage.from(MANAGE_FULL_RES_PHOTO_BUCKET).remove([meta.path]).catch(function(){});
+        }
+
+        async function applyDeferredManagePhotoUpload(event) {
+            var detail = event && event.detail || {};
+            var operation = detail.operation;
+            if (!operation || operation.adapterType !== 'item_photo_upload') return;
+            if ((parseInt(operation.attempts, 10) || 0) === 0) return;
+            var uploadPayload = operation.payload || {};
+            var context = uploadPayload.context || {};
+            var meta = detail.result && detail.result.data;
+            if (!meta || !context.cat || !context.name) return;
+            var requestedIndex = parseInt(context.photoIndex, 10);
+            findManagePhotoItems(context.cat, context.name).forEach(function(item) {
+                if (context.field === 'upgradePhoto') {
+                    var target = findManageUpgradePhotoTarget(item, context.upgradeGroupId || '', context.upgradeOptionId || '');
+                    var photos = target && target.option ? normalizeManageUpgradePhotos(target.option) : [];
+                    var index = Number.isFinite(requestedIndex) && requestedIndex >= 0 ? requestedIndex : photos.indexOf(context.thumbnail || '');
+                    if (index < 0) index = Math.max(0, photos.length - 1);
+                    setManageUpgradeOptionPhotoFull(item, context.upgradeGroupId || '', context.upgradeOptionId || '', meta, index);
+                } else {
+                    var itemPhotos = normalizeManageItemPhotos(item);
+                    var itemFull = normalizeManageItemPhotosFull(item);
+                    var itemIndex = Number.isFinite(requestedIndex) && requestedIndex >= 0 ? requestedIndex : itemPhotos.indexOf(context.thumbnail || '');
+                    if (itemIndex < 0) itemIndex = Math.max(0, itemPhotos.length - 1);
+                    itemFull[itemIndex] = normalizeManageFullResPhotoMeta(meta);
+                    item.photosFull = itemPhotos.map(function(_photo, index) { return normalizeManageFullResPhotoMeta(itemFull[index]); });
+                    item.photoFull = item.photosFull[0] || null;
+                }
+            });
+            if (context.field === 'upgradePhoto') {
+                var first = findManagePhotoItem(context.cat, context.name);
+                var target = first && findManageUpgradePhotoTarget(first, context.upgradeGroupId || '', context.upgradeOptionId || '');
+                var photos = target && target.option ? normalizeManageUpgradePhotos(target.option) : [];
+                var index = Number.isFinite(requestedIndex) && requestedIndex >= 0 ? requestedIndex : photos.indexOf(context.thumbnail || '');
+                syncManageUpgradePhotoFullFromDetails(context.cat, context.name, context.upgradeGroupId || '', context.upgradeOptionId || '', meta, index < 0 ? Math.max(0, photos.length - 1) : index);
+            }
+            persistManageItemsLocalSnapshot(customItems);
+            if (typeof _doBackupItemsToCloud === 'function') _doBackupItemsToCloud(customItems).catch(function() {});
+            if (document.getElementById('manageItemsModal')?.classList.contains('show')) {
+                renderAllItemsList();
+                showManageItemsToast('Full-resolution photo finished syncing.', true);
+            }
+        }
+
+        if (typeof window.addEventListener === 'function') {
+            window.addEventListener('quotedr-save-acknowledged', applyDeferredManagePhotoUpload);
         }
 
         function refreshManageFullResPhotoUpgradeNotes() {
@@ -2193,13 +2328,8 @@
 
         async function _saveCategoryRenamesToCloud() {
             try {
-                if (typeof _supabase === 'undefined') return;
-                var user = await _supabase.auth.getUser();
-                if (!user.data?.user) return;
-                await _supabase.from('user_data').upsert(
-                    { user_id: user.data.user.id, key: 'category_renames', value: manageCategoryRenames || {}, updated_at: new Date().toISOString() },
-                    { onConflict: 'user_id,key' }
-                );
+                if (typeof saveUserDataValue !== 'function') return;
+                await saveUserDataValue('category_renames', manageCategoryRenames || {}, { entityType: 'quote_preferences', entityLabel: 'Category renames', localStorageKey: MANAGE_CATEGORY_RENAMES_KEY, background: true });
             } catch(e) {
                 console.warn('Category renames cloud save failed:', e);
             }
@@ -2590,7 +2720,9 @@
                             name: name,
                             field: field,
                             upgradeGroupId: upgradeGroupId,
-                            upgradeOptionId: upgradeOptionId
+                            upgradeOptionId: upgradeOptionId,
+                            photoIndex: requestedIndex,
+                            thumbnail: dataUrl
                         }, existingFullMeta, { width: thumbnail.sourceWidth, height: thumbnail.sourceHeight });
                     } catch(fullErr) {
                         var fullErrMessage = fullErr && fullErr.message ? fullErr.message : 'Full-resolution photo was not saved.';
@@ -3304,22 +3436,8 @@
 
         // Inline backup function - guaranteed available regardless of supabase-v2.js load order
         async function _doBackupItemsToCloud(itemsObj) {
-            const { data: { user }, error: authErr } = await _supabase.auth.getUser();
-            if (authErr || !user) return { error: 'Not authenticated' };
-            const snapshot = JSON.stringify(itemsObj || {});
-            const payload = { user_id: user.id, client_name: '__ITEMS_BACKUP__', quote_number: '__ITEMS_BACKUP__', status: 'backup', data: { items_snapshot: snapshot, backed_up_at: new Date().toISOString() }, updated_at: new Date().toISOString() };
-            var timeoutId = null;
-            var cloudRequest = Promise.resolve(_supabase.from('quotes').upsert(payload, { onConflict: 'user_id,quote_number' }).select());
-            var timeoutResult = new Promise(function(resolve) {
-                timeoutId = setTimeout(function() {
-                    resolve({ data: null, error: { message: 'Cloud save timed out' } });
-                }, 12000);
-            });
-            const { data, error } = await Promise.race([cloudRequest, timeoutResult]);
-            if (timeoutId) clearTimeout(timeoutId);
-            if (error) { console.error('[Backup] error:', error); return { error }; }
-            console.log('[Backup] saved:', Object.keys(itemsObj || {}).length, 'categories');
-            return { data };
+            if (typeof backupItemsToCloud !== 'function') return { error: { message: 'Item database cloud adapter is unavailable' } };
+            return backupItemsToCloud(itemsObj);
         }
 
         function saveAllPricingRows() {

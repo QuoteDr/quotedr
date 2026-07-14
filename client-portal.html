@@ -2530,6 +2530,8 @@
 <script src="help-content.js?v=1777741200"></script>
 <script src="modal-help.js?v=1777741200"></script>
 <script src="change-orders.js?v=1778060200"></script>
+<script src="supabase-v2.js?v=1783272000"></script>
+<script src="save-coordinator.js?v=1783272000"></script>
 
   <script>
     // Supabase initialization
@@ -2581,6 +2583,7 @@
     const PORTAL_JOB_FOLDER_SOFT_WARNING_BYTES = 500 * 1024 * 1024;
     const PORTAL_JOB_ACCOUNT_SOFT_WARNING_BYTES = 5 * 1024 * 1024 * 1024;
     const PORTAL_JOB_ACCOUNT_HARD_LIMIT_BYTES = 10 * 1024 * 1024 * 1024;
+    const PORTAL_JOB_ASSET_BUNDLE_ADAPTER = 'portal_job_asset_bundle';
     const PORTAL_JOB_ALLOWED_FILE_TYPES = new Set([
       'application/pdf',
       'application/msword',
@@ -2600,6 +2603,105 @@
     let portalJobAssetUrlCache = {};
     let portalAccountAssetBytes = 0;
     let portalDocumentActivityCache = {};
+
+    function portalDurableError(result, fallback) {
+      const message = result?.error?.message || result?.error || fallback || 'This change could not be saved safely on this device.';
+      const error = new Error(String(message));
+      error.saveState = result?.state || result?.saveState || 'local_failed';
+      return error;
+    }
+
+    async function portalDurableDatabaseSave(options) {
+      if (typeof window.qdDurableSupabaseOperation !== 'function') {
+        throw new Error('The durable save service is unavailable. Refresh before making more portal changes.');
+      }
+      const result = await window.qdDurableSupabaseOperation(options);
+      if (!result || result.state === 'local_failed' || result.saveState === 'local_failed') {
+        throw portalDurableError(result);
+      }
+      return result;
+    }
+
+    async function writePortalJobAssetBundle(operation) {
+      const payload = operation?.payload || {};
+      const mode = payload.mode || 'upload';
+      if (mode === 'upload') {
+        for (const upload of (payload.uploads || [])) {
+          const uploadResult = await _sbClient.storage
+            .from(PORTAL_JOB_ASSET_BUCKET)
+            .upload(upload.path, upload.blob, { contentType: upload.mimeType || upload.blob?.type || 'application/octet-stream', upsert: true });
+          if (uploadResult.error) throw uploadResult.error;
+        }
+        const upsertResult = await _sbClient
+          .from('portal_job_assets')
+          .upsert(payload.record, { onConflict: 'id' })
+          .select('*')
+          .single();
+        if (upsertResult.error) throw upsertResult.error;
+        return { data: upsertResult.data };
+      }
+
+      const paths = Array.from(new Set((payload.paths || []).filter(Boolean)));
+      let deleteQuery = _sbClient.from('portal_job_assets').delete().eq('user_id', operation.userId);
+      if (mode === 'delete_folder') {
+        deleteQuery = deleteQuery.eq('portal_id', payload.portalId).eq('job_folder_id', payload.folderId);
+      } else {
+        deleteQuery = deleteQuery.eq('id', payload.asset?.id || operation.entityId);
+      }
+      const deleteResult = await deleteQuery;
+      if (deleteResult.error) throw deleteResult.error;
+      if (paths.length) {
+        const removeResult = await _sbClient.storage.from(PORTAL_JOB_ASSET_BUCKET).remove(paths);
+        if (removeResult.error) throw removeResult.error;
+      }
+      return { data: { deleted: true } };
+    }
+
+    function registerPortalJobAssetBundleAdapter() {
+      if (!window.QuoteDrSave) return;
+      window.QuoteDrSave.registerAdapter(PORTAL_JOB_ASSET_BUNDLE_ADAPTER, {
+        write: writePortalJobAssetBundle,
+        verify: function(result) { return !!result && !result.error; },
+        redact: function(payload) {
+          return {
+            mode: payload?.mode || 'upload',
+            record: payload?.record || null,
+            asset: payload?.asset || null,
+            portalId: payload?.portalId || '',
+            folderId: payload?.folderId || '',
+            paths: payload?.paths || [],
+            uploads: (payload?.uploads || []).map(function(upload) {
+              return { path: upload.path, mimeType: upload.mimeType, size: upload.blob?.size || 0 };
+            })
+          };
+        }
+      });
+    }
+
+    async function savePortalJobAssetBundle(options) {
+      if (!window.QuoteDrSave) throw new Error('The durable upload service is unavailable. Refresh before uploading.');
+      registerPortalJobAssetBundleAdapter();
+      const result = await window.QuoteDrSave.save({
+        entityType: 'portal_job_asset',
+        entityId: options.entityId,
+        entityLabel: options.entityLabel || 'Portal job upload',
+        adapterType: PORTAL_JOB_ASSET_BUNDLE_ADAPTER,
+        action: options.action || 'upsert',
+        payload: options.payload,
+        snapshotPayload: options.snapshotPayload,
+        ownerId: options.ownerId || contractorId,
+        timeoutMs: 30000
+      });
+      if (!result || result.state === 'local_failed') throw portalDurableError(result, 'This upload could not be retained safely on this device.');
+      return result;
+    }
+
+    registerPortalJobAssetBundleAdapter();
+    window.addEventListener('quotedr-save-acknowledged', function(event) {
+      const operation = event.detail?.operation;
+      if (!portalIsAdminView || operation?.entityType !== 'portal_job_asset') return;
+      loadPortalJobAssets().then(updatePortalJobDashboard).catch(function() {});
+    });
 
     // Initialize page
     async function init() {
@@ -3742,11 +3844,21 @@
       for (const row of rows) {
         const data = Object.assign({}, row.data || {});
         data.portal_job_folders = sanitizedFolders;
-        const { error } = await _sbClient
-          .from('quotes')
-          .update({ data: data })
-          .eq('id', row.id);
-        if (error) throw error;
+        await portalDurableDatabaseSave({
+          entityType: 'portal_job_folder',
+          entityId: row.id,
+          entityLabel: 'Portal job folders',
+          action: 'update',
+          payload: data.portal_job_folders,
+          target: {
+            table: 'quotes',
+            action: 'update',
+            values: { data: data, updated_at: new Date().toISOString() },
+            filters: [{ column: 'id', value: row.id }],
+            versionRead: { table: 'quotes', column: 'updated_at', filters: [{ column: 'id', value: row.id }] }
+          },
+          baseVersion: row.updated_at || null
+        });
         row.data = data;
       }
 
@@ -3824,20 +3936,25 @@
       if (!confirm('Delete this job folder? The quotes and invoices will stay in the portal.')) return;
       try {
         const cachedAssets = folderDbAssets(folder.id);
+        const folderAssets = (cachedAssets.photos || []).concat(cachedAssets.files || []);
         const paths = (cachedAssets.photos || []).concat(cachedAssets.files || []).flatMap(function(asset) {
           return [asset.storage_path, asset.thumbnail_path].filter(Boolean);
         });
-        if (paths.length) {
-          const removeResult = await _sbClient.storage.from(PORTAL_JOB_ASSET_BUCKET).remove(paths);
-          if (removeResult.error) throw removeResult.error;
-        }
-        if ((cachedAssets.photos || []).length || (cachedAssets.files || []).length) {
-          await _sbClient
-            .from('portal_job_assets')
-            .delete()
-            .eq('user_id', contractorId)
-            .eq('portal_id', currentPortalAssetsId())
-            .eq('job_folder_id', folder.id);
+        if (folderAssets.length) {
+          await savePortalJobAssetBundle({
+            entityId: 'folder:' + folder.id,
+            entityLabel: 'Uploads in ' + folder.name,
+            action: 'delete',
+            ownerId: contractorId,
+            payload: {
+              mode: 'delete_folder',
+              portalId: currentPortalAssetsId(),
+              folderId: folder.id,
+              paths: paths,
+              assets: folderAssets
+            },
+            snapshotPayload: { mode: 'delete_folder', portalId: currentPortalAssetsId(), folderId: folder.id, paths: paths, assets: folderAssets }
+          });
         }
         await persistPortalJobFolders(portalJobFolders.filter(function(item) {
           return item.id !== folder.id;
@@ -4065,6 +4182,7 @@
       let uploadedCount = 0;
       let uploadedBytes = 0;
       let largePhotoWarnings = 0;
+      let pendingSyncCount = 0;
       try {
         for (let index = 0; index < files.length; index++) {
           const file = files[index];
@@ -4074,7 +4192,7 @@
           const quoteId = (folder.documentIds || [])[0] || null;
           let storagePath = '';
           let thumbnailPath = '';
-          let uploadedPaths = [];
+          let uploads = [];
           let uploadMime = file.type || 'application/octet-stream';
           let uploadSize = file.size;
           let originalSize = file.size;
@@ -4087,17 +4205,8 @@
             storagePath = [userId, currentPortalId, folder.id, assetId, 'display.' + extension].join('/');
             thumbnailPath = [userId, currentPortalId, folder.id, assetId, 'thumbnail.' + extension].join('/');
 
-            const displayUpload = await _sbClient.storage
-              .from(PORTAL_JOB_ASSET_BUCKET)
-              .upload(storagePath, display.blob, { contentType: display.mimeType, upsert: false });
-            if (displayUpload.error) throw displayUpload.error;
-            uploadedPaths.push(storagePath);
-
-            const thumbUpload = await _sbClient.storage
-              .from(PORTAL_JOB_ASSET_BUCKET)
-              .upload(thumbnailPath, thumb.blob, { contentType: thumb.mimeType, upsert: false });
-            if (thumbUpload.error) throw thumbUpload.error;
-            uploadedPaths.push(thumbnailPath);
+            uploads.push({ path: storagePath, blob: display.blob, mimeType: display.mimeType });
+            uploads.push({ path: thumbnailPath, blob: thumb.blob, mimeType: thumb.mimeType });
 
             uploadMime = display.mimeType;
             uploadSize = display.size + thumb.size;
@@ -4117,36 +4226,34 @@
             if (!portalJobFileAllowed(file)) throw new Error(file.name + ' is not an allowed project file type.');
             const extension = portalFileExtension(file, 'bin');
             storagePath = [userId, currentPortalId, folder.id, assetId, safeName + '.' + extension].join('/');
-            const fileUpload = await _sbClient.storage
-              .from(PORTAL_JOB_ASSET_BUCKET)
-              .upload(storagePath, file, { contentType: uploadMime, upsert: false });
-            if (fileUpload.error) throw fileUpload.error;
-            uploadedPaths.push(storagePath);
+            uploads.push({ path: storagePath, blob: file, mimeType: uploadMime });
             metadata = { original_filename: file.name };
           }
 
-          const { error: insertError } = await _sbClient
-            .from('portal_job_assets')
-            .insert({
-              id: assetId,
-              user_id: userId,
-              portal_id: currentPortalId,
-              job_folder_id: folder.id,
-              quote_id: quoteId,
-              kind: kind,
-              title: file.name.replace(/\.[^.]+$/, '') || (kind === 'photo' ? 'Project photo' : 'Project file'),
-              storage_path: storagePath,
-              thumbnail_path: thumbnailPath || null,
-              mime_type: uploadMime,
-              size_bytes: uploadSize,
-              original_size_bytes: originalSize,
-              visible_to_client: true,
-              metadata: metadata
-            });
-          if (insertError) {
-            if (uploadedPaths.length) await _sbClient.storage.from(PORTAL_JOB_ASSET_BUCKET).remove(uploadedPaths);
-            throw insertError;
-          }
+          const record = {
+            id: assetId,
+            user_id: userId,
+            portal_id: currentPortalId,
+            job_folder_id: folder.id,
+            quote_id: quoteId,
+            kind: kind,
+            title: file.name.replace(/\.[^.]+$/, '') || (kind === 'photo' ? 'Project photo' : 'Project file'),
+            storage_path: storagePath,
+            thumbnail_path: thumbnailPath || null,
+            mime_type: uploadMime,
+            size_bytes: uploadSize,
+            original_size_bytes: originalSize,
+            visible_to_client: true,
+            metadata: metadata
+          };
+          const saveResult = await savePortalJobAssetBundle({
+            entityId: assetId,
+            entityLabel: record.title,
+            ownerId: userId,
+            payload: { mode: 'upload', uploads: uploads, record: record },
+            snapshotPayload: { mode: 'upload', record: record, uploads: uploads.map(function(upload) { return { path: upload.path, mimeType: upload.mimeType, size: upload.blob.size }; }) }
+          });
+          if (saveResult.state !== 'cloud_saved') pendingSyncCount++;
           uploadedCount++;
           uploadedBytes += uploadSize;
         }
@@ -4154,6 +4261,7 @@
         await loadPortalJobAssets();
         updatePortalJobDashboard();
         let successMessage = 'Uploaded ' + uploadedCount + ' ' + (kind === 'photo' ? 'photo' : 'file') + (uploadedCount === 1 ? '' : 's') + ' (' + formatPortalBytes(uploadedBytes) + ').';
+        if (pendingSyncCount) successMessage = pendingSyncCount + ' ' + (kind === 'photo' ? 'photo' : 'file') + (pendingSyncCount === 1 ? ' is' : 's are') + ' saved on this device and will finish uploading automatically.';
         if (largePhotoWarnings) successMessage += ' ' + largePhotoWarnings + ' photo' + (largePhotoWarnings === 1 ? ' is' : 's are') + ' still over 3 MB after compression.';
         if (portalAccountAssetBytes >= PORTAL_JOB_ACCOUNT_SOFT_WARNING_BYTES) successMessage += ' Account storage is over 5 GB; use links for larger media when possible.';
         portalJobAssetStatus(kind, successMessage, largePhotoWarnings ? 'text-warning fw-bold' : 'text-success fw-bold');
@@ -4172,13 +4280,17 @@
       const cleanTitle = String(title || '').trim();
       if (!cleanTitle) return;
       try {
-        const { error } = await _sbClient
-          .from('portal_job_assets')
-          .update({ title: cleanTitle, updated_at: new Date().toISOString() })
-          .eq('id', asset.id)
-          .eq('user_id', contractorId);
-        if (error) throw error;
-        await loadPortalJobAssets();
+        const values = { title: cleanTitle, updated_at: new Date().toISOString() };
+        const result = await portalDurableDatabaseSave({
+          entityType: 'portal_job_asset',
+          entityId: asset.id,
+          entityLabel: cleanTitle,
+          action: 'update',
+          payload: Object.assign({}, asset, values),
+          target: { table: 'portal_job_assets', action: 'update', values: values, filters: [{ column: 'id', value: asset.id }] }
+        });
+        asset.title = cleanTitle;
+        if (result.state === 'cloud_saved') await loadPortalJobAssets();
         updatePortalJobDashboard();
       } catch (error) {
         console.error('Could not rename portal job asset:', error);
@@ -4191,13 +4303,17 @@
       const asset = findPortalDbAsset(assetId);
       if (!asset) return;
       try {
-        const { error } = await _sbClient
-          .from('portal_job_assets')
-          .update({ visible_to_client: !!visible, updated_at: new Date().toISOString() })
-          .eq('id', asset.id)
-          .eq('user_id', contractorId);
-        if (error) throw error;
-        await loadPortalJobAssets();
+        const values = { visible_to_client: !!visible, updated_at: new Date().toISOString() };
+        const result = await portalDurableDatabaseSave({
+          entityType: 'portal_job_asset',
+          entityId: asset.id,
+          entityLabel: asset.title || 'Portal upload visibility',
+          action: 'update',
+          payload: Object.assign({}, asset, values),
+          target: { table: 'portal_job_assets', action: 'update', values: values, filters: [{ column: 'id', value: asset.id }] }
+        });
+        asset.visible_to_client = !!visible;
+        if (result.state === 'cloud_saved') await loadPortalJobAssets();
         updatePortalJobDashboard();
       } catch (error) {
         console.error('Could not update portal job asset visibility:', error);
@@ -4212,17 +4328,19 @@
         if (!confirm('Delete this uploaded ' + dbAsset.kind + '? This removes it from storage.')) return;
         try {
           const paths = [dbAsset.storage_path, dbAsset.thumbnail_path].filter(Boolean);
-          if (paths.length) {
-            const removeResult = await _sbClient.storage.from(PORTAL_JOB_ASSET_BUCKET).remove(paths);
-            if (removeResult.error) throw removeResult.error;
-          }
-          const { error } = await _sbClient
-            .from('portal_job_assets')
-            .delete()
-            .eq('id', dbAsset.id)
-            .eq('user_id', contractorId);
-          if (error) throw error;
-          await loadPortalJobAssets();
+          const result = await savePortalJobAssetBundle({
+            entityId: dbAsset.id,
+            entityLabel: dbAsset.title || 'Portal upload',
+            action: 'delete',
+            ownerId: contractorId,
+            payload: { mode: 'delete_asset', paths: paths, asset: dbAsset },
+            snapshotPayload: { mode: 'delete_asset', paths: paths, asset: dbAsset }
+          });
+          Object.values(portalJobAssetCache || {}).forEach(function(folderAssets) {
+            folderAssets.photos = (folderAssets.photos || []).filter(function(item) { return item.id !== dbAsset.id; });
+            folderAssets.files = (folderAssets.files || []).filter(function(item) { return item.id !== dbAsset.id; });
+          });
+          if (result.state === 'cloud_saved') await loadPortalJobAssets();
           updatePortalJobDashboard();
         } catch (error) {
           console.error('Could not delete portal job asset:', error);

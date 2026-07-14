@@ -1671,7 +1671,8 @@ if (location.search.includes('debug')) {
     <script src="quote-dialogs.js?v=1777660407"></script>
     <script src="quote-discounts.js?v=1783218460"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-v2.js?v=2026071203"></script>
+    <script src="supabase-v2.js?v=2026071301"></script>
+    <script src="save-coordinator.js?v=2026071301"></script>
     <script src="change-orders.js?v=1778152100"></script>
 
     <script>
@@ -4955,19 +4956,6 @@ if (location.search.includes('debug')) {
             } catch(e) { console.warn('Could not mark quote viewed:', e); }
         }
 
-        async function markQuoteAccepted(quoteId, signerName) {
-            try {
-                const sb = window._supabaseClient || (typeof supabase !== 'undefined' ? supabase : null);
-                if (!sb || !quoteId) return;
-                await sb.from('quotes').update({
-                    status: 'accepted',
-                    accepted_at: new Date().toISOString(),
-                    accepted_by: signerName,
-                    updated_at: new Date().toISOString()
-                }).eq('id', quoteId);
-            } catch(e) { console.warn('Could not mark quote accepted:', e); }
-        }
-
                 function dataURLtoBlob(dataUrl) {
             const arr = dataUrl.split(',');
             const mime = arr[0].match(/:(.*?);/)[1];
@@ -5306,6 +5294,8 @@ if (location.search.includes('debug')) {
             btn.disabled = true;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Redirecting to Stripe...';
             try {
+                var depositOperationEntity = quoteId + ':deposit:' + depositAmt;
+                var depositOperationId = qdGetExternalOperationId('stripe_checkout', depositOperationEntity);
                 var resp = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/stripe-deposit', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -5317,11 +5307,15 @@ if (location.search.includes('debug')) {
                         clientEmail: quoteData.clientEmail || quoteData.email || '',
                         description: 'Project Deposit — Quote #' + (quoteData.quoteNumber || quoteId),
                         successUrl: window.location.href.split('#')[0].replace(/[?&]payment=[^&]*/g, ''),
-                        cancelUrl: window.location.href.split('#')[0]
+                        cancelUrl: window.location.href.split('#')[0],
+                        idempotencyKey: depositOperationId
                     })
                 });
                 var data = await resp.json();
-                if (data.url) { window.location.href = data.url; }
+                if (data.url) {
+                    qdCompleteExternalOperation('stripe_checkout', depositOperationEntity);
+                    window.location.href = data.url;
+                }
                 else { throw new Error(data.error || 'Payment failed'); }
             } catch(e) {
                 qdAlert('Payment error: ' + e.message);

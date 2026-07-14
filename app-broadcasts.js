@@ -54,6 +54,7 @@
     };
     if (!receipt) payload.created_at = payload.updated_at;
     try {
+      // qd-save-audit: noncritical delivery telemetry; a lost receipt can only repeat a notice.
       await _supabase
         .from('app_broadcast_receipts')
         .upsert(payload, { onConflict: 'message_id,user_id' });
@@ -65,6 +66,7 @@
   async function recordDismissed(message, userId) {
     if (!window._supabase || !message || !userId) return;
     try {
+      // qd-save-audit: noncritical dismissed-tip preference; business data is not stored here.
       await _supabase
         .from('app_broadcast_receipts')
         .upsert({

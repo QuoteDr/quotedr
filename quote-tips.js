@@ -255,6 +255,7 @@
     var userId = await getCurrentUserId();
     if (!userId || !window._supabase) return settings;
     try {
+      // qd-save-audit: dismissed help tips are a noncritical device preference, not business data.
       await _supabase.from('user_data').upsert({
         user_id: userId,
         key: QUOTE_TIPS_CLOUD_KEY,

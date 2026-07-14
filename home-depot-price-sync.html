@@ -142,6 +142,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-v2.js?v1777304470"></script>
+    <script src="save-coordinator.js?v=1783272000"></script>
     <script>
         const FUNCTION_URL = 'https://axmoffknvblluibuitrq.supabase.co/functions/v1/hd-price-sync';
         let customItems = {};
@@ -397,32 +398,12 @@
             localStorage.setItem('ald_custom_items', JSON.stringify(customItems));
             status.textContent = 'Saved ' + changed + ' local item updates. Backing up to cloud...';
             try {
-                await backupItemsToCloud(customItems);
+                await window.backupItemsToCloud(customItems);
                 status.innerHTML = '<span class="text-success">Saved ' + changed + ' item updates locally and to cloud backup.</span>';
             } catch (err) {
                 status.innerHTML = '<span class="text-warning">Saved locally, but cloud backup failed: ' + escapeHtml(err.message) + '</span>';
             }
             reloadItems();
-        }
-
-        async function backupItemsToCloud(items) {
-            const { data: { session } } = await _supabase.auth.getSession();
-            if (!session || !session.user) throw new Error('Not signed in.');
-            const { error } = await _supabase.from('quotes').upsert({
-                user_id: session.user.id,
-                quote_number: '__ITEMS_BACKUP__',
-                client_name: 'Items Backup',
-                status: 'system',
-                total: 0,
-                data: {
-                    items_snapshot: items,
-                    backup_type: 'items',
-                    updated_at: new Date().toISOString(),
-                    source: 'home_depot_price_sync'
-                },
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'user_id,quote_number' });
-            if (error) throw error;
         }
 
         document.addEventListener('DOMContentLoaded', function() {

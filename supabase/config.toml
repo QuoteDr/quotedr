@@ -32,4 +32,10 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.optimize-photo-storage]
+verify_jwt = false
+
+[functions.save-recovery]
+verify_jwt = true
+
+[functions.send-quote-email]
 verify_jwt = true

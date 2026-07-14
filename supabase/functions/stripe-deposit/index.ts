@@ -160,6 +160,8 @@ Deno.serve(async (req) => {
 
     if (!amount || amount < 50) return json({ error: "Amount must be at least $0.50" }, 400);
     if (!quoteId) return json({ error: "Missing quote or invoice id" }, 400);
+    const idempotencyKey = String(body.idempotencyKey || "").trim();
+    if (!/^[a-zA-Z0-9_-]{16,200}$/.test(idempotencyKey)) return json({ error: "Missing or invalid idempotency key" }, 400);
 
     const { data: quoteRow, error: quoteError } = await supabase
       .from("quotes")
@@ -189,9 +191,22 @@ Deno.serve(async (req) => {
       client_name: quoteRow.client_name || quoteData.clientName || "",
     };
 
-    const { data: paymentRecord, error: recordError } = await supabase
-      .from("payment_records")
-      .insert({
+    let paymentRecord: any = null;
+    const existingRecord = await supabase.from("payment_records").select("*").eq("idempotency_key", idempotencyKey).maybeSingle();
+    if (existingRecord.error) return json({ error: "Could not verify payment request" }, 500);
+    paymentRecord = existingRecord.data;
+    if (paymentRecord?.stripe_checkout_session_id) {
+      const existingSessionResponse = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(paymentRecord.stripe_checkout_session_id)}`, {
+        headers: { "Authorization": `Bearer ${stripeKey}` },
+      });
+      if (existingSessionResponse.ok) {
+        const existingSession = await existingSessionResponse.json();
+        return json({ url: existingSession.url, sessionId: existingSession.id, paymentRecordId: paymentRecord.id, idempotentReplay: true });
+      }
+    }
+
+    if (!paymentRecord) {
+      const insertedRecord = await supabase.from("payment_records").insert({
         user_id: quoteRow.user_id,
         quote_id: paymentType === "deposit" ? quoteRow.id : null,
         invoice_id: paymentType !== "deposit" ? quoteRow.id : null,
@@ -202,13 +217,20 @@ Deno.serve(async (req) => {
         client_email: clientEmail,
         description,
         metadata,
+        idempotency_key: idempotencyKey,
       })
       .select()
       .single();
-
-    if (recordError || !paymentRecord) {
-      console.error("payment_records insert error", recordError);
-      return json({ error: "Could not create payment record" }, 500);
+      if (insertedRecord.error || !insertedRecord.data) {
+        const racedRecord = await supabase.from("payment_records").select("*").eq("idempotency_key", idempotencyKey).maybeSingle();
+        if (racedRecord.error || !racedRecord.data) {
+          console.error("payment_records insert error", insertedRecord.error);
+          return json({ error: "Could not create payment record" }, 500);
+        }
+        paymentRecord = racedRecord.data;
+      } else {
+        paymentRecord = insertedRecord.data;
+      }
     }
 
     const finalSuccessUrl = successUrl + (successUrl.includes("?") ? "&" : "?") + "payment=success&session_id={CHECKOUT_SESSION_ID}";
@@ -239,6 +261,7 @@ Deno.serve(async (req) => {
       headers: {
         "Authorization": `Bearer ${stripeKey}`,
         "Content-Type": "application/x-www-form-urlencoded",
+        "Idempotency-Key": idempotencyKey,
       },
       body: params.toString(),
     });

@@ -172,6 +172,14 @@
                     <i class="fas fa-bell"></i><span class="ms-1">Alerts</span>
                     <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="clientActivityUnreadBadge" style="display:none;">0</span>
                 </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm position-relative" id="dashboardSyncRecoveryBtn" onclick="QuoteDrSave.openRecoveryCenter()" title="Sync and recovery" style="display:none;">
+                    <i class="fas fa-cloud-arrow-up"></i><span class="ms-1">Sync</span>
+                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-warning text-dark" id="saveRecoveryBadge" style="display:none;">0</span>
+                </button>
+                <a id="dashboardSaveIncidentsBtn" href="settings.html#save-incidents" class="btn btn-outline-danger btn-sm position-relative" title="Save incidents" style="display:none;">
+                    <i class="fas fa-shield-halved"></i><span class="ms-1">Incidents</span>
+                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="dashboardSaveIncidentsBadge" style="display:none;">0</span>
+                </a>
                 <a href="settings.html" class="btn btn-outline-secondary btn-sm" title="Settings"><i class="fas fa-cog"></i><span class="ms-1">Settings</span></a>
                 <a href="help.html" class="btn btn-outline-secondary btn-sm" title="Help"><i class="fas fa-question-circle"></i><span class="ms-1">Help</span></a>
                 <button onclick="signOut()" class="btn btn-outline-danger btn-sm" title="Sign Out"><i class="fas fa-sign-out-alt"></i><span class="ms-1">Sign Out</span></button>
@@ -188,6 +196,8 @@
                     <li><a class="dropdown-item" href="home-depot-tracker.html" onclick="return openJobTracker(event)"><i class="fas fa-folder-tree me-2 text-primary"></i>Job Tracker</a></li>
                     <li><a class="dropdown-item" href="labor-tracker.html" onclick="return openLaborTracker(event)"><i class="fas fa-clock me-2 text-success"></i>Labour Tracker</a></li>
                     <li><button class="dropdown-item" onclick="openClientActivityAlerts()"><i class="fas fa-bell me-2 text-primary"></i>Alerts <span class="badge bg-danger ms-1" id="clientActivityUnreadBadgeMobile" style="display:none;">0</span></button></li>
+                    <li id="dashboardSyncRecoveryMobile" style="display:none;"><button class="dropdown-item" onclick="QuoteDrSave.openRecoveryCenter()"><i class="fas fa-cloud-arrow-up me-2 text-warning"></i>Sync &amp; Recovery <span class="badge bg-warning text-dark ms-1" id="saveRecoveryBadgeMobile" style="display:none;">0</span></button></li>
+                    <li id="dashboardSaveIncidentsMobile" style="display:none;"><a class="dropdown-item" href="settings.html#save-incidents"><i class="fas fa-shield-halved me-2 text-danger"></i>Save Incidents <span class="badge bg-danger ms-1" id="dashboardSaveIncidentsBadgeMobile" style="display:none;">0</span></a></li>
                     <li><a class="dropdown-item" href="settings.html"><i class="fas fa-cog me-2 text-secondary"></i>Settings</a></li>
                     <li><a class="dropdown-item" href="help.html"><i class="fas fa-question-circle me-2 text-secondary"></i>Help</a></li>
                     <li><hr class="dropdown-divider"></li>
@@ -415,9 +425,91 @@
     <script src="modal-help.js?v=1777741200"></script>
     <script src="change-orders.js?v=1778060200"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-v2.js?v=2026071203"></script>
+    <script src="supabase-v2.js?v=2026071301"></script>
+    <script src="save-coordinator.js?v=2026071301"></script>
     <script src="app-broadcasts.js?v=1779131000"></script>
     <script>
+        function dashboardQuoteRowById(quoteId) {
+            var pools = [];
+            try { pools = pools.concat(allQuotes || []); } catch (e) {}
+            try { pools = pools.concat(junkQuotes || []); } catch (e) {}
+            return pools.find(function(row) { return String(row.id) === String(quoteId); }) || null;
+        }
+
+        async function qdDurableQuoteRowUpdate(quoteId, values, label) {
+            var user = await getCurrentUser();
+            if (!user) return { error: { message: 'Not authenticated' } };
+            var cached = dashboardQuoteRowById(quoteId);
+            var updatedAt = new Date().toISOString();
+            var saveValues = Object.assign({}, values || {});
+            if (!saveValues.updated_at) saveValues.updated_at = updatedAt;
+            var result = await qdDurableSupabaseOperation({
+                entityType: (cached && cached.status === 'invoiced') ? 'invoice' : 'quote',
+                entityId: quoteId,
+                entityLabel: label || (cached && (cached.data?.quoteTitle || cached.client_name || cached.quote_number)) || 'Quote',
+                action: 'update',
+                payload: cached ? Object.assign({}, cached, saveValues) : saveValues,
+                target: {
+                    table: 'quotes',
+                    action: 'update',
+                    values: saveValues,
+                    filters: [{ column: 'id', value: quoteId }],
+                    versionRead: { table: 'quotes', column: 'updated_at', filters: [{ column: 'id', value: quoteId }] },
+                    verifyRevision: !!saveValues.data
+                },
+                baseVersion: cached && cached.updated_at ? cached.updated_at : null
+            });
+            if (!result.error && cached) {
+                Object.assign(cached, saveValues);
+                var saved = Array.isArray(result.data) ? result.data[0] : result.data;
+                cached.updated_at = saved && saved.updated_at ? saved.updated_at : updatedAt;
+            }
+            return result;
+        }
+
+        async function qdDurableQuoteRowInsert(row, label) {
+            var entityId = row.id || ('quote-number:' + (row.quote_number || row.client_name || Date.now()));
+            var values = Object.assign({ created_at: new Date().toISOString(), updated_at: new Date().toISOString() }, row || {});
+            return qdDurableSupabaseOperation({
+                entityType: values.status === 'invoiced' ? 'invoice' : 'quote',
+                entityId: entityId,
+                entityLabel: label || values.client_name || values.quote_number || 'Quote',
+                action: 'insert',
+                payload: values,
+                target: {
+                    table: 'quotes',
+                    action: 'insert',
+                    values: values,
+                    dedupe: values.quote_number ? { filters: [{ column: 'quote_number', value: values.quote_number }], select: 'id,updated_at' } : null,
+                    verifyRevision: !!values.data
+                }
+            });
+        }
+
+        async function qdDurableQuoteRowsDelete(ids) {
+            var quoteIds = Array.isArray(ids) ? ids.filter(Boolean) : [ids].filter(Boolean);
+            var results = [];
+            for (var i = 0; i < quoteIds.length; i++) results.push(await deleteQuoteFromSupabase(quoteIds[i]));
+            return { data: results, error: results.find(function(result) { return result && result.error; })?.error || null };
+        }
+
+        async function refreshDashboardSaveIncidents(user) {
+            var isAdmin = String(user && user.email || '').trim().toLowerCase() === 'info@alddirect.ca';
+            var desktop = document.getElementById('dashboardSaveIncidentsBtn');
+            var mobile = document.getElementById('dashboardSaveIncidentsMobile');
+            if (desktop) desktop.style.display = isAdmin ? '' : 'none';
+            if (mobile) mobile.style.display = isAdmin ? '' : 'none';
+            if (!isAdmin) return;
+            var result = await _supabase.from('save_recovery_records').select('operation_id,status').in('status', ['pending', 'retry_requested']);
+            if (result.error) return;
+            var count = (result.data || []).length;
+            ['dashboardSaveIncidentsBadge', 'dashboardSaveIncidentsBadgeMobile'].forEach(function(id) {
+                var badge = document.getElementById(id);
+                if (!badge) return;
+                badge.textContent = count;
+                badge.style.display = count ? '' : 'none';
+            });
+        }
         // DASHBOARD FUNCTIONS
 
         let allQuotes = []; // Store all quotes for client-side filtering
@@ -687,7 +779,8 @@
             if (!expired.length) return rows || [];
             var ids = expired.map(function(q) { return q.id; });
             try {
-                await _supabase.from('quotes').delete().in('id', ids);
+                var purgeResult = await qdDurableQuoteRowsDelete(ids);
+                if (purgeResult.error) throw purgeResult.error;
             } catch(e) {
                 console.warn('Could not purge expired junk:', e);
                 return rows || [];
@@ -792,7 +885,7 @@
             });
             if (toDelete.length > 0) {
                 console.log('Auto-deleting', toDelete.length, 'duplicate drafts:', toDelete);
-                _supabase.from('quotes').delete().in('id', toDelete).then(function() {
+                qdDurableQuoteRowsDelete(toDelete).then(function() {
                     console.log('Duplicates cleaned up');
                 });
                 data = data.filter(function(q) { return toDelete.indexOf(q.id) === -1; });
@@ -1243,7 +1336,7 @@
             try {
                 quote = await loadDashboardFullQuote(quote);
                 var data = clearPortalAssignmentForEdit(quote.data || {});
-                var result = await _supabase.from('quotes').update({ data: data, updated_at: new Date().toISOString() }).eq('id', quoteId);
+                var result = await qdDurableQuoteRowUpdate(quoteId, { data: data }, 'Remove document from portal');
                 if (result.error) throw result.error;
                 quote.data = data;
                 window.location.href = 'quote-builder.html?load=' + quoteId;
@@ -1271,7 +1364,7 @@
                 var session = await _supabase.auth.getSession();
                 var userId = session.data?.session?.user?.id || quote.user_id;
                 if (!userId) throw new Error('Not logged in');
-                var insertResult = await _supabase.from('quotes').insert({
+                var insertResult = await qdDurableQuoteRowInsert({
                     user_id: userId,
                     client_name: quote.client_name || data.clientName || '',
                     quote_number: quoteNumber,
@@ -1283,9 +1376,10 @@
                     data: data,
                     created_at: now,
                     updated_at: now
-                }).select().single();
+                }, revisionTitle);
                 if (insertResult.error) throw insertResult.error;
-                window.location.href = 'quote-builder.html?load=' + insertResult.data.id;
+                var insertedRevision = Array.isArray(insertResult.data) ? insertResult.data[0] : insertResult.data;
+                window.location.href = 'quote-builder.html?load=' + insertedRevision.id;
             } catch(err) {
                 qdAlert('Could not duplicate this document as a revision: ' + err.message);
             }
@@ -1384,7 +1478,7 @@
                 const { data: q } = await _supabase.from('quotes').select('data').eq('id', quoteId).single();
                 if (q) {
                     const updatedData = stampPortalAddedAt(Object.assign({}, q.data || {}, { portal_visible: true }));
-                    await _supabase.from('quotes').update({ data: updatedData }).eq('id', quoteId);
+                    await qdDurableQuoteRowUpdate(quoteId, { data: updatedData }, 'Publish resolved quote to portal');
                 }
             } catch(e) { console.error('Auto-portal-publish error:', e); }
             var modal = bootstrap.Modal.getInstance(document.getElementById('notesReviewModal'));
@@ -1411,7 +1505,7 @@
                 var { data: quote, error } = await _supabase.from('quotes').select('data').eq('id', quoteId).single();
                 if (error) throw error;
                 var updatedData = Object.assign({}, quote.data || {}, { quoteTitle: newTitle });
-                var { error: saveErr } = await _supabase.from('quotes').update({ data: updatedData }).eq('id', quoteId);
+                var { error: saveErr } = await qdDurableQuoteRowUpdate(quoteId, { data: updatedData }, 'Quote title');
                 if (saveErr) throw saveErr;
                 var row = (allQuotes || []).find(function(q) { return q.id === quoteId; });
                 if (row) row.data = updatedData;
@@ -1429,7 +1523,7 @@
                 const updatedData = visible
                     ? stampPortalAddedAt(Object.assign({}, quote.data || {}, { portal_visible: true }))
                     : clearPortalAssignmentForEdit(quote.data || {});
-                const { error } = await _supabase.from('quotes').update({ data: updatedData }).eq('id', quoteId);
+                const { error } = await qdDurableQuoteRowUpdate(quoteId, { data: updatedData }, 'Portal visibility');
                 if (error) throw error;
                 refreshQuotes();
             } catch(err) {
@@ -1490,7 +1584,7 @@
                 row = await loadDashboardFullQuote(row);
                 var data = applyPortalStableShareToData(row.data || {}, share);
                 row.data = data;
-                var result = await _supabase.from('quotes').update({ data: data }).eq('id', row.id);
+                var result = await qdDurableQuoteRowUpdate(row.id, { data: data }, 'Portal secure link');
                 if (result.error) throw result.error;
             }
         }
@@ -1775,7 +1869,7 @@
                     if (!row) continue;
                     row = await loadDashboardFullQuote(row);
                     var data = Object.assign({}, row.data || {}, { portal_pin: newPin });
-                    var result = await _supabase.from('quotes').update({ data: data }).eq('id', row.id);
+                    var result = await qdDurableQuoteRowUpdate(row.id, { data: data }, 'Portal PIN');
                     if (result.error) throw result.error;
                 }
                 window._portalPinEditorId = portalId;
@@ -2068,7 +2162,7 @@
                     } else {
                         delete data.portal_theme;
                     }
-                    var result = await _supabase.from('quotes').update({ data: data }).eq('id', row.id);
+                    var result = await qdDurableQuoteRowUpdate(row.id, { data: data }, 'Portal theme');
                     if (result.error) throw result.error;
                 }
                 await refreshQuotes();
@@ -2192,7 +2286,7 @@
                     } else {
                         delete data.portal_theme;
                     }
-                    var result = await _supabase.from('quotes').update({ data: data }).eq('id', row.id);
+                    var result = await qdDurableQuoteRowUpdate(row.id, { data: data }, 'Merge client portals');
                     if (result.error) throw result.error;
                 }
                 window._portalMergeMode = false;
@@ -2235,7 +2329,7 @@
                             duplicateData.quoteNumber = duplicateCanonicalNumber;
                             duplicateUpdate.quote_number = duplicateCanonicalNumber;
                         }
-                        var duplicateResult = await _supabase.from('quotes').update(duplicateUpdate).eq('id', row.id);
+                        var duplicateResult = await qdDurableQuoteRowUpdate(row.id, duplicateUpdate, 'Archive duplicate portal invoice');
                         if (duplicateResult.error) throw duplicateResult.error;
                         continue;
                     }
@@ -2262,7 +2356,7 @@
                             updatePayload.quote_number = canonicalInvoiceNumber;
                         }
                     }
-                    var result = await _supabase.from('quotes').update(updatePayload).eq('id', row.id);
+                    var result = await qdDurableQuoteRowUpdate(row.id, updatePayload, 'Portal assignment');
                     if (result.error) throw result.error;
                 }
                 await refreshQuotes();
@@ -2296,7 +2390,7 @@
                         portal_pin: pin
                     });
                     stampPortalAddedAt(data);
-                    var result = await _supabase.from('quotes').update({ data: data }).eq('id', quoteId);
+                    var result = await qdDurableQuoteRowUpdate(quoteId, { data: data }, 'Portal assignment');
                     if (result.error) throw result.error;
                 } else {
                     var session = await _supabase.auth.getSession();
@@ -2319,14 +2413,14 @@
                         termsExplicit: false
                     };
                     stampPortalAddedAt(placeholderData);
-                    var insertResult = await _supabase.from('quotes').insert({
+                    var insertResult = await qdDurableQuoteRowInsert({
                         user_id: userId,
                         client_name: clientName,
                         quote_number: 'PORTAL-' + Date.now().toString(36).toUpperCase(),
                         total: 0,
                         status: 'draft',
                         data: placeholderData
-                    });
+                    }, portalName + ' portal');
                     if (insertResult.error) throw insertResult.error;
                 }
                 await refreshQuotes();
@@ -2362,7 +2456,7 @@
             try {
                 target = await loadDashboardFullQuote(target);
                 var data = clearPortalAssignmentForEdit(target.data || {});
-                var result = await _supabase.from('quotes').update({ data: data }).eq('id', quoteId);
+                var result = await qdDurableQuoteRowUpdate(quoteId, { data: data }, 'Remove document from portal');
                 if (result.error) throw result.error;
                 await refreshQuotes();
                 renderPortalAssignmentList();
@@ -2383,7 +2477,7 @@
                     if (!row) continue;
                     row = await loadDashboardFullQuote(row);
                     var data = Object.assign({}, row.data || {}, { portal_name: newName });
-                    var result = await _supabase.from('quotes').update({ data: data }).eq('id', row.id);
+                    var result = await qdDurableQuoteRowUpdate(row.id, { data: data }, 'Rename portal');
                     if (result.error) throw result.error;
                 }
                 await refreshQuotes();
@@ -2404,7 +2498,7 @@
                     if (!row) continue;
                     row = await loadDashboardFullQuote(row);
                     var data = clearPortalAssignmentForEdit(row.data || {});
-                    var result = await _supabase.from('quotes').update({ data: data }).eq('id', row.id);
+                    var result = await qdDurableQuoteRowUpdate(row.id, { data: data }, 'Delete portal assignment');
                     if (result.error) throw result.error;
                 }
                 await refreshQuotes();
@@ -2592,7 +2686,7 @@
                             portal_client_name: selectedName,
                             portal_client_email: selectedEmail
                         });
-                        await _supabase.from('quotes').update({ data: newData }).eq('id', quotes[j].id);
+                        await qdDurableQuoteRowUpdate(quotes[j].id, { data: newData }, 'Portal PIN');
                         quotes[j].data = newData;
                     }
                 }
@@ -2715,7 +2809,7 @@
             if (quotes && quotes.length > 0) {
                 for (var q of quotes) {
                     var newData = Object.assign({}, q.data || {}, { portal_pin: newPin });
-                    await _supabase.from('quotes').update({ data: newData }).eq('id', q.id);
+                    await qdDurableQuoteRowUpdate(q.id, { data: newData }, 'Reset portal PIN');
                 }
             }
             document.getElementById('portalPinDisplay').textContent = newPin;
@@ -2741,13 +2835,16 @@
                 var share = await createSecureClientShareLink(quoteId, viewerBaseUrl, { mode: 'document' });
                 var viewerUrl = share && share.url ? share.url : '';
                 if (!viewerUrl) throw new Error('Could not create secure quote link.');
+                var followUpOperationEntity = quoteId + ':' + clientEmail;
+                var followUpOperationId = qdGetExternalOperationId('email_followup', followUpOperationEntity);
                 var res = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/send-quote-email', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso' },
-                    body: JSON.stringify({ to: clientEmail, clientName: clientName, contractorName: '', companyName: '', quoteNumber: quote.quote_number || '', total: quote.total || 0, quoteUrl: viewerUrl, message: (function(){ try { var ns = JSON.parse(localStorage.getItem('ald_notification_settings') || '{}'); return ns.followupMessage || "Just following up on the quote I sent you! Let me know if you have any questions or if you're ready to proceed."; } catch(e) { return "Just following up on the quote I sent you!"; } })() })
+                    headers: await getSupabaseFunctionAuthHeaders(),
+                    body: JSON.stringify({ to: clientEmail, clientName: clientName, contractorName: '', companyName: '', quoteNumber: quote.quote_number || '', total: quote.total || 0, quoteUrl: viewerUrl, message: (function(){ try { var ns = JSON.parse(localStorage.getItem('ald_notification_settings') || '{}'); return ns.followupMessage || "Just following up on the quote I sent you! Let me know if you have any questions or if you're ready to proceed."; } catch(e) { return "Just following up on the quote I sent you!"; } })(), idempotencyKey: followUpOperationId })
                 });
                 var data = await res.json();
                 if (data.error) throw new Error(data.error);
+                qdCompleteExternalOperation('email_followup', followUpOperationEntity);
                 if (btn) { btn.innerHTML = '<i class="fas fa-check me-1"></i>Sent!'; setTimeout(function() { btn.disabled = false; btn.innerHTML = '<i class="fas fa-bell me-1"></i> Send Follow-up'; }, 3000); }
             } catch(e) {
                 qdAlert('Failed to send: ' + e.message);
@@ -2772,9 +2869,11 @@
             if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Sending...'; }
             try {
                 var message = dashboardReviewRequestMessage(settings, clientName);
+                var reviewOperationEntity = quoteId + ':' + clientEmail;
+                var reviewOperationId = qdGetExternalOperationId('email_review_request', reviewOperationEntity);
                 var res = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/send-quote-email', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso' },
+                    headers: await getSupabaseFunctionAuthHeaders(),
                     body: JSON.stringify({
                         to: clientEmail,
                         clientName: clientName,
@@ -2783,11 +2882,13 @@
                         quoteNumber: quote.quote_number || 'Google Review',
                         total: quote.total || 0,
                         quoteUrl: reviewLink,
-                        message: message
+                        message: message,
+                        idempotencyKey: reviewOperationId
                     })
                 });
                 var data = await res.json();
                 if (data.error) throw new Error(data.error);
+                qdCompleteExternalOperation('email_review_request', reviewOperationEntity);
 
                 quote = await loadDashboardFullQuote(quote);
                 var now = new Date().toISOString();
@@ -2796,7 +2897,7 @@
                     review_request_sent_to: clientEmail,
                     review_request_nudge_ignored: false
                 });
-                var update = await _supabase.from('quotes').update({ data: updatedData, updated_at: now }).eq('id', quoteId);
+                var update = await qdDurableQuoteRowUpdate(quoteId, { data: updatedData, updated_at: now }, 'Review request status');
                 if (update.error) throw update.error;
                 quote.data = updatedData;
                 renderDashboardResults();
@@ -2817,7 +2918,7 @@
                     review_request_nudge_ignored: true,
                     review_request_nudge_ignored_at: now
                 });
-                var update = await _supabase.from('quotes').update({ data: updatedData, updated_at: now }).eq('id', quoteId);
+                var update = await qdDurableQuoteRowUpdate(quoteId, { data: updatedData, updated_at: now }, 'Review reminder status');
                 if (update.error) throw update.error;
                 quote.data = updatedData;
                 renderDashboardResults();
@@ -2842,10 +2943,7 @@
                 updateStats(allQuotes);
             }
             try {
-                const { error } = await _supabase
-                    .from('quotes')
-                    .update({ status: newStatus, updated_at: new Date().toISOString() })
-                    .eq('id', quoteId);
+                const { error } = await qdDurableQuoteRowUpdate(quoteId, { status: newStatus }, 'Quote status');
                 if (error) console.error('Status update error:', error);
             } catch(e) { console.warn('Could not update status in Supabase:', e); }
         }
@@ -2868,10 +2966,7 @@
             data.junk_was_portal_visible = data.portal_visible === true;
             data.portal_visible = false;
 
-            const { error } = await _supabase
-                .from('quotes')
-                .update({ data: data, updated_at: now.toISOString() })
-                .eq('id', quoteId);
+            const { error } = await qdDurableQuoteRowUpdate(quoteId, { data: data, updated_at: now.toISOString() }, 'Move document to Junk');
             if (error) {
                 console.error('Error moving quote to junk:', error);
                 qdAlert('Failed to move document to Junk: ' + (error.message || error));
@@ -2924,10 +3019,7 @@
             delete data.junk_delete_after;
             delete data.junk_was_portal_visible;
             data.portal_visible = wasPortalVisible;
-            const { error } = await _supabase
-                .from('quotes')
-                .update({ data: data, updated_at: new Date().toISOString() })
-                .eq('id', quoteId);
+            const { error } = await qdDurableQuoteRowUpdate(quoteId, { data: data }, 'Restore document from Junk');
             if (error) {
                 qdAlert('Could not restore document: ' + (error.message || error));
                 return;
@@ -2982,6 +3074,7 @@
             const { data: { session } } = await _supabase.auth.getSession();
             if (!session) { window.location.href = 'login.html'; return; }
             window.currentUser = session.user;
+            refreshDashboardSaveIncidents(session.user);
             const userName = localStorage.getItem('ald_user_name') || 'User';
             document.getElementById('userName').textContent = userName;
             var mob = document.getElementById('userNameMobile');
@@ -3703,10 +3796,7 @@ function renderBusinessInsights(quotes) {
                                               const updatedChangeOrders = [...changeOrders, newCo];
                                               const updatedData = { ...quote.data, change_orders: updatedChangeOrders };
                                               
-                                              return window._supabase
-                                                .from('quotes')
-                                                .update({ data: updatedData })
-                                                .eq('id', quoteId);
+                                              return qdDurableQuoteRowUpdate(quoteId, { data: updatedData }, 'Change order');
                                             })
                                             .then(() => {
                                               // Reload view tab
@@ -3827,10 +3917,7 @@ function renderBusinessInsights(quotes) {
                                               
                                               const updatedData = { ...quote.data, change_orders: updatedChangeOrders };
                                               
-                                              return window._supabase
-                                                .from('quotes')
-                                                .update({ data: updatedData, total: newTotal })
-                                                .eq('id', quoteId);
+                                              return qdDurableQuoteRowUpdate(quoteId, { data: updatedData, total: newTotal }, 'Approve change order');
                                             })
                                             .then(() => {
                                               // Reload view tab
@@ -3870,10 +3957,7 @@ function renderBusinessInsights(quotes) {
                                               
                                               const updatedData = { ...quote.data, change_orders: updatedChangeOrders };
                                               
-                                              return window._supabase
-                                                .from('quotes')
-                                                .update({ data: updatedData })
-                                                .eq('id', quoteId);
+                                              return qdDurableQuoteRowUpdate(quoteId, { data: updatedData }, 'Decline change order');
                                             })
                                             .then(() => {
                                               // Reload view tab
@@ -4791,6 +4875,26 @@ function renderBusinessInsights(quotes) {
   </div>
 </div>
 <script>
+function initializeDashboardSyncRecovery() {
+  if (!window.QuoteDrSave || !QuoteDrSave.isEnabled() || window._dashboardSyncRecoveryInitialized) return;
+  window._dashboardSyncRecoveryInitialized = true;
+  var syncDesktop = document.getElementById('dashboardSyncRecoveryBtn');
+  var syncMobile = document.getElementById('dashboardSyncRecoveryMobile');
+  if (syncDesktop) syncDesktop.style.display = '';
+  if (syncMobile) syncMobile.style.display = '';
+  QuoteDrSave.subscribe(function(status) {
+    ['saveRecoveryBadge', 'saveRecoveryBadgeMobile'].forEach(function(id) {
+      var badge = document.getElementById(id);
+      if (!badge) return;
+      badge.textContent = status.pendingCount || 0;
+      badge.style.display = status.pendingCount ? '' : 'none';
+      badge.className = 'badge ms-1 ' + (status.conflictCount ? 'bg-danger text-white' : 'bg-warning text-dark');
+      if (id === 'saveRecoveryBadge') badge.className += ' position-absolute top-0 start-100 translate-middle rounded-pill';
+    });
+  });
+}
+window.addEventListener('quotedr-save-ready', initializeDashboardSyncRecovery);
+initializeDashboardSyncRecovery();
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(err => console.warn('SW reg failed:', err));

@@ -348,15 +348,9 @@
         }
 
         function _fpSetupSave() {
-            _supabase.auth.getUser().then(function(r) {
-                var uid = r.data && r.data.user ? r.data.user.id : null;
-                _fpEnsureMapping();
-                if (!uid) { _fpRenderStep1(); return; }
-                _supabase.from('user_data').upsert(
-                    { user_id: uid, key: 'fp_scanner_mapping', value: _fpMapping, updated_at: new Date().toISOString() },
-                    { onConflict: 'user_id,key' }
-                ).then(function() { _fpRenderStep1(); });
-            });
+            _fpEnsureMapping();
+            if (typeof saveUserDataValue !== 'function') { _fpRenderStep1(); return; }
+            saveUserDataValue('fp_scanner_mapping', _fpMapping, { entityType: 'quote_preferences', entityLabel: 'Floor plan scanner mapping' }).then(function() { _fpRenderStep1(); });
         }
 
         function _fpRenderStep1() {

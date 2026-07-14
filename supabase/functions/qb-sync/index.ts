@@ -40,6 +40,49 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+async function qbPayloadHash(value: unknown) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(value)));
+  return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function claimQBOperation(userId: string, idempotencyKey: string, hash: string) {
+  const now = new Date().toISOString();
+  const inserted = await supabaseAdmin.from("external_operation_receipts").insert({
+    idempotency_key: idempotencyKey,
+    user_id: userId,
+    operation_type: "quickbooks_push_invoice",
+    payload_hash: hash,
+    status: "processing",
+    created_at: now,
+    updated_at: now,
+  });
+  if (!inserted.error) return { claimed: true, response: null };
+  if (inserted.error.code !== "23505") throw inserted.error;
+  const existing = await supabaseAdmin.from("external_operation_receipts").select("*").eq("idempotency_key", idempotencyKey).eq("user_id", userId).single();
+  if (existing.error || !existing.data) throw existing.error || new Error("Could not verify the QuickBooks request");
+  if (existing.data.payload_hash !== hash) throw new Error("This QuickBooks request key was already used for different content");
+  if (existing.data.status === "completed") return { claimed: false, response: existing.data.response || { success: true } };
+  if (existing.data.status === "processing") {
+    const stale = Date.now() - new Date(existing.data.updated_at || existing.data.created_at).getTime() > 2 * 60 * 1000;
+    if (!stale) return { claimed: false, processing: true, response: null };
+    const reclaimedStale = await supabaseAdmin.from("external_operation_receipts")
+      .update({ attempts: Number(existing.data.attempts || 0) + 1, updated_at: now })
+      .eq("idempotency_key", idempotencyKey)
+      .eq("status", "processing")
+      .eq("updated_at", existing.data.updated_at)
+      .select("idempotency_key")
+      .maybeSingle();
+    return { claimed: !!reclaimedStale.data, processing: !reclaimedStale.data, response: null };
+  }
+  const reclaimed = await supabaseAdmin.from("external_operation_receipts")
+    .update({ status: "processing", attempts: Number(existing.data.attempts || 0) + 1, last_error: "", updated_at: now })
+    .eq("idempotency_key", idempotencyKey)
+    .eq("status", "failed")
+    .select("idempotency_key")
+    .maybeSingle();
+  return { claimed: !!reclaimed.data, processing: !reclaimed.data, response: null };
+}
+
 interface QBToken {
   access_token: string;
   refresh_token: string;
@@ -77,8 +120,23 @@ serve(async (req) => {
     const action = body.action;
 
     switch (action) {
-      case "push_invoice":
-        return await handlePushInvoice(userId, body.invoice);
+      case "push_invoice": {
+        const idempotencyKey = String(body.idempotencyKey || "").trim();
+        if (!/^[a-zA-Z0-9_-]{16,200}$/.test(idempotencyKey)) return jsonResponse({ error: "Missing or invalid idempotency key" }, 400);
+        const hash = await qbPayloadHash(body.invoice || {});
+        const claim = await claimQBOperation(userId, idempotencyKey, hash);
+        if (claim.response) return jsonResponse({ ...claim.response, idempotentReplay: true });
+        if (!claim.claimed) return jsonResponse({ error: "This QuickBooks request is already processing. Check QuickBooks before retrying." }, 409);
+        const response = await handlePushInvoice(userId, body.invoice);
+        const responseBody = await response.clone().json().catch(() => ({}));
+        const now = new Date().toISOString();
+        if (response.ok && !responseBody.error) {
+          await supabaseAdmin.from("external_operation_receipts").update({ status: "completed", response: responseBody, completed_at: now, updated_at: now }).eq("idempotency_key", idempotencyKey);
+        } else {
+          await supabaseAdmin.from("external_operation_receipts").update({ status: "failed", last_error: String(responseBody.error || "QuickBooks request failed"), updated_at: now }).eq("idempotency_key", idempotencyKey);
+        }
+        return response;
+      }
       case "get_customers":
         return await handleGetCustomers(userId);
       case "get_items":

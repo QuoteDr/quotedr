@@ -29,7 +29,9 @@ assert(
 assert(
   items.includes('async function uploadManageFullResPhoto') &&
     items.includes("storage.from(MANAGE_FULL_RES_PHOTO_BUCKET).upload") &&
-    items.includes('getPublicUrl(path)'),
+    items.includes('getPublicUrl(payload.path)') &&
+    items.includes("adapterType: 'item_photo_upload'") &&
+    items.includes('payload: uploadPayload'),
   'Manage Items should upload originals to Supabase Storage for signed-in users'
 );
 

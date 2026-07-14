@@ -510,13 +510,7 @@
             });
             localStorage.setItem('ald_estimator_pricing', JSON.stringify(pricing));
             // Also save to Supabase
-            if (typeof saveItemsToSupabase === 'function') {
-                getCurrentUser && getCurrentUser().then(function(u) {
-                    if (u && typeof _supabase !== 'undefined') {
-                        _supabase.from('user_data').upsert({ user_id: u.id, key: 'estimator_pricing', value: pricing, updated_at: new Date().toISOString() }, { onConflict: 'user_id,key' });
-                    }
-                });
-            }
+            if (typeof saveUserDataValue === 'function') saveUserDataValue('estimator_pricing', pricing, { entityType: 'quote_preferences', entityLabel: 'Estimator pricing', localStorageKey: 'ald_estimator_pricing', background: true });
             bootstrap.Modal.getInstance(document.getElementById('estimatorPricingModal')).hide();
             var t3 = document.createElement('div');
             t3.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#198754;color:white;padding:10px 18px;border-radius:8px;z-index:9999;font-size:0.9rem;box-shadow:0 2px 8px rgba(0,0,0,0.2);';

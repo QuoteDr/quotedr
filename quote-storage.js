@@ -325,6 +325,7 @@
                 grandTotal: grandTotal,
                 total: grandTotal,
                 supabaseId: supabaseId,
+                _serverUpdatedAt: window._quoteServerUpdatedAt || loadedData._serverUpdatedAt || loadedData.updated_at || null,
                 currency: (function(){ try { return JSON.parse(localStorage.getItem('ald_quote_prefs')||'{}').currency||'CAD'; } catch(e){return 'CAD';} })(),
                 paymentSettings: (typeof getLocalPaymentSettingsSnapshot === 'function') ? getLocalPaymentSettingsSnapshot() : null,
                 businessProfile: (typeof getLocalBusinessProfileSnapshot === 'function') ? getLocalBusinessProfileSnapshot() : {},
@@ -384,6 +385,7 @@
             window._previousApprovedChangeOrderTotal = window._changeOrderPreviousApprovedTotal;
             window._changeOrderPriceSummary = data.changeOrderPriceSummary || null;
             window._changeOrderNumber = parseInt(data.changeOrderNumber || data.change_order_number || 0, 10) || 0;
+            window._quoteServerUpdatedAt = data._serverUpdatedAt || data.serverUpdatedAt || data.updated_at || null;
             setTimeout(function() {
                 if (document.getElementById('changeOrderReason')) document.getElementById('changeOrderReason').value = data.changeReason || '';
                 if (typeof updateChangeOrderModeUI === 'function') updateChangeOrderModeUI();
@@ -411,6 +413,9 @@
                 el.innerHTML = '<span style="color:#fd7e14;"><i class="fas fa-circle"></i> Unsaved changes</span>';
             } else if (state === 'saving') {
                 el.innerHTML = '<span style="color:#6c757d;"><i class="fas fa-spinner fa-spin"></i> Saving\u2026</span>';
+            } else if (state === 'pending') {
+                el.innerHTML = '<span style="color:#9a6700;"><i class="fas fa-cloud-arrow-up"></i> ' + (detail || 'Saved on this device - syncing to cloud') + '</span>';
+                unsavedChanges = false;
             } else if (state === 'loaded') {
                 el.innerHTML = '<span style="color:#1a56a0;"><i class="fas fa-folder-open"></i> Opened at ' + t + (detail ? ' \u2014 ' + detail : '') + '</span>';
                 unsavedChanges = false;
@@ -600,15 +605,21 @@ async function saveQuote() {
             if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...'; }
             try {
                 var result = await saveQuoteToSupabase(_saveDialogData);
-                if (result && !result.error && result.data) {
+                if (result && !result.error && result.state === 'cloud_saved' && result.data) {
                     var saved = Array.isArray(result.data) ? result.data[0] : result.data;
                     if (saved && saved.id) {
                         window._supabaseQuoteId = saved.id;
+                        window._quoteServerUpdatedAt = saved.updated_at || null;
                         localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
                     }
+                    unsavedChanges = false;
+                    updateSaveStatus('saved', 'Confirmed in cloud');
+                } else if (result && result.state !== 'local_failed') {
+                    unsavedChanges = false;
+                    updateSaveStatus('pending', 'Saved on this device - syncing to cloud');
+                } else {
+                    throw new Error((result && result.error && result.error.message) || 'The quote could not be stored safely.');
                 }
-                unsavedChanges = false;
-                updateSaveStatus('saved', 'Saved to cloud ?');
                 updateDraftWarning();
                 bootstrap.Modal.getInstance(document.getElementById('saveQuoteModal')).hide();
                 qdAfterManualQuoteSave();
@@ -641,8 +652,19 @@ async function saveQuote() {
             if (owBtn) { owBtn.disabled = true; owBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...'; }
             try {
                 var result = await saveQuoteToSupabase(_saveDialogData);
-                unsavedChanges = false;
-                updateSaveStatus('saved', 'Saved to cloud ?');
+                if (result && !result.error && result.state === 'cloud_saved') {
+                    var saved = Array.isArray(result.data) ? result.data[0] : result.data;
+                    if (saved && saved.id) {
+                        window._supabaseQuoteId = saved.id;
+                        window._quoteServerUpdatedAt = saved.updated_at || null;
+                        localStorage.setItem("ald_active_quote_id", saved.id);
+                    }
+                    updateSaveStatus('saved', 'Confirmed in cloud');
+                } else if (result && result.state !== 'local_failed') {
+                    updateSaveStatus('pending', 'Saved on this device - syncing to cloud');
+                } else {
+                    throw new Error((result && result.error && result.error.message) || 'The quote could not be stored safely.');
+                }
                 updateDraftWarning();
                 bootstrap.Modal.getInstance(document.getElementById('saveQuoteModal')).hide();
                 qdAfterManualQuoteSave();
@@ -798,6 +820,7 @@ async function saveQuote() {
                 }
                 var qData = q.data || {};
                 qData.supabaseId = q.id;
+                qData._serverUpdatedAt = q.updated_at || null;
                 qData.clientName = q.client_name || qData.clientName || '';
                 qData.quoteNumber = q.quote_number || qData.quoteNumber || '';
                 qData.grandTotal = q.total || 0;
@@ -855,6 +878,7 @@ async function saveQuote() {
                 }
             }
             // Cloud save to Supabase - always runs regardless of file handle
+            var cloudState = null;
             if (typeof saveQuoteToSupabase === 'function') {
                 var qData = collectQuoteData();
                 if (quoteDataIsPortalLockedForBuilder(qData)) {
@@ -867,23 +891,33 @@ async function saveQuote() {
                     console.warn('[AutoSave] Skipping cloud save - rooms empty and quote not confirmed loaded from cloud');
                     return;
                 }
-                saveQuoteToSupabase(qData).then(function(result) {
-                    if (result && result.data) {
-                        // result.data may be an array (insert) or object (update)
+                try {
+                    var result = await saveQuoteToSupabase(qData);
+                    cloudState = result && result.state;
+                    if (result && !result.error && result.state === 'cloud_saved' && result.data) {
                         var saved = Array.isArray(result.data) ? result.data[0] : result.data;
                         if (saved && saved.id) {
                             window._supabaseQuoteId = saved.id;
+                            window._quoteServerUpdatedAt = saved.updated_at || null;
                             localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
                         }
+                    } else if (!result || result.state === 'local_failed') {
+                        throw new Error((result && result.error && result.error.message) || 'Auto-save could not store a durable copy.');
                     }
-                }).catch(function(){});
+                } catch (error) {
+                    unsavedChanges = true;
+                    updateSaveStatus('error', error.message || 'Auto-save failed');
+                    return;
+                }
             }
             unsavedChanges = false;
             if (el) {
-                if (saveFileHandle) {
+                if (cloudState === 'cloud_saved') {
+                    el.innerHTML = '<span style="color:#28a745;"><i class="fas fa-cloud-check"></i> Cloud saved at ' + t + '</span>';
+                } else if (cloudState === 'local_pending' || cloudState === 'conflict') {
+                    el.innerHTML = '<span style="color:#9a6700;"><i class="fas fa-cloud-arrow-up"></i> Saved on this device at ' + t + ' - syncing</span>';
+                } else if (saveFileHandle) {
                     el.innerHTML = '<span style="color:#28a745;"><i class="fas fa-check-circle"></i> File saved at ' + t + '</span>';
-                } else if (window._supabaseQuoteId) {
-                    el.innerHTML = '<span style="color:#28a745;"><i class="fas fa-cloud"></i> Cloud saved at ' + t + '</span>';
                 } else {
                     el.innerHTML = '<span style="color:#fd7e14;"><i class="fas fa-exclamation-triangle"></i> Draft saved locally at ' + t + '</span>';
                 }
@@ -969,6 +1003,7 @@ async function saveQuote() {
                         }
                         const qData = Object.assign({}, data.data || {});
                         qData.supabaseId = data.id;
+                        qData._serverUpdatedAt = data.updated_at || null;
                         qData.clientName = data.client_name || qData.clientName || '';
                         qData.quoteNumber = data.quote_number || qData.quoteNumber || '';
                         qData.status = data.status || qData.status || 'draft';
@@ -1239,6 +1274,7 @@ async function saveQuote() {
                                 }
                                 var qData = result.data.data;
                                 qData.supabaseId = result.data.id;
+                                qData._serverUpdatedAt = result.data.updated_at || null;
                                 window._supabaseQuoteId = result.data.id;
                                 localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
                                 applyQuoteData(qData);
@@ -1288,6 +1324,7 @@ async function saveQuote() {
                                 qData.supabaseId = result.data.id;
                                 // Map fields - client_name lives at row level, rest in data JSON
                                 var row = result.data;
+                                qData._serverUpdatedAt = row.updated_at || null;
                                 qData.clientName = row.client_name || qData.clientName || '';
                                 qData.quoteNumber = row.quote_number || qData.quoteNumber || '';
                                 if (!qData.projectAddress) qData.projectAddress = qData.project_address || '';

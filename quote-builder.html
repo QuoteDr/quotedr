@@ -1959,7 +1959,8 @@
 
 </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-v2.js?v=2026071203"></script>
+    <script src="supabase-v2.js?v=2026071301"></script>
+    <script src="save-coordinator.js?v=2026071301"></script>
     <script src="quote-media.js?v=2026071202"></script>
 <!-- Eruda mobile console (only loads with ?debug in URL) -->
 <script>
@@ -7595,12 +7596,8 @@ Example:
 
         async function _saveUsedQuoteNumbersToCloud(nums) {
             try {
-                var user = await _supabase.auth.getUser();
-                if (!user.data?.user) return;
-                await _supabase.from('user_data').upsert(
-                    { user_id: user.data.user.id, key: 'used_quote_numbers', value: nums, updated_at: new Date().toISOString() },
-                    { onConflict: 'user_id,key' }
-                );
+                if (typeof saveUserDataValue !== 'function') return;
+                await saveUserDataValue('used_quote_numbers', nums, { entityType: 'quote_preferences', entityLabel: 'Used quote numbers', localStorageKey: 'ald_used_quote_numbers', background: true });
             } catch(e) { console.warn('Used quote numbers cloud save failed:', e); }
         }
 
@@ -12620,15 +12617,7 @@ Example:
             };
             localStorage.setItem(INVOICE_SETTINGS_KEY, JSON.stringify(settings));
             try {
-                if (typeof _supabase !== 'undefined') {
-                    var user = await _supabase.auth.getUser();
-                    if (user.data && user.data.user) {
-                        await _supabase.from('user_data').upsert(
-                            { user_id: user.data.user.id, key: 'invoice_settings', value: settings, updated_at: new Date().toISOString() },
-                            { onConflict: 'user_id,key' }
-                        );
-                    }
-                }
+                if (typeof saveUserDataValue === 'function') await saveUserDataValue('invoice_settings', settings, { entityType: 'quote_preferences', entityLabel: 'Invoice settings', localStorageKey: INVOICE_SETTINGS_KEY });
             } catch(e) {
                 console.warn('Invoice settings cloud save failed:', e);
             }
@@ -12788,7 +12777,15 @@ Example:
             localStorage.setItem('ald_last_preview_invoice', invoiceId);
 
             if (window._supabaseQuoteId && typeof _supabase !== 'undefined' && options.markInvoiced !== false) {
-                _supabase.from('quotes').update({ status: 'invoiced', updated_at: new Date().toISOString() }).eq('id', window._supabaseQuoteId).then(function() {});
+                qdDurableSupabaseOperation({
+                    entityType: 'quote',
+                    entityId: window._supabaseQuoteId,
+                    entityLabel: 'Quote invoice status',
+                    action: 'update',
+                    payload: { status: 'invoiced' },
+                    target: { table: 'quotes', action: 'update', values: { status: 'invoiced', updated_at: new Date().toISOString() }, filters: [{ column: 'id', value: window._supabaseQuoteId }] },
+                    background: true
+                });
             }
 
             var result = { invoiceId: invoiceId, invoiceData: invoiceData, invoiceUrl: invoiceUrl, invoiceBaseUrl: invoiceBaseUrl };
@@ -13125,7 +13122,14 @@ Example:
                     portal_client_email: portal.clientEmail || invoicePortalRowClientEmail(row),
                     portal_pin: pin
                 });
-                var updated = await _supabase.from('quotes').update({ data: data }).eq('id', row.id);
+                var updated = await qdDurableSupabaseOperation({
+                    entityType: row.status === 'invoiced' ? 'invoice' : 'quote',
+                    entityId: row.id,
+                    entityLabel: row.client_name || row.quote_number || 'Portal document',
+                    action: 'update',
+                    payload: Object.assign({}, row, { data: data }),
+                    target: { table: 'quotes', action: 'update', values: { data: data, updated_at: new Date().toISOString() }, filters: [{ column: 'id', value: row.id }], verifyRevision: true }
+                });
                 if (updated.error) throw updated.error;
             }
         }
@@ -13427,18 +13431,20 @@ Example:
             // Also save to Supabase (cloud backup)
             if (typeof saveQuoteToSupabase === 'function') {
                 try {
-                    const { data, error } = await saveQuoteToSupabase(draftData);
-                    if (error) {
-                        console.warn('Supabase save failed (local save succeeded):', error.message);
-                        qdAlert('Quote saved locally! (Cloud sync failed: ' + error.message + ')');
+                    const result = await saveQuoteToSupabase(draftData);
+                    if (result.error) {
+                        console.warn('Cloud save deferred (durable local save succeeded):', result.error.message);
+                        qdAlert('Quote saved safely on this device. Cloud sync will retry automatically.');
                     } else {
+                        var data = Array.isArray(result.data) ? result.data[0] : result.data;
                         // Store the Supabase ID for future updates
                         currentSupabaseId = data.id;
                         window._supabaseQuoteId = data.id;
+                        window._quoteServerUpdatedAt = data.updated_at || null;
                         draftData.supabaseId = data.id;
                         localStorage.setItem("ald_active_quote_id", data.id);
                         localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
-                        qdAlert('Quote saved! ? (Saved to cloud + local backup)');
+                        qdAlert('Quote saved locally and confirmed in the cloud.');
                     }
                 } catch(e) {
                     console.warn('Supabase save error:', e);
@@ -13614,14 +13620,8 @@ Example:
 
         async function _syncTemplateToCloud(name, rooms) {
             try {
-                var user = await _supabase.auth.getUser();
-                if (!user.data?.user) return;
-                await _supabase.from('templates').upsert({
-                    user_id: user.data.user.id,
-                    name: name,
-                    rooms: rooms,
-                    updated_at: new Date().toISOString()
-                }, { onConflict: 'user_id,name' });
+                if (typeof saveTemplate !== 'function') return;
+                await saveTemplate({ name: name, rooms: rooms });
             } catch(e) {
                 console.warn('Cloud template sync failed:', e);
             }
@@ -13967,6 +13967,7 @@ Example:
                 status: 'published',
                 updated_at: new Date().toISOString()
             };
+            // qd-save-audit: explicit marketplace publish command; never auto-replay an ambiguous public post.
             var result = await _supabase.from('community_templates').insert(row).select().single();
             if (result.error) {
                 console.warn('Community publish failed:', result.error);
@@ -14082,6 +14083,7 @@ Example:
             var userResult = await _supabase.auth.getUser();
             var user = userResult.data?.user;
             if (!user) { qdAlert('Please sign in to report templates.'); return; }
+            // qd-save-audit: explicit marketplace moderation command; user retries manually on failure.
             var result = await _supabase.from('community_template_reports').upsert({
                 template_id: id,
                 user_id: user.id,
@@ -14100,6 +14102,7 @@ Example:
             var userResult = await _supabase.auth.getUser();
             var user = userResult.data?.user;
             if (!user) { qdAlert('Please sign in to rate templates.'); return; }
+            // qd-save-audit: explicit marketplace rating command; user retries manually on failure.
             var result = await _supabase.from('community_template_ratings').upsert({
                 template_id: id,
                 user_id: user.id,
@@ -14206,10 +14209,7 @@ Example:
             _saveTemplates(templates);
             // Also delete from cloud
             if (deleted) {
-                _supabase.auth.getUser().then(function(r) {
-                    if (!r.data?.user) return;
-                    _supabase.from('templates').delete().eq('user_id', r.data.user.id).eq('name', deleted.name).catch(function(){});
-                }).catch(function(){});
+                if (typeof deleteTemplate === 'function') deleteTemplate(deleted.name).catch(function(){});
             }
             openManageTemplates();
         }
@@ -14404,12 +14404,11 @@ Example:
             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Sending...';
             resultEl.innerHTML = '';
             try {
+                var invoiceEmailOperationEntity = (invoiceData.supabaseId || invoiceData.quoteNumber || 'invoice') + ':' + email;
+                var invoiceEmailOperationId = qdGetExternalOperationId('email_invoice', invoiceEmailOperationEntity);
                 var res = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/send-quote-email', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso'
-                    },
+                    headers: await getSupabaseFunctionAuthHeaders(),
                     body: JSON.stringify({
                         to: email,
                         clientName: invoiceData.clientName || '',
@@ -14425,11 +14424,13 @@ Example:
                         emailButtonText: 'View Invoice',
                         portalUrl: portalUrl,
                         emailReplyTo: replyTo,
-                        emailFooter: profile.emailFooter || ''
+                        emailFooter: profile.emailFooter || '',
+                        idempotencyKey: invoiceEmailOperationId
                     })
                 });
                 var data = await res.json();
                 if (data.error) throw new Error(data.error);
+                qdCompleteExternalOperation('email_invoice', invoiceEmailOperationEntity);
                 resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>Invoice sent to ' + email + '!' + (portalUrl ? ' Portal link included.' : '') + '</span>';
                 if (typeof qdCaptureEvent === 'function') {
                     qdCaptureEvent('invoice_sent', {
@@ -14828,12 +14829,11 @@ Example:
             resultEl.innerHTML = '';
 
             try {
+                var quoteEmailOperationEntity = (qData.supabaseId || window._supabaseQuoteId || qData.quoteNumber || 'quote') + ':' + email;
+                var quoteEmailOperationId = qdGetExternalOperationId('email_quote', quoteEmailOperationEntity);
                 var res = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/send-quote-email', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso'
-                    },
+                    headers: await getSupabaseFunctionAuthHeaders(),
                     body: JSON.stringify({
                         to: email,
                         clientName: qData.clientName || '',
@@ -14848,11 +14848,13 @@ Example:
                         emailButtonText: profile.emailButtonText || '',
                         portalUrl: portalUrl,
                         emailReplyTo: profile.emailReplyTo || '',
-                        emailFooter: profile.emailFooter || ''
+                        emailFooter: profile.emailFooter || '',
+                        idempotencyKey: quoteEmailOperationId
                     })
                 });
                 var data = await res.json();
                 if (data.error) throw new Error(data.error);
+                qdCompleteExternalOperation('email_quote', quoteEmailOperationEntity);
                 resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>Quote sent to ' + email + '!' + (portalUrl ? ' Portal link included.' : '') + '</span>';
                 if (typeof qdCaptureEvent === 'function') {
                     qdCaptureEvent('quote_sent', {
@@ -15179,12 +15181,8 @@ Example:
         // -- Cloud sync helpers for settings --------------------------------------
         async function _saveCategoryStylesToCloud() {
             try {
-                var user = await _supabase.auth.getUser();
-                if (!user.data?.user) return;
-                await _supabase.from('user_data').upsert(
-                    { user_id: user.data.user.id, key: 'category_styles', value: categoryStyles, updated_at: new Date().toISOString() },
-                    { onConflict: 'user_id,key' }
-                );
+                if (typeof saveUserDataValue !== 'function') return;
+                await saveUserDataValue('category_styles', categoryStyles, { entityType: 'quote_preferences', entityLabel: 'Category styles', localStorageKey: 'ald_category_styles', background: true });
             } catch(e) { console.warn('Category styles cloud save failed:', e); }
         }
         async function _restoreCategoryStylesFromCloud() {
@@ -15200,12 +15198,8 @@ Example:
         }
         async function _saveHiddenCategoriesToCloud(arr) {
             try {
-                var user = await _supabase.auth.getUser();
-                if (!user.data?.user) return;
-                await _supabase.from('user_data').upsert(
-                    { user_id: user.data.user.id, key: 'hidden_categories', value: arr, updated_at: new Date().toISOString() },
-                    { onConflict: 'user_id,key' }
-                );
+                if (typeof saveUserDataValue !== 'function') return;
+                await saveUserDataValue('hidden_categories', arr, { entityType: 'quote_preferences', entityLabel: 'Hidden categories', localStorageKey: 'ald_hidden_categories', background: true });
             } catch(e) { console.warn('Hidden categories cloud save failed:', e); }
         }
         async function _restoreHiddenCategoriesFromCloud() {
@@ -15223,12 +15217,8 @@ Example:
         }
         async function _saveItemOverridesToCloud() {
             try {
-                var user = await _supabase.auth.getUser();
-                if (!user.data?.user) return;
-                await _supabase.from('user_data').upsert(
-                    { user_id: user.data.user.id, key: 'item_overrides', value: itemOverrides, updated_at: new Date().toISOString() },
-                    { onConflict: 'user_id,key' }
-                );
+                if (typeof saveUserDataValue !== 'function') return;
+                await saveUserDataValue('item_overrides', itemOverrides, { entityType: 'quote_preferences', entityLabel: 'Saved item overrides', localStorageKey: 'ald_item_overrides', background: true });
             } catch(e) { console.warn('Item overrides cloud save failed:', e); }
         }
         async function _restoreItemOverridesFromCloud() {

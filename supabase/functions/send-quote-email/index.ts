@@ -1,26 +1,103 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+
+function json(body: Record<string, unknown>, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+async function payloadHash(value: unknown) {
+  const bytes = new TextEncoder().encode(JSON.stringify(value));
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function authenticatedUser(req: Request) {
+  const authHeader = req.headers.get("Authorization") || "";
+  if (!authHeader.startsWith("Bearer ")) return null;
+  const auth = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const { data, error } = await auth.auth.getUser(authHeader.slice(7));
+  return error ? null : data.user;
+}
+
+async function claimEmailOperation(service: any, userId: string, idempotencyKey: string, hash: string) {
+  const now = new Date().toISOString();
+  const inserted = await service.from("external_operation_receipts").insert({
+    idempotency_key: idempotencyKey,
+    user_id: userId,
+    operation_type: "send_quote_email",
+    payload_hash: hash,
+    status: "processing",
+    created_at: now,
+    updated_at: now,
+  });
+  if (!inserted.error) return { claimed: true, response: null };
+  if (inserted.error.code !== "23505") throw inserted.error;
+  const existing = await service.from("external_operation_receipts").select("*").eq("idempotency_key", idempotencyKey).eq("user_id", userId).single();
+  if (existing.error || !existing.data) throw existing.error || new Error("Could not verify the email request");
+  if (existing.data.payload_hash !== hash) throw new Error("This email request key was already used for different content");
+  if (existing.data.status === "completed") return { claimed: false, response: existing.data.response || { success: true } };
+  if (existing.data.status === "processing") {
+    const stale = Date.now() - new Date(existing.data.updated_at || existing.data.created_at).getTime() > 2 * 60 * 1000;
+    if (!stale) return { claimed: false, processing: true, response: null };
+    const reclaimedStale = await service.from("external_operation_receipts")
+      .update({ attempts: Number(existing.data.attempts || 0) + 1, updated_at: now })
+      .eq("idempotency_key", idempotencyKey)
+      .eq("status", "processing")
+      .eq("updated_at", existing.data.updated_at)
+      .select("idempotency_key")
+      .maybeSingle();
+    return { claimed: !!reclaimedStale.data, processing: !reclaimedStale.data, response: null };
+  }
+  const reclaimed = await service.from("external_operation_receipts")
+    .update({ status: "processing", attempts: Number(existing.data.attempts || 0) + 1, last_error: "", updated_at: now })
+    .eq("idempotency_key", idempotencyKey)
+    .eq("status", "failed")
+    .select("idempotency_key")
+    .maybeSingle();
+  return { claimed: !!reclaimed.data, processing: !reclaimed.data, response: null };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  let service: any = null;
+  let operationKey = "";
   try {
+    const user = await authenticatedUser(req);
+    if (!user) return json({ error: "Authentication required" }, 401);
+    if (!SUPABASE_SERVICE_ROLE_KEY) return json({ error: "Email idempotency service is not configured" }, 500);
+    service = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const requestBody = await req.json();
     const {
       to, clientName, contractorName, companyName, quoteNumber, total, quoteUrl, message, isInvoice,
-      emailSubject, emailIntro, emailButtonText, portalUrl, emailReplyTo, emailFooter
-    } = await req.json();
+      emailSubject, emailIntro, emailButtonText, portalUrl, emailReplyTo, emailFooter, idempotencyKey
+    } = requestBody;
+    operationKey = String(idempotencyKey || "").trim();
 
     if (!to || !quoteUrl) {
       return new Response(JSON.stringify({ error: "Missing required fields: to, quoteUrl" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
+    if (!/^[a-zA-Z0-9_-]{16,200}$/.test(operationKey)) return json({ error: "Missing or invalid idempotency key" }, 400);
+
+    const hashBody = { ...requestBody };
+    delete hashBody.idempotencyKey;
+    const hash = await payloadHash(hashBody);
+    const claim = await claimEmailOperation(service, user.id, operationKey, hash);
+    if (claim.response) return json({ ...claim.response, idempotentReplay: true });
+    if (!claim.claimed) return json({ error: "This email request is already being processed. Check delivery before trying again." }, 409);
 
     const resendKey = Deno.env.get("RESEND_API_KEY");
     if (!resendKey) {
@@ -128,13 +205,19 @@ Deno.serve(async (req) => {
 
     const result = await response.json();
     if (!response.ok) {
+      await service.from("external_operation_receipts").update({ status: "failed", last_error: result.message || JSON.stringify(result), updated_at: new Date().toISOString() }).eq("idempotency_key", operationKey);
       throw new Error(result.message || JSON.stringify(result));
     }
 
-    return new Response(JSON.stringify({ success: true, id: result.id }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" }
-    });
+    const success = { success: true, id: result.id };
+    const completedAt = new Date().toISOString();
+    const receipt = await service.from("external_operation_receipts").update({ status: "completed", response: success, completed_at: completedAt, updated_at: completedAt }).eq("idempotency_key", operationKey);
+    if (receipt.error) throw receipt.error;
+    return json(success);
   } catch (err) {
+    if (service && operationKey) {
+      await service.from("external_operation_receipts").update({ status: "failed", last_error: (err as Error).message, updated_at: new Date().toISOString() }).eq("idempotency_key", operationKey).eq("status", "processing");
+    }
     return new Response(JSON.stringify({ error: (err as Error).message }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
     });

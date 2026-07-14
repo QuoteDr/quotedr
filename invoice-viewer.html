@@ -747,7 +747,8 @@ if (location.search.includes('debug')) {
     <script src="help-content.js?v=1777741200"></script>
     <script src="modal-help.js?v=1777741200"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-v2.js?v=1779130000"></script>
+    <script src="supabase-v2.js?v=1783272000"></script>
+    <script src="save-coordinator.js?v=1783272000"></script>
     <script src="quote-discounts.js?v=1783218460"></script>
     <script>
         const ROOM_COLORS = [
@@ -1736,13 +1737,16 @@ if (location.search.includes('debug')) {
             var successUrl = window.location.href + (window.location.href.includes('?') ? '&' : '?') + 'paid=1';
             var cancelUrl = window.location.href;
             try {
+                var depositOperationEntity = quoteId + ':invoice_deposit:' + Math.round(amount * 100);
+                var depositOperationId = qdGetExternalOperationId('stripe_checkout', depositOperationEntity);
                 var resp = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/stripe-deposit', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso' },
-                    body: JSON.stringify({ amount: Math.round(amount * 100), currency: 'cad', quoteId: quoteId, paymentType: 'invoice_deposit', clientEmail: invoiceData.email || invoiceData.clientEmail || '', description: description, successUrl: successUrl, cancelUrl: cancelUrl })
+                    body: JSON.stringify({ amount: Math.round(amount * 100), currency: 'cad', quoteId: quoteId, paymentType: 'invoice_deposit', clientEmail: invoiceData.email || invoiceData.clientEmail || '', description: description, successUrl: successUrl, cancelUrl: cancelUrl, idempotencyKey: depositOperationId })
                 });
                 var data = await resp.json();
                 if (data.url) {
+                    qdCompleteExternalOperation('stripe_checkout', depositOperationEntity);
                     bootstrap.Modal.getInstance(document.getElementById('depositModal')).hide();
                     document.getElementById('depositRequestedBadge').style.display = 'block';
                     localStorage.setItem('deposit_requested_' + quoteId, JSON.stringify({ amount: amount, ts: Date.now() }));
@@ -1937,6 +1941,9 @@ if (location.search.includes('debug')) {
                 b.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Opening Stripe...';
             });
             try {
+                var invoicePaymentType = paymentType || 'invoice_full';
+                var invoicePaymentOperationEntity = _invoiceIdForPayment + ':' + invoicePaymentType + ':' + amountCents;
+                var invoicePaymentOperationId = qdGetExternalOperationId('stripe_checkout', invoicePaymentOperationEntity);
                 var resp = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/stripe-deposit', {
                     method: 'POST',
                     headers: {
@@ -1948,18 +1955,22 @@ if (location.search.includes('debug')) {
                         amount: amountCents,
                         currency: 'cad',
                         quoteId: _invoiceIdForPayment,
-                        paymentType: paymentType || 'invoice_full',
+                        paymentType: invoicePaymentType,
                         clientEmail: invoiceData.email || invoiceData.clientEmail || '',
                         description: description,
                         successUrl: window.location.href.split('#')[0].replace(/[?&]payment=[^&]*/g, ''),
-                        cancelUrl: window.location.href.split('#')[0]
+                        cancelUrl: window.location.href.split('#')[0],
+                        idempotencyKey: invoicePaymentOperationId
                     })
                 });
                 var responseText = await resp.text();
                 var data = {};
                 try { data = responseText ? JSON.parse(responseText) : {}; } catch(parseErr) { data = { error: responseText }; }
                 if (!resp.ok) throw new Error(data.error || 'Payment failed');
-                if (data.url) { window.location.href = data.url; }
+                if (data.url) {
+                    qdCompleteExternalOperation('stripe_checkout', invoicePaymentOperationEntity);
+                    window.location.href = data.url;
+                }
                 else { throw new Error(data.error || 'Payment failed'); }
             } catch(e) {
                 alert('Payment error: ' + e.message);
@@ -2016,13 +2027,16 @@ if (location.search.includes('debug')) {
                         total: parseFloat(row.querySelector('.item-total')?.textContent?.replace(/[^0-9.]/g,'')) || 0
                     }))
                 };
+                var qbOperationEntity = (quoteId || invoiceData.invoiceNumber || 'invoice') + ':' + invoiceData.total;
+                var qbOperationId = qdGetExternalOperationId('quickbooks_invoice', qbOperationEntity);
                 const resp = await fetch(_QB_SUPABASE_URL + '/functions/v1/qb-sync', {
                     method: 'POST',
                     headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', 'apikey': _QB_ANON },
-                    body: JSON.stringify({ action: 'push_invoice', invoice: invoiceData })
+                    body: JSON.stringify({ action: 'push_invoice', invoice: invoiceData, idempotencyKey: qbOperationId })
                 });
                 const result = await resp.json();
                 if (result.error) throw new Error(result.error);
+                qdCompleteExternalOperation('quickbooks_invoice', qbOperationEntity);
                 btn.innerHTML = '<i class="fas fa-check me-1"></i> Sent to QuickBooks!';
                 btn.className = 'btn btn-success btn-sm';
                 var qbUrl = result.qb_url || result.deepLink;
