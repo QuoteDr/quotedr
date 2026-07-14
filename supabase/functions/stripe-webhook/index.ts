@@ -56,6 +56,14 @@ async function saveSubscriptionStatus(supabase: any, userId: string, statusData:
     .upsert({ user_id: userId, key: "subscription_status", value, updated_at: new Date().toISOString() }, { onConflict: "user_id,key" });
 }
 
+function subscriptionBillingInterval(source: any) {
+  return source?.metadata?.billing_interval
+    || source?.subscription_details?.metadata?.billing_interval
+    || source?.items?.data?.[0]?.price?.recurring?.interval
+    || source?.lines?.data?.[0]?.price?.recurring?.interval
+    || "month";
+}
+
 async function updateQuotePaymentState(supabase: any, quoteId: string, paymentType: string, amountCents: number, session: any) {
   const { data: row } = await supabase.from("quotes").select("id,status,data").eq("id", quoteId).maybeSingle();
   if (!row) return;
@@ -124,6 +132,7 @@ Deno.serve(async (req) => {
           await saveSubscriptionStatus(supabase, userId, {
             status: session.payment_status === "paid" || session.payment_status === "no_payment_required" ? "active" : session.payment_status,
             plan: session.metadata?.plan || "pro",
+            billing_interval: subscriptionBillingInterval(session),
             stripe_customer_id: session.customer,
             stripe_subscription_id: session.subscription,
             started_at: new Date().toISOString(),
@@ -139,6 +148,7 @@ Deno.serve(async (req) => {
         await saveSubscriptionStatus(supabase, userId, {
           status: sub.status,
           plan: sub.metadata?.plan || "pro",
+          billing_interval: subscriptionBillingInterval(sub),
           stripe_customer_id: sub.customer,
           stripe_subscription_id: sub.id,
           current_period_end: sub.current_period_end || null,
@@ -153,6 +163,7 @@ Deno.serve(async (req) => {
         await saveSubscriptionStatus(supabase, userId, {
           status: "cancelled",
           plan: sub.metadata?.plan || "basic",
+          billing_interval: subscriptionBillingInterval(sub),
           stripe_customer_id: sub.customer,
           stripe_subscription_id: sub.id,
           cancelled_at: new Date().toISOString(),
@@ -166,6 +177,7 @@ Deno.serve(async (req) => {
         await saveSubscriptionStatus(supabase, userId, {
           status: "past_due",
           plan: invoice.subscription_details?.metadata?.plan || invoice.metadata?.plan || "pro",
+          billing_interval: subscriptionBillingInterval(invoice),
           stripe_customer_id: invoice.customer,
           stripe_subscription_id: invoice.subscription || null,
         });
@@ -178,6 +190,7 @@ Deno.serve(async (req) => {
         await saveSubscriptionStatus(supabase, userId, {
           status: "active",
           plan: invoice.subscription_details?.metadata?.plan || invoice.metadata?.plan || "pro",
+          billing_interval: subscriptionBillingInterval(invoice),
           stripe_customer_id: invoice.customer,
           stripe_subscription_id: invoice.subscription || null,
           last_invoice_id: invoice.id,
