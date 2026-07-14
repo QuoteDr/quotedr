@@ -18,6 +18,10 @@ const POSTHOG_PERSONAL_API_KEY = Deno.env.get("POSTHOG_PERSONAL_API_KEY") ?? "";
 const POSTHOG_PROJECT_ID = Deno.env.get("POSTHOG_PROJECT_ID") ?? "411455";
 const POSTHOG_HOST = Deno.env.get("POSTHOG_HOST") ?? "https://us.posthog.com";
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
+const QUOTEDR_ADMIN_EMAILS = new Set([
+  "info@alddirect.ca",
+  "ald.direct.contracting@gmail.com",
+]);
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -73,6 +77,13 @@ async function verifyUser(req: Request) {
   const { data, error } = await supabase.auth.getUser(token);
   if (error || !data?.user) throw new Error("Invalid authorization");
   return data.user;
+}
+
+async function verifyAdmin(req: Request) {
+  const user = await verifyUser(req);
+  const email = String(user.email || "").trim().toLowerCase();
+  if (!QUOTEDR_ADMIN_EMAILS.has(email)) throw new Error("Admin access required");
+  return user;
 }
 
 async function posthogQuery(query: string, name: string) {
@@ -210,7 +221,7 @@ serve(async (req) => {
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
 
   try {
-    await verifyUser(req);
+    await verifyAdmin(req);
     const body = await req.json().catch(() => ({}));
     const days = clampDays(body.days);
     const eventList = trackedEvents.map(hogqlString).join(", ");
@@ -303,7 +314,7 @@ serve(async (req) => {
       return aiGuardErrorResponse(error, corsHeaders);
     }
     const message = error instanceof Error ? error.message : "Internal server error";
-    const status = /authorization/i.test(message) ? 401 : /configured/i.test(message) ? 500 : 500;
+    const status = /authorization/i.test(message) ? 401 : /admin access/i.test(message) ? 403 : /configured/i.test(message) ? 500 : 500;
     return jsonResponse({ error: message }, status);
   }
 });
