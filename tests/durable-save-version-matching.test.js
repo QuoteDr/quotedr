@@ -106,6 +106,16 @@ vm.runInContext('async ' + extractFunction(coordinator, 'checkConflict', 'flushO
     })
   });
   assert(otherDeviceWrite && otherDeviceWrite.code === 'QD_SAVE_CONFLICT', 'a genuinely different device revision should remain a conflict');
+
+  const explicitLocalChoice = await coordinatorContext.checkConflict({
+    ...operation,
+    forceConflictOverwrite: true
+  }, {
+    readVersion: async () => {
+      throw new Error('The cloud version should not be checked again after an explicit local choice');
+    }
+  });
+  assert.strictEqual(explicitLocalChoice, null, 'Use This Device should explicitly bypass the resolved conflict');
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;
@@ -114,7 +124,8 @@ vm.runInContext('async ' + extractFunction(coordinator, 'checkConflict', 'flushO
 assert(
   coordinator.includes('versionsMatch(serverVersion, operation.baseVersion)') &&
     coordinator.includes('versionsMatch(serverVersion, expectedVersion)') &&
-    coordinator.includes('serverVersion.operationId === operation.operationId'),
+    coordinator.includes('serverVersion.operationId === operation.operationId') &&
+    coordinator.includes('operation.forceConflictOverwrite = true'),
   'Conflict checks should accept either the loaded base version or an already-written expected version'
 );
 
@@ -155,7 +166,7 @@ assert(
     assert(html.includes('supabase-v2.js?v=2026071402'), `${file} should load the fixed Supabase adapter`);
   }
   if (html.includes('save-coordinator.js')) {
-    assert(html.includes('save-coordinator.js?v=2026071402'), `${file} should load the fixed save coordinator`);
+    assert(html.includes('save-coordinator.js?v=2026071403'), `${file} should load the fixed save coordinator`);
   }
 });
 

@@ -359,6 +359,7 @@
     }
 
     async function checkConflict(operation, adapter) {
+        if (operation.forceConflictOverwrite === true) return null;
         if (!operation.baseVersion || !adapter || typeof adapter.readVersion !== 'function') return null;
         var serverVersion = await withTimeout(adapter.readVersion(operation), operation.timeoutMs);
         if (serverVersion && typeof serverVersion === 'object') {
@@ -563,6 +564,7 @@
         if (!operation || operation.state !== 'conflict') return { state: 'missing' };
         if (strategy === 'use_local') {
             operation.baseVersion = null;
+            operation.forceConflictOverwrite = true;
             operation.state = 'local_pending';
             operation.attempts = 0;
             operation.lastError = null;
