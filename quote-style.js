@@ -7,7 +7,9 @@
         var _quoteStyle = {
             preset: 'clean-blue',
             accent: '#1a56a0',
+            accentStrength: 100,
             optionAccent: '#1a56a0',
+            optionAccentStrength: 100,
             upgradeAccent: '#0d9488',
             upgradeBg: '#f8fafc',
             bg: '#f7fbff',
@@ -37,6 +39,16 @@
                 ]
             },
             clientMessage: ''
+        };
+
+        var QUOTE_STYLE_COLOUR_FAVOURITES_KEY = 'quotedr_quote_style_colour_favourites';
+        var QUOTE_STYLE_COLOUR_FAVOURITE_LIMIT = 5;
+        var QUOTE_STYLE_COLOUR_AREAS = {
+            accent: { containerId: 'accentSwatches', fieldId: '', styleKey: 'accent', label: 'Accent Colour' },
+            optionAccent: { containerId: 'optionAccentSwatches', fieldId: 'quoteOptionAccent', styleKey: 'optionAccent', label: 'Option Group Colour' },
+            upgradeAccent: { containerId: 'upgradeAccentSwatches', fieldId: 'quoteUpgradeAccent', styleKey: 'upgradeAccent', label: 'Upgrade Options Colour' },
+            upgradeBg: { containerId: 'upgradeBgSwatches', fieldId: 'quoteUpgradeBg', styleKey: 'upgradeBg', label: 'Upgrade Card Background' },
+            bg: { containerId: 'bgSwatches', fieldId: '', styleKey: 'bg', label: 'Background Tint' }
         };
 
         var QUOTE_STUDIO_MESSAGE_VERSION = 1;
@@ -383,6 +395,208 @@
             else el.value = value || '';
         }
 
+        function normalizeQuoteStyleColour(value) {
+            var hex = String(value || '').trim();
+            if (/^#[0-9a-f]{3}$/i.test(hex)) {
+                hex = '#' + hex.slice(1).split('').map(function(ch) { return ch + ch; }).join('');
+            }
+            return /^#[0-9a-f]{6}$/i.test(hex) ? hex.toLowerCase() : '';
+        }
+
+        function getQuoteStyleColourFavourites() {
+            var parsed = {};
+            try { parsed = JSON.parse(localStorage.getItem(QUOTE_STYLE_COLOUR_FAVOURITES_KEY) || '{}'); } catch(e) { parsed = {}; }
+            var result = {};
+            Object.keys(QUOTE_STYLE_COLOUR_AREAS).forEach(function(areaKey) {
+                var seen = {};
+                var list = Array.isArray(parsed[areaKey]) ? parsed[areaKey] : [];
+                result[areaKey] = list.map(normalizeQuoteStyleColour).filter(function(color) {
+                    if (!color || seen[color]) return false;
+                    seen[color] = true;
+                    return true;
+                }).slice(0, QUOTE_STYLE_COLOUR_FAVOURITE_LIMIT);
+            });
+            return result;
+        }
+
+        function persistQuoteStyleColourFavourites(store) {
+            try {
+                localStorage.setItem(QUOTE_STYLE_COLOUR_FAVOURITES_KEY, JSON.stringify(store));
+                return true;
+            } catch(e) {
+                console.warn('Could not save quote style colour favourites:', e);
+                return false;
+            }
+        }
+
+        function setQuoteStyleColourStatus(areaKey, message, warning) {
+            var status = document.getElementById('quoteStyleColourStatus-' + areaKey);
+            if (!status) return;
+            status.textContent = message || 'Up to five saved colours in this area.';
+            status.classList.toggle('is-warning', !!warning);
+        }
+
+        function renderQuoteStyleColourFavourites(areaKey) {
+            var config = QUOTE_STYLE_COLOUR_AREAS[areaKey];
+            if (!config) return;
+            var listEl = document.getElementById('quoteStyleColourFavourites-' + areaKey);
+            var countEl = document.getElementById('quoteStyleColourCount-' + areaKey);
+            var input = document.getElementById('quoteStyleColourInput-' + areaKey);
+            if (!listEl || !countEl) return;
+            var favourites = getQuoteStyleColourFavourites()[areaKey] || [];
+            var active = normalizeQuoteStyleColour(_quoteStyle[config.styleKey]);
+            countEl.textContent = favourites.length + '/' + QUOTE_STYLE_COLOUR_FAVOURITE_LIMIT;
+            if (input && active) input.value = active;
+            if (!favourites.length) {
+                listEl.innerHTML = '<div class="quote-style-colour-empty">No saved custom colours for this area yet.</div>';
+                return;
+            }
+            listEl.innerHTML = favourites.map(function(color) {
+                var selected = color === active ? ' selected' : '';
+                return '<div class="quote-style-colour-favourite">' +
+                    '<button type="button" class="quote-style-colour-favourite-use' + selected + '" data-style-colour-use="' + color + '" title="Use ' + color.toUpperCase() + '">' +
+                    '<span class="quote-style-colour-favourite-dot" style="background:' + color + ';"></span>' +
+                    '<span>' + color.toUpperCase() + '</span></button>' +
+                    '<button type="button" class="btn btn-sm btn-outline-danger quote-style-colour-favourite-delete" data-style-colour-delete="' + color + '" title="Delete saved colour" aria-label="Delete saved colour ' + color.toUpperCase() + '"><i class="fas fa-trash"></i></button>' +
+                    '</div>';
+            }).join('');
+        }
+
+        function closeOtherQuoteStyleColourPanels(areaKey) {
+            document.querySelectorAll('.quote-style-colour-panel').forEach(function(panel) {
+                if (panel.dataset.styleColourArea !== areaKey) panel.hidden = true;
+            });
+            document.querySelectorAll('.quote-style-colour-wheel').forEach(function(button) {
+                if (button.dataset.styleColourArea !== areaKey) button.setAttribute('aria-expanded', 'false');
+            });
+        }
+
+        function toggleQuoteStyleColourPanel(areaKey) {
+            var panel = document.getElementById('quoteStyleColourPanel-' + areaKey);
+            var button = document.querySelector('.quote-style-colour-wheel[data-style-colour-area="' + areaKey + '"]');
+            if (!panel || !button) return;
+            var shouldOpen = panel.hidden;
+            closeOtherQuoteStyleColourPanels(areaKey);
+            panel.hidden = !shouldOpen;
+            button.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+            if (shouldOpen) {
+                renderQuoteStyleColourFavourites(areaKey);
+                setQuoteStyleColourStatus(areaKey, 'Up to five saved colours in this area.', false);
+            }
+        }
+
+        function applyQuoteStyleColour(areaKey, color) {
+            var config = QUOTE_STYLE_COLOUR_AREAS[areaKey];
+            color = normalizeQuoteStyleColour(color);
+            if (!config || !color) return;
+            _quoteStyle.preset = 'custom';
+            _quoteStyle[config.styleKey] = color;
+            if (config.fieldId) setFieldValue(config.fieldId, color);
+            syncQuoteStyleGlobal();
+            applyQuoteStyleToControls(_quoteStyle);
+        }
+
+        function saveAndUseQuoteStyleColour(areaKey) {
+            var input = document.getElementById('quoteStyleColourInput-' + areaKey);
+            var color = normalizeQuoteStyleColour(input && input.value);
+            if (!color) return;
+            var store = getQuoteStyleColourFavourites();
+            var favourites = store[areaKey] || [];
+            var existingIndex = favourites.indexOf(color);
+            var saved = true;
+            if (existingIndex >= 0) favourites.splice(existingIndex, 1);
+            else if (favourites.length >= QUOTE_STYLE_COLOUR_FAVOURITE_LIMIT) saved = false;
+            if (saved) {
+                favourites.unshift(color);
+                store[areaKey] = favourites.slice(0, QUOTE_STYLE_COLOUR_FAVOURITE_LIMIT);
+                saved = persistQuoteStyleColourFavourites(store);
+            }
+            applyQuoteStyleColour(areaKey, color);
+            renderQuoteStyleColourFavourites(areaKey);
+            setQuoteStyleColourStatus(
+                areaKey,
+                saved ? 'Colour saved and applied.' : 'Colour applied but not saved. Delete a favourite to save another.',
+                !saved
+            );
+        }
+
+        function deleteQuoteStyleColourFavourite(areaKey, color) {
+            color = normalizeQuoteStyleColour(color);
+            if (!color) return;
+            var store = getQuoteStyleColourFavourites();
+            store[areaKey] = (store[areaKey] || []).filter(function(saved) { return saved !== color; });
+            persistQuoteStyleColourFavourites(store);
+            renderQuoteStyleColourFavourites(areaKey);
+            setQuoteStyleColourStatus(areaKey, 'Saved colour removed.', false);
+        }
+
+        function initQuoteStyleColourPickers() {
+            Object.keys(QUOTE_STYLE_COLOUR_AREAS).forEach(function(areaKey) {
+                var config = QUOTE_STYLE_COLOUR_AREAS[areaKey];
+                var container = document.getElementById(config.containerId);
+                if (!container) return;
+                var wheel = container.querySelector('.quote-style-colour-wheel');
+                if (!wheel) {
+                    wheel = document.createElement('button');
+                    wheel.type = 'button';
+                    wheel.className = 'style-swatch quote-style-colour-wheel';
+                    wheel.dataset.styleColourArea = areaKey;
+                    wheel.setAttribute('aria-label', 'Choose a custom ' + config.label.toLowerCase());
+                    wheel.setAttribute('aria-expanded', 'false');
+                    wheel.title = 'Choose or reuse a custom colour';
+                    wheel.innerHTML = '<i class="fas fa-palette" aria-hidden="true"></i>';
+                    container.appendChild(wheel);
+                }
+
+                var panel = document.getElementById('quoteStyleColourPanel-' + areaKey);
+                if (!panel) {
+                    panel = document.createElement('div');
+                    panel.id = 'quoteStyleColourPanel-' + areaKey;
+                    panel.className = 'quote-style-colour-panel';
+                    panel.dataset.styleColourArea = areaKey;
+                    panel.hidden = true;
+                    panel.innerHTML = '<div class="d-flex justify-content-between align-items-center gap-2">' +
+                        '<span class="small fw-semibold">Saved custom colours</span>' +
+                        '<span id="quoteStyleColourCount-' + areaKey + '" class="text-muted small">0/' + QUOTE_STYLE_COLOUR_FAVOURITE_LIMIT + '</span></div>' +
+                        '<div id="quoteStyleColourFavourites-' + areaKey + '" class="quote-style-colour-favourites"></div>' +
+                        '<div class="quote-style-colour-exact">' +
+                        '<input type="color" id="quoteStyleColourInput-' + areaKey + '" class="form-control form-control-color" aria-label="Choose exact ' + config.label.toLowerCase() + '">' +
+                        '<button type="button" class="btn btn-sm btn-primary quote-style-colour-save"><i class="fas fa-bookmark me-1"></i>Save &amp; use</button></div>' +
+                        '<div id="quoteStyleColourStatus-' + areaKey + '" class="quote-style-colour-status mt-2" aria-live="polite">Up to five saved colours in this area.</div>';
+                    container.insertAdjacentElement('afterend', panel);
+                }
+
+                if (!wheel.dataset.styleColourBound) {
+                    wheel.addEventListener('click', function(event) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        toggleQuoteStyleColourPanel(areaKey);
+                    });
+                    wheel.dataset.styleColourBound = '1';
+                }
+                if (!panel.dataset.styleColourBound) {
+                    panel.addEventListener('click', function(event) {
+                        var deleteButton = event.target.closest('[data-style-colour-delete]');
+                        if (deleteButton) {
+                            deleteQuoteStyleColourFavourite(areaKey, deleteButton.dataset.styleColourDelete);
+                            return;
+                        }
+                        var useButton = event.target.closest('[data-style-colour-use]');
+                        if (useButton) {
+                            applyQuoteStyleColour(areaKey, useButton.dataset.styleColourUse);
+                            panel.hidden = true;
+                            wheel.setAttribute('aria-expanded', 'false');
+                            return;
+                        }
+                        var saveButton = event.target.closest('.quote-style-colour-save');
+                        if (saveButton) saveAndUseQuoteStyleColour(areaKey);
+                    });
+                    panel.dataset.styleColourBound = '1';
+                }
+                renderQuoteStyleColourFavourites(areaKey);
+            });
+        }
+
         function normalizeDescriptionPreviewLength(value) {
             var parsed = parseInt(value, 10);
             if (!isFinite(parsed)) parsed = QUOTE_DESCRIPTION_PREVIEW_DEFAULT;
@@ -476,6 +690,12 @@
 
         function readQuoteStyleFromControls() {
             var style = Object.assign({}, _quoteStyle);
+            style.accentStrength = parseInt(document.getElementById('quoteAccentStrength')?.value || style.accentStrength || 100, 10);
+            if (!isFinite(style.accentStrength)) style.accentStrength = 100;
+            style.accentStrength = Math.max(20, Math.min(style.accentStrength, 100));
+            style.optionAccentStrength = parseInt(document.getElementById('quoteOptionAccentStrength')?.value || style.optionAccentStrength || 100, 10);
+            if (!isFinite(style.optionAccentStrength)) style.optionAccentStrength = 100;
+            style.optionAccentStrength = Math.max(20, Math.min(style.optionAccentStrength, 100));
             style.headerStyle = document.getElementById('quoteHeaderStyle')?.value || style.headerStyle;
             style.headerEffect = document.getElementById('quoteHeaderEffect')?.value || style.headerEffect || 'soft-gradient';
             style.headerOpacity = parseInt(document.getElementById('quoteHeaderOpacity')?.value || style.headerOpacity || 100, 10);
@@ -519,12 +739,21 @@
         }
 
         function applyQuoteStyleToControls(style) {
-            _quoteStyle = Object.assign({}, _quoteStyle, style || {});
+            var incomingStyle = style || {};
+            _quoteStyle = Object.assign({}, _quoteStyle, incomingStyle);
+            if (!Object.prototype.hasOwnProperty.call(incomingStyle, 'accentStrength')) _quoteStyle.accentStrength = 100;
+            if (!Object.prototype.hasOwnProperty.call(incomingStyle, 'optionAccentStrength')) _quoteStyle.optionAccentStrength = 100;
+            if (!isFinite(parseInt(_quoteStyle.accentStrength, 10))) _quoteStyle.accentStrength = 100;
+            if (!isFinite(parseInt(_quoteStyle.optionAccentStrength, 10))) _quoteStyle.optionAccentStrength = 100;
             if (!isFinite(parseInt(_quoteStyle.headerOpacity, 10))) _quoteStyle.headerOpacity = 100;
             if (!isFinite(parseInt(_quoteStyle.bgOpacity, 10))) _quoteStyle.bgOpacity = 100;
             _quoteStyle.descriptionPreviewLength = normalizeDescriptionPreviewLength(_quoteStyle.descriptionPreviewLength);
             _quoteStyle.alwaysShowFullDescriptions = _quoteStyle.alwaysShowFullDescriptions === true;
             syncQuoteStyleGlobal();
+            setFieldValue('quoteAccentStrength', _quoteStyle.accentStrength);
+            updateQuoteStyleStrengthLabel('quoteAccentStrengthValue', _quoteStyle.accentStrength);
+            setFieldValue('quoteOptionAccentStrength', _quoteStyle.optionAccentStrength);
+            updateQuoteStyleStrengthLabel('quoteOptionAccentStrengthValue', _quoteStyle.optionAccentStrength);
             setFieldValue('quoteHeaderStyle', _quoteStyle.headerStyle);
             setFieldValue('quoteHeaderEffect', _quoteStyle.headerEffect || 'soft-gradient');
             setFieldValue('quoteHeaderOpacity', _quoteStyle.headerOpacity);
@@ -564,13 +793,13 @@
             document.querySelectorAll('#stylePresets .quote-style-preset').forEach(function(btn) {
                 btn.classList.toggle('selected', btn.getAttribute('data-preset') === _quoteStyle.preset);
             });
-            document.querySelectorAll('#accentSwatches .style-swatch').forEach(function(sw) {
+            document.querySelectorAll('#accentSwatches .style-swatch[data-accent]').forEach(function(sw) {
                 sw.classList.toggle('selected', sw.getAttribute('data-accent') === _quoteStyle.accent);
             });
-            document.querySelectorAll('#bgSwatches .style-swatch').forEach(function(sw) {
+            document.querySelectorAll('#bgSwatches .style-swatch[data-bg]').forEach(function(sw) {
                 sw.classList.toggle('selected', sw.getAttribute('data-bg') === _quoteStyle.bg);
             });
-            document.querySelectorAll('#optionAccentSwatches .style-swatch').forEach(function(sw) {
+            document.querySelectorAll('#optionAccentSwatches .style-swatch[data-option-accent]').forEach(function(sw) {
                 sw.classList.toggle('selected', sw.getAttribute('data-option-accent') === (_quoteStyle.optionAccent || _quoteStyle.accent || '#1a56a0'));
             });
             document.querySelectorAll('#upgradeAccentSwatches .style-swatch').forEach(function(sw) {
@@ -579,6 +808,7 @@
             document.querySelectorAll('#upgradeBgSwatches .style-swatch').forEach(function(sw) {
                 sw.classList.toggle('selected', sw.getAttribute('data-upgrade-bg') === (_quoteStyle.upgradeBg || '#f8fafc'));
             });
+            Object.keys(QUOTE_STYLE_COLOUR_AREAS).forEach(renderQuoteStyleColourFavourites);
             applyQuoteUpgradeTheme(_quoteStyle);
             updateStylePreview();
         }
@@ -587,6 +817,8 @@
             _quoteStyle = readQuoteStyleFromControls();
             syncQuoteStyleGlobal();
             applyQuoteUpgradeTheme(_quoteStyle);
+            updateQuoteStyleStrengthLabel('quoteAccentStrengthValue', _quoteStyle.accentStrength);
+            updateQuoteStyleStrengthLabel('quoteOptionAccentStrengthValue', _quoteStyle.optionAccentStrength);
             var headerOpacity = Math.max(20, Math.min(parseInt(_quoteStyle.headerOpacity || 100, 10), 100));
             updateHeaderOpacityLabel(headerOpacity);
             var bgOpacity = parseInt(_quoteStyle.bgOpacity, 10);
@@ -621,9 +853,18 @@
             var accent = (style && style.upgradeAccent) || '#0d9488';
             var bg = (style && style.upgradeBg) || '#f8fafc';
             root.style.setProperty('--quote-upgrade-accent', accent);
+            root.style.setProperty('--quote-upgrade-accent-contrast', readableQuoteStyleTextColor(accent));
             root.style.setProperty('--quote-upgrade-bg', bg);
+            root.style.setProperty('--quote-upgrade-bg-contrast', readableQuoteStyleTextColor(bg));
             root.style.setProperty('--quote-upgrade-accent-soft', colorWithOpacity(accent, 20));
             root.style.setProperty('--quote-upgrade-border', colorWithOpacity(accent, 35));
+        }
+
+        function readableQuoteStyleTextColor(hex) {
+            var rgb = hexToRgb(hex);
+            if (!rgb) return '#334155';
+            var luminance = (0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b) / 255;
+            return luminance > 0.62 ? '#102033' : '#ffffff';
         }
 
         function quoteHeaderBackgroundForEffect(accent, headerStyle, headerOpacity, effect) {
@@ -677,6 +918,13 @@
             var parsed = parseInt(value, 10);
             if (!isFinite(parsed)) parsed = 100;
             if (label) label.textContent = Math.max(0, Math.min(parsed, 100)) + '%';
+        }
+
+        function updateQuoteStyleStrengthLabel(labelId, value) {
+            var label = document.getElementById(labelId);
+            var parsed = parseInt(value, 10);
+            if (!isFinite(parsed)) parsed = 100;
+            if (label) label.textContent = Math.max(20, Math.min(parsed, 100)) + '%';
         }
 
         function safeCommitmentIcon(icon) {
@@ -843,6 +1091,7 @@
         async function initStyleModal() {
             var savedDefault = await loadQuoteStyleDefaults();
             var activeStyle = getActiveQuoteStyleForSend();
+            initQuoteStyleColourPickers();
             applyQuoteStyleToControls(Object.assign({}, savedDefault, activeStyle));
             initCommitmentIconPickers();
 
@@ -886,7 +1135,7 @@
             });
             bindStyleSwatchGroup('upgradeAccentSwatches', 'data-upgrade-accent', 'quoteUpgradeAccent', 'upgradeAccent');
             bindStyleSwatchGroup('upgradeBgSwatches', 'data-upgrade-bg', 'quoteUpgradeBg', 'upgradeBg');
-            ['quoteHeaderStyle','quoteHeaderEffect','quoteHeaderOpacity','quoteBgOpacity','quoteFontFeel','quoteOptionAccent','quoteUpgradeAccent','quoteUpgradeBg','quotePricingMode','quoteDepositMode','quoteDepositPercent','quoteApprovalMode','quoteExpiryDate','quoteShowUpgrades','quoteShowScopeNotes','quoteDescriptionPreviewLength','quoteAlwaysShowFullDescriptions','quoteShowCommitment','quoteSkipSettingsOnGenerate','commitmentTitleInput','commitmentIcon1','commitmentImage1','commitmentLabel1','commitmentText1','commitmentIcon2','commitmentImage2','commitmentLabel2','commitmentText2','commitmentIcon3','commitmentImage3','commitmentLabel3','commitmentText3','commitmentIcon4','commitmentImage4','commitmentLabel4','commitmentText4','quoteClientMessage'].forEach(function(id) {
+            ['quoteAccentStrength','quoteOptionAccentStrength','quoteHeaderStyle','quoteHeaderEffect','quoteHeaderOpacity','quoteBgOpacity','quoteFontFeel','quoteOptionAccent','quoteUpgradeAccent','quoteUpgradeBg','quotePricingMode','quoteDepositMode','quoteDepositPercent','quoteApprovalMode','quoteExpiryDate','quoteShowUpgrades','quoteShowScopeNotes','quoteDescriptionPreviewLength','quoteAlwaysShowFullDescriptions','quoteShowCommitment','quoteSkipSettingsOnGenerate','commitmentTitleInput','commitmentIcon1','commitmentImage1','commitmentLabel1','commitmentText1','commitmentIcon2','commitmentImage2','commitmentLabel2','commitmentText2','commitmentIcon3','commitmentImage3','commitmentLabel3','commitmentText3','commitmentIcon4','commitmentImage4','commitmentLabel4','commitmentText4','quoteClientMessage'].forEach(function(id) {
                 var el = document.getElementById(id);
                 if (el && !el.dataset.styleBound) {
                     el.addEventListener('input', updateStylePreview);
