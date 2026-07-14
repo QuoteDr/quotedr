@@ -177,6 +177,42 @@
             return Array.isArray(saved.upgradeGroups) ? cloneQuoteStorageValue(saved.upgradeGroups) : [];
         }
 
+        function quoteStorageUpgradeRuntimeTextKey(value) {
+            return String(value || '')
+                .trim()
+                .toLowerCase()
+                .replace(/\s+/g, ' ');
+        }
+
+        function findQuoteStorageUpgradeRuntimeGroup(groups, targetGroup) {
+            groups = Array.isArray(groups) ? groups : [];
+            targetGroup = targetGroup || {};
+            var exact = targetGroup.id ? groups.find(function(group) {
+                return group && group.id === targetGroup.id;
+            }) : null;
+            if (exact) return exact;
+            var targetName = quoteStorageUpgradeRuntimeTextKey(targetGroup.name);
+            return targetName ? groups.find(function(group) {
+                return quoteStorageUpgradeRuntimeTextKey(group && group.name) === targetName;
+            }) : null;
+        }
+
+        function findQuoteStorageUpgradeRuntimeOption(group, targetOption) {
+            var options = group && Array.isArray(group.options) ? group.options : [];
+            targetOption = targetOption || {};
+            var exact = targetOption.id ? options.find(function(option) {
+                return option && option.id === targetOption.id;
+            }) : null;
+            if (exact) return exact;
+            var targetName = quoteStorageUpgradeRuntimeTextKey(targetOption.name || targetOption.sourceItemName || targetOption.description);
+            var targetUnit = quoteStorageUpgradeRuntimeTextKey(targetOption.unitType || targetOption.unit);
+            return targetName ? options.find(function(option) {
+                var optionName = quoteStorageUpgradeRuntimeTextKey(option && (option.name || option.sourceItemName || option.description));
+                var optionUnit = quoteStorageUpgradeRuntimeTextKey(option && (option.unitType || option.unit));
+                return optionName === targetName && (!targetUnit || !optionUnit || optionUnit === targetUnit);
+            }) : null;
+        }
+
         function mergeQuoteStorageUpgradeGroupRuntimeState(targetGroups, previousGroups) {
             targetGroups = Array.isArray(targetGroups) ? cloneQuoteStorageValue(targetGroups) : [];
             previousGroups = Array.isArray(previousGroups) ? cloneQuoteStorageValue(previousGroups) : [];
@@ -184,31 +220,20 @@
                 targetGroups = normalizeQuoteItemUpgradeGroups({ upgradeGroups: targetGroups });
                 previousGroups = normalizeQuoteItemUpgradeGroups({ upgradeGroups: previousGroups });
             }
-            var selectedIdsByGroup = {};
-            var quantityStateByGroupAndOption = {};
-            previousGroups.forEach(function(group) {
-                if (!group) return;
-                selectedIdsByGroup[group.id] = Array.isArray(group.selectedOptionIds) ? group.selectedOptionIds.slice() : [];
-                (group.options || []).forEach(function(option) {
-                    if (!option) return;
-                    quantityStateByGroupAndOption[group.id + '||' + option.id] = {
-                        manualQuantity: option.manualQuantity
-                    };
-                });
-            });
             targetGroups.forEach(function(group) {
                 if (!group) return;
-                if (selectedIdsByGroup[group.id]) {
-                    group.selectedOptionIds = selectedIdsByGroup[group.id].filter(function(optionId) {
-                        return (group.options || []).some(function(option) { return option && option.id === optionId; });
-                    });
-                }
+                var previousGroup = findQuoteStorageUpgradeRuntimeGroup(previousGroups, group);
+                if (!previousGroup) return;
+                var previousSelectedIds = Array.isArray(previousGroup.selectedOptionIds) ? previousGroup.selectedOptionIds : [];
+                var nextSelectedIds = [];
                 (group.options || []).forEach(function(option) {
                     if (!option) return;
-                    var quantityState = quantityStateByGroupAndOption[group.id + '||' + option.id];
-                    if (!quantityState) return;
-                    option.manualQuantity = parseFloat(quantityState.manualQuantity || 0) || 0;
+                    var previousOption = findQuoteStorageUpgradeRuntimeOption(previousGroup, option);
+                    if (!previousOption) return;
+                    option.manualQuantity = parseFloat(previousOption.manualQuantity || 0) || 0;
+                    if (previousSelectedIds.indexOf(previousOption.id) !== -1) nextSelectedIds.push(option.id);
                 });
+                group.selectedOptionIds = group.type === 'multiple' ? nextSelectedIds : nextSelectedIds.slice(0, 1);
             });
             return targetGroups;
         }
@@ -255,11 +280,14 @@
                     option.photo = saved.photo;
                 }
                 var savedUpgradeGroups = quoteStorageSavedItemUpgradeGroups(saved);
-                if (savedUpgradeGroups.length) {
-                    option.upgradeGroups = selectedChoiceOptionIds.indexOf(option.id) !== -1 && liveUpgradeGroups.length
-                        ? mergeQuoteStorageUpgradeGroupRuntimeState(savedUpgradeGroups, liveUpgradeGroups)
-                        : cloneQuoteStorageValue(savedUpgradeGroups);
+                var optionRuntimeGroups = Array.isArray(option.upgradeGroups) ? option.upgradeGroups : [];
+                var mergedUpgradeGroups = savedUpgradeGroups.length
+                    ? mergeQuoteStorageUpgradeGroupRuntimeState(savedUpgradeGroups, optionRuntimeGroups)
+                    : cloneQuoteStorageValue(optionRuntimeGroups);
+                if (selectedChoiceOptionIds.indexOf(option.id) !== -1 && liveUpgradeGroups.length) {
+                    mergedUpgradeGroups = mergeQuoteStorageUpgradeGroupRuntimeState(mergedUpgradeGroups, liveUpgradeGroups);
                 }
+                if (mergedUpgradeGroups.length) option.upgradeGroups = mergedUpgradeGroups;
             });
         }
 
@@ -1397,3 +1425,4 @@ async function saveQuote() {
             }
             openBuilderHashTarget();
         });
+
