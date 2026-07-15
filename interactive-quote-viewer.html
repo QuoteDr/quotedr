@@ -1415,22 +1415,22 @@ if (location.search.includes('debug')) {
             </div>
             <div class="warranty-grid">
                 <div class="warranty-item">
-                    <div class="icon">ðŸ›¡ï¸</div>
+                    <div class="icon">🛡️</div>
                     <div class="label" id="commitmentLabel1">1-Year Warranty</div>
                     <div class="sublabel" id="commitmentText1">Workmanship guaranteed for 12 months from project completion</div>
                 </div>
                 <div class="warranty-item">
-                    <div class="icon">ðŸ­</div>
+                    <div class="icon">🏭</div>
                     <div class="label" id="commitmentLabel2">Manufacturer Warranty</div>
                     <div class="sublabel" id="commitmentText2">All materials carry full manufacturer warranty &mdash; passed directly to you</div>
                 </div>
                 <div class="warranty-item">
-                    <div class="icon">âœ…</div>
+                    <div class="icon">✅</div>
                     <div class="label" id="commitmentLabel3">Fully Insured</div>
                     <div class="sublabel" id="commitmentText3">Liability insurance coverage on all work performed</div>
                 </div>
                 <div class="warranty-item">
-                    <div class="icon">ðŸ¤</div>
+                    <div class="icon">🤝</div>
                     <div class="label" id="commitmentLabel4">Satisfaction Promise</div>
                     <div class="sublabel" id="commitmentText4">Any concerns addressed promptly &mdash; your satisfaction is our priority</div>
                 </div>
@@ -2877,7 +2877,7 @@ if (location.search.includes('debug')) {
         function normalizeViewerUpgradeUnitForCompare(unit) {
             var clean = String(unit || '').trim().toLowerCase().replace(/\s+/g, ' ');
             if (!clean) return '';
-            if (['sq ft', 'sqft', 'square foot', 'square feet', 'ft2', 'ftÂ²'].indexOf(clean) !== -1) return 'sq ft';
+            if (['sq ft', 'sqft', 'square foot', 'square feet', 'ft2', 'ft²'].indexOf(clean) !== -1) return 'sq ft';
             if (['lf', 'linear foot', 'linear feet', 'linear ft'].indexOf(clean) !== -1) return 'LF';
             if (['each', 'ea'].indexOf(clean) !== -1) return 'each';
             if (['flatrate', 'flat rate', 'flat'].indexOf(clean) !== -1) return 'Flatrate';
@@ -4464,7 +4464,7 @@ if (location.search.includes('debug')) {
                                     ${!isUpgraded ? `<div class="text-muted mb-1" style="font-size:0.88rem;"><i class="fas fa-arrow-up" style="color:#f0ad4e;"></i> <strong>Upgrade available:</strong> ${item.upgrade.name}</div>` : ''}
                                     ${item.upgrade.photo ? `<div class="mb-2">${renderViewerPhotoButton(item.upgrade.photos || item.upgrade.photo, 'Upgrade Picture', 'btn-outline-warning', item.upgrade.photosFull || item.upgrade.photoFull)}</div>` : ''}
                                     <button class="btn btn-sm upgrade-action-btn ${isUpgraded ? 'btn-warning' : 'btn-outline-warning'}" onclick="toggleViewerUpgrade(${roomIdx}, ${itemIndex})" style="font-size:0.85rem;">
-                                        <i class="fas fa-arrow-up"></i> ${isUpgraded ? 'Upgraded âœ“' : 'Upgrade: ' + item.upgrade.name}
+                                        <i class="fas fa-arrow-up"></i> ${isUpgraded ? 'Upgraded ✓' : 'Upgrade: ' + item.upgrade.name}
                                     </button>
                                 </div>` : ''}
                                 ${isOptional ? `<button class="btn btn-sm ${optionalSelected ? 'btn-success' : 'btn-outline-primary'}" onclick="toggleViewerOptionalItem(${roomIdx}, ${itemIndex})" style="font-size:0.82rem;">
@@ -5454,7 +5454,7 @@ if (location.search.includes('debug')) {
             termsContainer.innerHTML = html;
         }
 
-        // â”€â”€ Stripe Deposit Payment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Stripe Deposit Payment ───────────────────────────────────────
         var _paymentSettings = null;
         var _quoteTotal = 0;
 
@@ -5515,7 +5515,7 @@ if (location.search.includes('debug')) {
                         quoteId: quoteId,
                         paymentType: 'deposit',
                         clientEmail: quoteData.clientEmail || quoteData.email || '',
-                        description: 'Project Deposit â€” Quote #' + (quoteData.quoteNumber || quoteId),
+                        description: 'Project Deposit — Quote #' + (quoteData.quoteNumber || quoteId),
                         successUrl: window.location.href.split('#')[0].replace(/[?&]payment=[^&]*/g, ''),
                         cancelUrl: window.location.href.split('#')[0],
                         idempotencyKey: depositOperationId
@@ -5547,4 +5547,3 @@ if (location.search.includes('debug')) {
     </div>
 </body>
 </html>
-
