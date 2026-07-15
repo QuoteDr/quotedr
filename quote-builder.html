@@ -939,6 +939,61 @@
         .cat-drag-handle:hover { opacity: 1; }
         .cat-group-header { user-select: none; }
         .cat-group-block.sortable-ghost { opacity: 0.3; background: #e8eeff; }
+        .line-item-drag-handle {
+            align-items: center;
+            appearance: none;
+            background: transparent;
+            border: 0;
+            color: #607086;
+            cursor: grab;
+            display: inline-flex;
+            justify-content: center;
+            margin-right: 3px;
+            padding: 2px 3px;
+            touch-action: none;
+        }
+        .line-item-drag-handle:hover,
+        .line-item-drag-handle:focus { color: #0d6efd; }
+        .line-item-drag-handle:active { cursor: grabbing; }
+        .quote-line-item-drag-ghost > td {
+            background: #dcebff !important;
+            opacity: 0.72;
+        }
+        .room-item-drop-zone {
+            align-items: center;
+            background: #f4f8fd;
+            border: 0 dashed #6ea8fe;
+            color: #1a56a0;
+            display: flex;
+            font-size: 0.8rem;
+            font-weight: 700;
+            height: 0;
+            justify-content: center;
+            margin: 0;
+            opacity: 0;
+            overflow: hidden;
+            transition: height 0.15s ease, margin 0.15s ease, opacity 0.15s ease;
+        }
+        body.quote-line-item-dragging .room-item-drop-zone {
+            border-width: 2px;
+            height: 44px;
+            margin: 7px 0;
+            opacity: 1;
+        }
+        body.quote-line-item-dragging .room-item-drop-zone.sortable-drag-over {
+            background: #e1efff;
+            border-color: #0d6efd;
+        }
+        .room-bulk-menu .dropdown-item {
+            align-items: center;
+            display: flex;
+            gap: 8px;
+        }
+        .room-bulk-menu .dropdown-item i {
+            text-align: center;
+            width: 18px;
+        }
+        .room-bulk-count:empty { display: none; }
         /* Hide markup controls when printing for client view */
         @media print {
             .room-header > div:not(:first-child) {
@@ -9568,6 +9623,169 @@ Example:
             });
         }
 
+
+        const quoteBuilderLineItemDragKeys = new WeakMap();
+        let quoteBuilderLineItemDragCounter = 0;
+
+        function quoteBuilderRoomById(roomId) {
+            return (rooms || []).find(function(room) { return String(room.id) === String(roomId); }) || null;
+        }
+
+        function quoteBuilderLineItemDragKey(item) {
+            if (!item || typeof item !== 'object') return '';
+            if (!quoteBuilderLineItemDragKeys.has(item)) {
+                quoteBuilderLineItemDragCounter += 1;
+                quoteBuilderLineItemDragKeys.set(item, 'quote_line_' + quoteBuilderLineItemDragCounter);
+            }
+            return quoteBuilderLineItemDragKeys.get(item);
+        }
+
+        function getSelectedRoomItemIndexes(roomId) {
+            var room = quoteBuilderRoomById(roomId);
+            if (!room) return [];
+            var selected = Array.from(document.querySelectorAll('.choice-group-select[data-room-id="' + room.id + '"]:checked'))
+                .map(function(checkbox) { return parseInt(checkbox.dataset.itemIndex, 10); })
+                .filter(function(index) { return Number.isFinite(index) && room.items[index]; });
+            return Array.from(new Set(selected)).sort(function(a, b) { return a - b; });
+        }
+
+        function updateRoomBulkSelectionState(roomId) {
+            var room = quoteBuilderRoomById(roomId);
+            if (!room) return;
+            var count = getSelectedRoomItemIndexes(room.id).length;
+            var countEl = document.getElementById('roomBulkCount_' + room.id);
+            if (countEl) countEl.textContent = count ? String(count) : '';
+            document.querySelectorAll('[data-room-bulk-requires-selection="' + room.id + '"]').forEach(function(button) {
+                button.disabled = count === 0;
+                button.classList.toggle('disabled', count === 0);
+            });
+        }
+
+        function setAllRoomItemSelections(roomId, selected) {
+            var room = quoteBuilderRoomById(roomId);
+            if (!room) return;
+            document.querySelectorAll('.choice-group-select[data-room-id="' + room.id + '"]').forEach(function(checkbox) {
+                checkbox.checked = selected !== false;
+            });
+            updateRoomBulkSelectionState(room.id);
+        }
+
+        function cloneQuoteBuilderLineItem(item) {
+            return JSON.parse(JSON.stringify(item || {}));
+        }
+
+        function finishRoomBulkItemAction(message) {
+            renderRooms();
+            if (typeof calculateTotals === 'function') calculateTotals();
+            if (typeof saveSessionQuote === 'function') saveSessionQuote();
+            if (typeof markUnsaved === 'function') markUnsaved();
+            if (message && typeof showToast === 'function') showToast(message, 'success');
+        }
+
+        async function openRoomBulkDestinationPicker(sourceRoomId, actionLabel) {
+            var sourceRoom = quoteBuilderRoomById(sourceRoomId);
+            var destinations = (rooms || []).filter(function(room) { return !sourceRoom || String(room.id) !== String(sourceRoom.id); });
+            var labels = getQuoteDividerLabels();
+            if (!sourceRoom || !destinations.length) {
+                await qdAlert('Add another ' + labels.singularLower + ' before moving or copying line items.');
+                return null;
+            }
+            if (!window.bootstrap || !bootstrap.Modal) {
+                var choices = destinations.map(function(room, index) { return (index + 1) + '. ' + room.name; }).join('\n');
+                var response = await qdPrompt('Choose a destination by number:\n\n' + choices, '1', { title: actionLabel + ' Line Items' });
+                var destinationIndex = parseInt(response, 10) - 1;
+                return destinations[destinationIndex] || null;
+            }
+            return new Promise(function(resolve) {
+                var oldModal = document.getElementById('roomBulkDestinationModal');
+                if (oldModal) oldModal.remove();
+                var modalEl = document.createElement('div');
+                modalEl.className = 'modal fade';
+                modalEl.id = 'roomBulkDestinationModal';
+                modalEl.tabIndex = -1;
+                modalEl.innerHTML = '<div class="modal-dialog modal-dialog-centered"><div class="modal-content">' +
+                    '<div class="modal-header"><h5 class="modal-title"><i class="fas fa-folder-tree me-2 text-primary"></i>' + qdTemplateEscapeHtml(actionLabel) + ' to ' + qdTemplateEscapeHtml(labels.singular) + '</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>' +
+                    '<div class="modal-body"><p class="text-muted small mb-3">Choose where the selected line items should go.</p><div class="d-grid gap-2">' +
+                    destinations.map(function(room) {
+                        var itemCount = Array.isArray(room.items) ? room.items.length : 0;
+                        return '<button type="button" class="btn btn-outline-primary text-start d-flex justify-content-between align-items-center" data-destination-room-id="' + qdTemplateEscapeHtml(room.id) + '"><span><i class="fas ' + quoteBuilderSafeIconClass(room.icon || 'fa-door-open') + ' me-2"></i>' + qdTemplateEscapeHtml(room.name) + '</span><span class="badge text-bg-light">' + itemCount + ' item' + (itemCount === 1 ? '' : 's') + '</span></button>';
+                    }).join('') +
+                    '</div></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button></div></div></div>';
+                document.body.appendChild(modalEl);
+                var selectedRoom = null;
+                modalEl.querySelectorAll('[data-destination-room-id]').forEach(function(button) {
+                    button.addEventListener('click', function() {
+                        selectedRoom = quoteBuilderRoomById(button.dataset.destinationRoomId);
+                        bootstrap.Modal.getInstance(modalEl).hide();
+                    });
+                });
+                modalEl.addEventListener('hidden.bs.modal', function() {
+                    modalEl.remove();
+                    resolve(selectedRoom);
+                }, { once: true });
+                bootstrap.Modal.getOrCreateInstance(modalEl).show();
+            });
+        }
+
+        async function transferSelectedRoomItems(roomId, mode) {
+            var sourceRoom = quoteBuilderRoomById(roomId);
+            var selectedIndexes = getSelectedRoomItemIndexes(roomId);
+            if (!sourceRoom || !selectedIndexes.length) {
+                await qdAlert('Select one or more line items first.');
+                return;
+            }
+            var isMove = mode === 'move';
+            var destination = await openRoomBulkDestinationPicker(sourceRoom.id, isMove ? 'Move' : 'Copy');
+            if (!destination) return;
+            var selectedSet = new Set(selectedIndexes);
+            var selectedItems = selectedIndexes.map(function(index) { return sourceRoom.items[index]; });
+            _pushUndo();
+            if (isMove) {
+                sourceRoom.items = sourceRoom.items.filter(function(item, index) { return !selectedSet.has(index); });
+                destination.items.push.apply(destination.items, selectedItems);
+            } else {
+                destination.items.push.apply(destination.items, selectedItems.map(cloneQuoteBuilderLineItem));
+            }
+            finishRoomBulkItemAction((isMove ? 'Moved ' : 'Copied ') + selectedItems.length + ' line item' + (selectedItems.length === 1 ? '' : 's') + ' to ' + destination.name + '.');
+        }
+
+        async function duplicateSelectedRoomItems(roomId) {
+            var room = quoteBuilderRoomById(roomId);
+            var selectedIndexes = getSelectedRoomItemIndexes(roomId);
+            if (!room || !selectedIndexes.length) {
+                await qdAlert('Select one or more line items first.');
+                return;
+            }
+            var selectedSet = new Set(selectedIndexes);
+            _pushUndo();
+            var duplicated = [];
+            room.items.forEach(function(item, index) {
+                duplicated.push(item);
+                if (selectedSet.has(index)) duplicated.push(cloneQuoteBuilderLineItem(item));
+            });
+            room.items = duplicated;
+            finishRoomBulkItemAction('Duplicated ' + selectedIndexes.length + ' line item' + (selectedIndexes.length === 1 ? '' : 's') + '.');
+        }
+
+        async function deleteSelectedRoomItems(roomId) {
+            var room = quoteBuilderRoomById(roomId);
+            var selectedIndexes = getSelectedRoomItemIndexes(roomId);
+            if (!room || !selectedIndexes.length) {
+                await qdAlert('Select one or more line items first.');
+                return;
+            }
+            var confirmed = await qdConfirm('Delete ' + selectedIndexes.length + ' selected line item' + (selectedIndexes.length === 1 ? '' : 's') + '?', {
+                title: 'Delete Selected Items',
+                okText: 'Delete Items',
+                okClass: 'btn-danger',
+                type: 'danger'
+            });
+            if (!confirmed) return;
+            var selectedSet = new Set(selectedIndexes);
+            _pushUndo();
+            room.items = room.items.filter(function(item, index) { return !selectedSet.has(index); });
+            finishRoomBulkItemAction('Deleted ' + selectedIndexes.length + ' line item' + (selectedIndexes.length === 1 ? '' : 's') + '.');
+        }
         async function createChoiceGroupFromRoomItems(roomId) {
             var room = rooms.find(function(r) { return r.id === roomId; });
             if (!room) return;
@@ -12387,14 +12605,29 @@ Example:
                 html += '</div>';
                 html += '<button onclick="addLine(' + room.id + ')" class="btn btn-sm btn-light text-dark mt-1 btn-add-item">';
                 html += '<i class="fas fa-plus"></i> Add Item</button>';
-                html += '<button onclick="deleteRoom(' + room.id + ', this)" class="btn btn-sm btn-danger mt-1">';
-                html += '<i class="fas fa-trash"></i> Delete Room</button>';
-                html += '<button onclick="saveRoomAsTemplate(' + room.id + ')" class="btn btn-sm btn-info text-white ms-1" title="Save this room as a template">';
-                html += '<i class="fas fa-bookmark"></i></button>';
-                html += '<button onclick="createChoiceGroupFromRoomItems(' + room.id + ')" class="btn btn-sm btn-outline-light ms-1" title="Group checked items into client-selectable options"><i class="fas fa-layer-group me-1"></i>Option Group</button>';
-                html += '<button onclick="addChoiceTemplateToRoom(' + room.id + ')" class="btn btn-sm btn-outline-light ms-1" title="Add a saved reusable option group"><i class="fas fa-list-check me-1"></i>Saved Group</button>';
                 var groupingEnabled = isRoomAutoGroupingEnabled(room);
-                html += '<button onclick="toggleRoomAutoGrouping(' + room.id + ')" class="btn btn-sm ' + (groupingEnabled ? 'btn-outline-light' : 'btn-secondary') + ' ms-1" title="' + (groupingEnabled ? 'Disable automatic saved grouping for this room and future rooms' : 'Enable automatic saved grouping for this room and future rooms') + '"><i class="fas fa-' + (groupingEnabled ? 'ban' : 'layer-group') + ' me-1"></i>' + (groupingEnabled ? 'Disable Grouping' : 'Enable Grouping') + '</button>';
+                html += '<div class="dropdown d-inline-block room-bulk-menu ms-1">';
+                html += '<button type="button" class="btn btn-sm btn-outline-light dropdown-toggle mt-1" data-bs-toggle="dropdown" aria-expanded="false"><i class="fas fa-pen-to-square me-1"></i>Edit <span class="badge text-bg-warning room-bulk-count ms-1" id="roomBulkCount_' + room.id + '"></span></button>';
+                html += '<ul class="dropdown-menu">';
+                html += '<li><button type="button" class="dropdown-item" onclick="setAllRoomItemSelections(' + room.id + ', true)"><i class="fas fa-check-double text-primary"></i>Select All Items</button></li>';
+                html += '<li><button type="button" class="dropdown-item" onclick="setAllRoomItemSelections(' + room.id + ', false)"><i class="fas fa-square text-secondary"></i>Clear Selection</button></li>';
+                html += '<li><hr class="dropdown-divider"></li>';
+                html += '<li><button type="button" class="dropdown-item disabled" disabled data-room-bulk-requires-selection="' + room.id + '" onclick="transferSelectedRoomItems(' + room.id + ', \'move\')"><i class="fas fa-folder-tree text-primary"></i>Move Selected to...</button></li>';
+                html += '<li><button type="button" class="dropdown-item disabled" disabled data-room-bulk-requires-selection="' + room.id + '" onclick="transferSelectedRoomItems(' + room.id + ', \'copy\')"><i class="fas fa-copy text-success"></i>Copy Selected to...</button></li>';
+                html += '<li><button type="button" class="dropdown-item disabled" disabled data-room-bulk-requires-selection="' + room.id + '" onclick="duplicateSelectedRoomItems(' + room.id + ')"><i class="fas fa-clone text-info"></i>Duplicate Selected Here</button></li>';
+                html += '<li><button type="button" class="dropdown-item text-danger disabled" disabled data-room-bulk-requires-selection="' + room.id + '" onclick="deleteSelectedRoomItems(' + room.id + ')"><i class="fas fa-trash"></i>Delete Selected</button></li>';
+                html += '<li><hr class="dropdown-divider"></li>';
+                html += '<li><button type="button" class="dropdown-item" onclick="saveRoomAsTemplate(' + room.id + ')"><i class="fas fa-bookmark text-info"></i>Save ' + qdTemplateEscapeHtml(getQuoteDividerLabels().singular) + ' Template</button></li>';
+                html += '<li><button type="button" class="dropdown-item text-danger" onclick="deleteRoom(' + room.id + ', this)"><i class="fas fa-trash"></i>Delete ' + qdTemplateEscapeHtml(getQuoteDividerLabels().singular) + '</button></li>';
+                html += '</ul></div>';
+                html += '<div class="dropdown d-inline-block room-bulk-menu ms-1">';
+                html += '<button type="button" class="btn btn-sm btn-outline-light dropdown-toggle mt-1" data-bs-toggle="dropdown" aria-expanded="false"><i class="fas fa-layer-group me-1"></i>Group</button>';
+                html += '<ul class="dropdown-menu">';
+                html += '<li><button type="button" class="dropdown-item" onclick="createChoiceGroupFromRoomItems(' + room.id + ')"><i class="fas fa-layer-group text-primary"></i>Option Group from Selected</button></li>';
+                html += '<li><button type="button" class="dropdown-item" onclick="addChoiceTemplateToRoom(' + room.id + ')"><i class="fas fa-list-check text-success"></i>Saved Group</button></li>';
+                html += '<li><hr class="dropdown-divider"></li>';
+                html += '<li><button type="button" class="dropdown-item" onclick="toggleRoomAutoGrouping(' + room.id + ')"><i class="fas fa-' + (groupingEnabled ? 'ban text-warning' : 'layer-group text-success') + '"></i>' + (groupingEnabled ? 'Disable Grouping' : 'Enable Grouping') + '</button></li>';
+                html += '</ul></div>';
                 html += '<button onclick="undoLastAction()" class="btn btn-sm btn-warning ms-1" title="Undo last action (Ctrl+Z)" id="undoBtn">';
                 html += '<i class="fas fa-undo"></i> Undo</button>';
                 html += '</div>';
@@ -12408,6 +12641,8 @@ Example:
                 html += '</div>';
                 html += '<textarea id="scopeNotes_' + room.id + '" class="form-control form-control-sm" rows="3" placeholder="Describe the scope of work for this room..." onchange="updateRoomScopeNotes(' + room.id + ')">' + qdTemplateEscapeHtml(roomNotes) + '</textarea>';
                 html += '</div>';
+
+                html += '<div class="room-item-drop-zone quote-line-items-sortable" data-room-id="' + room.id + '" aria-label="Drop line item into ' + qdTemplateEscapeHtml(room.name) + '"><i class="fas fa-arrow-down me-2"></i>Drop line item into ' + qdTemplateEscapeHtml(room.name) + '</div>';
 
                 if (room.items.length > 0) {
                     const markupFactor = 1 + (room.markup || 0) / 100;
@@ -12447,10 +12682,10 @@ Example:
                         html += '<span class="cat-drag-handle" title="Drag to reorder category" style="color:' + catTheme.icon + ';">&#8801;</span>';
                         html += renderCategoryIconMarkup(catIcon, 'me-1', 'color:' + catTheme.icon + ';') + catDisplay;
                         html += '</div>';
-                        var quoteItemTableColgroup = '<col style="width:32px"><col style="width:34px"><col><col style="width:96px"><col style="width:86px"><col style="width:100px">';
+                        var quoteItemTableColgroup = '<col style="width:56px"><col style="width:34px"><col><col style="width:96px"><col style="width:86px"><col style="width:100px">';
                         if (showLineProfitDetails) quoteItemTableColgroup += '<col style="width:118px">';
                         quoteItemTableColgroup += '<col style="width:220px">';
-                        html += '<div style="overflow-x:auto;"><table class="table table-sm mb-0 quote-items-table"><colgroup>' + quoteItemTableColgroup + '</colgroup><tbody>';
+                        html += '<div style="overflow-x:auto;"><table class="table table-sm mb-0 quote-items-table"><colgroup>' + quoteItemTableColgroup + '</colgroup><tbody class="quote-line-items-sortable" data-room-id="' + room.id + '" data-category="' + qdTemplateEscapeHtml(cat) + '">';
 
                         entries.forEach(({ item, origIndex }) => {
                             hydrateQuoteLineItemPhotoFromSavedItem(item);
@@ -12475,7 +12710,8 @@ Example:
                             const displayItemDescription = hasUpgradeGroups ? (item.itemDescription || '') : getQuoteDisplayItemDescription(item, isUpgraded, hasUpgrade);
                             var coStatus = window._quoteDocumentType === 'change_order' ? (item._coChangeStatus || 'added') : '';
                             const highlight = getLineItemHighlight(item);
-                            var rowClassNames = [];
+                            const itemDragKey = quoteBuilderLineItemDragKey(item);
+                            var rowClassNames = ['quote-line-item-row'];
                             if (coStatus) rowClassNames.push('co-item-' + coStatus);
                             if (highlight) rowClassNames.push('quote-item-highlighted');
                             var rowClass = rowClassNames.length ? ' class="' + rowClassNames.join(' ') + '"' : '';
@@ -12487,9 +12723,9 @@ Example:
                                 rowStyles.push('border-left:3px dashed #0dcaf0');
                             }
                             const rowStyle = rowStyles.length ? ' style="' + rowStyles.join(';') + ';"' : '';
-                            html += '<tr' + rowClass + rowStyle + '>';
-                            html += '<td>' + displayNum + (isOptional ? ' <span class="badge bg-info" style="font-size:0.6em;">opt</span>' : '') + '</td>';
-                            html += '<td><input type="checkbox" class="form-check-input choice-group-select" data-room-id="' + room.id + '" data-item-index="' + origIndex + '" title="Select for option group"></td>';
+                            html += '<tr' + rowClass + rowStyle + ' data-item-key="' + itemDragKey + '" data-room-id="' + room.id + '">';
+                            html += '<td><span class="d-inline-flex align-items-center"><button type="button" class="line-item-drag-handle" title="Drag to reorder or move to another ' + qdTemplateEscapeHtml(getQuoteDividerLabels().singularLower) + '" aria-label="Move line item"><i class="fas fa-grip-vertical"></i></button><span>' + displayNum + '</span></span>' + (isOptional ? ' <span class="badge bg-info" style="font-size:0.6em;">opt</span>' : '') + '</td>';
+                            html += '<td><input type="checkbox" class="form-check-input choice-group-select" data-room-id="' + room.id + '" data-item-index="' + origIndex + '" title="Select for bulk actions or option group" onchange="updateRoomBulkSelectionState(' + room.id + ')"></td>';
                             const visibleJobNote = getVisibleLineItemNote(item, displayItemDescription);
                             var _hasDesc = !!(displayItemDescription || visibleJobNote);
                             var _descId = 'itemdesc_' + room.id + '_' + origIndex;
@@ -12760,6 +12996,57 @@ Example:
             }
         }
 
+
+        function quoteBuilderLineItemLookup() {
+            var lookup = new Map();
+            (rooms || []).forEach(function(room) {
+                (room.items || []).forEach(function(item) {
+                    lookup.set(quoteBuilderLineItemDragKey(item), item);
+                });
+            });
+            return lookup;
+        }
+
+        function clearQuoteLineItemDragState() {
+            document.body.classList.remove('quote-line-item-dragging');
+            document.querySelectorAll('.room-item-drop-zone.sortable-drag-over').forEach(function(zone) {
+                zone.classList.remove('sortable-drag-over');
+            });
+        }
+
+        function handleQuoteLineItemDragEnd(evt) {
+            clearQuoteLineItemDragState();
+            if (!evt || !evt.item || !evt.from || !evt.to) return;
+            if (evt.from === evt.to && evt.oldIndex === evt.newIndex) return;
+            var sourceRoom = quoteBuilderRoomById(evt.from.dataset.roomId);
+            var destinationRoom = quoteBuilderRoomById(evt.to.dataset.roomId);
+            var itemKey = evt.item.dataset.itemKey;
+            var itemLookup = quoteBuilderLineItemLookup();
+            var movedItem = itemLookup.get(itemKey);
+            if (!sourceRoom || !destinationRoom || !movedItem) {
+                renderRooms();
+                return;
+            }
+            _pushUndo();
+            var destinationCategory = evt.to.dataset.category;
+            if (destinationCategory) movedItem.category = destinationCategory;
+            var affectedRoomIds = Array.from(new Set([String(sourceRoom.id), String(destinationRoom.id)]));
+            affectedRoomIds.forEach(function(affectedRoomId) {
+                var room = quoteBuilderRoomById(affectedRoomId);
+                var card = document.querySelector('.room-card[data-room-id="' + affectedRoomId + '"]');
+                if (!room || !card) return;
+                var orderedItems = Array.from(card.querySelectorAll('.quote-line-item-row[data-item-key]'))
+                    .map(function(row) { return itemLookup.get(row.dataset.itemKey); })
+                    .filter(Boolean);
+                room.items = orderedItems;
+            });
+            var destinationName = destinationRoom.name || getQuoteDividerLabels().singular;
+            var message = String(sourceRoom.id) === String(destinationRoom.id)
+                ? 'Line item reordered.'
+                : 'Line item moved to ' + destinationName + '.';
+            finishRoomBulkItemAction(message);
+        }
+
         function initSortable() {
             if (typeof Sortable === 'undefined') return;
 
@@ -12799,6 +13086,35 @@ Example:
                         room.categoryOrder = Array.from(blocks).map(el => el.dataset.cat);
                         renderRooms();
                     }
+                });
+            });
+
+            document.querySelectorAll('.quote-line-items-sortable').forEach(function(itemList) {
+                Sortable.create(itemList, {
+                    group: { name: 'quote-line-items', pull: true, put: true },
+                    draggable: '.quote-line-item-row',
+                    handle: '.line-item-drag-handle',
+                    animation: 150,
+                    ghostClass: 'quote-line-item-drag-ghost',
+                    chosenClass: 'quote-line-item-drag-chosen',
+                    emptyInsertThreshold: 24,
+                    scroll: true,
+                    scrollSensitivity: 90,
+                    scrollSpeed: 16,
+                    bubbleScroll: true,
+                    onStart: function() {
+                        document.body.classList.add('quote-line-item-dragging');
+                    },
+                    onMove: function(evt) {
+                        document.querySelectorAll('.room-item-drop-zone.sortable-drag-over').forEach(function(zone) {
+                            zone.classList.remove('sortable-drag-over');
+                        });
+                        if (evt && evt.to && evt.to.classList.contains('room-item-drop-zone')) {
+                            evt.to.classList.add('sortable-drag-over');
+                        }
+                        return true;
+                    },
+                    onEnd: handleQuoteLineItemDragEnd
                 });
             });
         }
