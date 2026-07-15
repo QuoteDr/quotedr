@@ -483,6 +483,22 @@
         @media (prefers-reduced-motion: reduce) {
             .viewer-optional-add-nudge { animation: none; }
         }
+        .viewer-optional-price {
+            transition: color 0.18s ease;
+        }
+        .viewer-optional-price.is-unselected strong {
+            color: #64748b;
+        }
+        .viewer-optional-price-state {
+            color: #64748b;
+            font-size: 0.72rem;
+            font-weight: 700;
+            line-height: 1.2;
+            margin-top: 2px;
+        }
+        .viewer-optional-price.is-selected .viewer-optional-price-state {
+            color: #198754;
+        }
         .price-tag {
             font-weight: bold;
             color: #28a745;
@@ -4416,6 +4432,9 @@ if (location.search.includes('debug')) {
                     const visibleNotes = viewerVisibleNotes(item, displayDesc);
                     const isOptional = !!item.optional;
                     const optionalSelected = isOptional ? syncViewerOptionalItemState(item) : true;
+                    const displayedItemTotalText = isOptional && !optionalSelected && !linePriceTbd
+                        ? viewerMoney(itemTotal, { forceSign: true })
+                        : itemTotalText;
                     const isRemoved = !!item._removed && !isOptional;
                     const lineItemHighlight = getViewerLineItemHighlight(item);
 
@@ -4482,11 +4501,14 @@ if (location.search.includes('debug')) {
                                     ${isChangeOrder && coStatus === 'added' ? '<span class="badge bg-success ms-2">Added</span>' : ''}
                                     ${isChangeOrder && coStatus === 'removed' ? '<span class="badge bg-danger ms-2">Removed</span>' : ''}
                                     ${wasOptionalAdded ? '<span class="badge bg-success ms-2">Added by client</span>' : ''}
-                                    ${isOptional && !isSignedDiff ? '<span class="badge bg-info ms-2" style="font-size:0.65em;">Optional Add-on</span>' : ''}
+                                    ${isOptional && !isSignedDiff ? (optionalSelected
+                                        ? '<span class="badge bg-success ms-2" style="font-size:0.65em;"><i class="fas fa-check-circle me-1"></i>Included in quote</span>'
+                                        : '<span class="badge bg-info ms-2" style="font-size:0.65em;">Optional Add-on &middot; Not selected</span>') : ''}
                                     ${lineItemPhotoButton ? `<div class="viewer-line-photo-actions viewer-line-title-actions">${lineItemPhotoButton}</div>` : ''}
                                 </div>
-                                <div style="text-align:right; min-width:140px; padding-left:16px;">
-                                    <div>${coCanExplain ? `<button type="button" class="viewer-change-order-total-btn" onclick="toggleViewerChangeOrderExplanation(${roomIdx}, ${itemIndex})">${itemTotalText}</button>` : `<strong>${itemTotalText}</strong>`}</div>
+                                <div class="${isOptional && !isSignedDiff ? `viewer-optional-price ${optionalSelected ? 'is-selected' : 'is-unselected'}` : ''}" style="text-align:right; min-width:140px; padding-left:16px;">
+                                    <div>${coCanExplain ? `<button type="button" class="viewer-change-order-total-btn" onclick="toggleViewerChangeOrderExplanation(${roomIdx}, ${itemIndex})">${displayedItemTotalText}</button>` : `<strong>${displayedItemTotalText}</strong>`}</div>
+                                    ${isOptional && !isSignedDiff ? `<div class="viewer-optional-price-state">${optionalSelected ? 'Included in quote total' : 'Not included in quote total'}</div>` : ''}
                                     <small class="text-muted">${typeof qdFormatQuantity === 'function' ? qdFormatQuantity(item.quantity, item.unitType || item.unit || '') : (item.quantity + ' ' + (item.unitType || ''))} @ ${activeRateText}</small>
                                     ${qvDiscountDetailsHtml(item)}
                                 </div>

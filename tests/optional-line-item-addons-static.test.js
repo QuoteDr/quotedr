@@ -15,6 +15,10 @@ assert(viewer.includes("optionalSelected ? 'Added to Quote' : 'Add to Quote'"), 
 assert(viewer.includes("'btn-outline-primary viewer-optional-add-nudge'"), 'unselected add-ons should receive the subtle click nudge');
 assert(viewer.includes('@keyframes viewerOptionalAddNudge'), 'viewer should define the optional add-on nudge animation');
 assert(viewer.includes('.viewer-optional-add-nudge { animation: none; }'), 'viewer should disable the nudge for reduced motion');
+assert(viewer.includes("viewerMoney(itemTotal, { forceSign: true })"), 'unselected add-ons should present their price as an additional cost');
+assert(viewer.includes('Optional Add-on &middot; Not selected'), 'unselected add-ons should clearly identify their selection state');
+assert(viewer.includes('Not included in quote total'), 'unselected add-ons should explicitly say their price is excluded');
+assert(viewer.includes('Included in quote total'), 'selected add-ons should explicitly say their price is included');
 assert(!viewer.includes('Remove this item'), 'viewer should not describe optional add-ons as removals');
 
 const helperStart = viewer.indexOf('function viewerOptionalItemDefaultSelected');
