@@ -1415,22 +1415,22 @@ if (location.search.includes('debug')) {
             </div>
             <div class="warranty-grid">
                 <div class="warranty-item">
-                    <div class="icon">🛡️</div>
+                    <div class="icon">ðŸ›¡ï¸</div>
                     <div class="label" id="commitmentLabel1">1-Year Warranty</div>
                     <div class="sublabel" id="commitmentText1">Workmanship guaranteed for 12 months from project completion</div>
                 </div>
                 <div class="warranty-item">
-                    <div class="icon">🏭</div>
+                    <div class="icon">ðŸ­</div>
                     <div class="label" id="commitmentLabel2">Manufacturer Warranty</div>
                     <div class="sublabel" id="commitmentText2">All materials carry full manufacturer warranty &mdash; passed directly to you</div>
                 </div>
                 <div class="warranty-item">
-                    <div class="icon">✅</div>
+                    <div class="icon">âœ…</div>
                     <div class="label" id="commitmentLabel3">Fully Insured</div>
                     <div class="sublabel" id="commitmentText3">Liability insurance coverage on all work performed</div>
                 </div>
                 <div class="warranty-item">
-                    <div class="icon">🤝</div>
+                    <div class="icon">ðŸ¤</div>
                     <div class="label" id="commitmentLabel4">Satisfaction Promise</div>
                     <div class="sublabel" id="commitmentText4">Any concerns addressed promptly &mdash; your satisfaction is our priority</div>
                 </div>
@@ -2180,6 +2180,32 @@ if (location.search.includes('debug')) {
             return discounts.hasDiscount(item) ? discounts.chargedTotal(item) : viewerItemActiveTotal(item);
         }
 
+        function viewerOptionalItemDefaultSelected(item) {
+            return !item || item.optionalSelectedByDefault !== false;
+        }
+
+        function syncViewerOptionalItemState(item) {
+            if (!item || !item.optional) return true;
+            var selected;
+            if (typeof item._optionalSelected === 'boolean') {
+                selected = item._optionalSelected;
+            } else if (item._removed === true) {
+                selected = false;
+            } else if (typeof item.optionalSelectedByDefault === 'boolean') {
+                selected = viewerOptionalItemDefaultSelected(item);
+            } else {
+                // Optional items created before default-state support were included initially.
+                selected = true;
+            }
+            item._optionalSelected = selected;
+            item._removed = !selected;
+            return selected;
+        }
+
+        function viewerOptionalItemChangedFromDefault(item) {
+            return !!(item && item.optional) && syncViewerOptionalItemState(item) !== viewerOptionalItemDefaultSelected(item);
+        }
+
         function qvLineRate(item) {
             if (isViewerPriceTbd(item)) return 0;
             var discounts = qvDiscounts();
@@ -2851,7 +2877,7 @@ if (location.search.includes('debug')) {
         function normalizeViewerUpgradeUnitForCompare(unit) {
             var clean = String(unit || '').trim().toLowerCase().replace(/\s+/g, ' ');
             if (!clean) return '';
-            if (['sq ft', 'sqft', 'square foot', 'square feet', 'ft2', 'ft²'].indexOf(clean) !== -1) return 'sq ft';
+            if (['sq ft', 'sqft', 'square foot', 'square feet', 'ft2', 'ftÂ²'].indexOf(clean) !== -1) return 'sq ft';
             if (['lf', 'linear foot', 'linear feet', 'linear ft'].indexOf(clean) !== -1) return 'LF';
             if (['each', 'ea'].indexOf(clean) !== -1) return 'each';
             if (['flatrate', 'flat rate', 'flat'].indexOf(clean) !== -1) return 'Flatrate';
@@ -3989,6 +4015,7 @@ if (location.search.includes('debug')) {
             var _clientItemUpgradeSelections = [];
             (quoteData.rooms || []).forEach(function(room) {
                 (room.items || []).forEach(function(item) {
+                    if (item._removed) return;
                     getViewerSelectedItemUpgradeOptions(item).forEach(function(option) {
                         _clientItemUpgradeSelections.push({
                             room: room.name,
@@ -4266,7 +4293,10 @@ if (location.search.includes('debug')) {
             ];
 
             quoteData.rooms.forEach((room, roomIdx) => {
-                (room.items || []).forEach(function(item) { applyViewerChoiceGroupToItem(item); });
+                (room.items || []).forEach(function(item) {
+                    syncViewerOptionalItemState(item);
+                    applyViewerChoiceGroupToItem(item);
+                });
                 const roomTotal = room.items.reduce((sum, item) => item._removed ? sum : sum + (isChangeOrder ? viewerChangeOrderLineDisplayTotal(item, room) : qvLineTotal(item)), 0);
                 const headerBg = roomHeaderBackground(room, ROOM_COLORS[room.colorIndex ?? 0] || ROOM_COLORS[0]);
 
@@ -4345,13 +4375,15 @@ if (location.search.includes('debug')) {
                         : (item.itemDescription || ''));
                     const visibleNotes = viewerVisibleNotes(item, displayDesc);
                     const isOptional = !!item.optional;
-                    const isRemoved = !!item._removed;
+                    const optionalSelected = isOptional ? syncViewerOptionalItemState(item) : true;
+                    const isRemoved = !!item._removed && !isOptional;
                     const lineItemHighlight = getViewerLineItemHighlight(item);
 
                     // Find original item for diff (match by description)
                     const origRoom = origRoomsForDiff[roomIdx] || {};
                     const origItem = isSignedDiff ? (origRoom.items || []).find(oi => oi.description === item.description) : null;
                     const wasUpgraded = isSignedDiff && origItem && origItem.rate !== item.rate;
+                    const wasOptionalAdded = isSignedDiff && item.optional && origItem && origItem.optionalSelectedByDefault === false && item._optionalSelected === true;
 
                     if (item.choiceGroup && !isRemoved) {
                         html += renderViewerChoiceGroup(roomIdx, itemIndex, item, isSignedDiff);
@@ -4395,6 +4427,10 @@ if (location.search.includes('debug')) {
                         } else if (isOptional && !isSignedDiff) {
                             itemStyles.push('border-left:3px dashed #0dcaf0');
                             itemStyles.push('padding-left:8px');
+                            if (!optionalSelected) {
+                                itemStyles.push('background:#f8fbff');
+                                itemStyles.push('opacity:0.88');
+                            }
                         }
                         const lineItemPhotoButton = !isSignedDiff ? renderViewerPhotoButton(getViewerItemPhotoList(item), 'Picture', 'btn-outline-secondary', getViewerItemPhotoFullList(item)) : '';
                         html += `
@@ -4405,7 +4441,8 @@ if (location.search.includes('debug')) {
                                     ${isChangeOrder && coStatus === 'changed' ? '<span class="badge bg-warning text-dark ms-2">Changed</span>' : ''}
                                     ${isChangeOrder && coStatus === 'added' ? '<span class="badge bg-success ms-2">Added</span>' : ''}
                                     ${isChangeOrder && coStatus === 'removed' ? '<span class="badge bg-danger ms-2">Removed</span>' : ''}
-                                    ${isOptional && !isSignedDiff ? '<span class="badge bg-info ms-2" style="font-size:0.65em;">Optional</span>' : ''}
+                                    ${wasOptionalAdded ? '<span class="badge bg-success ms-2">Added by client</span>' : ''}
+                                    ${isOptional && !isSignedDiff ? '<span class="badge bg-info ms-2" style="font-size:0.65em;">Optional Add-on</span>' : ''}
                                     ${lineItemPhotoButton ? `<div class="viewer-line-photo-actions viewer-line-title-actions">${lineItemPhotoButton}</div>` : ''}
                                 </div>
                                 <div style="text-align:right; min-width:140px; padding-left:16px;">
@@ -4427,11 +4464,11 @@ if (location.search.includes('debug')) {
                                     ${!isUpgraded ? `<div class="text-muted mb-1" style="font-size:0.88rem;"><i class="fas fa-arrow-up" style="color:#f0ad4e;"></i> <strong>Upgrade available:</strong> ${item.upgrade.name}</div>` : ''}
                                     ${item.upgrade.photo ? `<div class="mb-2">${renderViewerPhotoButton(item.upgrade.photos || item.upgrade.photo, 'Upgrade Picture', 'btn-outline-warning', item.upgrade.photosFull || item.upgrade.photoFull)}</div>` : ''}
                                     <button class="btn btn-sm upgrade-action-btn ${isUpgraded ? 'btn-warning' : 'btn-outline-warning'}" onclick="toggleViewerUpgrade(${roomIdx}, ${itemIndex})" style="font-size:0.85rem;">
-                                        <i class="fas fa-arrow-up"></i> ${isUpgraded ? 'Upgraded ✓' : 'Upgrade: ' + item.upgrade.name}
+                                        <i class="fas fa-arrow-up"></i> ${isUpgraded ? 'Upgraded âœ“' : 'Upgrade: ' + item.upgrade.name}
                                     </button>
                                 </div>` : ''}
-                                ${isOptional ? `<button class="btn btn-sm btn-outline-danger" onclick="removeViewerItem(${roomIdx}, ${itemIndex})" style="font-size:0.82rem;">
-                                    <i class="fas fa-times"></i> Remove this item
+                                ${isOptional ? `<button class="btn btn-sm ${optionalSelected ? 'btn-success' : 'btn-outline-primary'}" onclick="toggleViewerOptionalItem(${roomIdx}, ${itemIndex})" style="font-size:0.82rem;">
+                                    <i class="fas fa-${optionalSelected ? 'check-circle' : 'plus-circle'}"></i> ${optionalSelected ? 'Added to Quote' : 'Add to Quote'}
                                 </button>` : ''}
                             </div>`}
                         </div>`;
@@ -4518,6 +4555,16 @@ if (location.search.includes('debug')) {
 
         function restoreViewerItem(roomIdx, itemIdx) {
             quoteData.rooms[roomIdx].items[itemIdx]._removed = false;
+            renderQuote();
+            updateTotal();
+        }
+
+        function toggleViewerOptionalItem(roomIdx, itemIdx) {
+            const item = quoteData.rooms[roomIdx]?.items[itemIdx];
+            if (!item || !item.optional) return;
+            const selected = !syncViewerOptionalItemState(item);
+            item._optionalSelected = selected;
+            item._removed = !selected;
             renderQuote();
             updateTotal();
         }
@@ -4617,6 +4664,7 @@ if (location.search.includes('debug')) {
                 quoteData.rooms.forEach(room => {
                     room.items.forEach(item => {
                         applyViewerChoiceGroupToItem(item);
+                        syncViewerOptionalItemState(item);
                         if (item._removed) return; // skip removed items
                         const baseTotal = qvBaseLineTotal(item);
                         const activeTotal = qvLineTotal(item);
@@ -5211,7 +5259,12 @@ if (location.search.includes('debug')) {
 
                     var _hasUpgrades = hasClientUpgrades();
                     var _hasRemovals = (quoteData.rooms || []).some(function(room) {
-                        return (room.items || []).some(function(item) { return item._removed; });
+                        return (room.items || []).some(function(item) {
+                            return item._removed && (!item.optional || viewerOptionalItemChangedFromDefault(item));
+                        });
+                    });
+                    var _hasOptionalChanges = (quoteData.rooms || []).some(function(room) {
+                        return (room.items || []).some(viewerOptionalItemChangedFromDefault);
                     });
                     var _clientChoiceGroups = collectClientChoiceGroups();
                     var _clientEnhancements = collectClientEnhancements();
@@ -5219,6 +5272,7 @@ if (location.search.includes('debug')) {
                     var _hasChoiceGroups = _clientChoiceGroups.length > 0;
                     var _hasEnhancements = _clientEnhancements.length > 0;
                     var _hasItemUpgradeSelections = _clientItemUpgradeSelections.length > 0;
+                    var _hasClientChanges = _hasUpgrades || _hasRemovals || _hasOptionalChanges || _hasChoiceGroups || _hasEnhancements || _hasItemUpgradeSelections;
 
                     var isChangeOrder = !!(window.QuoteDrChangeOrders && QuoteDrChangeOrders.isChangeOrder(quoteData));
                     const updateData = {
@@ -5233,9 +5287,9 @@ if (location.search.includes('debug')) {
                             signed_at: now.toISOString(),
                             approved_by: name,
                             approved_at: now.toISOString(),
-                            client_upgraded: _hasUpgrades || _hasRemovals || _hasChoiceGroups || _hasEnhancements || _hasItemUpgradeSelections,
-                            client_upgraded_at: (_hasUpgrades || _hasRemovals || _hasChoiceGroups || _hasEnhancements || _hasItemUpgradeSelections) ? now.toISOString() : undefined,
-                            original_rooms: (_hasUpgrades || _hasRemovals || _hasChoiceGroups || _hasEnhancements || _hasItemUpgradeSelections) ? originalRoomsSnapshot : undefined,
+                            client_upgraded: _hasClientChanges,
+                            client_upgraded_at: _hasClientChanges ? now.toISOString() : undefined,
+                            original_rooms: _hasClientChanges ? originalRoomsSnapshot : undefined,
                             _clientChoiceGroups: _clientChoiceGroups,
                             _clientEnhancements: _clientEnhancements,
                             _clientItemUpgradeSelections: _clientItemUpgradeSelections
@@ -5256,7 +5310,7 @@ if (location.search.includes('debug')) {
                     qdCaptureEvent('quote_signed', {
                         quote_id: quoteId,
                         document_type: isChangeOrder ? 'change_order' : 'quote',
-                            had_client_changes: _hasUpgrades || _hasRemovals || _hasChoiceGroups,
+                            had_client_changes: _hasClientChanges,
                             room_count: Array.isArray(updatedRooms) ? updatedRooms.length : 0
                         });
                     }
@@ -5296,6 +5350,7 @@ if (location.search.includes('debug')) {
             // Build upgrade summary for Supabase
             var _clientUpgrades = [];
             var _clientRemovals = [];
+            var _clientOptionalSelections = [];
             var _clientChoiceGroups = collectClientChoiceGroups();
             var _clientEnhancements = collectClientEnhancements();
             var _clientItemUpgradeSelections = collectClientItemUpgradeSelections();
@@ -5307,7 +5362,14 @@ if (location.search.includes('debug')) {
                     if (item.upgraded && item.upgrade) {
                         _clientUpgrades.push({ room: room.name, from: item.description, to: item.upgrade.name, diff: qvLineTotal(item) - qvBaseLineTotal(item) });
                     }
-                    if (item._removed) {
+                    if (item.optional && viewerOptionalItemChangedFromDefault(item)) {
+                        _clientOptionalSelections.push({
+                            room: room.name,
+                            item: item.description,
+                            selected: syncViewerOptionalItemState(item)
+                        });
+                    }
+                    if (item._removed && (!item.optional || viewerOptionalItemChangedFromDefault(item))) {
                         _clientRemovals.push({ room: room.name, item: item.description });
                     }
                 });
@@ -5325,6 +5387,7 @@ if (location.search.includes('debug')) {
                             _roomNotes: quoteData._roomNotes || {},
                             _clientUpgrades: _clientUpgrades,
                             _clientRemovals: _clientRemovals,
+                            _clientOptionalSelections: _clientOptionalSelections,
                             _clientChoiceGroups: _clientChoiceGroups,
                             _clientEnhancements: _clientEnhancements,
                             _clientItemUpgradeSelections: _clientItemUpgradeSelections,
@@ -5391,7 +5454,7 @@ if (location.search.includes('debug')) {
             termsContainer.innerHTML = html;
         }
 
-        // ── Stripe Deposit Payment ───────────────────────────────────────
+        // â”€â”€ Stripe Deposit Payment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         var _paymentSettings = null;
         var _quoteTotal = 0;
 
@@ -5452,7 +5515,7 @@ if (location.search.includes('debug')) {
                         quoteId: quoteId,
                         paymentType: 'deposit',
                         clientEmail: quoteData.clientEmail || quoteData.email || '',
-                        description: 'Project Deposit — Quote #' + (quoteData.quoteNumber || quoteId),
+                        description: 'Project Deposit â€” Quote #' + (quoteData.quoteNumber || quoteId),
                         successUrl: window.location.href.split('#')[0].replace(/[?&]payment=[^&]*/g, ''),
                         cancelUrl: window.location.href.split('#')[0],
                         idempotencyKey: depositOperationId
