@@ -12,6 +12,9 @@ assert(builder.includes('function quoteOptionalItemIncludedByDefault'), 'builder
 assert(builder.includes('quoteOptionalItemIncludedByDefault(item) ? sum + itemChargedTotal(item) : sum'), 'builder totals should exclude add-ons that start unselected');
 assert(viewer.includes('function toggleViewerOptionalItem'), 'viewer should let clients select optional add-ons');
 assert(viewer.includes("optionalSelected ? 'Added to Quote' : 'Add to Quote'"), 'viewer should use positive add-on wording');
+assert(viewer.includes("'btn-outline-primary viewer-optional-add-nudge'"), 'unselected add-ons should receive the subtle click nudge');
+assert(viewer.includes('@keyframes viewerOptionalAddNudge'), 'viewer should define the optional add-on nudge animation');
+assert(viewer.includes('.viewer-optional-add-nudge { animation: none; }'), 'viewer should disable the nudge for reduced motion');
 assert(!viewer.includes('Remove this item'), 'viewer should not describe optional add-ons as removals');
 
 const helperStart = viewer.indexOf('function viewerOptionalItemDefaultSelected');

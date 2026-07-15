@@ -1762,6 +1762,9 @@ async function saveBusinessProfile(profile) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
     localStorage.setItem('ald_business_profile', JSON.stringify(profile));
+    if (Array.isArray(profile && profile.hidden_profile_fields)) {
+        localStorage.setItem('ald_hidden_profile_fields', JSON.stringify(profile.hidden_profile_fields));
+    }
     const result = await qdDurableSupabaseOperation({
         entityType: 'business_profile',
         entityId: 'account',
@@ -1801,6 +1804,9 @@ async function loadBusinessProfile() {
         .maybeSingle();
     if (!error && data && data.value) {
         localStorage.setItem('ald_business_profile', JSON.stringify(data.value));
+        if (Array.isArray(data.value.hidden_profile_fields)) {
+            localStorage.setItem('ald_hidden_profile_fields', JSON.stringify(data.value.hidden_profile_fields));
+        }
         return data.value;
     }
     return JSON.parse(localStorage.getItem('ald_business_profile') || '{}');

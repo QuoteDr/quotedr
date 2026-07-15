@@ -464,6 +464,25 @@
         @media (prefers-reduced-motion: reduce) {
             .upgrade-action-btn::after { animation: none; display: none; }
         }
+        .viewer-optional-add-nudge {
+            animation: viewerOptionalAddNudge 4.6s ease-in-out infinite;
+            transform-origin: center;
+        }
+        .viewer-optional-add-nudge:hover,
+        .viewer-optional-add-nudge:focus-visible {
+            animation: none;
+            transform: none;
+        }
+        @keyframes viewerOptionalAddNudge {
+            0%, 6%, 28%, 100% { transform: translateX(0); }
+            10% { transform: translateX(-2px); }
+            14% { transform: translateX(2px); }
+            18% { transform: translateX(-1.5px); }
+            22% { transform: translateX(1.5px); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .viewer-optional-add-nudge { animation: none; }
+        }
         .price-tag {
             font-weight: bold;
             color: #28a745;
@@ -1893,7 +1912,12 @@ if (location.search.includes('debug')) {
             if (profile && typeof profile === 'object') {
                 var nameEl = document.getElementById('companyNameDisplay');
                 var tagEl = document.getElementById('companyTaglineDisplay');
-                if (nameEl && (profile.business_name || profile.company_name)) nameEl.textContent = profile.business_name || profile.company_name;
+                var hiddenProfileFields = getViewerHiddenProfileFields(profile);
+                if (nameEl) {
+                    var companyName = profile.business_name || profile.company_name || profile.businessName || profile.companyName || '';
+                    nameEl.textContent = hiddenProfileFields.includes('businessName') ? '' : companyName;
+                    nameEl.style.display = nameEl.textContent ? '' : 'none';
+                }
                 if (tagEl) {
                     tagEl.textContent = profile.tagline || '';
                     tagEl.style.display = profile.tagline ? '' : 'none';
@@ -4121,13 +4145,28 @@ if (location.search.includes('debug')) {
 
         var viewerBusinessProfileRequested = false;
 
+        function getViewerHiddenProfileFields(profile) {
+            var hidden = [];
+            function addFields(fields) {
+                if (!Array.isArray(fields)) return;
+                fields.forEach(function(field) {
+                    if (hidden.indexOf(field) === -1) hidden.push(field);
+                });
+            }
+            addFields(quoteData && quoteData.hiddenProfileFields);
+            addFields(quoteData && quoteData.hidden_profile_fields);
+            addFields(profile && profile.hidden_profile_fields);
+            addFields(profile && profile.hiddenProfileFields);
+            if (!hidden.length) {
+                try { addFields(JSON.parse(localStorage.getItem('ald_hidden_profile_fields') || '[]')); } catch(e) {}
+            }
+            return hidden;
+        }
+
         function renderViewerBusinessInfo(profile) {
             var bizEl = document.getElementById('businessInfoDisplay');
             if (!bizEl || !profile || typeof profile !== 'object') return;
-            var hidden = Array.isArray(quoteData.hiddenProfileFields) ? quoteData.hiddenProfileFields : [];
-            if (!hidden.length) {
-                try { hidden = JSON.parse(localStorage.getItem('ald_hidden_profile_fields') || '[]'); } catch(e) { hidden = []; }
-            }
+            var hidden = getViewerHiddenProfileFields(profile);
             var lines = [];
             if (!hidden.includes('businessName') && profile.business_name) lines.push('<strong>' + escapeHtml(profile.business_name) + '</strong>');
             if (!hidden.includes('ownerName') && profile.owner_name) lines.push(escapeHtml(profile.owner_name));
@@ -4137,6 +4176,7 @@ if (location.search.includes('debug')) {
             if (!hidden.includes('email') && profile.email) lines.push(escapeHtml(profile.email));
             if (!hidden.includes('hst') && profile.hst_number) lines.push('HST: ' + escapeHtml(profile.hst_number));
             bizEl.innerHTML = lines.map(function(line) { return '<div>' + line + '</div>'; }).join('');
+            bizEl.style.display = lines.length ? '' : 'none';
         }
 
         function applyCommitmentBanner() {
@@ -4467,7 +4507,7 @@ if (location.search.includes('debug')) {
                                         <i class="fas fa-arrow-up"></i> ${isUpgraded ? 'Upgraded ✓' : 'Upgrade: ' + item.upgrade.name}
                                     </button>
                                 </div>` : ''}
-                                ${isOptional ? `<button class="btn btn-sm ${optionalSelected ? 'btn-success' : 'btn-outline-primary'}" onclick="toggleViewerOptionalItem(${roomIdx}, ${itemIndex})" style="font-size:0.82rem;">
+                                ${isOptional ? `<button class="btn btn-sm ${optionalSelected ? 'btn-success' : 'btn-outline-primary viewer-optional-add-nudge'}" onclick="toggleViewerOptionalItem(${roomIdx}, ${itemIndex})" style="font-size:0.82rem;">
                                     <i class="fas fa-${optionalSelected ? 'check-circle' : 'plus-circle'}"></i> ${optionalSelected ? 'Added to Quote' : 'Add to Quote'}
                                 </button>` : ''}
                             </div>`}
