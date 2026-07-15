@@ -39,4 +39,3 @@ sandbox.syncViewerOptionalItemState(untouchedDefaultOff);
 assert.strictEqual(sandbox.viewerOptionalItemChangedFromDefault(untouchedDefaultOff), false, 'an untouched default-off add-on should not be called a client removal');
 
 console.log('optional line item add-ons static test passed');
-
