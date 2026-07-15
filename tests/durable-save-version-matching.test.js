@@ -190,12 +190,12 @@ assert(
     assert(html.includes('supabase-v2.js?v=2026071402'), `${file} should load the fixed Supabase adapter`);
   }
   if (html.includes('save-coordinator.js')) {
-    assert(html.includes('save-coordinator.js?v=2026071404'), `${file} should load the fixed save coordinator`);
+    assert(html.includes('save-coordinator.js?v=2026071405'), `${file} should load the fixed save coordinator`);
   }
 });
 
 assert(
-  fs.readFileSync('quote-builder.html', 'utf8').includes('quote-storage.js?v=2026071402'),
+  fs.readFileSync('quote-builder.html', 'utf8').includes('quote-storage.js?v=2026071403'),
   'Quote Builder should load the cloud acknowledgement listener immediately'
 );
 

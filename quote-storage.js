@@ -783,6 +783,176 @@ async function saveQuote() {
             showLoadModal();
         }
 
+        function quoteStorageRecoveryQuoteFromOperation(operation) {
+            if (!operation || operation.entityType !== 'quote' || operation.action === 'delete') return null;
+            var payload = operation.payload;
+            if (!payload || typeof payload !== 'object' || !Array.isArray(payload.rooms)) return null;
+            var quote = JSON.parse(JSON.stringify(payload));
+            var entityId = String(operation.entityId || '');
+            if (!quote.supabaseId && entityId && entityId.indexOf('quote-number:') !== 0) quote.supabaseId = entityId;
+            if (!quote._serverUpdatedAt && operation.baseVersion) quote._serverUpdatedAt = operation.baseVersion;
+            quote._quoteDrBackup = {
+                format: 'quotedr-quote-backup-v1',
+                exportedAt: new Date().toISOString(),
+                operationId: operation.operationId || '',
+                revision: operation.revision || '',
+                state: operation.state || 'local_pending',
+                localSavedAt: operation.localSavedAt || ''
+            };
+            return quote;
+        }
+
+        function quoteStorageRecoveryCandidates(data) {
+            if (!data || data.format !== 'quotedr-recovery-v1' || !Array.isArray(data.operations)) return [];
+            return data.operations.map(function(operation) {
+                var quote = quoteStorageRecoveryQuoteFromOperation(operation);
+                return quote ? { operation: operation, quote: quote } : null;
+            }).filter(Boolean).sort(function(a, b) {
+                return String(b.operation.localSavedAt || '').localeCompare(String(a.operation.localSavedAt || ''));
+            });
+        }
+
+        function quoteStorageSafeBackupName(data) {
+            var title = String(data && (data.quoteTitle || data.clientName || data.quoteNumber) || 'Quote').trim() || 'Quote';
+            title = title.replace(/[<>:"/\\|?*\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'Quote';
+            return title + ' - Recovery - ' + new Date().toISOString().slice(0, 10) + '.qdr';
+        }
+
+        function quoteStorageDownloadJson(data, fileName) {
+            var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            var url = URL.createObjectURL(blob);
+            var link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(function() { URL.revokeObjectURL(url); }, 0);
+        }
+
+        function quoteStorageExportRecoveryQuote(operation) {
+            var quote = quoteStorageRecoveryQuoteFromOperation(operation);
+            if (!quote) return false;
+            quoteStorageDownloadJson(quote, quoteStorageSafeBackupName(quote));
+            return true;
+        }
+
+        window.qdExportQuoteRecovery = quoteStorageExportRecoveryQuote;
+
+        function quoteStorageChooseRecoveryQuote(candidates) {
+            if (!candidates.length) return Promise.resolve(null);
+            if (candidates.length === 1 || typeof bootstrap === 'undefined') return Promise.resolve(candidates[0]);
+            return new Promise(function(resolve) {
+                var existing = document.getElementById('qdRecoveryQuotePicker');
+                if (existing) existing.remove();
+                var modalEl = document.createElement('div');
+                modalEl.className = 'modal fade';
+                modalEl.id = 'qdRecoveryQuotePicker';
+                modalEl.tabIndex = -1;
+                modalEl.innerHTML = '<div class="modal-dialog modal-dialog-centered"><div class="modal-content">' +
+                    '<div class="modal-header"><h5 class="modal-title"><i class="fas fa-file-arrow-up me-2"></i>Choose Quote Backup</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>' +
+                    '<div class="modal-body"><div class="list-group">' + candidates.map(function(candidate, index) {
+                        var quote = candidate.quote;
+                        var title = quote.quoteTitle || quote.clientName || quote.quoteNumber || 'Quote';
+                        var details = [];
+                        if (quote.quoteNumber) details.push('#' + quote.quoteNumber);
+                        if (candidate.operation.localSavedAt) details.push(new Date(candidate.operation.localSavedAt).toLocaleString());
+                        return '<button type="button" class="list-group-item list-group-item-action" data-qd-recovery-index="' + index + '"><span class="d-block fw-semibold">' + quoteStorageEscapeHtml(title) + '</span><span class="small text-muted">' + quoteStorageEscapeHtml(details.join(' | ') || 'Local recovery copy') + '</span></button>';
+                    }).join('') + '</div></div>' +
+                    '<div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button></div>' +
+                    '</div></div>';
+                document.body.appendChild(modalEl);
+                var modal = new bootstrap.Modal(modalEl);
+                var settled = false;
+                modalEl.querySelectorAll('[data-qd-recovery-index]').forEach(function(button) {
+                    button.addEventListener('click', function() {
+                        settled = true;
+                        var selected = candidates[parseInt(button.getAttribute('data-qd-recovery-index'), 10)] || null;
+                        modal.hide();
+                        resolve(selected);
+                    });
+                });
+                modalEl.addEventListener('hidden.bs.modal', function() {
+                    modalEl.remove();
+                    if (!settled) resolve(null);
+                }, { once: true });
+                modal.show();
+            });
+        }
+
+        async function quoteStorageResolveOpenedData(parsed) {
+            if (parsed && parsed.format === 'quotedr-recovery-v1') {
+                var candidates = quoteStorageRecoveryCandidates(parsed);
+                if (!candidates.length) throw new Error('This recovery file does not contain a quote backup.');
+                var selected = await quoteStorageChooseRecoveryQuote(candidates);
+                if (!selected) return null;
+                return { data: selected.quote, fromRecovery: true };
+            }
+            if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.rooms)) {
+                throw new Error('This file is not a valid QuoteDr quote or recovery backup.');
+            }
+            return {
+                data: parsed,
+                fromRecovery: !!(parsed._quoteDrBackup && parsed._quoteDrBackup.format === 'quotedr-quote-backup-v1')
+            };
+        }
+
+        function quoteStoragePickLocalFile() {
+            if (window.showOpenFilePicker) {
+                return window.showOpenFilePicker({
+                    types: [{ description: 'QuoteDr Quote or Recovery File', accept: { 'application/json': ['.qdr', '.aldquote', '.json'] } }]
+                }).then(async function(handles) {
+                    var handle = handles && handles[0];
+                    if (!handle) return null;
+                    return { handle: handle, file: await handle.getFile() };
+                });
+            }
+            return new Promise(function(resolve) {
+                var input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.qdr,.aldquote,.json,application/json';
+                input.style.display = 'none';
+                input.onchange = function(event) {
+                    var file = event.target.files && event.target.files[0];
+                    input.remove();
+                    resolve(file ? { handle: null, file: file } : null);
+                };
+                input.oncancel = function() {
+                    input.remove();
+                    resolve(null);
+                };
+                document.body.appendChild(input);
+                input.click();
+            });
+        }
+
+        async function quoteStorageOpenLocalSelection() {
+            var selectedFile = await quoteStoragePickLocalFile();
+            if (!selectedFile) return null;
+            var parsed = JSON.parse(await selectedFile.file.text());
+            if (parsed && parsed.format === 'quotedr-recovery-v1') {
+                var loadModal = bootstrap.Modal.getInstance(document.getElementById('loadQuoteModal'));
+                if (loadModal) loadModal.hide();
+            }
+            var resolved = await quoteStorageResolveOpenedData(parsed);
+            if (!resolved) return null;
+            var data = resolved.data;
+            if (!data.supabaseId) {
+                window._supabaseQuoteId = null;
+                localStorage.removeItem('ald_active_quote_id');
+            }
+            saveFileHandle = resolved.fromRecovery ? null : selectedFile.handle;
+            applyQuoteData(data);
+            startAutoSave();
+            updateSaveStatus('loaded', selectedFile.file.name);
+            if (resolved.fromRecovery) {
+                unsavedChanges = true;
+                updateSaveStatus('pending', 'Backup opened on this device - syncing to cloud');
+                setTimeout(function() { doAutoSave(); }, 0);
+            }
+            return { data: data, fileName: selectedFile.file.name, fromRecovery: resolved.fromRecovery };
+        }
+
         async function loadQuoteFromLocalFile() {
             if (unsavedChanges && !await qdConfirm('You have unsaved changes. Open a different quote anyway?', {
                 title: 'Unsaved Changes',
@@ -791,19 +961,15 @@ async function saveQuote() {
                 type: 'warning'
             })) return;
             try {
-                const [handle] = await window.showOpenFilePicker({
-                    types: [{ description: 'QuoteDr File', accept: { 'application/json': ['.qdr', '.aldquote'] } }]
-                });
-                const file = await handle.getFile();
-                const data = JSON.parse(await file.text());
-                saveFileHandle = handle;
-                applyQuoteData(data);
-                startAutoSave();
-                updateSaveStatus('loaded', handle.name);
+                var opened = await quoteStorageOpenLocalSelection();
+                if (!opened) return;
                 var m = bootstrap.Modal.getInstance(document.getElementById('loadQuoteModal'));
                 if (m) m.hide();
             } catch (err) {
-                if (err.name !== 'AbortError') updateSaveStatus('error', 'Could not open file');
+                if (err.name !== 'AbortError') {
+                    updateSaveStatus('error', err.message || 'Could not open file');
+                    if (typeof qdAlert === 'function') qdAlert(err.message || 'Could not open file.', { title: 'Could Not Open Backup', type: 'error' });
+                }
             }
         }
 
@@ -836,15 +1002,11 @@ async function saveQuote() {
                         </div>
                         <div class="modal-footer flex-wrap gap-2">
                             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                            <button type="button" class="btn btn-outline-secondary" onclick="loadQuoteFromLocalFile()" id="openLocalFileBtn" style="display:none;"><i class="fas fa-folder me-1"></i>Open Local File</button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="loadQuoteFromLocalFile()" id="openLocalFileBtn"><i class="fas fa-folder me-1"></i>Open Local File</button>
                         </div>
                     </div>
                 </div>`;
                 document.body.appendChild(modalEl);
-                // Show local file button only if File System API available
-                if (window.showOpenFilePicker) {
-                    modalEl.querySelector('#openLocalFileBtn').style.display = '';
-                }
             }
 
             var modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
@@ -1209,53 +1371,13 @@ async function saveQuote() {
             var modal = bootstrap.Modal.getInstance(document.getElementById('startupModal'));
             if (modal) modal.hide();
             cleanupModalBackdrop();
-
-            // On mobile: use simple file input (no File System API)
-            if (!window.showOpenFilePicker) {
-                var input = document.createElement('input');
-                input.type = 'file';
-                input.accept = '.qdr,.aldquote,application/json';
-                input.onchange = function(e) {
-                    var f = e.target.files[0];
-                    if (!f) return;
-                    var reader = new FileReader();
-                    reader.onload = function(ev) {
-                        try {
-                            var d = JSON.parse(ev.target.result);
-                            applyQuoteData(d);
-                            if (d.supabaseId) {
-                                window._supabaseQuoteId = d.supabaseId;
-                                localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
-                            }
-                            if (d.quoteNumber) document.getElementById('quoteNumber').value = d.quoteNumber;
-                            updateSaveStatus('loaded', f.name);
-                        } catch(e) { qdAlert('Could not read file.'); }
-                    };
-                    reader.readAsText(f);
-                };
-                // Small delay so backdrop is fully removed before input click
-                setTimeout(function() { input.click(); }, 400);
-                return;
-            }
-
-            // Desktop: use File System API
             try {
-                const [handle] = await window.showOpenFilePicker({
-                    types: [{ description: 'QuoteDr File', accept: { 'application/json': ['.qdr', '.aldquote'] } }]
-                });
-                const file = await handle.getFile();
-                const data = JSON.parse(await file.text());
-                saveFileHandle = handle;
-                applyQuoteData(data);
-                if (data.supabaseId) {
-                    window._supabaseQuoteId = data.supabaseId;
-                    localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
-                }
-                if (data.quoteNumber) document.getElementById('quoteNumber').value = data.quoteNumber;
-                updateSaveStatus('loaded', file.name);
-                startAutoSave();
+                await quoteStorageOpenLocalSelection();
             } catch (err) {
-                if (err.name !== 'AbortError') console.warn('File open error:', err);
+                if (err.name !== 'AbortError') {
+                    console.warn('File open error:', err);
+                    if (typeof qdAlert === 'function') qdAlert(err.message || 'Could not open file.', { title: 'Could Not Open Backup', type: 'error' });
+                }
                 // Always ensure backdrop is cleaned up
                 cleanupModalBackdrop();
             }

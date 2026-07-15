@@ -11,6 +11,7 @@
     var RECOVERY_FUNCTION = '/functions/v1/save-recovery';
     var DEFAULT_TIMEOUT_MS = 15000;
     var MAX_BACKOFF_MS = 30 * 60 * 1000;
+    var RECOVERY_GUIDANCE_ATTEMPTS = 3;
     var adapters = {};
     var listeners = [];
     var dbPromise = null;
@@ -20,6 +21,7 @@
     var broadcast = null;
     var uiClickBound = false;
     var rolloutEnabled = null;
+    var recoveryGuidanceShown = {};
 
     function isEnabled() {
         if (window.QUOTEDR_DURABLE_SAVE_ENABLED === false) return false;
@@ -282,6 +284,12 @@
     async function notify() {
         var status = await getStatus();
         updateIndicator(status);
+        var guidance = document.getElementById('qdSaveGuidanceOverlay');
+        if (guidance) {
+            var guidanceKey = guidance.getAttribute('data-qd-operation-key');
+            var stillPending = status.operations.some(function(operation) { return operation.key === guidanceKey; });
+            if (!stillPending && !status.lastLocalFailure) guidance.remove();
+        }
         listeners.slice().forEach(function(listener) {
             try { listener(status); } catch (e) {}
         });
@@ -338,6 +346,7 @@
         else await putStoreValue(SNAPSHOT_STORE, snapshot);
         await deleteStoreValue(OUTBOX_STORE, operation.key);
         await putStoreValue(META_STORE, { key: 'lastCloudAckAt', value: snapshot.cloudAckAt });
+        clearRecoveryGuidance(operation);
         resolveVaultIncident(operation).catch(function() {});
         await notify();
         return publicResult('cloud_saved', operation, result, null);
@@ -358,6 +367,7 @@
         await putStoreValue(SNAPSHOT_STORE, snapshot);
         if (isImmediateVaultError(error) || current.attempts >= 3) captureVaultIncident(current).catch(function() {});
         await notify();
+        if (current.entityType === 'quote' && current.attempts >= RECOVERY_GUIDANCE_ATTEMPTS) scheduleRecoveryGuidance(current, { localFailed: false });
         return publicResult(current.state, current, null, error);
     }
 
@@ -524,7 +534,7 @@
             lastLocalFailure.hasEmergencyRecovery = true;
             emergencyRecovery = { operation: operation, error: lastLocalFailure };
             await notify().catch(function() {});
-            setTimeout(function() { openRecoveryCenter().catch(function() {}); }, 0);
+            scheduleRecoveryGuidance(operation, { localFailed: true });
             return publicResult('local_failed', operation, null, error);
         }
         await notify();
@@ -756,6 +766,154 @@
         URL.revokeObjectURL(url);
     }
 
+    function recoveryGuidanceKey(operation, localFailed) {
+        return (localFailed ? 'local:' : 'cloud:') + String(operation && (operation.operationId || operation.key) || 'unknown');
+    }
+
+    function recoveryGuidanceStorageKey(operation) {
+        return 'quotedr_recovery_guidance:' + String(operation && (operation.operationId || operation.key) || 'unknown');
+    }
+
+    function clearRecoveryGuidance(operation) {
+        delete recoveryGuidanceShown[recoveryGuidanceKey(operation, false)];
+        delete recoveryGuidanceShown[recoveryGuidanceKey(operation, true)];
+        try { localStorage.removeItem(recoveryGuidanceStorageKey(operation)); } catch (e) {}
+        var overlay = document.getElementById('qdSaveGuidanceOverlay');
+        if (overlay && overlay.getAttribute('data-qd-operation-key') === String(operation && operation.key || '')) overlay.remove();
+    }
+
+    function scheduleRecoveryGuidance(operation, options) {
+        options = options || {};
+        if (!operation || operation.entityType !== 'quote') return;
+        var localFailed = options.localFailed === true;
+        if (!localFailed && (parseInt(operation.attempts, 10) || 0) < RECOVERY_GUIDANCE_ATTEMPTS) return;
+        var key = recoveryGuidanceKey(operation, localFailed);
+        if (recoveryGuidanceShown[key]) return;
+        if (!localFailed) {
+            try {
+                if (localStorage.getItem(recoveryGuidanceStorageKey(operation)) === 'shown') return;
+                localStorage.setItem(recoveryGuidanceStorageKey(operation), 'shown');
+            } catch (e) {}
+        }
+        recoveryGuidanceShown[key] = true;
+        setTimeout(function() { openRecoveryGuidance(operation, { localFailed: localFailed }).catch(function() {}); }, 0);
+    }
+
+    async function exportQuoteOperation(operation) {
+        if (operation && operation.entityType === 'quote' && typeof window.qdExportQuoteRecovery === 'function') {
+            var exported = await window.qdExportQuoteRecovery(cloneValue(operation));
+            if (exported !== false) return true;
+        }
+        await exportRecovery();
+        return false;
+    }
+
+    async function retryEmergencyRecovery() {
+        if (!emergencyRecovery || !emergencyRecovery.operation) return null;
+        var operation = emergencyRecovery.operation;
+        operation.state = operation.action === 'delete' ? 'delete_pending' : 'local_pending';
+        operation.nextAttemptAt = 0;
+        operation.lastError = null;
+        var snapshot = {
+            key: operation.key,
+            userId: operation.userId,
+            entityType: operation.entityType,
+            entityId: operation.entityId,
+            entityLabel: operation.entityLabel,
+            revision: operation.revision,
+            payloadHash: operation.payloadHash,
+            payload: cloneValue(operation.payload),
+            state: operation.state,
+            localSavedAt: operation.localSavedAt,
+            cloudAckAt: null,
+            lastError: null
+        };
+        try {
+            await persistOperationAndSnapshot(operation, snapshot);
+            lastLocalFailure = null;
+            emergencyRecovery = null;
+            await notify();
+            return publicResult('local_pending', operation, null, null);
+        } catch (error) {
+            lastLocalFailure = errorObject(error);
+            lastLocalFailure.hasEmergencyRecovery = true;
+            emergencyRecovery = { operation: operation, error: lastLocalFailure };
+            await notify().catch(function() {});
+            return publicResult('local_failed', operation, null, error);
+        }
+    }
+
+    async function retryPendingSaves() {
+        var operation = emergencyRecovery && emergencyRecovery.operation;
+        try {
+            var emergencyResult = await retryEmergencyRecovery();
+            var results = await flush({ force: true });
+            if (emergencyResult) results.unshift(emergencyResult);
+            return results;
+        } catch (error) {
+            lastLocalFailure = errorObject(error);
+            if (operation) {
+                lastLocalFailure.hasEmergencyRecovery = true;
+                emergencyRecovery = { operation: operation, error: lastLocalFailure };
+            }
+            await notify().catch(function() {});
+            return [publicResult('local_failed', operation, null, error)];
+        }
+    }
+
+    async function openRecoveryGuidance(operation, options) {
+        options = options || {};
+        var localFailed = options.localFailed === true;
+        if (!localFailed) {
+            var current = await getStoreValue(OUTBOX_STORE, operation.key);
+            if (!current || current.operationId !== operation.operationId) return;
+            operation = current;
+        }
+        if (!document.body || document.getElementById('qdSaveGuidanceOverlay')) return;
+        ensureUi();
+        var quoteLabel = operation.entityLabel || 'This quote';
+        var title = localFailed ? 'Back Up This Quote Now' : 'Cloud Save Needs Attention';
+        var message = localFailed
+            ? 'QuoteDr could not safely retain the latest change in this browser. Export a quote backup before leaving this page.'
+            : 'QuoteDr has not been able to confirm this quote in the cloud after several attempts. Your latest changes remain saved on this device.';
+        var overlay = document.createElement('div');
+        overlay.id = 'qdSaveGuidanceOverlay';
+        overlay.setAttribute('data-qd-operation-key', operation.key || '');
+        overlay.innerHTML = '<div id="qdSaveGuidanceDialog" role="dialog" aria-modal="true" aria-labelledby="qdSaveGuidanceTitle">' +
+            '<div class="qd-recovery-header"><div><div class="h5 mb-0" id="qdSaveGuidanceTitle"><i class="fas fa-cloud-arrow-up me-2"></i>' + escapeHtml(title) + '</div><div class="small text-muted mt-1">' + escapeHtml(quoteLabel) + '</div></div><button type="button" class="btn btn-sm btn-outline-secondary" data-qd-guidance-close aria-label="Close"><i class="fas fa-xmark"></i></button></div>' +
+            '<div class="qd-recovery-body"><p class="mb-2">' + escapeHtml(message) + '</p><p class="mb-0"><strong>For an extra copy:</strong> choose Export Quote Backup. You can reopen the downloaded <code>.qdr</code> file later from <strong>File &gt; Open &gt; Open Local File</strong>. These controls are also available from <strong>Save Status</strong> in the bottom-left corner.</p></div>' +
+            '<div class="qd-recovery-footer"><button type="button" class="btn btn-outline-success btn-sm" data-qd-guidance-export><i class="fas fa-download me-1"></i>Export Quote Backup</button><button type="button" class="btn btn-primary btn-sm" data-qd-guidance-retry><i class="fas fa-rotate me-1"></i>Retry Now</button><button type="button" class="btn btn-outline-secondary btn-sm" data-qd-guidance-status>Open Save Status</button><button type="button" class="btn btn-secondary btn-sm" data-qd-guidance-close>Continue Editing</button></div>' +
+            '</div>';
+        overlay.addEventListener('click', function(event) {
+            if (event.target === overlay || event.target.closest('[data-qd-guidance-close]')) overlay.remove();
+        });
+        overlay.querySelector('[data-qd-guidance-export]').addEventListener('click', async function(event) {
+            var button = event.currentTarget;
+            button.disabled = true;
+            try {
+                await exportQuoteOperation(operation);
+                button.innerHTML = '<i class="fas fa-check me-1"></i>Backup Downloaded';
+            } catch (error) {
+                button.disabled = false;
+                button.innerHTML = '<i class="fas fa-triangle-exclamation me-1"></i>Export Failed - Try Again';
+            }
+        });
+        overlay.querySelector('[data-qd-guidance-retry]').addEventListener('click', async function(event) {
+            var button = event.currentTarget;
+            button.disabled = true;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Retrying';
+            await retryPendingSaves();
+            overlay.remove();
+            var status = await getStatus();
+            if (status.pendingCount || status.lastLocalFailure) openRecoveryCenter();
+        });
+        overlay.querySelector('[data-qd-guidance-status]').addEventListener('click', function() {
+            overlay.remove();
+            openRecoveryCenter();
+        });
+        document.body.appendChild(overlay);
+    }
+
     function escapeHtml(value) {
         return String(value === undefined || value === null ? '' : value)
             .replace(/&/g, '&amp;')
@@ -787,13 +945,13 @@
             '#qdSaveSyncButton{position:fixed;left:14px;bottom:14px;z-index:1040;border:1px solid #9aa7b7;border-radius:8px;background:#fff;color:#233348;padding:7px 10px;box-shadow:0 2px 8px rgba(26,41,64,.18);font:600 12px/1.2 system-ui;display:flex;align-items:center;gap:7px;max-width:230px}' +
             '#qdSaveSyncButton.qd-sync-pending{border-color:#d18b23;color:#80520c;background:#fff8e8}' +
             '#qdSaveSyncButton.qd-sync-error{border-color:#dc3545;color:#a61e2d;background:#fff5f5}' +
-            '#qdSaveRecoveryOverlay{position:fixed;inset:0;z-index:20050;background:rgba(15,23,42,.58);display:flex;align-items:center;justify-content:center;padding:18px}' +
-            '#qdSaveRecoveryDialog{width:min(720px,100%);max-height:min(760px,92vh);overflow:auto;background:#fff;border-radius:8px;box-shadow:0 16px 44px rgba(0,0,0,.28)}' +
+            '#qdSaveRecoveryOverlay,#qdSaveGuidanceOverlay{position:fixed;inset:0;z-index:20050;background:rgba(15,23,42,.58);display:flex;align-items:center;justify-content:center;padding:18px}' +
+            '#qdSaveRecoveryDialog,#qdSaveGuidanceDialog{width:min(720px,100%);max-height:min(760px,92vh);overflow:auto;background:#fff;border-radius:8px;box-shadow:0 16px 44px rgba(0,0,0,.28)}' +
             '.qd-recovery-header,.qd-recovery-footer{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;border-bottom:1px solid #d8dee8}' +
             '.qd-recovery-footer{border-top:1px solid #d8dee8;border-bottom:0;justify-content:flex-end;flex-wrap:wrap}' +
             '.qd-recovery-body{padding:14px 16px}.qd-recovery-row{padding:10px 0;border-bottom:1px solid #e5e9f0}.qd-recovery-row:last-child{border:0}' +
             '.qd-recovery-title{font-weight:700;color:#17283e}.qd-recovery-meta{font-size:12px;color:#667085;margin-top:3px}.qd-recovery-error{font-size:12px;color:#b42318;margin-top:4px;overflow-wrap:anywhere}' +
-            '@media(max-width:600px){#qdSaveSyncButton{left:8px;bottom:72px;max-width:190px}#qdSaveRecoveryOverlay{padding:8px;align-items:flex-end}#qdSaveRecoveryDialog{max-height:88vh}}';
+            '@media(max-width:600px){#qdSaveSyncButton{left:8px;bottom:72px;max-width:190px}#qdSaveRecoveryOverlay,#qdSaveGuidanceOverlay{padding:8px;align-items:flex-end}#qdSaveRecoveryDialog,#qdSaveGuidanceDialog{max-height:88vh}}';
         document.head.appendChild(style);
         var button = document.createElement('button');
         button.type = 'button';
@@ -837,19 +995,23 @@
             var lastError = operation.lastError && operation.lastError.message ? operation.lastError.message : '';
             var conflictActions = operation.state === 'conflict' ? '<div class="qd-recovery-actions mt-2"><button type="button" class="btn btn-sm btn-primary" data-qd-use-local data-qd-operation-key="' + escapeHtml(operation.key) + '"><i class="fas fa-mobile-screen-button me-1"></i>Use This Device</button>' +
                 (operation.entityType === 'quote' ? '<button type="button" class="btn btn-sm btn-outline-primary" data-qd-use-cloud data-qd-operation-key="' + escapeHtml(operation.key) + '"><i class="fas fa-cloud-arrow-down me-1"></i>Load Cloud Copy</button>' : '') + '</div>' : '';
+            var quoteExportAction = operation.entityType === 'quote' ? '<div class="qd-recovery-actions mt-2"><button type="button" class="btn btn-sm btn-outline-success" data-qd-export-quote data-qd-operation-key="' + escapeHtml(operation.key) + '"><i class="fas fa-download me-1"></i>Export Quote Backup</button></div>' : '';
             return '<div class="qd-recovery-row">' +
                 '<div class="qd-recovery-title">' + escapeHtml(operation.entityLabel || operation.entityType) + '</div>' +
                 '<div class="qd-recovery-meta">' + escapeHtml(operation.state || 'local_pending') + ' | Saved locally ' + escapeHtml(new Date(operation.localSavedAt).toLocaleString()) + ' | Attempts: ' + escapeHtml(operation.attempts || 0) + '</div>' +
                 (lastError ? '<div class="qd-recovery-error">' + escapeHtml(lastError) + '</div>' : '') +
                 conflictActions +
+                quoteExportAction +
                 '</div>';
         }).join('') : (status.lastLocalFailure
-            ? '<div class="qd-recovery-row"><div class="qd-recovery-title text-danger">This change is not safely retained</div><div class="qd-recovery-error">' + escapeHtml(status.lastLocalFailure.message || 'Local browser storage failed.') + '</div><div class="qd-recovery-meta">Export a recovery file now. For a file larger than 50 MB, keep the original selected file available for re-upload.</div></div>'
+            ? '<div class="qd-recovery-row"><div class="qd-recovery-title text-danger">This change is not safely retained</div><div class="qd-recovery-error">' + escapeHtml(status.lastLocalFailure.message || 'Local browser storage failed.') + '</div><div class="qd-recovery-meta">Export a recovery file now. For a file larger than 50 MB, keep the original selected file available for re-upload.</div>' +
+                (emergencyRecovery && emergencyRecovery.operation && emergencyRecovery.operation.entityType === 'quote' ? '<div class="qd-recovery-actions mt-2"><button type="button" class="btn btn-sm btn-outline-success" data-qd-export-quote data-qd-operation-key="' + escapeHtml(emergencyRecovery.operation.key) + '"><i class="fas fa-download me-1"></i>Export Quote Backup</button></div>' : '') + '</div>'
             : '<div class="text-muted py-3">There are no pending saves. Your latest changes are confirmed in the cloud.</div>');
+        var exportDisabled = status.operations.length || status.lastLocalFailure ? '' : ' disabled title="There are no pending saves to export"';
         overlay.innerHTML = '<div id="qdSaveRecoveryDialog" role="dialog" aria-modal="true" aria-labelledby="qdSaveRecoveryTitle">' +
             '<div class="qd-recovery-header"><div><div class="h5 mb-0" id="qdSaveRecoveryTitle"><i class="fas fa-shield-halved me-2"></i>Sync &amp; Recovery</div><div class="small text-muted mt-1">Local copies remain here until the cloud confirms them.</div></div><button type="button" class="btn btn-sm btn-outline-secondary" data-qd-close aria-label="Close"><i class="fas fa-xmark"></i></button></div>' +
             '<div class="qd-recovery-body">' + rows + '</div>' +
-            '<div class="qd-recovery-footer"><button type="button" class="btn btn-outline-secondary btn-sm" data-qd-export><i class="fas fa-download me-1"></i>Export Backup</button><button type="button" class="btn btn-primary btn-sm" data-qd-retry><i class="fas fa-rotate me-1"></i>Retry Now</button><button type="button" class="btn btn-secondary btn-sm" data-qd-close>Close</button></div>' +
+            '<div class="qd-recovery-footer"><button type="button" class="btn btn-outline-secondary btn-sm" data-qd-export' + exportDisabled + '><i class="fas fa-download me-1"></i>Export Recovery Bundle</button><button type="button" class="btn btn-primary btn-sm" data-qd-retry><i class="fas fa-rotate me-1"></i>Retry Now</button><button type="button" class="btn btn-secondary btn-sm" data-qd-close>Close</button></div>' +
             '</div>';
         overlay.addEventListener('click', function(event) {
             if (event.target === overlay || event.target.closest('[data-qd-close]')) overlay.remove();
@@ -884,12 +1046,38 @@
                 await resolveConflict(button.getAttribute('data-qd-operation-key'), 'use_cloud');
             });
         });
-        overlay.querySelector('[data-qd-export]').addEventListener('click', exportRecovery);
+        overlay.querySelectorAll('[data-qd-export-quote]').forEach(function(button) {
+            button.addEventListener('click', async function() {
+                var operationKey = button.getAttribute('data-qd-operation-key');
+                var operation = status.operations.find(function(item) { return item.key === operationKey; });
+                if (!operation && emergencyRecovery) operation = emergencyRecovery.operation;
+                if (!operation) return;
+                button.disabled = true;
+                try {
+                    await exportQuoteOperation(operation);
+                    button.innerHTML = '<i class="fas fa-check me-1"></i>Backup Downloaded';
+                } catch (error) {
+                    button.disabled = false;
+                    button.innerHTML = '<i class="fas fa-triangle-exclamation me-1"></i>Export Failed - Try Again';
+                }
+            });
+        });
+        overlay.querySelector('[data-qd-export]').addEventListener('click', async function(event) {
+            var button = event.currentTarget;
+            button.disabled = true;
+            try {
+                await exportRecovery();
+                button.innerHTML = '<i class="fas fa-check me-1"></i>Bundle Downloaded';
+            } catch (error) {
+                button.disabled = false;
+                button.innerHTML = '<i class="fas fa-triangle-exclamation me-1"></i>Export Failed - Try Again';
+            }
+        });
         overlay.querySelector('[data-qd-retry]').addEventListener('click', async function(event) {
             var button = event.currentTarget;
             button.disabled = true;
             button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Retrying';
-            await flush({ force: true });
+            await retryPendingSaves();
             overlay.remove();
             openRecoveryCenter();
         });

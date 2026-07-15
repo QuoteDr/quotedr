@@ -62,7 +62,7 @@ assert(
 assert(
   coordinator.includes('navigator.storage.persist()') &&
     coordinator.includes('lastLocalFailure.hasEmergencyRecovery = true') &&
-    coordinator.includes('openRecoveryCenter().catch') &&
+    coordinator.includes("scheduleRecoveryGuidance(operation, { localFailed: true })") &&
     coordinator.includes('_mustReselectOriginal') &&
     coordinator.includes('dataUrl:'),
   'Storage failures should be visible and offer an immediate recovery export, including reasonably sized blobs'
@@ -82,7 +82,8 @@ assert(
     coordinator.includes('Save needs attention') &&
     coordinator.includes('Sync &amp; Recovery') &&
     coordinator.includes('Retry Now') &&
-    coordinator.includes('Export Backup'),
+    coordinator.includes('Export Quote Backup') &&
+    coordinator.includes('Export Recovery Bundle'),
   'The app should expose persistent global sync state and user recovery controls'
 );
 
