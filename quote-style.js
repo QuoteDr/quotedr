@@ -1399,10 +1399,16 @@
             const result = await saveQuoteForSharing(quoteData);
             if (result.error) throw result.error;
 
-            const supabaseId = result.data.id;
+            const savedRow = Array.isArray(result.data) ? result.data[0] : result.data;
+            const supabaseId = (savedRow && savedRow.id) || quoteData.supabaseId || window._supabaseQuoteId;
+            if (!supabaseId) {
+                throw new Error('Quote cloud save did not return a document id. Please try again.');
+            }
             window._supabaseQuoteId = supabaseId;
             quoteData.supabaseId = supabaseId;
+            if (savedRow && savedRow.updated_at) quoteData._serverUpdatedAt = savedRow.updated_at;
             window._currentQuoteData = quoteData;
+            window._loadedQuoteData = Object.assign({}, window._loadedQuoteData || {}, quoteData);
             localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
 
             const _base = window.location.href.split('?')[0].split('#')[0].replace(/quote-builder(\.html)?\/?$/, '');

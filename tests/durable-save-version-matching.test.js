@@ -242,7 +242,7 @@ assert(
 ].forEach(file => {
   const html = fs.readFileSync(file, 'utf8');
   if (html.includes('supabase-v2.js')) {
-    assert(html.includes('supabase-v2.js?v=2026071502'), `${file} should load the fixed Supabase adapter`);
+    assert(html.includes('supabase-v2.js?v=2026071503'), `${file} should load the fixed Supabase adapter`);
   }
   if (html.includes('save-coordinator.js')) {
     assert(html.includes('save-coordinator.js?v=2026071502'), `${file} should load the fixed save coordinator`);

@@ -1780,7 +1780,7 @@ async function saveQuoteForSharing(quoteData) {
             change_order_number: quoteData.changeOrderNumber || null,
             updated_at: now
         };
-    return qdDurableSupabaseOperation({
+    var sharingResult = await qdDurableSupabaseOperation({
         entityType: 'quote',
         entityId: quoteData.supabaseId,
         entityLabel: quoteData.quoteTitle || quoteData.clientName || quoteData.quoteNumber || 'Quote',
@@ -1802,6 +1802,18 @@ async function saveQuoteForSharing(quoteData) {
         },
         baseVersion: quoteData._serverUpdatedAt || quoteData.serverUpdatedAt || null
     });
+    if (sharingResult.error) return sharingResult;
+
+    // Fresh quote updates use a compare-and-swap path that returns an array,
+    // while other durable writes return one row. Keep this public helper's
+    // contract stable so link creation always receives the saved document id.
+    var sharingRow = Array.isArray(sharingResult.data) ? sharingResult.data[0] : sharingResult.data;
+    if (!sharingRow && quoteData.supabaseId) sharingRow = { id: quoteData.supabaseId };
+    else if (sharingRow && !sharingRow.id && quoteData.supabaseId) {
+        sharingRow = Object.assign({ id: quoteData.supabaseId }, sharingRow);
+    }
+    if (sharingRow && sharingRow.updated_at) quoteData._serverUpdatedAt = sharingRow.updated_at;
+    return Object.assign({}, sharingResult, { data: sharingRow });
 }
 
 // Delete a quote from Supabase
