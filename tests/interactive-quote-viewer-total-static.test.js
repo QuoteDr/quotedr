@@ -16,8 +16,8 @@ assert(source.includes('height: clamp(185px, 18vw, 250px)'), 'proposal logo shou
 assert(source.includes('function qvLineTotal'), 'interactive viewer should centralize discount-aware line totals');
 assert(source.includes('viewerItemActiveTotal(item)'), 'discount-aware line totals should preserve existing active total behavior');
 assert(
-  source.includes('room.items.reduce((sum, item) => item._removed ? sum : sum + (isChangeOrder ? viewerChangeOrderLineDisplayTotal(item, room) : qvLineTotal(item)), 0)'),
-  'room totals should use discount-aware saved item totals, change-order display totals, and skip removed items'
+  source.includes('room.items.reduce((sum, item) => item._removed ? sum : sum + (isChangeOrder ? viewerChangeOrderLineDisplayTotal(item, room) : viewerRoomMarkedAmount(room, qvLineTotal(item))), 0)'),
+  'room totals should use marked-up discount-aware item totals, change-order display totals, and skip removed items'
 );
 assert(source.includes('function viewerVisibleNotes'), 'interactive viewer should centralize note visibility so duplicate descriptions can be suppressed');
 assert(source.includes('viewerVisibleNotes(item, displayDesc)'), 'item rendering should hide notes that duplicate the displayed description');
