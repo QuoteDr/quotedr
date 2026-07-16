@@ -19,7 +19,7 @@ function walk(directory, output = []) {
 
 function approvedAdapterRegion(relative, source, index) {
   if (relative === 'supabase-v2.js') {
-    const start = source.indexOf('async function qdExecuteDurableSupabaseTarget');
+    const start = source.indexOf('async function qdExecuteFreshQuoteUpdate');
     const end = source.indexOf('async function qdReadDurableSupabaseVersion');
     if (index >= start && index < end) return true;
   }

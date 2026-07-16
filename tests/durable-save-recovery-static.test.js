@@ -34,16 +34,18 @@ assert(
 );
 
 assert(
-  coordinator.includes('operationId: existing ? existing.operationId') &&
+  coordinator.includes('operationId: sameEditorChain ? existing.operationId') &&
+    coordinator.includes('incomingEditorInstance === existingEditorInstance') &&
     coordinator.includes('revision: revision') &&
     coordinator.includes('payloadHash: await payloadHash(payload)') &&
-    coordinator.includes('baseVersion: existing ? (existing.baseVersion || options.baseVersion || null) : (options.baseVersion || null)'),
-  'Outbox operations should carry stable ids, revisions, hashes, and base server versions'
+    coordinator.includes('baseVersion: sameEditorChain ? (existing.baseVersion || options.baseVersion || null) : (options.baseVersion || null)'),
+  'Outbox operations should carry stable per-editor ids, revisions, hashes, and base server versions'
 );
 
 assert(
   coordinator.includes("publicResult('cloud_saved'") &&
     coordinator.includes("publicResult('local_pending'") &&
+    coordinator.includes("publicResult('superseded'") &&
     coordinator.includes("current.state = isConflictError(error) ? 'conflict' : 'local_pending'") &&
     coordinator.includes("publicResult('local_failed'"),
   'Save callers should receive every explicit save state'
@@ -104,9 +106,9 @@ assert(
 );
 
 assert(
-  quoteStorage.includes("result.state === 'cloud_saved'") &&
+  quoteStorage.includes("cloudResult.state === 'cloud_saved'") &&
     quoteStorage.includes("cloudState === 'local_pending'") &&
-    quoteStorage.includes("result.state === 'local_failed'") &&
+    quoteStorage.includes("cloudResult.state === 'local_failed'") &&
     quoteStorage.includes('await saveQuoteToSupabase('),
   'Quote saves should await the coordinator and distinguish cloud, local-pending, and local-failed outcomes'
 );
@@ -150,9 +152,10 @@ assert(
     edge.includes('replayTables') &&
     edge.includes('QUOTEDR_SAVE_ALERT_EMAIL') &&
     edge.includes('alert_sent_at') &&
-    edge.includes('sanitize(operation.payload') &&
-    edge.includes('target.dedupe?.filters?.length'),
-  'The recovery function should authenticate, validate, redact, deduplicate alerts, and replay only allowlisted idempotent targets'
+  edge.includes('sanitize(operation.payload') &&
+    edge.includes('target.dedupe?.filters?.length') &&
+    edge.includes('Quote and invoice recovery records are backup-only'),
+  'The recovery function should authenticate, validate, redact, deduplicate alerts, replay only allowlisted targets, and never replay document backups'
 );
 
 assert(

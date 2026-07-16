@@ -71,6 +71,148 @@ function qdDurableSaveMetaMatches(operation, saveMeta) {
     return !saveMeta.operationId || !operation.operationId || saveMeta.operationId === operation.operationId;
 }
 
+function qdDurableSaveTime(value) {
+    var parsed = Date.parse(String(value || ''));
+    return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function qdQuoteOperationEditTime(operation) {
+    var payload = operation && operation.payload || {};
+    var targetData = operation && operation.target && operation.target.values && operation.target.values.data || {};
+    return qdDurableSaveTime(
+        operation && operation.clientEditedAt ||
+        payload._clientEditedAt ||
+        payload.clientEditedAt ||
+        targetData._clientEditedAt ||
+        payload.savedAt ||
+        operation && operation.localSavedAt
+    );
+}
+
+function qdQuoteCloudEditTime(row) {
+    var data = row && row.data || {};
+    var saveMeta = data && data._saveMeta || {};
+    return qdDurableSaveTime(
+        saveMeta.clientEditedAt ||
+        data._clientEditedAt ||
+        saveMeta.localSavedAt ||
+        data.savedAt ||
+        row && row.updated_at
+    );
+}
+
+function qdQuoteOperationSavedTime(operation) {
+    var payload = operation && operation.payload || {};
+    var targetData = operation && operation.target && operation.target.values && operation.target.values.data || {};
+    var saveMeta = targetData && targetData._saveMeta || {};
+    return qdDurableSaveTime(
+        operation && operation.localSavedAt ||
+        saveMeta.localSavedAt ||
+        payload.savedAt
+    );
+}
+
+function qdQuoteCloudSavedTime(row) {
+    var data = row && row.data || {};
+    var saveMeta = data && data._saveMeta || {};
+    return qdDurableSaveTime(
+        saveMeta.localSavedAt ||
+        data.savedAt ||
+        row && row.updated_at
+    );
+}
+
+function qdQuoteOperationIsSuperseded(operation, row) {
+    if (operation && operation.baseVersion && qdDurableVersionsMatch(operation.baseVersion, row && row.updated_at)) {
+        return false;
+    }
+    var incomingTime = qdQuoteOperationEditTime(operation);
+    var cloudTime = qdQuoteCloudEditTime(row);
+    if (incomingTime > 0) {
+        if (cloudTime !== incomingTime) return cloudTime > incomingTime;
+        var incomingSavedTime = qdQuoteOperationSavedTime(operation);
+        var cloudSavedTime = qdQuoteCloudSavedTime(row);
+        return incomingSavedTime > 0 && cloudSavedTime > incomingSavedTime;
+    }
+    // A legacy retry with no trustworthy edit time cannot safely replace an
+    // existing cloud quote unless its base version matched above.
+    return !!(row && row.id);
+}
+
+function qdQuoteMetadataRow(row) {
+    if (!row) return null;
+    return {
+        id: row.id,
+        user_id: row.user_id,
+        status: row.status,
+        type: row.type,
+        quote_number: row.quote_number,
+        updated_at: row.updated_at
+    };
+}
+
+async function qdExecuteFreshQuoteUpdate(operation, target, values) {
+    for (var attempt = 0; attempt < 4; attempt++) {
+        var currentQuery = _supabase
+            .from('quotes')
+            .select('id,user_id,status,type,quote_number,updated_at,data')
+            .eq('user_id', operation.userId);
+        currentQuery = qdApplyDurableFilters(currentQuery, target.filters);
+        var currentResult = await currentQuery.limit(1).maybeSingle();
+        if (currentResult.error) throw qdDurableSaveError(currentResult.error, 'Could not inspect the current cloud quote.');
+        if (!currentResult.data) throw new Error('Cloud save matched no quote. Your local copy is retained for retry.');
+
+        var current = currentResult.data;
+        var currentMeta = current.data && current.data._saveMeta;
+        if (qdDurableSaveMetaMatches(operation, currentMeta)) {
+            return { data: [qdQuoteMetadataRow(current)], error: null, alreadyAcknowledged: true };
+        }
+        var sameOperationChain = !!(currentMeta && currentMeta.operationId && operation.operationId && currentMeta.operationId === operation.operationId);
+        if (target.requireCurrentQuoteBase === true && !sameOperationChain && !qdDurableVersionsMatch(operation.baseVersion, current.updated_at)) {
+            var conflictError = new Error('This quote was updated in another tab or device. Choose which version to keep before saving.');
+            conflictError.code = '409';
+            conflictError.serverVersion = current.updated_at || null;
+            throw conflictError;
+        }
+        if (qdQuoteOperationIsSuperseded(operation, current)) {
+            return {
+                data: [qdQuoteMetadataRow(current)],
+                error: null,
+                superseded: true,
+                cloudVersion: current.updated_at || null
+            };
+        }
+
+        async function executeQuoteUpdate(currentValues) {
+            var updateQuery = _supabase
+                .from('quotes')
+                .update(currentValues)
+                .eq('user_id', operation.userId);
+            updateQuery = qdApplyDurableFilters(updateQuery, target.filters);
+            updateQuery = current.updated_at == null
+                ? updateQuery.is('updated_at', null)
+                : updateQuery.eq('updated_at', current.updated_at);
+            return await updateQuery.select('id,user_id,status,type,quote_number,updated_at');
+        }
+
+        var writeValues = values;
+        var writeResult = await executeQuoteUpdate(writeValues);
+        if (writeResult.error && target.fallbackStripColumns && /schema cache|column|type|parent_quote_id|change_order_number/i.test(writeResult.error.message || '')) {
+            writeValues = Object.assign({}, values);
+            target.fallbackStripColumns.forEach(function(column) { delete writeValues[column]; });
+            writeResult = await executeQuoteUpdate(writeValues);
+        }
+        if (writeResult.error) throw qdDurableSaveError(writeResult.error);
+        if (Array.isArray(writeResult.data) && writeResult.data.length) {
+            return { data: writeResult.data, error: null };
+        }
+        // Another device won the compare-and-swap. Re-read and compare again.
+    }
+    var raceError = new Error('The quote changed in the cloud while this device was saving. Your local copy is retained for retry.');
+    raceError.code = 'QD_SAVE_RACE';
+    throw raceError;
+}
+
 async function qdDurableAcknowledgementMatches(operation, target, acknowledged) {
     if (!operation || !target || !acknowledged) return false;
     var versionColumn = target.verifyVersionColumn || 'updated_at';
@@ -146,6 +288,19 @@ async function qdExecuteDurableSupabaseTarget(operation) {
             action = 'update';
             target.filters = [{ column: 'id', value: existingResult.data.id }];
         }
+    }
+
+    // Apply this to queued operations created by older app versions too. Those
+    // operations do not contain the freshnessGuard marker.
+    if (action === 'update' && target.table === 'quotes' && operation.entityType === 'quote') {
+        var quoteResult = await qdExecuteFreshQuoteUpdate(operation, target, values);
+        if (!quoteResult.superseded && target.verifyRevision) {
+            var quoteAcknowledged = Array.isArray(quoteResult.data) ? quoteResult.data[0] : quoteResult.data;
+            if (!await qdDurableAcknowledgementMatches(operation, target, quoteAcknowledged)) {
+                throw new Error('Cloud save acknowledgement did not match the local revision.');
+            }
+        }
+        return quoteResult;
     }
 
     async function executeOnce(currentValues) {
@@ -250,6 +405,7 @@ async function qdDurableSupabaseOperation(options) {
             target: options.target,
             baseVersion: options.baseVersion || null,
             background: options.background === true,
+            holdConflict: options.holdConflict === true,
             timeoutMs: options.timeoutMs || 15000
         });
     }
@@ -259,6 +415,8 @@ async function qdDurableSupabaseOperation(options) {
             userId: user ? user.id : 'anonymous',
             entityType: options.entityType,
             entityId: String(options.entityId),
+            payload: options.payload,
+            baseVersion: options.baseVersion || null,
             target: options.target
         };
         var result = await qdExecuteDurableSupabaseTarget(directOperation);
@@ -1014,6 +1172,8 @@ async function saveQuote(quoteData) {
             portal_pin: quoteData.portal_pin || '',
             portal_added_at: quoteData.portal_added_at || null,
             portal_theme: quoteData.portal_theme || null,
+            _clientEditedAt: quoteData._clientEditedAt || quoteData.savedAt || now,
+            _editorInstanceId: quoteData._editorInstanceId || '',
             savedAt: quoteData.savedAt || now
         },
         updated_at: now
@@ -1038,6 +1198,7 @@ async function saveQuote(quoteData) {
                     };
                 }
                 quoteData.supabaseId = existingQuote.id;
+                quoteData._serverUpdatedAt = quoteData._serverUpdatedAt || existingQuote.updated_at || null;
             }
         } catch(e) {
             console.warn('Quote duplicate guard could not check quote number:', e);
@@ -1062,6 +1223,8 @@ async function saveQuote(quoteData) {
             filters: [{ column: 'id', value: quoteData.supabaseId }]
         } : null,
         fallbackStripColumns: ['type', 'parent_quote_id', 'change_order_number'],
+        freshnessGuard: 'quote_edit_time',
+        requireCurrentQuoteBase: true,
         verifyRevision: true,
         verifyVersionValue: payload.updated_at,
         selectQuoteMetadata: true
@@ -1073,7 +1236,8 @@ async function saveQuote(quoteData) {
         action: isUpdate ? 'update' : 'insert',
         payload: quoteData,
         target: target,
-        baseVersion: isUpdate ? (quoteData._serverUpdatedAt || quoteData.serverUpdatedAt || null) : null
+        baseVersion: isUpdate ? (quoteData._serverUpdatedAt || quoteData.serverUpdatedAt || null) : null,
+        holdConflict: quoteData._remoteUpdatePending === true
     });
     if (durableResult.error) {
         console.error('Quote save deferred:', durableResult.error);
@@ -1629,6 +1793,8 @@ async function saveQuoteForSharing(quoteData) {
             filters: [{ column: 'id', value: quoteData.supabaseId }],
             versionRead: { table: 'quotes', column: 'updated_at', filters: [{ column: 'id', value: quoteData.supabaseId }] },
             fallbackStripColumns: ['type', 'parent_quote_id', 'change_order_number'],
+            freshnessGuard: 'quote_edit_time',
+            requireCurrentQuoteBase: true,
             verifyRevision: true,
             verifyVersionValue: payload.updated_at,
             selectQuoteMetadata: true,

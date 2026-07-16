@@ -147,6 +147,9 @@ async function replayTarget(record: Record<string, unknown>) {
   const target = (record.recovery_target || {}) as ReplayTarget;
   const table = text(target.table, 80);
   const action = target.action || "upsert";
+  if (table === "quotes" || ["quote", "invoice"].includes(text(record.entity_type, 80))) {
+    throw new Error("Quote and invoice recovery records are backup-only and cannot overwrite a live document. Export the retained copy for review instead.");
+  }
   if (!replayTables.has(table)) throw new Error("This recovery target is not allowlisted for replay");
   if (!["upsert", "insert", "update", "delete", "replace"].includes(action)) throw new Error("Unsupported recovery action");
   const client = adminClient();
@@ -298,6 +301,10 @@ serve(async (req) => {
       const { data: record, error } = await service.from("save_recovery_records").select("*").eq("operation_id", operationId).single();
       if (error || !record) return json({ error: "Recovery record not found" }, 404);
       const now = new Date().toISOString();
+      const replayTable = text((record.recovery_target as ReplayTarget | null)?.table, 80);
+      if (replayTable === "quotes" || ["quote", "invoice"].includes(text(record.entity_type, 80))) {
+        return json({ error: "Quote and invoice incidents cannot be replayed over a live document. Export the retained backup for review, then close the incident." }, 409);
+      }
       if (!record.recovery_target) {
         await service.from("save_recovery_records").update({ status: "retry_requested", retry_requested_at: now, updated_at: now }).eq("operation_id", operationId);
         return json({ success: true, state: "retry_requested" });

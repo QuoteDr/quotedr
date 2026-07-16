@@ -274,29 +274,13 @@
         qdToast({ message: message, type: type || 'info' });
     };
     window.qdLeavePage = async function(url) {
-        if (typeof unsavedChanges !== 'undefined' && unsavedChanges) {
-            var ok = await window.qdConfirm('You have unsaved changes. Leave anyway?', {
-                title: 'Unsaved Changes',
-                okText: 'Leave',
-                okClass: 'btn-warning',
-                type: 'warning'
-            });
-            if (!ok) return;
-        }
-        if (typeof saveSessionQuote === 'function') saveSessionQuote();
+        if (typeof window.qdSaveBeforeNavigation === 'function' && !await window.qdSaveBeforeNavigation()) return;
+        if (typeof window.qdSaveBeforeNavigation !== 'function' && typeof saveSessionQuote === 'function') saveSessionQuote();
         window.location.href = url;
     };
     window.qdRunAfterLeaveConfirm = async function(fnName) {
-        if (typeof unsavedChanges !== 'undefined' && unsavedChanges) {
-            var ok = await window.qdConfirm('You have unsaved changes. Continue anyway?', {
-                title: 'Unsaved Changes',
-                okText: 'Continue',
-                okClass: 'btn-warning',
-                type: 'warning'
-            });
-            if (!ok) return;
-        }
-        if (typeof saveSessionQuote === 'function') saveSessionQuote();
+        if (typeof window.qdSaveBeforeNavigation === 'function' && !await window.qdSaveBeforeNavigation()) return;
+        if (typeof window.qdSaveBeforeNavigation !== 'function' && typeof saveSessionQuote === 'function') saveSessionQuote();
         if (typeof window[fnName] === 'function') window[fnName]();
     };
 })();

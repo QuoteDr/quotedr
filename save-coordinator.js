@@ -217,7 +217,8 @@
             message: String(error.message || error.error_description || error.details || error.hint || error),
             code: error.code || error.status || '',
             details: error.details || '',
-            hint: error.hint || ''
+            hint: error.hint || '',
+            serverVersion: error.serverVersion || null
         };
     }
 
@@ -235,6 +236,16 @@
         var column = operation && operation.target && operation.target.verifyVersionColumn || 'updated_at';
         return row && (row[column] || row.updated_at || row.updatedAt || row.version) ||
             operation && operation.target && operation.target.verifyVersionValue || null;
+    }
+
+    function operationClientEditedAt(payload, fallback) {
+        payload = payload && typeof payload === 'object' ? payload : {};
+        return payload._clientEditedAt || payload.clientEditedAt || payload.savedAt || fallback;
+    }
+
+    function operationEditorInstance(payload) {
+        payload = payload && typeof payload === 'object' ? payload : {};
+        return String(payload._editorInstanceId || '');
     }
 
     function isConflictError(error) {
@@ -314,9 +325,6 @@
 
     async function markAcknowledged(operation, result) {
         var cloudVersion = acknowledgedVersion(result, operation);
-        window.dispatchEvent(new CustomEvent('quotedr-save-acknowledged', {
-            detail: { operation: operation, result: result, version: cloudVersion }
-        }));
         var current = await getStoreValue(OUTBOX_STORE, operation.key);
         if (!current || current.operationId !== operation.operationId || current.revision !== operation.revision) {
             if (current && current.operationId === operation.operationId && current.revision !== operation.revision) {
@@ -331,6 +339,9 @@
                 successorSnapshot.lastError = null;
                 successorSnapshot.cloudBaseVersion = current.baseVersion;
                 await putStoreValue(SNAPSHOT_STORE, successorSnapshot);
+                window.dispatchEvent(new CustomEvent('quotedr-save-acknowledged', {
+                    detail: { operation: operation, result: result, version: cloudVersion }
+                }));
                 await notify();
                 setTimeout(function() { flushSavedOperation(current, { force: true }); }, 0);
                 return publicResult('local_pending', current, result, null);
@@ -348,8 +359,51 @@
         await putStoreValue(META_STORE, { key: 'lastCloudAckAt', value: snapshot.cloudAckAt });
         clearRecoveryGuidance(operation);
         resolveVaultIncident(operation).catch(function() {});
+        window.dispatchEvent(new CustomEvent('quotedr-save-acknowledged', {
+            detail: { operation: operation, result: result, version: cloudVersion }
+        }));
         await notify();
         return publicResult('cloud_saved', operation, result, null);
+    }
+
+    async function markSuperseded(operation, result) {
+        var cloudVersion = result && result.cloudVersion || acknowledgedVersion(result, operation);
+        var current = await getStoreValue(OUTBOX_STORE, operation.key);
+        if (current && current.operationId === operation.operationId && current.revision !== operation.revision) {
+            current.baseVersion = cloudVersion || current.baseVersion || null;
+            current.forceConflictOverwrite = false;
+            current.state = 'local_pending';
+            current.attempts = 0;
+            current.lastError = null;
+            current.nextAttemptAt = 0;
+            await putStoreValue(OUTBOX_STORE, current);
+            var successorSnapshot = await getStoreValue(SNAPSHOT_STORE, current.key) || {};
+            successorSnapshot.state = 'local_pending';
+            successorSnapshot.lastError = null;
+            successorSnapshot.cloudBaseVersion = current.baseVersion;
+            await putStoreValue(SNAPSHOT_STORE, successorSnapshot);
+            await notify();
+            setTimeout(function() { flushSavedOperation(current, { force: true }); }, 0);
+            return publicResult('local_pending', current, result, null);
+        }
+        if (current && current.operationId === operation.operationId && current.revision === operation.revision) {
+            var snapshot = await getStoreValue(SNAPSHOT_STORE, operation.key) || {};
+            snapshot.state = 'superseded_by_cloud';
+            snapshot.supersededAt = new Date().toISOString();
+            snapshot.cloudBaseVersion = cloudVersion || null;
+            snapshot.cloudResult = result && result.data ? result.data : null;
+            snapshot.lastError = null;
+            await putStoreValue(SNAPSHOT_STORE, snapshot);
+            await deleteStoreValue(OUTBOX_STORE, operation.key);
+        }
+        await putStoreValue(META_STORE, { key: 'lastCloudAckAt', value: new Date().toISOString() });
+        clearRecoveryGuidance(operation);
+        resolveVaultIncident(operation).catch(function() {});
+        window.dispatchEvent(new CustomEvent('quotedr-save-superseded', {
+            detail: { operation: operation, result: result, version: cloudVersion }
+        }));
+        await notify();
+        return publicResult('superseded', operation, result, null);
     }
 
     async function markPending(operation, error) {
@@ -373,9 +427,8 @@
 
     async function checkConflict(operation, adapter) {
         if (operation.forceConflictOverwrite === true) return null;
-        // Quotes historically use last-write-wins. Their payload is a whole
-        // document, so timestamp blocking makes normal multi-device editing
-        // unusable without a field-level merge engine.
+        // Quote writes perform their own edit-time comparison and atomic
+        // compare-and-swap in the Supabase adapter.
         if (operation.entityType === 'quote') return null;
         if (!operation.baseVersion || !adapter || typeof adapter.readVersion !== 'function') return null;
         var serverVersion = await withTimeout(adapter.readVersion(operation), operation.timeoutMs);
@@ -408,6 +461,7 @@
             var conflict = await checkConflict(latest, adapter);
             if (conflict) return markPending(latest, conflict);
             var result = await withTimeout(adapter.write(cloneValue(latest)), latest.timeoutMs || DEFAULT_TIMEOUT_MS);
+            if (result && result.superseded === true) return markSuperseded(latest, result);
             normalizedAdapterResult(result, latest, adapter);
             return markAcknowledged(latest, result);
         } catch (error) {
@@ -432,7 +486,7 @@
         var results = [];
         for (var i = 0; i < operations.length; i++) {
             var operation = operations[i];
-            if (!options.force && operation.state === 'conflict' && operation.entityType !== 'quote') continue;
+            if (operation.state === 'conflict') continue;
             results.push(await flushOperation(operation, options));
         }
         await notify();
@@ -462,11 +516,15 @@
         var key = entityKey(userId, options.entityType, String(options.entityId));
         var now = new Date().toISOString();
         var existing = await getStoreValue(OUTBOX_STORE, key);
-        var revision = randomId();
         var payload = cloneValue(options.payload);
+        var incomingEditorInstance = operationEditorInstance(payload);
+        var existingEditorInstance = operationEditorInstance(existing && existing.payload);
+        var sameEditorChain = !!existing && (!incomingEditorInstance || !existingEditorInstance || incomingEditorInstance === existingEditorInstance);
+        var holdExistingConflict = options.holdConflict === true && sameEditorChain && existing.state === 'conflict';
+        var revision = randomId();
         var operation = {
             key: key,
-            operationId: existing ? existing.operationId : randomId(),
+            operationId: sameEditorChain ? existing.operationId : randomId(),
             revision: revision,
             payloadHash: await payloadHash(payload),
             userId: userId,
@@ -477,14 +535,15 @@
             action: options.action || 'upsert',
             payload: payload,
             target: options.target ? cloneValue(options.target) : null,
-            baseVersion: existing ? (existing.baseVersion || options.baseVersion || null) : (options.baseVersion || null),
-            state: 'local_pending',
-            attempts: existing ? existing.attempts || 0 : 0,
-            createdAt: existing ? existing.createdAt : now,
+            baseVersion: sameEditorChain ? (existing.baseVersion || options.baseVersion || null) : (options.baseVersion || null),
+            state: holdExistingConflict ? 'conflict' : 'local_pending',
+            attempts: sameEditorChain ? existing.attempts || 0 : 0,
+            createdAt: sameEditorChain ? existing.createdAt : now,
             localSavedAt: now,
+            clientEditedAt: operationClientEditedAt(payload, now),
             lastAttemptAt: null,
             nextAttemptAt: 0,
-            lastError: null,
+            lastError: holdExistingConflict ? existing.lastError : null,
             timeoutMs: options.timeoutMs || DEFAULT_TIMEOUT_MS,
             page: window.location.pathname,
             appVersion: document.documentElement.getAttribute('data-app-version') || ''
@@ -494,7 +553,9 @@
                 operationId: operation.operationId,
                 revision: operation.revision,
                 payloadHash: operation.payloadHash,
-                localSavedAt: operation.localSavedAt
+                localSavedAt: operation.localSavedAt,
+                clientEditedAt: operation.clientEditedAt,
+                sourceInstanceId: payload && payload._editorInstanceId || ''
             };
         }
         if (!isEnabled()) {
@@ -518,10 +579,11 @@
             revision: revision,
             payloadHash: operation.payloadHash,
             payload: snapshotPayload,
-            state: options.action === 'delete' ? 'delete_pending' : 'local_pending',
+            state: options.action === 'delete' ? 'delete_pending' : operation.state,
             localSavedAt: now,
+            clientEditedAt: operation.clientEditedAt,
             cloudAckAt: null,
-            lastError: null
+            lastError: operation.lastError
         };
         try {
             await persistOperationAndSnapshot(operation, snapshot);
@@ -538,6 +600,7 @@
             return publicResult('local_failed', operation, null, error);
         }
         await notify();
+        if (holdExistingConflict) return publicResult('conflict', operation, null, operation.lastError);
         if (options.background === true) {
             setTimeout(function() { flushSavedOperation(operation, { force: true }); }, 0);
             return publicResult('local_pending', operation, null, null);
@@ -550,8 +613,12 @@
         var key = entityKey(userId, entityType, String(entityId));
         var pending = await getStoreValue(OUTBOX_STORE, key);
         if (!pending) return true;
+        if (pending.state === 'conflict') {
+            openRecoveryCenter();
+            return false;
+        }
         var result = await flushSavedOperation(pending, { force: true });
-        if (result.state === 'cloud_saved') return true;
+        if (result.state === 'cloud_saved' || result.state === 'superseded') return true;
         openRecoveryCenter();
         return false;
     }
@@ -576,11 +643,107 @@
         return getStoreValue(SNAPSHOT_STORE, entityKey(await currentUserId(ownerId), entityType, String(entityId)));
     }
 
+    async function pauseEntity(entityType, entityId, options) {
+        options = options || {};
+        var key = entityKey(await currentUserId(options.ownerId), entityType, String(entityId));
+        var operation = await getStoreValue(OUTBOX_STORE, key);
+        if (!operation) return { state: 'missing' };
+        operation.state = 'conflict';
+        operation.nextAttemptAt = 0;
+        operation.lastError = {
+            message: options.message || 'This record was updated elsewhere while local changes were pending.',
+            code: '409',
+            details: '',
+            hint: '',
+            serverVersion: options.serverVersion || null
+        };
+        await putStoreValue(OUTBOX_STORE, operation);
+        var snapshot = await getStoreValue(SNAPSHOT_STORE, key) || {};
+        snapshot.state = 'conflict';
+        snapshot.lastError = operation.lastError;
+        await putStoreValue(SNAPSHOT_STORE, snapshot);
+        await notify();
+        return publicResult('conflict', operation, null, operation.lastError);
+    }
+
+    async function updateConflictPayload(entityType, entityId, payload, options) {
+        options = options || {};
+        var key = entityKey(await currentUserId(options.ownerId), entityType, String(entityId));
+        var operation = await getStoreValue(OUTBOX_STORE, key);
+        if (!operation || operation.state !== 'conflict') return { state: 'missing' };
+        var now = new Date().toISOString();
+        operation.payload = cloneValue(payload);
+        operation.payloadHash = await payloadHash(operation.payload);
+        operation.revision = randomId();
+        operation.localSavedAt = now;
+        operation.clientEditedAt = operationClientEditedAt(operation.payload, now);
+        await putStoreValue(OUTBOX_STORE, operation);
+        var snapshot = await getStoreValue(SNAPSHOT_STORE, key) || {};
+        snapshot.revision = operation.revision;
+        snapshot.payloadHash = operation.payloadHash;
+        snapshot.payload = cloneValue(operation.payload);
+        snapshot.state = 'conflict';
+        snapshot.localSavedAt = now;
+        snapshot.clientEditedAt = operation.clientEditedAt;
+        snapshot.lastError = operation.lastError;
+        await putStoreValue(SNAPSHOT_STORE, snapshot);
+        await notify();
+        return publicResult('conflict', operation, null, operation.lastError);
+    }
+
+    async function discardPending(entityType, entityId, options) {
+        options = options || {};
+        var key = entityKey(await currentUserId(options.ownerId), entityType, String(entityId));
+        var operation = await getStoreValue(OUTBOX_STORE, key);
+        var snapshot = await getStoreValue(SNAPSHOT_STORE, key) || null;
+        if (snapshot) {
+            snapshot.state = options.state || 'superseded_by_cloud';
+            snapshot.supersededAt = new Date().toISOString();
+            snapshot.lastError = null;
+            await putStoreValue(SNAPSHOT_STORE, snapshot);
+        }
+        await deleteStoreValue(OUTBOX_STORE, key);
+        if (operation) {
+            clearRecoveryGuidance(operation);
+            resolveVaultIncident(operation).catch(function() {});
+        }
+        await notify();
+        return { state: operation || snapshot ? 'discarded' : 'missing' };
+    }
+
     async function resolveConflict(key, strategy) {
         var operation = await getStoreValue(OUTBOX_STORE, key);
         if (!operation || operation.state !== 'conflict') return { state: 'missing' };
         if (strategy === 'use_local') {
-            operation.baseVersion = null;
+            if (operation.entityType === 'quote') {
+                var serverVersion = operation.lastError && operation.lastError.serverVersion || null;
+                var quoteAdapter = adapterFor(operation);
+                if (!serverVersion && quoteAdapter && typeof quoteAdapter.readVersion === 'function') {
+                    var versionResult = await withTimeout(quoteAdapter.readVersion(operation), operation.timeoutMs);
+                    serverVersion = versionResult && typeof versionResult === 'object' ? versionResult.version : versionResult;
+                }
+                if (!serverVersion || typeof saveQuoteToSupabase !== 'function') {
+                    return { state: 'conflict', error: { message: 'The current cloud version could not be confirmed. Load the cloud copy or export this backup.' } };
+                }
+                var quotePayload = cloneValue(operation.payload || {});
+                quotePayload._serverUpdatedAt = serverVersion;
+                quotePayload._clientEditedAt = new Date().toISOString();
+                quotePayload._remoteUpdatePending = false;
+                var retainedSnapshot = await getStoreValue(SNAPSHOT_STORE, key) || {};
+                retainedSnapshot.state = 'explicit_overwrite_selected';
+                retainedSnapshot.lastError = null;
+                await putStoreValue(SNAPSHOT_STORE, retainedSnapshot);
+                await deleteStoreValue(OUTBOX_STORE, key);
+                await notify();
+                var localResult = await saveQuoteToSupabase(quotePayload);
+                if (localResult && localResult.state === 'cloud_saved') {
+                    window.dispatchEvent(new CustomEvent('quotedr-quote-conflict-resolved', {
+                        detail: { strategy: 'use_local', entityId: operation.entityId, result: localResult }
+                    }));
+                }
+                return localResult;
+            }
+            operation.baseVersion = operation.lastError && operation.lastError.serverVersion || operation.baseVersion || null;
             operation.forceConflictOverwrite = true;
             operation.state = 'local_pending';
             operation.attempts = 0;
@@ -993,7 +1156,7 @@
         overlay.id = 'qdSaveRecoveryOverlay';
         var rows = status.operations.length ? status.operations.map(function(operation) {
             var lastError = operation.lastError && operation.lastError.message ? operation.lastError.message : '';
-            var conflictActions = operation.state === 'conflict' ? '<div class="qd-recovery-actions mt-2"><button type="button" class="btn btn-sm btn-primary" data-qd-use-local data-qd-operation-key="' + escapeHtml(operation.key) + '"><i class="fas fa-mobile-screen-button me-1"></i>Use This Device</button>' +
+            var conflictActions = operation.state === 'conflict' ? '<div class="qd-recovery-actions mt-2"><button type="button" class="btn btn-sm btn-primary" data-qd-use-local data-qd-operation-key="' + escapeHtml(operation.key) + '"><i class="fas fa-laptop me-1"></i>Use My Version</button>' +
                 (operation.entityType === 'quote' ? '<button type="button" class="btn btn-sm btn-outline-primary" data-qd-use-cloud data-qd-operation-key="' + escapeHtml(operation.key) + '"><i class="fas fa-cloud-arrow-down me-1"></i>Load Cloud Copy</button>' : '') + '</div>' : '';
             var quoteExportAction = operation.entityType === 'quote' ? '<div class="qd-recovery-actions mt-2"><button type="button" class="btn btn-sm btn-outline-success" data-qd-export-quote data-qd-operation-key="' + escapeHtml(operation.key) + '"><i class="fas fa-download me-1"></i>Export Quote Backup</button></div>' : '';
             return '<div class="qd-recovery-row">' +
@@ -1019,9 +1182,9 @@
         overlay.querySelectorAll('[data-qd-use-local]').forEach(function(button) {
             button.addEventListener('click', async function() {
                 overlay.style.display = 'none';
-                var confirmed = typeof qdConfirm === 'function' ? await qdConfirm('Use the quote saved on this device and replace the newer cloud copy? Close the quote on your other device first so it does not save over this choice again.', {
-                    title: 'Use This Device?', okText: 'Use This Device', cancelText: 'Cancel', type: 'warning'
-                }) : window.confirm('Use this device and replace the newer cloud copy?');
+                var confirmed = typeof qdConfirm === 'function' ? await qdConfirm('Replace the newer cloud copy with the retained version from this device? QuoteDr will verify that the cloud has not changed again before saving.', {
+                    title: 'Use My Version?', okText: 'Use My Version', cancelText: 'Cancel', type: 'warning'
+                }) : window.confirm('Use this version and replace the newer cloud copy?');
                 if (!confirmed) {
                     overlay.style.display = '';
                     return;
@@ -1176,6 +1339,9 @@
         subscribe: subscribe,
         getStatus: getStatus,
         getSnapshot: getSnapshot,
+        pauseEntity: pauseEntity,
+        updateConflictPayload: updateConflictPayload,
+        discardPending: discardPending,
         resolveConflict: resolveConflict,
         exportRecovery: exportRecovery,
         openRecoveryCenter: openRecoveryCenter,

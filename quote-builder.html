@@ -2103,8 +2103,8 @@
 
 </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-v2.js?v=2026071402"></script>
-    <script src="save-coordinator.js?v=2026071405"></script>
+    <script src="supabase-v2.js?v=2026071502"></script>
+    <script src="save-coordinator.js?v=2026071502"></script>
     <script src="quote-media.js?v=2026071202"></script>
 <!-- Eruda mobile console (only loads with ?debug in URL) -->
 <script>
@@ -3571,7 +3571,7 @@ Example:
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="quote-dialogs.js?v=1783218459"></script>
+    <script src="quote-dialogs.js?v=2026071501"></script>
     <script src="quote-discounts.js?v=1783218460"></script>
     <script src="app-broadcasts.js?v=1779131000"></script>
     <script src="quote-template-files.js?v=1778012600"></script>
@@ -4822,7 +4822,7 @@ Example:
                         actionText: 'Open Dashboard',
                         optional: true,
                         complete: function() { return isBuilderGuideStepCompleted('advanced_tools:portal'); },
-                        action: function() { window.location.href = 'dashboard.html'; }
+                        action: function() { qdLeavePage('dashboard.html'); }
                     },
                     {
                         id: 'invoice',
@@ -4843,7 +4843,7 @@ Example:
                         actionText: 'Open Dashboard',
                         optional: true,
                         complete: function() { return isBuilderGuideStepCompleted('advanced_tools:change_orders'); },
-                        action: function() { window.location.href = 'dashboard.html'; }
+                        action: function() { qdLeavePage('dashboard.html'); }
                     }
                 ]
             }
@@ -11945,7 +11945,7 @@ Example:
                 } catch(e) {
                     console.warn('Photo upload error:', e);
                 }
-                renderRooms(); calculateTotals(); unsavedChanges = true;
+                renderRooms(); calculateTotals(); markUnsaved();
             };
             input.click();
         }
@@ -11967,7 +11967,7 @@ Example:
             room.photos.splice(photoIndex, 1);
             renderRooms();
             calculateTotals();
-            unsavedChanges = true;
+            markUnsaved();
         }
 
         function updateProfitReport() {
@@ -15775,7 +15775,7 @@ Example:
         // Save/load/session core moved to quote-storage.js
     </script>
     <script src="change-orders.js?v=1778152100"></script>
-    <script src="quote-storage.js?v=2026071403"></script>
+    <script src="quote-storage.js?v=2026071502"></script>
     <script>
         // -- End Save / Load ------------------------------------------------------
 

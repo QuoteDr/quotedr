@@ -11,6 +11,15 @@
         let initDone = false;
         let supabaseQuoteId = null;
         currentUser = null;
+        var quoteStorageInstanceId = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+            ? crypto.randomUUID()
+            : 'quote-tab-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+        var quoteStorageTabChannel = null;
+        var quoteStorageRealtimeChannel = null;
+        var quoteStorageRealtimeQuoteId = '';
+        var quoteStorageRemoteUpdate = null;
+        var quoteStorageRemotePromptOpen = false;
+        var quoteStorageRemoteConflictPromise = null;
 
         function parseQuoteMoney(value) {
             var raw = String(value || '');
@@ -323,6 +332,494 @@
             return JSON.parse(JSON.stringify(snapshot));
         }
 
+        function quoteStorageEditTime(data, fallback) {
+            data = data && typeof data === 'object' ? data : {};
+            var saveMeta = data._saveMeta || {};
+            var parsed = Date.parse(String(
+                data._clientEditedAt ||
+                saveMeta.clientEditedAt ||
+                saveMeta.localSavedAt ||
+                data.savedAt ||
+                fallback || ''
+            ));
+            return Number.isFinite(parsed) ? parsed : 0;
+        }
+
+        function quoteStorageCloudRowData(row) {
+            var data = Object.assign({}, row && row.data || {});
+            data.supabaseId = row && row.id || data.supabaseId || null;
+            data._serverUpdatedAt = row && row.updated_at || data._serverUpdatedAt || null;
+            data.clientName = row && row.client_name || data.clientName || '';
+            data.quoteNumber = row && row.quote_number || data.quoteNumber || '';
+            data.status = row && row.status || data.status || 'draft';
+            data.type = row && row.type || data.type || data.documentType || 'quote';
+            data.documentType = data.type;
+            data.parentQuoteId = row && row.parent_quote_id || data.parentQuoteId || '';
+            data.changeOrderNumber = row && row.change_order_number || data.changeOrderNumber || null;
+            if (data.grandTotal === undefined || data.grandTotal === null) data.grandTotal = row && row.total || 0;
+            if (!data.projectAddress) data.projectAddress = data.project_address || '';
+            if (!data.clientEmail) data.clientEmail = data.email || '';
+            if (!data.clientPhone) data.clientPhone = data.phone || '';
+            if (!data.paymentsReceived && !data.paymentReceived && row && row.total !== undefined && row.total !== null) {
+                data._paymentBalanceDueFallback = row.total;
+            }
+            return data;
+        }
+
+        function quoteStorageOperationMatchesRow(operation, row, cloudData) {
+            if (!operation || operation.entityType !== 'quote' || operation.action === 'delete') return false;
+            var rowId = String(row && row.id || '');
+            var payload = operation.payload || {};
+            if (rowId && (String(operation.entityId || '') === rowId || String(payload.supabaseId || '') === rowId)) return true;
+            var quoteNumber = String(cloudData && cloudData.quoteNumber || row && row.quote_number || '');
+            return !!quoteNumber && (
+                String(payload.quoteNumber || '') === quoteNumber ||
+                String(operation.entityId || '') === 'quote-number:' + quoteNumber
+            );
+        }
+
+        async function quoteStorageResolveCloudRow(row) {
+            var cloudData = quoteStorageCloudRowData(row);
+            var best = { data: cloudData, source: 'cloud', time: quoteStorageEditTime(cloudData, row && row.updated_at) };
+            var rowId = String(row && row.id || '');
+
+            if (rowId && window.QuoteDrSave && typeof window.QuoteDrSave.getSnapshot === 'function') {
+                try {
+                    var snapshot = await window.QuoteDrSave.getSnapshot('quote', rowId);
+                    if (snapshot && (snapshot.state === 'local_pending' || snapshot.state === 'conflict') && snapshot.payload) {
+                        var snapshotTime = quoteStorageEditTime(snapshot.payload, snapshot.clientEditedAt || snapshot.localSavedAt);
+                        if (snapshotTime > best.time) best = { data: Object.assign({}, snapshot.payload), source: 'snapshot', time: snapshotTime };
+                    }
+                } catch (e) {
+                    console.warn('Could not inspect the local quote snapshot:', e);
+                }
+            }
+
+            if (window.QuoteDrSave && typeof window.QuoteDrSave.getStatus === 'function') {
+                try {
+                    var saveStatus = await window.QuoteDrSave.getStatus();
+                    (saveStatus.operations || []).forEach(function(operation) {
+                        if (!quoteStorageOperationMatchesRow(operation, row, cloudData)) return;
+                        var operationTime = quoteStorageEditTime(operation.payload, operation.clientEditedAt || operation.localSavedAt);
+                        if (operationTime > best.time) best = { data: Object.assign({}, operation.payload), source: 'outbox', time: operationTime };
+                    });
+                } catch (e) {
+                    console.warn('Could not inspect pending quote saves:', e);
+                }
+            }
+
+            try {
+                var session = JSON.parse(localStorage.getItem('ald_session_quote') || 'null');
+                if (session && String(session.supabaseId || '') === rowId) {
+                    var sessionTime = quoteStorageEditTime(session);
+                    if (sessionTime > best.time) best = { data: Object.assign({}, session), source: 'session', time: sessionTime };
+                }
+            } catch (e) {}
+
+            if (best.source !== 'cloud') {
+                best.data.supabaseId = row && row.id || best.data.supabaseId || null;
+                best.data._serverUpdatedAt = row && row.updated_at || best.data._serverUpdatedAt || null;
+                best.data.clientName = best.data.clientName || row && row.client_name || '';
+                best.data.quoteNumber = best.data.quoteNumber || row && row.quote_number || '';
+                best.data.status = best.data.status || row && row.status || 'draft';
+                best.data.type = best.data.type || best.data.documentType || row && row.type || 'quote';
+                best.data.documentType = best.data.type;
+            }
+            return best;
+        }
+
+        function quoteStorageFinishResolvedLoad(resolved, cloudDetail) {
+            clearTimeout(_autoSaveTimer);
+            if (!resolved || resolved.source === 'cloud') {
+                quoteStorageRemoteUpdate = null;
+                quoteStorageRenderRemoteUpdateBanner();
+                unsavedChanges = false;
+                updateSaveStatus('saved', cloudDetail || 'Quote loaded');
+                return;
+            }
+            unsavedChanges = resolved.source === 'session';
+            updateSaveStatus('pending', resolved.source === 'session'
+                ? 'Recovered newer changes from this device - syncing to cloud'
+                : 'Restored newer saved changes from this device - syncing to cloud');
+            if (resolved.source === 'session') setTimeout(function() { doAutoSave({ force: true }); }, 0);
+        }
+
+        var quoteStorageCloudRefreshBusy = false;
+        var quoteStorageQueuedRemoteSignal = null;
+
+        function quoteStorageVersionsMatch(left, right) {
+            if (!left || !right) return false;
+            if (String(left) === String(right)) return true;
+            var leftTime = Date.parse(String(left));
+            var rightTime = Date.parse(String(right));
+            return Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime === rightTime;
+        }
+
+        function quoteStorageRemoteEditorInstance(row) {
+            var data = row && row.data || {};
+            return String(data._saveMeta && data._saveMeta.sourceInstanceId || data._editorInstanceId || '');
+        }
+
+        function quoteStorageUiBusy() {
+            return !!document.querySelector('.modal.show:not(#qdDialogModal)');
+        }
+
+        async function quoteStorageCurrentHasPending(quoteId) {
+            if (!window.QuoteDrSave || typeof window.QuoteDrSave.getStatus !== 'function') return false;
+            try {
+                var status = await window.QuoteDrSave.getStatus();
+                return (status.operations || []).some(function(operation) {
+                    var operationInstanceId = String(operation.payload && operation.payload._editorInstanceId || '');
+                    if (operationInstanceId && operationInstanceId !== quoteStorageInstanceId) return false;
+                    return quoteStorageOperationMatchesRow(operation, { id: quoteId }, window._loadedQuoteData || {});
+                });
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function quoteStorageEnsureRemoteUpdateBanner() {
+            var banner = document.getElementById('quoteRemoteUpdateBanner');
+            if (banner) return banner;
+            banner = document.createElement('div');
+            banner.id = 'quoteRemoteUpdateBanner';
+            banner.className = 'alert alert-warning border-top border-bottom mb-0';
+            banner.style.cssText = 'display:none;border-left:0;border-right:0;border-radius:0;padding:10px 14px;';
+            banner.innerHTML = '<div class="d-flex flex-column flex-lg-row align-items-lg-center gap-2">' +
+                '<div class="d-flex align-items-start gap-2 flex-grow-1"><i class="fas fa-cloud-arrow-down mt-1"></i><div><strong>Quote updated elsewhere</strong><div class="small" data-quote-remote-message></div></div></div>' +
+                '<div class="d-flex flex-wrap gap-2">' +
+                    '<button type="button" class="btn btn-sm btn-primary" data-quote-remote-load><i class="fas fa-cloud-arrow-down me-1"></i>Load Latest</button>' +
+                    '<button type="button" class="btn btn-sm btn-outline-danger" data-quote-remote-local><i class="fas fa-laptop me-1"></i>Use My Version</button>' +
+                    '<button type="button" class="btn btn-sm btn-outline-secondary" data-quote-remote-export><i class="fas fa-download me-1"></i>Export Backup</button>' +
+                '</div></div>';
+            var anchor = document.getElementById('draftWarningBanner');
+            if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(banner, anchor.nextSibling);
+            else document.body.insertBefore(banner, document.body.firstChild);
+            banner.querySelector('[data-quote-remote-load]').addEventListener('click', function() { quoteStorageLoadLatestRemote(); });
+            banner.querySelector('[data-quote-remote-local]').addEventListener('click', function() { quoteStorageUseLocalVersion(); });
+            banner.querySelector('[data-quote-remote-export]').addEventListener('click', function() { quoteStorageExportCurrentConflict(); });
+            return banner;
+        }
+
+        function quoteStorageRenderRemoteUpdateBanner() {
+            var banner = document.getElementById('quoteRemoteUpdateBanner');
+            if (!quoteStorageRemoteUpdate) {
+                if (banner) banner.style.display = 'none';
+                return;
+            }
+            banner = quoteStorageEnsureRemoteUpdateBanner();
+            banner.style.display = '';
+            var dirty = quoteStorageRemoteUpdate.hasLocalEdits === true;
+            banner.querySelector('[data-quote-remote-message]').textContent = dirty
+                ? 'This tab also has changes. Cloud saving is paused until you choose which version to keep.'
+                : 'Your unchanged tab will load the newest cloud copy as soon as the open window is closed.';
+            banner.querySelector('[data-quote-remote-local]').style.display = dirty ? '' : 'none';
+            banner.querySelector('[data-quote-remote-export]').style.display = dirty ? '' : 'none';
+        }
+
+        function quoteStoragePersistConflictLocalCopy(qData) {
+            qData = qData || collectQuoteData();
+            try {
+                localStorage.setItem('ald_session_quote', JSON.stringify(qData));
+                localStorage.setItem('ald_autosave_draft', JSON.stringify(qData));
+                if (window._supabaseQuoteId) {
+                    localStorage.setItem('ald_remote_conflict_quote:' + window._supabaseQuoteId, JSON.stringify(qData));
+                }
+            } catch (e) {}
+            return qData;
+        }
+
+        function quoteStorageExportCurrentConflict() {
+            var qData = quoteStoragePersistConflictLocalCopy();
+            var exported = quoteStorageExportRecoveryQuote({
+                entityType: 'quote',
+                entityId: window._supabaseQuoteId || '',
+                entityLabel: qData.quoteTitle || qData.clientName || qData.quoteNumber || 'Quote',
+                action: 'update',
+                payload: qData,
+                state: 'conflict',
+                localSavedAt: new Date().toISOString()
+            });
+            if (exported && typeof qdToast === 'function') qdToast({ title: 'Backup Exported', message: 'Open this .qdr file later from File > Open > Open Local File.', type: 'success' });
+            return exported;
+        }
+
+        async function quoteStoragePersistRemoteConflict(qData) {
+            if (!quoteStorageRemoteUpdate || !quoteStorageRemoteUpdate.hasLocalEdits) return { state: 'unchanged' };
+            if (quoteStorageRemoteConflictPromise) return quoteStorageRemoteConflictPromise;
+            quoteStorageRemoteConflictPromise = (async function() {
+                qData = quoteStoragePersistConflictLocalCopy(qData);
+                qData._remoteUpdatePending = true;
+                var quoteId = String(window._supabaseQuoteId || '');
+                if (!quoteId || !window.QuoteDrSave) return { state: 'local_saved' };
+
+                if (quoteStorageRemoteUpdate.captured && typeof window.QuoteDrSave.updateConflictPayload === 'function') {
+                    var refreshed = await window.QuoteDrSave.updateConflictPayload('quote', quoteId, qData);
+                    if (refreshed && refreshed.state !== 'missing') return refreshed;
+                    quoteStorageRemoteUpdate.captured = false;
+                }
+
+                if (typeof window.QuoteDrSave.pauseEntity === 'function') {
+                    var paused = await window.QuoteDrSave.pauseEntity('quote', quoteId, {
+                        serverVersion: quoteStorageRemoteUpdate.version || null,
+                        message: 'This quote was updated in another tab or device while local changes were pending.'
+                    });
+                    if (paused && paused.state === 'conflict') {
+                        quoteStorageRemoteUpdate.captured = true;
+                        if (typeof window.QuoteDrSave.updateConflictPayload === 'function') {
+                            return window.QuoteDrSave.updateConflictPayload('quote', quoteId, qData);
+                        }
+                        return paused;
+                    }
+                }
+
+                if (typeof saveQuoteToSupabase === 'function') {
+                    var result = await saveQuoteToSupabase(qData);
+                    if (result && result.state === 'conflict') {
+                        quoteStorageRemoteUpdate.captured = true;
+                        if (result.error && result.error.serverVersion) quoteStorageRemoteUpdate.version = result.error.serverVersion;
+                    }
+                    return result;
+                }
+                return { state: 'local_saved' };
+            })().finally(function() { quoteStorageRemoteConflictPromise = null; });
+            return quoteStorageRemoteConflictPromise;
+        }
+
+        async function quoteStorageLoadLatestRemote() {
+            var pending = quoteStorageRemoteUpdate;
+            var quoteId = String(window._supabaseQuoteId || pending && pending.quoteId || '');
+            if (!quoteId || typeof loadQuoteFromSupabase !== 'function') return false;
+            if (pending && pending.hasLocalEdits) quoteStoragePersistConflictLocalCopy();
+            var latest = await loadQuoteFromSupabase(quoteId);
+            if (!latest || latest.error || !latest.data || quoteIsPortalLockedForBuilder(latest.data)) {
+                if (typeof qdToast === 'function') qdToast({ title: 'Could Not Load Update', message: 'Your local copy is still retained. Try again shortly.', type: 'danger' });
+                return false;
+            }
+            if (pending && pending.hasLocalEdits && window.QuoteDrSave && typeof window.QuoteDrSave.discardPending === 'function') {
+                await window.QuoteDrSave.discardPending('quote', quoteId, { state: 'superseded_by_cloud' });
+            }
+            quoteStorageRemoteUpdate = null;
+            quoteStorageRenderRemoteUpdateBanner();
+            var qData = quoteStorageCloudRowData(latest.data);
+            applyQuoteData(qData);
+            window._quoteFullyLoaded = true;
+            quoteStorageFinishResolvedLoad({ data: qData, source: 'cloud' }, 'Updated from another tab or device');
+            if (pending && pending.hasLocalEdits) {
+                try {
+                    localStorage.setItem('ald_session_quote', JSON.stringify(qData));
+                    localStorage.setItem('ald_autosave_draft', JSON.stringify(qData));
+                } catch (e) {}
+            }
+            if (typeof qdToast === 'function') qdToast({ title: 'Quote Updated', message: 'Loaded the newest changes from the cloud.', type: 'success' });
+            quoteStorageEnsureRealtimeSubscription();
+            return true;
+        }
+
+        async function quoteStorageUseLocalVersion(options) {
+            options = options || {};
+            if (!quoteStorageRemoteUpdate || !quoteStorageRemoteUpdate.hasLocalEdits) return false;
+            if (!options.confirmed) {
+                var confirmed = await qdConfirm('Replace the newer cloud quote with the version currently shown on this device? A local backup will remain available.', {
+                    title: 'Use My Version?',
+                    okText: 'Use My Version',
+                    cancelText: 'Cancel',
+                    okClass: 'btn-danger',
+                    type: 'warning'
+                });
+                if (!confirmed) return false;
+            }
+            var pending = quoteStorageRemoteUpdate;
+            var quoteId = String(window._supabaseQuoteId || pending.quoteId || '');
+            quoteStoragePersistConflictLocalCopy();
+            if (window.QuoteDrSave && typeof window.QuoteDrSave.discardPending === 'function') {
+                await window.QuoteDrSave.discardPending('quote', quoteId, { state: 'explicit_overwrite_selected' });
+            }
+            window._quoteServerUpdatedAt = pending.version || window._quoteServerUpdatedAt || null;
+            window._quoteLocalEditAt = new Date().toISOString();
+            quoteStorageRemoteUpdate = null;
+            quoteStorageRenderRemoteUpdateBanner();
+            unsavedChanges = true;
+            var result = await doAutoSave({ force: true });
+            if (result && result.state === 'cloud_saved' && typeof qdToast === 'function') {
+                qdToast({ title: 'Your Version Saved', message: 'The cloud quote now matches this device.', type: 'success' });
+            }
+            return result;
+        }
+
+        async function quoteStorageShowRemoteUpdatePrompt() {
+            if (!quoteStorageRemoteUpdate || !quoteStorageRemoteUpdate.hasLocalEdits || quoteStorageRemoteUpdate.promptDismissed || quoteStorageRemotePromptOpen) return;
+            quoteStorageRemotePromptOpen = true;
+            try {
+                var choice = await qdConfirm('This quote changed in another tab or device, and this tab also has edits. Loading latest keeps the cloud changes. Using your version replaces them. Your local copy remains recoverable either way.', {
+                    title: 'Quote Updated Elsewhere',
+                    okText: 'Load Latest',
+                    cancelText: 'Keep Editing',
+                    secondaryText: 'Use My Version',
+                    secondaryValue: 'use_local',
+                    secondaryClass: 'btn-outline-danger',
+                    type: 'warning'
+                });
+                if (choice === true) await quoteStorageLoadLatestRemote();
+                else if (choice === 'use_local') await quoteStorageUseLocalVersion({ confirmed: true });
+                else if (quoteStorageRemoteUpdate) quoteStorageRemoteUpdate.promptDismissed = true;
+            } finally {
+                quoteStorageRemotePromptOpen = false;
+            }
+        }
+
+        async function quoteStorageMaybeApplyDeferredRemote() {
+            if (!quoteStorageRemoteUpdate || quoteStorageRemoteUpdate.hasLocalEdits || unsavedChanges || quoteStorageUiBusy()) return;
+            await quoteStorageLoadLatestRemote();
+        }
+
+        async function quoteStorageHandleRemoteSignal(signal) {
+            signal = signal || {};
+            var quoteId = String(window._supabaseQuoteId || '');
+            if (!quoteId || String(signal.quoteId || quoteId) !== quoteId || !window._quoteFullyLoaded) return;
+            if (quoteStorageCloudRefreshBusy) {
+                quoteStorageQueuedRemoteSignal = signal;
+                return;
+            }
+            quoteStorageCloudRefreshBusy = true;
+            try {
+                var latest = await loadQuoteFromSupabase(quoteId);
+                if (!latest || latest.error || !latest.data || quoteIsPortalLockedForBuilder(latest.data)) return;
+                var remoteVersion = latest.data.updated_at || '';
+                var localVersion = window._quoteServerUpdatedAt || '';
+                if (quoteStorageVersionsMatch(remoteVersion, localVersion)) return;
+                var sourceInstanceId = quoteStorageRemoteEditorInstance(latest.data) || String(signal.sourceInstanceId || '');
+                if (sourceInstanceId && sourceInstanceId === quoteStorageInstanceId) {
+                    window._quoteServerUpdatedAt = remoteVersion;
+                    if (window._loadedQuoteData) window._loadedQuoteData._serverUpdatedAt = remoteVersion;
+                    return;
+                }
+
+                var hasPending = await quoteStorageCurrentHasPending(quoteId);
+                var hasLocalEdits = unsavedChanges || hasPending || quoteStorageRemoteUpdate && quoteStorageRemoteUpdate.hasLocalEdits;
+                var previousRemoteUpdate = quoteStorageRemoteUpdate;
+                quoteStorageRemoteUpdate = {
+                    quoteId: quoteId,
+                    version: remoteVersion,
+                    source: signal.source || 'cloud',
+                    hasLocalEdits: !!hasLocalEdits,
+                    captured: previousRemoteUpdate && previousRemoteUpdate.captured === true,
+                    promptDismissed: !!(previousRemoteUpdate && quoteStorageVersionsMatch(previousRemoteUpdate.version, remoteVersion) && previousRemoteUpdate.promptDismissed)
+                };
+                quoteStorageRenderRemoteUpdateBanner();
+                if (!hasLocalEdits && !quoteStorageUiBusy()) {
+                    await quoteStorageLoadLatestRemote();
+                    return;
+                }
+                if (hasLocalEdits) {
+                    clearTimeout(_autoSaveTimer);
+                    await quoteStoragePersistRemoteConflict(collectQuoteData());
+                    var el = document.getElementById('saveStatus');
+                    if (el) el.innerHTML = '<span style="color:#b45309;"><i class="fas fa-triangle-exclamation"></i> Cloud update waiting - choose which version to keep</span>';
+                    setTimeout(function() { quoteStorageShowRemoteUpdatePrompt(); }, 0);
+                }
+            } catch (e) {
+                console.warn('Remote quote update check skipped:', e);
+            } finally {
+                quoteStorageCloudRefreshBusy = false;
+                if (quoteStorageQueuedRemoteSignal) {
+                    var queued = quoteStorageQueuedRemoteSignal;
+                    quoteStorageQueuedRemoteSignal = null;
+                    setTimeout(function() { quoteStorageHandleRemoteSignal(queued); }, 0);
+                }
+            }
+        }
+
+        function quoteStorageBroadcastCloudUpdate(quoteId, version, sourceInstanceId) {
+            if (!quoteStorageTabChannel || !quoteId || !version) return;
+            try {
+                quoteStorageTabChannel.postMessage({
+                    type: 'quote_cloud_updated',
+                    quoteId: String(quoteId),
+                    version: version,
+                    sourceInstanceId: sourceInstanceId || quoteStorageInstanceId
+                });
+            } catch (e) {}
+        }
+
+        function quoteStorageEnsureRealtimeSubscription() {
+            var quoteId = String(window._supabaseQuoteId || '');
+            if (quoteStorageRealtimeQuoteId === quoteId && quoteStorageRealtimeChannel) return;
+            if (quoteStorageRealtimeChannel && _supabase && typeof _supabase.removeChannel === 'function') {
+                _supabase.removeChannel(quoteStorageRealtimeChannel);
+            }
+            quoteStorageRealtimeChannel = null;
+            quoteStorageRealtimeQuoteId = quoteId;
+            if (!quoteId || !_supabase || typeof _supabase.channel !== 'function') return;
+            try {
+                quoteStorageRealtimeChannel = _supabase
+                    .channel('quote-builder-' + quoteId + '-' + quoteStorageInstanceId)
+                    .on('postgres_changes', {
+                        event: 'UPDATE',
+                        schema: 'public',
+                        table: 'quotes',
+                        filter: 'id=eq.' + quoteId
+                    }, function(payload) {
+                        var row = payload && payload.new || {};
+                        quoteStorageHandleRemoteSignal({
+                            quoteId: quoteId,
+                            version: row.updated_at || '',
+                            sourceInstanceId: quoteStorageRemoteEditorInstance(row),
+                            source: 'realtime'
+                        });
+                    })
+                    .subscribe();
+            } catch (e) {
+                console.warn('Realtime quote updates are unavailable; polling remains active.', e);
+            }
+        }
+
+        async function quoteStorageRefreshFromCloudIfIdle() {
+            var quoteId = String(window._supabaseQuoteId || '');
+            if (!quoteId || quoteStorageCloudRefreshBusy || document.hidden || !window._quoteFullyLoaded) return;
+            try {
+                var versionResult = await _supabase.from('quotes').select('updated_at').eq('id', quoteId).maybeSingle();
+                if (versionResult.error || !versionResult.data) return;
+                var remoteVersion = versionResult.data.updated_at || '';
+                var localVersion = window._quoteServerUpdatedAt || '';
+                if (!quoteStorageVersionsMatch(remoteVersion, localVersion)) {
+                    await quoteStorageHandleRemoteSignal({ quoteId: quoteId, version: remoteVersion, source: 'poll' });
+                } else {
+                    await quoteStorageMaybeApplyDeferredRemote();
+                }
+            } catch (e) {
+                console.warn('Background quote refresh skipped:', e);
+            }
+        }
+
+        function quoteStorageStartCloudRefresh() {
+            if (window._quoteStorageCloudRefreshStarted) return;
+            window._quoteStorageCloudRefreshStarted = true;
+            if (typeof BroadcastChannel === 'function') {
+                quoteStorageTabChannel = new BroadcastChannel('quotedr-quote-cloud-updates');
+                quoteStorageTabChannel.onmessage = function(event) {
+                    if (event.data && event.data.type === 'quote_cloud_updated') quoteStorageHandleRemoteSignal(Object.assign({ source: 'tab' }, event.data));
+                };
+            }
+            window.addEventListener('focus', function() {
+                quoteStorageMaybeApplyDeferredRemote();
+                quoteStorageRefreshFromCloudIfIdle();
+            });
+            document.addEventListener('visibilitychange', function() {
+                if (!document.hidden) {
+                    quoteStorageMaybeApplyDeferredRemote();
+                    quoteStorageRefreshFromCloudIfIdle();
+                }
+            });
+            document.addEventListener('hidden.bs.modal', function() { quoteStorageMaybeApplyDeferredRemote(); });
+            window.addEventListener('pagehide', function() {
+                if (quoteStorageTabChannel) quoteStorageTabChannel.close();
+                if (quoteStorageRealtimeChannel && _supabase && typeof _supabase.removeChannel === 'function') _supabase.removeChannel(quoteStorageRealtimeChannel);
+            });
+            setInterval(quoteStorageRefreshFromCloudIfIdle, 60000);
+            quoteStorageEnsureRealtimeSubscription();
+        }
+
         function collectQuoteData() {
             var grandTotal = parseQuoteMoney(document.getElementById('grandTotalDisplay')?.textContent || '0');
             var isChangeOrder = window._quoteDocumentType === 'change_order';
@@ -337,6 +834,9 @@
             return {
                 version: 1,
                 savedAt: new Date().toISOString(),
+                _clientEditedAt: window._quoteLocalEditAt || loadedData._clientEditedAt || loadedData._saveMeta && loadedData._saveMeta.clientEditedAt || null,
+                _editorInstanceId: quoteStorageInstanceId,
+                _remoteUpdatePending: !!(quoteStorageRemoteUpdate && quoteStorageRemoteUpdate.hasLocalEdits),
                 type: window._quoteDocumentType || 'quote',
                 documentType: window._quoteDocumentType || 'quote',
                 parentQuoteId: window._parentQuoteId || '',
@@ -403,21 +903,41 @@
                 : operationQuoteNumber && operationQuoteNumber === currentQuoteNumber;
             if (!belongsToCurrentQuote) return;
 
+            var sourceInstanceId = String(operation.payload && operation.payload._editorInstanceId || '');
+            var cloudVersion = detail.version || saved && saved.updated_at ||
+                operation.target && operation.target.verifyVersionValue || null;
+            quoteStorageBroadcastCloudUpdate(savedId || operationId || currentId, cloudVersion, sourceInstanceId);
+            if (sourceInstanceId && sourceInstanceId !== quoteStorageInstanceId) {
+                quoteStorageHandleRemoteSignal({
+                    quoteId: savedId || operationId || currentId,
+                    version: cloudVersion,
+                    sourceInstanceId: sourceInstanceId,
+                    source: 'tab'
+                });
+                return;
+            }
+
             if (savedId) {
                 window._supabaseQuoteId = savedId;
                 localStorage.setItem('ald_active_quote_id', savedId);
             }
-            var cloudVersion = detail.version || saved && saved.updated_at ||
-                operation.target && operation.target.verifyVersionValue || null;
             if (!cloudVersion) return;
             window._quoteServerUpdatedAt = cloudVersion;
             if (window._loadedQuoteData) {
                 window._loadedQuoteData._serverUpdatedAt = cloudVersion;
                 window._loadedQuoteData.updated_at = cloudVersion;
             }
+            quoteStorageEnsureRealtimeSubscription();
         }
 
         window.addEventListener('quotedr-save-acknowledged', applyQuoteCloudAcknowledgement);
+        window.addEventListener('quotedr-quote-conflict-resolved', function(event) {
+            var detail = event && event.detail || {};
+            if (detail.strategy !== 'use_local' || String(detail.entityId || '') !== String(window._supabaseQuoteId || '')) return;
+            quoteStorageRemoteUpdate = null;
+            quoteStorageRenderRemoteUpdateBanner();
+            unsavedChanges = false;
+        });
 
         function toggleClientInfo() {
             var body = document.getElementById('clientInfoBody');
@@ -464,6 +984,7 @@
             window._changeOrderPriceSummary = data.changeOrderPriceSummary || null;
             window._changeOrderNumber = parseInt(data.changeOrderNumber || data.change_order_number || 0, 10) || 0;
             window._quoteServerUpdatedAt = data._serverUpdatedAt || data.serverUpdatedAt || data.updated_at || null;
+            window._quoteLocalEditAt = data._clientEditedAt || data._saveMeta && data._saveMeta.clientEditedAt || data.savedAt || null;
             setTimeout(function() {
                 if (document.getElementById('changeOrderReason')) document.getElementById('changeOrderReason').value = data.changeReason || '';
                 if (typeof updateChangeOrderModeUI === 'function') updateChangeOrderModeUI();
@@ -478,6 +999,7 @@
             renderRooms();
             initDone = wasInitDone;
             unsavedChanges = false; // clean slate after load
+            setTimeout(function() { quoteStorageEnsureRealtimeSubscription(); }, 0);
         }
 
         function updateSaveStatus(state, detail) {
@@ -504,6 +1026,12 @@
 
         function markUnsaved() {
             unsavedChanges = true;
+            window._quoteLocalEditAt = new Date().toISOString();
+            if (quoteStorageRemoteUpdate) {
+                quoteStorageRemoteUpdate.hasLocalEdits = true;
+                quoteStorageRenderRemoteUpdateBanner();
+                setTimeout(function() { quoteStorageShowRemoteUpdatePrompt(); }, 0);
+            }
             var el = document.getElementById('saveStatus');
             if (el) el.innerHTML = '<span style="color:#fd7e14;"><i class="fas fa-circle"></i> Unsaved changes</span>';
             // Debounced auto-save: 1 second after last change
@@ -946,6 +1474,7 @@ async function saveQuote() {
             startAutoSave();
             updateSaveStatus('loaded', selectedFile.file.name);
             if (resolved.fromRecovery) {
+                window._quoteLocalEditAt = new Date().toISOString();
                 unsavedChanges = true;
                 updateSaveStatus('pending', 'Backup opened on this device - syncing to cloud');
                 setTimeout(function() { doAutoSave(); }, 0);
@@ -1058,19 +1587,13 @@ async function saveQuote() {
                     await handlePortalLockedBuilderLoad(q);
                     return;
                 }
-                var qData = q.data || {};
-                qData.supabaseId = q.id;
-                qData._serverUpdatedAt = q.updated_at || null;
-                qData.clientName = q.client_name || qData.clientName || '';
-                qData.quoteNumber = q.quote_number || qData.quoteNumber || '';
-                qData.grandTotal = q.total || 0;
+                var resolved = await quoteStorageResolveCloudRow(q);
+                var qData = resolved.data;
                 window._supabaseQuoteId = q.id;
                 localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
                 applyQuoteData(qData);
                 window._loadedQuoteData = qData;
-                unsavedChanges = false;
-                clearTimeout(_autoSaveTimer);
-                updateSaveStatus('saved', 'Quote loaded ?');
+                quoteStorageFinishResolvedLoad(resolved, 'Quote loaded');
                 updateDraftWarning();
                 var m = bootstrap.Modal.getInstance(document.getElementById('loadQuoteModal'));
                 if (m) m.hide();
@@ -1100,14 +1623,16 @@ async function saveQuote() {
             banner.style.display = (saveFileHandle || window._supabaseQuoteId) ? 'none' : 'block';
         }
 
-        async function doAutoSave() {
-            if (!unsavedChanges) return;
+        async function doAutoSave(options) {
+            options = options || {};
+            if (!unsavedChanges && options.force !== true) return { state: 'unchanged' };
             var t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             var el = document.getElementById('saveStatus');
+            var qData = collectQuoteData();
             // Always save to localStorage as backup
             try {
-                localStorage.setItem('ald_autosave_draft', JSON.stringify(collectQuoteData()));
-                localStorage.setItem('ald_session_quote', JSON.stringify(collectQuoteData()));
+                localStorage.setItem('ald_autosave_draft', JSON.stringify(qData));
+                localStorage.setItem('ald_session_quote', JSON.stringify(qData));
             } catch(e) {}
             // Also write to file if we have a handle
             if (saveFileHandle) {
@@ -1117,44 +1642,72 @@ async function saveQuote() {
                     if (el) el.innerHTML = '<span style="color:#dc3545;"><i class="fas fa-exclamation-triangle"></i> Auto-save failed</span>';
                 }
             }
+            if (quoteStorageRemoteUpdate && quoteStorageRemoteUpdate.hasLocalEdits) {
+                qData._remoteUpdatePending = true;
+                var heldResult = await quoteStoragePersistRemoteConflict(qData);
+                unsavedChanges = true;
+                quoteStorageRenderRemoteUpdateBanner();
+                if (el) el.innerHTML = '<span style="color:#b45309;"><i class="fas fa-triangle-exclamation"></i> Cloud update waiting - choose which version to keep</span>';
+                setTimeout(function() { quoteStorageShowRemoteUpdatePrompt(); }, 0);
+                updateDraftWarning();
+                return heldResult && heldResult.state ? heldResult : { state: 'conflict' };
+            }
             // Cloud save to Supabase - always runs regardless of file handle
             var cloudState = null;
+            var cloudResult = null;
             if (typeof saveQuoteToSupabase === 'function') {
-                var qData = collectQuoteData();
                 if (quoteDataIsPortalLockedForBuilder(qData)) {
                     console.warn('[AutoSave] Skipping cloud save - this quote is locked in a client portal');
-                    return;
+                    return { state: 'skipped', reason: 'portal_locked' };
                 }
                 // SAFETY GUARD: never overwrite cloud data with empty rooms unless we know the quote is intentionally empty
                 // _quoteFullyLoaded is set true only after a successful Supabase load
                 if (!window._quoteFullyLoaded && (!qData.rooms || qData.rooms.length === 0)) {
                     console.warn('[AutoSave] Skipping cloud save - rooms empty and quote not confirmed loaded from cloud');
-                    return;
+                    return { state: 'skipped', reason: 'quote_not_loaded' };
                 }
                 try {
-                    var result = await saveQuoteToSupabase(qData);
-                    cloudState = result && result.state;
-                    if (result && !result.error && result.state === 'cloud_saved' && result.data) {
-                        var saved = Array.isArray(result.data) ? result.data[0] : result.data;
+                    cloudResult = await saveQuoteToSupabase(qData);
+                    cloudState = cloudResult && cloudResult.state;
+                    if (cloudState === 'conflict') {
+                        quoteStorageRemoteUpdate = {
+                            quoteId: String(window._supabaseQuoteId || qData.supabaseId || ''),
+                            version: cloudResult.error && cloudResult.error.serverVersion || null,
+                            source: 'save_check',
+                            hasLocalEdits: true,
+                            captured: true
+                        };
+                        quoteStoragePersistConflictLocalCopy(qData);
+                        quoteStorageRenderRemoteUpdateBanner();
+                        unsavedChanges = true;
+                        if (el) el.innerHTML = '<span style="color:#b45309;"><i class="fas fa-triangle-exclamation"></i> Cloud update waiting - choose which version to keep</span>';
+                        setTimeout(function() { quoteStorageShowRemoteUpdatePrompt(); }, 0);
+                        updateDraftWarning();
+                        return cloudResult;
+                    }
+                    if (cloudResult && !cloudResult.error && cloudResult.state === 'cloud_saved' && cloudResult.data) {
+                        var saved = Array.isArray(cloudResult.data) ? cloudResult.data[0] : cloudResult.data;
                         if (saved && saved.id) {
                             window._supabaseQuoteId = saved.id;
                             window._quoteServerUpdatedAt = saved.updated_at || null;
                             localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
                         }
-                    } else if (!result || result.state === 'local_failed') {
-                        throw new Error((result && result.error && result.error.message) || 'Auto-save could not store a durable copy.');
+                    } else if (!cloudResult || cloudResult.state === 'local_failed') {
+                        throw new Error((cloudResult && cloudResult.error && cloudResult.error.message) || 'Auto-save could not store a durable copy.');
                     }
                 } catch (error) {
                     unsavedChanges = true;
                     updateSaveStatus('error', error.message || 'Auto-save failed');
-                    return;
+                    return { state: 'local_failed', error: error };
                 }
             }
             unsavedChanges = false;
             if (el) {
                 if (cloudState === 'cloud_saved') {
                     el.innerHTML = '<span style="color:#28a745;"><i class="fas fa-cloud-check"></i> Cloud saved at ' + t + '</span>';
-                } else if (cloudState === 'local_pending' || cloudState === 'conflict') {
+                } else if (cloudState === 'superseded') {
+                    el.innerHTML = '<span style="color:#1a56a0;"><i class="fas fa-cloud"></i> Newer cloud copy kept at ' + t + '</span>';
+                } else if (cloudState === 'local_pending') {
                     el.innerHTML = '<span style="color:#9a6700;"><i class="fas fa-cloud-arrow-up"></i> Saved on this device at ' + t + ' - syncing</span>';
                 } else if (saveFileHandle) {
                     el.innerHTML = '<span style="color:#28a745;"><i class="fas fa-check-circle"></i> File saved at ' + t + '</span>';
@@ -1163,7 +1716,28 @@ async function saveQuote() {
                 }
             }
             updateDraftWarning();
+            return cloudResult || { state: saveFileHandle ? 'file_saved' : 'local_saved' };
         }
+
+        window.qdSaveBeforeNavigation = async function() {
+            clearTimeout(_autoSaveTimer);
+            saveSessionQuote();
+            if (quoteStorageRemoteUpdate && quoteStorageRemoteUpdate.hasLocalEdits) {
+                await quoteStoragePersistRemoteConflict(collectQuoteData());
+                await quoteStorageShowRemoteUpdatePrompt();
+                return false;
+            }
+            if (!unsavedChanges) return true;
+            updateSaveStatus('saving', 'Finishing save before leaving');
+            var result = await doAutoSave({ force: true });
+            if (result && result.state !== 'local_failed' && result.state !== 'conflict') return true;
+            if (window.QuoteDrSave && typeof window.QuoteDrSave.openRecoveryCenter === 'function') window.QuoteDrSave.openRecoveryCenter();
+            await qdAlert('QuoteDr could not safely retain your latest changes, so this page will stay open. Export a backup from Save Status before leaving.', {
+                title: 'Save Needs Attention',
+                type: 'error'
+            });
+            return false;
+        };
 
         function downloadQuoteFallback() {
             const blob = new Blob([JSON.stringify(collectQuoteData(), null, 2)], { type: 'application/json' });
@@ -1189,6 +1763,7 @@ async function saveQuote() {
             const { data: { session } } = await _supabase.auth.getSession();
             if (!session) { window.location.href = 'login.html'; return; }
             window.currentUser = session.user;
+            quoteStorageStartCloudRefresh();
 
             // Subscription status check - show banner if billing needs attention
             if (typeof refreshSubscriptionBanner === 'function') refreshSubscriptionBanner();
@@ -1241,28 +1816,13 @@ async function saveQuote() {
                             await handlePortalLockedBuilderLoad(q);
                             return;
                         }
-                        const qData = Object.assign({}, data.data || {});
-                        qData.supabaseId = data.id;
-                        qData._serverUpdatedAt = data.updated_at || null;
-                        qData.clientName = data.client_name || qData.clientName || '';
-                        qData.quoteNumber = data.quote_number || qData.quoteNumber || '';
-                        qData.status = data.status || qData.status || 'draft';
-                        qData.type = data.type || qData.type || qData.documentType || 'quote';
-                        qData.documentType = qData.type;
-                        qData.parentQuoteId = data.parent_quote_id || qData.parentQuoteId || '';
-                        qData.changeOrderNumber = data.change_order_number || qData.changeOrderNumber || null;
-                        if (!qData.paymentsReceived && !qData.paymentReceived && data.total !== undefined && data.total !== null) {
-                            qData._paymentBalanceDueFallback = data.total;
-                        }
-                        if (!qData.projectAddress) qData.projectAddress = qData.project_address || '';
-                        if (!qData.clientEmail) qData.clientEmail = qData.email || '';
-                        if (!qData.clientPhone) qData.clientPhone = qData.phone || '';
+                        const resolved = await quoteStorageResolveCloudRow(data);
+                        const qData = resolved.data;
                         window._supabaseQuoteId = data.id;
                         localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
                         applyQuoteData(qData);
-                        unsavedChanges = false;
+                        quoteStorageFinishResolvedLoad(resolved, 'Quote loaded');
                         window._quoteFullyLoaded = true; // allow autosave now
-                        updateSaveStatus('saved', 'Quote loaded ?');
                         updateDraftWarning();
                         if (window.location.hash === "#change-order" && typeof createChangeOrderFromCurrentQuote === "function") {
                             setTimeout(function() {
@@ -1472,16 +2032,16 @@ async function saveQuote() {
                                     await handlePortalLockedBuilderLoad(result.data);
                                     return;
                                 }
-                                var qData = result.data.data;
-                                qData.supabaseId = result.data.id;
-                                qData._serverUpdatedAt = result.data.updated_at || null;
+                                var resolved = await quoteStorageResolveCloudRow(result.data);
+                                var qData = resolved.data;
                                 window._supabaseQuoteId = result.data.id;
                                 localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
                                 applyQuoteData(qData);
+                                quoteStorageFinishResolvedLoad(resolved, 'Loaded from cloud');
                                 if (qData.quoteNumber) document.getElementById('quoteNumber').value = qData.quoteNumber;
                                 renderTermsCheckboxes(getQuoteTermsForRender(qData));
                                 var el = document.getElementById('saveStatus');
-                                if (el) el.innerHTML = '<span style="color:#1a56a0;"><i class="fas fa-cloud"></i> Loaded from cloud</span>';
+                                if (el && resolved.source === 'cloud') el.innerHTML = '<span style="color:#1a56a0;"><i class="fas fa-cloud"></i> Loaded from cloud</span>';
                                 updateDraftWarning();
                             }
                         }).catch(function(e) { console.warn('Failed to load cloud quote:', e); });
@@ -1520,25 +2080,16 @@ async function saveQuote() {
                                     await handlePortalLockedBuilderLoad(result.data);
                                     return;
                                 }
-                                var qData = result.data.data;
-                                qData.supabaseId = result.data.id;
-                                // Map fields - client_name lives at row level, rest in data JSON
-                                var row = result.data;
-                                qData._serverUpdatedAt = row.updated_at || null;
-                                qData.clientName = row.client_name || qData.clientName || '';
-                                qData.quoteNumber = row.quote_number || qData.quoteNumber || '';
-                                if (!qData.projectAddress) qData.projectAddress = qData.project_address || '';
-                                if (!qData.clientEmail) qData.clientEmail = qData.email || '';
-                                if (!qData.clientPhone) qData.clientPhone = qData.phone || '';
+                                var resolved = await quoteStorageResolveCloudRow(result.data);
+                                var qData = resolved.data;
                                 window._supabaseQuoteId = result.data.id;
                                 localStorage.setItem("ald_active_quote_id", result.data.id);
                                 applyQuoteData(qData);
                                 if (qData.quoteNumber) document.getElementById("quoteNumber").value = qData.quoteNumber || "";
                                 renderTermsCheckboxes(getQuoteTermsForRender(qData));
-                                unsavedChanges = false;
-                                clearTimeout(_autoSaveTimer);
+                                quoteStorageFinishResolvedLoad(resolved, 'Restored from cloud');
                                 var el = document.getElementById("saveStatus");
-                                if (el) el.innerHTML = "<span style=\"color:#28a745;\"><i class=\"fas fa-cloud\"></i> Restored - " + (qData.clientName || "quote") + "</span>";
+                                if (el && resolved.source === 'cloud') el.innerHTML = "<span style=\"color:#28a745;\"><i class=\"fas fa-cloud\"></i> Restored - " + (qData.clientName || "quote") + "</span>";
                                 updateDraftWarning();
                             } else {
                                 // Quote not found - fall back to session restore

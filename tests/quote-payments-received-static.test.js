@@ -43,7 +43,7 @@ assert(
 );
 
 assert(
-  storage.includes('qData._paymentBalanceDueFallback = data.total;') &&
+  storage.includes('data._paymentBalanceDueFallback = row.total;') &&
   builder.includes('window._quotePaymentFallbackBalanceDue') &&
   builder.includes("name: 'Deposit paid'"),
   'Builder should infer missing payment metadata from a lower saved cloud balance for quotes saved before this field existed'

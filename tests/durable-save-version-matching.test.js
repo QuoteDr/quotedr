@@ -16,11 +16,62 @@ const coordinator = fs.readFileSync('save-coordinator.js', 'utf8');
 const supabaseContext = {};
 vm.createContext(supabaseContext);
 vm.runInContext(extractFunction(supabase, 'qdDurableVersionsMatch', 'qdApplyDurableFilters'), supabaseContext);
+vm.runInContext(extractFunction(supabase, 'qdDurableSaveTime', 'qdQuoteOperationEditTime'), supabaseContext);
+vm.runInContext(extractFunction(supabase, 'qdQuoteOperationEditTime', 'qdQuoteCloudEditTime'), supabaseContext);
+vm.runInContext(extractFunction(supabase, 'qdQuoteCloudEditTime', 'qdQuoteOperationIsSuperseded'), supabaseContext);
+vm.runInContext(extractFunction(supabase, 'qdQuoteOperationIsSuperseded', 'qdQuoteMetadataRow'), supabaseContext);
 
 assert.strictEqual(
   supabaseContext.qdDurableVersionsMatch('2026-07-14T11:10:59.123Z', '2026-07-14 11:10:59.123+00'),
   true,
   'Supabase timestamp formatting differences should still acknowledge the same save'
+);
+
+assert.strictEqual(
+  supabaseContext.qdQuoteOperationIsSuperseded(
+    { payload: { savedAt: '2026-07-14T10:00:00.000Z' }, forceConflictOverwrite: true },
+    { updated_at: '2026-07-14T11:00:01.000Z', data: { _saveMeta: { clientEditedAt: '2026-07-14T11:00:00.000Z' } } }
+  ),
+  true,
+  'an old queued quote must not overwrite newer cloud work, even if a legacy conflict choice remained on the operation'
+);
+assert.strictEqual(
+  supabaseContext.qdQuoteOperationIsSuperseded(
+    { payload: { _clientEditedAt: '2026-07-14T12:00:00.000Z' } },
+    { updated_at: '2026-07-14T11:00:01.000Z', data: { _saveMeta: { clientEditedAt: '2026-07-14T11:00:00.000Z' } } }
+  ),
+  false,
+  'a genuinely newer device edit should be allowed to update the cloud quote'
+);
+assert.strictEqual(
+  supabaseContext.qdQuoteOperationIsSuperseded(
+    {
+      baseVersion: '2026-07-14T11:00:01.000Z',
+      payload: { _clientEditedAt: '2026-07-14T10:59:00.000Z' }
+    },
+    { updated_at: '2026-07-14T11:00:01.000Z', data: { _saveMeta: { clientEditedAt: '2026-07-14T11:00:00.000Z' } } }
+  ),
+  false,
+  'an edit based on the exact cloud version should not be rejected because a device clock is behind'
+);
+assert.strictEqual(
+  supabaseContext.qdQuoteOperationIsSuperseded(
+    {
+      baseVersion: '2026-07-14T10:30:00.000Z',
+      payload: { _clientEditedAt: '2026-07-14T10:59:00.000Z' }
+    },
+    { updated_at: '2026-07-14T11:00:01.000Z', data: { _saveMeta: { clientEditedAt: '2026-07-14T11:00:00.000Z' } } }
+  ),
+  true,
+  'an edit based on an older cloud version must still yield to newer cloud work'
+);
+assert.strictEqual(
+  supabaseContext.qdQuoteOperationIsSuperseded(
+    { payload: {}, forceConflictOverwrite: true },
+    { id: 'existing-cloud-quote', updated_at: '2026-07-14T11:00:01.000Z', data: {} }
+  ),
+  true,
+  'a legacy retry with no freshness metadata must not overwrite an existing cloud quote'
 );
 assert.strictEqual(
   supabaseContext.qdDurableVersionsMatch('2026-07-14T11:10:59.123Z', '2026-07-14T11:11:00.123Z'),
@@ -115,7 +166,7 @@ vm.runInContext('async ' + extractFunction(coordinator, 'checkConflict', 'flushO
       throw new Error('The cloud version should not be checked again after an explicit local choice');
     }
   });
-  assert.strictEqual(explicitLocalChoice, null, 'Use This Device should explicitly bypass the resolved conflict');
+  assert.strictEqual(explicitLocalChoice, null, 'an explicit local choice should bypass the generic non-quote conflict check');
 
   const quoteLastWriteWins = await coordinatorContext.checkConflict({
     ...operation,
@@ -125,7 +176,7 @@ vm.runInContext('async ' + extractFunction(coordinator, 'checkConflict', 'flushO
       throw new Error('Quote saves should not be blocked by another device timestamp');
     }
   });
-  assert.strictEqual(quoteLastWriteWins, null, 'quotes should retain their historical last-write-wins behavior');
+  assert.strictEqual(quoteLastWriteWins, null, 'quote conflict decisions should be delegated to the atomic freshness-aware adapter');
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;
@@ -142,8 +193,12 @@ assert(
 assert(
   coordinator.includes("if (operation.entityType === 'quote') return null;") &&
     coordinator.includes('detail: { operation: operation, result: result, version: cloudVersion }') &&
-    coordinator.includes("operation.state === 'conflict' && operation.entityType !== 'quote'"),
-  'Quote acknowledgements should expose the confirmed cloud version without blocking multi-device saves'
+    coordinator.includes('async function markSuperseded(operation, result)') &&
+    supabase.includes("action === 'update' && target.table === 'quotes' && operation.entityType === 'quote'") &&
+    supabase.includes("updateQuery.eq('updated_at', current.updated_at)") &&
+    supabase.includes("target.requireCurrentQuoteBase === true") &&
+    supabase.includes("conflictError.code = '409'"),
+  'Quote saves should expose confirmed versions while atomically rejecting genuine stale-base edits'
 );
 
 const quoteStorage = fs.readFileSync('quote-storage.js', 'utf8');
@@ -166,9 +221,9 @@ assert(
 
 assert(
   coordinator.includes("await flush({ force: true });") &&
-    coordinator.includes('Use This Device') &&
+    coordinator.includes('Use My Version') &&
     coordinator.includes('Load Cloud Copy'),
-  'Startup should retry old conflicts and genuine conflicts should expose explicit resolution choices'
+  'Startup should retry pending work while genuine conflicts expose explicit resolution choices'
 );
 
 [
@@ -187,15 +242,15 @@ assert(
 ].forEach(file => {
   const html = fs.readFileSync(file, 'utf8');
   if (html.includes('supabase-v2.js')) {
-    assert(html.includes('supabase-v2.js?v=2026071402'), `${file} should load the fixed Supabase adapter`);
+    assert(html.includes('supabase-v2.js?v=2026071502'), `${file} should load the fixed Supabase adapter`);
   }
   if (html.includes('save-coordinator.js')) {
-    assert(html.includes('save-coordinator.js?v=2026071405'), `${file} should load the fixed save coordinator`);
+    assert(html.includes('save-coordinator.js?v=2026071502'), `${file} should load the fixed save coordinator`);
   }
 });
 
 assert(
-  fs.readFileSync('quote-builder.html', 'utf8').includes('quote-storage.js?v=2026071403'),
+  fs.readFileSync('quote-builder.html', 'utf8').includes('quote-storage.js?v=2026071502'),
   'Quote Builder should load the cloud acknowledgement listener immediately'
 );
 
