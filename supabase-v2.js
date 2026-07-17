@@ -15,8 +15,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 // Initialize Supabase client
 const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-window._supabase = _supabase;
-window._supabaseClient = _supabase;
 
 // Current user state
 let currentUser = null;
@@ -39,446 +37,6 @@ async function getCurrentUser() {
     }
     return currentUser;
 }
-
-const QD_DURABLE_ENTITY_TYPES = [
-    'quote', 'invoice', 'item_database', 'item', 'client', 'client_database', 'template', 'term',
-    'business_profile', 'company_logo', 'payment_settings', 'notification_settings', 'quote_preferences',
-    'quote_style', 'portal_theme', 'portal_job_folder', 'portal_job_asset', 'client_note', 'client_signature',
-    'client_approval', 'labor_job_site', 'labor_session', 'labor_device', 'labor_location_event',
-    'labor_notification_settings', 'user_data', 'upload_metadata', 'feedback', 'admin_broadcast', 'ai_mapping', 'ai_trade_rule'
-];
-
-function qdDurableSaveError(error, fallback) {
-    if (!error) return new Error(fallback || 'Cloud save failed');
-    if (error instanceof Error) return error;
-    var wrapped = new Error(error.message || error.details || fallback || String(error));
-    wrapped.code = error.code || error.status || '';
-    wrapped.details = error.details || '';
-    wrapped.hint = error.hint || '';
-    return wrapped;
-}
-
-function qdDurableVersionsMatch(left, right) {
-    if (left === undefined || left === null || right === undefined || right === null) return false;
-    if (String(left) === String(right)) return true;
-    var leftTime = Date.parse(String(left));
-    var rightTime = Date.parse(String(right));
-    return Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime === rightTime;
-}
-
-function qdDurableSaveMetaMatches(operation, saveMeta) {
-    if (!operation || !saveMeta || saveMeta.revision !== operation.revision) return false;
-    return !saveMeta.operationId || !operation.operationId || saveMeta.operationId === operation.operationId;
-}
-
-function qdDurableSaveTime(value) {
-    var parsed = Date.parse(String(value || ''));
-    return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function qdQuoteOperationEditTime(operation) {
-    var payload = operation && operation.payload || {};
-    var targetData = operation && operation.target && operation.target.values && operation.target.values.data || {};
-    return qdDurableSaveTime(
-        operation && operation.clientEditedAt ||
-        payload._clientEditedAt ||
-        payload.clientEditedAt ||
-        targetData._clientEditedAt ||
-        payload.savedAt ||
-        operation && operation.localSavedAt
-    );
-}
-
-function qdQuoteCloudEditTime(row) {
-    var data = row && row.data || {};
-    var saveMeta = data && data._saveMeta || {};
-    return qdDurableSaveTime(
-        saveMeta.clientEditedAt ||
-        data._clientEditedAt ||
-        saveMeta.localSavedAt ||
-        data.savedAt ||
-        row && row.updated_at
-    );
-}
-
-function qdQuoteOperationSavedTime(operation) {
-    var payload = operation && operation.payload || {};
-    var targetData = operation && operation.target && operation.target.values && operation.target.values.data || {};
-    var saveMeta = targetData && targetData._saveMeta || {};
-    return qdDurableSaveTime(
-        operation && operation.localSavedAt ||
-        saveMeta.localSavedAt ||
-        payload.savedAt
-    );
-}
-
-function qdQuoteCloudSavedTime(row) {
-    var data = row && row.data || {};
-    var saveMeta = data && data._saveMeta || {};
-    return qdDurableSaveTime(
-        saveMeta.localSavedAt ||
-        data.savedAt ||
-        row && row.updated_at
-    );
-}
-
-function qdQuoteOperationIsSuperseded(operation, row) {
-    if (operation && operation.baseVersion && qdDurableVersionsMatch(operation.baseVersion, row && row.updated_at)) {
-        return false;
-    }
-    var incomingTime = qdQuoteOperationEditTime(operation);
-    var cloudTime = qdQuoteCloudEditTime(row);
-    if (incomingTime > 0) {
-        if (cloudTime !== incomingTime) return cloudTime > incomingTime;
-        var incomingSavedTime = qdQuoteOperationSavedTime(operation);
-        var cloudSavedTime = qdQuoteCloudSavedTime(row);
-        return incomingSavedTime > 0 && cloudSavedTime > incomingSavedTime;
-    }
-    // A legacy retry with no trustworthy edit time cannot safely replace an
-    // existing cloud quote unless its base version matched above.
-    return !!(row && row.id);
-}
-
-function qdQuoteMetadataRow(row) {
-    if (!row) return null;
-    return {
-        id: row.id,
-        user_id: row.user_id,
-        status: row.status,
-        type: row.type,
-        quote_number: row.quote_number,
-        updated_at: row.updated_at
-    };
-}
-
-async function qdExecuteFreshQuoteUpdate(operation, target, values) {
-    for (var attempt = 0; attempt < 4; attempt++) {
-        var currentQuery = _supabase
-            .from('quotes')
-            .select('id,user_id,status,type,quote_number,updated_at,data')
-            .eq('user_id', operation.userId);
-        currentQuery = qdApplyDurableFilters(currentQuery, target.filters);
-        var currentResult = await currentQuery.limit(1).maybeSingle();
-        if (currentResult.error) throw qdDurableSaveError(currentResult.error, 'Could not inspect the current cloud quote.');
-        if (!currentResult.data) throw new Error('Cloud save matched no quote. Your local copy is retained for retry.');
-
-        var current = currentResult.data;
-        var currentMeta = current.data && current.data._saveMeta;
-        if (qdDurableSaveMetaMatches(operation, currentMeta)) {
-            return { data: [qdQuoteMetadataRow(current)], error: null, alreadyAcknowledged: true };
-        }
-        var sameOperationChain = !!(currentMeta && currentMeta.operationId && operation.operationId && currentMeta.operationId === operation.operationId);
-        if (target.requireCurrentQuoteBase === true && !sameOperationChain && !qdDurableVersionsMatch(operation.baseVersion, current.updated_at)) {
-            var conflictError = new Error('This quote was updated in another tab or device. Choose which version to keep before saving.');
-            conflictError.code = '409';
-            conflictError.serverVersion = current.updated_at || null;
-            throw conflictError;
-        }
-        if (qdQuoteOperationIsSuperseded(operation, current)) {
-            return {
-                data: [qdQuoteMetadataRow(current)],
-                error: null,
-                superseded: true,
-                cloudVersion: current.updated_at || null
-            };
-        }
-
-        async function executeQuoteUpdate(currentValues) {
-            var updateQuery = _supabase
-                .from('quotes')
-                .update(currentValues)
-                .eq('user_id', operation.userId);
-            updateQuery = qdApplyDurableFilters(updateQuery, target.filters);
-            updateQuery = current.updated_at == null
-                ? updateQuery.is('updated_at', null)
-                : updateQuery.eq('updated_at', current.updated_at);
-            return await updateQuery.select('id,user_id,status,type,quote_number,updated_at');
-        }
-
-        var writeValues = values;
-        var writeResult = await executeQuoteUpdate(writeValues);
-        if (writeResult.error && target.fallbackStripColumns && /schema cache|column|type|parent_quote_id|change_order_number/i.test(writeResult.error.message || '')) {
-            writeValues = Object.assign({}, values);
-            target.fallbackStripColumns.forEach(function(column) { delete writeValues[column]; });
-            writeResult = await executeQuoteUpdate(writeValues);
-        }
-        if (writeResult.error) throw qdDurableSaveError(writeResult.error);
-        if (Array.isArray(writeResult.data) && writeResult.data.length) {
-            return { data: writeResult.data, error: null };
-        }
-        // Another device won the compare-and-swap. Re-read and compare again.
-    }
-    var raceError = new Error('The quote changed in the cloud while this device was saving. Your local copy is retained for retry.');
-    raceError.code = 'QD_SAVE_RACE';
-    throw raceError;
-}
-
-async function qdDurableAcknowledgementMatches(operation, target, acknowledged) {
-    if (!operation || !target || !acknowledged) return false;
-    var versionColumn = target.verifyVersionColumn || 'updated_at';
-    if (target.verifyVersionValue !== undefined && target.verifyVersionValue !== null &&
-        qdDurableVersionsMatch(acknowledged[versionColumn], target.verifyVersionValue)) {
-        return true;
-    }
-    var returnedMeta = acknowledged.data && acknowledged.data._saveMeta;
-    if (qdDurableSaveMetaMatches(operation, returnedMeta)) return true;
-
-    // Lightweight quote responses omit `data`, so verify the marker that was
-    // actually stored before treating a server-adjusted timestamp as failure.
-    if (target.versionRead) {
-        var storedVersion = await qdReadDurableSupabaseVersion(operation);
-        if (storedVersion && typeof storedVersion === 'object' &&
-            qdDurableSaveMetaMatches(operation, storedVersion)) {
-            return true;
-        }
-        return false;
-    }
-
-    // Inserts have no stable row id to read before their first acknowledgement.
-    if (target.selectQuoteMetadata === true && target.action === 'insert' && acknowledged.id) {
-        var expectedId = target.values && target.values.id;
-        return !expectedId || String(expectedId) === String(acknowledged.id);
-    }
-    return false;
-}
-
-function qdApplyDurableFilters(query, filters) {
-    (filters || []).forEach(function(filter) {
-        if (!filter || !filter.column || filter.column === 'user_id') return;
-        if (filter.operator === 'in') query = query.in(filter.column, Array.isArray(filter.value) ? filter.value : []);
-        else if (filter.operator === 'is') query = query.is(filter.column, filter.value);
-        else if (filter.operator === 'neq') query = query.neq(filter.column, filter.value);
-        else query = query.eq(filter.column, filter.value);
-    });
-    return query;
-}
-
-async function qdExecuteDurableSupabaseTarget(operation) {
-    var target = operation && operation.target;
-    if (!target || !target.table || !target.action) throw new Error('Durable save target is incomplete.');
-    var action = target.action;
-    var values = target.values;
-    var result;
-
-    if (action === 'replace') {
-        var replacementRows = Array.isArray(values) ? values : [];
-        var matchColumn = target.matchColumn || 'id';
-        var oldRowsResult = await _supabase.from(target.table).select('id,' + matchColumn).eq('user_id', operation.userId);
-        if (oldRowsResult.error) throw qdDurableSaveError(oldRowsResult.error, 'Could not inspect records before replacement.');
-        var replacementResult = { data: [], error: null };
-        if (replacementRows.length) {
-            replacementResult = await _supabase.from(target.table).upsert(replacementRows, target.onConflict ? { onConflict: target.onConflict } : undefined).select();
-            if (replacementResult.error) throw qdDurableSaveError(replacementResult.error, 'Could not save replacement records.');
-        }
-        var keep = new Set(replacementRows.map(function(row) { return String(row[matchColumn] || ''); }));
-        var staleIds = (oldRowsResult.data || []).filter(function(row) { return !keep.has(String(row[matchColumn] || '')); }).map(function(row) { return row.id; }).filter(Boolean);
-        if (staleIds.length) {
-            var deleteResult = await _supabase.from(target.table).delete().eq('user_id', operation.userId).in('id', staleIds);
-            if (deleteResult.error) throw qdDurableSaveError(deleteResult.error, 'Could not finish replacing old records.');
-        }
-        return { data: replacementResult.data || [], error: null };
-    }
-
-    if (action === 'insert' && target.dedupe && target.dedupe.filters) {
-        var existingQuery = _supabase.from(target.table).select(target.dedupe.select || 'id,updated_at').eq('user_id', operation.userId);
-        existingQuery = qdApplyDurableFilters(existingQuery, target.dedupe.filters);
-        var existingResult = await existingQuery.limit(1).maybeSingle();
-        if (existingResult.error) throw qdDurableSaveError(existingResult.error, 'Could not verify an idempotent insert.');
-        if (existingResult.data) {
-            action = 'update';
-            target.filters = [{ column: 'id', value: existingResult.data.id }];
-        }
-    }
-
-    // Apply this to queued operations created by older app versions too. Those
-    // operations do not contain the freshnessGuard marker.
-    if (action === 'update' && target.table === 'quotes' && operation.entityType === 'quote') {
-        var quoteResult = await qdExecuteFreshQuoteUpdate(operation, target, values);
-        if (!quoteResult.superseded && target.verifyRevision) {
-            var quoteAcknowledged = Array.isArray(quoteResult.data) ? quoteResult.data[0] : quoteResult.data;
-            if (!await qdDurableAcknowledgementMatches(operation, target, quoteAcknowledged)) {
-                throw new Error('Cloud save acknowledgement did not match the local revision.');
-            }
-        }
-        return quoteResult;
-    }
-
-    async function executeOnce(currentValues) {
-        var query;
-        if (action === 'upsert') {
-            query = _supabase.from(target.table).upsert(currentValues, target.onConflict ? { onConflict: target.onConflict } : undefined);
-        } else if (action === 'insert') {
-            query = _supabase.from(target.table).insert(currentValues);
-        } else if (action === 'update') {
-            query = _supabase.from(target.table).update(currentValues);
-            if (target.ownerScoped !== false) query = query.eq('user_id', operation.userId);
-            query = qdApplyDurableFilters(query, target.filters);
-        } else if (action === 'delete') {
-            query = _supabase.from(target.table).delete();
-            if (target.ownerScoped !== false) query = query.eq('user_id', operation.userId);
-            query = qdApplyDurableFilters(query, target.filters);
-        } else {
-            throw new Error('Unsupported durable Supabase action: ' + action);
-        }
-        if (target.selectQuoteMetadata === true) query = query.select('id,user_id,status,type,quote_number,updated_at');
-        else if (target.select !== false) query = query.select(target.select || '*');
-        if (target.single === 'single') query = query.single();
-        else if (target.single === 'maybeSingle') query = query.maybeSingle();
-        return await query;
-    }
-
-    result = await executeOnce(values);
-    if (result.error && target.fallbackStripColumns && /schema cache|column|type|parent_quote_id|change_order_number/i.test(result.error.message || '')) {
-        var stripped = Array.isArray(values)
-            ? values.map(function(row) { return Object.assign({}, row); })
-            : Object.assign({}, values);
-        target.fallbackStripColumns.forEach(function(column) {
-            if (Array.isArray(stripped)) stripped.forEach(function(row) { delete row[column]; });
-            else delete stripped[column];
-        });
-        result = await executeOnce(stripped);
-    }
-    if (result.error) throw qdDurableSaveError(result.error);
-    if (target.expectRows !== false && target.select !== false && Array.isArray(result.data) && result.data.length === 0) {
-        throw new Error('Cloud save matched no records. Your local copy is retained for retry.');
-    }
-    if (target.verifyRevision) {
-        var acknowledged = Array.isArray(result.data) ? result.data[0] : result.data;
-        if (!await qdDurableAcknowledgementMatches(operation, target, acknowledged)) {
-            throw new Error('Cloud save acknowledgement did not match the local revision.');
-        }
-    }
-    return { data: result.data, error: null };
-}
-
-async function qdReadDurableSupabaseVersion(operation) {
-    var target = operation && operation.target;
-    var version = target && target.versionRead;
-    if (!version || !version.table || !version.filters) return null;
-    var versionColumn = version.column || 'updated_at';
-    var selectColumns = operation.target && operation.target.verifyRevision ? (versionColumn + ',data') : versionColumn;
-    var query = _supabase.from(version.table).select(selectColumns).eq('user_id', operation.userId);
-    query = qdApplyDurableFilters(query, version.filters);
-    var result = await query.limit(1).maybeSingle();
-    if (result.error) throw qdDurableSaveError(result.error, 'Could not verify the cloud revision.');
-    if (!result.data) return null;
-    if (operation.target && operation.target.verifyRevision) {
-        var saveMeta = result.data.data && result.data.data._saveMeta;
-        return {
-            version: result.data[versionColumn],
-            revision: saveMeta && saveMeta.revision,
-            operationId: saveMeta && saveMeta.operationId
-        };
-    }
-    return result.data[versionColumn];
-}
-
-function qdRegisterDurableSaveAdapter(entityType) {
-    if (!window.QuoteDrSave || !entityType) return false;
-    if (!window._qdDurableRegisteredAdapters) window._qdDurableRegisteredAdapters = {};
-    if (window._qdDurableRegisteredAdapters[entityType]) return true;
-    window.QuoteDrSave.registerAdapter(entityType, {
-        write: qdExecuteDurableSupabaseTarget,
-        readVersion: qdReadDurableSupabaseVersion,
-        verify: function(result) { return !!result && !result.error; }
-    });
-    window._qdDurableRegisteredAdapters[entityType] = true;
-    return true;
-}
-
-function qdRegisterAllDurableSaveAdapters() {
-    QD_DURABLE_ENTITY_TYPES.forEach(qdRegisterDurableSaveAdapter);
-    qdRegisterSecureClientSaveAdapters();
-}
-
-async function qdDurableSupabaseOperation(options) {
-    options = options || {};
-    if (!options.entityType || !options.entityId || !options.target) throw new Error('Durable Supabase operation is incomplete.');
-    if (window.QuoteDrSave) {
-        qdRegisterDurableSaveAdapter(options.entityType);
-        return window.QuoteDrSave.save({
-            entityType: options.entityType,
-            entityId: options.entityId,
-            entityLabel: options.entityLabel || '',
-            action: options.action || options.target.action || 'upsert',
-            payload: options.payload,
-            target: options.target,
-            baseVersion: options.baseVersion || null,
-            background: options.background === true,
-            holdConflict: options.holdConflict === true,
-            timeoutMs: options.timeoutMs || 15000
-        });
-    }
-    try {
-        var user = await getCurrentUser();
-        var directOperation = {
-            userId: user ? user.id : 'anonymous',
-            entityType: options.entityType,
-            entityId: String(options.entityId),
-            payload: options.payload,
-            baseVersion: options.baseVersion || null,
-            target: options.target
-        };
-        var result = await qdExecuteDurableSupabaseTarget(directOperation);
-        return { state: 'cloud_saved', saveState: 'cloud_saved', data: result.data, error: null };
-    } catch (error) {
-        return { state: 'local_failed', saveState: 'local_failed', data: null, error: qdDurableSaveError(error) };
-    }
-}
-
-async function saveUserDataValue(key, value, options) {
-    options = options || {};
-    var user = await getCurrentUser();
-    if (!user) return { error: 'Not authenticated' };
-    if (options.localStorageKey) {
-        try {
-            localStorage.setItem(options.localStorageKey, options.rawLocalValue === true ? String(value || '') : JSON.stringify(value));
-        } catch (e) {}
-    }
-    return qdDurableSupabaseOperation({
-        entityType: options.entityType || 'user_data',
-        entityId: key,
-        entityLabel: options.entityLabel || key.replace(/_/g, ' '),
-        payload: value,
-        target: {
-            table: 'user_data',
-            action: 'upsert',
-            values: { user_id: user.id, key: key, value: value, updated_at: new Date().toISOString() },
-            onConflict: 'user_id,key'
-        },
-        background: options.background === true
-    });
-}
-
-window.qdRegisterAllDurableSaveAdapters = qdRegisterAllDurableSaveAdapters;
-window.qdDurableSupabaseOperation = qdDurableSupabaseOperation;
-window.saveUserDataValue = saveUserDataValue;
-
-function qdExternalOperationStorageKey(action, entityId) {
-    return 'quotedr_external_operation:' + String(action || 'action') + ':' + String(entityId || 'default');
-}
-
-function qdGetExternalOperationId(action, entityId) {
-    var key = qdExternalOperationStorageKey(action, entityId);
-    try {
-        var existing = sessionStorage.getItem(key);
-        if (existing) return existing;
-        var value = window.crypto && typeof window.crypto.randomUUID === 'function'
-            ? window.crypto.randomUUID()
-            : 'qd-side-effect-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
-        sessionStorage.setItem(key, value);
-        return value;
-    } catch (e) {
-        return 'qd-side-effect-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
-    }
-}
-
-function qdCompleteExternalOperation(action, entityId) {
-    try { sessionStorage.removeItem(qdExternalOperationStorageKey(action, entityId)); } catch (e) {}
-}
-
-window.qdGetExternalOperationId = qdGetExternalOperationId;
-window.qdCompleteExternalOperation = qdCompleteExternalOperation;
 
 // Auth headers for Supabase Edge Functions that need the current signed-in user.
 async function getSupabaseFunctionAuthHeaders() {
@@ -526,11 +84,6 @@ async function callClientDocumentFunction(body, requireUser) {
 async function createSecureClientShareLink(documentId, baseUrl, options) {
     options = options || {};
     if (!documentId) throw new Error('Missing document id for secure client link');
-    if (window.QuoteDrSave) {
-        var quoteReady = await window.QuoteDrSave.requireCloudAck('quote', documentId);
-        var invoiceReady = quoteReady ? await window.QuoteDrSave.requireCloudAck('invoice', documentId) : false;
-        if (!quoteReady || !invoiceReady) throw new Error('This document is safely stored on this device but has not finished syncing to the cloud. Retry the pending save before sharing it.');
-    }
     return callClientDocumentFunction({
         action: 'create_link',
         documentId: documentId,
@@ -556,76 +109,25 @@ async function loadSecureClientDocument(documentId, token, portalAnchorId) {
 
 async function updateSecureClientDocument(documentId, token, updateAction, payload, portalAnchorId) {
     if (!documentId || !token) return { error: 'Missing secure client link token' };
-    var businessUpdate = updateAction === 'client_update' || updateAction === 'decline_change_order';
-    if (businessUpdate && window.QuoteDrSave) {
-        qdRegisterSecureClientSaveAdapters();
-        var dataPatch = payload && payload.dataPatch || {};
-        var signed = !!(dataPatch.signed_at || dataPatch.signature_url || dataPatch.signature_data_url || (payload && payload.topLevel && payload.topLevel.accepted_at));
-        var entityType = signed ? 'client_signature' : (updateAction === 'decline_change_order' ? 'client_approval' : 'client_note');
-        return window.QuoteDrSave.save({
-            entityType: entityType,
-            adapterType: 'secure_client_document',
-            entityId: documentId + ':' + (signed ? 'signature' : updateAction),
-            entityLabel: signed ? 'Client signature and approval' : (updateAction === 'decline_change_order' ? 'Client change order decision' : 'Client quote notes and selections'),
-            ownerId: 'client-document:' + documentId,
-            payload: {
-                documentId: documentId,
-                secureToken: token,
-                updateAction: updateAction,
-                updatePayload: payload || {},
-                portalAnchorId: portalAnchorId || ''
-            },
-            action: 'update'
-        });
-    }
-    return qdExecuteSecureClientDocumentUpdate({
-        payload: {
-            documentId: documentId,
-            secureToken: token,
-            updateAction: updateAction,
-            updatePayload: payload || {},
-            portalAnchorId: portalAnchorId || ''
-        }
-    });
-}
-
-async function qdExecuteSecureClientDocumentUpdate(operation) {
-    var envelope = operation && operation.payload || {};
     try {
         const data = await fetch(CLIENT_DOCUMENT_FUNCTION_URL, {
             method: 'POST',
             headers: await getSupabaseOptionalUserFunctionHeaders(),
             body: JSON.stringify(Object.assign({
             action: 'update',
-            updateAction: envelope.updateAction,
-            documentId: envelope.documentId,
-            token: envelope.secureToken,
-            portalAnchorId: envelope.portalAnchorId || ''
-            }, envelope.updatePayload || {}))
+            updateAction: updateAction,
+            documentId: documentId,
+            token: token,
+            portalAnchorId: portalAnchorId || ''
+            }, payload || {}))
         }).then(async function(response) {
             const data = await response.json().catch(function() { return {}; });
             if (!response.ok || data.error) throw new Error(data.error || 'Secure client document request failed');
             return data;
         });
-        return { data: data.document || data.result || null, unchanged: data.unchanged, status: data.status || '' };
+        return { data: data.document, unchanged: data.unchanged };
     } catch (error) {
         return { error: error };
-    }
-}
-
-function qdRegisterSecureClientSaveAdapters() {
-    if (!window.QuoteDrSave) return;
-    if (!window._qdSecureClientAdapterRegistered) {
-        window.QuoteDrSave.registerAdapter('secure_client_document', {
-            write: qdExecuteSecureClientDocumentUpdate,
-            verify: function(result) { return !!result && !result.error; },
-            redact: function(payload) {
-                var clean = Object.assign({}, payload || {});
-                delete clean.secureToken;
-                return clean;
-            }
-        });
-        window._qdSecureClientAdapterRegistered = true;
     }
 }
 
@@ -724,21 +226,17 @@ async function saveClientNotificationPreferences(preferences) {
         email_to: String(prefs.email_to || '').trim(),
         updated_at: new Date().toISOString()
     };
-    var result = await qdDurableSupabaseOperation({
-        entityType: 'notification_settings',
-        entityId: 'client-activity',
-        entityLabel: 'Client activity notification settings',
-        payload: prefs,
-        target: {
-            table: 'client_notification_preferences',
-            action: 'upsert',
-            values: payload,
-            onConflict: 'user_id',
-            single: 'maybeSingle'
-        }
-    });
-    if (result.error) return result;
-    return Object.assign({}, result, { data: Object.assign(clientActivityDefaultPreferences(), result.data || payload) });
+    try {
+        const { data, error } = await _supabase
+            .from('client_notification_preferences')
+            .upsert(payload, { onConflict: 'user_id' })
+            .select('*')
+            .maybeSingle();
+        if (error) throw error;
+        return { data: Object.assign(clientActivityDefaultPreferences(), data || payload) };
+    } catch (error) {
+        return { error: error };
+    }
 }
 
 async function loadClientActivityEvents(limit) {
@@ -763,24 +261,35 @@ async function markClientActivityEventsRead(ids, read) {
     if (!user) return { error: 'Not authenticated' };
     const eventIds = Array.isArray(ids) ? ids.filter(Boolean) : [];
     if (!eventIds.length) return { data: [] };
-    return qdDurableSupabaseOperation({
-        entityType: 'notification_settings',
-        entityId: 'client-activity-read-' + eventIds.slice().sort().join(','),
-        entityLabel: 'Client activity read status',
-        action: 'update',
-        payload: { ids: eventIds, read: read !== false },
-        target: {
-            table: 'client_activity_events',
-            action: 'update',
-            values: { read_at: read === false ? null : new Date().toISOString() },
-            filters: [{ column: 'id', operator: 'in', value: eventIds }]
-        }
-    });
+    try {
+        const { data, error } = await _supabase
+            .from('client_activity_events')
+            .update({ read_at: read === false ? null : new Date().toISOString() })
+            .eq('user_id', user.id)
+            .in('id', eventIds)
+            .select('*');
+        if (error) throw error;
+        return { data: data || [] };
+    } catch (error) {
+        return { error: error };
+    }
 }
 
 // Sign in with email and password
 async function signInWithEmail(email, password) {
     const { data, error } = await _supabase.auth.signInWithPassword({
+        email: email,
+        password: password
+    });
+    if (error) throw error;
+    currentUser = data.user;
+    qdIdentifyAnalyticsUser(currentUser);
+    return data;
+}
+
+// Sign up with email and password
+async function signUpWithEmail(email, password) {
+    const { data, error } = await _supabase.auth.signUp({
         email: email,
         password: password
     });
@@ -830,18 +339,9 @@ async function updateUserProfile(profileData) {
 async function saveOnboardingComplete(value) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
-    const result = await qdDurableSupabaseOperation({
-        entityType: 'user_data',
-        entityId: 'onboarding_complete',
-        entityLabel: 'Onboarding status',
-        payload: { complete: value },
-        target: {
-            table: 'user_data',
-            action: 'upsert',
-            values: { user_id: user.id, key: 'onboarding_complete', value: { complete: value }, updated_at: new Date().toISOString() },
-            onConflict: 'user_id,key'
-        }
-    });
+    const result = await _supabase
+        .from('user_data')
+        .upsert({ user_id: user.id, key: 'onboarding_complete', value: { complete: value }, updated_at: new Date().toISOString() }, { onConflict: 'user_id,key' });
     if (!result.error) localStorage.setItem('ald_onboarding_complete', value ? '1' : '');
     return result;
 }
@@ -886,19 +386,22 @@ async function saveTemplate(templateData) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
     
-    var now = new Date().toISOString();
-    return qdDurableSupabaseOperation({
-        entityType: 'template',
-        entityId: templateData.name || 'unnamed',
-        entityLabel: templateData.name || 'Template',
-        payload: templateData,
-        target: {
-            table: 'templates',
-            action: 'upsert',
-            values: { user_id: user.id, name: templateData.name || '', rooms: templateData.rooms || [], created_at: now, updated_at: now },
-            onConflict: 'user_id,name'
-        }
-    });
+    const { data, error } = await _supabase
+        .from('templates')
+        .upsert({
+            user_id: user.id,
+            name: templateData.name || '',
+            rooms: templateData.rooms || [],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id,name' })
+        .select();
+        
+    if (error) {
+        console.error('Template save error:', error);
+        return { error };
+    }
+    return { data };
 }
 
 // Delete a template
@@ -906,14 +409,17 @@ async function deleteTemplate(templateName) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
     
-    return qdDurableSupabaseOperation({
-        entityType: 'template',
-        entityId: templateName,
-        entityLabel: templateName,
-        action: 'delete',
-        payload: { name: templateName },
-        target: { table: 'templates', action: 'delete', values: {}, filters: [{ column: 'name', value: templateName }], expectRows: false }
-    });
+    const { data, error } = await _supabase
+        .from('templates')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('name', templateName);
+        
+    if (error) {
+        console.error('Template delete error:', error);
+        return { error };
+    }
+    return { data };
 }
 
 // Get all terms for current user
@@ -939,19 +445,22 @@ async function saveTerm(termData) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
     
-    var now = new Date().toISOString();
-    return qdDurableSupabaseOperation({
-        entityType: 'term',
-        entityId: termData.name || 'unnamed',
-        entityLabel: termData.name || 'Quote term',
-        payload: termData,
-        target: {
-            table: 'terms',
-            action: 'upsert',
-            values: { user_id: user.id, name: termData.name || '', text: termData.text || '', created_at: now, updated_at: now },
-            onConflict: 'user_id,name'
-        }
-    });
+    const { data, error } = await _supabase
+        .from('terms')
+        .upsert({
+            user_id: user.id,
+            name: termData.name || '',
+            text: termData.text || '',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id,name' })
+        .select();
+        
+    if (error) {
+        console.error('Term save error:', error);
+        return { error };
+    }
+    return { data };
 }
 
 // Delete a term
@@ -959,14 +468,17 @@ async function deleteTerm(termName) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
     
-    return qdDurableSupabaseOperation({
-        entityType: 'term',
-        entityId: termName,
-        entityLabel: termName,
-        action: 'delete',
-        payload: { name: termName },
-        target: { table: 'terms', action: 'delete', values: {}, filters: [{ column: 'name', value: termName }], expectRows: false }
-    });
+    const { data, error } = await _supabase
+        .from('terms')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('name', termName);
+        
+    if (error) {
+        console.error('Term delete error:', error);
+        return { error };
+    }
+    return { data };
 }
 
 // Get all items for current user
@@ -992,29 +504,26 @@ async function saveItem(itemData) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
     
-    var now = new Date().toISOString();
-    return qdDurableSupabaseOperation({
-        entityType: 'item',
-        entityId: (itemData.category || '') + ':' + (itemData.name || 'unnamed'),
-        entityLabel: itemData.name || 'Saved item',
-        payload: itemData,
-        target: {
-            table: 'items',
-            action: 'upsert',
-            values: {
-                user_id: user.id,
-                name: itemData.name || '',
-                category: itemData.category || '',
-                unit_type: itemData.unitType || '',
-                rate: itemData.rate || 0,
-                material_cost: itemData.materialCost || 0,
-                supplier_url: itemData.supplierUrl || '',
-                created_at: now,
-                updated_at: now
-            },
-            onConflict: 'user_id,name'
-        }
-    });
+    const { data, error } = await _supabase
+        .from('items')
+        .upsert({
+            user_id: user.id,
+            name: itemData.name || '',
+            category: itemData.category || '',
+            unit_type: itemData.unitType || '',
+            rate: itemData.rate || 0,
+            material_cost: itemData.materialCost || 0,
+            supplier_url: itemData.supplierUrl || '',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id,name' })
+        .select();
+        
+    if (error) {
+        console.error('Item save error:', error);
+        return { error };
+    }
+    return { data };
 }
 
 // Delete an item
@@ -1022,14 +531,17 @@ async function deleteItem(itemName) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
     
-    return qdDurableSupabaseOperation({
-        entityType: 'item',
-        entityId: itemName,
-        entityLabel: itemName,
-        action: 'delete',
-        payload: { name: itemName },
-        target: { table: 'items', action: 'delete', values: {}, filters: [{ column: 'name', value: itemName }], expectRows: false }
-    });
+    const { data, error } = await _supabase
+        .from('items')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('name', itemName);
+        
+    if (error) {
+        console.error('Item delete error:', error);
+        return { error };
+    }
+    return { data };
 }
 
 // Get all quotes for current user
@@ -1050,72 +562,10 @@ async function listQuotes() {
     return { data };
 }
 
-// Compact rows for dashboards and quote pickers. Full quote JSON is fetched by id only when needed.
-async function listQuoteSummaries() {
-    const user = await getCurrentUser();
-    if (!user) return { error: 'Not authenticated' };
-
-    const result = await _supabase.rpc('quotedr_list_quote_summaries');
-    if (!result.error) {
-        var summaryRows = result.data || [];
-        if (summaryRows.length === 0) {
-            const emptyFallback = await listQuotes();
-            if (emptyFallback.error) return emptyFallback;
-            var existingRows = (emptyFallback.data || []).filter(function(row) {
-                return row.status !== 'backup' && row.quote_number !== '__ITEMS_BACKUP__';
-            });
-            if (existingRows.length > 0) {
-                console.warn('Quote summary query returned no rows; using compatibility fallback.');
-                return { data: existingRows };
-            }
-        }
-        return {
-            data: summaryRows.map(function(row) {
-                row._summaryOnly = true;
-                return row;
-            })
-        };
-    }
-
-    console.warn('Quote summary query failed; using compatibility fallback:', result.error.message || result.error);
-    const fallback = await listQuotes();
-    if (fallback.error) return fallback;
-    return {
-        data: (fallback.data || []).filter(function(row) {
-            return row.status !== 'backup' && row.quote_number !== '__ITEMS_BACKUP__';
-        })
-    };
-}
-
-async function prepareQuoteMediaForCloudSave(quoteData) {
-    if (!quoteData || !window.QuoteDrMedia || typeof QuoteDrMedia.prepareQuoteForCloud !== 'function') {
-        return { data: quoteData, replacements: [], bytesRemoved: 0 };
-    }
-    if (typeof QuoteDrMedia.countEmbeddedPhotos === 'function' && QuoteDrMedia.countEmbeddedPhotos(quoteData) === 0) {
-        return { data: quoteData, replacements: [], bytesRemoved: 0 };
-    }
-    return await QuoteDrMedia.prepareQuoteForCloud(quoteData);
-}
-
-async function quoteFullResolutionPhotosEnabledForSave() {
-    try {
-        return typeof hasFeature === 'function' ? await hasFeature('full_resolution_photos') : false;
-    } catch (e) {
-        return false;
-    }
-}
-
 // Save a quote
 async function saveQuote(quoteData) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
-
-    try {
-        await prepareQuoteMediaForCloudSave(quoteData);
-    } catch (error) {
-        console.error('Quote photo preparation error:', error);
-        return { error: error };
-    }
 
     const now = new Date().toISOString();
     if ((quoteData.type === 'change_order' || quoteData.documentType === 'change_order') &&
@@ -1151,7 +601,6 @@ async function saveQuote(quoteData) {
             projectAddress: projectAddress,
             clientEmail: clientEmail,
             clientPhone: clientPhone,
-            fullResolutionPhotosEnabled: await quoteFullResolutionPhotosEnabledForSave(),
             rooms: quoteData.rooms || [],
             terms: quoteData.terms || [],
             style: quoteData.style || {},
@@ -1172,13 +621,12 @@ async function saveQuote(quoteData) {
             portal_pin: quoteData.portal_pin || '',
             portal_added_at: quoteData.portal_added_at || null,
             portal_theme: quoteData.portal_theme || null,
-            _clientEditedAt: quoteData._clientEditedAt || quoteData.savedAt || now,
-            _editorInstanceId: quoteData._editorInstanceId || '',
             savedAt: quoteData.savedAt || now
         },
         updated_at: now
     };
 
+    let data, error;
     if (!quoteData.supabaseId && !quoteData.forceNew && !quoteData._forceNewQuote && quoteData.quoteNumber) {
         try {
             var existingResult = await _supabase
@@ -1198,52 +646,42 @@ async function saveQuote(quoteData) {
                     };
                 }
                 quoteData.supabaseId = existingQuote.id;
-                quoteData._serverUpdatedAt = quoteData._serverUpdatedAt || existingQuote.updated_at || null;
             }
         } catch(e) {
             console.warn('Quote duplicate guard could not check quote number:', e);
         }
     }
 
-    var isUpdate = !!quoteData.supabaseId;
-    if (!isUpdate) payload.created_at = now;
-    var entityId = quoteData.supabaseId || ('quote-number:' + (quoteData.quoteNumber || quoteData.clientName || 'draft'));
-    var target = {
-        table: 'quotes',
-        action: isUpdate ? 'update' : 'insert',
-        values: payload,
-        filters: isUpdate ? [{ column: 'id', value: quoteData.supabaseId }] : [],
-        dedupe: !isUpdate && quoteData.quoteNumber ? {
-            filters: [{ column: 'quote_number', value: quoteData.quoteNumber }],
-            select: 'id,updated_at'
-        } : null,
-        versionRead: isUpdate ? {
-            table: 'quotes',
-            column: 'updated_at',
-            filters: [{ column: 'id', value: quoteData.supabaseId }]
-        } : null,
-        fallbackStripColumns: ['type', 'parent_quote_id', 'change_order_number'],
-        freshnessGuard: 'quote_edit_time',
-        requireCurrentQuoteBase: true,
-        verifyRevision: true,
-        verifyVersionValue: payload.updated_at,
-        selectQuoteMetadata: true
-    };
-    var durableResult = await qdDurableSupabaseOperation({
-        entityType: 'quote',
-        entityId: entityId,
-        entityLabel: quoteData.quoteTitle || quoteData.clientName || quoteData.quoteNumber || 'Quote',
-        action: isUpdate ? 'update' : 'insert',
-        payload: quoteData,
-        target: target,
-        baseVersion: isUpdate ? (quoteData._serverUpdatedAt || quoteData.serverUpdatedAt || null) : null,
-        holdConflict: quoteData._remoteUpdatePending === true
-    });
-    if (durableResult.error) {
-        console.error('Quote save deferred:', durableResult.error);
-        return durableResult;
+    async function runSave(savePayload) {
+    if (quoteData.supabaseId) {
+        // Update existing quote
+        return await _supabase
+            .from('quotes')
+            .update(savePayload)
+            .eq('id', quoteData.supabaseId)
+            .eq('user_id', user.id)
+            .select();
+    } else {
+        // Insert new quote
+        savePayload.created_at = new Date().toISOString();
+        return await _supabase
+            .from('quotes')
+            .insert(savePayload)
+            .select();
     }
-    var data = durableResult.data;
+    }
+    ({ data, error } = await runSave(payload));
+    if (error && /type|parent_quote_id|change_order_number|schema cache/i.test(error.message || '')) {
+        delete payload.type;
+        delete payload.parent_quote_id;
+        delete payload.change_order_number;
+        ({ data, error } = await runSave(payload));
+    }
+
+    if (error) {
+        console.error('Quote save error:', error);
+        return { error };
+    }
     var savedQuote = Array.isArray(data) ? data[0] : data;
     var quoteKey = (savedQuote && savedQuote.id) || quoteData.supabaseId || quoteData.quoteNumber || now;
     var roomCount = Array.isArray(quoteData.rooms) ? quoteData.rooms.length : 0;
@@ -1259,7 +697,7 @@ async function saveQuote(quoteData) {
     if (roomCount > 0 && itemCount > 0 && (parseFloat(quoteData.grandTotal) || 0) > 0) {
         qdCaptureOnce('quote_completed', quoteKey, quoteProps);
     }
-    return durableResult;
+    return { data };
 }
 
 // Get all invoices for current user
@@ -1290,17 +728,10 @@ function qdCanonicalInvoiceNumber(value) {
 
 async function saveInvoiceForSharing(invoiceData) {
     const user = await getCurrentUser();
-    if (!user) return { error: 'Not authenticated' };
-    try {
-        await prepareQuoteMediaForCloudSave(invoiceData);
-    } catch (error) {
-        console.error('Invoice photo preparation error:', error);
-        return { error: error };
-    }
     const now = new Date().toISOString();
     const invoiceQuoteNumber = qdCanonicalInvoiceNumber(invoiceData.quoteNumber || invoiceData.quote_number || '');
     const payload = {
-        user_id: user.id,
+        user_id: user ? user.id : null,
         data: {
             ...invoiceData,
             quoteNumber: invoiceQuoteNumber,
@@ -1318,46 +749,41 @@ async function saveInvoiceForSharing(invoiceData) {
         status: 'invoiced',
         updated_at: now
     };
-    var isUpdate = !!invoiceData.supabaseId;
-    if (!isUpdate) payload.created_at = now;
-    var result = await qdDurableSupabaseOperation({
-        entityType: 'invoice',
-        entityId: invoiceData.supabaseId || ('invoice-number:' + invoiceQuoteNumber),
-        entityLabel: invoiceData.clientName ? ('Invoice for ' + invoiceData.clientName) : invoiceQuoteNumber,
-        action: isUpdate ? 'update' : 'insert',
-        payload: invoiceData,
-        target: {
-            table: 'quotes',
-            action: isUpdate ? 'update' : 'insert',
-            values: payload,
-            filters: isUpdate ? [{ column: 'id', value: invoiceData.supabaseId }] : [],
-            dedupe: !isUpdate ? { filters: [{ column: 'quote_number', value: invoiceQuoteNumber }], select: 'id,updated_at' } : null,
-            versionRead: isUpdate ? { table: 'quotes', column: 'updated_at', filters: [{ column: 'id', value: invoiceData.supabaseId }] } : null,
-            verifyRevision: true,
-            verifyVersionValue: payload.updated_at,
-            selectQuoteMetadata: true,
-            single: 'single'
-        },
-        baseVersion: isUpdate ? (invoiceData._serverUpdatedAt || invoiceData.serverUpdatedAt || null) : null
-    });
-    var data = result.data;
-    if (result.error) console.error('saveInvoiceForSharing deferred:', result.error);
-    if (!result.error && data) {
-        var savedInvoice = Array.isArray(data) ? data[0] : data;
-        qdCaptureOnce('invoice_created', savedInvoice.id || invoiceData.supabaseId || invoiceData.id || now, {
-            invoice_id: savedInvoice.id,
+    let data, error;
+    if (invoiceData.supabaseId) {
+        // Update existing invoice row
+        ({ data, error } = await _supabase.from('quotes').update(payload).eq('id', invoiceData.supabaseId).select().single());
+    } else {
+        // Insert new invoice row
+        payload.created_at = now;
+        ({ data, error } = await _supabase.from('quotes').insert(payload).select().single());
+        // If unique constraint hit (same quote number), update existing instead
+        if (error && error.code === '23505') {
+            console.warn('Invoice row exists, updating instead...');
+            var existing = await _supabase.from('quotes').select('id').eq('user_id', payload.user_id).eq('quote_number', payload.quote_number).single();
+            if (existing.data) {
+                ({ data, error } = await _supabase.from('quotes').update(payload).eq('id', existing.data.id).select().single());
+            }
+        }
+    }
+    if (error) console.error('saveInvoiceForSharing error:', error);
+    if (!error && data) {
+        qdCaptureOnce('invoice_created', data.id || invoiceData.supabaseId || invoiceData.id || now, {
+            invoice_id: data.id,
             total_bucket: qdAnalyticsBucketMoney(invoiceData.grandTotal || 0),
             room_count: Array.isArray(invoiceData.rooms) ? invoiceData.rooms.length : 0
         });
     }
-    return result;
+    return { data, error };
 }
 
 // Save client to Supabase
 async function saveClientToSupabase(client) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
-    var values = {
+    const { data, error } = await _supabase
+        .from('clients')
+        .upsert({
             user_id: user.id,
             name: client.name || '',
             phone: client.phone || '',
@@ -1367,14 +793,9 @@ async function saveClientToSupabase(client) {
             notes: client.notes || '',
             crm: client.crm || {},
             updated_at: new Date().toISOString()
-        };
-    return qdDurableSupabaseOperation({
-        entityType: 'client',
-        entityId: client.id || client.name || client.email || 'unnamed',
-        entityLabel: client.name || client.email || 'Client',
-        payload: client,
-        target: { table: 'clients', action: 'upsert', values: values, onConflict: 'user_id,name' }
-    });
+        }, { onConflict: 'user_id,name' })
+        .select();
+    return { data, error };
 }
 
 // List clients from Supabase
@@ -1467,35 +888,25 @@ async function saveLaborJobSite(site) {
     var payload = qdNormalizeLaborJobSite(site || {}, user.id);
     if (site && site.id) payload.id = site.id;
     if (!payload.name || !payload.name.trim()) return { error: 'Job site name is required' };
-    var isUpdate = !!(site && site.id);
-    return qdDurableSupabaseOperation({
-        entityType: 'labor_job_site',
-        entityId: site.id || (payload.name + ':' + payload.address),
-        entityLabel: payload.name,
-        action: isUpdate ? 'update' : 'insert',
-        payload: site,
-        target: {
-            table: 'labor_job_sites',
-            action: isUpdate ? 'update' : 'insert',
-            values: payload,
-            filters: isUpdate ? [{ column: 'id', value: site.id }] : [],
-            dedupe: isUpdate ? null : { filters: [{ column: 'name', value: payload.name }, { column: 'address', value: payload.address }], select: 'id,updated_at' }
-        },
-        baseVersion: isUpdate ? (site.updated_at || site.updatedAt || null) : null
-    });
+    const { data, error } = await _supabase
+        .from('labor_job_sites')
+        .upsert(payload)
+        .select();
+    if (error) console.error('Labor job site save error:', error);
+    return { data, error };
 }
 
 async function archiveLaborJobSite(siteId) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
-    return qdDurableSupabaseOperation({
-        entityType: 'labor_job_site',
-        entityId: siteId,
-        entityLabel: 'Archived job site',
-        action: 'update',
-        payload: { id: siteId, active: false },
-        target: { table: 'labor_job_sites', action: 'update', values: { active: false, updated_at: new Date().toISOString() }, filters: [{ column: 'id', value: siteId }] }
-    });
+    const { data, error } = await _supabase
+        .from('labor_job_sites')
+        .update({ active: false, updated_at: new Date().toISOString() })
+        .eq('id', siteId)
+        .eq('user_id', user.id)
+        .select();
+    if (error) console.error('Labor job site archive error:', error);
+    return { data, error };
 }
 
 // Labour tracker: list sessions for review/reporting
@@ -1525,22 +936,12 @@ async function saveLaborSession(session) {
     if (session && session.id) payload.id = session.id;
     if (!payload.job_site_id) return { error: 'Job site is required' };
     if (!payload.started_at || !payload.ended_at) return { error: 'Start and end times are required' };
-    var isUpdate = !!(session && session.id);
-    return qdDurableSupabaseOperation({
-        entityType: 'labor_session',
-        entityId: session.id || [payload.job_site_id, payload.started_at, payload.worker_name].join(':'),
-        entityLabel: payload.worker_name ? ('Labour session - ' + payload.worker_name) : 'Labour session',
-        action: isUpdate ? 'update' : 'insert',
-        payload: session,
-        target: {
-            table: 'labor_time_sessions',
-            action: isUpdate ? 'update' : 'insert',
-            values: payload,
-            filters: isUpdate ? [{ column: 'id', value: session.id }] : [],
-            dedupe: isUpdate ? null : { filters: [{ column: 'job_site_id', value: payload.job_site_id }, { column: 'started_at', value: payload.started_at }], select: 'id,updated_at' }
-        },
-        baseVersion: isUpdate ? (session.updated_at || session.updatedAt || null) : null
-    });
+    const { data, error } = await _supabase
+        .from('labor_time_sessions')
+        .upsert(payload)
+        .select();
+    if (error) console.error('Labor session save error:', error);
+    return { data, error };
 }
 
 async function updateLaborSessionStatus(sessionId, status, reviewNotes) {
@@ -1552,14 +953,14 @@ async function updateLaborSessionStatus(sessionId, status, reviewNotes) {
         approved_at: status === 'approved' ? new Date().toISOString() : null,
         updated_at: new Date().toISOString()
     };
-    return qdDurableSupabaseOperation({
-        entityType: 'labor_session',
-        entityId: sessionId,
-        entityLabel: 'Labour session review',
-        action: 'update',
-        payload: payload,
-        target: { table: 'labor_time_sessions', action: 'update', values: payload, filters: [{ column: 'id', value: sessionId }] }
-    });
+    const { data, error } = await _supabase
+        .from('labor_time_sessions')
+        .update(payload)
+        .eq('id', sessionId)
+        .eq('user_id', user.id)
+        .select();
+    if (error) console.error('Labor session status update error:', error);
+    return { data, error };
 }
 
 async function listLaborDevices() {
@@ -1593,13 +994,12 @@ async function saveLaborDevice(device) {
     };
     if (!payload.device_key) return { error: 'Device key is required' };
     if (device.id) payload.id = device.id;
-    return qdDurableSupabaseOperation({
-        entityType: 'labor_device',
-        entityId: payload.device_key,
-        entityLabel: payload.device_name || payload.device_key,
-        payload: device,
-        target: { table: 'labor_devices', action: 'upsert', values: payload, onConflict: 'user_id,device_key' }
-    });
+    const { data, error } = await _supabase
+        .from('labor_devices')
+        .upsert(payload, { onConflict: 'user_id,device_key' })
+        .select();
+    if (error) console.error('Labor device save error:', error);
+    return { data, error };
 }
 
 async function listLaborLocationEvents(options) {
@@ -1638,14 +1038,12 @@ async function saveLaborLocationEvent(event) {
         raw_payload: event.raw_payload || event.rawPayload || {}
     };
     if (!payload.event_type) return { error: 'Event type is required' };
-    return qdDurableSupabaseOperation({
-        entityType: 'labor_location_event',
-        entityId: [payload.device_key, payload.job_site_id, payload.event_type, payload.occurred_at].join(':'),
-        entityLabel: 'Labour location event',
-        payload: event,
-        target: { table: 'labor_location_events', action: 'upsert', values: payload, onConflict: 'user_id,device_key,job_site_id,event_type,occurred_at' },
-        background: true
-    });
+    const { data, error } = await _supabase
+        .from('labor_location_events')
+        .upsert(payload, { onConflict: 'user_id,device_key,job_site_id,event_type,occurred_at' })
+        .select();
+    if (error) console.error('Labor location event save error:', error);
+    return { data, error };
 }
 
 async function getLaborNotificationSettings() {
@@ -1686,13 +1084,13 @@ async function saveLaborNotificationSettings(settings) {
         last_opened_at: settings.last_opened_at || settings.lastOpenedAt || null,
         updated_at: now
     };
-    return qdDurableSupabaseOperation({
-        entityType: 'labor_notification_settings',
-        entityId: 'account',
-        entityLabel: 'Labour notification settings',
-        payload: settings,
-        target: { table: 'labor_notification_settings', action: 'upsert', values: payload, onConflict: 'user_id', single: 'single' }
-    });
+    const { data, error } = await _supabase
+        .from('labor_notification_settings')
+        .upsert(payload, { onConflict: 'user_id' })
+        .select()
+        .single();
+    if (error) console.error('Labor notification settings save error:', error);
+    return { data, error };
 }
 
 async function submitLaborDailyCheckin(checkin) {
@@ -1729,7 +1127,6 @@ async function listLaborProductionRates(options) {
 
 // Aliases for consistent naming
 var listQuotesFromSupabase = listQuotes;
-var listQuoteSummariesFromSupabase = listQuoteSummaries;
 var listInvoicesFromSupabase = listInvoices;
 var listTemplatesFromSupabase = listTemplates;
 var listTermsFromSupabase = listTerms;
@@ -1739,37 +1136,27 @@ var listItemsFromSupabase = listItems;
 var saveQuoteToSupabase = saveQuote;
 var saveInvoice = saveInvoiceForSharing; // alias — saveInvoice was missing from v2
 var saveInvoiceToSupabase = saveInvoice;
-var loadQuoteFromSupabase = loadQuoteByIdFromSupabase;
+var loadQuoteFromSupabase = function(quoteId) {
+    return listQuotes().then(function(result) {
+        if (result.error) return { error: result.error };
+        var found = (result.data || []).find(function(q) { return q.id === quoteId || (q.data && q.data.id === quoteId); });
+        return { data: found || null };
+    });
+};
 
 // Save a quote to Supabase for sharing
 async function saveQuoteForSharing(quoteData) {
     const user = await getCurrentUser();
-    if (!user) return { error: 'Not authenticated' };
-    try {
-        await prepareQuoteMediaForCloudSave(quoteData);
-    } catch (error) {
-        console.error('Quote photo preparation error:', error);
-        return { error: error };
-    }
     const now = new Date().toISOString();
-    quoteData.fullResolutionPhotosEnabled = await quoteFullResolutionPhotosEnabledForSave();
     if ((quoteData.type === 'change_order' || quoteData.documentType === 'change_order') &&
         quoteData.supabaseId &&
         quoteData.parentQuoteId &&
         quoteData.supabaseId === quoteData.parentQuoteId) {
         quoteData.supabaseId = null;
     }
-    if (!quoteData.supabaseId) {
-        var initialSave = await saveQuote(quoteData);
-        if (initialSave.error) return initialSave;
-        var initialRow = Array.isArray(initialSave.data) ? initialSave.data[0] : initialSave.data;
-        if (!initialRow || !initialRow.id) return { error: { message: 'Quote could not be confirmed in the cloud before sharing.' } };
-        quoteData.supabaseId = initialRow.id;
-        quoteData._serverUpdatedAt = initialRow.updated_at || null;
-    }
     const payload = {
-            id: quoteData.supabaseId,
-            user_id: user.id,
+            id: quoteData.supabaseId || undefined,
+            user_id: user ? user.id : null,
             client_name: quoteData.clientName || '',
             quote_number: quoteData.quoteNumber || '',
             total: quoteData.grandTotal || quoteData.total || 0,
@@ -1780,40 +1167,23 @@ async function saveQuoteForSharing(quoteData) {
             change_order_number: quoteData.changeOrderNumber || null,
             updated_at: now
         };
-    var sharingResult = await qdDurableSupabaseOperation({
-        entityType: 'quote',
-        entityId: quoteData.supabaseId,
-        entityLabel: quoteData.quoteTitle || quoteData.clientName || quoteData.quoteNumber || 'Quote',
-        action: 'update',
-        payload: quoteData,
-        target: {
-            table: 'quotes',
-            action: 'update',
-            values: payload,
-            filters: [{ column: 'id', value: quoteData.supabaseId }],
-            versionRead: { table: 'quotes', column: 'updated_at', filters: [{ column: 'id', value: quoteData.supabaseId }] },
-            fallbackStripColumns: ['type', 'parent_quote_id', 'change_order_number'],
-            freshnessGuard: 'quote_edit_time',
-            requireCurrentQuoteBase: true,
-            verifyRevision: true,
-            verifyVersionValue: payload.updated_at,
-            selectQuoteMetadata: true,
-            single: 'single'
-        },
-        baseVersion: quoteData._serverUpdatedAt || quoteData.serverUpdatedAt || null
-    });
-    if (sharingResult.error) return sharingResult;
-
-    // Fresh quote updates use a compare-and-swap path that returns an array,
-    // while other durable writes return one row. Keep this public helper's
-    // contract stable so link creation always receives the saved document id.
-    var sharingRow = Array.isArray(sharingResult.data) ? sharingResult.data[0] : sharingResult.data;
-    if (!sharingRow && quoteData.supabaseId) sharingRow = { id: quoteData.supabaseId };
-    else if (sharingRow && !sharingRow.id && quoteData.supabaseId) {
-        sharingRow = Object.assign({ id: quoteData.supabaseId }, sharingRow);
+    var data, error;
+    ({ data, error } = await _supabase
+        .from('quotes')
+        .upsert(payload, { onConflict: 'id' })
+        .select()
+        .single());
+    if (error && /type|parent_quote_id|change_order_number|schema cache/i.test(error.message || '')) {
+        delete payload.type;
+        delete payload.parent_quote_id;
+        delete payload.change_order_number;
+        ({ data, error } = await _supabase
+            .from('quotes')
+            .upsert(payload, { onConflict: 'id' })
+            .select()
+            .single());
     }
-    if (sharingRow && sharingRow.updated_at) quoteData._serverUpdatedAt = sharingRow.updated_at;
-    return Object.assign({}, sharingResult, { data: sharingRow });
+    return { data, error };
 }
 
 // Delete a quote from Supabase
@@ -1821,23 +1191,22 @@ async function deleteQuoteFromSupabase(quoteId) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
 
-    var existing = await _supabase.from('quotes').select('*').eq('id', quoteId).eq('user_id', user.id).maybeSingle();
-    if (existing.error) return { error: existing.error };
-    var result = await qdDurableSupabaseOperation({
-        entityType: (existing.data && existing.data.status === 'invoiced') ? 'invoice' : 'quote',
-        entityId: quoteId,
-        entityLabel: (existing.data && (existing.data.client_name || existing.data.quote_number)) || 'Quote',
-        action: 'delete',
-        payload: existing.data || { id: quoteId },
-        target: { table: 'quotes', action: 'delete', values: {}, filters: [{ column: 'id', value: quoteId }] }
-    });
-    if (result.error) return result;
-    return Object.assign({ success: true }, result);
+    const { error } = await _supabase
+        .from('quotes')
+        .delete()
+        .eq('id', quoteId)
+        .eq('user_id', user.id);
+
+    if (error) {
+        console.error('Delete quote error:', error);
+        return { error };
+    }
+    return { success: true };
 }
 
 // Load a quote from Supabase for viewing
 // Load a quote for editing in the quote builder
-async function loadQuoteByIdFromSupabase(supabaseId) {
+async function loadQuoteFromSupabase(supabaseId) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
     const { data, error } = await _supabase
@@ -1862,28 +1231,17 @@ async function loadQuoteForViewing(supabaseId) {
 async function saveItemsToSupabase(itemsData) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not logged in' };
-    try {
-        await prepareQuoteMediaForCloudSave(itemsData);
-    } catch (error) {
-        return { error: error };
-    }
     // Check if row exists
     const { data: existing } = await _supabase
         .from('items')
         .select('id')
         .eq('user_id', user.id)
         .single();
-    var target = existing
-        ? { table: 'items', action: 'update', values: { data: itemsData, updated_at: new Date().toISOString() }, filters: [{ column: 'id', value: existing.id }] }
-        : { table: 'items', action: 'insert', values: { user_id: user.id, data: itemsData, updated_at: new Date().toISOString() }, dedupe: { filters: [], select: 'id,updated_at' } };
-    return qdDurableSupabaseOperation({
-        entityType: 'item_database',
-        entityId: 'account-items-row',
-        entityLabel: 'Saved item database',
-        action: target.action,
-        payload: itemsData,
-        target: target
-    });
+    if (existing) {
+        return await _supabase.from('items').update({ data: itemsData, updated_at: new Date().toISOString() }).eq('user_id', user.id);
+    } else {
+        return await _supabase.from('items').insert({ user_id: user.id, data: itemsData });
+    }
 }
 
 // Load custom items from Supabase
@@ -1902,7 +1260,10 @@ async function loadItemsFromSupabase() {
 async function saveAllClientsToSupabase(clientsArray) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not logged in' };
-    const rows = (clientsArray || []).map(c => ({
+    // Delete existing and re-insert (simplest approach for full sync)
+    await _supabase.from('clients').delete().eq('user_id', user.id);
+    if (!clientsArray || clientsArray.length === 0) return { data: [], error: null };
+    const rows = clientsArray.map(c => ({
         user_id: user.id,
         name: c.name || '',
         phone: c.phone || '',
@@ -1910,16 +1271,9 @@ async function saveAllClientsToSupabase(clientsArray) {
         address: c.address || '',
         city: c.city || '',
         notes: c.notes || '',
-        crm: c.crm || {},
-        updated_at: new Date().toISOString()
+        crm: c.crm || {}
     }));
-    return qdDurableSupabaseOperation({
-        entityType: 'client_database',
-        entityId: 'account',
-        entityLabel: 'Client database',
-        payload: clientsArray || [],
-        target: { table: 'clients', action: 'replace', values: rows, onConflict: 'user_id,name', matchColumn: 'name' }
-    });
+    return await _supabase.from('clients').insert(rows);
 }
 
 // Load all clients from Supabase
@@ -1939,36 +1293,11 @@ async function loadClientsFromSupabase() {
 async function saveBusinessProfile(profile) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
-    localStorage.setItem('ald_business_profile', JSON.stringify(profile));
-    if (Array.isArray(profile && profile.hidden_profile_fields)) {
-        localStorage.setItem('ald_hidden_profile_fields', JSON.stringify(profile.hidden_profile_fields));
-    }
-    const result = await qdDurableSupabaseOperation({
-        entityType: 'business_profile',
-        entityId: 'account',
-        entityLabel: 'Business profile',
-        payload: profile,
-        target: { table: 'user_data', action: 'upsert', values: { user_id: user.id, key: 'business_profile', value: profile, updated_at: new Date().toISOString() }, onConflict: 'user_id,key' }
-    });
+    const result = await _supabase
+        .from('user_data')
+        .upsert({ user_id: user.id, key: 'business_profile', value: profile, updated_at: new Date().toISOString() }, { onConflict: 'user_id,key' });
+    if (!result.error) localStorage.setItem('ald_business_profile', JSON.stringify(profile));
     return result;
-}
-
-async function optimizeStoredPhotoBatch(cursor, batchSize) {
-    try {
-        const response = await fetch(SUPABASE_URL + '/functions/v1/optimize-photo-storage', {
-            method: 'POST',
-            headers: await getSupabaseFunctionAuthHeaders(),
-            body: JSON.stringify({
-                cursor: Math.max(0, parseInt(cursor || 0, 10) || 0),
-                batchSize: Math.max(1, Math.min(3, parseInt(batchSize || 1, 10) || 1))
-            })
-        });
-        const data = await response.json().catch(function() { return {}; });
-        if (!response.ok || data.error) throw new Error(data.error || 'Stored photo optimization failed');
-        return { data: data };
-    } catch (error) {
-        return { error: error };
-    }
 }
 
 async function loadBusinessProfile() {
@@ -1982,9 +1311,6 @@ async function loadBusinessProfile() {
         .maybeSingle();
     if (!error && data && data.value) {
         localStorage.setItem('ald_business_profile', JSON.stringify(data.value));
-        if (Array.isArray(data.value.hidden_profile_fields)) {
-            localStorage.setItem('ald_hidden_profile_fields', JSON.stringify(data.value.hidden_profile_fields));
-        }
         return data.value;
     }
     return JSON.parse(localStorage.getItem('ald_business_profile') || '{}');
@@ -1993,14 +1319,10 @@ async function loadBusinessProfile() {
 async function saveLogoToSupabase(base64) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
-    localStorage.setItem('ald_company_logo', base64);
-    const result = await qdDurableSupabaseOperation({
-        entityType: 'company_logo',
-        entityId: 'account',
-        entityLabel: 'Company logo',
-        payload: { logo: base64 },
-        target: { table: 'user_data', action: 'upsert', values: { user_id: user.id, key: 'company_logo', value: { logo: base64 }, updated_at: new Date().toISOString() }, onConflict: 'user_id,key' }
-    });
+    const result = await _supabase
+        .from('user_data')
+        .upsert({ user_id: user.id, key: 'company_logo', value: { logo: base64 }, updated_at: new Date().toISOString() }, { onConflict: 'user_id,key' });
+    if (!result.error) localStorage.setItem('ald_company_logo', base64);
     return result;
 }
 
@@ -2023,14 +1345,10 @@ async function loadLogoFromSupabase() {
 async function savePaymentSettings(settings) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
-    localStorage.setItem('ald_payment_settings', JSON.stringify(settings));
-    const result = await qdDurableSupabaseOperation({
-        entityType: 'payment_settings',
-        entityId: 'account',
-        entityLabel: 'Payment settings',
-        payload: settings,
-        target: { table: 'user_data', action: 'upsert', values: { user_id: user.id, key: 'payment_settings', value: settings, updated_at: new Date().toISOString() }, onConflict: 'user_id,key' }
-    });
+    const result = await _supabase
+        .from('user_data')
+        .upsert({ user_id: user.id, key: 'payment_settings', value: settings, updated_at: new Date().toISOString() }, { onConflict: 'user_id,key' });
+    if (!result.error) localStorage.setItem('ald_payment_settings', JSON.stringify(settings));
     return result;
 }
 
@@ -2114,13 +1432,11 @@ async function saveLearnedMapping(phrase, mappedItem, note) {
         usage_count: (parseInt(existing && existing.usage_count, 10) || 0) + 1,
         updated_at: new Date().toISOString()
     };
-    return qdDurableSupabaseOperation({
-        entityType: 'ai_mapping',
-        entityId: phraseKey,
-        entityLabel: 'AI mapping: ' + phrase,
-        payload: payload,
-        target: { table: 'ai_learned_mappings', action: 'upsert', values: payload, onConflict: 'user_id,phrase_key', single: 'single' }
-    });
+    return await _supabase
+        .from('ai_learned_mappings')
+        .upsert(payload, { onConflict: 'user_id,phrase_key' })
+        .select()
+        .single();
 }
 
 async function incrementLearnedMappingUsage(mappingId) {
@@ -2134,7 +1450,6 @@ async function incrementLearnedMappingUsage(mappingId) {
         .eq('user_id', user.id)
         .maybeSingle();
     if (loadError || !existing) return { data: null, error: loadError || 'Mapping not found' };
-    // qd-save-audit: noncritical usage counter; failure does not lose user-authored data.
     return await _supabase
         .from('ai_learned_mappings')
         .update({ usage_count: (parseInt(existing.usage_count, 10) || 0) + 1, updated_at: new Date().toISOString() })
@@ -2162,27 +1477,23 @@ async function updateLearnedMapping(mappingId, phrase, mappedItem, note) {
         payload.mapped_unit = mappedItem.unitType || mappedItem.unit || 'ls';
         payload.mapped_price = parseFloat(mappedItem.rate || mappedItem.price || 0) || 0;
     }
-    return qdDurableSupabaseOperation({
-        entityType: 'ai_mapping',
-        entityId: mappingId,
-        entityLabel: 'AI mapping: ' + phrase,
-        action: 'update',
-        payload: payload,
-        target: { table: 'ai_learned_mappings', action: 'update', values: payload, filters: [{ column: 'id', value: mappingId }], single: 'single' }
-    });
+    return await _supabase
+        .from('ai_learned_mappings')
+        .update(payload)
+        .eq('id', mappingId)
+        .eq('user_id', user.id)
+        .select()
+        .single();
 }
 
 async function deleteLearnedMapping(mappingId) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
-    return qdDurableSupabaseOperation({
-        entityType: 'ai_mapping',
-        entityId: mappingId,
-        entityLabel: 'AI learned mapping',
-        action: 'delete',
-        payload: { id: mappingId },
-        target: { table: 'ai_learned_mappings', action: 'delete', values: {}, filters: [{ column: 'id', value: mappingId }], expectRows: false }
-    });
+    return await _supabase
+        .from('ai_learned_mappings')
+        .delete()
+        .eq('id', mappingId)
+        .eq('user_id', user.id);
 }
 
 async function getUserAiTradeRules() {
@@ -2254,35 +1565,29 @@ async function saveAiTradeRule(rule) {
         updated_at: new Date().toISOString()
     };
     if (rule.id) {
-        return qdDurableSupabaseOperation({
-            entityType: 'ai_trade_rule',
-            entityId: rule.id,
-            entityLabel: 'AI trade rule: ' + payload.trigger_phrase,
-            action: 'update',
-            payload: payload,
-            target: { table: 'ai_trade_rules', action: 'update', values: payload, filters: [{ column: 'id', value: rule.id }], single: 'single' }
-        });
+        return await _supabase
+            .from('ai_trade_rules')
+            .update(payload)
+            .eq('id', rule.id)
+            .eq('user_id', user.id)
+            .select()
+            .single();
     }
-    return qdDurableSupabaseOperation({
-        entityType: 'ai_trade_rule',
-        entityId: phraseKey,
-        entityLabel: 'AI trade rule: ' + payload.trigger_phrase,
-        payload: payload,
-        target: { table: 'ai_trade_rules', action: 'upsert', values: payload, onConflict: 'user_id,phrase_key', single: 'single' }
-    });
+    return await _supabase
+        .from('ai_trade_rules')
+        .upsert(payload, { onConflict: 'user_id,phrase_key' })
+        .select()
+        .single();
 }
 
 async function deleteAiTradeRule(ruleId) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
-    return qdDurableSupabaseOperation({
-        entityType: 'ai_trade_rule',
-        entityId: ruleId,
-        entityLabel: 'AI trade rule',
-        action: 'delete',
-        payload: { id: ruleId },
-        target: { table: 'ai_trade_rules', action: 'delete', values: {}, filters: [{ column: 'id', value: ruleId }], expectRows: false }
-    });
+    return await _supabase
+        .from('ai_trade_rules')
+        .delete()
+        .eq('id', ruleId)
+        .eq('user_id', user.id);
 }
 
 async function incrementAiTradeRuleUsage(ruleId) {
@@ -2296,7 +1601,6 @@ async function incrementAiTradeRuleUsage(ruleId) {
         .eq('user_id', user.id)
         .maybeSingle();
     if (loadError || !existing) return { data: null, error: loadError || 'Rule not found' };
-    // qd-save-audit: noncritical usage counter; failure does not lose user-authored data.
     return await _supabase
         .from('ai_trade_rules')
         .update({ usage_count: (parseInt(existing.usage_count, 10) || 0) + 1, updated_at: new Date().toISOString() })
@@ -2329,7 +1633,16 @@ async function saveUserAiVoiceTemplates(templates) {
     localStorage.setItem('ald_ai_voice_templates', JSON.stringify(safeTemplates));
     const user = await getCurrentUser();
     if (!user) return { data: safeTemplates, error: null };
-    return saveUserDataValue('ai_voice_templates', safeTemplates, { entityType: 'quote_preferences', entityLabel: 'AI voice templates', localStorageKey: 'ald_ai_voice_templates' });
+    return await _supabase
+        .from('user_data')
+        .upsert({
+            user_id: user.id,
+            key: 'ai_voice_templates',
+            value: safeTemplates,
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id,key' })
+        .select()
+        .single();
 }
 
 const QUOTEDR_PLAN_FEATURES = {
@@ -2357,12 +1670,12 @@ const QUOTEDR_PLAN_FEATURES = {
         'smart_import',
         'quote_import',
         'ai_refine',
+        'writing_suggestions',
         'ikea_quoter',
         'job_tracker',
         'labor_tracker',
         'floor_plan_scanner',
         'quote_upsells',
-        'full_resolution_photos',
         'profit_tracking',
         'payment_reminders',
         'quickbooks',
@@ -2375,8 +1688,8 @@ const QUOTEDR_PRO_FEATURE_LABELS = {
     job_tracker: 'Job Tracker',
     labor_tracker: 'Labour Tracker',
     ai_refine: 'AI Refine',
+    writing_suggestions: 'Quote Spell Check',
     quote_import: 'Legacy Quote Import',
-    full_resolution_photos: 'Full-resolution item photos',
     quickbooks: 'QuickBooks sync',
     bank_card_sync: 'Bank/card sync'
 };
@@ -2444,7 +1757,6 @@ async function saveProTrialUsage(usage) {
     const user = await getCurrentUser();
     localStorage.setItem('ald_pro_trial_usage', JSON.stringify(usage || {}));
     if (!user) return { data: null, error: null };
-    // qd-save-audit: entitlement telemetry is not user-authored business data.
     return await _supabase
         .from('user_data')
         .upsert({ user_id: user.id, key: 'pro_trial_usage', value: usage || {}, updated_at: new Date().toISOString() }, { onConflict: 'user_id,key' });
@@ -3145,53 +2457,34 @@ async function backupItemsToCloud(customItems) {
     // Use getUser() directly to ensure fresh session token is used
     const { data: { user }, error: authErr } = await _supabase.auth.getUser();
     if (authErr || !user) return { error: 'Not authenticated' };
-    try {
-        await prepareQuoteMediaForCloudSave(customItems);
-        if (typeof persistManageItemsLocalSnapshot === 'function') persistManageItemsLocalSnapshot(customItems);
-    } catch (error) {
-        return { error: error };
-    }
     const snapshot = JSON.stringify(customItems || {});
-    const now = new Date().toISOString();
     const payload = {
         user_id: user.id,
         client_name: '__ITEMS_BACKUP__',
         quote_number: '__ITEMS_BACKUP__',
         status: 'backup',
-        data: { items_snapshot: snapshot, backed_up_at: now },
-        updated_at: now
+        data: { items_snapshot: snapshot, backed_up_at: new Date().toISOString() },
+        updated_at: new Date().toISOString()
     };
-    var existing = await _supabase.from('quotes').select('id,updated_at').eq('user_id', user.id).eq('quote_number', '__ITEMS_BACKUP__').limit(1).maybeSingle();
-    if (existing.error) return { error: existing.error };
-    var target = existing.data
-        ? {
-            table: 'quotes',
-            action: 'update',
-            values: payload,
-            filters: [{ column: 'id', value: existing.data.id }],
-            versionRead: { table: 'quotes', column: 'updated_at', filters: [{ column: 'id', value: existing.data.id }] }
-        }
-        : {
-            table: 'quotes',
-            action: 'insert',
-            values: Object.assign({ created_at: now }, payload),
-            dedupe: { filters: [{ column: 'quote_number', value: '__ITEMS_BACKUP__' }], select: 'id,updated_at' }
-        };
-    var result = await qdDurableSupabaseOperation({
-        entityType: 'item_database',
-        entityId: 'account',
-        entityLabel: 'Saved item database',
-        action: target.action,
-        payload: customItems || {},
-        target: target,
-        baseVersion: existing.data ? existing.data.updated_at : null
-    });
-    if (!result.error) {
-        console.log('[Backup] Items backup confirmed:', Object.keys(customItems || {}).length, 'categories');
-        // qd-save-audit: optional history snapshot; the durable item_database operation is authoritative.
-        _supabase.from('item_history').insert({ user_id: user.id, snapshot: customItems, created_at: now }).then(function() {}).catch(function() {});
+    const { data: upd, error: updErr } = await _supabase
+        .from('quotes')
+        .update(payload)
+        .eq('user_id', user.id)
+        .eq('quote_number', '__ITEMS_BACKUP__')
+        .select();
+    if (!updErr && upd && upd.length > 0) {
+        console.log('[Backup] Items backup updated:', Object.keys(customItems || {}).length, 'categories');
+        _supabase.from('item_history').insert({ user_id: user.id, snapshot: customItems, created_at: new Date().toISOString() }).then(() => {}).catch(() => {});
+        return { data: upd };
     }
-    return result;
+    const { data, error } = await _supabase
+        .from('quotes')
+        .insert(payload)
+        .select();
+    if (error) { console.error('Items backup error:', error); return { error }; }
+    console.log('[Backup] Items backup created:', Object.keys(customItems || {}).length, 'categories');
+    _supabase.from('item_history').insert({ user_id: user.id, snapshot: customItems, created_at: new Date().toISOString() }).then(() => {}).catch(() => {});
+    return { data };
 }
 
 async function restoreItemsFromCloud() {
