@@ -9674,6 +9674,29 @@ Example:
             return JSON.parse(JSON.stringify(item || {}));
         }
 
+        function quoteBuilderIsChangeOrderMode() {
+            return window._quoteDocumentType === 'change_order';
+        }
+
+        function cloneQuoteBuilderLineItemAsAddition(item) {
+            var copy = cloneQuoteBuilderLineItem(item);
+            if (!quoteBuilderIsChangeOrderMode()) return copy;
+            delete copy._coOriginal;
+            delete copy._coRemoved;
+            delete copy._coChangeStatus;
+            delete copy.changeOrderNote;
+            if (typeof coRefreshItemDelta === 'function') coRefreshItemDelta(copy);
+            return copy;
+        }
+
+        function markQuoteBuilderOriginalItemRemoved(item) {
+            if (!quoteBuilderIsChangeOrderMode() || !item || !item._coOriginal) return false;
+            item._coRemoved = true;
+            item.quantity = 0;
+            if (typeof coRefreshItemDelta === 'function') coRefreshItemDelta(item);
+            return true;
+        }
+
         function finishRoomBulkItemAction(message) {
             renderRooms();
             if (typeof calculateTotals === 'function') calculateTotals();
@@ -9741,10 +9764,24 @@ Example:
             var selectedItems = selectedIndexes.map(function(index) { return sourceRoom.items[index]; });
             _pushUndo();
             if (isMove) {
-                sourceRoom.items = sourceRoom.items.filter(function(item, index) { return !selectedSet.has(index); });
-                destination.items.push.apply(destination.items, selectedItems);
+                var movedItems = [];
+                sourceRoom.items = sourceRoom.items.reduce(function(nextItems, item, index) {
+                    if (!selectedSet.has(index)) {
+                        nextItems.push(item);
+                        return nextItems;
+                    }
+                    if (quoteBuilderIsChangeOrderMode() && item && item._coOriginal) {
+                        movedItems.push(cloneQuoteBuilderLineItemAsAddition(item));
+                        markQuoteBuilderOriginalItemRemoved(item);
+                        nextItems.push(item);
+                    } else {
+                        movedItems.push(item);
+                    }
+                    return nextItems;
+                }, []);
+                destination.items.push.apply(destination.items, movedItems);
             } else {
-                destination.items.push.apply(destination.items, selectedItems.map(cloneQuoteBuilderLineItem));
+                destination.items.push.apply(destination.items, selectedItems.map(cloneQuoteBuilderLineItemAsAddition));
             }
             finishRoomBulkItemAction((isMove ? 'Moved ' : 'Copied ') + selectedItems.length + ' line item' + (selectedItems.length === 1 ? '' : 's') + ' to ' + destination.name + '.');
         }
@@ -9761,7 +9798,7 @@ Example:
             var duplicated = [];
             room.items.forEach(function(item, index) {
                 duplicated.push(item);
-                if (selectedSet.has(index)) duplicated.push(cloneQuoteBuilderLineItem(item));
+                if (selectedSet.has(index)) duplicated.push(cloneQuoteBuilderLineItemAsAddition(item));
             });
             room.items = duplicated;
             finishRoomBulkItemAction('Duplicated ' + selectedIndexes.length + ' line item' + (selectedIndexes.length === 1 ? '' : 's') + '.');
@@ -9783,7 +9820,14 @@ Example:
             if (!confirmed) return;
             var selectedSet = new Set(selectedIndexes);
             _pushUndo();
-            room.items = room.items.filter(function(item, index) { return !selectedSet.has(index); });
+            room.items = room.items.reduce(function(nextItems, item, index) {
+                if (!selectedSet.has(index)) {
+                    nextItems.push(item);
+                } else if (markQuoteBuilderOriginalItemRemoved(item)) {
+                    nextItems.push(item);
+                }
+                return nextItems;
+            }, []);
             finishRoomBulkItemAction('Deleted ' + selectedIndexes.length + ' line item' + (selectedIndexes.length === 1 ? '' : 's') + '.');
         }
         async function createChoiceGroupFromRoomItems(roomId) {
@@ -10673,11 +10717,7 @@ Example:
             if (room) {
                 _pushUndo();
                 var item = room.items[itemIndex];
-                if (window._quoteDocumentType === 'change_order' && item && item._coOriginal) {
-                    item._coRemoved = true;
-                    item.quantity = 0;
-                    coRefreshItemDelta(item);
-                } else {
+                if (!markQuoteBuilderOriginalItemRemoved(item)) {
                     room.items.splice(itemIndex, 1);
                 }
                 renderRooms();
@@ -13028,8 +13068,22 @@ Example:
                 return;
             }
             _pushUndo();
+            var movedAcrossRooms = String(sourceRoom.id) !== String(destinationRoom.id);
+            var sourceRemovalItem = null;
+            var sourceRemovalIndex = -1;
+            if (movedAcrossRooms && quoteBuilderIsChangeOrderMode() && movedItem._coOriginal) {
+                sourceRemovalIndex = sourceRoom.items.indexOf(movedItem);
+                sourceRemovalItem = cloneQuoteBuilderLineItem(movedItem);
+                markQuoteBuilderOriginalItemRemoved(sourceRemovalItem);
+                movedItem = cloneQuoteBuilderLineItemAsAddition(movedItem);
+                itemLookup.set(itemKey, movedItem);
+            }
             var destinationCategory = evt.to.dataset.category;
+            var categoryChanged = destinationCategory && destinationCategory !== movedItem.category;
             if (destinationCategory) movedItem.category = destinationCategory;
+            if (!movedAcrossRooms && categoryChanged && quoteBuilderIsChangeOrderMode() && typeof coRefreshItemDelta === 'function') {
+                coRefreshItemDelta(movedItem);
+            }
             var affectedRoomIds = Array.from(new Set([String(sourceRoom.id), String(destinationRoom.id)]));
             affectedRoomIds.forEach(function(affectedRoomId) {
                 var room = quoteBuilderRoomById(affectedRoomId);
@@ -13040,8 +13094,12 @@ Example:
                     .filter(Boolean);
                 room.items = orderedItems;
             });
+            if (sourceRemovalItem) {
+                var insertAt = sourceRemovalIndex < 0 ? sourceRoom.items.length : Math.min(sourceRemovalIndex, sourceRoom.items.length);
+                sourceRoom.items.splice(insertAt, 0, sourceRemovalItem);
+            }
             var destinationName = destinationRoom.name || getQuoteDividerLabels().singular;
-            var message = String(sourceRoom.id) === String(destinationRoom.id)
+            var message = !movedAcrossRooms
                 ? 'Line item reordered.'
                 : 'Line item moved to ' + destinationName + '.';
             finishRoomBulkItemAction(message);

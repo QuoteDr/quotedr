@@ -17,6 +17,8 @@ assert(source.includes('data-item-key="\' + itemDragKey + \'"'), 'rendered line 
 assert(source.includes('function transferSelectedRoomItems'), 'quote builder should support moving and copying selected items');
 assert(source.includes('function duplicateSelectedRoomItems'), 'quote builder should support duplicating selected items');
 assert(source.includes('function deleteSelectedRoomItems'), 'quote builder should support deleting selected items');
+assert(source.includes('function cloneQuoteBuilderLineItemAsAddition'), 'copied Change Order lines should use an addition-aware clone helper');
+assert(source.includes('function markQuoteBuilderOriginalItemRemoved'), 'bulk deletion should reuse original-line Change Order removal semantics');
 assert(source.includes('Move Selected to...'), 'Edit menu should include Move Selected');
 assert(source.includes('Copy Selected to...'), 'Edit menu should include Copy Selected');
 assert(source.includes('Duplicate Selected Here'), 'Edit menu should include Duplicate Selected Here');
@@ -40,6 +42,14 @@ assert(
 assert(
   /async function deleteSelectedRoomItems[\s\S]*?_pushUndo\(\);[\s\S]*?finishRoomBulkItemAction/.test(source),
   'bulk delete should be undoable and persist'
+);
+assert(
+  /function cloneQuoteBuilderLineItemAsAddition[\s\S]*?delete copy\._coOriginal;[\s\S]*?coRefreshItemDelta\(copy\)/.test(source),
+  'copied and duplicated Change Order items should drop original provenance and recalculate as additions'
+);
+assert(
+  /async function deleteSelectedRoomItems[\s\S]*?markQuoteBuilderOriginalItemRemoved\(item\)/.test(source),
+  'bulk delete should retain genuine original Change Order lines as removal credits'
 );
 
 console.log('quote builder bulk room items static test passed');
