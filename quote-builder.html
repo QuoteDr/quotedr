@@ -2152,6 +2152,7 @@ if (location.search.includes('debug')) {
                         <ul class="dropdown-menu">
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="startVoiceQuote()"><i class="fas fa-microphone me-2" style="color:#7c3aed"></i>AI Quote</a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openQuoteImportModal()"><i class="fas fa-file-import me-2 text-success"></i>Import Old Quote</a></li>
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="openFullQuoteSpellcheck()"><i class="fas fa-spell-check me-2 text-primary"></i>Check Entire Quote</a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openMeasureModal()"><i class="fas fa-satellite me-2 text-primary"></i>Satellite Measure</a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openIkeaQuoteModal()"><i class="fas fa-utensils me-2 text-warning"></i>IKEA Quick Quote</a></li>
@@ -2642,11 +2643,11 @@ if (location.search.includes('debug')) {
         <div class="modal-dialog modal-sm modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title"><i class="fas fa-highlighter me-2"></i>Highlight Item</h5>
+                    <h5 class="modal-title" id="lineItemHighlightModalTitle"><i class="fas fa-highlighter me-2"></i>Highlight Item</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="small text-muted mb-2">Choose a faint highlight colour for this line item.</div>
+                    <div class="small text-muted mb-2" id="lineItemHighlightModalMessage">Choose a faint highlight colour for this line item.</div>
                     <div id="lineItemHighlightOptions" class="row g-2" data-room-id="" data-item-index=""></div>
                 </div>
                 <div class="modal-footer">
@@ -9037,17 +9038,26 @@ Example:
             if (typeof markUnsaved === 'function') markUnsaved();
         }
 
-        function renderLineItemHighlightModalOptions(roomId, itemIndex) {
+        function renderLineItemHighlightModalOptions(roomId, itemIndex, selectedIndexes) {
             const room = rooms.find(r => r.id === roomId);
             const item = room && room.items[itemIndex];
+            const bulkIndexes = Array.isArray(selectedIndexes)
+                ? selectedIndexes.filter(index => Number.isFinite(index) && room && room.items[index])
+                : [];
+            const bulkItems = bulkIndexes.map(index => room.items[index]);
             const optionsEl = document.getElementById('lineItemHighlightOptions');
-            if (!optionsEl || !item) return;
+            if (!optionsEl || (!item && !bulkItems.length)) return;
+            const activeColor = bulkItems.length && bulkItems.every(selectedItem => selectedItem.highlightColor === bulkItems[0].highlightColor)
+                ? (bulkItems[0].highlightColor || '')
+                : (bulkItems.length ? '' : (item.highlightColor || ''));
             optionsEl.setAttribute('data-room-id', String(roomId));
-            optionsEl.setAttribute('data-item-index', String(itemIndex));
+            optionsEl.setAttribute('data-item-index', bulkItems.length ? '' : String(itemIndex));
+            optionsEl.setAttribute('data-highlight-mode', bulkItems.length ? 'bulk' : 'single');
+            optionsEl.setAttribute('data-selected-indexes', bulkIndexes.join(','));
             let html = '';
             Object.keys(LINE_ITEM_HIGHLIGHTS).forEach(function(key) {
                 const highlight = LINE_ITEM_HIGHLIGHTS[key];
-                const isActive = item.highlightColor === key;
+                const isActive = activeColor === key;
                 html += '<div class="col-6">';
                 html += '<button type="button" class="line-item-highlight-option w-100 ' + (isActive ? 'active' : '') + '" onclick="setActiveLineItemHighlight(\'' + key + '\')">';
                 html += '<span class="d-flex align-items-center gap-2">';
@@ -9064,6 +9074,10 @@ Example:
             const room = rooms.find(r => r.id === roomId);
             if (!room || !room.items[itemIndex]) return;
             renderLineItemHighlightModalOptions(roomId, itemIndex);
+            const titleEl = document.getElementById('lineItemHighlightModalTitle');
+            const messageEl = document.getElementById('lineItemHighlightModalMessage');
+            if (titleEl) titleEl.innerHTML = '<i class="fas fa-highlighter me-2"></i>Highlight Item';
+            if (messageEl) messageEl.textContent = 'Choose a faint highlight colour for this line item.';
             const modalEl = document.getElementById('lineItemHighlightModal');
             if (!modalEl || !window.bootstrap) return;
             bootstrap.Modal.getOrCreateInstance(modalEl).show();
@@ -9073,8 +9087,17 @@ Example:
             const optionsEl = document.getElementById('lineItemHighlightOptions');
             const roomId = parseInt(optionsEl && optionsEl.getAttribute('data-room-id'), 10);
             const itemIndex = parseInt(optionsEl && optionsEl.getAttribute('data-item-index'), 10);
-            if (!Number.isFinite(roomId) || !Number.isFinite(itemIndex)) return;
-            setLineItemHighlight(roomId, itemIndex, colorKey);
+            const isBulk = optionsEl && optionsEl.getAttribute('data-highlight-mode') === 'bulk';
+            const selectedIndexes = String(optionsEl && optionsEl.getAttribute('data-selected-indexes') || '')
+                .split(',')
+                .map(value => parseInt(value, 10))
+                .filter(Number.isFinite);
+            if (!Number.isFinite(roomId) || (!isBulk && !Number.isFinite(itemIndex))) return;
+            if (isBulk) {
+                setSelectedLineItemHighlights(roomId, selectedIndexes, colorKey);
+            } else {
+                setLineItemHighlight(roomId, itemIndex, colorKey);
+            }
             const modalEl = document.getElementById('lineItemHighlightModal');
             if (modalEl && window.bootstrap) {
                 const instance = bootstrap.Modal.getInstance(modalEl);
@@ -9703,6 +9726,45 @@ Example:
             if (typeof saveSessionQuote === 'function') saveSessionQuote();
             if (typeof markUnsaved === 'function') markUnsaved();
             if (message && typeof showToast === 'function') showToast(message, 'success');
+        }
+
+        function setSelectedLineItemHighlights(roomId, selectedIndexes, colorKey) {
+            var room = quoteBuilderRoomById(roomId);
+            var indexes = Array.isArray(selectedIndexes)
+                ? Array.from(new Set(selectedIndexes)).filter(function(index) { return Number.isFinite(index) && room && room.items[index]; })
+                : [];
+            if (!room || !indexes.length) return;
+            var hasHighlight = !!(colorKey && LINE_ITEM_HIGHLIGHTS[colorKey]);
+            _pushUndo();
+            indexes.forEach(function(index) {
+                if (hasHighlight) {
+                    room.items[index].highlightColor = colorKey;
+                } else {
+                    delete room.items[index].highlightColor;
+                }
+            });
+            var itemLabel = indexes.length === 1 ? 'line item' : 'line items';
+            var message = hasHighlight
+                ? 'Highlighted ' + indexes.length + ' selected ' + itemLabel + '.'
+                : 'Cleared highlights from ' + indexes.length + ' selected ' + itemLabel + '.';
+            finishRoomBulkItemAction(message);
+        }
+
+        async function openSelectedLineItemHighlightModal(roomId) {
+            var room = quoteBuilderRoomById(roomId);
+            var selectedIndexes = getSelectedRoomItemIndexes(roomId);
+            if (!room || !selectedIndexes.length) {
+                await qdAlert('Select one or more line items first.');
+                return;
+            }
+            renderLineItemHighlightModalOptions(room.id, null, selectedIndexes);
+            var titleEl = document.getElementById('lineItemHighlightModalTitle');
+            var messageEl = document.getElementById('lineItemHighlightModalMessage');
+            if (titleEl) titleEl.innerHTML = '<i class="fas fa-highlighter me-2"></i>Highlight Selected Items';
+            if (messageEl) messageEl.textContent = 'Choose one faint highlight colour for all ' + selectedIndexes.length + ' selected line items.';
+            var modalEl = document.getElementById('lineItemHighlightModal');
+            if (!modalEl || !window.bootstrap) return;
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
         }
 
         async function openRoomBulkDestinationPicker(sourceRoomId, actionLabel) {
@@ -12554,6 +12616,51 @@ Example:
             return note;
         }
 
+        function getFullQuoteSpellcheckState() {
+            return {
+                quoteTitle: document.getElementById('quoteTitle')?.value || '',
+                clientName: document.getElementById('clientName')?.value || '',
+                projectAddress: document.getElementById('projectAddress')?.value || '',
+                changeOrderReason: document.getElementById('changeOrderReason')?.value || '',
+                quoteAdjustment: getQuoteClientAdjustment(),
+                paymentsReceived: getQuotePaymentsReceived(),
+                rooms: rooms
+            };
+        }
+
+        function applyFullQuoteSpellcheckState(state) {
+            state = state || {};
+            var topLevelFields = {
+                quoteTitle: 'quoteTitle',
+                clientName: 'clientName',
+                projectAddress: 'projectAddress',
+                changeOrderReason: 'changeOrderReason'
+            };
+            Object.keys(topLevelFields).forEach(function(key) {
+                var field = document.getElementById(topLevelFields[key]);
+                if (field && state[key] !== undefined) field.value = state[key];
+            });
+            if (Array.isArray(state.rooms)) rooms = state.rooms;
+            if (state.quoteAdjustment) setQuoteClientAdjustment(state.quoteAdjustment);
+            if (state.paymentsReceived) setQuotePaymentsReceived(state.paymentsReceived);
+            renderRooms();
+            calculateTotals();
+            if (typeof markUnsaved === 'function') markUnsaved();
+            if (typeof autoSaveDraft === 'function') autoSaveDraft();
+            if (typeof doAutoSave === 'function') setTimeout(function() { doAutoSave(); }, 0);
+        }
+
+        function openFullQuoteSpellcheck() {
+            if (!window.QuoteDrSpellcheck || typeof window.QuoteDrSpellcheck.open !== 'function') {
+                if (typeof showToast === 'function') showToast('Spell check is still loading. Please try again.', 'warning');
+                return;
+            }
+            window.QuoteDrSpellcheck.open({
+                state: getFullQuoteSpellcheckState(),
+                onApply: applyFullQuoteSpellcheckState
+            });
+        }
+
         function renderRooms() {
             const container = document.getElementById('roomsContainer');
             ensureUniqueRoomIds();
@@ -12655,6 +12762,7 @@ Example:
                 html += '<li><button type="button" class="dropdown-item disabled" disabled data-room-bulk-requires-selection="' + room.id + '" onclick="transferSelectedRoomItems(' + room.id + ', \'move\')"><i class="fas fa-folder-tree text-primary"></i>Move Selected to...</button></li>';
                 html += '<li><button type="button" class="dropdown-item disabled" disabled data-room-bulk-requires-selection="' + room.id + '" onclick="transferSelectedRoomItems(' + room.id + ', \'copy\')"><i class="fas fa-copy text-success"></i>Copy Selected to...</button></li>';
                 html += '<li><button type="button" class="dropdown-item disabled" disabled data-room-bulk-requires-selection="' + room.id + '" onclick="duplicateSelectedRoomItems(' + room.id + ')"><i class="fas fa-clone text-info"></i>Duplicate Selected Here</button></li>';
+                html += '<li><button type="button" class="dropdown-item disabled" disabled data-room-bulk-requires-selection="' + room.id + '" onclick="openSelectedLineItemHighlightModal(' + room.id + ')"><i class="fas fa-highlighter text-warning"></i>Highlight Selected...</button></li>';
                 html += '<li><button type="button" class="dropdown-item text-danger disabled" disabled data-room-bulk-requires-selection="' + room.id + '" onclick="deleteSelectedRoomItems(' + room.id + ')"><i class="fas fa-trash"></i>Delete Selected</button></li>';
                 html += '<li><hr class="dropdown-divider"></li>';
                 html += '<li><button type="button" class="dropdown-item" onclick="saveRoomAsTemplate(' + room.id + ')"><i class="fas fa-bookmark text-info"></i>Save ' + qdTemplateEscapeHtml(getQuoteDividerLabels().singular) + ' Template</button></li>';
@@ -12679,7 +12787,7 @@ Example:
                 html += '<label class="mb-0"><small><i class="fas fa-clipboard-list"></i> <strong>Scope / Notes</strong> <span class="text-muted">(visible to client)</span></small></label>';
                 html += '<button type="button" class="btn btn-sm btn-outline-primary" id="aiScopeBtn_' + room.id + '" onclick="generateRoomScopeNotes(' + room.id + ', this)" title="Build a client-facing scope from this room&apos;s line items"><i class="fas fa-magic me-1"></i>AI Scope</button>';
                 html += '</div>';
-                html += '<textarea id="scopeNotes_' + room.id + '" class="form-control form-control-sm" rows="3" placeholder="Describe the scope of work for this room..." onchange="updateRoomScopeNotes(' + room.id + ')">' + qdTemplateEscapeHtml(roomNotes) + '</textarea>';
+                html += '<textarea id="scopeNotes_' + room.id + '" class="form-control form-control-sm" rows="3" placeholder="Describe the scope of work for this room..." spellcheck="true" onchange="updateRoomScopeNotes(' + room.id + ')">' + qdTemplateEscapeHtml(roomNotes) + '</textarea>';
                 html += '</div>';
 
                 html += '<div class="room-item-drop-zone quote-line-items-sortable" data-room-id="' + room.id + '" aria-label="Drop line item into ' + qdTemplateEscapeHtml(room.name) + '"><i class="fas fa-arrow-down me-2"></i>Drop line item into ' + qdTemplateEscapeHtml(room.name) + '</div>';
@@ -19585,6 +19693,7 @@ Example:
 <script src="help-content.js?v=1778198300"></script>
 <script src="modal-help.js?v=1778055200"></script>
 <script src="quote-tips.js?v=1783300000"></script>
+<script src="quote-spellcheck.js?v=2026071602"></script>
 <script>
         function _toggleAiBtn() {
             var btn = document.getElementById('qdAiBtn');

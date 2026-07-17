@@ -25,6 +25,14 @@ export const AI_USAGE_LIMITS = Object.freeze({
     maxInputChars: 2500,
     maxOutputTokens: 350,
   }),
+  writing_suggestions: Object.freeze({
+    feature: 'writing_suggestions',
+    label: 'Quote spell check',
+    hourlyLimit: 80,
+    dailyLimit: 400,
+    maxInputChars: 12000,
+    maxOutputTokens: 1800,
+  }),
   voice_quote: Object.freeze({
     feature: 'voice_quote',
     label: 'AI voice quote',

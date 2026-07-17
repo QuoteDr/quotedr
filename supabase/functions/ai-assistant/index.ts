@@ -28,7 +28,11 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'No messages provided' }, 400, corsHeaders);
     }
 
-    const aiFeature = feature === 'ai_refine' ? 'ai_refine' : 'ai_assistant';
+    const aiFeature = feature === 'ai_refine'
+      ? 'ai_refine'
+      : feature === 'writing_suggestions'
+        ? 'writing_suggestions'
+        : 'ai_assistant';
     const inputChars = JSON.stringify({ messages, context }).length;
     usageGuard = await startAiUsage(req, { feature: aiFeature, endpoint: 'ai-assistant', inputChars });
     assertWithinAiInputLimit(usageGuard.policy, messages, usageGuard.policy.label);
@@ -40,9 +44,21 @@ Deno.serve(async (req) => {
     }
 
     // Grounded-only product guide: QuoteDr workflow answers come from the shared knowledge module.
+    const writingSuggestionsSystemPrompt = [
+      'You are QuoteDr spell check, a precise proofreader for contractor quotes.',
+      'Return only valid JSON. Do not use markdown.',
+      'JSON shape: {"suggestions":[{"fieldId":"exact field id","original":"exact text from that field","replacement":"replacement text","reason":"short reason"}]}',
+      'Check spelling, grammar, punctuation, and contractor-context homophones such as boarder/border.',
+      'Preserve contractor meaning, product and brand names, measurements, prices, addresses, client names, and legal wording.',
+      'Only return high-confidence corrections. Never invent a field id or rewrite a whole passage for style.',
+      'Return at most 20 suggestions. If nothing needs changing, return {"suggestions":[]}.',
+    ].join('\n');
+
     const assistantSystemPrompt = aiFeature === 'ai_refine'
       ? `You help QuoteDr users rewrite client-facing descriptions. Keep the user's meaning, make it clear and professional, and return only the refined wording.`
-      : buildQuoteDrAssistantSystemPrompt(context as QuoteDrAssistantContext | undefined);
+      : aiFeature === 'writing_suggestions'
+        ? writingSuggestionsSystemPrompt
+        : buildQuoteDrAssistantSystemPrompt(context as QuoteDrAssistantContext | undefined);
 
     const model = 'gpt-4o-mini';
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -57,7 +73,7 @@ Deno.serve(async (req) => {
           { role: 'system', content: assistantSystemPrompt },
           ...messages,
         ],
-        temperature: 0.7,
+        temperature: aiFeature === 'writing_suggestions' ? 0.1 : 0.7,
         max_tokens: usageGuard.policy.maxOutputTokens,
       }),
     });

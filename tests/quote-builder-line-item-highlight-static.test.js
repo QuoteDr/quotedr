@@ -35,6 +35,20 @@ assert(
   'Line item highlight picker should open in a modal with a durable selected item context'
 );
 
+assert(
+  source.includes('function setSelectedLineItemHighlights(') &&
+    source.includes('function openSelectedLineItemHighlightModal(') &&
+    source.includes('Highlight Selected...'),
+  'the room Edit menu should apply one highlight colour to all selected line items'
+);
+
+assert(
+  source.includes('id="lineItemHighlightModalTitle"') &&
+    source.includes('id="lineItemHighlightModalMessage"') &&
+    source.includes('Highlight Selected Items'),
+  'the shared highlight modal should clearly identify bulk highlighting mode'
+);
+
 const highlightButtonSource = source.slice(
   source.indexOf('function renderLineItemHighlightButton('),
   source.indexOf('async function openProFeature(')
