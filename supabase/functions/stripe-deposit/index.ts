@@ -165,11 +165,17 @@ Deno.serve(async (req) => {
 
     const { data: quoteRow, error: quoteError } = await supabase
       .from("quotes")
-      .select("id,user_id,quote_number,client_name,total,data")
+      .select("id,user_id,quote_number,client_name,status,total,data")
       .eq("id", quoteId)
       .single();
 
     if (quoteError || !quoteRow) return json({ error: "Quote or invoice not found" }, 404);
+    const quoteData = quoteRow.data || {};
+    const documentStatus = String(quoteRow.status || quoteData.status || "").toLowerCase();
+    const documentValidity = String(quoteData.document_validity || quoteData.documentValidity || "").toLowerCase();
+    if (documentStatus === "voided" || ["voided", "invalid", "superseded"].includes(documentValidity)) {
+      return json({ error: "This invoice is no longer valid and cannot accept payment" }, 409);
+    }
 
     const { data: settingsRow } = await supabase
       .from("user_data")
@@ -184,7 +190,6 @@ Deno.serve(async (req) => {
     if (paymentType === "invoice_deposit" && settings.accept_deposit === false) return json({ error: "Invoice deposits are not enabled" }, 403);
     if (paymentType === "invoice_full" && settings.accept_full_payment === false) return json({ error: "Full invoice payments are not enabled" }, 403);
 
-    const quoteData = quoteRow.data || {};
     const clientEmail = String(body.clientEmail || quoteData.clientEmail || quoteData.email || "");
     const metadata = {
       quote_number: quoteRow.quote_number || quoteData.quoteNumber || "",

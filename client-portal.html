@@ -144,6 +144,7 @@
     .status-declined { background-color: #f8d7da; color: #721c24; }
     .status-invoiced { background-color: #fff3cd; color: #856404; }
     .status-paid { background-color: #d1ecf1; color: #0c5460; }
+    .status-voided { background-color: #f8d7da; color: #842029; }
 
     .signature-thumb {
       width: 120px;
@@ -205,6 +206,11 @@
 
     .quote-card {
       background-color: var(--portal-surface-bg, #ffffff);
+    }
+    .quote-card.portal-invalid-document {
+      border-color: #dc3545;
+      background: #fff7f7;
+      box-shadow: inset 4px 0 0 #dc3545;
     }
 
     .portal-document-activity {
@@ -4734,9 +4740,10 @@
 
     function renderGroupedPortalDocuments(parents, children, co) {
       const groups = [
-        { key: 'needs', icon: 'fa-circle-exclamation', title: 'Needs Action', items: parents.filter(function(q) { return documentNeedsAction(q) && !documentIsCompleted(q); }) },
-        { key: 'open', icon: 'fa-folder-open', title: 'Open', items: parents.filter(function(q) { return !documentNeedsAction(q) && !documentIsCompleted(q); }) },
-        { key: 'completed', icon: 'fa-circle-check', title: 'Completed', items: parents.filter(documentIsCompleted) }
+        { key: 'needs', icon: 'fa-circle-exclamation', title: 'Needs Action', items: parents.filter(function(q) { return !documentIsInvalid(q) && documentNeedsAction(q) && !documentIsCompleted(q); }) },
+        { key: 'open', icon: 'fa-folder-open', title: 'Open', items: parents.filter(function(q) { return !documentIsInvalid(q) && !documentNeedsAction(q) && !documentIsCompleted(q); }) },
+        { key: 'completed', icon: 'fa-circle-check', title: 'Completed', items: parents.filter(function(q) { return !documentIsInvalid(q) && documentIsCompleted(q); }) },
+        { key: 'invalid', icon: 'fa-ban', title: 'No Longer Valid', items: parents.filter(documentIsInvalid) }
       ];
 
       groups.forEach(function(group) {
@@ -4852,9 +4859,11 @@
       if (quote.id === portalQuoteId) card.classList.add('portal-focus');
 
       const status = quoteStatus(quote);
-      const statusClass = statusClassName(status);
+      const isInvalid = documentIsInvalid(quote);
+      const displayStatus = isInvalid ? 'voided' : status;
+      const statusClass = statusClassName(displayStatus);
       const statusText = getClientStatusText(quote);
-      const statusIcon = getStatusIcon(status);
+      const statusIcon = getStatusIcon(displayStatus);
       const docType = getDocumentType(quote);
       const needsAction = documentNeedsAction(quote);
       const primaryHref = portalDocumentPrimaryHref(quote);
@@ -4895,9 +4904,15 @@
       const activityPanelMarkup = portalIsAdminView
         ? `<div id="portalActivityPanel-${escapeHtml(quote.id)}" class="portal-document-activity d-none"></div>`
         : '';
+      const invalidNoticeMarkup = isInvalid
+        ? `<div class="alert alert-danger mb-3"><i class="fas fa-ban me-2"></i><strong>This invoice is no longer valid.</strong> It has been replaced or voided and is kept here for reference only. Do not make payment from this document.</div>`
+        : '';
+
+      if (isInvalid) card.classList.add('portal-invalid-document');
 
       card.innerHTML = `
         <div class="card-body">
+          ${invalidNoticeMarkup}
           <div class="d-flex justify-content-between align-items-start mb-3 portal-doc-main">
             <div>
               <div class="d-flex gap-2 flex-wrap align-items-center mb-2">
@@ -4982,14 +4997,23 @@
 
     function isInvoiceDocument(quote) {
       const status = quoteStatus(quote);
-      return status === 'invoiced' || status === 'paid' || quote.type === 'invoice' || quote.data?.documentType === 'invoice';
+      const documentType = String(quote.type || quote.data?.documentType || quote.data?.type || '').toLowerCase();
+      return status === 'invoiced' || status === 'paid' || documentType === 'invoice';
+    }
+
+    function documentIsInvalid(quote) {
+      const status = quoteStatus(quote);
+      const validity = String(quote.data?.document_validity || quote.data?.documentValidity || '').toLowerCase();
+      return status === 'voided' || ['voided', 'invalid', 'superseded'].includes(validity);
     }
 
     function documentIsCompleted(quote) {
+      if (documentIsInvalid(quote)) return false;
       return quoteStatus(quote) === 'paid' || quote.data?.paymentStatus === 'paid';
     }
 
     function documentNeedsAction(quote) {
+      if (documentIsInvalid(quote)) return false;
       if (documentIsCompleted(quote)) return false;
       const status = quoteStatus(quote);
       const paymentStatus = String(quote.data?.paymentStatus || '').toLowerCase();
@@ -5004,7 +5028,7 @@
         return { label: 'Change Order', icon: 'fa-file-circle-plus', className: 'doc-type-change-order', actionIcon: 'fa-pen-nib', actionLabel: 'Review Change Order' };
       }
       if (isInvoiceDocument(quote)) {
-        return { label: 'Invoice', icon: 'fa-file-invoice-dollar', className: 'doc-type-invoice', actionIcon: 'fa-file-invoice-dollar', actionLabel: quoteStatus(quote) === 'paid' ? 'View Invoice' : 'View / Pay Invoice' };
+        return { label: 'Invoice', icon: 'fa-file-invoice-dollar', className: 'doc-type-invoice', actionIcon: 'fa-file-invoice-dollar', actionLabel: documentIsInvalid(quote) ? 'View Invalid Invoice' : (quoteStatus(quote) === 'paid' ? 'View Invoice' : 'View / Pay Invoice') };
       }
       return { label: 'Quote', icon: 'fa-file-signature', className: '', actionIcon: quoteStatus(quote) === 'accepted' ? 'fa-eye' : 'fa-pen-nib', actionLabel: quoteStatus(quote) === 'accepted' ? 'View Quote' : 'Review / Sign Quote' };
     }
@@ -5012,6 +5036,7 @@
     function getClientStatusText(quote) {
       const status = quoteStatus(quote);
       const paymentStatus = String(quote.data?.paymentStatus || '').toLowerCase();
+      if (documentIsInvalid(quote)) return 'No Longer Valid';
       if (documentIsCompleted(quote)) return 'Paid';
       if (status === 'invoiced') return paymentStatus === 'partially_paid' ? 'Partially Paid' : 'Invoice Due';
       if (status === 'accepted' || status === 'approved') return 'Accepted';
@@ -5024,6 +5049,7 @@
 
     function getClientActionLine(quote) {
       const status = quoteStatus(quote);
+      if (documentIsInvalid(quote)) return 'Replaced or voided. Kept for reference only — do not pay.';
       if (documentIsCompleted(quote)) return 'Completed and paid.';
       if (status === 'invoiced') return 'Invoice is ready for review and payment.';
       if (status === 'accepted' || status === 'approved') return 'Accepted. Your contractor has this on file.';
@@ -5048,6 +5074,7 @@
         case 'accepted': return 'fa-circle-check';
         case 'invoiced': return 'fa-file-invoice';
         case 'paid': return 'fa-money-bill-wave';
+        case 'voided': return 'fa-ban';
         default: return 'fa-file';
       }
     }
@@ -5071,20 +5098,21 @@
         }, 0);
         const paymentStatus = String(quote.data?.paymentStatus || '').toLowerCase();
         const status = String(quote.status || '').toLowerCase();
-        const isInvoice = status === 'invoiced' || status === 'paid' || quote.type === 'invoice' || quote.data?.documentType === 'invoice';
+        const isInvalid = documentIsInvalid(quote);
+        const isInvoice = isInvoiceDocument(quote);
 
-        if (status === 'accepted' || status === 'invoiced' || status === 'paid') clientLifetimeValue += total;
+        if (!isInvalid && (status === 'accepted' || status === 'invoiced' || status === 'paid')) clientLifetimeValue += total;
         if (isInvoice) invoiceCount++;
-        if (status === 'paid' || quote.data?.paymentStatus === 'paid') jobsCompleted++;
+        if (documentIsCompleted(quote)) jobsCompleted++;
         if (documentNeedsAction(quote) && !documentIsCompleted(quote)) {
           needsActionCount++;
           if (isInvoice) invoiceDueCount++;
           else quoteWaitingCount++;
         }
-        if (status === 'invoiced') balanceDue += Math.max(total - paidAmount, 0);
-        if (paymentStatus === 'partially_paid' && status !== 'invoiced') balanceDue += Math.max(total - paidAmount, 0);
+        if (!isInvalid && status === 'invoiced') balanceDue += Math.max(total - paidAmount, 0);
+        if (!isInvalid && paymentStatus === 'partially_paid' && status !== 'invoiced') balanceDue += Math.max(total - paidAmount, 0);
 
-        if (status === 'sent' || status === 'draft' || status === 'viewed') {
+        if (!isInvalid && (status === 'sent' || status === 'draft' || status === 'viewed')) {
           openQuotes++;
         }
       });

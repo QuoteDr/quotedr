@@ -548,6 +548,12 @@ if (location.search.includes('debug')) {
             </button>
         </div>
 
+        <div id="invoiceInvalidNotice" class="alert alert-danger border-danger mb-4" style="display:none;">
+            <h4 class="alert-heading mb-2"><i class="fas fa-ban me-2"></i>NO LONGER VALID</h4>
+            <p class="mb-1"><strong>This invoice has been replaced or voided.</strong> It is kept for reference only. Do not make payment from this document.</p>
+            <div id="invoiceInvalidMeta" class="small"></div>
+        </div>
+
         <!-- Header -->
         <div class="invoice-header">
             <div class="row align-items-center">
@@ -780,6 +786,35 @@ if (location.search.includes('debug')) {
 
         function getInvoiceSettings() {
             return Object.assign({}, DEFAULT_INVOICE_SETTINGS, invoiceData.invoiceSettings || {});
+        }
+
+        function invoiceIsInvalid() {
+            var row = window._invoiceRow || {};
+            var data = invoiceData || {};
+            var status = String(row.status || data.document_status || data.status || '').toLowerCase();
+            var validity = String(data.document_validity || data.documentValidity || '').toLowerCase();
+            return status === 'voided' || ['voided', 'invalid', 'superseded'].includes(validity);
+        }
+
+        function renderInvoiceInvalidNotice() {
+            var notice = document.getElementById('invoiceInvalidNotice');
+            if (!notice) return;
+            var invalid = invoiceIsInvalid();
+            notice.style.display = invalid ? 'block' : 'none';
+            var meta = document.getElementById('invoiceInvalidMeta');
+            if (!meta) return;
+            if (!invalid) {
+                meta.textContent = '';
+                return;
+            }
+            var invalidatedAt = invoiceData.invalidated_at || invoiceData.invalidatedAt || '';
+            var reason = invoiceData.invalidated_reason || invoiceData.invalidatedReason || 'Superseded by a newer invoice';
+            var parts = [reason];
+            if (invalidatedAt) {
+                var date = new Date(invalidatedAt);
+                if (!Number.isNaN(date.getTime())) parts.push('Marked invalid ' + date.toLocaleDateString('en-CA'));
+            }
+            meta.textContent = parts.join(' · ');
         }
 
         function formatMoney(amount, currency) {
@@ -1529,6 +1564,7 @@ if (location.search.includes('debug')) {
 
         function renderInvoice() {
             const settings = getInvoiceSettings();
+            renderInvoiceInvalidNotice();
             // Header info
             const date = new Date().toLocaleDateString('en-CA', { year:'numeric', month:'long', day:'numeric' });
             document.getElementById('invoiceDateDisplay').textContent = date;
@@ -1695,7 +1731,7 @@ if (location.search.includes('debug')) {
             var paymentDisplay = document.getElementById('invoicePaymentReceivedDisplay');
             if (paymentDisplay) paymentDisplay.textContent = formatSignedMoney(-paymentReceivedAmount, _iCurrency);
             var balanceLabel = document.getElementById('invoiceBalanceLabel');
-            if (balanceLabel) balanceLabel.textContent = paymentReceivedAmount > 0 ? 'Balance Due' : 'Total Due';
+            if (balanceLabel) balanceLabel.textContent = invoiceIsInvalid() ? 'Reference Total (No Longer Valid)' : (paymentReceivedAmount > 0 ? 'Balance Due' : 'Total Due');
             document.getElementById('grandTotalDisplay').textContent = formatMoney(balanceDue, _iCurrency);
             var taxLabelRow = document.getElementById('invoiceTaxLabel');
             if (taxLabelRow) taxLabelRow.textContent = _iTaxEnabled
@@ -1709,12 +1745,13 @@ if (location.search.includes('debug')) {
             if (noteEl) noteEl.textContent = settings.note || '';
             if (termsEl) termsEl.textContent = settings.paymentTerms ? 'Payment terms: ' + settings.paymentTerms : '';
             // Store total for payment helpers
-            window._invoiceTotal = balanceDue;
+            window._invoiceTotal = invoiceIsInvalid() ? 0 : balanceDue;
             var depBtn = document.getElementById('depositRequestBtn');
             if (depBtn) depBtn.style.display = 'none';
         }
 
         function openDepositModal() {
+            if (invoiceIsInvalid()) { alert('This invoice is no longer valid and cannot accept payment.'); return; }
             var total = window._invoiceTotal || 0;
             var half = (total * 0.5).toFixed(2);
             document.getElementById('depositAmountInput').value = half;
@@ -1729,6 +1766,7 @@ if (location.search.includes('debug')) {
         }
 
         async function submitDepositRequest() {
+            if (invoiceIsInvalid()) { alert('This invoice is no longer valid and cannot accept payment.'); return; }
             var amount = parseFloat(document.getElementById('depositAmountInput').value);
             if (!amount || amount <= 0) { alert('Please enter a valid amount.'); return; }
             var quoteId = invoiceData.supabaseId || invoiceData.id || '';
@@ -1873,6 +1911,16 @@ if (location.search.includes('debug')) {
         }
 
         function renderInvoicePaymentOptions(settings, total, invoiceId) {
+            if (invoiceIsInvalid()) {
+                var invalidSection = document.getElementById('clientPaymentSection');
+                var invalidButtons = document.getElementById('clientPaymentButtons');
+                var invalidManual = document.getElementById('manualPaymentDetails');
+                if (invalidSection) invalidSection.style.display = 'none';
+                if (invalidButtons) invalidButtons.innerHTML = '';
+                if (invalidManual) invalidManual.innerHTML = '';
+                _invoiceIdForPayment = '';
+                return;
+            }
             if (getInvoiceSettings().showPaymentOptions === false || !total) return;
             var s = withDefaultPaymentSettings(settings || getInvoicePaymentSettingsFallback());
             var paymentTargetId = getInvoicePaymentTargetId(invoiceId);
@@ -1917,6 +1965,10 @@ if (location.search.includes('debug')) {
         }
 
         async function initInvoicePaymentSection(contractorUserId, total, invoiceId) {
+            if (invoiceIsInvalid()) {
+                renderInvoicePaymentOptions(null, 0, '');
+                return;
+            }
             if (getInvoiceSettings().showPaymentOptions === false) return;
             _invoiceTotalForPayment = total || 0;
             _invoiceIdForPayment = invoiceId;
@@ -1930,6 +1982,10 @@ if (location.search.includes('debug')) {
         }
 
         async function handleClientInvoicePayment(amountCents, description, paymentType) {
+            if (invoiceIsInvalid()) {
+                alert('This invoice is no longer valid and cannot accept payment.');
+                return;
+            }
             if (!_invoiceIdForPayment) {
                 alert('This invoice needs to be saved before card payment is available. Please use the shared invoice link.');
                 return;

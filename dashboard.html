@@ -39,6 +39,11 @@
         .quote-card.change-order-card:hover {
             box-shadow: inset 4px 0 0 #f97316, 0 2px 8px rgba(249,115,22,0.16);
         }
+        .quote-card.voided-document-card {
+            background: #fff7f7;
+            border-color: #dc3545;
+            box-shadow: inset 4px 0 0 #dc3545;
+        }
         .change-order-badge {
             background: #f97316;
             color: #fff;
@@ -50,6 +55,7 @@
         .status-accepted { color: #198754; }
         .status-invoiced { color: #fd7e14; font-weight: 600; }
         .status-paid { color: #198754; font-weight: 700; }
+        .status-voided { color: #dc3545; font-weight: 700; }
         .status-declined { color: #dc3545; }
         .quote-card .status-select {
             padding: 0.25rem 0.5rem;
@@ -123,6 +129,9 @@
             transform: translateX(-50%);
             pointer-events: none;
         }
+        .dashboard-brand.dashboard-brand-colliding {
+            visibility: hidden;
+        }
         @media (orientation: landscape) and (max-height: 520px) and (max-width: 1100px) {
             .dashboard-brand {
                 display: none;
@@ -161,7 +170,7 @@
         <span class="navbar-brand mx-auto mb-0 dashboard-brand">QuoteDr.io</span>
 
         <!-- Right: Nav menu -->
-        <div class="d-flex align-items-center gap-2 ms-auto">
+        <div class="dashboard-nav-actions d-flex align-items-center gap-2 ms-auto">
             <!-- Username (desktop only) -->
             <span class="fw-semibold small text-muted d-none d-md-inline" id="userName"></span>
 
@@ -207,6 +216,41 @@
             </div>
         </div>
     </nav>
+    <script>
+        (function() {
+            function initializeDashboardBrandCollisionGuard() {
+                var brand = document.querySelector('.dashboard-brand');
+                var backButton = document.querySelector('nav.navbar > a[href="quote-builder.html"]');
+                var actions = document.querySelector('.dashboard-nav-actions');
+                if (!brand || !backButton || !actions) return;
+
+                function updateDashboardBrandVisibility() {
+                    var brandRect = brand.getBoundingClientRect();
+                    var backRect = backButton.getBoundingClientRect();
+                    var actionsRect = actions.getBoundingClientRect();
+                    var clearance = 12;
+                    var isColliding = brandRect.left <= backRect.right + clearance ||
+                        brandRect.right >= actionsRect.left - clearance;
+                    brand.classList.toggle('dashboard-brand-colliding', isColliding);
+                }
+
+                updateDashboardBrandVisibility();
+                window.addEventListener('resize', updateDashboardBrandVisibility, { passive: true });
+                if ('ResizeObserver' in window) {
+                    var observer = new ResizeObserver(updateDashboardBrandVisibility);
+                    observer.observe(brand);
+                    observer.observe(backButton);
+                    observer.observe(actions);
+                }
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initializeDashboardBrandCollisionGuard);
+            } else {
+                initializeDashboardBrandCollisionGuard();
+            }
+        })();
+    </script>
     <div class="container py-4">
 
         <!-- Stats Cards -->
@@ -303,6 +347,7 @@
                                     <option value="accepted">Accepted</option>
                                     <option value="invoiced">Invoiced</option>
                                     <option value="paid">Paid</option>
+                                    <option value="voided">Invalid / Voided</option>
                                     <option value="declined">Declined</option>
                                 </select>
                             </div>
@@ -856,7 +901,7 @@
             const total = quotes.length;
             const accepted = quotes.filter(q => q.status === 'accepted').length;
             const inReview = quotes.filter(q => q.status === 'viewed' || q.status === 'in_review').length;
-            const revenue = quotes.reduce((sum, q) => sum + (parseFloat(q.total) || 0), 0);
+            const revenue = quotes.reduce((sum, q) => sum + dashboardRevenueAmount(q), 0);
             const outstanding = quotes.reduce((sum, q) => sum + dashboardOutstandingAmount(q), 0);
 
             document.getElementById('totalQuotesCount').textContent = total;
@@ -926,6 +971,9 @@
                 var clientEmail = q.data && q.data.clientEmail ? q.data.clientEmail : '';
                 var status = q.status || 'draft';
                 var isChangeOrder = window.QuoteDrChangeOrders && QuoteDrChangeOrders.isChangeOrder(q);
+                var isInvoice = dashboardIsInvoiceDocument(q);
+                var isInvalid = dashboardDocumentIsInvalid(q);
+                var displayStatus = isInvalid ? 'voided' : status;
                 var changeOrders = (allQuotes || []).filter(function(row) { return window.QuoteDrChangeOrders && QuoteDrChangeOrders.parentQuoteId(row) === q.id; });
                 var pendingCos = changeOrders.filter(function(row) { return row.status === 'pending_approval'; }).length;
                 var portalVisible = !!(q.data && q.data.portal_visible);
@@ -934,11 +982,11 @@
                 var depositPaid = !!(q.data && (q.data.deposit_paid === true || q.data.paymentStatus === 'partially_paid' || q.data.paymentStatus === 'paid' || payments.some(function(payment) { return ['deposit', 'invoice_deposit'].includes(payment.type) && payment.paid_at; })));
                 var depositPayment = payments.slice().reverse().find(function(payment) { return ['deposit', 'invoice_deposit'].includes(payment.type) && payment.paid_at; });
                 var depositAmount = depositPayment && depositPayment.amount_cents ? '$' + (depositPayment.amount_cents / 100).toFixed(2) : 'Deposit';
-                var reviewReady = dashboardIsPaidForReviewRequest(q);
+                var reviewReady = !isInvalid && dashboardIsPaidForReviewRequest(q);
                 var reviewSentAt = q.data && q.data.review_request_sent_at;
                 var reviewNudge = shouldShowReviewNudge(q);
                 return `
-                <div class="quote-card ${isChangeOrder ? 'change-order-card' : ''}">
+                <div class="quote-card ${isChangeOrder ? 'change-order-card' : ''} ${isInvalid ? 'voided-document-card' : ''}">
                     <div class="d-flex justify-content-between align-items-start">
                         <div onclick="openQuote(${jsAttr(q.id)})" style="flex:1; cursor:pointer;">
                             ${q.id === lastOpenedId ? '<span class="badge bg-primary me-1" style="font-size:0.65rem; vertical-align:middle;">Last Opened</span>' : ''}
@@ -959,23 +1007,25 @@
                         </div>
                         <div class="text-end d-flex flex-column align-items-end gap-1">
                             <div class="fw-bold">$${parseFloat(q.total || 0).toFixed(2)}</div>
-                            <select class="status-select status-${escapeHtml(status)}" onchange="updateQuoteStatus(${jsAttr(q.id)}, this.value)">
-                                <option value="draft" ${status === 'draft' ? 'selected' : ''}>Draft</option>
-                                <option value="sent" ${status === 'sent' ? 'selected' : ''}>Sent</option>
-                                <option value="viewed" ${status === 'viewed' ? 'selected' : ''}>Viewed</option>
-                                <option value="in_review" ${status === 'in_review' ? 'selected' : ''}>In Review</option>
-                                <option value="accepted" ${status === 'accepted' ? 'selected' : ''}>Accepted</option>
-                                <option value="invoiced" ${status === 'invoiced' ? 'selected' : ''}>Invoiced</option>
-                                <option value="paid" ${status === 'paid' ? 'selected' : ''}>Paid</option>
-                                <option value="pending_approval" ${status === 'pending_approval' ? 'selected' : ''}>Pending CO Approval</option>
-                                <option value="approved" ${status === 'approved' ? 'selected' : ''}>CO Approved</option>
-                                <option value="declined" ${status === 'declined' ? 'selected' : ''}>Declined</option>
+                            <select class="status-select status-${escapeHtml(displayStatus)}" onchange="updateQuoteStatus(${jsAttr(q.id)}, this.value)" ${isInvalid ? 'disabled title="Restore this invoice before changing its status"' : ''}>
+                                <option value="draft" ${!isInvalid && status === 'draft' ? 'selected' : ''}>Draft</option>
+                                <option value="sent" ${!isInvalid && status === 'sent' ? 'selected' : ''}>Sent</option>
+                                <option value="viewed" ${!isInvalid && status === 'viewed' ? 'selected' : ''}>Viewed</option>
+                                <option value="in_review" ${!isInvalid && status === 'in_review' ? 'selected' : ''}>In Review</option>
+                                <option value="accepted" ${!isInvalid && status === 'accepted' ? 'selected' : ''}>Accepted</option>
+                                <option value="invoiced" ${!isInvalid && status === 'invoiced' ? 'selected' : ''}>Invoiced</option>
+                                <option value="paid" ${!isInvalid && status === 'paid' ? 'selected' : ''}>Paid</option>
+                                ${isInvalid ? '<option value="voided" selected>Invalid / Voided</option>' : ''}
+                                <option value="pending_approval" ${!isInvalid && status === 'pending_approval' ? 'selected' : ''}>Pending CO Approval</option>
+                                <option value="approved" ${!isInvalid && status === 'approved' ? 'selected' : ''}>CO Approved</option>
+                                <option value="declined" ${!isInvalid && status === 'declined' ? 'selected' : ''}>Declined</option>
                             </select>
                             <button class="btn btn-outline-danger" onclick="deleteQuote(${jsAttr(q.id)})">
                                 <i class="fas fa-trash"></i>
                             </button>
                         </div>
                     </div>
+                    ${isInvalid ? `<div class="alert alert-danger py-2 px-2 mt-2 mb-0 small"><i class="fas fa-ban me-1"></i><strong>No longer valid.</strong> This invoice remains in the client portal for reference only and cannot be paid.</div>` : ''}
                     ${status === 'accepted' && q.data && q.data.client_upgraded ? `<div class="alert alert-warning py-1 px-2 mt-2 mb-0 small"><i class="fas fa-bolt me-1"></i><strong>Client made upgrades</strong> when signing - <a href="interactive-quote-viewer.html?id=${encodeURIComponent(q.id)}" class="alert-link">review quote</a></div>` : ''}
                     ${portalVisible ? `<div class="portal-locked-note mt-2"><i class="fas fa-shield-halved me-1"></i>This document is locked while it is in the client portal. Remove from portal or duplicate as a revision to edit.</div>` : ''}
                     ${depositPaid ? `<div class="alert alert-success py-1 px-2 mt-2 mb-0 small"><i class="fas fa-credit-card me-1"></i><strong>${escapeHtml(depositAmount)} paid</strong>${depositPayment && depositPayment.paid_at ? ' on ' + escapeHtml(formatDate(depositPayment.paid_at)) : ''}</div>` : ''}
@@ -984,6 +1034,8 @@
                     ${pendingCos ? `<div class="alert alert-info py-1 px-2 mt-2 mb-0 small"><i class="fas fa-file-circle-plus me-1"></i><strong>${pendingCos} pending change order${pendingCos === 1 ? '' : 's'}</strong></div>` : ''}
                     ${status === 'in_review' ? `<button class="btn btn-warning btn-sm w-100 mt-2" onclick="openNotesReview(${jsAttr(q.id)}, ${jsAttr(clientName)})"><i class="fas fa-comments me-1"></i> Review Client Notes</button>` : ''}
                     ${(!isChangeOrder && (status === 'accepted' || status === 'invoiced')) ? `<button class="btn btn-warning btn-sm w-100 mt-1" onclick="openQuoteForChangeOrder(${jsAttr(q.id)})"><i class="fas fa-file-circle-plus me-1"></i>Create Change Order</button>` : ''}
+                    ${(isInvoice && !isInvalid) ? `<button class="btn btn-danger btn-sm w-100 mt-1" onclick="invalidateInvoice(${jsAttr(q.id)})"><i class="fas fa-ban me-1"></i> Mark Invoice No Longer Valid</button>` : ''}
+                    ${isInvalid ? `<button class="btn btn-outline-secondary btn-sm w-100 mt-1" onclick="restoreInvalidInvoice(${jsAttr(q.id)})"><i class="fas fa-rotate-left me-1"></i> Restore Invoice</button>` : ''}
                     ${reviewReady && !reviewSentAt ? `<button class="btn btn-outline-success btn-sm w-100 mt-1" onclick="sendGoogleReviewRequest(${jsAttr(q.id)}, ${jsAttr(clientName)}, ${jsAttr(clientEmail)})"><i class="fab fa-google me-1"></i> Request Review</button>` : ''}
                     <button class="btn btn-sm w-100 mt-1 ${portalVisible ? 'btn-success' : 'btn-outline-secondary'}" onclick="openPortalAssignment(${jsAttr(q.id)})" title="${portalVisible ? 'Manage portal assignment' : 'Choose a client portal'}"><i class="fas ${portalVisible ? 'fa-eye' : 'fa-eye-slash'} me-1"></i> ${portalVisible ? 'In Portal' : 'Add to Portal'}</button>
                     ${portalVisible ? `<button class="btn btn-outline-primary btn-sm w-100 mt-1" onclick="openClientDocumentPreview(${jsAttr(q.id)}, this)" title="Open this document exactly as the client sees it"><i class="fas fa-eye me-1"></i> Client View</button>` : ''}
@@ -1004,7 +1056,7 @@
                     (quoteTitle && quoteTitle.includes(searchTerm)) ||
                     (quote.client_name && quote.client_name.toLowerCase().includes(searchTerm)) ||
                     (quote.quote_number && quote.quote_number.toLowerCase().includes(searchTerm));
-                const matchesStatus = statusFilter === 'all' || quote.status === statusFilter;
+                const matchesStatus = statusFilter === 'all' || dashboardDocumentStatus(quote) === statusFilter;
                 return matchesSearch && matchesStatus && quoteMatchesSelectedClient(quote);
             });
 
@@ -1192,12 +1244,23 @@
         function dashboardIsInvoiceDocument(quote) {
             var data = quote && quote.data || {};
             var status = String((quote && quote.status) || data.status || '').toLowerCase();
+            var documentType = String((quote && quote.type) || data.documentType || data.type || data._type || '').toLowerCase();
             return status === 'invoiced' ||
                 status === 'paid' ||
-                quote && quote.type === 'invoice' ||
-                data.type === 'invoice' ||
-                data.documentType === 'invoice' ||
-                data._type === 'invoice';
+                documentType === 'invoice';
+        }
+
+        function dashboardDocumentIsInvalid(quote) {
+            var data = quote && quote.data || {};
+            var status = String((quote && quote.status) || data.status || '').toLowerCase();
+            var validity = String(data.document_validity || data.documentValidity || '').toLowerCase();
+            return status === 'voided' || ['voided', 'invalid', 'superseded'].includes(validity);
+        }
+
+        function dashboardDocumentStatus(quote) {
+            if (dashboardDocumentIsInvalid(quote)) return 'voided';
+            var data = quote && quote.data || {};
+            return String((quote && quote.status) || data.status || 'draft').toLowerCase();
         }
 
         function dashboardPaidAmount(quote) {
@@ -1209,11 +1272,19 @@
             }, 0);
         }
 
+        function dashboardRevenueAmount(quote) {
+            var data = quote && quote.data || {};
+            var status = String((quote && quote.status) || data.status || '').toLowerCase();
+            var validity = String(data.document_validity || data.documentValidity || '').toLowerCase();
+            if (status === 'voided' || ['voided', 'invalid', 'superseded'].includes(validity) || status !== 'paid') return 0;
+            return parseFloat((quote && quote.total) || data.grandTotal || data.total || 0) || 0;
+        }
+
         function dashboardOutstandingAmount(quote) {
             var data = quote && quote.data || {};
             var status = String((quote && quote.status) || data.status || '').toLowerCase();
             var paymentStatus = String(data.paymentStatus || '').toLowerCase();
-            if (status !== 'invoiced' || paymentStatus === 'paid') return 0;
+            if (dashboardDocumentIsInvalid(quote) || status !== 'invoiced' || paymentStatus === 'paid') return 0;
             var total = parseFloat((quote && quote.total) || data.grandTotal || data.total || 0) || 0;
             if (total <= 0) return 0;
             return Math.max(total - dashboardPaidAmount(quote), 0);
@@ -2949,6 +3020,77 @@
             } catch(e) { console.warn('Could not update status in Supabase:', e); }
         }
 
+        async function invalidateInvoice(quoteId) {
+            var quote = allQuotes.find(function(row) { return row.id === quoteId; });
+            if (!quote || !dashboardIsInvoiceDocument(quote) || dashboardDocumentIsInvalid(quote)) return;
+            var confirmed = await qdConfirm('Mark this invoice as no longer valid? It will stay visible in the client portal for reference, but the client will see a warning and will not be able to pay it.', {
+                title: 'Mark Invoice No Longer Valid',
+                okText: 'Mark No Longer Valid',
+                okClass: 'btn-danger',
+                type: 'danger'
+            });
+            if (!confirmed) return;
+
+            try {
+                quote = await loadDashboardFullQuote(quote);
+                var now = new Date().toISOString();
+                var data = Object.assign({}, quote.data || {});
+                data.document_validity = 'voided';
+                data.invalidated_at = now;
+                data.invalidated_reason = 'Superseded by a newer invoice';
+                data.invalidated_previous_status = quote.status && quote.status !== 'voided' ? quote.status : 'invoiced';
+                data.documentType = data.documentType || data.type || 'invoice';
+                var result = await qdDurableQuoteRowUpdate(quoteId, { data: data, updated_at: now }, 'Void invoice');
+                if (result.error) throw result.error;
+                quote.data = data;
+                renderDashboardResults();
+                updateStats(allQuotes);
+                qdAlert('Invoice marked as no longer valid. It remains visible in the client portal for reference.');
+            } catch (error) {
+                console.error('Could not invalidate invoice:', error);
+                qdAlert('Could not mark this invoice as no longer valid: ' + (error.message || error));
+            }
+        }
+
+        async function restoreInvalidInvoice(quoteId) {
+            var quote = allQuotes.find(function(row) { return row.id === quoteId; });
+            if (!quote || !dashboardDocumentIsInvalid(quote)) return;
+            var confirmed = await qdConfirm('Restore this invoice as an active document? The client portal warning will be removed and payment options can become available again.', {
+                title: 'Restore Invoice',
+                okText: 'Restore Invoice',
+                okClass: 'btn-primary'
+            });
+            if (!confirmed) return;
+
+            try {
+                quote = await loadDashboardFullQuote(quote);
+                var now = new Date().toISOString();
+                var data = Object.assign({}, quote.data || {});
+                var previousStatus = String(data.invalidated_previous_status || 'invoiced').toLowerCase();
+                var allowedStatuses = ['draft', 'sent', 'viewed', 'in_review', 'accepted', 'invoiced', 'paid'];
+                if (!allowedStatuses.includes(previousStatus)) previousStatus = 'invoiced';
+                data.last_invalidated_at = data.invalidated_at || null;
+                data.last_invalidated_reason = data.invalidated_reason || '';
+                data.document_validity = 'active';
+                data.restored_at = now;
+                delete data.invalidated_at;
+                delete data.invalidated_reason;
+                delete data.invalidated_previous_status;
+                var updates = { data: data, updated_at: now };
+                if (String(quote.status || '').toLowerCase() === 'voided') updates.status = previousStatus;
+                var result = await qdDurableQuoteRowUpdate(quoteId, updates, 'Restore invoice');
+                if (result.error) throw result.error;
+                if (updates.status) quote.status = previousStatus;
+                quote.data = data;
+                renderDashboardResults();
+                updateStats(allQuotes);
+                qdAlert('Invoice restored.');
+            } catch (error) {
+                console.error('Could not restore invoice:', error);
+                qdAlert('Could not restore this invoice: ' + (error.message || error));
+            }
+        }
+
         async function deleteQuote(quoteId) {
             var quote = allQuotes.find(function(q) { return q.id === quoteId; });
             if (!quote) return;
@@ -3120,7 +3262,8 @@
             { status: 'in_review', label: 'In Review', color: '#ffc107', icon: 'fa-comments' },
             { status: 'pending_approval', label: 'Pending CO', color: '#0dcaf0', icon: 'fa-file-signature' },
             { status: 'approved', label: 'CO Approved', color: '#20c997', icon: 'fa-file-circle-check' },
-            { status: 'paid', label: 'Paid', color: '#006400', icon: 'fa-dollar-sign' }
+            { status: 'paid', label: 'Paid', color: '#006400', icon: 'fa-dollar-sign' },
+            { status: 'voided', label: 'No Longer Valid', color: '#dc3545', icon: 'fa-ban' }
         ];
                         
                         function setView(mode) {
@@ -3248,7 +3391,7 @@
                             kanbanColumns.innerHTML = '';
                         
                             columns.forEach(col => {
-                                const statusQuotes = quotes.filter(q => q.status === col.status);
+                                const statusQuotes = quotes.filter(q => dashboardDocumentStatus(q) === col.status);
                                 const countBadge = `<span class="badge bg-white text-dark ms-1">${statusQuotes.length}</span>`;
                                 
                                 let cardsHtml = '';
@@ -3332,7 +3475,7 @@
                                                     kanbanColumns.innerHTML = '';
                                                 
                                                     columns.forEach(col => {
-                                                        const statusQuotes = quotes.filter(q => q.status === col.status);
+                                                        const statusQuotes = quotes.filter(q => dashboardDocumentStatus(q) === col.status);
                                                         const countBadge = `<span class="badge bg-white text-dark ms-1">${statusQuotes.length}</span>`;
                                                         
                                                         let cardsHtml = '';
