@@ -53,7 +53,8 @@ assert(
 assert(
   supabase.includes("target.requireCurrentQuoteBase === true") &&
     supabase.includes('var sameOperationChain =') &&
-    supabase.includes('!sameOperationChain && !qdDurableVersionsMatch(operation.baseVersion, current.updated_at)') &&
+    supabase.includes('var sameEditorInstance =') &&
+    supabase.includes('!sameOperationChain && !sameEditorInstance && !qdDurableVersionsMatch(operation.baseVersion, current.updated_at)') &&
     supabase.includes('cloudSavedTime > incomingSavedTime') &&
     supabase.includes("conflictError.code = '409'") &&
     supabase.includes('conflictError.serverVersion = current.updated_at || null') &&

@@ -248,6 +248,15 @@
         return String(payload._editorInstanceId || '');
     }
 
+    function operationPublishesPortalQuote(operation) {
+        return !!(operation && operation.entityType === 'quote' && operation.payload &&
+            operation.payload.portal_visible === true);
+    }
+
+    function isPortalLockedError(error) {
+        return String(errorObject(error).code) === 'PORTAL_LOCKED';
+    }
+
     function isConflictError(error) {
         var normalized = errorObject(error);
         return String(normalized.code) === '409' || /conflict|newer revision|stale write/i.test(normalized.message);
@@ -328,6 +337,26 @@
         var current = await getStoreValue(OUTBOX_STORE, operation.key);
         if (!current || current.operationId !== operation.operationId || current.revision !== operation.revision) {
             if (current && current.operationId === operation.operationId && current.revision !== operation.revision) {
+                if (operationPublishesPortalQuote(operation)) {
+                    var lockedSnapshot = await getStoreValue(SNAPSHOT_STORE, current.key) || {};
+                    lockedSnapshot.state = 'portal_locked';
+                    lockedSnapshot.cloudAckAt = new Date().toISOString();
+                    lockedSnapshot.cloudResult = result && result.data ? result.data : null;
+                    lockedSnapshot.cloudBaseVersion = cloudVersion || null;
+                    lockedSnapshot.lastError = null;
+                    await putStoreValue(SNAPSHOT_STORE, lockedSnapshot);
+                    await deleteStoreValue(OUTBOX_STORE, current.key);
+                    await putStoreValue(META_STORE, { key: 'lastCloudAckAt', value: lockedSnapshot.cloudAckAt });
+                    clearRecoveryGuidance(current);
+                    clearRecoveryGuidance(operation);
+                    resolveVaultIncident(current).catch(function() {});
+                    resolveVaultIncident(operation).catch(function() {});
+                    window.dispatchEvent(new CustomEvent('quotedr-save-acknowledged', {
+                        detail: { operation: operation, result: result, version: cloudVersion }
+                    }));
+                    await notify();
+                    return publicResult('cloud_saved', operation, result, null);
+                }
                 current.baseVersion = cloudVersion || current.baseVersion || null;
                 current.state = 'local_pending';
                 current.attempts = 0;
@@ -425,6 +454,31 @@
         return publicResult(current.state, current, null, error);
     }
 
+    async function markPortalLocked(operation, error) {
+        var current = await getStoreValue(OUTBOX_STORE, operation.key);
+        var snapshot = await getStoreValue(SNAPSHOT_STORE, operation.key) || {};
+        snapshot.state = 'portal_locked';
+        snapshot.cloudBaseVersion = error && error.serverVersion || null;
+        snapshot.lastError = null;
+        snapshot.supersededAt = new Date().toISOString();
+        await putStoreValue(SNAPSHOT_STORE, snapshot);
+        await deleteStoreValue(OUTBOX_STORE, operation.key);
+        clearRecoveryGuidance(current || operation);
+        resolveVaultIncident(current || operation).catch(function() {});
+        window.dispatchEvent(new CustomEvent('quotedr-quote-portal-locked', {
+            detail: {
+                quoteData: operation.payload || null,
+                row: {
+                    id: operation.entityId || null,
+                    updated_at: error && error.serverVersion || null,
+                    data: { portal_visible: true }
+                }
+            }
+        }));
+        await notify();
+        return publicResult('portal_locked', operation, null, error);
+    }
+
     async function checkConflict(operation, adapter) {
         if (operation.forceConflictOverwrite === true) return null;
         // Quote writes perform their own edit-time comparison and atomic
@@ -465,6 +519,9 @@
             normalizedAdapterResult(result, latest, adapter);
             return markAcknowledged(latest, result);
         } catch (error) {
+            if (isPortalLockedError(error) && latest.entityType === 'quote' && latest.target && latest.target.requireCurrentQuoteBase === true) {
+                return markPortalLocked(latest, error);
+            }
             return markPending(latest, error);
         }
     }

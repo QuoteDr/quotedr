@@ -204,8 +204,9 @@ assert(
 const quoteStorage = fs.readFileSync('quote-storage.js', 'utf8');
 assert(
   quoteStorage.includes("window.addEventListener('quotedr-save-acknowledged', applyQuoteCloudAcknowledgement)") &&
-    quoteStorage.includes('window._quoteServerUpdatedAt = cloudVersion'),
-  'The quote builder should adopt cloud versions acknowledged by recovery saves'
+    quoteStorage.includes('window._quoteServerUpdatedAt = cloudVersion') &&
+    quoteStorage.includes('window._currentQuoteData._serverUpdatedAt = cloudVersion'),
+  'The quote builder and its cached sharing snapshot should adopt cloud versions acknowledged by recovery saves'
 );
 
 assert(
@@ -242,15 +243,17 @@ assert(
 ].forEach(file => {
   const html = fs.readFileSync(file, 'utf8');
   if (html.includes('supabase-v2.js')) {
-    assert(html.includes('supabase-v2.js?v=2026071503'), `${file} should load the fixed Supabase adapter`);
+    const adapterVersion = html.match(/supabase-v2\.js\?v=(\d+)/);
+    assert(adapterVersion && Number(adapterVersion[1]) >= 2026071503, `${file} should load the fixed Supabase adapter`);
   }
   if (html.includes('save-coordinator.js')) {
-    assert(html.includes('save-coordinator.js?v=2026071502'), `${file} should load the fixed save coordinator`);
+    const coordinatorVersion = html.match(/save-coordinator\.js\?v=(\d+)/);
+    assert(coordinatorVersion && Number(coordinatorVersion[1]) >= 2026071502, `${file} should load the fixed save coordinator`);
   }
 });
 
 assert(
-  fs.readFileSync('quote-builder.html', 'utf8').includes('quote-storage.js?v=2026071502'),
+  Number((fs.readFileSync('quote-builder.html', 'utf8').match(/quote-storage\.js\?v=(\d+)/) || [])[1]) >= 2026071901,
   'Quote Builder should load the cloud acknowledgement listener immediately'
 );
 

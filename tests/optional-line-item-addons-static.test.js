@@ -9,7 +9,7 @@ assert(builder.includes('function toggleOptionalItemDefault'), 'builder should l
 assert(builder.includes('optionalSelectedByDefault'), 'builder should persist the optional item default in quote JSON');
 assert(builder.includes("optionalSelectedByDefault ? 'Added' : 'Not Added'"), 'builder should clearly show the selected default');
 assert(builder.includes('function quoteOptionalItemIncludedByDefault'), 'builder should centralize whether an add-on belongs in the starting total');
-assert(builder.includes('quoteOptionalItemIncludedByDefault(item) ? sum + itemChargedTotal(item) : sum'), 'builder totals should exclude add-ons that start unselected');
+assert(/quoteOptionalItemIncludedByDefault\(item\)[\s\S]*?sum \+ quoteItemMarkedAmount\(room, item, itemChargedTotal\(item\)\)[\s\S]*?: sum/.test(builder), 'builder totals should exclude add-ons that start unselected while applying effective markup');
 assert(viewer.includes('function toggleViewerOptionalItem'), 'viewer should let clients select optional add-ons');
 assert(viewer.includes("optionalSelected ? 'Added to Quote' : 'Add to Quote'"), 'viewer should use positive add-on wording');
 assert(viewer.includes("'btn-outline-primary viewer-optional-add-nudge'"), 'unselected add-ons should receive the subtle click nudge');

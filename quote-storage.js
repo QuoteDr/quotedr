@@ -110,6 +110,69 @@
             return !!(data && (data.portal_visible === true || (data.data && data.data.portal_visible === true)));
         }
 
+        function quoteStoragePortalExitActive() {
+            return !!(window._quoteLockedAfterPortalPublish ||
+                window._quotePortalRedirectInProgress ||
+                document.documentElement.getAttribute('data-quote-portal-locked') === 'true');
+        }
+
+        function quoteStorageExitPortalLockedBuilder(value) {
+            var row = value && value.row ? value.row : value;
+            var data = row && row.data && row.data.portal_visible === true ? row.data : row;
+            if (!quoteDataIsPortalLockedForBuilder(data)) return false;
+
+            var quoteId = String((row && row.id) || (data && data.supabaseId) || window._supabaseQuoteId || '');
+            var lockedData = Object.assign({}, window._loadedQuoteData || {}, data || {}, {
+                portal_visible: true,
+                supabaseId: quoteId || (data && data.supabaseId) || null
+            });
+            window._loadedQuoteData = lockedData;
+            window._currentQuoteData = Object.assign({}, window._currentQuoteData || {}, lockedData);
+            window._quoteLockedAfterPortalPublish = true;
+            window._quoteLockedAfterPortalData = Object.assign({}, lockedData);
+            document.documentElement.setAttribute('data-quote-portal-locked', 'true');
+            unsavedChanges = false;
+            clearTimeout(_autoSaveTimer);
+            clearTimeout(autoSaveTimer);
+            quoteStorageRemoteUpdate = null;
+            quoteStorageRemotePromptOpen = false;
+            if (typeof quoteStorageRenderRemoteUpdateBanner === 'function') quoteStorageRenderRemoteUpdateBanner();
+            if (quoteId) localStorage.removeItem('ald_remote_conflict_quote:' + quoteId);
+
+            var discardPromise = null;
+            if (window.QuoteDrSave && typeof window.QuoteDrSave.discardPending === 'function' && quoteId) {
+                if (!window._quotePortalDiscardPromise) {
+                    window._quotePortalDiscardPromise = window.QuoteDrSave.discardPending('quote', quoteId, { state: 'portal_locked' })
+                        .catch(function(error) {
+                            console.warn('Could not clear the locked quote save queue before leaving:', error);
+                        });
+                }
+                discardPromise = window._quotePortalDiscardPromise;
+            }
+
+            if (window._quotePortalPublishInProgress) {
+                window._quotePortalRedirectPending = true;
+                return true;
+            }
+            var finishPortalLockedExit = function() {
+                if (typeof armQuotePortalLockRedirect === 'function') {
+                    armQuotePortalLockRedirect(lockedData);
+                } else {
+                    clearPortalLockedBuilderRestoreState();
+                    window.location.replace('dashboard.html');
+                }
+            };
+            if (discardPromise) discardPromise.then(finishPortalLockedExit, finishPortalLockedExit);
+            else finishPortalLockedExit();
+            return true;
+        }
+
+        window.quoteStorageExitPortalLockedBuilder = quoteStorageExitPortalLockedBuilder;
+        window.addEventListener('quotedr-quote-portal-locked', function(event) {
+            var detail = event && event.detail || {};
+            quoteStorageExitPortalLockedBuilder(detail.row || detail.quoteData || detail);
+        });
+
         function clearPortalLockedBuilderRestoreState() {
             localStorage.removeItem("ald_active_quote_id");
             localStorage.removeItem("ald_open_cloud_quote");
@@ -122,6 +185,12 @@
             var message = 'This document is already in a client portal and cannot be edited directly. Remove it from the portal in the dashboard to edit, or duplicate it as a new revision.';
             if (added) message += '\n\nAdded to portal: ' + added;
             message += '\n\nChoose another quote/draft, or start a new quote.';
+            window._quoteLockedAfterPortalPublish = true;
+            window._quoteLockedAfterPortalData = Object.assign({}, q && q.data || {});
+            document.documentElement.setAttribute('data-quote-portal-locked', 'true');
+            unsavedChanges = false;
+            clearTimeout(_autoSaveTimer);
+            clearTimeout(autoSaveTimer);
             clearPortalLockedBuilderRestoreState();
             if (typeof qdAlert === 'function') {
                 var choice = true;
@@ -592,9 +661,13 @@
             if (!quoteId || typeof loadQuoteFromSupabase !== 'function') return false;
             if (pending && pending.hasLocalEdits) quoteStoragePersistConflictLocalCopy();
             var latest = await loadQuoteFromSupabase(quoteId);
-            if (!latest || latest.error || !latest.data || quoteIsPortalLockedForBuilder(latest.data)) {
+            if (!latest || latest.error || !latest.data) {
                 if (typeof qdToast === 'function') qdToast({ title: 'Could Not Load Update', message: 'Your local copy is still retained. Try again shortly.', type: 'danger' });
                 return false;
+            }
+            if (quoteIsPortalLockedForBuilder(latest.data)) {
+                quoteStorageExitPortalLockedBuilder(latest.data);
+                return true;
             }
             if (pending && pending.hasLocalEdits && window.QuoteDrSave && typeof window.QuoteDrSave.discardPending === 'function') {
                 await window.QuoteDrSave.discardPending('quote', quoteId, { state: 'superseded_by_cloud' });
@@ -684,7 +757,11 @@
             quoteStorageCloudRefreshBusy = true;
             try {
                 var latest = await loadQuoteFromSupabase(quoteId);
-                if (!latest || latest.error || !latest.data || quoteIsPortalLockedForBuilder(latest.data)) return;
+                if (!latest || latest.error || !latest.data) return;
+                if (quoteIsPortalLockedForBuilder(latest.data)) {
+                    quoteStorageExitPortalLockedBuilder(latest.data);
+                    return;
+                }
                 var remoteVersion = latest.data.updated_at || '';
                 var localVersion = window._quoteServerUpdatedAt || '';
                 if (quoteStorageVersionsMatch(remoteVersion, localVersion)) return;
@@ -907,6 +984,16 @@
             var cloudVersion = detail.version || saved && saved.updated_at ||
                 operation.target && operation.target.verifyVersionValue || null;
             quoteStorageBroadcastCloudUpdate(savedId || operationId || currentId, cloudVersion, sourceInstanceId);
+
+            if (operation.payload && operation.payload.portal_visible === true) {
+                if (savedId) window._supabaseQuoteId = savedId;
+                if (cloudVersion) {
+                    window._quoteServerUpdatedAt = cloudVersion;
+                    operation.payload._serverUpdatedAt = cloudVersion;
+                }
+                quoteStorageExitPortalLockedBuilder(operation.payload);
+                return;
+            }
             if (sourceInstanceId && sourceInstanceId !== quoteStorageInstanceId) {
                 quoteStorageHandleRemoteSignal({
                     quoteId: savedId || operationId || currentId,
@@ -926,6 +1013,10 @@
             if (window._loadedQuoteData) {
                 window._loadedQuoteData._serverUpdatedAt = cloudVersion;
                 window._loadedQuoteData.updated_at = cloudVersion;
+            }
+            if (window._currentQuoteData) {
+                window._currentQuoteData._serverUpdatedAt = cloudVersion;
+                window._currentQuoteData.updated_at = cloudVersion;
             }
             quoteStorageEnsureRealtimeSubscription();
         }
@@ -1025,6 +1116,7 @@
         }
 
         function markUnsaved() {
+            if (quoteStoragePortalExitActive()) return;
             unsavedChanges = true;
             window._quoteLocalEditAt = new Date().toISOString();
             if (quoteStorageRemoteUpdate) {
@@ -1607,6 +1699,7 @@ async function saveQuote() {
         }
 
         function saveSessionQuote() {
+            if (quoteStoragePortalExitActive()) return;
             try {
                 localStorage.setItem('ald_session_quote', JSON.stringify(collectQuoteData()));
             } catch(e) {}
@@ -1625,6 +1718,7 @@ async function saveQuote() {
 
         async function doAutoSave(options) {
             options = options || {};
+            if (quoteStoragePortalExitActive()) return { state: 'skipped', reason: 'portal_locked' };
             if (!unsavedChanges && options.force !== true) return { state: 'unchanged' };
             var t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             var el = document.getElementById('saveStatus');
@@ -1721,6 +1815,7 @@ async function saveQuote() {
 
         window.qdSaveBeforeNavigation = async function() {
             clearTimeout(_autoSaveTimer);
+            if (quoteStoragePortalExitActive()) return true;
             saveSessionQuote();
             if (quoteStorageRemoteUpdate && quoteStorageRemoteUpdate.hasLocalEdits) {
                 await quoteStoragePersistRemoteConflict(collectQuoteData());

@@ -2,6 +2,10 @@ const fs = require('fs');
 const assert = require('assert');
 
 const builder = fs.readFileSync('quote-builder.html', 'utf8');
+const storage = fs.readFileSync('quote-storage.js', 'utf8');
+const coordinator = fs.readFileSync('save-coordinator.js', 'utf8');
+const supabase = fs.readFileSync('supabase-v2.js', 'utf8');
+const quoteStyle = fs.readFileSync('quote-style.js', 'utf8');
 
 assert(
   builder.includes('function confirmQuotePortalLockBeforePublish(') &&
@@ -18,9 +22,22 @@ assert(
 assert(
   builder.includes('function armQuotePortalLockRedirect(') &&
     builder.includes('window._quoteLockedAfterPortalPublish = true') &&
-    builder.includes("hidden.bs.modal") &&
-    builder.includes('quotePortalLockModalStillOpen()'),
-  'After publishing, the builder should arm a dashboard redirect that waits until send/portal modals close'
+    builder.includes("document.documentElement.setAttribute('data-quote-portal-locked', 'true')") &&
+    builder.includes('setTimeout(redirectPortalLockedQuoteBuilderToDashboard, 0)'),
+  'After publishing, the builder should immediately arm the dashboard redirect and mark the page locked'
+);
+
+assert(
+  /function redirectPortalLockedQuoteBuilderToDashboard\(\) \{[\s\S]*?clearPortalLockedBuilderRestoreState\(\)[\s\S]*?window\.location\.replace\('dashboard\.html'\)/.test(builder) &&
+    !builder.includes('quotePortalLockModalStillOpen()'),
+  'Portal publication should clear editable restore state and leave for the dashboard without waiting for a modal to close'
+);
+
+assert(
+  /function armQuotePortalLockRedirect\(quoteData\) \{[\s\S]*?if \(window\._resumeQuoteEmailAfterPortal\) \{[\s\S]*?window\._quotePortalRedirectAfterEmail = true;[\s\S]*?return;[\s\S]*?setTimeout\(redirectPortalLockedQuoteBuilderToDashboard, 0\)/.test(builder) &&
+    builder.includes('function finishDeferredQuotePortalRedirect()') &&
+    /async function sendQuoteByEmail\(\) \{[\s\S]*?Please enter a valid email address[\s\S]*?finishDeferredQuotePortalRedirect\(\)[\s\S]*?No quote link found[\s\S]*?finishDeferredQuotePortalRedirect\(\)[\s\S]*?finally \{[\s\S]*?finishDeferredQuotePortalRedirect\(\)/.test(builder),
+  'Portal-assisted email should finish sending before the locked builder redirects'
 );
 
 assert(
@@ -29,6 +46,34 @@ assert(
 );
 
 assert(
-  /window\._currentQuoteData = quoteData;[\s\S]*?window\._loadedQuoteData = Object\.assign\(\{\}, window\._loadedQuoteData \|\| \{\}, quoteData\);[\s\S]*?if \(quoteWillBecomePortalLocked\) armQuotePortalLockRedirect\(quoteData\);/.test(builder),
-  'ensureQuotePortalUrl should preserve portal lock metadata and arm redirect after a successful save'
+  /async function ensureQuotePortalUrl\(statusEl, portal\) \{[\s\S]*?window\._quotePortalPublishInProgress = true;[\s\S]*?portalSaveConfirmed = [^;]+;[\s\S]*?finally \{[\s\S]*?window\._quotePortalPublishInProgress = false;[\s\S]*?quoteStorageExitPortalLockedBuilder\(lockedData\)/.test(builder),
+  'ensureQuotePortalUrl should defer the lock exit until portal save and secure-link work settle'
+);
+
+assert(
+  storage.includes("window.addEventListener('quotedr-quote-portal-locked'") &&
+    /function applyQuoteCloudAcknowledgement\(event\) \{[\s\S]*?operation\.payload\.portal_visible === true[\s\S]*?quoteStorageExitPortalLockedBuilder\(operation\.payload\)/.test(storage) &&
+    /function quoteStorageHandleRemoteSignal\(signal\) \{[\s\S]*?quoteIsPortalLockedForBuilder\(latest\.data\)[\s\S]*?quoteStorageExitPortalLockedBuilder\(latest\.data\)/.test(storage),
+  'Conflict recovery acknowledgements and remote portal locks should both eject the active builder'
+);
+
+assert(
+  /function quoteStoragePortalExitActive\(\) \{[\s\S]*?data-quote-portal-locked/.test(storage) &&
+    /function saveSessionQuote\(\) \{[\s\S]*?quoteStoragePortalExitActive\(\)/.test(storage) &&
+    /async function doAutoSave\(options\) \{[\s\S]*?reason: 'portal_locked'/.test(storage) &&
+    (builder.match(/beforeunload[\s\S]{0,220}quoteStoragePortalExitActive/g) || []).length >= 2,
+  'Portal lock exit should cancel autosave/session restore and suppress both unload handlers'
+);
+
+assert(
+  /target\.requireCurrentQuoteBase === true && current\.data && current\.data\.portal_visible === true/.test(supabase) &&
+    /operationPublishesPortalQuote\(operation\)[\s\S]*?deleteStoreValue\(OUTBOX_STORE, current\.key\)/.test(coordinator) &&
+    /isPortalLockedError\(error\)[\s\S]*?markPortalLocked\(latest, error\)/.test(coordinator),
+  'Queued builder writes should be discarded and blocked after the portal lock without blocking dashboard portal management'
+);
+
+assert(
+  (quoteStyle.match(/err && err\.code === 'PORTAL_LOCKED'/g) || []).length >= 2 &&
+    /err && err\.code === 'PORTAL_LOCKED'[\s\S]*?return;[\s\S]*?alert\('Failed to save quote to cloud:/.test(quoteStyle),
+  'Generate and preview should redirect a server-confirmed portal lock without showing the obsolete native save-failure alert'
 );

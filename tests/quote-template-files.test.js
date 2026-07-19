@@ -28,6 +28,7 @@ const template = {
       rate: 14,
       total: 1120,
       materialCost: 4.25,
+      markup: 18,
       upgrade: { name: 'Large format', rate: 18 }
     }]
   }]
@@ -43,11 +44,13 @@ assert(noPricing.includePricing === false, 'payload should record that pricing w
 assert(exportedItem.rate === 0, 'item rate should be blanked when pricing is excluded');
 assert(exportedItem.total === 0, 'item total should be blanked when pricing is excluded');
 assert(exportedItem.materialCost === 0, 'material cost should be blanked when pricing is excluded');
+assert(!Object.prototype.hasOwnProperty.call(exportedItem, 'markup'), 'item markup should be removed when pricing is excluded');
 assert(exportedItem.upgrade.rate === 0, 'upgrade pricing should be blanked when pricing is excluded');
 assert(noPricing.templates[0].rooms[0].markup === 0, 'room markup should be blanked when pricing is excluded');
 
 const withPricing = files.createExportPayload([template], true, { now: '2026-05-05T01:00:00.000Z' });
 assert(withPricing.templates[0].rooms[0].items[0].rate === 14, 'pricing export should keep item rates');
+assert(withPricing.templates[0].rooms[0].items[0].markup === 18, 'pricing export should keep item markup');
 
 const imported = files.prepareTemplatesForImport(noPricing, [{ id: 1, name: 'Basement Bathroom', rooms: [] }], { now: 1000 });
 assert(imported.length === 1, 'one template should be prepared for import');
@@ -72,6 +75,7 @@ assert(community.creatorName === 'Adam', 'community payload should include creat
 assert(community.rooms[0].items[0].rate === 0, 'community payload should always strip item rates');
 assert(community.rooms[0].items[0].total === 0, 'community payload should always strip totals');
 assert(community.rooms[0].items[0].upgrade.rate === 0, 'community payload should always strip upgrade rates');
+assert(!Object.prototype.hasOwnProperty.call(community.rooms[0].items[0], 'markup'), 'community payload should strip item markup by default');
 assert(community.rooms[0].markup === 0, 'community payload should always strip markup');
 assert(community.includePricing === false, 'community payload should strip pricing by default');
 assert(community.isAnonymous === false, 'community payload should be named by default');
@@ -90,6 +94,7 @@ assert(pricedAnonymousCommunity.creatorName === '', 'anonymous payload should no
 assert(pricedAnonymousCommunity.rooms[0].items[0].rate === 14, 'opt-in priced community payload should keep item rates');
 assert(pricedAnonymousCommunity.rooms[0].items[0].total === 1120, 'opt-in priced community payload should keep totals');
 assert(pricedAnonymousCommunity.rooms[0].items[0].upgrade.rate === 18, 'opt-in priced community payload should keep upgrade rates');
+assert(pricedAnonymousCommunity.rooms[0].items[0].markup === 18, 'opt-in priced community payload should keep item markup');
 assert(pricedAnonymousCommunity.rooms[0].markup === 12, 'opt-in priced community payload should keep markup');
 
 const communityImport = files.prepareCommunityTemplateForImport({

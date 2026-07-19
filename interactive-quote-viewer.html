@@ -2265,9 +2265,9 @@ if (location.search.includes('debug')) {
         function qvDiscountDetailsHtml(item, room) {
             var discounts = qvDiscounts();
             if (!discounts.hasDiscount(item)) return '';
-            var original = viewerRoomMarkedAmount(room, discounts.originalTotal(item));
-            var amount = viewerRoomMarkedAmount(room, discounts.discountAmount(item));
-            var chargedTotal = viewerRoomMarkedAmount(room, discounts.chargedTotal(item));
+            var original = viewerItemMarkedAmount(room, item, discounts.originalTotal(item));
+            var amount = viewerItemMarkedAmount(room, item, discounts.discountAmount(item));
+            var chargedTotal = viewerItemMarkedAmount(room, item, discounts.chargedTotal(item));
             return '<div class="small text-muted"><span>Was </span><s>' + viewerMoney(original) + '</s></div>' +
                 '<div class="small text-success">' + escapeHtml(discounts.discountLabel(item)) + ' -' + viewerMoney(amount) + '</div>' +
                 '<div class="small text-muted">Now ' + viewerMoney(chargedTotal) + '</div>';
@@ -3504,7 +3504,7 @@ if (location.search.includes('debug')) {
                     var requiresConsultation = isViewerConsultationUpgradeOption(option);
                     var priceTbd = isViewerPriceTbd(option);
                     var optionQuantity = getViewerItemUpgradeOptionQuantity(item, option);
-                    var optionTotal = viewerRoomMarkedAmount(room, optionQuantity * viewerNumber(option.rate));
+                    var optionTotal = viewerItemMarkedAmount(room, item, optionQuantity * viewerNumber(option.rate));
                     var groupArg = JSON.stringify(group.id || '').replace(/"/g, '&quot;');
                     var optionArg = JSON.stringify(option.id || '').replace(/"/g, '&quot;');
                     var description = getViewerUpgradeOptionDescription(option);
@@ -3720,15 +3720,33 @@ if (location.search.includes('debug')) {
 
         function viewerRoomMarkupFactor(room) {
             var markup = parseFloat(room && room.markup);
-            return 1 + ((isFinite(markup) ? markup : 0) / 100);
+            if (!isFinite(markup)) markup = 0;
+            return 1 + (Math.max(0, Math.min(100, markup)) / 100);
         }
 
         function viewerRoomMarkedAmount(room, amount) {
             return viewerNumber(amount) * viewerRoomMarkupFactor(room);
         }
 
-        function viewerChangeOrderRoomMarkupFactor(room) {
-            return viewerRoomMarkupFactor(room);
+        function viewerItemOwnMarkupPercent(item) {
+            if (!item || !Object.prototype.hasOwnProperty.call(item, 'markup')) return null;
+            if (item.markup === '' || item.markup === null || item.markup === undefined) return null;
+            var markup = parseFloat(item.markup);
+            if (!isFinite(markup)) return null;
+            return Math.max(0, markup);
+        }
+
+        function viewerItemMarkupFactor(room, item) {
+            var markup = viewerItemOwnMarkupPercent(item);
+            return viewerRoomMarkupFactor(room) + ((markup === null ? 0 : markup) / 100);
+        }
+
+        function viewerItemMarkedAmount(room, item, amount) {
+            return viewerNumber(amount) * viewerItemMarkupFactor(room, item);
+        }
+
+        function viewerChangeOrderRoomMarkupFactor(room, item) {
+            return viewerItemMarkupFactor(room, item);
         }
 
         function viewerChangeOrderLineDelta(item, room) {
@@ -3747,12 +3765,12 @@ if (location.search.includes('debug')) {
             } else {
                 rawDelta = viewerItemActiveTotal(item);
             }
-            return rawDelta * viewerChangeOrderRoomMarkupFactor(room);
+            return rawDelta * viewerChangeOrderRoomMarkupFactor(room, item);
         }
 
         function viewerChangeOrderLineDisplayTotal(item, room) {
             var displayTotal = item && item._coRemoved ? 0 : viewerChangeOrderCurrentRawTotal(item);
-            return displayTotal * viewerChangeOrderRoomMarkupFactor(room);
+            return displayTotal * viewerChangeOrderRoomMarkupFactor(room, item);
         }
 
         function viewerChangeOrderStatus(item, room) {
@@ -3926,9 +3944,9 @@ if (location.search.includes('debug')) {
             group.options.forEach(function(option) {
                 var checked = selectedIds.indexOf(option.id) !== -1;
                 var optionQty = option.quantityMode === 'override' ? (parseFloat(option.quantityOverride) || 0) : (parseFloat(item.quantity) || 0);
-                var optionTotal = viewerRoomMarkedAmount(room, optionQty * (parseFloat(option.rate) || 0));
+                var optionTotal = viewerItemMarkedAmount(room, item, optionQty * (parseFloat(option.rate) || 0));
                 var optionPriceText = isViewerPriceTbd(option) ? viewerPriceTbdLabel() : viewerMoney(optionTotal);
-                var optionRateText = isViewerPriceTbd(option) ? viewerPriceTbdLabel() : viewerMoney(viewerRoomMarkedAmount(room, option.rate));
+                var optionRateText = isViewerPriceTbd(option) ? viewerPriceTbdLabel() : viewerMoney(viewerItemMarkedAmount(room, item, option.rate));
                 var optionArg = JSON.stringify(option.id || '').replace(/"/g, '&quot;');
                 html += '<div class="col-md-6' + (!isSignedDiff && option.photo ? ' choice-option-with-photo' : '') + '"><button type="button" class="w-100 text-start btn choice-option-btn ' + (checked ? 'choice-option-selected' : '') + '" ' + (isSignedDiff ? 'disabled' : 'onclick="toggleViewerChoiceOption(' + roomIdx + ',' + itemIndex + ',' + optionArg + ')"') + '>';
                 html += '<div class="d-flex justify-content-between gap-2"><span><i class="fas ' + (checked ? 'fa-check-circle' : 'fa-circle') + ' me-1"></i>' + escapeHtml(option.name) + '</span><strong>' + optionPriceText + '</strong></div>';
@@ -3964,7 +3982,7 @@ if (location.search.includes('debug')) {
                 compatible.forEach(function(option) {
                     var checked = (enhGroup.selectedOptionIds || []).indexOf(option.id) !== -1;
                     var qty = parseFloat(item.quantity) || 0;
-                    var total = viewerRoomMarkedAmount(room, qty * viewerNumber(option.rate));
+                    var total = viewerItemMarkedAmount(room, item, qty * viewerNumber(option.rate));
                     var totalText = isViewerPriceTbd(option) ? viewerPriceTbdLabel() : viewerMoney(total, { forceSign: option.upgradeType !== 'replacement' });
                     var groupArg = JSON.stringify(enhGroup.id || '').replace(/"/g, '&quot;');
                     var optionArg = JSON.stringify(option.id || '').replace(/"/g, '&quot;');
@@ -4365,7 +4383,7 @@ if (location.search.includes('debug')) {
                     syncViewerOptionalItemState(item);
                     applyViewerChoiceGroupToItem(item);
                 });
-                const roomTotal = room.items.reduce((sum, item) => item._removed ? sum : sum + (isChangeOrder ? viewerChangeOrderLineDisplayTotal(item, room) : viewerRoomMarkedAmount(room, qvLineTotal(item))), 0);
+                const roomTotal = room.items.reduce((sum, item) => item._removed ? sum : sum + (isChangeOrder ? viewerChangeOrderLineDisplayTotal(item, room) : viewerItemMarkedAmount(room, item, qvLineTotal(item))), 0);
                 const headerBg = roomHeaderBackground(room, ROOM_COLORS[room.colorIndex ?? 0] || ROOM_COLORS[0]);
 
                 html += `
@@ -4405,7 +4423,7 @@ if (location.search.includes('debug')) {
                     html += `<div class="text-uppercase fw-bold mt-3 mb-1" style="font-size:0.72rem; letter-spacing:0.8px; color:#6c757d; border-bottom:1px solid #dee2e6; padding-bottom:3px;">${quoteViewerCategoryIconMarkup(catName) + catDisplay}</div>`;
 
                     if (pricingMode === 'category') {
-                        const catSubtotal = catEntries.reduce((sum, entry) => entry.item._removed ? sum : sum + (isChangeOrder ? viewerChangeOrderLineDisplayTotal(entry.item, room) : viewerRoomMarkedAmount(room, qvLineTotal(entry.item))), 0);
+                        const catSubtotal = catEntries.reduce((sum, entry) => entry.item._removed ? sum : sum + (isChangeOrder ? viewerChangeOrderLineDisplayTotal(entry.item, room) : viewerItemMarkedAmount(room, entry.item, qvLineTotal(entry.item))), 0);
                         html += `<div class="d-flex justify-content-between py-2 border-bottom"><span>${catEntries.length} item${catEntries.length === 1 ? '' : 's'}</span><strong>${viewerMoney(catSubtotal)}</strong></div>`;
                         return;
                     }
@@ -4422,8 +4440,8 @@ if (location.search.includes('debug')) {
                     const itemUpgradeGroups = normalizeViewerItemUpgradeGroups(item);
                     const hasUpgradeGroups = showUpgrades && itemUpgradeGroups.length > 0;
                     const isUpgraded = !!item.upgraded;
-                    const activeRate = isChangeOrder ? qvLineRate(item) : viewerRoomMarkedAmount(room, qvLineRate(item));
-                    const itemDisplayTotal = isChangeOrder ? viewerChangeOrderLineDisplayTotal(item, room) : viewerRoomMarkedAmount(room, qvLineTotal(item));
+                    const activeRate = viewerItemMarkedAmount(room, item, qvLineRate(item));
+                    const itemDisplayTotal = isChangeOrder ? viewerChangeOrderLineDisplayTotal(item, room) : viewerItemMarkedAmount(room, item, qvLineTotal(item));
                     const itemTotal = itemDisplayTotal;
                     const linePriceTbd = isViewerPriceTbd(item);
                     const itemTotalText = linePriceTbd ? viewerPriceTbdLabel() : viewerMoney(itemTotal);
@@ -4468,7 +4486,7 @@ if (location.search.includes('debug')) {
                             <div class="py-2 border-bottom" id="item_${roomIdx}_${itemIndex}" style="opacity:0.6; background:#fff5f5;">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <span><s class="text-muted">${item.description || item.name || 'Item'}</s> <span class="badge bg-danger ms-1">Removed by client</span></span>
-                                    <span class="text-muted small">-${viewerMoney(viewerRoomMarkedAmount(room, qvLineTotal(item)))}</span>
+                                    <span class="text-muted small">-${viewerMoney(viewerItemMarkedAmount(room, item, qvLineTotal(item)))}</span>
                                 </div>
                             </div>`;
                         } else {
@@ -4530,7 +4548,7 @@ if (location.search.includes('debug')) {
                             ${hasUpgradeGroups ? renderViewerItemUpgradeGroups(roomIdx, itemIndex, item, isSignedDiff) : ''}
                             ${visibleNotes ? `<div class="text-muted mb-1"><small><i class="fas fa-info-circle"></i> ${visibleNotes}</small></div>` : ''}
                             ${isSignedDiff ? `
-                                ${wasUpgraded && origItem ? `<div class="mt-1"><span class="badge bg-success me-1"><i class="fas fa-arrow-up me-1"></i>Upgraded by client</span><span class="text-muted small">was: ${origItem.description} @ ${viewerMoney(viewerRoomMarkedAmount(room, origItem.rate))} = ${viewerMoney(viewerRoomMarkedAmount(room, qvLineTotal(origItem)))}</span></div>` : ''}
+                                ${wasUpgraded && origItem ? `<div class="mt-1"><span class="badge bg-success me-1"><i class="fas fa-arrow-up me-1"></i>Upgraded by client</span><span class="text-muted small">was: ${origItem.description} @ ${viewerMoney(viewerItemMarkedAmount(room, origItem, origItem.rate))} = ${viewerMoney(viewerItemMarkedAmount(room, origItem, qvLineTotal(origItem)))}</span></div>` : ''}
                             ` : `
                             <div class="d-flex gap-2 mt-1 flex-wrap">
                                 ${hasLegacyUpgrade ? `
@@ -4736,15 +4754,15 @@ if (location.search.includes('debug')) {
             let upgradesTotal = 0;
             if (quoteData.rooms) {
                 quoteData.rooms.forEach(room => {
-                    const roomMarkupFactor = viewerRoomMarkupFactor(room);
                     room.items.forEach(item => {
                         applyViewerChoiceGroupToItem(item);
                         syncViewerOptionalItemState(item);
                         if (item._removed) return; // skip removed items
                         const baseTotal = qvBaseLineTotal(item);
                         const activeTotal = qvLineTotal(item);
-                        subtotal += activeTotal * roomMarkupFactor;
-                        if (item.upgraded) upgradesTotal += (activeTotal - baseTotal) * roomMarkupFactor;
+                        const itemMarkupFactor = viewerItemMarkupFactor(room, item);
+                        subtotal += activeTotal * itemMarkupFactor;
+                        if (item.upgraded) upgradesTotal += (activeTotal - baseTotal) * itemMarkupFactor;
                     });
                 });
             }
