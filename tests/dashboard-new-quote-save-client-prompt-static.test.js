@@ -8,27 +8,37 @@ const dashboard = fs.readFileSync('dashboard.html', 'utf8');
   'function isNewQuoteClientDraftSaveable(',
   'function dashboardClientExistsForDraft(',
   'function saveNewQuoteClientDraft(',
+  'function saveNewQuoteClientFromModal()',
   'function maybePromptSaveNewQuoteClient('
 ].forEach(function(fragment) {
   assert(dashboard.includes(fragment), fragment + ' should be implemented for saving new dashboard clients');
 });
 
 assert(
-  dashboard.includes('Would you like to save this client information to the database?') &&
+  dashboard.includes('Client not found. Do you want to save this client to your database?') &&
     /maybePromptSaveNewQuoteClient\(clientDraft\)/.test(dashboard),
   'New quote creation should ask to save unknown client info before opening the builder'
 );
 
 assert(
   /saveNewQuoteClientDraft[\s\S]*localStorage\.setItem\('ald_clients'/.test(dashboard) &&
-    /saveNewQuoteClientDraft[\s\S]*saveClientToSupabase\(client\)/.test(dashboard),
+    /saveNewQuoteClientDraft[\s\S]*saveClientToSupabase\(/.test(dashboard),
   'Accepting the prompt should save the client locally and sync through the existing Supabase helper'
 );
 
+const clientExistsImplementation = dashboard.split('function dashboardClientExistsForDraft(client) {')[1]
+  .split('async function saveNewQuoteClientDraft')[0];
 assert(
-  /dashboardClientExistsForDraft[\s\S]*findNewQuoteClientByName/.test(dashboard) &&
-    /dashboardClientExistsForDraft[\s\S]*findDashboardClientByEmail/.test(dashboard),
-  'Prompt should be skipped for clients already known by name or email'
+  clientExistsImplementation.includes('findNewQuoteClientByName(client.name)') &&
+    !clientExistsImplementation.includes('findDashboardClientByEmail'),
+  'Prompt should be based on whether the entered client name is already saved'
+);
+
+assert(
+  dashboard.includes('id="newQuoteSaveClientBtn"') &&
+    dashboard.includes('onclick="saveNewQuoteClientFromModal()"') &&
+    dashboard.includes('Client saved to your database.'),
+  'New quote modal should provide a visible Save Client action with confirmation feedback'
 );
 
 assert(

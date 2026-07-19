@@ -4217,7 +4217,7 @@ function renderBusinessInsights(quotes) {
 
         function dashboardClientExistsForDraft(client) {
             if (!client || !client.name) return false;
-            return !!(findNewQuoteClientByName(client.name) || findDashboardClientByEmail(client.email) || window._newQuoteSelectedClient);
+            return !!findNewQuoteClientByName(client.name);
         }
 
         async function saveNewQuoteClientDraft(clientDraft) {
@@ -4238,32 +4238,63 @@ function renderBusinessInsights(quotes) {
                 saved.forEach(function(c) { if (c && c.name) converted[c.name] = c; });
                 saved = converted;
             }
-            saved[client.name] = Object.assign({}, saved[client.name] || {}, client);
+            var existingClient = findNewQuoteClientByName(client.name);
+            var storageName = existingClient && existingClient.name ? existingClient.name : client.name;
+            saved[storageName] = Object.assign({}, saved[storageName] || {}, client, { name: storageName });
             localStorage.setItem('ald_clients', JSON.stringify(saved));
-            window._newQuoteSelectedClient = client;
+            window._newQuoteSelectedClient = saved[storageName];
             populateNewQuoteClientSuggestions();
             if (typeof saveClientToSupabase === 'function') {
-                saveClientToSupabase(client).catch(function(e) {
+                saveClientToSupabase(saved[storageName]).catch(function(e) {
                     console.warn('Dashboard new quote client sync error:', e);
                 });
             }
             return true;
         }
 
+        async function saveNewQuoteClientFromModal() {
+            var clientDraft = getNewQuoteClientDraft();
+            var errEl = document.getElementById('newQuoteError');
+            var statusEl = document.getElementById('newQuoteClientSaveStatus');
+            var saveBtn = document.getElementById('newQuoteSaveClientBtn');
+            if (!isNewQuoteClientDraftSaveable(clientDraft)) {
+                errEl.textContent = 'Client name is required before saving.';
+                document.getElementById('newQuoteClientName').focus();
+                return;
+            }
+            errEl.textContent = '';
+            if (statusEl) statusEl.textContent = '';
+            if (saveBtn) {
+                saveBtn.disabled = true;
+                saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
+            }
+            try {
+                await saveNewQuoteClientDraft(clientDraft);
+                if (statusEl) statusEl.innerHTML = '<i class="fas fa-check-circle me-1"></i>Client saved to your database.';
+            } catch(e) {
+                errEl.textContent = 'Unable to save client: ' + (e && e.message ? e.message : 'Unknown error');
+            } finally {
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = '<i class="fas fa-user-plus me-1"></i>Save Client';
+                }
+            }
+        }
+
         async function maybePromptSaveNewQuoteClient(clientDraft) {
             if (!isNewQuoteClientDraftSaveable(clientDraft) || dashboardClientExistsForDraft(clientDraft)) return false;
             var shouldSave = false;
             if (typeof qdConfirm === 'function') {
-                shouldSave = await qdConfirm('Would you like to save this client information to the database?', {
+                shouldSave = await qdConfirm('Client not found. Do you want to save this client to your database?', {
                     title: 'Save Client?',
-                    okText: 'Yes',
-                    cancelText: 'No',
+                    okText: 'Yes, Save Client',
+                    cancelText: 'No, Continue',
                     okClass: 'btn-success',
                     type: 'info',
                     enterSubmits: true
                 });
             } else {
-                shouldSave = window.confirm('Would you like to save this client information to the database?');
+                shouldSave = window.confirm('Client not found. Do you want to save this client to your database?');
             }
             if (!shouldSave) return false;
             await saveNewQuoteClientDraft(clientDraft);
@@ -4547,6 +4578,7 @@ function renderBusinessInsights(quotes) {
             document.getElementById('newQuoteNumber').value = '';
             document.getElementById('newQuoteFileName').value = '';
             document.getElementById('newQuoteError').textContent = '';
+            document.getElementById('newQuoteClientSaveStatus').textContent = '';
             window._newQuoteSelectedClient = null;
             populateNewQuoteClientSuggestions();
             refreshDashboardSavedClientsFromCloud();
@@ -5008,9 +5040,13 @@ function renderBusinessInsights(quotes) {
           <input type="text" id="newQuoteNumber" class="form-control" placeholder="e.g. Q-2026-042">
         </div>
         <div id="newQuoteError" class="text-danger small" style="min-height:1.2rem;"></div>
+        <div id="newQuoteClientSaveStatus" class="text-success small" role="status" aria-live="polite"></div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-outline-success" id="newQuoteSaveClientBtn" onclick="saveNewQuoteClientFromModal()">
+          <i class="fas fa-user-plus me-1"></i>Save Client
+        </button>
         <button type="button" class="btn btn-primary" id="newQuoteCreateBtn" onclick="createAndOpenQuote()">
           <i class="fas fa-arrow-right me-1"></i>Create &amp; Open Builder
         </button>
