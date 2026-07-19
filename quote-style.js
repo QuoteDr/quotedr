@@ -1360,6 +1360,10 @@
 
             } catch(err) {
                 hideQuoteGenerationProgress();
+                if (err && err.code === 'PORTAL_LOCKED') {
+                    if (saveStatus) saveStatus.innerHTML = '<span style="color:#1a56a0;"><i class="fas fa-lock"></i> Quote is in the client portal - returning to dashboard...</span>';
+                    return;
+                }
                 if (isChangeOrderReasonRequiredError(err)) {
                     promptForChangeOrderReason();
                     return;
@@ -1447,6 +1451,10 @@
                 window.location.href = previewUrl.toString();
             } catch(err) {
                 hideQuoteGenerationProgress();
+                if (err && err.code === 'PORTAL_LOCKED') {
+                    if (saveStatus) saveStatus.innerHTML = '<span style="color:#1a56a0;"><i class="fas fa-lock"></i> Quote is in the client portal - returning to dashboard...</span>';
+                    return;
+                }
                 console.error('Failed to preview quote:', err);
                 alert('Failed to prepare quote preview: ' + (err.message || err));
                 if (saveStatus) saveStatus.innerHTML = '<span style="color:red;"><i class="fas fa-times"></i> Preview failed</span>';

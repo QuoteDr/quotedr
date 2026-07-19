@@ -18,6 +18,7 @@
         ['rate', 'total', 'materialCost', 'laborCost', 'unit_rate', 'line_total', '_baseRate'].forEach(function(key) {
             if (Object.prototype.hasOwnProperty.call(obj, key)) obj[key] = 0;
         });
+        if (Object.prototype.hasOwnProperty.call(obj, 'markup')) delete obj.markup;
         if (obj.upgrade && typeof obj.upgrade === 'object') blankMoneyFields(obj.upgrade);
         return obj;
     }

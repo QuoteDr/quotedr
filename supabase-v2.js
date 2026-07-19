@@ -167,8 +167,17 @@ async function qdExecuteFreshQuoteUpdate(operation, target, values) {
         if (qdDurableSaveMetaMatches(operation, currentMeta)) {
             return { data: [qdQuoteMetadataRow(current)], error: null, alreadyAcknowledged: true };
         }
+        if (target.requireCurrentQuoteBase === true && current.data && current.data.portal_visible === true) {
+            var portalLockedError = new Error('This quote is already in a client portal and cannot be edited directly. Remove it from the portal in the dashboard before editing.');
+            portalLockedError.code = 'PORTAL_LOCKED';
+            portalLockedError.serverVersion = current.updated_at || null;
+            throw portalLockedError;
+        }
         var sameOperationChain = !!(currentMeta && currentMeta.operationId && operation.operationId && currentMeta.operationId === operation.operationId);
-        if (target.requireCurrentQuoteBase === true && !sameOperationChain && !qdDurableVersionsMatch(operation.baseVersion, current.updated_at)) {
+        var incomingInstanceId = String(operation.payload && operation.payload._editorInstanceId || '');
+        var currentInstanceId = String(currentMeta && currentMeta.sourceInstanceId || current.data && current.data._editorInstanceId || '');
+        var sameEditorInstance = !!(incomingInstanceId && currentInstanceId && incomingInstanceId === currentInstanceId);
+        if (target.requireCurrentQuoteBase === true && !sameOperationChain && !sameEditorInstance && !qdDurableVersionsMatch(operation.baseVersion, current.updated_at)) {
             var conflictError = new Error('This quote was updated in another tab or device. Choose which version to keep before saving.');
             conflictError.code = '409';
             conflictError.serverVersion = current.updated_at || null;
@@ -1106,9 +1115,55 @@ async function quoteFullResolutionPhotosEnabledForSave() {
 }
 
 // Save a quote
+function quotePortalLockedSaveError(quoteData, row) {
+    var error = {
+        code: 'PORTAL_LOCKED',
+        message: 'This quote is already in a client portal and cannot be edited directly. Remove it from the portal in the dashboard before editing.'
+    };
+    try {
+        if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
+            window.dispatchEvent(new CustomEvent('quotedr-quote-portal-locked', {
+                detail: { quoteData: quoteData || null, row: row || null }
+            }));
+        }
+    } catch (dispatchError) {}
+    return { error: error };
+}
+
+async function verifyQuoteIsEditableBeforeSave(userId, quoteData) {
+    if (!quoteData || !quoteData.supabaseId) return { editable: true, row: null };
+    const { data, error } = await _supabase
+        .from('quotes')
+        .select('id,data,updated_at')
+        .eq('id', quoteData.supabaseId)
+        .eq('user_id', userId)
+        .maybeSingle();
+    if (error) return { editable: false, error: error, row: null };
+    return {
+        editable: !(data && data.data && data.data.portal_visible === true),
+        row: data || null
+    };
+}
+
+function qdAdoptOwnLatestQuoteVersion(quoteData, row) {
+    if (!quoteData || !row || !row.updated_at) return false;
+    var localInstanceId = String(quoteData._editorInstanceId || '');
+    var rowData = row.data || {};
+    var saveMeta = rowData._saveMeta || {};
+    var cloudInstanceId = String(saveMeta.sourceInstanceId || rowData._editorInstanceId || '');
+    if (!localInstanceId || !cloudInstanceId || localInstanceId !== cloudInstanceId) return false;
+    quoteData._serverUpdatedAt = row.updated_at;
+    return true;
+}
+
 async function saveQuote(quoteData) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
+
+    var editCheck = await verifyQuoteIsEditableBeforeSave(user.id, quoteData);
+    if (editCheck.error) return { error: editCheck.error };
+    if (!editCheck.editable) return quotePortalLockedSaveError(quoteData, editCheck.row);
+    qdAdoptOwnLatestQuoteVersion(quoteData, editCheck.row);
 
     try {
         await prepareQuoteMediaForCloudSave(quoteData);
@@ -1245,6 +1300,7 @@ async function saveQuote(quoteData) {
     }
     var data = durableResult.data;
     var savedQuote = Array.isArray(data) ? data[0] : data;
+    if (savedQuote && savedQuote.updated_at) quoteData._serverUpdatedAt = savedQuote.updated_at;
     var quoteKey = (savedQuote && savedQuote.id) || quoteData.supabaseId || quoteData.quoteNumber || now;
     var roomCount = Array.isArray(quoteData.rooms) ? quoteData.rooms.length : 0;
     var itemCount = Array.isArray(quoteData.rooms) ? quoteData.rooms.reduce(function(sum, room) { return sum + ((room.items || []).length); }, 0) : 0;
@@ -1745,6 +1801,10 @@ var loadQuoteFromSupabase = loadQuoteByIdFromSupabase;
 async function saveQuoteForSharing(quoteData) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
+    var editCheck = await verifyQuoteIsEditableBeforeSave(user.id, quoteData);
+    if (editCheck.error) return { error: editCheck.error };
+    if (!editCheck.editable) return quotePortalLockedSaveError(quoteData, editCheck.row);
+    qdAdoptOwnLatestQuoteVersion(quoteData, editCheck.row);
     try {
         await prepareQuoteMediaForCloudSave(quoteData);
     } catch (error) {

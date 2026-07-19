@@ -17,11 +17,13 @@ assert(source.includes('data-item-key="\' + itemDragKey + \'"'), 'rendered line 
 assert(source.includes('function transferSelectedRoomItems'), 'quote builder should support moving and copying selected items');
 assert(source.includes('function duplicateSelectedRoomItems'), 'quote builder should support duplicating selected items');
 assert(source.includes('function deleteSelectedRoomItems'), 'quote builder should support deleting selected items');
+assert(source.includes('function applyMarkupToSelectedRoomItems'), 'quote builder should support marking up selected items');
 assert(source.includes('function cloneQuoteBuilderLineItemAsAddition'), 'copied Change Order lines should use an addition-aware clone helper');
 assert(source.includes('function markQuoteBuilderOriginalItemRemoved'), 'bulk deletion should reuse original-line Change Order removal semantics');
 assert(source.includes('Move Selected to...'), 'Edit menu should include Move Selected');
 assert(source.includes('Copy Selected to...'), 'Edit menu should include Copy Selected');
 assert(source.includes('Duplicate Selected Here'), 'Edit menu should include Duplicate Selected Here');
+assert(source.includes('Markup Selected'), 'Edit menu should include Markup Selected');
 assert(source.includes('Delete Selected'), 'Edit menu should include Delete Selected');
 assert(source.includes('Option Group from Selected'), 'Group menu should retain option grouping for selected items');
 assert(source.includes('Saved Group'), 'Group menu should retain saved groups');
@@ -42,6 +44,37 @@ assert(
 assert(
   /async function deleteSelectedRoomItems[\s\S]*?_pushUndo\(\);[\s\S]*?finishRoomBulkItemAction/.test(source),
   'bulk delete should be undoable and persist'
+);
+assert(
+  /async function applyMarkupToRoomItems[\s\S]*?_pushUndo\(\);[\s\S]*?finishRoomBulkItemAction/.test(source) &&
+    /async function applyMarkupToSelectedRoomItems[\s\S]*?applyMarkupToRoomItems\(roomId, getSelectedRoomItemIndexes\(roomId\)\)/.test(source) &&
+    /async function applyMarkupToRoomItem[\s\S]*?applyMarkupToRoomItems\(roomId, \[itemIndex\]\)/.test(source),
+  'selected-item markup should be undoable and persist'
+);
+assert(
+  source.includes('This is added on top of the room markup') &&
+    source.includes('function quoteItemMarkupBadgeHtml(room, item, itemIndex)') &&
+    source.includes("html += quoteItemMarkupBadgeHtml(room, item, origIndex);") &&
+    source.includes("applyMarkupToRoomItem(' + roomIdArg + ', ' + itemIndex + ')'") &&
+    source.includes("'% markup &middot; ' + visibilityLabel"),
+  'room and item markup should share a clickable combined client-visibility badge'
+);
+assert(
+  source.includes('Enter an additional markup percentage for ') &&
+    !source.includes('Enter an additional markup percentage from 0 to 100') &&
+    /if \(!clearOverride && \(!isFinite\(percent\) \|\| percent < 0\)\)/.test(source),
+  'individual item markup should allow any non-negative percentage without an upper limit'
+);
+const globalMarkupBlock = source.slice(source.indexOf('async function applyGlobalMarkup()'), source.indexOf('// Template Management Functions'));
+assert(
+  !globalMarkupBlock.includes('delete item.markup') &&
+    globalMarkupBlock.includes('Individual item markups were kept and added on top.'),
+  'whole-quote room markup should preserve additional item markups'
+);
+assert(
+  /function updateRoomMarkup[\s\S]*?_pushUndo\(\);[\s\S]*?saveSessionQuote\(\);[\s\S]*?markUnsaved\(\)/.test(source) &&
+    /function toggleMarkupVisibility[\s\S]*?_pushUndo\(\);[\s\S]*?renderRooms\(\);[\s\S]*?saveSessionQuote\(\);[\s\S]*?markUnsaved\(\)/.test(source),
+  'room markup amount and client visibility changes should be undoable, rerender badges, and persist'
 );
 assert(
   /function cloneQuoteBuilderLineItemAsAddition[\s\S]*?delete copy\._coOriginal;[\s\S]*?coRefreshItemDelta\(copy\)/.test(source),

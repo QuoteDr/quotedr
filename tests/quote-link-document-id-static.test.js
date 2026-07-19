@@ -37,7 +37,8 @@ assert(
   'the saved quote id should be adopted before secure-link creation'
 );
 assert(
-  builderSource.includes('supabase-v2.js?v=2026071503') && builderSource.includes('quote-style.js?v=2026071503'),
+  Number((builderSource.match(/supabase-v2\.js\?v=(\d+)/) || [])[1]) >= 2026071901 &&
+    Number((builderSource.match(/quote-style\.js\?v=(\d+)/) || [])[1]) >= 2026071503,
   'quote builder should cache-bust both scripts containing the fix'
 );
 

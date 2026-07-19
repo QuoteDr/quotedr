@@ -2103,8 +2103,8 @@
 
 </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-v2.js?v=2026071503"></script>
-    <script src="save-coordinator.js?v=2026071502"></script>
+    <script src="supabase-v2.js?v=2026071902"></script>
+    <script src="save-coordinator.js?v=2026071901"></script>
     <script src="quote-media.js?v=2026071202"></script>
 <!-- Eruda mobile console (only loads with ?debug in URL) -->
 <script>
@@ -3678,6 +3678,64 @@ Example:
             return qdDiscounts().chargedTotal(item);
         }
 
+        function quoteItemOwnMarkupPercent(item) {
+            if (!item || !Object.prototype.hasOwnProperty.call(item, 'markup')) return null;
+            if (item.markup === '' || item.markup === null || item.markup === undefined) return null;
+            var markup = parseFloat(item.markup);
+            if (!isFinite(markup)) return null;
+            return Math.max(0, markup);
+        }
+
+        function quoteItemMarkupPercent(room, item) {
+            var itemMarkup = quoteItemOwnMarkupPercent(item);
+            var roomMarkup = parseFloat(room && room.markup);
+            if (!isFinite(roomMarkup)) roomMarkup = 0;
+            roomMarkup = Math.max(0, Math.min(100, roomMarkup));
+            return roomMarkup + (itemMarkup === null ? 0 : itemMarkup);
+        }
+
+        function quoteItemMarkupFactor(room, item) {
+            return 1 + (quoteItemMarkupPercent(room, item) / 100);
+        }
+
+        function quoteItemMarkedAmount(room, item, amount) {
+            var numericAmount = parseFloat(amount);
+            return (isFinite(numericAmount) ? numericAmount : 0) * quoteItemMarkupFactor(room, item);
+        }
+
+        function quoteMarkupPercentLabel(value) {
+            var numericValue = parseFloat(value);
+            if (!isFinite(numericValue)) numericValue = 0;
+            return Number.isInteger(numericValue)
+                ? String(numericValue)
+                : numericValue.toFixed(2).replace(/\.?0+$/, '');
+        }
+
+        function quoteItemMarkupBadgeHtml(room, item, itemIndex) {
+            var totalMarkup = quoteItemMarkupPercent(room, item);
+            if (totalMarkup <= 0) return '';
+            var roomMarkup = parseFloat(room && room.markup);
+            if (!isFinite(roomMarkup)) roomMarkup = 0;
+            roomMarkup = Math.max(0, Math.min(100, roomMarkup));
+            var itemMarkup = quoteItemOwnMarkupPercent(item);
+            var visibleToClient = !!(room && room.hideMarkup === false);
+            var visibilityLabel = visibleToClient ? 'shown to client' : 'hidden from client';
+            var visibilityIcon = visibleToClient ? 'fa-eye' : 'fa-eye-slash';
+            var parts = [];
+            if (roomMarkup > 0) parts.push(quoteMarkupPercentLabel(roomMarkup) + '% room');
+            if (itemMarkup !== null && itemMarkup > 0) parts.push(quoteMarkupPercentLabel(itemMarkup) + '% item');
+            var title = (parts.length ? parts.join(' + ') + ' = ' : '') + quoteMarkupPercentLabel(totalMarkup) + '% total markup; ' + visibilityLabel + '.';
+            var interactive = !!(room && room.id !== undefined && room.id !== null && Number.isInteger(itemIndex) && itemIndex >= 0);
+            var interactionAttrs = '';
+            if (interactive) {
+                var roomIdArg = JSON.stringify(room.id).replace(/"/g, '&quot;');
+                var action = 'applyMarkupToRoomItem(' + roomIdArg + ', ' + itemIndex + ')';
+                title += ' Click to edit this item\'s additional markup.';
+                interactionAttrs = ' role="button" tabindex="0" aria-label="Edit this item\'s markup" style="cursor:pointer;" onclick="event.stopPropagation(); ' + action + '" onkeydown="if (event.key === \'Enter\' || event.key === \' \') { event.preventDefault(); event.stopPropagation(); ' + action + '; }"';
+            }
+            return ' <span class="badge quote-item-markup-badge bg-danger-subtle text-danger-emphasis border border-danger-subtle ms-1" title="' + title + '"' + interactionAttrs + '><i class="fas ' + visibilityIcon + ' me-1"></i>' + quoteMarkupPercentLabel(totalMarkup) + '% markup &middot; ' + visibilityLabel + '</span>';
+        }
+
         function isMetricMeasurement() {
             return typeof getMeasurementSystem === 'function' && getMeasurementSystem() === 'metric';
         }
@@ -4212,6 +4270,7 @@ Example:
 
         function renderItemUpgradeGroups(roomId, itemIndex, item) {
             if (!item) return '';
+            var room = quoteBuilderRoomById(roomId);
             item.upgradeGroups = normalizeQuoteItemUpgradeGroups(item);
             clearInvalidItemUpgradeSelections(item);
             if (!item.upgradeGroups.length) return '';
@@ -4243,7 +4302,7 @@ Example:
                     var requiresConsultation = isQuoteItemConsultationUpgradeOption(option);
                     var priceTbd = isQuotePriceTbd(option);
                     var optionQuantity = getQuoteItemUpgradeOptionQuantity(item, option);
-                    var optionTotal = optionQuantity * (parseFloat(option.rate) || 0);
+                    var optionTotal = quoteItemMarkedAmount(room, item, optionQuantity * (parseFloat(option.rate) || 0));
                     var groupArg = JSON.stringify(group.id || '').replace(/"/g, '&quot;');
                     var optionArg = JSON.stringify(option.id || '').replace(/"/g, '&quot;');
                     var description = getItemUpgradeOptionDescription(option);
@@ -8259,6 +8318,7 @@ Example:
 
         // Auto-save on beforeunload
         window.addEventListener('beforeunload', function() {
+            if (typeof quoteStoragePortalExitActive === 'function' && quoteStoragePortalExitActive()) return;
             if (typeof collectQuoteData === 'function' && typeof saveSessionQuote === 'function') {
                 saveSessionQuote();
             }
@@ -9536,6 +9596,9 @@ Example:
         function openQuoteChoiceGroupOptionPicker(groupedItem) {
             return new Promise(function(resolve) {
                 var group = groupedItem && groupedItem.choiceGroup;
+                var groupedRoom = (rooms || []).find(function(room) {
+                    return Array.isArray(room.items) && room.items.indexOf(groupedItem) !== -1;
+                }) || null;
                 var options = group && Array.isArray(group.options) ? group.options : [];
                 if (!group || group.type !== 'single' || !options.length) {
                     resolve(null);
@@ -9549,12 +9612,13 @@ Example:
                 var accepted = false;
                 var rowsHtml = options.map(function(option, index) {
                     var qty = option.quantityMode === 'override' ? (parseFloat(option.quantityOverride) || 0) : (parseFloat(groupedItem.quantity) || 0);
-                    var total = qty * (parseFloat(option.rate) || 0);
+                    var markedRate = quoteItemMarkedAmount(groupedRoom, groupedItem, option.rate);
+                    var total = qty * markedRate;
                     return '<button type="button" class="list-group-item list-group-item-action text-start" data-quote-choice-option="' + index + '">' +
                         '<div class="d-flex justify-content-between align-items-start gap-2">' +
                         '<span class="flex-grow-1">' +
                         '<span class="d-block fw-bold">' + qdTemplateEscapeHtml(option.name || option.description || 'Option') + '</span>' +
-                        '<span class="d-block small text-muted">' + qdTemplateEscapeHtml(qty + ' ' + (option.unitType || groupedItem.unitType || groupedItem.unit || '')) + ' @ ' + qdFormatMoney(option.rate) + '</span>' +
+                        '<span class="d-block small text-muted">' + qdTemplateEscapeHtml(qty + ' ' + (option.unitType || groupedItem.unitType || groupedItem.unit || '')) + ' @ ' + qdFormatMoney(markedRate) + '</span>' +
                         (option.itemDescription || option.description ? '<span class="d-block small mt-1">' + qdTemplateEscapeHtml(option.itemDescription || option.description) + '</span>' : '') +
                         '</span>' +
                         '<span class="text-end">' +
@@ -9726,6 +9790,63 @@ Example:
             if (typeof saveSessionQuote === 'function') saveSessionQuote();
             if (typeof markUnsaved === 'function') markUnsaved();
             if (message && typeof showToast === 'function') showToast(message, 'success');
+        }
+
+        async function applyMarkupToRoomItems(roomId, itemIndexes) {
+            var room = quoteBuilderRoomById(roomId);
+            var selectedIndexes = Array.from(new Set((itemIndexes || []).map(function(index) {
+                return parseInt(index, 10);
+            }))).filter(function(index) {
+                return Number.isInteger(index) && index >= 0 && room && room.items[index];
+            });
+            if (!room || !selectedIndexes.length) {
+                await qdAlert('Select one or more line items first.');
+                return;
+            }
+            var selectedMarkups = selectedIndexes.map(function(index) {
+                return quoteItemOwnMarkupPercent(room.items[index]);
+            });
+            var commonMarkup = selectedMarkups.length && selectedMarkups.every(function(value) {
+                return value === selectedMarkups[0];
+            }) ? selectedMarkups[0] : null;
+            var markupValue = await qdPrompt(
+                'Enter an additional markup percentage for ' + selectedIndexes.length + ' selected line item' + (selectedIndexes.length === 1 ? '' : 's') + '. This is added on top of the room markup. Leave blank to remove the individual markup.',
+                commonMarkup === null ? '' : String(commonMarkup),
+                { title: 'Markup Selected Items', enterSubmits: true }
+            );
+            if (markupValue === null) return;
+            var rawValue = String(markupValue).trim();
+            var clearOverride = rawValue === '';
+            var percent = clearOverride ? null : parseFloat(rawValue);
+            if (!clearOverride && (!isFinite(percent) || percent < 0)) {
+                await qdAlert('Please enter a valid non-negative percentage, or leave it blank to remove the individual markup.');
+                return;
+            }
+            _pushUndo();
+            selectedIndexes.forEach(function(index) {
+                var item = room.items[index];
+                if (clearOverride) {
+                    delete item.markup;
+                } else {
+                    item.markup = percent;
+                }
+                if (quoteBuilderIsChangeOrderMode() && item._coOriginal && typeof coRefreshItemDelta === 'function') {
+                    coRefreshItemDelta(item, room);
+                }
+            });
+            var itemLabel = selectedIndexes.length === 1 ? 'line item' : 'line items';
+            var message = clearOverride
+                ? 'Removed individual markup from ' + selectedIndexes.length + ' selected ' + itemLabel + '.'
+                : 'Applied ' + percent + '% additional markup to ' + selectedIndexes.length + ' selected ' + itemLabel + '.';
+            finishRoomBulkItemAction(message);
+        }
+
+        async function applyMarkupToSelectedRoomItems(roomId) {
+            return applyMarkupToRoomItems(roomId, getSelectedRoomItemIndexes(roomId));
+        }
+
+        async function applyMarkupToRoomItem(roomId, itemIndex) {
+            return applyMarkupToRoomItems(roomId, [itemIndex]);
         }
 
         function setSelectedLineItemHighlights(roomId, selectedIndexes, colorKey) {
@@ -10480,7 +10601,7 @@ Example:
         function choiceGroupOptionToLineItem(option, groupedItem) {
             var quantity = parseFloat(groupedItem.quantity) || 1;
             var rate = parseFloat(option.rate) || 0;
-            return {
+            var lineItem = {
                 category: option.category || groupedItem.category || 'Miscellaneous',
                 description: option.description || option.name || groupedItem.description || '',
                 serviceName: option.name || option.description || groupedItem.serviceName || '',
@@ -10500,6 +10621,9 @@ Example:
                 upgraded: false,
                 total: quantity * rate
             };
+            var markup = quoteItemOwnMarkupPercent(groupedItem);
+            if (markup !== null) lineItem.markup = markup;
+            return lineItem;
         }
 
         function openTurnOffChoiceGroupingPicker(groupedItem) {
@@ -10598,6 +10722,7 @@ Example:
         function renderChoiceGroupEnhancements(roomId, itemIndex, item) {
             var group = item && item.choiceGroup;
             if (!group) return '';
+            var room = quoteBuilderRoomById(roomId);
             group.enhancementGroups = normalizeChoiceGroupEnhancementGroups(group.enhancementGroups);
             clearInvalidChoiceGroupEnhancementSelections(group);
             if (!group.enhancementGroups.length) return '';
@@ -10615,7 +10740,7 @@ Example:
                 compatible.forEach(function(option) {
                     var selected = (enhGroup.selectedOptionIds || []).indexOf(option.id) !== -1;
                     var optionLabel = qdTemplateEscapeHtml(option.name || 'Enhancement');
-                    var optionPrice = qdFormatMoney((parseFloat(item.quantity) || 0) * (parseFloat(option.rate) || 0));
+                    var optionPrice = qdFormatMoney(quoteItemMarkedAmount(room, item, (parseFloat(item.quantity) || 0) * (parseFloat(option.rate) || 0)));
                     var groupArg = JSON.stringify(enhGroup.id || '').replace(/"/g, '&quot;');
                     var optionArg = JSON.stringify(option.id || '').replace(/"/g, '&quot;');
                     html += '<button type="button" class="btn btn-sm ' + (selected ? 'btn-primary' : 'btn-outline-primary') + ' py-0" onclick="event.stopPropagation(); toggleChoiceGroupEnhancementOption(' + roomId + ', ' + itemIndex + ', ' + groupArg + ', ' + optionArg + ')" title="' + qdTemplateEscapeHtml(option.upgradeType === 'replacement' ? 'Replacement' : 'Add-on') + '">' +
@@ -11007,16 +11132,17 @@ Example:
             let coCreditSubtotal = 0;
 
             rooms.forEach(room => {
-                const baseTotal = room.items.reduce((sum, item) => quoteOptionalItemIncludedByDefault(item) ? sum + itemChargedTotal(item) : sum, 0);
-                const markup = room.markup || 0;
-                const roomTotal = baseTotal * (1 + markup / 100);
+                const roomTotal = room.items.reduce(function(sum, item) {
+                    return quoteOptionalItemIncludedByDefault(item)
+                        ? sum + quoteItemMarkedAmount(room, item, itemChargedTotal(item))
+                        : sum;
+                }, 0);
                 room.roomTotal = roomTotal;
                 subtotal += roomTotal;
                 if (window._quoteDocumentType === 'change_order') {
-                    const markupFactor = 1 + markup / 100;
                     room.items.forEach(function(item) {
                         if (!quoteOptionalItemIncludedByDefault(item)) return;
-                        var lineTotal = itemChargedTotal(item) * markupFactor;
+                        var lineTotal = quoteItemMarkedAmount(room, item, itemChargedTotal(item));
                         if (lineTotal > 0) coAddedSubtotal += lineTotal;
                         if (lineTotal < 0) coCreditSubtotal += Math.abs(lineTotal);
                     });
@@ -12091,11 +12217,9 @@ Example:
                     var qty = parseFloat(item.quantity) || 1;
                     var rate = parseFloat(item.rate) || 0;
                     var mat = parseFloat(item.materialCost) || 0;
-                    roomRevenue += itemChargedTotal(item);
+                    roomRevenue += quoteItemMarkedAmount(room, item, itemChargedTotal(item));
                     roomMaterial += mat * qty;
                 });
-                var roomMarkup = parseFloat(room.markup) || 0;
-                if (roomMarkup) roomRevenue = roomRevenue * (1 + roomMarkup / 100);
                 var roomProfit = roomRevenue - roomMaterial;
                 var roomMargin = roomRevenue > 0 ? (roomProfit / roomRevenue * 100) : 0;
                 totalRevenue += roomRevenue;
@@ -12695,16 +12819,16 @@ Example:
             let html = '';
 
             rooms.forEach(room => {
-                // Apply room markup if set
                 const roomMarkup = room.markup || 0;
                 let roomTotal = window._quoteDocumentType === 'change_order'
-                    ? coDisplayRoomAmount(room)
+                    ? (room.items || []).reduce(function(sum, item) {
+                        return sum + quoteItemMarkedAmount(room, item, coDisplayLineAmount(item));
+                    }, 0)
                     : (room.items || []).reduce(function(sum, item) {
-                        return quoteOptionalItemIncludedByDefault(item) ? sum + itemChargedTotal(item) : sum;
+                        return quoteOptionalItemIncludedByDefault(item)
+                            ? sum + quoteItemMarkedAmount(room, item, itemChargedTotal(item))
+                            : sum;
                     }, 0);
-                if (roomMarkup > 0) {
-                    roomTotal = roomTotal * (1 + roomMarkup / 100);
-                }
 
                 const colorIdx = (room.colorIndex !== undefined) ? room.colorIndex : 0;
                 const headerBg = roomHeaderBackground(room);
@@ -12762,6 +12886,7 @@ Example:
                 html += '<li><button type="button" class="dropdown-item disabled" disabled data-room-bulk-requires-selection="' + room.id + '" onclick="transferSelectedRoomItems(' + room.id + ', \'move\')"><i class="fas fa-folder-tree text-primary"></i>Move Selected to...</button></li>';
                 html += '<li><button type="button" class="dropdown-item disabled" disabled data-room-bulk-requires-selection="' + room.id + '" onclick="transferSelectedRoomItems(' + room.id + ', \'copy\')"><i class="fas fa-copy text-success"></i>Copy Selected to...</button></li>';
                 html += '<li><button type="button" class="dropdown-item disabled" disabled data-room-bulk-requires-selection="' + room.id + '" onclick="duplicateSelectedRoomItems(' + room.id + ')"><i class="fas fa-clone text-info"></i>Duplicate Selected Here</button></li>';
+                html += '<li><button type="button" class="dropdown-item disabled" disabled data-room-bulk-requires-selection="' + room.id + '" onclick="applyMarkupToSelectedRoomItems(' + room.id + ')"><i class="fas fa-percent text-danger"></i>Markup Selected</button></li>';
                 html += '<li><button type="button" class="dropdown-item disabled" disabled data-room-bulk-requires-selection="' + room.id + '" onclick="openSelectedLineItemHighlightModal(' + room.id + ')"><i class="fas fa-highlighter text-warning"></i>Highlight Selected...</button></li>';
                 html += '<li><button type="button" class="dropdown-item text-danger disabled" disabled data-room-bulk-requires-selection="' + room.id + '" onclick="deleteSelectedRoomItems(' + room.id + ')"><i class="fas fa-trash"></i>Delete Selected</button></li>';
                 html += '<li><hr class="dropdown-divider"></li>';
@@ -12793,8 +12918,6 @@ Example:
                 html += '<div class="room-item-drop-zone quote-line-items-sortable" data-room-id="' + room.id + '" aria-label="Drop line item into ' + qdTemplateEscapeHtml(room.name) + '"><i class="fas fa-arrow-down me-2"></i>Drop line item into ' + qdTemplateEscapeHtml(room.name) + '</div>';
 
                 if (room.items.length > 0) {
-                    const markupFactor = 1 + (room.markup || 0) / 100;
-
                     // Build category groups in default trade order
                     const sortedItems = sortItemsByCategory(room.items);
                     // Collect groups preserving sorted order
@@ -12844,6 +12967,7 @@ Example:
                             const itemUpgradeGroups = normalizeQuoteItemUpgradeGroups(item);
                             const hasUpgradeGroups = itemUpgradeGroups.length > 0;
                             const discounts = qdDiscounts();
+                            const markupFactor = quoteItemMarkupFactor(room, item);
                             const displayRate = discounts.activeRate(item) * markupFactor;
                             const originalLineTotal = discounts.originalTotal(item) * markupFactor;
                             const displayDiscount = discounts.discountAmount(item) * markupFactor;
@@ -12879,6 +13003,7 @@ Example:
                             var _descId = 'itemdesc_' + room.id + '_' + origIndex;
                             html += '<td class="quote-item-desc-cell" style="cursor:' + (_hasDesc ? 'pointer' : 'default') + ';" ' + (_hasDesc ? 'onclick="toggleItemDesc(\''+_descId+'\')" title="Click to expand description"' : '') + '>';
                             html += '<strong>' + displayItemName + '</strong>';
+                            html += quoteItemMarkupBadgeHtml(room, item, origIndex);
                             if (hasChoiceGroup) {
                                 if (item.choiceGroup.type === 'single') {
                                     html += ' <button type="button" class="badge bg-primary border-0 ms-1" onclick="event.stopPropagation(); changeQuoteChoiceGroupDefault(' + room.id + ', ' + origIndex + ')" title="Choose which Pick One option is the base visible item"><i class="fas fa-layer-group me-1"></i>Pick One</button>';
@@ -14100,30 +14225,28 @@ Example:
         function updateRoomMarkup(roomId, value) {
             const room = rooms.find(r => r.id === roomId);
             if (room) {
-                room.markup = parseFloat(value) || 0;
+                const nextMarkup = Math.max(0, Math.min(100, parseFloat(value) || 0));
+                if (nextMarkup === (parseFloat(room.markup) || 0)) return;
+                _pushUndo();
+                room.markup = nextMarkup;
                 renderRooms();
+                if (typeof saveSessionQuote === 'function') saveSessionQuote();
+                if (typeof markUnsaved === 'function') markUnsaved();
             }
         }
 
         function toggleMarkupVisibility(roomId) {
             const room = rooms.find(r => r.id === roomId);
+            if (!room) return;
+            _pushUndo();
             if (room && room.hideMarkup !== undefined) {
                 room.hideMarkup = !room.hideMarkup;
             } else {
                 room.hideMarkup = true; // Default to hidden
             }
 
-            // Update icon
-            const icon = document.getElementById('markupIcon_' + roomId);
-            if (icon) {
-                if (room.hideMarkup) {
-                    icon.className = 'fas fa-eye';
-                } else {
-                    icon.className = 'fas fa-eye-slash';
-                }
-            }
-            const warning = document.getElementById('markupWarning_' + roomId);
-            if (warning) warning.style.display = room.hideMarkup ? 'none' : 'inline-flex';
+            renderRooms();
+            if (typeof saveSessionQuote === 'function') saveSessionQuote();
             if (typeof markUnsaved === 'function') markUnsaved();
         }
 
@@ -14139,6 +14262,7 @@ Example:
                 return;
             }
 
+            _pushUndo();
             // Apply to all rooms
             rooms.forEach(room => {
                 room.markup = percent;
@@ -14146,7 +14270,9 @@ Example:
             });
 
             renderRooms();
-            qdAlert('Markup of ' + percent + '% applied to all rooms!');
+            if (typeof saveSessionQuote === 'function') saveSessionQuote();
+            if (typeof markUnsaved === 'function') markUnsaved();
+            qdAlert('Room markup of ' + percent + '% applied to all rooms. Individual item markups were kept and added on top.');
         }
 
         // Template Management Functions
@@ -14339,6 +14465,7 @@ Example:
 
         function autoSaveDraft() {
             // Save current state as draft automatically
+            if (typeof quoteStoragePortalExitActive === 'function' && quoteStoragePortalExitActive()) return;
             if (rooms.length === 0) return;
             const dividerLabels = getQuoteDividerLabels();
 
@@ -15222,10 +15349,17 @@ Example:
         // Quote Style Modal behavior lives in quote-style.js.
 
         function getCurrentQuoteDataForPortal() {
-            var data = Object.assign({}, window._currentQuoteData || {});
-            if (!data.clientName && typeof collectQuoteData === 'function') {
-                data = Object.assign({}, collectQuoteData(), data);
-            }
+            var cachedData = Object.assign({}, window._currentQuoteData || {});
+            var liveData = typeof collectQuoteData === 'function' ? collectQuoteData() : {};
+            // The share modal keeps a cached quote snapshot, but autosave can
+            // acknowledge a newer version while that modal is open. Always let
+            // the live builder snapshot win so portal publishing uses both the
+            // newest line items and the newest compare-and-swap base version.
+            var data = Object.assign({}, cachedData, liveData);
+            var acknowledgedVersion = window._quoteServerUpdatedAt ||
+                (window._loadedQuoteData && (window._loadedQuoteData._serverUpdatedAt || window._loadedQuoteData.updated_at)) ||
+                data._serverUpdatedAt || data.updated_at || null;
+            if (acknowledgedVersion) data._serverUpdatedAt = acknowledgedVersion;
             if (!data.supabaseId && window._supabaseQuoteId) data.supabaseId = window._supabaseQuoteId;
             data.clientName = data.clientName || document.getElementById('clientName')?.value || 'Client';
             data.clientEmail = data.clientEmail || data.email || document.getElementById('clientEmail')?.value || '';
@@ -15269,39 +15403,48 @@ Example:
             return window.confirm(message);
         }
 
-        function quotePortalLockModalStillOpen() {
-            return !!document.querySelector('#interactiveLinkModal.show, #quotePortalAssignModal.show');
-        }
-
-        function redirectPortalLockedQuoteBuilderAfterModal() {
-            if (!window._quoteLockedAfterPortalPublish) return;
-            if (quotePortalLockModalStillOpen()) return;
-            window._quoteLockedAfterPortalPublish = false;
-            var lockedData = window._quoteLockedAfterPortalData || window._currentQuoteData || {};
-            if (typeof handlePortalLockedBuilderLoad === 'function') {
-                handlePortalLockedBuilderLoad({ data: lockedData });
+        function redirectPortalLockedQuoteBuilderToDashboard() {
+            if (!window._quoteLockedAfterPortalPublish || window._quotePortalRedirectInProgress) return;
+            window._quotePortalRedirectInProgress = true;
+            if (typeof unsavedChanges !== 'undefined') unsavedChanges = false;
+            document.documentElement.setAttribute('data-quote-portal-locked', 'true');
+            var lockedQuoteId = String(window._supabaseQuoteId || window._quoteLockedAfterPortalData && window._quoteLockedAfterPortalData.supabaseId || '');
+            if (lockedQuoteId) localStorage.removeItem('ald_remote_conflict_quote:' + lockedQuoteId);
+            if (typeof clearPortalLockedBuilderRestoreState === 'function') {
+                clearPortalLockedBuilderRestoreState();
+            } else {
+                localStorage.removeItem('ald_active_quote_id');
+                localStorage.removeItem('ald_open_cloud_quote');
+                localStorage.removeItem('ald_session_quote');
+                window._supabaseQuoteId = null;
+            }
+            if (typeof _autoSaveTimer !== 'undefined') clearTimeout(_autoSaveTimer);
+            if (typeof autoSaveTimer !== 'undefined') clearTimeout(autoSaveTimer);
+            if (window.location && typeof window.location.replace === 'function') {
+                window.location.replace('dashboard.html');
             } else {
                 window.location.href = 'dashboard.html';
             }
         }
 
-        function bindQuotePortalLockModalRedirect(modalId) {
-            var modalEl = document.getElementById(modalId);
-            if (!modalEl || modalEl.dataset.portalLockRedirectBound === 'true') return;
-            modalEl.dataset.portalLockRedirectBound = 'true';
-            modalEl.addEventListener('hidden.bs.modal', function() {
-                setTimeout(redirectPortalLockedQuoteBuilderAfterModal, 75);
-            });
-        }
-
         function armQuotePortalLockRedirect(quoteData) {
             window._quoteLockedAfterPortalPublish = true;
             window._quoteLockedAfterPortalData = Object.assign({}, quoteData || {});
-            setTimeout(function() {
-                bindQuotePortalLockModalRedirect('quotePortalAssignModal');
-                bindQuotePortalLockModalRedirect('interactiveLinkModal');
-                redirectPortalLockedQuoteBuilderAfterModal();
-            }, 0);
+            document.documentElement.setAttribute('data-quote-portal-locked', 'true');
+            if (typeof unsavedChanges !== 'undefined') unsavedChanges = false;
+            if (typeof _autoSaveTimer !== 'undefined') clearTimeout(_autoSaveTimer);
+            if (typeof autoSaveTimer !== 'undefined') clearTimeout(autoSaveTimer);
+            if (window._quotePortalPublishInProgress) {
+                window._quotePortalRedirectPending = true;
+                return;
+            }
+            if (window._resumeQuoteEmailAfterPortal) {
+                window._quotePortalRedirectAfterEmail = true;
+                return;
+            }
+            if (window._quotePortalRedirectScheduled) return;
+            window._quotePortalRedirectScheduled = true;
+            setTimeout(redirectPortalLockedQuoteBuilderToDashboard, 0);
         }
 
         function updateQuotePortalButton(inPortal) {
@@ -15398,7 +15541,12 @@ Example:
             options = options || {};
             ensureQuotePortalAssignmentModal();
             var resultEl = document.getElementById('sendQuoteEmailResult');
-            if (options.resumeQuoteEmailAfterPortal) window._resumeQuoteEmailAfterPortal = true;
+            if (options.resumeQuoteEmailAfterPortal) {
+                window._resumeQuoteEmailAfterPortal = true;
+            } else if (!options.keepModalOpen) {
+                window._resumeQuoteEmailAfterPortal = false;
+                window._quotePortalRedirectAfterEmail = false;
+            }
             if (resultEl && !options.keepModalOpen) resultEl.innerHTML = '<span class="text-muted"><i class="fas fa-spinner fa-spin me-1"></i>Loading client portals...</span>';
             try {
                 var quoteData = getCurrentQuoteDataForPortal();
@@ -15442,22 +15590,46 @@ Example:
             quoteData = markQuoteForPortal(quoteData, portal);
             if (!quoteData.supabaseId) throw new Error('Save or generate the quote link before adding it to a portal.');
             if (statusEl) statusEl.innerHTML = '<span class="text-muted"><i class="fas fa-spinner fa-spin me-1"></i>Adding quote to client portal...</span>';
-            await updateLegacyInvoicePortalRows(portal, quoteData.portal_id, quoteData.portal_pin);
-            var saved = await saveQuoteForSharing(quoteData);
-            if (saved && saved.error) throw saved.error;
-            if (saved && saved.data && saved.data.id) {
-                quoteData.supabaseId = saved.data.id;
-                window._supabaseQuoteId = saved.data.id;
+            var portalSaveConfirmed = false;
+            window._quotePortalPublishInProgress = true;
+            try {
+                await updateLegacyInvoicePortalRows(portal, quoteData.portal_id, quoteData.portal_pin);
+                // A same-tab autosave may have finished while the portal picker was
+                // open. Adopt that acknowledged base immediately before saving.
+                if (window._quoteServerUpdatedAt) quoteData._serverUpdatedAt = window._quoteServerUpdatedAt;
+                var saved = await saveQuoteForSharing(quoteData);
+                if (saved && saved.error) throw saved.error;
+                var savedRow = saved && saved.data ? (Array.isArray(saved.data) ? saved.data[0] : saved.data) : null;
+                portalSaveConfirmed = !!(savedRow || saved && saved.state === 'cloud_saved');
+                if (savedRow && savedRow.id) {
+                    quoteData.supabaseId = savedRow.id;
+                    window._supabaseQuoteId = savedRow.id;
+                }
+                if (savedRow && savedRow.updated_at) {
+                    quoteData._serverUpdatedAt = savedRow.updated_at;
+                    window._quoteServerUpdatedAt = savedRow.updated_at;
+                }
+                window._currentQuoteData = quoteData;
+                window._loadedQuoteData = Object.assign({}, window._loadedQuoteData || {}, quoteData);
+                var share = await createSecureClientShareLink(quoteData.supabaseId, getClientPortalBaseUrl(), { mode: 'portal' });
+                if (!share || !share.url || share.url.indexOf('token=') < 0) throw new Error('Could not create the client portal link.');
+                setQuoteUrlFromSecureShare(quoteData, share);
+                window._currentQuotePortalUrl = share.url;
+                updateQuotePortalButton(true);
+                return share.url;
+            } finally {
+                window._quotePortalPublishInProgress = false;
+                var serverConfirmedLocked = window._quotePortalRedirectPending && window._quoteLockedAfterPortalPublish;
+                if (portalSaveConfirmed || serverConfirmedLocked) {
+                    window._quotePortalRedirectPending = false;
+                    var lockedData = window._quoteLockedAfterPortalData || quoteData;
+                    if (typeof quoteStorageExitPortalLockedBuilder === 'function') {
+                        quoteStorageExitPortalLockedBuilder(lockedData);
+                    } else {
+                        armQuotePortalLockRedirect(lockedData);
+                    }
+                }
             }
-            window._currentQuoteData = quoteData;
-            window._loadedQuoteData = Object.assign({}, window._loadedQuoteData || {}, quoteData);
-            if (quoteWillBecomePortalLocked) armQuotePortalLockRedirect(quoteData);
-            var share = await createSecureClientShareLink(quoteData.supabaseId, getClientPortalBaseUrl(), { mode: 'portal' });
-            if (!share || !share.url || share.url.indexOf('token=') < 0) throw new Error('Could not create the client portal link.');
-            setQuoteUrlFromSecureShare(quoteData, share);
-            window._currentQuotePortalUrl = share.url;
-            updateQuotePortalButton(true);
-            return share.url;
         }
 
         async function finishQuotePortalAssignment(portal) {
@@ -15535,6 +15707,13 @@ Example:
             }, 50);
         }
 
+        function finishDeferredQuotePortalRedirect() {
+            if (!window._quotePortalRedirectAfterEmail) return false;
+            window._quotePortalRedirectAfterEmail = false;
+            redirectPortalLockedQuoteBuilderToDashboard();
+            return true;
+        }
+
         async function publishCurrentQuoteToPortal() {
             var resultEl = document.getElementById('sendQuoteEmailResult');
             var btn = document.getElementById('addQuoteToPortalBtn');
@@ -15562,10 +15741,15 @@ Example:
             var email = emailEl ? emailEl.value.trim() : '';
             if (!email || !email.includes('@')) {
                 resultEl.innerHTML = '<span class="text-danger">Please enter a valid email address.</span>';
+                finishDeferredQuotePortalRedirect();
                 return;
             }
             var quoteUrl = document.getElementById('interactiveLinkInput')?.value || '';
-            if (!quoteUrl) { resultEl.innerHTML = '<span class="text-danger">No quote link found.</span>'; return; }
+            if (!quoteUrl) {
+                resultEl.innerHTML = '<span class="text-danger">No quote link found.</span>';
+                finishDeferredQuotePortalRedirect();
+                return;
+            }
 
             // Gather quote info
             var qData = getCurrentQuoteDataForPortal();
@@ -15589,6 +15773,7 @@ Example:
                     resultEl.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>' + e.message + '</span>';
                     btn.disabled = false;
                     btn.innerHTML = '<i class="fas fa-paper-plane me-1"></i>Send Quote by Email';
+                    if (finishDeferredQuotePortalRedirect()) return;
                     await openQuotePortalAssignment({ resumeQuoteEmailAfterPortal: true });
                     return;
                 }
@@ -15642,9 +15827,16 @@ Example:
                 if (clientEmailEl && !clientEmailEl.value) clientEmailEl.value = email;
             } catch(e) {
                 resultEl.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>' + e.message + '</span>';
+                if (window._quotePortalRedirectAfterEmail && typeof qdAlert === 'function') {
+                    await qdAlert('The quote was added to the client portal and is now locked, but the email could not be sent: ' + e.message, {
+                        title: 'Quote Locked - Email Not Sent',
+                        type: 'warning'
+                    });
+                }
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fas fa-paper-plane me-1"></i>Send Quote by Email';
+                finishDeferredQuotePortalRedirect();
             }
         }
 
@@ -15717,6 +15909,7 @@ Example:
                 materialCost: parseFloat(item.materialCost) || 0,
                 notes: item.notes || '',
                 itemDescription: item.itemDescription || '',
+                markup: quoteItemOwnMarkupPercent(item),
                 total: item.total !== undefined ? parseFloat(item.total) || 0 : coLineAmount(item)
             };
         }
@@ -15728,7 +15921,7 @@ Example:
             return formatted + (unit ? ' ' + unit : '');
         }
 
-        function coRefreshItemDelta(item) {
+        function coRefreshItemDelta(item, room) {
             if (!item || window._quoteDocumentType !== 'change_order') return item;
             var original = item._coOriginal || null;
             var unit = item.unitType || item.unit || (original && original.unitType) || '';
@@ -15753,9 +15946,15 @@ Example:
             var descChanged = (item.description || '') !== (original.description || '');
             var categoryChanged = (item.category || '') !== (original.category || '');
             var unitChanged = (item.unitType || item.unit || '') !== (original.unitType || '');
-            var delta = currentTotal - originalTotal;
+            var currentMarkup = quoteItemOwnMarkupPercent(item);
+            var originalMarkup = quoteItemOwnMarkupPercent(original);
+            var markupChanged = currentMarkup !== originalMarkup;
+            var currentMarkupFactor = quoteItemMarkupFactor(room, item);
+            var originalMarkupFactor = quoteItemMarkupFactor(room, original);
+            var markedDelta = (currentTotal * currentMarkupFactor) - (originalTotal * originalMarkupFactor);
+            var delta = markupChanged && currentMarkupFactor ? markedDelta / currentMarkupFactor : currentTotal - originalTotal;
 
-            if (!qtyChanged && !rateChanged && !descChanged && !categoryChanged && !unitChanged && Math.abs(delta) < 0.005) {
+            if (!qtyChanged && !rateChanged && !descChanged && !categoryChanged && !unitChanged && !markupChanged && Math.abs(delta) < 0.005) {
                 item._coChangeStatus = 'unchanged';
                 item.changeOrderNote = '';
                 item.total = 0;
@@ -15767,8 +15966,9 @@ Example:
             if (rateChanged) parts.push('rate ' + qdFormatMoney(original.rate) + ' to ' + qdFormatMoney(item.rate));
             if (descChanged) parts.push('item renamed from "' + original.description + '"');
             if (categoryChanged || unitChanged) parts.push('item details updated');
+            if (markupChanged) parts.push('additional item markup ' + (originalMarkup === null ? 'none' : originalMarkup + '%') + ' to ' + (currentMarkup === null ? 'none' : currentMarkup + '%'));
             item._coChangeStatus = 'changed';
-            item.changeOrderNote = 'Changed ' + (parts.length ? parts.join(', ') : 'line item') + '. Net ' + (delta >= 0 ? 'add' : 'credit') + ': ' + qdFormatMoney(Math.abs(delta)) + '.';
+            item.changeOrderNote = 'Changed ' + (parts.length ? parts.join(', ') : 'line item') + '. Net ' + (markedDelta >= 0 ? 'add' : 'credit') + ': ' + qdFormatMoney(Math.abs(markedDelta)) + '.';
             item.total = delta;
             return item;
         }
@@ -15941,7 +16141,7 @@ Example:
         // Save/load/session core moved to quote-storage.js
     </script>
     <script src="change-orders.js?v=1778152100"></script>
-    <script src="quote-storage.js?v=2026071502"></script>
+    <script src="quote-storage.js?v=2026071902"></script>
     <script>
         // -- End Save / Load ------------------------------------------------------
 
@@ -18232,6 +18432,7 @@ Example:
 
         // Warn on refresh/close if unsaved
         window.addEventListener('beforeunload', function(e) {
+            if (typeof quoteStoragePortalExitActive === 'function' && quoteStoragePortalExitActive()) return;
             if (typeof unsavedChanges !== 'undefined' && unsavedChanges) {
                 e.preventDefault();
                 e.returnValue = '';
@@ -18375,7 +18576,7 @@ Example:
     <script src="quote-clients.js?v=1777660402"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
     <script src="ikea-quote.js?v=1778059000"></script>
-<script src="quote-style.js?v=2026071503"></script>
+<script src="quote-style.js?v=2026071901"></script>
 
     <!-- Quote Style Modal -->
     <div class="modal fade" id="quoteStyleModal" tabindex="-1">

@@ -52,7 +52,7 @@ assert(
 );
 
 assert(
-  viewer.includes('const itemDisplayTotal = isChangeOrder ? viewerChangeOrderLineDisplayTotal(item, room) : viewerRoomMarkedAmount(room, qvLineTotal(item));') &&
+  viewer.includes('const itemDisplayTotal = isChangeOrder ? viewerChangeOrderLineDisplayTotal(item, room) : viewerItemMarkedAmount(room, item, qvLineTotal(item));') &&
     viewer.includes('const itemTotal = itemDisplayTotal;'),
   'line item display should show marked-up regular totals and current/new change-order totals instead of net zero deltas'
 );

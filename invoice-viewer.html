@@ -911,22 +911,46 @@ if (location.search.includes('debug')) {
             };
         }
 
-        function invoiceLineRate(item) {
-            return invDiscounts().activeRate(item);
+        function invoiceRoomMarkupFactor(room) {
+            var markup = parseFloat(room && room.markup);
+            if (!isFinite(markup)) markup = 0;
+            return 1 + (Math.max(0, Math.min(100, markup)) / 100);
         }
 
-        function invoiceLineTotal(item) {
-            return invDiscounts().chargedTotal(item);
+        function invoiceItemOwnMarkupPercent(item) {
+            if (!item || !Object.prototype.hasOwnProperty.call(item, 'markup')) return null;
+            if (item.markup === '' || item.markup === null || item.markup === undefined) return null;
+            var markup = parseFloat(item.markup);
+            if (!isFinite(markup)) return null;
+            return Math.max(0, markup);
         }
 
-        function invoiceDiscountHtml(item, currency) {
+        function invoiceItemMarkupFactor(room, item) {
+            var markup = invoiceItemOwnMarkupPercent(item);
+            return invoiceRoomMarkupFactor(room) + ((markup === null ? 0 : markup) / 100);
+        }
+
+        function invoiceMarkedAmount(room, item, amount) {
+            var numericAmount = parseFloat(amount);
+            return (isFinite(numericAmount) ? numericAmount : 0) * invoiceItemMarkupFactor(room, item);
+        }
+
+        function invoiceLineRate(item, room) {
+            return invoiceMarkedAmount(room, item, invDiscounts().activeRate(item));
+        }
+
+        function invoiceLineTotal(item, room) {
+            return invoiceMarkedAmount(room, item, invDiscounts().chargedTotal(item));
+        }
+
+        function invoiceDiscountHtml(item, currency, room) {
             var discounts = invDiscounts();
             if (!discounts.hasDiscount(item)) return '';
-            var original = discounts.originalTotal(item);
-            var amount = discounts.discountAmount(item);
+            var original = invoiceMarkedAmount(room, item, discounts.originalTotal(item));
+            var amount = invoiceMarkedAmount(room, item, discounts.discountAmount(item));
             return '<div class="small text-muted"><span>Was </span><s>' + formatMoney(original, currency) + '</s></div>' +
                 '<div class="small text-success">' + escapeHtml(discounts.discountLabel(item)) + ' -' + formatMoney(amount, currency) + '</div>' +
-                '<div class="small text-muted">Now ' + formatMoney(discounts.chargedTotal(item), currency) + '</div>';
+                '<div class="small text-muted">Now ' + formatMoney(invoiceLineTotal(item, room), currency) + '</div>';
         }
 
         function invoiceRoomIconClass(room) {
@@ -1611,7 +1635,7 @@ if (location.search.includes('debug')) {
             invoiceData.rooms.forEach((room, roomIndex) => {
                 const headerBg = ROOM_COLORS[room.colorIndex ?? 0] || ROOM_COLORS[0];
                 const roomIconClass = invoiceRoomIconClass(room);
-                const roomTotal = room.items.reduce((sum, item) => sum + invoiceLineTotal(item), 0);
+                const roomTotal = room.items.reduce((sum, item) => sum + invoiceLineTotal(item, room), 0);
                 subtotal += roomTotal;
 
                 html += `
@@ -1652,8 +1676,8 @@ if (location.search.includes('debug')) {
                     catItems.forEach(item => {
                     const originalUpgradeItem = getOriginalUpgradeForInvoiceItem(room, item, roomIndex);
                     const isUpgraded = !!item.upgraded || !!originalUpgradeItem;
-                    const activeRate = invoiceLineRate(item);
-                    const itemTotal = invoiceLineTotal(item);
+                    const activeRate = invoiceLineRate(item, room);
+                    const itemTotal = invoiceLineTotal(item, room);
                     const displayName = isUpgraded && item.upgrade ? item.upgrade.name : (item.description || item.name || 'Item');
                     const displayDesc = getInvoiceItemDescription(item, originalUpgradeItem, isUpgraded);
                     const choiceGroupSelection = item.choiceGroupSelection || null;
@@ -1680,7 +1704,7 @@ if (location.search.includes('debug')) {
                                 </td>
                                 <td class="invoice-qty-cell">${typeof qdFormatQuantity === 'function' ? qdFormatQuantity(item.quantity || 0, item.unitType || item.unit || '') : ((item.quantity || 0) + ' ' + (item.unitType || ''))}</td>
                                 <td class="invoice-rate-cell">${formatMoney(activeRate, _iCurrency)}</td>
-                                <td class="invoice-amount-cell">${formatMoney(itemTotal, _iCurrency)}${invoiceDiscountHtml(item, _iCurrency)}</td>
+                                <td class="invoice-amount-cell">${formatMoney(itemTotal, _iCurrency)}${invoiceDiscountHtml(item, _iCurrency, room)}</td>
                             </tr>`;
                     }); // end catItems
                 }); // end catGroups
