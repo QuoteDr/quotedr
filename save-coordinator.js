@@ -10,6 +10,7 @@
     var META_STORE = 'meta';
     var RECOVERY_FUNCTION = '/functions/v1/save-recovery';
     var DEFAULT_TIMEOUT_MS = 15000;
+    var SUCCESS_INDICATOR_MS = 3500;
     var MAX_BACKOFF_MS = 30 * 60 * 1000;
     var RECOVERY_GUIDANCE_ATTEMPTS = 3;
     var adapters = {};
@@ -20,6 +21,8 @@
     var emergencyRecovery = null;
     var broadcast = null;
     var uiClickBound = false;
+    var saveIndicatorHideTimer = null;
+    var lastShownCloudAckAt = null;
     var rolloutEnabled = null;
     var recoveryGuidanceShown = {};
 
@@ -1186,6 +1189,14 @@
         ensureUi();
         var button = document.getElementById('qdSaveSyncButton');
         if (!button) return;
+        var isCleanCloudSave = status.state === 'cloud_saved' && !status.pendingCount && !status.conflictCount && !status.lastLocalFailure;
+        var cloudAckKey = String(status.lastCloudAckAt || 'no-cloud-ack');
+        if (isCleanCloudSave && button.hidden && cloudAckKey === lastShownCloudAckAt) return;
+        if (saveIndicatorHideTimer) {
+            clearTimeout(saveIndicatorHideTimer);
+            saveIndicatorHideTimer = null;
+        }
+        button.hidden = false;
         button.classList.remove('qd-sync-pending', 'qd-sync-error');
         var icon = 'fa-cloud-check';
         var text = 'All changes saved to cloud';
@@ -1203,6 +1214,14 @@
             text = 'Saved on this device - syncing';
         }
         button.innerHTML = '<i class="fas ' + icon + '"></i><span>' + text + '</span>';
+        if (isCleanCloudSave) {
+            lastShownCloudAckAt = cloudAckKey;
+            saveIndicatorHideTimer = setTimeout(function() {
+                var currentButton = document.getElementById('qdSaveSyncButton');
+                if (currentButton) currentButton.hidden = true;
+                saveIndicatorHideTimer = null;
+            }, SUCCESS_INDICATOR_MS);
+        }
     }
 
     async function openRecoveryCenter() {
