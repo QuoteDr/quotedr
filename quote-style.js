@@ -20,7 +20,9 @@
             fontFeel: 'clean',
             pricingMode: 'full',
             depositMode: 'auto',
+            depositKind: 'percent',
             depositPercent: 50,
+            depositFixedCents: 0,
             approvalMode: 'approve_or_changes',
             expiryDate: '',
             showUpgrades: true,
@@ -710,9 +712,12 @@
             style.upgradeBg = document.querySelector('#upgradeBgSwatches .style-swatch.selected')?.getAttribute('data-upgrade-bg') || document.getElementById('quoteUpgradeBg')?.value || style.upgradeBg || '#f8fafc';
             style.pricingMode = document.getElementById('quotePricingMode')?.value || style.pricingMode;
             style.depositMode = document.getElementById('quoteDepositMode')?.value || style.depositMode;
+            style.depositKind = document.getElementById('quoteDepositKind')?.value === 'fixed' ? 'fixed' : 'percent';
             style.depositPercent = parseFloat(document.getElementById('quoteDepositPercent')?.value || style.depositPercent || 50);
             if (!isFinite(style.depositPercent) || style.depositPercent <= 0) style.depositPercent = 50;
             style.depositPercent = Math.min(style.depositPercent, 100);
+            var depositFixedAmount = parseFloat(document.getElementById('quoteDepositFixedAmount')?.value || 0);
+            style.depositFixedCents = Math.max(0, Math.round((isFinite(depositFixedAmount) ? depositFixedAmount : 0) * 100));
             style.approvalMode = document.getElementById('quoteApprovalMode')?.value || style.approvalMode;
             style.expiryDate = document.getElementById('quoteExpiryDate')?.value || '';
             style.showUpgrades = document.getElementById('quoteShowUpgrades')?.checked !== false;
@@ -766,7 +771,10 @@
             setFieldValue('quoteUpgradeBg', _quoteStyle.upgradeBg || '#f8fafc');
             setFieldValue('quotePricingMode', _quoteStyle.pricingMode);
             setFieldValue('quoteDepositMode', _quoteStyle.depositMode);
+            setFieldValue('quoteDepositKind', _quoteStyle.depositKind || 'percent');
             setFieldValue('quoteDepositPercent', _quoteStyle.depositPercent || 50);
+            setFieldValue('quoteDepositFixedAmount', (Number(_quoteStyle.depositFixedCents || 0) / 100).toFixed(2));
+            updateQuoteDepositTermControls();
             setFieldValue('quoteApprovalMode', _quoteStyle.approvalMode);
             setFieldValue('quoteExpiryDate', _quoteStyle.expiryDate);
             setFieldValue('quoteShowUpgrades', _quoteStyle.showUpgrades);
@@ -1135,11 +1143,14 @@
             });
             bindStyleSwatchGroup('upgradeAccentSwatches', 'data-upgrade-accent', 'quoteUpgradeAccent', 'upgradeAccent');
             bindStyleSwatchGroup('upgradeBgSwatches', 'data-upgrade-bg', 'quoteUpgradeBg', 'upgradeBg');
-            ['quoteAccentStrength','quoteOptionAccentStrength','quoteHeaderStyle','quoteHeaderEffect','quoteHeaderOpacity','quoteBgOpacity','quoteFontFeel','quoteOptionAccent','quoteUpgradeAccent','quoteUpgradeBg','quotePricingMode','quoteDepositMode','quoteDepositPercent','quoteApprovalMode','quoteExpiryDate','quoteShowUpgrades','quoteShowScopeNotes','quoteDescriptionPreviewLength','quoteAlwaysShowFullDescriptions','quoteShowCommitment','quoteSkipSettingsOnGenerate','commitmentTitleInput','commitmentIcon1','commitmentImage1','commitmentLabel1','commitmentText1','commitmentIcon2','commitmentImage2','commitmentLabel2','commitmentText2','commitmentIcon3','commitmentImage3','commitmentLabel3','commitmentText3','commitmentIcon4','commitmentImage4','commitmentLabel4','commitmentText4','quoteClientMessage'].forEach(function(id) {
+            ['quoteAccentStrength','quoteOptionAccentStrength','quoteHeaderStyle','quoteHeaderEffect','quoteHeaderOpacity','quoteBgOpacity','quoteFontFeel','quoteOptionAccent','quoteUpgradeAccent','quoteUpgradeBg','quotePricingMode','quoteDepositMode','quoteDepositKind','quoteDepositPercent','quoteDepositFixedAmount','quoteApprovalMode','quoteExpiryDate','quoteShowUpgrades','quoteShowScopeNotes','quoteDescriptionPreviewLength','quoteAlwaysShowFullDescriptions','quoteShowCommitment','quoteSkipSettingsOnGenerate','commitmentTitleInput','commitmentIcon1','commitmentImage1','commitmentLabel1','commitmentText1','commitmentIcon2','commitmentImage2','commitmentLabel2','commitmentText2','commitmentIcon3','commitmentImage3','commitmentLabel3','commitmentText3','commitmentIcon4','commitmentImage4','commitmentLabel4','commitmentText4','quoteClientMessage'].forEach(function(id) {
                 var el = document.getElementById(id);
                 if (el && !el.dataset.styleBound) {
                     el.addEventListener('input', updateStylePreview);
                     el.addEventListener('change', updateStylePreview);
+                    if (id === 'quoteDepositMode' || id === 'quoteDepositKind') {
+                        el.addEventListener('change', updateQuoteDepositTermControls);
+                    }
                     if (id === 'quoteExpiryDate') {
                         el.addEventListener('input', updateQuoteExpiryPresetButtons);
                         el.addEventListener('change', updateQuoteExpiryPresetButtons);
@@ -1374,9 +1385,70 @@
             }
         }
 
+        function updateQuoteDepositTermControls() {
+            var mode = document.getElementById('quoteDepositMode')?.value || 'auto';
+            var kind = document.getElementById('quoteDepositKind')?.value || 'percent';
+            var override = document.getElementById('quoteDepositOverrideFields');
+            var percent = document.getElementById('quoteDepositPercentFields');
+            var fixed = document.getElementById('quoteDepositFixedFields');
+            if (override) override.style.display = mode === 'show' ? 'block' : 'none';
+            if (percent) percent.style.display = mode === 'show' && kind === 'percent' ? 'block' : 'none';
+            if (fixed) fixed.style.display = mode === 'show' && kind === 'fixed' ? 'block' : 'none';
+        }
+
+        function buildQuotePaymentTerms(style, quoteData) {
+            style = style || {};
+            quoteData = quoteData || {};
+            var settings = quoteData.paymentSettings || {};
+            var mode = style.depositMode || 'auto';
+            var required = mode !== 'hide' && (mode === 'show' || settings.accept_deposit !== false);
+            if (!required) {
+                return {
+                    version: 2,
+                    deposit_required: false,
+                    kind: 'none',
+                    percent: null,
+                    fixed_cents: null,
+                    currency: String(quoteData.currency || 'CAD').toUpperCase(),
+                    due: 'after_acceptance',
+                    source: mode === 'hide' ? 'document' : 'account'
+                };
+            }
+            var requestedKind = mode === 'show'
+                ? (style.depositKind === 'fixed' ? 'fixed' : 'percent')
+                : (settings.deposit_default_kind === 'fixed' ? 'fixed' : 'percent');
+            var percent = Math.min(100, Math.max(1, parseFloat(mode === 'show' ? style.depositPercent : settings.deposit_default_pct) || 50));
+            var fixedCents = Math.max(0, Math.round(parseFloat(mode === 'show' ? style.depositFixedCents : settings.deposit_default_fixed_cents) || 0));
+            var kind = requestedKind === 'fixed' && fixedCents > 0 ? 'fixed' : 'percent';
+            return {
+                version: 2,
+                deposit_required: true,
+                kind: kind,
+                percent: kind === 'percent' ? percent : null,
+                fixed_cents: kind === 'fixed' ? fixedCents : null,
+                currency: String(quoteData.currency || 'CAD').toUpperCase(),
+                due: 'after_acceptance',
+                source: mode === 'show' ? 'document' : 'account'
+            };
+        }
+
+        function quoteDepositDueCents(totalCents, terms) {
+            totalCents = Math.max(0, Math.round(Number(totalCents || 0)));
+            terms = terms || {};
+            if (!terms.deposit_required || terms.kind === 'none' || !totalCents) return 0;
+            if (terms.kind === 'fixed') return Math.min(totalCents, Math.max(1, Math.round(Number(terms.fixed_cents || 0))));
+            return Math.min(totalCents, Math.max(1, Math.round(totalCents * Number(terms.percent || 50) / 100)));
+        }
+
+        window.updateQuoteDepositTermControls = updateQuoteDepositTermControls;
+        window.buildQuotePaymentTerms = buildQuotePaymentTerms;
+
         async function createInteractiveQuoteLink() {
             _quoteStyle = readQuoteStyleFromControls();
             syncQuoteStyleGlobal();
+            if (_quoteStyle.depositMode === 'show' && _quoteStyle.depositKind === 'fixed' && Number(_quoteStyle.depositFixedCents || 0) <= 0) {
+                throw new Error('Enter a fixed deposit amount greater than $0 before creating the client link.');
+            }
             if (document.getElementById('quoteSaveDefaultStyle')?.checked) {
                 await saveQuoteStyleDefaults(false);
             }
@@ -1398,6 +1470,9 @@
                 if (statusEl) statusEl.value = 'pending_approval';
             }
             quoteData.style = JSON.parse(JSON.stringify(_quoteStyle));
+            quoteData.payment_terms = buildQuotePaymentTerms(_quoteStyle, quoteData);
+            quoteData.quoted_total_cents = Math.max(0, Math.round((parseFloat(quoteData.grandTotal || quoteData.total || 0) || 0) * 100));
+            quoteData.deposit_due_cents = quoteDepositDueCents(quoteData.quoted_total_cents, quoteData.payment_terms);
             if (window._supabaseQuoteId) quoteData.supabaseId = window._supabaseQuoteId;
 
             const result = await saveQuoteForSharing(quoteData);

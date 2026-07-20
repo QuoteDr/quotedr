@@ -4,7 +4,8 @@ const assert = require('assert');
 const dashboard = fs.readFileSync('dashboard.html', 'utf8');
 const portal = fs.readFileSync('client-portal.html', 'utf8');
 const invoice = fs.readFileSync('invoice-viewer.html', 'utf8');
-const stripe = fs.readFileSync('supabase/functions/stripe-deposit/index.ts', 'utf8');
+const stripe = fs.readFileSync('supabase/functions/document-payment/index.ts', 'utf8');
+const legacyStripe = fs.readFileSync('supabase/functions/stripe-deposit/index.ts', 'utf8');
 
 assert(
   dashboard.includes('function invalidateInvoice(quoteId)') &&
@@ -48,10 +49,16 @@ assert(
 );
 
 assert(
-  stripe.includes('.select("id,user_id,quote_number,client_name,status,total,data")') &&
-    stripe.includes('documentStatus === "voided"') &&
-    stripe.includes('cannot accept payment" }, 409'),
-  'Stripe checkout should reject voided or superseded invoices server-side'
+  stripe.includes('function isInvalid(row: QuoteRow)') &&
+    stripe.includes('status === "voided"') &&
+    stripe.includes('This document is no longer valid and cannot accept payment.'),
+  'Secure document checkout should reject voided or superseded invoices server-side'
+);
+
+assert(
+  legacyStripe.includes('legacy_payment_endpoint_retired') &&
+    !legacyStripe.includes('body.amount'),
+  'The legacy amount-trusting Stripe deposit endpoint should remain retired'
 );
 
 console.log('voided invoice workflow static test passed');

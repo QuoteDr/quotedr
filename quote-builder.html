@@ -18760,18 +18760,34 @@ Example:
                                 </div>
                                 <div class="col-md-6">
                                     <div class="send-settings-card h-100">
-                                        <label class="form-label fw-bold">Deposit Display<button type="button" class="qd-inline-help-btn" title="Help with deposit display" aria-label="Help with deposit display" onclick="QuoteDrModalHelp.openInline('depositDisplay'); return false;"><i class="fas fa-question"></i></button></label>
-                                        <select id="quoteDepositMode" class="form-select form-select-sm">
-                                            <option value="auto">Use payment settings</option>
-                                            <option value="show">Show deposit section</option>
-                                            <option value="hide">Hide deposit section</option>
+                                        <label class="form-label fw-bold">Deposit Requirement<button type="button" class="qd-inline-help-btn" title="Help with deposit settings" aria-label="Help with deposit settings" onclick="QuoteDrModalHelp.openInline('depositDisplay'); return false;"><i class="fas fa-question"></i></button></label>
+                                        <select id="quoteDepositMode" class="form-select form-select-sm" onchange="updateQuoteDepositTermControls()">
+                                            <option value="auto">Use my payment-settings default</option>
+                                            <option value="show">Set a deposit for this quote</option>
+                                            <option value="hide">No deposit for this quote</option>
                                         </select>
-                                        <label class="form-label fw-bold mt-3">Deposit Percentage</label>
-                                        <div class="input-group input-group-sm">
-                                            <input type="number" id="quoteDepositPercent" class="form-control" min="1" max="100" step="1" value="50">
-                                            <span class="input-group-text">%</span>
+                                        <div id="quoteDepositOverrideFields" style="display:none;">
+                                            <label class="form-label fw-bold mt-3">Amount Type</label>
+                                            <select id="quoteDepositKind" class="form-select form-select-sm" onchange="updateQuoteDepositTermControls()">
+                                                <option value="percent">Percentage of accepted total</option>
+                                                <option value="fixed">Fixed amount</option>
+                                            </select>
+                                            <div id="quoteDepositPercentFields">
+                                                <label class="form-label fw-bold mt-3">Deposit Percentage</label>
+                                                <div class="input-group input-group-sm">
+                                                    <input type="number" id="quoteDepositPercent" class="form-control" min="1" max="100" step="1" value="50">
+                                                    <span class="input-group-text">%</span>
+                                                </div>
+                                            </div>
+                                            <div id="quoteDepositFixedFields" style="display:none;">
+                                                <label class="form-label fw-bold mt-3">Fixed Deposit</label>
+                                                <div class="input-group input-group-sm">
+                                                    <span class="input-group-text">$</span>
+                                                    <input type="number" id="quoteDepositFixedAmount" class="form-control" min="0.01" step="0.01" value="0.00">
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div class="text-muted small mt-2">Shown in the client total when deposit display is set to show.</div>
+                                        <div class="text-muted small mt-2">The client sees the exact deposit before signing, then payment options immediately after acceptance.</div>
                                     </div>
                                 </div>
                                 <div class="col-md-6">

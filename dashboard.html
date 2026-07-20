@@ -559,6 +559,7 @@
         // DASHBOARD FUNCTIONS
 
         let allQuotes = []; // Store all quotes for client-side filtering
+        var dashboardManualPaymentReports = {};
         var selectedClientFilesFilter = null;
         let junkQuotes = []; // Recently deleted quotes/invoices, retained temporarily
         const JUNK_RETENTION_DAYS = 30;
@@ -868,14 +869,63 @@
             return false;
         }
 
+        async function refreshDashboardManualPaymentReports() {
+            dashboardManualPaymentReports = {};
+            try {
+                var result = await _supabase
+                    .from('payment_records')
+                    .select('id,quote_id,invoice_id,payment_type,status,amount_cents,currency,method,client_reference,client_note,reported_at,created_at')
+                    .eq('status', 'client_reported')
+                    .order('created_at', { ascending: false });
+                if (result.error) throw result.error;
+                (result.data || []).forEach(function(report) {
+                    var documentId = report.invoice_id || report.quote_id;
+                    if (documentId && !dashboardManualPaymentReports[documentId]) dashboardManualPaymentReports[documentId] = report;
+                });
+            } catch(error) {
+                console.warn('Could not load manual payment reports:', error.message || error);
+            }
+            return dashboardManualPaymentReports;
+        }
+
+        function dashboardManualPaymentLabel(report) {
+            if (!report) return '';
+            if (report.method === 'etransfer') return 'e-transfer';
+            if (report.method === 'cheque') return 'cheque';
+            if (report.method === 'cash') return 'cash';
+            return 'manual payment';
+        }
+
+        async function decideDashboardManualPayment(recordId, decision) {
+            var verb = decision === 'rejected' ? 'mark this payment as not received' : 'confirm that this payment arrived';
+            if (!await qdConfirm('Are you sure you want to ' + verb + '?', {
+                title: decision === 'rejected' ? 'Payment Not Received' : 'Confirm Payment',
+                okText: decision === 'rejected' ? 'Not received' : 'Confirm payment',
+                okClass: decision === 'rejected' ? 'btn-outline-danger' : 'btn-success',
+                type: decision === 'rejected' ? 'warning' : 'success'
+            })) return;
+            try {
+                await callDocumentPaymentFunction({ action: 'confirm_manual', recordId: recordId, decision: decision }, true);
+                if (typeof qdToast === 'function') qdToast({
+                    title: decision === 'rejected' ? 'Report cleared' : 'Payment confirmed',
+                    message: decision === 'rejected' ? 'The client can report the payment again when it is sent.' : 'The document payment status has been updated.',
+                    type: decision === 'rejected' ? 'warning' : 'success'
+                });
+                await refreshQuotes();
+            } catch(error) {
+                qdAlert('Payment report could not be updated: ' + (error.message || 'Please try again.'));
+            }
+        }
+
         async function refreshQuotes() {
             try {
-                const { data, error } = await listQuoteSummariesFromSupabase();
+                const [{ data, error }] = await Promise.all([listQuoteSummariesFromSupabase(), refreshDashboardManualPaymentReports()]);
                 if (error === 'Not authenticated') {
                     // Retry after delay - session may not be ready yet
                     setTimeout(async function() {
                         const retry = await listQuoteSummariesFromSupabase();
                         if (!retry.error) {
+                            await refreshDashboardManualPaymentReports();
                             await setDashboardQuotesFromCloud(retry.data || []);
                             renderDashboardResults();
                             updateStats(allQuotes);
@@ -982,6 +1032,9 @@
                 var depositPaid = !!(q.data && (q.data.deposit_paid === true || q.data.paymentStatus === 'partially_paid' || q.data.paymentStatus === 'paid' || payments.some(function(payment) { return ['deposit', 'invoice_deposit'].includes(payment.type) && payment.paid_at; })));
                 var depositPayment = payments.slice().reverse().find(function(payment) { return ['deposit', 'invoice_deposit'].includes(payment.type) && payment.paid_at; });
                 var depositAmount = depositPayment && depositPayment.amount_cents ? '$' + (depositPayment.amount_cents / 100).toFixed(2) : 'Deposit';
+                var manualPaymentReport = dashboardManualPaymentReports[q.id] || null;
+                var manualPaymentAmount = manualPaymentReport ? '$' + (Number(manualPaymentReport.amount_cents || 0) / 100).toFixed(2) : '';
+                var manualPaymentPurpose = manualPaymentReport && manualPaymentReport.payment_type === 'invoice_full' ? 'invoice payment' : 'deposit';
                 var reviewReady = !isInvalid && dashboardIsPaidForReviewRequest(q);
                 var reviewSentAt = q.data && q.data.review_request_sent_at;
                 var reviewNudge = shouldShowReviewNudge(q);
@@ -1029,6 +1082,7 @@
                     ${status === 'accepted' && q.data && q.data.client_upgraded ? `<div class="alert alert-warning py-1 px-2 mt-2 mb-0 small"><i class="fas fa-bolt me-1"></i><strong>Client made upgrades</strong> when signing - <a href="interactive-quote-viewer.html?id=${encodeURIComponent(q.id)}" class="alert-link">review quote</a></div>` : ''}
                     ${portalVisible ? `<div class="portal-locked-note mt-2"><i class="fas fa-shield-halved me-1"></i>This document is locked while it is in the client portal. Remove from portal or duplicate as a revision to edit.</div>` : ''}
                     ${depositPaid ? `<div class="alert alert-success py-1 px-2 mt-2 mb-0 small"><i class="fas fa-credit-card me-1"></i><strong>${escapeHtml(depositAmount)} paid</strong>${depositPayment && depositPayment.paid_at ? ' on ' + escapeHtml(formatDate(depositPayment.paid_at)) : ''}</div>` : ''}
+                    ${manualPaymentReport ? `<div class="alert alert-warning py-2 px-2 mt-2 mb-0 small"><div><i class="fas fa-clock me-1"></i><strong>Client reports ${escapeHtml(manualPaymentAmount)} ${escapeHtml(manualPaymentPurpose)} by ${escapeHtml(dashboardManualPaymentLabel(manualPaymentReport))}.</strong> Confirm only after you receive it.</div><div class="d-flex gap-1 mt-2 flex-wrap"><button class="btn btn-success btn-sm" onclick="decideDashboardManualPayment(${jsAttr(manualPaymentReport.id)}, 'confirmed')"><i class="fas fa-check me-1"></i>Confirm received</button><button class="btn btn-outline-danger btn-sm" onclick="decideDashboardManualPayment(${jsAttr(manualPaymentReport.id)}, 'rejected')"><i class="fas fa-xmark me-1"></i>Not received</button></div></div>` : ''}
                     ${reviewSentAt ? `<div class="alert alert-success py-1 px-2 mt-2 mb-0 small"><i class="fab fa-google me-1"></i><strong>Review requested</strong> on ${escapeHtml(formatDate(reviewSentAt))}</div>` : ''}
                     ${reviewNudge ? `<div class="alert alert-warning py-2 px-2 mt-2 mb-0 small d-flex justify-content-between align-items-center gap-2 flex-wrap"><span><i class="fas fa-star me-1"></i>You haven't asked ${escapeHtml(clientName)} for a Google review yet. Click while the job is still fresh in their mind.</span><span class="d-flex gap-1"><button class="btn btn-sm btn-warning" onclick="sendGoogleReviewRequest(${jsAttr(q.id)}, ${jsAttr(clientName)}, ${jsAttr(clientEmail)})"><i class="fab fa-google me-1"></i>Request now</button><button class="btn btn-sm btn-outline-secondary" onclick="dismissGoogleReviewNudge(${jsAttr(q.id)})">Never show again</button></span></div>` : ''}
                     ${pendingCos ? `<div class="alert alert-info py-1 px-2 mt-2 mb-0 small"><i class="fas fa-file-circle-plus me-1"></i><strong>${pendingCos} pending change order${pendingCos === 1 ? '' : 's'}</strong></div>` : ''}
@@ -3231,6 +3285,7 @@
                 if (result.error === 'Not authenticated' && attempts < 3) {
                     setTimeout(loadWithRetry, 800 * attempts);
                 } else if (!result.error) {
+                    await refreshDashboardManualPaymentReports();
                     await setDashboardQuotesFromCloud(result.data || []);
                     renderDashboardResults();
                     updateStats(allQuotes);

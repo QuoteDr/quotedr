@@ -45,7 +45,7 @@ assert(
 );
 
 assert(
-  invoiceViewerSource.includes("buttonHtml += '<i class=\"fas fa-credit-card me-2\"></i>Pay Invoice - ' + formatMoney(total,"),
+  invoiceViewerSource.includes("buttonHtml += '<i class=\"fas fa-credit-card me-2\"></i>Pay Invoice - ' + formatMoney(balanceCents / 100,"),
   'Invoice payment button should use formatted money with commas'
 );
 

@@ -14,7 +14,7 @@ const migration = read('supabase/migrations/20260712150000_save_recovery_records
 const edge = read('supabase/functions/save-recovery/index.ts');
 const emailEdge = read('supabase/functions/send-quote-email/index.ts');
 const qbEdge = read('supabase/functions/qb-sync/index.ts');
-const stripeEdge = read('supabase/functions/stripe-deposit/index.ts');
+const stripeEdge = read('supabase/functions/document-payment/index.ts');
 const config = read('supabase/config.toml');
 
 assert(
@@ -171,7 +171,7 @@ assert(
     emailEdge.includes('claimEmailOperation') &&
     emailEdge.includes('authenticatedUser(req)') &&
     qbEdge.includes('claimQBOperation') &&
-    stripeEdge.includes('"Idempotency-Key": idempotencyKey') &&
+    stripeEdge.includes('"Idempotency-Key": key') &&
     config.includes('[functions.send-quote-email]'),
   'Email, QuickBooks, and Stripe side effects should require stable idempotency keys and server receipts instead of entering the automatic outbox'
 );

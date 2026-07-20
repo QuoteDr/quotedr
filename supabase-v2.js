@@ -502,12 +502,21 @@ async function getSupabaseFunctionAuthHeaders() {
 }
 
 const CLIENT_DOCUMENT_FUNCTION_URL = SUPABASE_URL + '/functions/v1/client-document';
+const DOCUMENT_PAYMENT_FUNCTION_URL = SUPABASE_URL + '/functions/v1/document-payment';
+const STRIPE_CONNECT_FUNCTION_URL = SUPABASE_URL + '/functions/v1/stripe-connect';
 
 function getSupabaseAnonFunctionHeaders() {
     return {
         'Content-Type': 'application/json',
         'apikey': SUPABASE_ANON_KEY,
         'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+    };
+}
+
+function getSupabasePublicFunctionHeaders() {
+    return {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY
     };
 }
 
@@ -521,7 +530,7 @@ async function getSupabaseOptionalUserFunctionHeaders() {
 }
 
 async function callClientDocumentFunction(body, requireUser) {
-    const headers = requireUser ? await getSupabaseFunctionAuthHeaders() : getSupabaseAnonFunctionHeaders();
+    const headers = requireUser ? await getSupabaseFunctionAuthHeaders() : getSupabasePublicFunctionHeaders();
     const response = await fetch(CLIENT_DOCUMENT_FUNCTION_URL, {
         method: 'POST',
         headers: headers,
@@ -557,10 +566,44 @@ async function loadSecureClientDocument(documentId, token, portalAnchorId) {
             token: token,
             portalAnchorId: portalAnchorId || ''
         }, false);
-        return { data: data.document };
+        return { data: data.document, paymentOptions: data.paymentOptions || null };
     } catch (error) {
         return { error: error };
     }
+}
+
+async function callDocumentPaymentFunction(body, requireUser) {
+    const headers = requireUser ? await getSupabaseFunctionAuthHeaders() : getSupabasePublicFunctionHeaders();
+    const response = await fetch(DOCUMENT_PAYMENT_FUNCTION_URL, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(body || {})
+    });
+    const data = await response.json().catch(function() { return {}; });
+    if (!response.ok || data.error) {
+        var error = new Error(data.error || 'Payment request failed');
+        error.code = data.code || 'payment_request_failed';
+        error.supportId = data.supportId || '';
+        throw error;
+    }
+    return data;
+}
+
+async function callStripeConnectFunction(action, payload) {
+    const headers = await getSupabaseFunctionAuthHeaders();
+    const response = await fetch(STRIPE_CONNECT_FUNCTION_URL, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(Object.assign({ action: action || 'status' }, payload || {}))
+    });
+    const data = await response.json().catch(function() { return {}; });
+    if (!response.ok || data.error) {
+        var error = new Error(data.error || 'Stripe setup request failed');
+        error.code = data.code || 'stripe_setup_failed';
+        error.supportId = data.supportId || '';
+        throw error;
+    }
+    return data;
 }
 
 async function updateSecureClientDocument(documentId, token, updateAction, payload, portalAnchorId) {
@@ -1210,6 +1253,10 @@ async function saveQuote(quoteData) {
             rooms: quoteData.rooms || [],
             terms: quoteData.terms || [],
             style: quoteData.style || {},
+            payment_terms: quoteData.payment_terms || quoteData.paymentTerms || null,
+            quoted_total_cents: quoteData.quoted_total_cents || Math.max(0, Math.round(Number(quoteData.grandTotal || 0) * 100)),
+            accepted_total_cents: quoteData.accepted_total_cents || null,
+            deposit_due_cents: quoteData.deposit_due_cents || null,
             notes: quoteData.notes || '',
             currency: quoteData.currency || 'CAD',
             quoteAdjustment: quoteData.quoteAdjustment || quoteData.clientAdjustment || null,
@@ -1219,6 +1266,12 @@ async function saveQuote(quoteData) {
             hiddenProfileFields: quoteData.hiddenProfileFields || [],
             paymentStatus: quoteData.paymentStatus || '',
             payments: quoteData.payments || [],
+            deposit_paid: quoteData.deposit_paid === true,
+            deposit_paid_at: quoteData.deposit_paid_at || null,
+            manual_payment_reported: quoteData.manual_payment_reported === true,
+            manual_payment_reported_at: quoteData.manual_payment_reported_at || null,
+            manual_payment_report_id: quoteData.manual_payment_report_id || '',
+            manual_payment_method: quoteData.manual_payment_method || '',
             portal_visible: quoteData.portal_visible === true,
             portal_id: quoteData.portal_id || '',
             portal_name: quoteData.portal_name || '',

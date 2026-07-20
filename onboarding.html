@@ -122,8 +122,21 @@
                             </div>
 
                             <div class="border rounded p-3 mb-3 bg-light">
-                                <h6 class="fw-bold mb-2"><i class="fas fa-money-bill-transfer me-1 text-success"></i>Invoice Payment Details <span class="text-muted small">(optional)</span></h6>
-                                <p class="text-muted small mb-3">These appear on invoice links so clients know how to pay you. You can update them later in Settings.</p>
+                                <h6 class="fw-bold mb-2"><i class="fas fa-money-bill-transfer me-1 text-success"></i>Payment &amp; Deposit Setup <span class="text-muted small">(optional)</span></h6>
+                                <p class="text-muted small mb-3">After a client accepts a quote, QuoteDr can guide them directly to the deposit methods you choose.</p>
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" id="onboardingAcceptDeposit" checked>
+                                    <label class="form-check-label fw-semibold" for="onboardingAcceptDeposit">Request a deposit after quote acceptance</label>
+                                </div>
+                                <div class="mb-3" style="max-width:220px;">
+                                    <label for="onboardingDepositPct" class="form-label">Default Deposit %</label>
+                                    <input type="number" class="form-control" id="onboardingDepositPct" min="1" max="100" value="50">
+                                </div>
+                                <div class="d-flex flex-wrap gap-3 mb-3">
+                                    <div class="form-check"><input class="form-check-input" type="checkbox" id="onboardingAcceptEtransfer" checked><label class="form-check-label" for="onboardingAcceptEtransfer">E-transfer</label></div>
+                                    <div class="form-check"><input class="form-check-input" type="checkbox" id="onboardingAcceptCheque" checked><label class="form-check-label" for="onboardingAcceptCheque">Cheque</label></div>
+                                    <div class="form-check"><input class="form-check-input" type="checkbox" id="onboardingAcceptCash" checked><label class="form-check-label" for="onboardingAcceptCash">Cash</label></div>
+                                </div>
                                 <div class="mb-3">
                                     <label for="etransferEmail" class="form-label">Email to Accept E-Transfers</label>
                                     <input type="email" class="form-control" id="etransferEmail" placeholder="Leave blank to ask clients to contact you">
@@ -133,6 +146,9 @@
                                     <label for="chequePayee" class="form-label">Cheques Should Be Made Out To</label>
                                     <input type="text" class="form-control" id="chequePayee" placeholder="Usually your business name">
                                 </div>
+                                <hr>
+                                <div id="onboardingStripeStatus" class="small text-muted mb-2"><i class="fab fa-stripe me-1"></i>Card payments are optional. Connect your own Stripe account now or later in Settings.</div>
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="onboardingStripeBtn" onclick="startOnboardingStripeSetup()"><i class="fab fa-stripe me-1"></i>Connect Stripe</button>
                             </div>
                             
                             <div class="d-flex justify-content-between">
@@ -494,6 +510,23 @@
         // Initialize first step
         var _onboardingParams = new URLSearchParams(window.location.search);
         showStep(_onboardingParams.get('qb') === 'connected' ? 5 : 1);
+		(function restoreOnboardingPaymentDraft() {
+			var settings = {};
+			var business = {};
+			try { settings = JSON.parse(localStorage.getItem('ald_payment_settings') || '{}') || {}; } catch(e) {}
+			try { business = JSON.parse(localStorage.getItem('ald_business_profile') || '{}') || {}; } catch(e) {}
+			if (document.getElementById('businessName')) document.getElementById('businessName').value = business.business_name || business.businessName || '';
+			if (document.getElementById('companyTagline')) document.getElementById('companyTagline').value = business.tagline || '';
+			if (document.getElementById('ownerName')) document.getElementById('ownerName').value = business.ownerName || business.owner_name || '';
+			if (document.getElementById('email')) document.getElementById('email').value = business.email || '';
+			if (document.getElementById('onboardingDepositPct')) document.getElementById('onboardingDepositPct').value = settings.deposit_default_pct || 50;
+			if (document.getElementById('onboardingAcceptDeposit')) document.getElementById('onboardingAcceptDeposit').checked = settings.accept_deposit !== false;
+			if (document.getElementById('onboardingAcceptEtransfer')) document.getElementById('onboardingAcceptEtransfer').checked = settings.accept_etransfer !== false;
+			if (document.getElementById('onboardingAcceptCheque')) document.getElementById('onboardingAcceptCheque').checked = settings.accept_cheque !== false;
+			if (document.getElementById('onboardingAcceptCash')) document.getElementById('onboardingAcceptCash').checked = settings.accept_cash !== false;
+			if (document.getElementById('etransferEmail')) document.getElementById('etransferEmail').value = settings.etransfer_email || '';
+			if (document.getElementById('chequePayee')) document.getElementById('chequePayee').value = settings.cheque_payee || '';
+		})();
         if (_onboardingParams.get('qb') === 'connected') {
             setTimeout(function() {
                 var statusEl = document.getElementById('obQbStatus');
@@ -501,19 +534,30 @@
                 if (typeof checkOnboardingQBStatus === 'function') checkOnboardingQBStatus();
             }, 250);
         }
+		if (_onboardingParams.get('stripe')) {
+			setTimeout(resumeOnboardingStripeSetup, 100);
+		}
 
         function saveOnboardingPaymentSettings() {
             var existing = {};
             try { existing = JSON.parse(localStorage.getItem('ald_payment_settings') || '{}') || {}; } catch(e) {}
             var settings = Object.assign({
                 stripe_enabled: false,
+                deposit_default_kind: 'percent',
                 deposit_default_pct: 50,
+                deposit_default_fixed_cents: 0,
                 accept_deposit: true,
                 accept_full_payment: true,
                 accept_etransfer: true,
                 accept_cheque: true,
                 accept_cash: true
             }, existing, {
+                deposit_default_kind: 'percent',
+                deposit_default_pct: Math.min(100, Math.max(1, parseInt(document.getElementById('onboardingDepositPct') ? document.getElementById('onboardingDepositPct').value : 50, 10) || 50)),
+                accept_deposit: document.getElementById('onboardingAcceptDeposit') ? document.getElementById('onboardingAcceptDeposit').checked : existing.accept_deposit !== false,
+                accept_etransfer: document.getElementById('onboardingAcceptEtransfer') ? document.getElementById('onboardingAcceptEtransfer').checked : existing.accept_etransfer !== false,
+                accept_cheque: document.getElementById('onboardingAcceptCheque') ? document.getElementById('onboardingAcceptCheque').checked : existing.accept_cheque !== false,
+                accept_cash: document.getElementById('onboardingAcceptCash') ? document.getElementById('onboardingAcceptCash').checked : existing.accept_cash !== false,
                 etransfer_email: document.getElementById('etransferEmail') ? document.getElementById('etransferEmail').value.trim() : (existing.etransfer_email || ''),
                 cheque_payee: document.getElementById('chequePayee') ? document.getElementById('chequePayee').value.trim() : (existing.cheque_payee || '')
             });
@@ -522,6 +566,75 @@
                 savePaymentSettings(settings).catch(function(e){ console.warn('payment settings sync error:', e); });
             }
         }
+
+		var onboardingStripeConnection = null;
+
+		function renderOnboardingStripeStatus(connection) {
+			onboardingStripeConnection = connection || { connected: false, ready: false, status: 'not_connected' };
+			var status = document.getElementById('onboardingStripeStatus');
+			var button = document.getElementById('onboardingStripeBtn');
+			if (!status || !button) return;
+			if (onboardingStripeConnection.ready) {
+				status.className = 'small text-success mb-2';
+				status.innerHTML = '<i class="fas fa-check-circle me-1"></i><strong>Stripe is connected and ready for card payments.</strong>';
+				button.innerHTML = '<i class="fas fa-pen-to-square me-1"></i>Update Stripe details';
+			} else if (onboardingStripeConnection.connected) {
+				status.className = 'small text-warning mb-2';
+				status.innerHTML = '<i class="fas fa-triangle-exclamation me-1"></i><strong>Stripe setup still needs attention.</strong> You can finish now or continue later in Settings.';
+				button.innerHTML = '<i class="fab fa-stripe me-1"></i>Continue Stripe setup';
+			} else {
+				status.className = 'small text-muted mb-2';
+				status.innerHTML = '<i class="fab fa-stripe me-1"></i>Card payments are optional. Connect your own Stripe account now or later in Settings.';
+				button.innerHTML = '<i class="fab fa-stripe me-1"></i>Connect Stripe';
+			}
+		}
+
+		async function enableOnboardingStripeSetting() {
+			var settings = {};
+			try { settings = JSON.parse(localStorage.getItem('ald_payment_settings') || '{}') || {}; } catch(e) {}
+			settings.stripe_enabled = true;
+			localStorage.setItem('ald_payment_settings', JSON.stringify(settings));
+			if (typeof savePaymentSettings === 'function') await savePaymentSettings(settings);
+		}
+
+		async function startOnboardingStripeSetup() {
+			var button = document.getElementById('onboardingStripeBtn');
+			if (button) button.disabled = true;
+			try {
+				var businessDraft = {
+					business_name: document.getElementById('businessName').value.trim(),
+					businessName: document.getElementById('businessName').value.trim(),
+					tagline: document.getElementById('companyTagline').value.trim(),
+					ownerName: document.getElementById('ownerName').value.trim(),
+					email: document.getElementById('email').value.trim()
+				};
+				localStorage.setItem('ald_business_profile', JSON.stringify(businessDraft));
+				saveOnboardingPaymentSettings();
+				await enableOnboardingStripeSetting();
+				var result = await callStripeConnectFunction(onboardingStripeConnection && onboardingStripeConnection.connected ? 'continue_onboarding' : 'start_onboarding', {
+					returnUrl: window.location.origin + window.location.pathname,
+					country: 'CA'
+				});
+				if (!result.url) throw new Error('Stripe did not return a setup link.');
+				window.location.href = result.url;
+			} catch(error) {
+				alert('Stripe setup could not be opened: ' + (error.message || 'Please try again.'));
+				if (button) button.disabled = false;
+			}
+		}
+
+		async function resumeOnboardingStripeSetup() {
+			try {
+				var mode = _onboardingParams.get('stripe');
+				var result = await callStripeConnectFunction('refresh');
+				renderOnboardingStripeStatus(result.connection);
+				if (result.connection && result.connection.ready) await enableOnboardingStripeSetting();
+				if (mode === 'refresh') await startOnboardingStripeSetup();
+			} catch(error) {
+				var status = document.getElementById('onboardingStripeStatus');
+				if (status) status.innerHTML = '<span class="text-danger">Stripe status could not be refreshed. You can continue onboarding and try again later in Settings.</span>';
+			}
+		}
         
         var _onboardingTerms = [
             { id: 't1', label: 'Deposit Required', text: 'A deposit of 30\u201350% of the total project cost is required before work begins. Work will not commence until the deposit is received.', defaultOn: true },

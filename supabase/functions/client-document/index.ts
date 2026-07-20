@@ -356,6 +356,101 @@ function sanitizeQuoteRow(row: QuoteRow) {
   };
 }
 
+async function loadPaymentOptions(userId: string) {
+  const supabase = adminClient();
+  const [{ data: settingsRow }, { data: connectionRow }] = await Promise.all([
+    supabase.from("user_data").select("value").eq("user_id", userId).eq("key", "payment_settings").maybeSingle(),
+    supabase.from("stripe_connected_accounts").select("status,charges_enabled,payouts_enabled,details_submitted").eq("user_id", userId).maybeSingle(),
+  ]);
+  const settings = settingsRow?.value && typeof settingsRow.value === "object"
+    ? settingsRow.value as Record<string, unknown>
+    : {};
+  const connectionReady = connectionRow?.status === "ready" && connectionRow?.charges_enabled === true;
+  const defaultPercent = Math.min(100, Math.max(1, Number(settings.deposit_default_pct || 50)));
+  const defaultFixedCents = Math.max(0, Math.round(Number(settings.deposit_default_fixed_cents || 0)));
+  const defaultKind = settings.deposit_default_kind === "fixed" && defaultFixedCents > 0 ? "fixed" : "percent";
+  return {
+    version: 2,
+    deposit: {
+      enabled: settings.accept_deposit !== false,
+      defaultKind,
+      defaultPercent,
+      defaultFixedCents,
+      due: "after_acceptance",
+    },
+    invoice: { fullPaymentEnabled: settings.accept_full_payment !== false },
+    stripe: {
+      enabled: settings.stripe_enabled === true,
+      ready: settings.stripe_enabled === true && connectionReady,
+      status: connectionRow?.status || "not_connected",
+    },
+    manual: {
+      etransfer: {
+        enabled: settings.accept_etransfer !== false,
+        email: String(settings.etransfer_email || "").trim().slice(0, 254),
+      },
+      cheque: {
+        enabled: settings.accept_cheque !== false,
+        payee: String(settings.cheque_payee || "").trim().slice(0, 200),
+      },
+      cash: { enabled: settings.accept_cash !== false },
+      instructions: String(settings.payment_instructions || "").trim().slice(0, 2000),
+    },
+  };
+}
+
+function normalizedDocumentPaymentTerms(row: QuoteRow, settings: Record<string, unknown>) {
+  const data = rowData(row);
+  const explicit = data.payment_terms || data.paymentTerms;
+  if (explicit && typeof explicit === "object" && Number((explicit as Record<string, unknown>).version || 0) >= 2) {
+    const terms = explicit as Record<string, unknown>;
+    const required = terms.deposit_required !== false && terms.kind !== "none";
+    const explicitFixedCents = Math.max(0, Math.round(Number(terms.fixed_cents || 0)));
+    const kind = terms.kind === "fixed" && explicitFixedCents > 0 ? "fixed" : (required ? "percent" : "none");
+    return {
+      version: 2,
+      deposit_required: required,
+      kind,
+      percent: kind === "percent" ? Math.min(100, Math.max(1, Number(terms.percent || 50))) : null,
+      fixed_cents: kind === "fixed" ? explicitFixedCents : null,
+      currency: String(terms.currency || data.currency || "CAD").toUpperCase(),
+      due: "after_acceptance",
+    };
+  }
+
+  const style = data.style && typeof data.style === "object" ? data.style as Record<string, unknown> : {};
+  const mode = String(style.depositMode || "auto");
+  if (mode === "hide" || settings.accept_deposit === false) {
+    return { version: 2, deposit_required: false, kind: "none", percent: null, fixed_cents: null, currency: String(data.currency || "CAD").toUpperCase(), due: "after_acceptance" };
+  }
+  const requestedKind = mode === "show"
+    ? (style.depositKind === "fixed" ? "fixed" : "percent")
+    : (settings.deposit_default_kind === "fixed" ? "fixed" : "percent");
+  const fixedCents = Math.max(0, Math.round(Number(mode === "show" ? style.depositFixedCents : settings.deposit_default_fixed_cents) || 0));
+  const kind = requestedKind === "fixed" && fixedCents > 0 ? "fixed" : "percent";
+  return {
+    version: 2,
+    deposit_required: true,
+    kind,
+    percent: kind === "percent" ? Math.min(100, Math.max(1, Number(mode === "show" ? style.depositPercent : settings.deposit_default_pct) || 50)) : null,
+    fixed_cents: kind === "fixed" ? fixedCents : null,
+    currency: String(data.currency || "CAD").toUpperCase(),
+    due: "after_acceptance",
+  };
+}
+
+function acceptedDocumentTotalCents(row: QuoteRow) {
+  const data = rowData(row);
+  const raw = Number(row.total ?? data.grandTotal ?? data.total ?? 0);
+  return Math.max(0, Math.round((Number.isFinite(raw) ? raw : 0) * 100));
+}
+
+function acceptedDepositDueCents(totalCents: number, terms: Record<string, unknown>) {
+  if (terms.deposit_required === false || terms.kind === "none" || totalCents <= 0) return 0;
+  if (terms.kind === "fixed") return Math.min(totalCents, Math.max(1, Number(terms.fixed_cents || 0)));
+  return Math.min(totalCents, Math.max(1, Math.round(totalCents * Number(terms.percent || 50) / 100)));
+}
+
 function compactDocumentResult(row: QuoteRow) {
   return {
     id: row.id,
@@ -542,7 +637,8 @@ async function viewDocument(body: Record<string, unknown>) {
   const token = String(body.token || "").trim();
   const portalAnchorId = normalizeId(body.portalAnchorId || body.portal_anchor);
   const { target } = await assertTokenAccess(documentId, token, portalAnchorId);
-  return json({ document: sanitizeQuoteRow(target) });
+  const paymentOptions = await loadPaymentOptions(target.user_id);
+  return json({ document: sanitizeQuoteRow(target), paymentOptions });
 }
 
 async function portalDocuments(body: Record<string, unknown>) {
@@ -746,11 +842,39 @@ async function updateDocument(req: Request, body: Record<string, unknown>) {
     }
   } else if (action === "client_update") {
     const topLevel = body.topLevel && typeof body.topLevel === "object" ? body.topLevel as Record<string, unknown> : {};
-    if (typeof topLevel.status === "string") update.status = topLevel.status;
+    const requestedStatus = typeof topLevel.status === "string" ? String(topLevel.status).toLowerCase() : "";
+    if (requestedStatus && !["accepted", "approved"].includes(requestedStatus)) {
+      return json({ error: "Unsupported client document status" }, 400);
+    }
+    if (requestedStatus) update.status = requestedStatus;
     if (typeof topLevel.client_name === "string") update.client_name = topLevel.client_name;
-    if (typeof topLevel.accepted_at === "string") update.accepted_at = topLevel.accepted_at;
-    if (typeof topLevel.accepted_by === "string") update.accepted_by = topLevel.accepted_by;
-    update.data = mergeSafeData(existingData, body.dataPatch);
+    if (requestedStatus) update.accepted_at = now;
+    if (typeof topLevel.accepted_by === "string") update.accepted_by = String(topLevel.accepted_by).trim().slice(0, 200);
+    const merged = mergeSafeData(existingData, body.dataPatch);
+    if (requestedStatus) {
+      const documentStatus = String(target.status || existingData.status || "").toLowerCase();
+      const validity = String(existingData.document_validity || existingData.documentValidity || "").toLowerCase();
+      if (documentStatus === "voided" || ["voided", "invalid", "superseded"].includes(validity)) {
+        return json({ error: "This document is no longer valid" }, 409);
+      }
+      const { data: settingsRow } = await supabase
+        .from("user_data")
+        .select("value")
+        .eq("user_id", target.user_id)
+        .eq("key", "payment_settings")
+        .maybeSingle();
+      const settings = settingsRow?.value && typeof settingsRow.value === "object"
+        ? settingsRow.value as Record<string, unknown>
+        : {};
+      const terms = normalizedDocumentPaymentTerms(target, settings);
+      const acceptedTotalCents = acceptedDocumentTotalCents(target);
+      merged.status = requestedStatus;
+      merged.payment_terms = terms;
+      merged.accepted_total_cents = acceptedTotalCents;
+      merged.deposit_due_cents = acceptedDepositDueCents(acceptedTotalCents, terms);
+      merged.accepted_at = now;
+    }
+    update.data = merged;
   } else if (action === "decline_change_order") {
     update.status = "declined";
     update.data = mergeSafeData(existingData, {

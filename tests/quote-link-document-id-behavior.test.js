@@ -21,6 +21,8 @@ const context = {
   syncQuoteStyleGlobal: () => {},
   saveQuoteStyleDefaults: async () => {},
   collectQuoteData: () => ({ quoteNumber: 'Q-100', type: 'quote', rooms: [] }),
+  buildQuotePaymentTerms: () => ({ version: 2, deposit_required: true, kind: 'percent', percent: 50 }),
+  quoteDepositDueCents: () => 0,
   saveQuoteForSharing: async () => ({
     state: 'cloud_saved',
     data: [{ id: 'saved-quote-id', updated_at: '2026-07-15T20:00:00.000Z' }],

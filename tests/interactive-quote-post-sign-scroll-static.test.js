@@ -14,7 +14,7 @@ assert(
 );
 
 assert(
-  /function handleMainAction\(\)[\s\S]*if \(quoteIsAccepted\(\)\) \{[\s\S]*applyQuoteCompletionState\(\);[\s\S]*scrollToPostApprovalActions\(\);[\s\S]*return;/.test(source),
+  /function handleMainAction\([^)]*\)[\s\S]*if \(quoteIsAccepted\(\)\) \{[\s\S]*applyQuoteCompletionState\(\);[\s\S]*scrollToPostApprovalActions\(\);[\s\S]*return;/.test(source),
   'Accept button should scroll already-signed quotes to the signed/deposit area'
 );
 

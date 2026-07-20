@@ -640,46 +640,13 @@ if (location.search.includes('debug')) {
             </div>
         </div>
 
-        <div id="depositRequestBtn" style="display:none;"></div>
-
-        <!-- Client Payment Section (shown when contractor has Stripe enabled) -->
+        <!-- Client Payment Section: connected Stripe when ready, plus selected manual methods -->
         <div id="clientPaymentSection" style="display:none;" class="mt-3 mb-4">
             <div class="card border-0 shadow-sm p-4 text-center">
                 <h5 class="mb-3"><i class="fas fa-lock me-2 text-success"></i>Payment Options</h5>
+                <div id="clientPaymentStatus" aria-live="polite"></div>
                 <div id="clientPaymentButtons"></div>
                 <div id="manualPaymentDetails"></div>
-            </div>
-        </div>
-
-        <!-- Deposit Modal -->
-        <div class="modal fade" id="depositModal" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title"><i class="fas fa-credit-card me-2"></i>Pay Invoice</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <p class="text-muted">Set the payment amount. A Stripe checkout link will open.</p>
-                        <label class="form-label fw-bold">Payment Amount</label>
-                        <div class="input-group mb-2">
-                            <span class="input-group-text">$</span>
-                            <input type="number" class="form-control" id="depositAmountInput" min="1" step="0.01" placeholder="0.00">
-                        </div>
-                        <div class="d-flex gap-2 mb-3">
-                            <button class="btn btn-outline-secondary btn-sm" onclick="setDepositPct(25)">25%</button>
-                            <button class="btn btn-outline-secondary btn-sm" onclick="setDepositPct(50)">50%</button>
-                            <button class="btn btn-outline-primary btn-sm" onclick="setDepositPct(100)">Full</button>
-                        </div>
-                        <div class="form-text">Invoice total: <strong id="depositModalTotal">$0.00</strong></div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-success" onclick="submitDepositRequest()">
-                            <i class="fas fa-external-link-alt me-1"></i>Open Stripe Checkout
-                        </button>
-                    </div>
-                </div>
             </div>
         </div>
 
@@ -1433,15 +1400,26 @@ if (location.search.includes('debug')) {
                 });
             }
             loadInvoice();
-            showPaymentReturnNotice();
             printInvoiceIfRequested();
         });
 
-        function showPaymentReturnNotice() {
+        async function showPaymentReturnNotice() {
             var params = new URLSearchParams(window.location.search);
             if (params.get('payment') !== 'success') return false;
-            showInvoicePaidNotice();
-            return true;
+            var sessionId = params.get('session_id') || '';
+            if (!sessionId || typeof callDocumentPaymentFunction !== 'function') return false;
+            var paymentStatus = document.getElementById('clientPaymentStatus');
+            if (paymentStatus) paymentStatus.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin me-1"></i>Confirming your Stripe payment...</div>';
+            try {
+                var result = await callDocumentPaymentFunction(secureInvoicePaymentPayload('verify_checkout', { sessionId: sessionId }), false);
+                applyInvoicePaymentState(result.payment);
+                if (result.payment && result.payment.fullPaid) showInvoicePaidNotice(result.payment);
+                else if (paymentStatus) paymentStatus.innerHTML = '<div class="alert alert-warning text-start"><strong>Stripe is still confirming this payment.</strong> Refresh in a moment before trying again.</div>';
+                return !!(result.payment && result.payment.fullPaid);
+            } catch(error) {
+                if (paymentStatus) paymentStatus.innerHTML = '<div class="alert alert-warning text-start"><strong>We are still confirming the Stripe payment.</strong> Refresh in a moment. Direct payment options remain available below.</div>';
+                return false;
+            }
         }
 
         function showInvoicePaidNotice(paymentInfo) {
@@ -1449,11 +1427,15 @@ if (location.search.includes('debug')) {
             if (!section) return;
             section.style.display = 'block';
             var buttons = document.getElementById('clientPaymentButtons');
+            var paymentStatus = document.getElementById('clientPaymentStatus');
             var amountText = '';
-            if (paymentInfo && paymentInfo.amountCents) {
-                amountText = ' ' + formatMoney(Number(paymentInfo.amountCents || 0) / 100, invoiceData.currency || 'CAD') + ' received.';
+            if (paymentInfo && (paymentInfo.paidCents || paymentInfo.amountCents)) {
+                amountText = ' ' + formatMoney(Number(paymentInfo.paidCents || paymentInfo.amountCents || 0) / 100, invoiceData.currency || 'CAD') + ' received.';
             }
             if (buttons) buttons.innerHTML = '<div class="alert alert-success mb-0"><i class="fas fa-check-circle me-1"></i>Payment received.' + amountText + ' Thank you.</div>';
+            if (paymentStatus) paymentStatus.innerHTML = '';
+            var manual = document.getElementById('manualPaymentDetails');
+            if (manual) manual.innerHTML = '';
         }
 
         function tryLocalStorageFallback() {
@@ -1543,6 +1525,7 @@ if (location.search.includes('debug')) {
                         return;
                     }
                     var row = result.data;
+                    window._secureInvoicePaymentOptions = result.paymentOptions || null;
                     window._invoiceRow = row;
                     invoiceData = row.data || row;
                     if (!invoiceData.clientName && row.client_name) invoiceData.clientName = row.client_name;
@@ -1770,56 +1753,6 @@ if (location.search.includes('debug')) {
             if (termsEl) termsEl.textContent = settings.paymentTerms ? 'Payment terms: ' + settings.paymentTerms : '';
             // Store total for payment helpers
             window._invoiceTotal = invoiceIsInvalid() ? 0 : balanceDue;
-            var depBtn = document.getElementById('depositRequestBtn');
-            if (depBtn) depBtn.style.display = 'none';
-        }
-
-        function openDepositModal() {
-            if (invoiceIsInvalid()) { alert('This invoice is no longer valid and cannot accept payment.'); return; }
-            var total = window._invoiceTotal || 0;
-            var half = (total * 0.5).toFixed(2);
-            document.getElementById('depositAmountInput').value = half;
-            document.getElementById('depositModalTotal').textContent = formatMoney(total, invoiceData.currency || 'CAD');
-            var modal = new bootstrap.Modal(document.getElementById('depositModal'));
-            modal.show();
-        }
-
-        function setDepositPct(pct) {
-            var total = window._invoiceTotal || 0;
-            document.getElementById('depositAmountInput').value = (total * pct / 100).toFixed(2);
-        }
-
-        async function submitDepositRequest() {
-            if (invoiceIsInvalid()) { alert('This invoice is no longer valid and cannot accept payment.'); return; }
-            var amount = parseFloat(document.getElementById('depositAmountInput').value);
-            if (!amount || amount <= 0) { alert('Please enter a valid amount.'); return; }
-            var quoteId = invoiceData.supabaseId || invoiceData.id || '';
-            var clientName = invoiceData.clientName || 'Client';
-            var quoteNum = invoiceData.quoteNumber || '';
-            var description = 'Deposit for ' + clientName + (quoteNum ? ' (Quote #' + quoteNum + ')' : '') + ' — ALD Direct Inc.';
-            var successUrl = window.location.href + (window.location.href.includes('?') ? '&' : '?') + 'paid=1';
-            var cancelUrl = window.location.href;
-            try {
-                var depositOperationEntity = quoteId + ':invoice_deposit:' + Math.round(amount * 100);
-                var depositOperationId = qdGetExternalOperationId('stripe_checkout', depositOperationEntity);
-                var resp = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/stripe-deposit', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso' },
-                    body: JSON.stringify({ amount: Math.round(amount * 100), currency: 'cad', quoteId: quoteId, paymentType: 'invoice_deposit', clientEmail: invoiceData.email || invoiceData.clientEmail || '', description: description, successUrl: successUrl, cancelUrl: cancelUrl, idempotencyKey: depositOperationId })
-                });
-                var data = await resp.json();
-                if (data.url) {
-                    qdCompleteExternalOperation('stripe_checkout', depositOperationEntity);
-                    bootstrap.Modal.getInstance(document.getElementById('depositModal')).hide();
-                    document.getElementById('depositRequestedBadge').style.display = 'block';
-                    localStorage.setItem('deposit_requested_' + quoteId, JSON.stringify({ amount: amount, ts: Date.now() }));
-                    window.open(data.url, '_blank');
-                } else {
-                    alert('Stripe error: ' + (data.error || 'Unknown error'));
-                }
-            } catch(e) {
-                alert('Failed to create payment link: ' + e.message);
-            }
         }
 
         function renderTerms() {
@@ -1846,18 +1779,14 @@ if (location.search.includes('debug')) {
 
         // ── Client Invoice Payment (Stripe) ───────────────────────────────
         var _invoicePaymentSettings = null;
+        var _invoicePaymentOptions = null;
+        var _invoicePaymentState = null;
         var _invoiceTotalForPayment = 0;
         var _invoiceIdForPayment = null;
-        var QUOTEDR_SUPABASE_ANON_KEY = typeof SUPABASE_ANON_KEY !== 'undefined' ? SUPABASE_ANON_KEY : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso';
 
         async function loadContractorPaymentSettings(contractorUserId) {
-            try {
-                if (invoiceData && (invoiceData.paymentSettings || invoiceData.payment_settings)) return invoiceData.paymentSettings || invoiceData.payment_settings;
-                var sb = window._supabase;
-                if (!sb || !contractorUserId) return null;
-                var result = await sb.from('user_data').select('value').eq('user_id', contractorUserId).eq('key', 'payment_settings').maybeSingle();
-                return (result.data && result.data.value) ? result.data.value : null;
-            } catch(e) { return null; }
+            if (window._secureInvoicePaymentOptions) return window._secureInvoicePaymentOptions;
+            return normalizeInvoicePaymentOptions(invoiceData.paymentSettings || invoiceData.payment_settings || loadLocalPaymentSettingsSnapshot());
         }
 
         function loadLocalPaymentSettingsSnapshot() {
@@ -1872,18 +1801,38 @@ if (location.search.includes('debug')) {
             return invoiceData.paymentSettings || invoiceData.payment_settings || loadLocalPaymentSettingsSnapshot();
         }
 
-        function withDefaultPaymentSettings(settings) {
-            var profile = invoiceData.businessProfile || {};
+        function normalizeInvoicePaymentOptions(settings) {
+            if (settings && Number(settings.version || 0) >= 2 && settings.manual && settings.stripe) return settings;
+            settings = settings || {};
+            return {
+                version: 1,
+                invoice: { fullPaymentEnabled: settings.accept_full_payment !== false },
+                stripe: { enabled: settings.stripe_enabled === true, ready: settings.stripe_ready === true },
+                manual: {
+                    etransfer: { enabled: settings.accept_etransfer !== false, email: settings.etransfer_email || '' },
+                    cheque: { enabled: settings.accept_cheque !== false, payee: settings.cheque_payee || '' },
+                    cash: { enabled: settings.accept_cash !== false },
+                    instructions: settings.payment_instructions || ''
+                }
+            };
+        }
+
+        function secureInvoicePaymentPayload(action, extra) {
+            var params = new URLSearchParams(window.location.search);
             return Object.assign({
-                stripe_enabled: false,
-                accept_full_payment: true,
-                accept_etransfer: true,
-                etransfer_email: '',
-                accept_cheque: true,
-                cheque_payee: '',
-                accept_cash: true,
-                payment_instructions: ''
-            }, settings || {});
+                action: action,
+                documentId: params.get('id') || _invoiceIdForPayment || '',
+                token: params.get('token') || '',
+                portalAnchorId: params.get('portal_anchor') || ''
+            }, extra || {});
+        }
+
+        function applyInvoicePaymentState(payment) {
+            if (!payment) return false;
+            _invoicePaymentState = payment;
+            if (payment.fullPaid) invoiceData.paymentStatus = 'paid';
+            invoiceData.manual_payment_reported = payment.status === 'client_reported';
+            return payment.fullPaid === true;
         }
 
         function isSupabaseUuid(value) {
@@ -1907,31 +1856,28 @@ if (location.search.includes('debug')) {
         }
 
         async function reconcileInvoicePaymentStatus(invoiceId) {
-            if (!isSupabaseUuid(invoiceId)) return false;
+            if (!isSupabaseUuid(invoiceId) || typeof callDocumentPaymentFunction !== 'function') return false;
             try {
-                var resp = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/stripe-deposit', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'apikey': QUOTEDR_SUPABASE_ANON_KEY,
-                        'Authorization': 'Bearer ' + QUOTEDR_SUPABASE_ANON_KEY
-                    },
-                    body: JSON.stringify({
-                        action: 'reconcile_quote_payments',
-                        quoteId: invoiceId
-                    })
-                });
-                var responseText = await resp.text();
-                var data = {};
-                try { data = responseText ? JSON.parse(responseText) : {}; } catch(parseErr) { data = {}; }
-                if (resp.ok && data.paid) {
-                    showInvoicePaidNotice(data);
+                var data = await callDocumentPaymentFunction(secureInvoicePaymentPayload('status'), false);
+                applyInvoicePaymentState(data.payment);
+                if (data.payment && data.payment.fullPaid) {
+                    showInvoicePaidNotice(data.payment);
                     return true;
                 }
             } catch(e) {
                 console.warn('Could not verify invoice payment status:', e);
             }
             return false;
+        }
+
+        function invoiceManualMethodMarkup(method, title, details, icon) {
+            var reportText = method === 'etransfer' ? "I've sent the e-transfer" : (method === 'cheque' ? "I've arranged the cheque" : "I've arranged the cash payment");
+            var copy = method === 'etransfer' || method === 'cheque'
+                ? '<button type="button" class="btn btn-sm btn-outline-secondary me-2 mt-2" onclick="copyInvoicePaymentText(\'' + method + '\')"><i class="fas fa-copy me-1"></i>Copy details</button>'
+                : '';
+            return '<div class="payment-method-item"><strong><i class="' + icon + ' me-2 text-success"></i>' + escapeHtml(title) + '</strong>' +
+                '<div class="text-muted small mt-1">' + details + '</div>' +
+                '<div>' + copy + '<button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="reportManualInvoicePayment(\'' + method + '\')">' + escapeHtml(reportText) + '</button></div></div>';
         }
 
         function renderInvoicePaymentOptions(settings, total, invoiceId) {
@@ -1946,46 +1892,67 @@ if (location.search.includes('debug')) {
                 return;
             }
             if (getInvoiceSettings().showPaymentOptions === false || !total) return;
-            var s = withDefaultPaymentSettings(settings || getInvoicePaymentSettingsFallback());
+            var s = normalizeInvoicePaymentOptions(settings || getInvoicePaymentSettingsFallback());
             var paymentTargetId = getInvoicePaymentTargetId(invoiceId);
             _invoicePaymentSettings = s;
+            _invoicePaymentOptions = s;
             _invoiceTotalForPayment = total || 0;
             _invoiceIdForPayment = paymentTargetId;
 
-            var buttonHtml = '';
-            if (s.stripe_enabled && s.accept_full_payment !== false && paymentTargetId) {
-                buttonHtml += '<button type="button" class="btn btn-success btn-lg px-5 mb-3 w-100" onclick="handleClientInvoicePayment(' + Math.round(total * 100) + ', \'Pay Invoice in Full\', \'invoice_full\')">';
-                buttonHtml += '<i class="fas fa-credit-card me-2"></i>Pay Invoice - ' + formatMoney(total, _iCurrency) + '</button>';
-                buttonHtml += '<div class="text-muted small mb-3"><i class="fab fa-stripe me-1"></i>Secure card payment powered by Stripe</div>';
-            } else if (s.stripe_enabled && s.accept_full_payment !== false) {
-                buttonHtml += '<div class="alert alert-warning small mb-3">Card payment will be available from the shared invoice link after this invoice is saved.</div>';
-            }
-
-            var manualHtml = '';
-            if (s.accept_etransfer !== false) {
-                manualHtml += '<div class="payment-method-item"><strong><i class="fas fa-money-bill-transfer me-2 text-success"></i>E-transfer</strong>';
-                manualHtml += '<div class="text-muted small mt-1">' + (s.etransfer_email ? 'Send payment to <strong>' + escapeHtml(s.etransfer_email) + '</strong>.' : 'Contact us for the e-transfer email.') + '</div></div>';
-            }
-            if (s.accept_cheque !== false) {
-                manualHtml += '<div class="payment-method-item"><strong><i class="fas fa-money-check-dollar me-2 text-success"></i>Cheque</strong>';
-                manualHtml += '<div class="text-muted small mt-1">' + (s.cheque_payee ? 'Please make cheques payable to <strong>' + escapeHtml(s.cheque_payee) + '</strong>.' : 'Cheques are accepted for this invoice.') + '</div></div>';
-            }
-            if (s.accept_cash !== false) {
-                manualHtml += '<div class="payment-method-item"><strong><i class="fas fa-money-bill-wave me-2 text-success"></i>Cash</strong>';
-                manualHtml += '<div class="text-muted small mt-1">Cash payments are accepted by arrangement.</div></div>';
-            }
-            if (s.payment_instructions) {
-                manualHtml += '<div class="payment-method-item"><strong><i class="fas fa-circle-info me-2 text-primary"></i>Instructions</strong>';
-                manualHtml += '<div class="text-muted small mt-1">' + escapeHtml(s.payment_instructions).replace(/\n/g, '<br>') + '</div></div>';
+            if (_invoicePaymentState && _invoicePaymentState.fullPaid) {
+                showInvoicePaidNotice(_invoicePaymentState);
+                return;
             }
 
             var buttonsEl = document.getElementById('clientPaymentButtons');
             var manualEl = document.getElementById('manualPaymentDetails');
             var section = document.getElementById('clientPaymentSection');
+            if (_invoicePaymentState && _invoicePaymentState.status === 'client_reported') {
+                if (buttonsEl) buttonsEl.innerHTML = '<div class="alert alert-warning mb-0"><i class="fas fa-clock me-1"></i><strong>Payment reported.</strong> Your contractor will confirm it after it arrives.</div>';
+                if (manualEl) manualEl.innerHTML = '';
+                if (section) section.style.display = 'block';
+                return;
+            }
+
+            var buttonHtml = '';
+            var balanceCents = _invoicePaymentState && Number(_invoicePaymentState.balanceDueCents || 0) > 0
+                ? Number(_invoicePaymentState.balanceDueCents)
+                : Math.round(total * 100);
+            var stripe = s.stripe || {};
+            var fullPaymentEnabled = !s.invoice || s.invoice.fullPaymentEnabled !== false;
+            if (stripe.ready && fullPaymentEnabled && paymentTargetId) {
+                buttonHtml += '<button type="button" class="btn btn-success btn-lg px-5 mb-3 w-100" onclick="handleClientInvoicePayment()">';
+                buttonHtml += '<i class="fas fa-credit-card me-2"></i>Pay Invoice - ' + formatMoney(balanceCents / 100, _iCurrency) + '</button>';
+                buttonHtml += '<div class="text-muted small mb-3"><i class="fab fa-stripe me-1"></i>Secure card payment powered by Stripe</div>';
+            } else if (stripe.enabled && fullPaymentEnabled) {
+                buttonHtml += '<div class="alert alert-light border small text-start mb-3"><i class="fas fa-credit-card me-1"></i>Card payment is temporarily unavailable. You can still use a direct payment method below.</div>';
+            }
+
+            var manualHtml = '';
+            var manual = s.manual || {};
+            if (manual.etransfer && manual.etransfer.enabled) {
+                var etransferDetails = manual.etransfer.email
+                    ? 'Send payment to <strong>' + escapeHtml(manual.etransfer.email) + '</strong>.'
+                    : 'Contact your contractor for the e-transfer email.';
+                manualHtml += invoiceManualMethodMarkup('etransfer', 'E-transfer', etransferDetails, 'fas fa-money-bill-transfer');
+            }
+            if (manual.cheque && manual.cheque.enabled) {
+                var chequeDetails = manual.cheque.payee
+                    ? 'Please make cheques payable to <strong>' + escapeHtml(manual.cheque.payee) + '</strong>.'
+                    : 'Contact your contractor for cheque details.';
+                manualHtml += invoiceManualMethodMarkup('cheque', 'Cheque', chequeDetails, 'fas fa-money-check-dollar');
+            }
+            if (manual.cash && manual.cash.enabled) {
+                manualHtml += invoiceManualMethodMarkup('cash', 'Cash', 'Arrange payment directly with your contractor.', 'fas fa-money-bill-wave');
+            }
+            if (manual.instructions) {
+                manualHtml += '<div class="payment-method-item"><strong><i class="fas fa-circle-info me-2 text-primary"></i>Instructions</strong>';
+                manualHtml += '<div class="text-muted small mt-1">' + escapeHtml(manual.instructions).replace(/\n/g, '<br>') + '</div></div>';
+            }
+
             if (buttonsEl) buttonsEl.innerHTML = buttonHtml;
             if (manualEl) manualEl.innerHTML = manualHtml ? '<div class="payment-method-list">' + manualHtml + '</div>' : '<p class="text-muted small mb-0">Please contact us to arrange payment.</p>';
-            if (section && (buttonHtml || manualHtml)) section.style.display = 'block';
-            if (paymentTargetId) reconcileInvoicePaymentStatus(paymentTargetId);
+            if (section) section.style.display = 'block';
         }
 
         async function initInvoicePaymentSection(contractorUserId, total, invoiceId) {
@@ -1997,15 +1964,17 @@ if (location.search.includes('debug')) {
             _invoiceTotalForPayment = total || 0;
             _invoiceIdForPayment = invoiceId;
             if (!total) return;
-            var returnedFromStripe = showPaymentReturnNotice();
-            if (await reconcileInvoicePaymentStatus(invoiceId)) return;
-            if (returnedFromStripe) return;
-            _invoicePaymentSettings = await loadContractorPaymentSettings(contractorUserId);
-            if (!_invoicePaymentSettings) _invoicePaymentSettings = getInvoicePaymentSettingsFallback();
+            _invoicePaymentOptions = await loadContractorPaymentSettings(contractorUserId);
+            _invoicePaymentSettings = _invoicePaymentOptions || normalizeInvoicePaymentOptions(getInvoicePaymentSettingsFallback());
+            if (new URLSearchParams(window.location.search).get('payment') === 'success') {
+                await showPaymentReturnNotice();
+            } else {
+                await reconcileInvoicePaymentStatus(invoiceId);
+            }
             renderInvoicePaymentOptions(_invoicePaymentSettings, total, invoiceId);
         }
 
-        async function handleClientInvoicePayment(amountCents, description, paymentType) {
+        async function handleClientInvoicePayment() {
             if (invoiceIsInvalid()) {
                 alert('This invoice is no longer valid and cannot accept payment.');
                 return;
@@ -2014,7 +1983,8 @@ if (location.search.includes('debug')) {
                 alert('This invoice needs to be saved before card payment is available. Please use the shared invoice link.');
                 return;
             }
-            logPortalDocumentActivity('payment_clicked', { metadata: { payment_type: paymentType || 'invoice_full' } });
+            if (typeof callDocumentPaymentFunction !== 'function') return;
+            logPortalDocumentActivity('payment_clicked', { metadata: { payment_type: 'invoice_full', method: 'card' } });
             var btns = document.querySelectorAll('#clientPaymentButtons button');
             btns.forEach(function(b) {
                 b.disabled = true;
@@ -2022,43 +1992,64 @@ if (location.search.includes('debug')) {
                 b.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Opening Stripe...';
             });
             try {
-                var invoicePaymentType = paymentType || 'invoice_full';
-                var invoicePaymentOperationEntity = _invoiceIdForPayment + ':' + invoicePaymentType + ':' + amountCents;
-                var invoicePaymentOperationId = qdGetExternalOperationId('stripe_checkout', invoicePaymentOperationEntity);
-                var resp = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/stripe-deposit', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'apikey': QUOTEDR_SUPABASE_ANON_KEY,
-                        'Authorization': 'Bearer ' + QUOTEDR_SUPABASE_ANON_KEY
-                    },
-                    body: JSON.stringify({
-                        amount: amountCents,
-                        currency: 'cad',
-                        quoteId: _invoiceIdForPayment,
-                        paymentType: invoicePaymentType,
-                        clientEmail: invoiceData.email || invoiceData.clientEmail || '',
-                        description: description,
-                        successUrl: window.location.href.split('#')[0].replace(/[?&]payment=[^&]*/g, ''),
-                        cancelUrl: window.location.href.split('#')[0],
-                        idempotencyKey: invoicePaymentOperationId
-                    })
-                });
-                var responseText = await resp.text();
-                var data = {};
-                try { data = responseText ? JSON.parse(responseText) : {}; } catch(parseErr) { data = { error: responseText }; }
-                if (!resp.ok) throw new Error(data.error || 'Payment failed');
-                if (data.url) {
-                    qdCompleteExternalOperation('stripe_checkout', invoicePaymentOperationEntity);
-                    window.location.href = data.url;
-                }
-                else { throw new Error(data.error || 'Payment failed'); }
+                var amountCents = _invoicePaymentState && Number(_invoicePaymentState.balanceDueCents || 0) > 0
+                    ? Number(_invoicePaymentState.balanceDueCents)
+                    : Math.round(_invoiceTotalForPayment * 100);
+                var operationEntity = _invoiceIdForPayment + ':invoice_full:' + amountCents;
+                var data = await callDocumentPaymentFunction(secureInvoicePaymentPayload('create_checkout', {
+                    paymentType: 'invoice_full',
+                    returnUrl: window.location.href,
+                    idempotencyKey: qdGetExternalOperationId('stripe_checkout', operationEntity)
+                }), false);
+                if (!data.url) throw new Error('Secure checkout did not return a payment link.');
+                window.location.href = data.url;
             } catch(e) {
-                alert('Payment error: ' + e.message);
+                var buttons = document.getElementById('clientPaymentButtons');
+                if (buttons) buttons.insertAdjacentHTML('afterbegin', '<div class="alert alert-warning text-start"><strong>Card payment could not be opened.</strong> ' + escapeHtml(e.message || 'Try again or choose a direct payment method below.') + '</div>');
                 btns.forEach(function(b) {
                     b.disabled = false;
                     if (b.dataset.originalHtml) b.innerHTML = b.dataset.originalHtml;
                 });
+            }
+        }
+
+        async function reportManualInvoicePayment(method) {
+            if (invoiceIsInvalid() || typeof callDocumentPaymentFunction !== 'function') return;
+            var label = method === 'etransfer' ? 'e-transfer' : method;
+            var confirmed = typeof qdConfirm === 'function'
+                ? await qdConfirm('Report that you have sent or arranged this ' + label + ' payment? Your contractor will verify it before the invoice is marked paid.', { title: 'Report Invoice Payment', okText: 'Report payment', okClass: 'btn-primary' })
+                : window.confirm('Report this payment to your contractor?');
+            if (!confirmed) return;
+            var amountCents = _invoicePaymentState && Number(_invoicePaymentState.balanceDueCents || 0) > 0
+                ? Number(_invoicePaymentState.balanceDueCents)
+                : Math.round(_invoiceTotalForPayment * 100);
+            var operationEntity = _invoiceIdForPayment + ':invoice_full:' + method + ':' + amountCents;
+            try {
+                var result = await callDocumentPaymentFunction(secureInvoicePaymentPayload('report_manual', {
+                    paymentType: 'invoice_full',
+                    method: method,
+                    idempotencyKey: qdGetExternalOperationId('manual_payment_report', operationEntity)
+                }), false);
+                applyInvoicePaymentState(result.payment);
+                qdCompleteExternalOperation('manual_payment_report', operationEntity);
+                logPortalDocumentActivity('payment_reported', { metadata: { payment_type: 'invoice_full', method: method } });
+                renderInvoicePaymentOptions(_invoicePaymentOptions, _invoiceTotalForPayment, _invoiceIdForPayment);
+            } catch(error) {
+                alert('Could not report the payment: ' + (error.message || 'Please try again.'));
+            }
+        }
+
+        async function copyInvoicePaymentText(method) {
+            var manual = _invoicePaymentOptions && _invoicePaymentOptions.manual ? _invoicePaymentOptions.manual : {};
+            var value = method === 'etransfer'
+                ? String(manual.etransfer && manual.etransfer.email || '')
+                : String(manual.cheque && manual.cheque.payee || '');
+            if (!value) return;
+            try {
+                await navigator.clipboard.writeText(value);
+                if (typeof qdToast === 'function') qdToast({ title: 'Copied', message: value, type: 'success' });
+            } catch(error) {
+                alert(value);
             }
         }
 

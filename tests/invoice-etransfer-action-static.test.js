@@ -4,7 +4,7 @@ const assert = require('assert');
 const invoice = fs.readFileSync('invoice-viewer.html', 'utf8');
 
 assert(
-  invoice.includes('E-transfer</strong>'),
+  invoice.includes("invoiceManualMethodMarkup('etransfer', 'E-transfer'"),
   'Invoice viewer should keep E-transfer visible as a manual payment option'
 );
 
@@ -24,6 +24,6 @@ assert(
 );
 
 assert(
-  !invoice.includes('payment-method-action'),
-  'E-transfer payment option should not render as a clickable action card'
+  invoice.includes('reportManualInvoicePayment') && invoice.includes("I've sent the e-transfer"),
+  'E-transfer should let the client report that payment was sent for contractor confirmation'
 );

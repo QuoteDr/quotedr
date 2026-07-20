@@ -17,6 +17,15 @@ verify_jwt = true
 [functions.stripe-deposit]
 verify_jwt = false
 
+[functions.stripe-connect]
+verify_jwt = true
+
+[functions.document-payment]
+verify_jwt = false
+
+[functions.client-document]
+verify_jwt = false
+
 [functions.stripe-webhook]
 verify_jwt = false
 

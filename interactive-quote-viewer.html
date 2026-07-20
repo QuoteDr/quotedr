@@ -1150,6 +1150,31 @@
             color: #64748b;
             font-size: 0.88rem;
         }
+        .deposit-method-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 0.75rem;
+            text-align: left;
+        }
+        .deposit-method-item {
+            border: 1px solid #dfe6ef;
+            border-radius: 8px;
+            padding: 0.9rem;
+            background: #fff;
+        }
+        .deposit-method-item .btn { margin-top: 0.65rem; }
+        .deposit-next-step {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            border-radius: 999px;
+            background: #e8f5ee;
+            color: #17633b;
+            font-weight: 700;
+            font-size: 0.82rem;
+            padding: 0.3rem 0.7rem;
+            margin-bottom: 0.75rem;
+        }
         .sticky-client-actions {
             position: fixed;
             left: 0;
@@ -1646,17 +1671,15 @@ if (location.search.includes('debug')) {
             </div>
         </div>
 
-        <!-- Stripe Deposit Payment Section -->
+        <!-- Deposit payment section: Stripe when ready, plus selected manual methods -->
         <div id="stripeDepositSection" style="display:none;" class="mt-4 mb-4">
-            <div class="card deposit-card border-0 p-4 text-center">
-                <h5 class="mb-3"><i class="fas fa-lock me-2 text-success"></i>Secure Your Project</h5>
-                <p class="text-muted mb-3" id="depositPromptText">Pay your deposit to confirm your project start date.</p>
-                <button id="payDepositBtn" class="btn btn-warning btn-lg px-5 mb-2" onclick="handleDepositPayment()">
-                    <i class="fas fa-credit-card me-2"></i><span id="depositBtnLabel">Pay Deposit</span>
-                </button>
-                <div class="secure-note mt-1"><i class="fab fa-stripe"></i>Secure payment powered by Stripe. Your remaining balance is due per the quote terms.</div>
-                <hr class="my-3">
-                <p class="text-muted small mb-0">Prefer to pay by e-transfer or cheque? Contact us directly.</p>
+            <div class="card deposit-card border-0 p-4 text-center" id="depositPaymentCard">
+                <div><span class="deposit-next-step"><i class="fas fa-arrow-right"></i><span id="depositNextStepLabel">Next step</span></span></div>
+                <h5 class="mb-2"><i class="fas fa-shield-halved me-2 text-success"></i><span id="depositSectionTitle">Secure Your Project</span></h5>
+                <p class="text-muted mb-3" id="depositPromptText">A deposit is required after you accept this quote.</p>
+                <div id="depositPaymentStatus" aria-live="polite"></div>
+                <div id="stripeDepositActions"></div>
+                <div id="manualDepositMethods"></div>
             </div>
         </div>
 
@@ -2034,75 +2057,68 @@ if (location.search.includes('debug')) {
             await loadQuoteFromURL();
             renderViewerDocument();
             startViewerBackgroundTasks();
-            showPaymentReturnNotice();
             showChangeOrderExplainer(false);
             printQuoteIfRequested();
         });
 
-        async function showPaymentReturnNotice() {
-            var params = new URLSearchParams(window.location.search);
-            if (params.get('payment') !== 'success') return;
-            var section = document.getElementById('stripeDepositSection');
-            if (!section) return;
-            section.style.display = 'block';
-            section.innerHTML = '<div class="alert alert-success mb-0"><i class="fas fa-spinner fa-spin me-1"></i>Confirming payment...</div>';
-            await syncCheckoutPaymentReturn(params);
-            section.innerHTML = '<div class="alert alert-success mb-0"><i class="fas fa-check-circle me-1"></i>Deposit received. Your contractor has been notified.</div>';
-            applyQuoteCompletionState();
+        var _documentPaymentState = null;
+
+        function applyClientDocumentPaymentState(payment) {
+            if (!payment) return false;
+            _documentPaymentState = payment;
+            if (payment.depositSecured || payment.fullPaid) {
+                quoteData.paymentStatus = payment.fullPaid ? 'paid' : 'partially_paid';
+                quoteData.deposit_paid = payment.depositSecured === true;
+                quoteData.deposit_paid_at = quoteData.deposit_paid_at || new Date().toISOString();
+            }
+            quoteData.manual_payment_reported = payment.status === 'client_reported';
+            if (payment.report) {
+                quoteData.manual_payment_report_id = payment.report.id || '';
+                quoteData.manual_payment_method = payment.report.method || '';
+                quoteData.manual_payment_reported_at = payment.report.reportedAt || '';
+            }
+            return payment.depositSecured === true || payment.fullPaid === true;
         }
 
-        async function syncCheckoutPaymentReturn(params) {
+        function secureDocumentPaymentPayload(action, extra) {
+            var params = new URLSearchParams(window.location.search);
+            return Object.assign({
+                action: action,
+                documentId: params.get('id') || '',
+                token: params.get('token') || '',
+                portalAnchorId: params.get('portal_anchor') || ''
+            }, extra || {});
+        }
+
+        async function showPaymentReturnNotice() {
+            var params = new URLSearchParams(window.location.search);
+            if (params.get('payment') !== 'success') return false;
             var sessionId = params.get('session_id');
-            var quoteId = params.get('id');
-            if (!sessionId || !quoteId) return;
+            if (!sessionId || typeof callDocumentPaymentFunction !== 'function') return false;
+            var notice = document.getElementById('depositPaymentStatus');
+            if (notice) notice.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin me-1"></i>Confirming your Stripe payment...</div>';
             try {
-                var resp = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/stripe-deposit', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'verify_checkout', sessionId: sessionId, quoteId: quoteId })
-                });
-                var result = await resp.json();
-                if (!resp.ok || !result.paid) return;
-                quoteData.paymentStatus = result.paymentType === 'invoice_full' ? 'paid' : 'partially_paid';
-                quoteData.deposit_paid = result.paymentType === 'deposit' ? true : quoteData.deposit_paid;
-                quoteData.deposit_paid_at = quoteData.deposit_paid_at || new Date().toISOString();
-                quoteData.payments = Array.isArray(quoteData.payments) ? quoteData.payments : [];
-                if (!quoteData.payments.some(function(payment) { return payment.stripe_checkout_session_id === sessionId; })) {
-                    quoteData.payments.push({
-                        type: result.paymentType || 'deposit',
-                        amount_cents: result.amountCents || 0,
-                        stripe_checkout_session_id: sessionId,
-                        paid_at: new Date().toISOString()
-                    });
-                }
+                var result = await callDocumentPaymentFunction(secureDocumentPaymentPayload('verify_checkout', { sessionId: sessionId }), false);
+                var secured = applyClientDocumentPaymentState(result.payment);
+                if (typeof renderDepositPaymentSection === 'function') renderDepositPaymentSection();
+                applyQuoteCompletionState();
+                if (!secured && notice) notice.innerHTML = '<div class="alert alert-warning"><strong>Stripe is still confirming this payment.</strong> Refresh in a moment before trying again.</div>';
+                return secured;
             } catch (error) {
                 console.warn('Could not sync payment return:', error);
+                if (notice) notice.innerHTML = '<div class="alert alert-warning"><strong>We are still confirming the Stripe payment.</strong> Refresh in a moment. Your manual payment options remain available below.</div>';
+                return false;
             }
         }
 
         async function reconcileQuotePaymentState(quoteId) {
-            if (!quoteId) return;
+            if (!quoteId || typeof callDocumentPaymentFunction !== 'function') return false;
             try {
-                var resp = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/stripe-deposit', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'reconcile_quote_payments', quoteId: quoteId })
-                });
-                var result = await resp.json();
-                if (!resp.ok || !result.paid) return;
-                quoteData.paymentStatus = result.paymentType === 'invoice_full' ? 'paid' : 'partially_paid';
-                quoteData.deposit_paid = result.paymentType === 'deposit' ? true : quoteData.deposit_paid;
-                quoteData.deposit_paid_at = quoteData.deposit_paid_at || new Date().toISOString();
-                quoteData.payments = Array.isArray(quoteData.payments) ? quoteData.payments : [];
-                if (result.amountCents && !quoteData.payments.some(function(payment) { return payment.type === result.paymentType && payment.amount_cents === result.amountCents; })) {
-                    quoteData.payments.push({
-                        type: result.paymentType || 'deposit',
-                        amount_cents: result.amountCents,
-                        paid_at: new Date().toISOString()
-                    });
-                }
+                var result = await callDocumentPaymentFunction(secureDocumentPaymentPayload('status'), false);
+                return applyClientDocumentPaymentState(result.payment);
             } catch (error) {
                 console.warn('Could not reconcile quote payment state:', error);
+                return false;
             }
         }
 
@@ -2116,7 +2132,7 @@ if (location.search.includes('debug')) {
             initPortalDocumentActivityTracking(quoteId, shareToken, portalAnchorId);
             var contractorId = window._quoteRow && window._quoteRow.user_id;
             var quoteTotal = quoteData.grandTotal || quoteData.total || 0;
-            if (contractorId && quoteTotal && resolveViewerDocumentStyle().depositMode !== 'hide') {
+            if (contractorId && quoteTotal) {
                 initPaymentSection(contractorId, quoteTotal);
             }
 
@@ -2140,6 +2156,7 @@ if (location.search.includes('debug')) {
             if (supabaseId && shareToken && typeof loadSecureClientDocument === 'function') {
                 const result = await loadSecureClientDocument(supabaseId, shareToken, portalAnchorId);
                 if (result && result.data && result.data.data) {
+                    window._securePaymentOptions = result.paymentOptions || null;
                     quoteData = result.data.data;
                     quoteData.id = result.data.id;
                     quoteData.status = result.data.status || quoteData.status || '';
@@ -4798,26 +4815,26 @@ if (location.search.includes('debug')) {
             }
 
             var depositSummary = document.getElementById('depositSummary');
-            var viewerStyle = resolveViewerDocumentStyle();
-            var depositMode = viewerStyle.depositMode || 'auto';
-            var depositPct = parseFloat(viewerStyle.depositPercent || 50);
-            if (!isFinite(depositPct) || depositPct <= 0) depositPct = 50;
-            depositPct = Math.min(depositPct, 100);
+            _quoteTotal = balanceDue;
+            _depositTerms = resolveQuoteDepositTerms();
             if (depositSummary) {
-                var showDeposit = depositMode === 'show';
+                var showDeposit = _depositTerms.deposit_required === true;
                 depositSummary.style.display = showDeposit ? 'block' : 'none';
                 if (showDeposit) {
                     var depositBasis = balanceDue;
-                    var depositAmt = depositBasis * depositPct / 100;
+                    var depositAmt = currentDepositAmountCents() / 100;
                     var remaining = Math.max(depositBasis - depositAmt, 0);
                     var labelEl = document.getElementById('depositLabel');
                     var amountEl = document.getElementById('depositAmountDisplay');
                     var remainingEl = document.getElementById('remainingBalanceDisplay');
-                    if (labelEl) labelEl.textContent = `Deposit (${depositPct.toFixed(0)}%)`;
+                    if (labelEl) labelEl.textContent = _depositTerms.kind === 'fixed'
+                        ? 'Deposit'
+                        : `Deposit (${Number(_depositTerms.percent || 50).toFixed(0)}%)`;
                     if (amountEl) amountEl.textContent = viewerMoney(depositAmt);
                     if (remainingEl) remainingEl.textContent = viewerMoney(remaining);
                 }
             }
+            if (_paymentOptions) renderDepositPaymentSection();
             if (isChangeOrder) {
                 var coTotals = computeViewerChangeOrderTotals();
                 var upgradesElCo = document.getElementById('upgradesTotalDisplay');
@@ -4985,7 +5002,8 @@ if (location.search.includes('debug')) {
 
         function quoteDepositIsPaid() {
             var payments = Array.isArray(quoteData.payments) ? quoteData.payments : [];
-            return quoteData.deposit_paid === true
+            return !!(_documentPaymentState && (_documentPaymentState.depositSecured || _documentPaymentState.fullPaid))
+                || quoteData.deposit_paid === true
                 || ['partially_paid', 'paid'].includes(String(quoteData.paymentStatus || '').toLowerCase())
                 || payments.some(function(payment) { return ['deposit', 'invoice_deposit'].includes(payment.type) && payment.paid_at; });
         }
@@ -5011,19 +5029,13 @@ if (location.search.includes('debug')) {
             var stickyActions = document.getElementById('stickyClientActions');
             if (stickyActions) stickyActions.style.display = 'none';
 
-            if (quoteDepositIsPaid()) {
-                var depSection = document.getElementById('stripeDepositSection');
-                if (depSection) {
-                    depSection.style.display = 'block';
-                    depSection.innerHTML = '<div class="alert alert-success mb-0"><i class="fas fa-check-circle me-1"></i>Deposit received. Your project is secured.</div>';
-                }
-            }
+            if (typeof renderDepositPaymentSection === 'function') renderDepositPaymentSection();
         }
 
         function scrollToPostApprovalActions() {
             var approveSection = document.getElementById('approveSection');
             var depositSection = document.getElementById('stripeDepositSection');
-            var target = approveSection && approveSection.style.display !== 'none' ? approveSection : depositSection;
+            var target = depositSection && depositSection.style.display !== 'none' ? depositSection : approveSection;
             if (!target) return;
             setTimeout(function() {
                 target.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -5415,10 +5427,8 @@ if (location.search.includes('debug')) {
                 if (stickyActions) stickyActions.style.display = 'none';
                 closeSignatureModal();
 
-                var depSection = document.getElementById('stripeDepositSection');
-                if (depSection && _paymentSettings && _paymentSettings.stripe_enabled && _paymentSettings.accept_deposit) {
-                    depSection.style.display = 'block';
-                }
+                if (typeof reconcileQuotePaymentState === 'function') await reconcileQuotePaymentState(quoteId);
+                if (typeof renderDepositPaymentSection === 'function') renderDepositPaymentSection();
 
                 if (signatureUrl) {
                     qdToast({ title: 'Quote Accepted', message: 'Signature saved securely.', type: 'success' });
@@ -5549,37 +5559,160 @@ if (location.search.includes('debug')) {
 
         // ── Stripe Deposit Payment ───────────────────────────────────────
         var _paymentSettings = null;
+        var _paymentOptions = null;
+        var _depositTerms = null;
         var _quoteTotal = 0;
 
         async function loadContractorPaymentSettings(contractorUserId) {
-            try {
-                if (quoteData && quoteData.paymentSettings) return quoteData.paymentSettings;
-                var sb = window._supabaseClient;
-                if (!sb || !contractorUserId) return null;
-                var result = await sb.from('user_data').select('value').eq('user_id', contractorUserId).eq('key', 'payment_settings').maybeSingle();
-                return (result.data && result.data.value) ? result.data.value : null;
-            } catch(e) { return null; }
+            if (window._securePaymentOptions) return window._securePaymentOptions;
+            var legacy = quoteData && quoteData.paymentSettings;
+            if (!legacy) return null;
+            return {
+                version: 1,
+                deposit: {
+                    enabled: legacy.accept_deposit !== false,
+                    defaultKind: legacy.deposit_default_kind === 'fixed' ? 'fixed' : 'percent',
+                    defaultPercent: Number(legacy.deposit_default_pct || 50),
+                    defaultFixedCents: Number(legacy.deposit_default_fixed_cents || 0)
+                },
+                stripe: { enabled: legacy.stripe_enabled === true, ready: legacy.stripe_enabled === true },
+                manual: {
+                    etransfer: { enabled: legacy.accept_etransfer !== false, email: legacy.etransfer_email || '' },
+                    cheque: { enabled: legacy.accept_cheque !== false, payee: legacy.cheque_payee || '' },
+                    cash: { enabled: legacy.accept_cash !== false },
+                    instructions: legacy.payment_instructions || ''
+                }
+            };
+        }
+
+        function resolveQuoteDepositTerms() {
+            var explicit = quoteData.payment_terms || quoteData.paymentTerms;
+            if (explicit && Number(explicit.version || 0) >= 2) {
+                var explicitRequired = explicit.deposit_required !== false && explicit.kind !== 'none';
+                var explicitFixedCents = Math.max(0, Math.round(Number(explicit.fixed_cents || 0)));
+                var explicitKind = explicit.kind === 'fixed' && explicitFixedCents > 0 ? 'fixed' : (explicitRequired ? 'percent' : 'none');
+                return {
+                    deposit_required: explicitRequired,
+                    kind: explicitKind,
+                    percent: Number(explicit.percent || 50),
+                    fixed_cents: explicitKind === 'fixed' ? explicitFixedCents : 0
+                };
+            }
+            var style = resolveViewerDocumentStyle();
+            var mode = style.depositMode || 'auto';
+            if (mode === 'hide' || (_paymentOptions && _paymentOptions.deposit && _paymentOptions.deposit.enabled === false)) {
+                return { deposit_required: false, kind: 'none', percent: 0, fixed_cents: 0 };
+            }
+            var defaults = _paymentOptions && _paymentOptions.deposit ? _paymentOptions.deposit : {};
+            var requestedKind = mode === 'show'
+                ? (style.depositKind === 'fixed' ? 'fixed' : 'percent')
+                : (defaults.defaultKind === 'fixed' ? 'fixed' : 'percent');
+            var fixedCents = Math.max(0, Math.round(Number(mode === 'show' ? style.depositFixedCents : defaults.defaultFixedCents) || 0));
+            var kind = requestedKind === 'fixed' && fixedCents > 0 ? 'fixed' : 'percent';
+            return {
+                deposit_required: true,
+                kind: kind,
+                percent: Math.min(100, Math.max(1, Number(mode === 'show' ? style.depositPercent : defaults.defaultPercent) || 50)),
+                fixed_cents: kind === 'fixed' ? fixedCents : 0
+            };
+        }
+
+        function currentDepositAmountCents() {
+            if (_documentPaymentState && Number(_documentPaymentState.depositDueCents || 0) > 0) {
+                return Math.round(Number(_documentPaymentState.depositDueCents));
+            }
+            var totalCents = Math.max(0, Math.round(Number(quoteData.accepted_total_cents || quoteData.quoted_total_cents || _quoteTotal * 100 || 0)));
+            var terms = _depositTerms || resolveQuoteDepositTerms();
+            if (!terms.deposit_required || !totalCents) return 0;
+            if (terms.kind === 'fixed') return Math.min(totalCents, Math.max(0, Math.round(Number(terms.fixed_cents || 0))));
+            return Math.min(totalCents, Math.max(1, Math.round(totalCents * Number(terms.percent || 50) / 100)));
+        }
+
+        function depositManualMethodMarkup(method, title, details, icon) {
+            var actionText = method === 'etransfer' ? "I've sent the e-transfer" : (method === 'cheque' ? "I've arranged the cheque" : "I've arranged the cash payment");
+            var copyButton = method === 'etransfer' || method === 'cheque'
+                ? '<button type="button" class="btn btn-sm btn-outline-secondary me-2" onclick="copyDepositPaymentText(\'' + method + '\')"><i class="fas fa-copy me-1"></i>Copy details</button>'
+                : '';
+            return '<div class="deposit-method-item">' +
+                '<div class="fw-semibold"><i class="' + icon + ' me-1 text-primary"></i>' + escapeHtml(title) + '</div>' +
+                '<div class="small text-muted mt-1">' + details + '</div>' +
+                '<div>' + copyButton + '<button type="button" class="btn btn-sm btn-outline-primary" onclick="reportManualDeposit(\'' + method + '\')">' + escapeHtml(actionText) + '</button></div>' +
+                '</div>';
+        }
+
+        function renderDepositPaymentSection() {
+            var section = document.getElementById('stripeDepositSection');
+            if (!section) return;
+            _depositTerms = resolveQuoteDepositTerms();
+            if (!_depositTerms.deposit_required || !quoteIsAccepted()) {
+                section.style.display = 'none';
+                return;
+            }
+            section.style.display = 'block';
+            var amountCents = currentDepositAmountCents();
+            var amountText = viewerMoney(amountCents / 100);
+            var title = document.getElementById('depositSectionTitle');
+            var prompt = document.getElementById('depositPromptText');
+            var status = document.getElementById('depositPaymentStatus');
+            var stripeActions = document.getElementById('stripeDepositActions');
+            var manualMethods = document.getElementById('manualDepositMethods');
+            if (!title || !prompt || !status || !stripeActions || !manualMethods) return;
+
+            if (quoteDepositIsPaid()) {
+                title.textContent = 'Project Secured';
+                prompt.textContent = 'Your deposit has been received and confirmed.';
+                status.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle me-1"></i><strong>Deposit received.</strong> Your contractor can now move ahead with scheduling.</div>';
+                stripeActions.innerHTML = '';
+                manualMethods.innerHTML = '';
+                return;
+            }
+
+            title.textContent = 'Secure Your Project';
+            prompt.textContent = 'Send the ' + amountText + ' deposit to lock in this accepted quote.';
+            if (_documentPaymentState && _documentPaymentState.status === 'client_reported') {
+                status.innerHTML = '<div class="alert alert-warning"><i class="fas fa-clock me-1"></i><strong>Payment reported.</strong> Your contractor will confirm it after it arrives.</div>';
+                stripeActions.innerHTML = '';
+                manualMethods.innerHTML = '';
+                return;
+            }
+            status.innerHTML = '';
+
+            var stripe = _paymentOptions && _paymentOptions.stripe ? _paymentOptions.stripe : {};
+            if (stripe.ready) {
+                stripeActions.innerHTML = '<button id="payDepositBtn" class="btn btn-warning btn-lg w-100 mb-3" onclick="handleDepositPayment()"><i class="fas fa-credit-card me-2"></i><span id="depositBtnLabel">Pay ' + escapeHtml(amountText) + ' securely by card</span></button><div class="small text-muted mb-3"><i class="fab fa-stripe me-1"></i>Secure checkout powered by Stripe.</div>';
+            } else {
+                stripeActions.innerHTML = stripe.enabled
+                    ? '<div class="alert alert-light border small text-start"><i class="fas fa-credit-card me-1"></i>Card payment is temporarily unavailable. You can still use any method below.</div>'
+                    : '';
+            }
+
+            var manual = _paymentOptions && _paymentOptions.manual ? _paymentOptions.manual : {};
+            var methods = [];
+            if (manual.etransfer && manual.etransfer.enabled) {
+                var emailText = manual.etransfer.email ? '<strong>' + escapeHtml(manual.etransfer.email) + '</strong>' : 'Contact your contractor for the e-transfer email.';
+                methods.push(depositManualMethodMarkup('etransfer', 'E-transfer', 'Send ' + escapeHtml(amountText) + ' to ' + emailText + '.', 'fas fa-envelope'));
+            }
+            if (manual.cheque && manual.cheque.enabled) {
+                var payeeText = manual.cheque.payee ? 'Payable to <strong>' + escapeHtml(manual.cheque.payee) + '</strong>.' : 'Contact your contractor for cheque details.';
+                methods.push(depositManualMethodMarkup('cheque', 'Cheque', payeeText, 'fas fa-money-check'));
+            }
+            if (manual.cash && manual.cash.enabled) {
+                methods.push(depositManualMethodMarkup('cash', 'Cash', 'Arrange delivery directly with your contractor.', 'fas fa-money-bill-wave'));
+            }
+            var instructions = String(manual.instructions || '').trim();
+            manualMethods.innerHTML = methods.length
+                ? '<div class="small fw-semibold text-muted mb-2">Or pay directly</div><div class="deposit-method-list">' + methods.join('') + '</div>' + (instructions ? '<div class="small text-muted text-start mt-3"><strong>Payment instructions:</strong> ' + escapeHtml(instructions).replace(/\n/g, '<br>') + '</div>' : '')
+                : '<div class="alert alert-light border mb-0">Contact your contractor to arrange the deposit.</div>';
         }
 
         async function initPaymentSection(contractorUserId, total) {
-            _quoteTotal = total || 0;
-            if (!contractorUserId || !total) return;
-            if (quoteDepositIsPaid()) {
-                applyQuoteCompletionState();
-                return;
-            }
-            if (new URLSearchParams(window.location.search).get('payment') === 'success') {
-                showPaymentReturnNotice();
-                return;
-            }
-            _paymentSettings = await loadContractorPaymentSettings(contractorUserId);
-            if (!_paymentSettings || !_paymentSettings.stripe_enabled || !_paymentSettings.accept_deposit) return;
-            var pct = _paymentSettings.deposit_default_pct || 50;
-            var depositAmt = total * pct / 100;
-            var depositText = viewerMoney(depositAmt);
-            document.getElementById('depositBtnLabel').textContent = 'Pay ' + pct + '% Deposit \u2014 ' + depositText;
-            document.getElementById('depositPromptText').textContent = 'A ' + pct + '% deposit (' + depositText + ') is required to confirm your project.';
-            document.getElementById('stripeDepositSection').style.display = 'block';
+            _quoteTotal = Number(total || 0);
+            if (!contractorUserId || !_quoteTotal) return;
+            _paymentOptions = await loadContractorPaymentSettings(contractorUserId);
+            _paymentSettings = _paymentOptions;
+            _depositTerms = resolveQuoteDepositTerms();
+            renderDepositPaymentSection();
+            if (new URLSearchParams(window.location.search).get('payment') === 'success') await showPaymentReturnNotice();
         }
 
         async function handleDepositPayment() {
@@ -5587,43 +5720,71 @@ if (location.search.includes('debug')) {
                 qdAlert('Payments are disabled inside the contractor preview.');
                 return;
             }
-            if (!_paymentSettings || !_quoteTotal) return;
-            logPortalDocumentActivity('payment_clicked', { metadata: { payment_type: 'deposit' } });
-            var pct = _paymentSettings.deposit_default_pct || 50;
-            var depositAmt = Math.round(_quoteTotal * pct / 100 * 100); // cents
-            var urlParams = new URLSearchParams(window.location.search);
-            var quoteId = urlParams.get('id');
+            if (typeof callDocumentPaymentFunction !== 'function' || !quoteIsAccepted()) return;
+            logPortalDocumentActivity('payment_clicked', { metadata: { payment_type: 'deposit', method: 'card' } });
+            var params = new URLSearchParams(window.location.search);
+            var quoteId = params.get('id') || '';
+            var amountCents = currentDepositAmountCents();
+            var operationEntity = quoteId + ':deposit:' + amountCents;
             var btn = document.getElementById('payDepositBtn');
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Redirecting to Stripe...';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Opening secure checkout...';
+            }
             try {
-                var depositOperationEntity = quoteId + ':deposit:' + depositAmt;
-                var depositOperationId = qdGetExternalOperationId('stripe_checkout', depositOperationEntity);
-                var resp = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/stripe-deposit', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        amount: depositAmt,
-                        currency: 'cad',
-                        quoteId: quoteId,
-                        paymentType: 'deposit',
-                        clientEmail: quoteData.clientEmail || quoteData.email || '',
-                        description: 'Project Deposit — Quote #' + (quoteData.quoteNumber || quoteId),
-                        successUrl: window.location.href.split('#')[0].replace(/[?&]payment=[^&]*/g, ''),
-                        cancelUrl: window.location.href.split('#')[0],
-                        idempotencyKey: depositOperationId
-                    })
-                });
-                var data = await resp.json();
-                if (data.url) {
-                    qdCompleteExternalOperation('stripe_checkout', depositOperationEntity);
-                    window.location.href = data.url;
+                var result = await callDocumentPaymentFunction(secureDocumentPaymentPayload('create_checkout', {
+                    paymentType: 'deposit',
+                    returnUrl: window.location.href,
+                    idempotencyKey: qdGetExternalOperationId('stripe_checkout', operationEntity)
+                }), false);
+                if (!result.url) throw new Error('Secure checkout did not return a payment link.');
+                window.location.href = result.url;
+            } catch(error) {
+                var status = document.getElementById('depositPaymentStatus');
+                if (status) status.innerHTML = '<div class="alert alert-warning text-start"><strong>Card payment could not be opened.</strong> ' + escapeHtml(error.message || 'Try again or choose a direct payment method below.') + '</div>';
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-credit-card me-2"></i><span id="depositBtnLabel">Pay ' + escapeHtml(viewerMoney(amountCents / 100)) + ' securely by card</span>';
                 }
-                else { throw new Error(data.error || 'Payment failed'); }
-            } catch(e) {
-                qdAlert('Payment error: ' + e.message);
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-credit-card me-2"></i><span id="depositBtnLabel">Pay Deposit</span>';
+            }
+        }
+
+        async function reportManualDeposit(method) {
+            if (isContractorPreviewView() || typeof callDocumentPaymentFunction !== 'function') return;
+            var label = method === 'etransfer' ? 'e-transfer' : method;
+            var confirmed = typeof qdConfirm === 'function'
+                ? await qdConfirm('Report that you have sent or arranged this ' + label + ' deposit? Your contractor will verify it before the project is marked secured.', { title: 'Report Deposit', okText: 'Report payment', okClass: 'btn-primary' })
+                : window.confirm('Report this deposit to your contractor?');
+            if (!confirmed) return;
+            var params = new URLSearchParams(window.location.search);
+            var quoteId = params.get('id') || '';
+            var operationEntity = quoteId + ':deposit:' + method + ':' + currentDepositAmountCents();
+            try {
+                var result = await callDocumentPaymentFunction(secureDocumentPaymentPayload('report_manual', {
+                    paymentType: 'deposit',
+                    method: method,
+                    idempotencyKey: qdGetExternalOperationId('manual_payment_report', operationEntity)
+                }), false);
+                applyClientDocumentPaymentState(result.payment);
+                qdCompleteExternalOperation('manual_payment_report', operationEntity);
+                logPortalDocumentActivity('payment_reported', { metadata: { payment_type: 'deposit', method: method } });
+                renderDepositPaymentSection();
+            } catch(error) {
+                qdAlert('Could not report the deposit: ' + (error.message || 'Please try again.'));
+            }
+        }
+
+        async function copyDepositPaymentText(method) {
+            var manual = _paymentOptions && _paymentOptions.manual ? _paymentOptions.manual : {};
+            var value = method === 'etransfer'
+                ? String(manual.etransfer && manual.etransfer.email || '')
+                : String(manual.cheque && manual.cheque.payee || '');
+            if (!value) return;
+            try {
+                await navigator.clipboard.writeText(value);
+                qdToast({ title: 'Copied', message: value, type: 'success' });
+            } catch(error) {
+                qdAlert(value);
             }
         }
 
