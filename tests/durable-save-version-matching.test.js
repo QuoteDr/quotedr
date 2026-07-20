@@ -248,7 +248,7 @@ assert(
   }
   if (html.includes('save-coordinator.js')) {
     const coordinatorVersion = html.match(/save-coordinator\.js\?v=(\d+)/);
-    assert(coordinatorVersion && Number(coordinatorVersion[1]) >= 2026071502, `${file} should load the fixed save coordinator`);
+    assert(coordinatorVersion && Number(coordinatorVersion[1]) >= 2026071902, `${file} should load the auto-dismissing save coordinator`);
   }
 });
 

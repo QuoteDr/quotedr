@@ -90,6 +90,53 @@ assert(
 );
 
 assert(
+  coordinator.includes('var SUCCESS_INDICATOR_MS = 3500;') &&
+    coordinator.includes('button.hidden = false;') &&
+    coordinator.includes("var cloudAckKey = String(status.lastCloudAckAt || 'no-cloud-ack');") &&
+    coordinator.includes('button.hidden && cloudAckKey === lastShownCloudAckAt') &&
+    coordinator.includes('currentButton.hidden = true;'),
+  'Successful cloud-save status should auto-dismiss once per acknowledgement while later attention states can show the indicator again'
+);
+
+const indicatorStart = coordinator.indexOf('    function updateIndicator(status) {');
+const indicatorEnd = coordinator.indexOf('\n    async function openRecoveryCenter()', indicatorStart);
+const indicatorSource = coordinator.slice(indicatorStart, indicatorEnd);
+const indicatorClasses = new Set();
+const indicatorButton = {
+  hidden: false,
+  innerHTML: '',
+  classList: {
+    add: (...names) => names.forEach(name => indicatorClasses.add(name)),
+    remove: (...names) => names.forEach(name => indicatorClasses.delete(name))
+  }
+};
+let scheduledIndicator = null;
+const updateIndicator = new Function('ensureUi', 'document', 'clearTimeout', 'setTimeout', `
+  var SUCCESS_INDICATOR_MS = 3500;
+  var saveIndicatorHideTimer = null;
+  var lastShownCloudAckAt = null;
+  ${indicatorSource}
+  return updateIndicator;
+`)(
+  () => {},
+  { getElementById: id => id === 'qdSaveSyncButton' ? indicatorButton : null },
+  () => { scheduledIndicator = null; },
+  (callback, delay) => { scheduledIndicator = { callback, delay }; return 1; }
+);
+
+updateIndicator({ state: 'cloud_saved', pendingCount: 0, conflictCount: 0, lastLocalFailure: null, lastCloudAckAt: 'ack-1' });
+assert.strictEqual(scheduledIndicator.delay, 3500, 'Successful saves should remain visible briefly');
+scheduledIndicator.callback();
+assert.strictEqual(indicatorButton.hidden, true, 'Successful saves should disappear after the delay');
+scheduledIndicator = null;
+updateIndicator({ state: 'cloud_saved', pendingCount: 0, conflictCount: 0, lastLocalFailure: null, lastCloudAckAt: 'ack-1' });
+assert.strictEqual(indicatorButton.hidden, true, 'Routine checks must not redisplay an already acknowledged save');
+assert.strictEqual(scheduledIndicator, null, 'Routine checks must not schedule another success notice');
+updateIndicator({ state: 'conflict', pendingCount: 1, conflictCount: 1, lastLocalFailure: null, lastCloudAckAt: 'ack-1' });
+assert.strictEqual(indicatorButton.hidden, false, 'A save conflict must restore the indicator');
+assert(indicatorClasses.has('qd-sync-error'), 'A save conflict must remain styled as an attention state');
+
+assert(
   supabase.includes('window.QuoteDrSave.registerAdapter(entityType') &&
     supabase.includes('async function qdDurableSupabaseOperation') &&
     supabase.includes("throw new Error('Cloud save matched no records") &&
