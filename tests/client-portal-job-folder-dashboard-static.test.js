@@ -42,6 +42,19 @@ assert(
 );
 
 assert(
+  portal.includes('.portal-layout-client-os .portal-side-filter-nav > button.active') &&
+    !portal.includes('.portal-layout-client-os .portal-side-filter-nav button.active {'),
+  'Client OS active filter styling should not catch nested job folder buttons'
+);
+
+assert(
+  /\.portal-job-folder-item\.active\s*\{[^}]*background:\s*#eef6ff;[^}]*box-shadow:\s*inset 3px 0 0 var\(--portal-accent-color, #12579c\)/s.test(portal) &&
+    portal.includes('.portal-job-folder-item.active .portal-job-folder-title') &&
+    portal.includes('color: var(--portal-accent-color, #12579c) !important;'),
+  'Active job folder items should use the same light blue treatment as the create folder control'
+);
+
+assert(
   portal.includes('portalJobFolderMode') && portal.includes('portalJobFolderId'),
   'Job folder modal should track create vs edit state'
 );
