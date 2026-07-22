@@ -1413,7 +1413,7 @@
       font-size: 1rem;
     }
 
-    .portal-layout-client-os .portal-side-filter-nav button.active {
+    .portal-layout-client-os .portal-side-filter-nav > button.active {
       color: #fff;
       border-color: var(--client-os-blue);
       background: var(--client-os-blue);
@@ -1492,8 +1492,14 @@
     }
 
     .portal-job-folder-item.active {
-      border-color: var(--portal-accent-color, #12579c);
+      border-color: rgba(15, 79, 148, 0.22);
+      background: #eef6ff;
       box-shadow: inset 3px 0 0 var(--portal-accent-color, #12579c);
+    }
+
+    .portal-job-folder-item.active .portal-job-folder-title,
+    .portal-job-folder-item.active .portal-job-folder-meta {
+      color: var(--portal-accent-color, #12579c) !important;
     }
 
     .portal-job-folder-title {
