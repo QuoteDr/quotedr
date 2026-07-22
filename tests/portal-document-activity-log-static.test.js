@@ -53,6 +53,8 @@ assert(portalSource.includes('Activity'), 'client portal should render an admin 
 assert(portalSource.includes('loadPortalDocumentActivity'), 'client portal should lazy-load document activity');
 assert(portalSource.includes('renderPortalDocumentActivityPanel'), 'client portal should render activity panels');
 assert(portalSource.includes('portalDocumentActivitySummary'), 'client portal should summarize activity');
+assert(portalSource.includes('portalDocumentActivityTimeline'), 'client portal should combine heartbeat durations into viewing sessions');
+assert(portalSource.includes('view.duration_seconds +='), 'viewing sessions should accumulate duration heartbeat seconds');
 assert(portalSource.includes('For security and service quality, document access may be logged.'), 'client portal should show the client logging notice');
 assert(portalSource.includes('pdf_opened'), 'portal PDF sharing flow should log PDF opens');
 

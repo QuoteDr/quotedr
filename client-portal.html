@@ -4529,6 +4529,60 @@
       };
     }
 
+    function portalDocumentActivityTimeline(events) {
+      const chronological = (Array.isArray(events) ? events : []).map(function(event, index) {
+        return { event: event, index: index };
+      }).sort(function(a, b) {
+        const aTime = new Date(a.event?.created_at || 0).getTime() || 0;
+        const bTime = new Date(b.event?.created_at || 0).getTime() || 0;
+        if (aTime !== bTime) return aTime - bTime;
+        if (a.event?.event_type === 'document_opened' && b.event?.event_type !== 'document_opened') return -1;
+        if (b.event?.event_type === 'document_opened' && a.event?.event_type !== 'document_opened') return 1;
+        return b.index - a.index;
+      });
+      const timeline = [];
+      const activeViews = new Map();
+
+      chronological.forEach(function(entry) {
+        const event = entry.event || {};
+        const type = event.event_type || '';
+        const sessionKey = String(event.session_id || '').trim() || ('event-' + (event.id || entry.index));
+        if (type === 'document_opened') {
+          const view = Object.assign({}, event, {
+            _portalActivityView: true,
+            duration_seconds: 0
+          });
+          activeViews.set(sessionKey, view);
+          timeline.push(view);
+          return;
+        }
+        if (type === 'document_view_duration') {
+          let view = activeViews.get(sessionKey);
+          if (!view) {
+            view = Object.assign({}, event, {
+              _portalActivityView: true,
+              duration_seconds: 0
+            });
+            activeViews.set(sessionKey, view);
+            timeline.push(view);
+          }
+          view.duration_seconds += Math.max(0, parseInt(event.duration_seconds || 0, 10) || 0);
+          return;
+        }
+        timeline.push(event);
+      });
+
+      timeline.forEach(function(event) {
+        if (!event._portalActivityView) return;
+        event.event_type = event.duration_seconds > 0 ? 'document_view_duration' : 'document_opened';
+      });
+      return timeline.sort(function(a, b) {
+        const aTime = new Date(a?.created_at || 0).getTime() || 0;
+        const bTime = new Date(b?.created_at || 0).getTime() || 0;
+        return bTime - aTime;
+      });
+    }
+
     async function loadPortalDocumentActivity(documentId) {
       if (!portalIsAdminView || !documentId) return [];
       if (portalDocumentActivityCache[documentId]) return portalDocumentActivityCache[documentId];
@@ -4549,7 +4603,7 @@
       const panel = document.getElementById('portalActivityPanel-' + documentId);
       if (!panel) return;
       const summary = portalDocumentActivitySummary(events);
-      const timeline = (events || []).slice(0, 40).map(function(event) {
+      const timeline = portalDocumentActivityTimeline(events).slice(0, 40).map(function(event) {
         return '<li><i class="fas ' + portalActivityEventIcon(event) + '"></i><div><strong>' + escapeHtml(portalActivityEventLabel(event)) + '</strong><div class="text-muted">' + escapeHtml(formatPortalActivityDate(event.created_at)) + '</div></div></li>';
       }).join('');
       panel.innerHTML = '<div class="portal-activity-summary">' +
