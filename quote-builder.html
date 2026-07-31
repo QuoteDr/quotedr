@@ -938,6 +938,31 @@
         }
         .cat-drag-handle:hover { opacity: 1; }
         .cat-group-header { user-select: none; }
+        .quote-category-name-button {
+            align-items: center;
+            appearance: none;
+            background: transparent;
+            border: 0;
+            color: inherit;
+            cursor: pointer;
+            display: inline-flex;
+            font: inherit;
+            gap: 2px;
+            letter-spacing: inherit;
+            padding: 1px 3px;
+            text-transform: inherit;
+        }
+        .quote-category-name-button:hover,
+        .quote-category-name-button:focus-visible {
+            background: rgba(255, 255, 255, 0.55);
+            border-radius: 4px;
+            outline: 1px solid currentColor;
+        }
+        .quote-category-name-button .quote-category-edit-icon {
+            font-size: 0.72rem;
+            margin-left: 5px;
+            opacity: 0.65;
+        }
         .cat-group-block.sortable-ghost { opacity: 0.3; background: #e8eeff; }
         .line-item-drag-handle {
             align-items: center;
@@ -2655,6 +2680,33 @@ if (location.search.includes('debug')) {
                         <i class="fas fa-ban me-1"></i>Clear
                     </button>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quote Category Picker Modal -->
+    <div class="modal fade" id="quoteCategoryPickerModal" tabindex="-1" aria-hidden="true" data-enter-submit="#applyQuoteCategoryBtn">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-tags me-2 text-primary"></i>Change Category</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="small text-muted mb-3" id="quoteCategoryPickerContext"></div>
+                    <label class="form-label fw-semibold" for="quoteCategoryPickerSelect">Choose one of your saved categories</label>
+                    <select class="form-select" id="quoteCategoryPickerSelect"></select>
+                    <div class="small text-muted mt-2">Every line item under this category heading will move to the selected category.</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-primary me-auto" onclick="createAndAssignQuoteCategory()">
+                        <i class="fas fa-plus me-1"></i>Create New Category
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="applyQuoteCategoryBtn" onclick="confirmQuoteCategoryChange()">
+                        <i class="fas fa-check me-1"></i>Apply Category
+                    </button>
                 </div>
             </div>
         </div>
@@ -10036,6 +10088,127 @@ Example:
             }, []);
             finishRoomBulkItemAction('Deleted ' + selectedIndexes.length + ' line item' + (selectedIndexes.length === 1 ? '' : 's') + '.');
         }
+        var activeQuoteCategoryChange = null;
+
+        function replaceQuoteCategoryOrder(room, oldCategory, newCategory) {
+            if (!room || !Array.isArray(room.categoryOrder)) return;
+            var seen = Object.create(null);
+            room.categoryOrder = room.categoryOrder.reduce(function(nextOrder, category) {
+                var nextCategory = category === oldCategory ? newCategory : category;
+                if (!nextCategory || seen[nextCategory]) return nextOrder;
+                seen[nextCategory] = true;
+                nextOrder.push(nextCategory);
+                return nextOrder;
+            }, []);
+        }
+
+        function reassignQuoteCategory(roomId, oldCategory, newCategory) {
+            var room = quoteBuilderRoomById(roomId);
+            var oldName = String(oldCategory || '').trim();
+            var newName = String(newCategory || '').trim();
+            if (!room || !oldName || !newName || oldName === newName) return false;
+            var matchingItems = (room.items || []).filter(function(item) {
+                return String((item && item.category) || 'Miscellaneous') === oldName;
+            });
+            if (!matchingItems.length) return false;
+            _pushUndo();
+            matchingItems.forEach(function(item) {
+                item.category = newName;
+                if (quoteBuilderIsChangeOrderMode() && item._coOriginal && typeof coRefreshItemDelta === 'function') {
+                    coRefreshItemDelta(item, room);
+                }
+            });
+            replaceQuoteCategoryOrder(room, oldName, newName);
+            finishRoomBulkItemAction('Moved ' + matchingItems.length + ' line item' + (matchingItems.length === 1 ? '' : 's') + ' to ' + newName + '.');
+            return true;
+        }
+
+        function getQuoteCategoryPickerCategories(currentCategory) {
+            var hiddenCategories = [];
+            try {
+                hiddenCategories = JSON.parse(localStorage.getItem('ald_hidden_categories') || '[]');
+            } catch(e) {
+                hiddenCategories = [];
+            }
+            var hiddenLookup = new Set(hiddenCategories.map(function(category) {
+                return String(category).toLowerCase();
+            }));
+            var categories = Object.keys(pricingDatabase || {}).filter(function(category) {
+                return !hiddenLookup.has(String(category).toLowerCase());
+            });
+            if (currentCategory && !categories.some(function(category) {
+                return String(category).toLowerCase() === String(currentCategory).toLowerCase();
+            })) {
+                categories.push(currentCategory);
+            }
+            return categories.sort(function(a, b) {
+                return String(a).localeCompare(String(b));
+            });
+        }
+
+        function populateQuoteCategoryPicker(selectedCategory) {
+            var select = document.getElementById('quoteCategoryPickerSelect');
+            if (!select) return;
+            var categories = getQuoteCategoryPickerCategories(selectedCategory);
+            var selectedMatch = categories.find(function(category) {
+                return String(category).toLowerCase() === String(selectedCategory || '').toLowerCase();
+            }) || selectedCategory;
+            select.innerHTML = categories.map(function(category) {
+                var isQuoteOnly = !Object.prototype.hasOwnProperty.call(pricingDatabase || {}, category);
+                var label = category + (isQuoteOnly ? ' (current quote)' : '');
+                return '<option value="' + qdTemplateEscapeHtml(category) + '">' + qdTemplateEscapeHtml(label) + '</option>';
+            }).join('');
+            if (selectedMatch) select.value = selectedMatch;
+        }
+
+        function openQuoteCategoryPicker(button) {
+            if (!button) return;
+            var room = quoteBuilderRoomById(button.dataset.roomId);
+            var oldCategory = String(button.dataset.category || '').trim();
+            if (!room || !oldCategory) return;
+            activeQuoteCategoryChange = {
+                roomId: room.id,
+                oldCategory: oldCategory
+            };
+            var itemCount = (room.items || []).filter(function(item) {
+                return String((item && item.category) || 'Miscellaneous') === oldCategory;
+            }).length;
+            var context = document.getElementById('quoteCategoryPickerContext');
+            if (context) {
+                context.textContent = oldCategory + ' in ' + (room.name || getQuoteDividerLabels().singular) + ' contains ' + itemCount + ' line item' + (itemCount === 1 ? '' : 's') + '.';
+            }
+            populateQuoteCategoryPicker(oldCategory);
+            var modalEl = document.getElementById('quoteCategoryPickerModal');
+            if (modalEl && window.bootstrap && bootstrap.Modal) {
+                bootstrap.Modal.getOrCreateInstance(modalEl).show();
+            }
+        }
+
+        function closeQuoteCategoryPicker() {
+            var modalEl = document.getElementById('quoteCategoryPickerModal');
+            if (modalEl && window.bootstrap && bootstrap.Modal) {
+                bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+            }
+            activeQuoteCategoryChange = null;
+        }
+
+        async function confirmQuoteCategoryChange() {
+            var select = document.getElementById('quoteCategoryPickerSelect');
+            if (!activeQuoteCategoryChange || !select || !select.value) return;
+            reassignQuoteCategory(activeQuoteCategoryChange.roomId, activeQuoteCategoryChange.oldCategory, select.value);
+            closeQuoteCategoryPicker();
+        }
+
+        async function createAndAssignQuoteCategory() {
+            if (!activeQuoteCategoryChange || typeof window.addNewCategory !== 'function') {
+                await qdAlert('Category creation is unavailable. Refresh the page and try again.');
+                return;
+            }
+            var createdCategory = await window.addNewCategory();
+            if (!createdCategory || !activeQuoteCategoryChange) return;
+            reassignQuoteCategory(activeQuoteCategoryChange.roomId, activeQuoteCategoryChange.oldCategory, createdCategory);
+            closeQuoteCategoryPicker();
+        }
         async function createChoiceGroupFromRoomItems(roomId) {
             var room = rooms.find(function(r) { return r.id === roomId; });
             if (!room) return;
@@ -12967,14 +13140,16 @@ Example:
                         if (!entries) return;
                         const catDisplay = canonicalCat(cat);
 
-                        html += '<div class="cat-group-block" data-cat="' + cat + '">';
+                        html += '<div class="cat-group-block" data-cat="' + qdTemplateEscapeHtml(cat) + '">';
                         var catStyle = categoryStyles[cat] || {};
                         var catIcon = catStyle.icon || 'fa-tag';
                         var catBg = catStyle.color || '#f0f4ff';
                         var catTheme = getCategoryStyleTheme(catBg);
                         html += '<div class="cat-group-header" style="background:' + catBg + '; padding:4px 8px; font-size:0.78rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:' + catTheme.bodyText + '; border-bottom:1px solid ' + catTheme.border + ';">';
                         html += '<span class="cat-drag-handle" title="Drag to reorder category" style="color:' + catTheme.icon + ';">&#8801;</span>';
-                        html += renderCategoryIconMarkup(catIcon, 'me-1', 'color:' + catTheme.icon + ';') + catDisplay;
+                        html += '<button type="button" class="quote-category-name-button" data-room-id="' + qdTemplateEscapeHtml(room.id) + '" data-category="' + qdTemplateEscapeHtml(cat) + '" onclick="event.stopPropagation(); openQuoteCategoryPicker(this)" title="Change this category">';
+                        html += renderCategoryIconMarkup(catIcon, 'me-1', 'color:' + catTheme.icon + ';') + '<span>' + qdTemplateEscapeHtml(catDisplay) + '</span><i class="fas fa-pen quote-category-edit-icon" aria-hidden="true"></i>';
+                        html += '</button>';
                         html += '</div>';
                         var quoteItemTableColgroup = '<col style="width:56px"><col style="width:34px"><col><col style="width:96px"><col style="width:86px"><col style="width:100px">';
                         if (showLineProfitDetails) quoteItemTableColgroup += '<col style="width:118px">';
