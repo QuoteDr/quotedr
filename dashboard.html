@@ -27,6 +27,10 @@
             margin-bottom: 0.75rem;
             transition: box-shadow 0.2s, transform 0.2s;
         }
+        .quote-card-open-area {
+            flex: 1;
+            cursor: pointer;
+        }
         .quote-card:hover {
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             transform: translateY(-2px);
@@ -1039,9 +1043,9 @@
                 var reviewSentAt = q.data && q.data.review_request_sent_at;
                 var reviewNudge = shouldShowReviewNudge(q);
                 return `
-                <div class="quote-card ${isChangeOrder ? 'change-order-card' : ''} ${isInvalid ? 'voided-document-card' : ''}">
+                <div class="quote-card ${isChangeOrder ? 'change-order-card' : ''} ${isInvalid ? 'voided-document-card' : ''}" onclick="handleDashboardQuoteCardClick(event, ${jsAttr(q.id)})">
                     <div class="d-flex justify-content-between align-items-start">
-                        <div onclick="openQuote(${jsAttr(q.id)})" style="flex:1; cursor:pointer;">
+                        <div class="quote-card-open-area">
                             ${q.id === lastOpenedId ? '<span class="badge bg-primary me-1" style="font-size:0.65rem; vertical-align:middle;">Last Opened</span>' : ''}
                             <div class="d-flex align-items-center gap-1" id="title-row-${escapeHtml(q.id)}">
                               <div class="fw-bold" id="title-display-${escapeHtml(q.id)}">${isChangeOrder ? '<span class="badge change-order-badge me-1">CO #' + escapeHtml(QuoteDrChangeOrders.number(q) || '') + '</span>' : ''}${escapeHtml(displayTitle)}</div>
@@ -1423,6 +1427,23 @@
         function isTitleEditing(quoteId) {
             var editEl = document.getElementById('title-edit-' + quoteId);
             return !!(editEl && editEl.style.display !== 'none');
+        }
+
+        function dashboardQuoteCardClickShouldOpen(event, quoteId) {
+            var card = event && event.currentTarget;
+            var target = event && event.target;
+            if (!card || !target || typeof target.closest !== 'function') return false;
+
+            var nestedControl = target.closest('button, a, input, select, textarea, label, summary, [role="button"], [role="link"], [contenteditable="true"], [onclick], [onchange]');
+            if (nestedControl && nestedControl !== card) return false;
+            if (isTitleEditing(quoteId)) return false;
+            if (target.closest('.quote-card-open-area')) return true;
+
+            return !!(window.matchMedia && window.matchMedia('(max-width: 768px)').matches);
+        }
+
+        function handleDashboardQuoteCardClick(event, quoteId) {
+            if (dashboardQuoteCardClickShouldOpen(event, quoteId)) openQuote(quoteId);
         }
 
         async function openQuote(quoteId) {
