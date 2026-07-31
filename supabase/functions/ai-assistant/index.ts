@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
 
   let usageGuard: any = null;
   try {
-    const { messages, feature, context } = await req.json();
+    const { messages, feature, context, refineMode } = await req.json();
 
     if (!messages || !Array.isArray(messages)) {
       return jsonResponse({ error: 'No messages provided' }, 400, corsHeaders);
@@ -33,6 +33,9 @@ Deno.serve(async (req) => {
       : feature === 'writing_suggestions'
         ? 'writing_suggestions'
         : 'ai_assistant';
+    const normalizedRefineMode = aiFeature === 'ai_refine' && refineMode === 'create_from_task'
+      ? 'create_from_task'
+      : 'refine_existing';
     const inputChars = JSON.stringify({ messages, context }).length;
     usageGuard = await startAiUsage(req, { feature: aiFeature, endpoint: 'ai-assistant', inputChars });
     assertWithinAiInputLimit(usageGuard.policy, messages, usageGuard.policy.label);
@@ -54,8 +57,12 @@ Deno.serve(async (req) => {
       'Return at most 20 suggestions. If nothing needs changing, return {"suggestions":[]}.',
     ].join('\n');
 
+    const aiRefineSystemPrompt = normalizedRefineMode === 'create_from_task'
+      ? 'You help QuoteDr users turn contractor task details and rough notes into complete, polished, client-facing line item descriptions. State the work and useful scope details supported by the notes. Organize shorthand into clear prose, but never invent brands, materials, measurements, quantities, pricing, warranties, code claims, or work the user did not provide. Return only the finished description with no heading, preface, or quotes.'
+      : 'You help QuoteDr users rewrite client-facing descriptions. Keep the user\'s meaning, make it clear and professional, and return only the refined wording.';
+
     const assistantSystemPrompt = aiFeature === 'ai_refine'
-      ? `You help QuoteDr users rewrite client-facing descriptions. Keep the user's meaning, make it clear and professional, and return only the refined wording.`
+      ? aiRefineSystemPrompt
       : aiFeature === 'writing_suggestions'
         ? writingSuggestionsSystemPrompt
         : buildQuoteDrAssistantSystemPrompt(context as QuoteDrAssistantContext | undefined);
@@ -88,7 +95,12 @@ Deno.serve(async (req) => {
     await usageGuard.recordSuccess({
       model,
       usage: data.usage || {},
-      metadata: { label: usageGuard.policy.label, messageCount: messages.length, hasContext: !!context },
+      metadata: {
+        label: usageGuard.policy.label,
+        messageCount: messages.length,
+        hasContext: !!context,
+        refineMode: aiFeature === 'ai_refine' ? normalizedRefineMode : undefined,
+      },
     });
 
     return jsonResponse({ reply }, 200, corsHeaders);

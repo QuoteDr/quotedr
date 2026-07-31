@@ -5266,62 +5266,234 @@
             });
         }
 
+        function buildAiDescriptionPrompt(mode, sourceText) {
+            var text = String(sourceText || '');
+            if (mode === 'create_from_task') {
+                return 'Create a strong renovation line item description from the task details or rough notes below. Turn the notes into a clear, professional, client-friendly, useful description. Include the work and relevant scope details that are present, but do not invent materials, measurements, quantities, pricing, warranties, or work that was not provided. Return only the completed description, no heading or quotes.\n\nTask details or rough notes: ' + text;
+            }
+            return 'Improve this renovation line item description so it is clear, professional, client-friendly, and concise. Return only the improved description, no heading or quotes.\n\nDescription: ' + text;
+        }
+
+        function normalizeAiDescriptionReply(reply) {
+            return String(reply || '').replace(/^["']|["']$/g, '').trim();
+        }
+
+        function aiDescriptionModeChoiceMarkup() {
+            return '' +
+                '<div id="aiDescriptionChoicePane">' +
+                '<p class="text-muted mb-3" id="aiDescriptionModeIntro">Choose whether to polish the description field or build a complete description from task notes.</p>' +
+                '<div class="row g-3">' +
+                '<div class="col-12 col-md-6">' +
+                '<button type="button" class="btn btn-outline-primary w-100 h-100 p-3 text-start" data-ai-description-mode="refine_existing">' +
+                '<strong class="d-block mb-1">Refine what I\'ve written</strong>' +
+                '<span class="small text-muted d-block">Improve the wording already in the description field while keeping its meaning.</span>' +
+                '</button>' +
+                '</div>' +
+                '<div class="col-12 col-md-6">' +
+                '<button type="button" class="btn btn-outline-primary w-100 h-100 p-3 text-start" data-ai-description-mode="create_from_task">' +
+                '<strong class="d-block mb-1">Describe the task to create the description</strong>' +
+                '<span class="small text-muted d-block">Turn a task explanation or rough notes into a polished, client-ready description.</span>' +
+                '</button>' +
+                '</div>' +
+                '</div></div>';
+        }
+
+        function aiDescriptionModeCreateMarkup() {
+            return '' +
+                '<div id="aiDescriptionCreatePane" class="d-none">' +
+                '<form id="aiDescriptionCreateForm" novalidate>' +
+                '<label class="form-label fw-bold" for="aiDescriptionTaskNotes">Describe the task or paste rough notes</label>' +
+                '<textarea class="form-control" id="aiDescriptionTaskNotes" rows="6" aria-describedby="aiDescriptionTaskHelp aiDescriptionTaskError" placeholder="Example: Remove the old vanity, install the customer-supplied vanity and faucet, reconnect plumbing, caulk edges, and clean the work area."></textarea>' +
+                '<div class="form-text" id="aiDescriptionTaskHelp">Include the work, key materials or areas, prep and finish steps, and any limits the client should know. Short notes are fine.</div>' +
+                '<div class="invalid-feedback" id="aiDescriptionTaskError" aria-live="polite">Describe the task or add a few rough notes first.</div>' +
+                '</form>' +
+                '</div>';
+        }
+
+        function aiDescriptionModeModalMarkup() {
+            return '' +
+                '<div class="modal fade" id="aiDescriptionModeModal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="aiDescriptionModeTitle" aria-describedby="aiDescriptionModeIntro">' +
+                '<div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">' +
+                '<div class="modal-content">' +
+                '<div class="modal-header bg-primary text-white">' +
+                '<h5 class="modal-title" id="aiDescriptionModeTitle"><i class="fas fa-wand-magic-sparkles me-2" aria-hidden="true"></i>How should AI help?</h5>' +
+                '<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>' +
+                '</div>' +
+                '<div class="modal-body">' +
+                aiDescriptionModeChoiceMarkup() +
+                aiDescriptionModeCreateMarkup() +
+                '</div>' +
+                '<div class="modal-footer">' +
+                '<button type="button" class="btn btn-link me-auto d-none" id="aiDescriptionBackBtn"><i class="fas fa-arrow-left me-1" aria-hidden="true"></i>Back</button>' +
+                '<button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>' +
+                '<button type="submit" class="btn btn-primary d-none" id="aiDescriptionCreateBtn" form="aiDescriptionCreateForm"><i class="fas fa-wand-magic-sparkles me-1" aria-hidden="true"></i>Create Description</button>' +
+                '</div>' +
+                '</div></div></div>';
+        }
+
+        function openAiDescriptionModeDialog(currentText) {
+            return new Promise(function(resolve) {
+                var existing = document.getElementById('aiDescriptionModeModal');
+                if (existing) existing.remove();
+                document.body.insertAdjacentHTML('beforeend', aiDescriptionModeModalMarkup());
+
+                var modalEl = document.getElementById('aiDescriptionModeModal');
+                var titleEl = document.getElementById('aiDescriptionModeTitle');
+                var choicePane = document.getElementById('aiDescriptionChoicePane');
+                var createPane = document.getElementById('aiDescriptionCreatePane');
+                var createForm = document.getElementById('aiDescriptionCreateForm');
+                var taskNotes = document.getElementById('aiDescriptionTaskNotes');
+                var backBtn = document.getElementById('aiDescriptionBackBtn');
+                var createBtn = document.getElementById('aiDescriptionCreateBtn');
+                var firstChoice = modalEl.querySelector('[data-ai-description-mode="refine_existing"]');
+                var createChoice = modalEl.querySelector('[data-ai-description-mode="create_from_task"]');
+                var result = null;
+                var modal = new bootstrap.Modal(modalEl);
+
+                taskNotes.value = String(currentText || '');
+
+                function showChoicePane() {
+                    choicePane.classList.remove('d-none');
+                    createPane.classList.add('d-none');
+                    backBtn.classList.add('d-none');
+                    createBtn.classList.add('d-none');
+                    modalEl.setAttribute('aria-describedby', 'aiDescriptionModeIntro');
+                    titleEl.innerHTML = '<i class="fas fa-wand-magic-sparkles me-2" aria-hidden="true"></i>How should AI help?';
+                    taskNotes.classList.remove('is-invalid');
+                    taskNotes.removeAttribute('aria-invalid');
+                    createChoice.focus();
+                }
+
+                function showCreatePane() {
+                    choicePane.classList.add('d-none');
+                    createPane.classList.remove('d-none');
+                    backBtn.classList.remove('d-none');
+                    createBtn.classList.remove('d-none');
+                    modalEl.setAttribute('aria-describedby', 'aiDescriptionTaskHelp');
+                    titleEl.innerHTML = '<i class="fas fa-list-check me-2" aria-hidden="true"></i>Create a client-ready description';
+                    setTimeout(function() {
+                        taskNotes.focus();
+                        taskNotes.setSelectionRange(taskNotes.value.length, taskNotes.value.length);
+                    }, 0);
+                }
+
+                choicePane.addEventListener('click', function(event) {
+                    var choice = event.target.closest('[data-ai-description-mode]');
+                    if (!choice) return;
+                    var mode = choice.getAttribute('data-ai-description-mode');
+                    if (mode === 'create_from_task') {
+                        showCreatePane();
+                        return;
+                    }
+                    result = { mode: 'refine_existing', sourceText: String(currentText || '') };
+                    modal.hide();
+                });
+
+                createForm.addEventListener('submit', function(event) {
+                    event.preventDefault();
+                    var notes = taskNotes.value.trim();
+                    if (!notes) {
+                        taskNotes.classList.add('is-invalid');
+                        taskNotes.setAttribute('aria-invalid', 'true');
+                        taskNotes.focus();
+                        return;
+                    }
+                    result = { mode: 'create_from_task', sourceText: notes };
+                    modal.hide();
+                });
+
+                taskNotes.addEventListener('input', function() {
+                    if (taskNotes.value.trim()) {
+                        taskNotes.classList.remove('is-invalid');
+                        taskNotes.removeAttribute('aria-invalid');
+                    }
+                });
+                taskNotes.addEventListener('keydown', function(event) {
+                    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+                        event.preventDefault();
+                        createForm.requestSubmit();
+                    }
+                });
+                backBtn.addEventListener('click', showChoicePane);
+                modalEl.addEventListener('shown.bs.modal', function() {
+                    firstChoice.focus();
+                }, { once: true });
+                modalEl.addEventListener('hidden.bs.modal', function() {
+                    modalEl.remove();
+                    resolve(result);
+                }, { once: true });
+                modal.show();
+            });
+        }
+
         async function refineDescription(textareaEl, btnEl) {
             if (!textareaEl || !btnEl) return;
             const currentText = textareaEl.value || '';
-            if (!currentText.trim()) { qdAlert('Please enter a description first.'); return; }
+            const request = await openAiDescriptionModeDialog(currentText);
+            if (!request) return;
+            if (!request.sourceText.trim()) { qdAlert('Please enter a description first.'); return; }
             if (typeof requireProFeature === 'function') {
                 var allowed = await requireProFeature('ai_refine', 'AI Refine');
                 if (!allowed) return;
             }
             const originalBtnHTML = btnEl.innerHTML;
-            btnEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            btnEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>' + (request.mode === 'create_from_task' ? 'Creating...' : 'Refining...');
             btnEl.disabled = true;
+            btnEl.setAttribute('aria-busy', 'true');
             try {
-                const prompt = 'Improve this renovation line item description so it is clear, professional, client-friendly, and concise. Return only the improved description, no heading or quotes.\n\nDescription: ' + currentText;
+                const prompt = buildAiDescriptionPrompt(request.mode, request.sourceText);
                 if (typeof getSupabaseFunctionAuthHeaders !== 'function') throw new Error('Please sign in again before using AI Refine.');
                 const response = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/ai-assistant', {
                     method: 'POST',
                     headers: await getSupabaseFunctionAuthHeaders(),
-                    body: JSON.stringify({ feature: 'ai_refine', messages: [{ role: 'user', content: prompt }] })
+                    body: JSON.stringify({ feature: 'ai_refine', refineMode: request.mode, messages: [{ role: 'user', content: prompt }] })
                 });
                 const data = await response.json();
-                if (!response.ok || data.error) throw new Error(data.error || 'AI refine failed');
-                if (data.reply) {
-                    const refinedText = data.reply.replace(/^["']|["']$/g, '').trim();
-                    if (refinedText && refinedText !== currentText) {
-                        const undoBtn = btnEl.parentElement ? btnEl.parentElement.querySelector('.undo-refine-desc-btn') : null;
-                        if (undoBtn) {
-                            undoBtn._previousDescription = currentText;
-                            undoBtn._refinedDescription = refinedText;
-                            undoBtn._showingRefined = true;
-                            undoBtn.innerHTML = '<i class="fas fa-undo"></i>';
-                            undoBtn.title = 'Undo AI refined description';
-                            undoBtn.style.display = '';
-                        }
-                    }
-                    textareaEl.value = refinedText;
-                    textareaEl.dispatchEvent(new Event('input', { bubbles: true }));
-                    markPricingDirty();
-                    if (typeof completeProTrialFeature === 'function') completeProTrialFeature('ai_refine', 'AI Refine');
-                    if (typeof qdMaybeShowProUpgradePrompt === 'function') {
-                        qdMaybeShowProUpgradePrompt('ai_refine_success', {
-                            featureKey: 'ai_refine',
-                            featureLabel: 'AI Refine',
-                            message: 'AI made this easier. Keep it with Pro access.'
-                        });
+                if (!response.ok || data.error) throw new Error(data.error || 'AI description request failed');
+                const refinedText = normalizeAiDescriptionReply(data.reply);
+                if (!refinedText) throw new Error('AI did not return a description. Please try again.');
+                if (refinedText !== currentText) {
+                    const undoBtn = btnEl.parentElement ? btnEl.parentElement.querySelector('.undo-refine-desc-btn') : null;
+                    if (undoBtn) {
+                        undoBtn._previousDescription = currentText;
+                        undoBtn._refinedDescription = refinedText;
+                        undoBtn._aiDescriptionMode = request.mode;
+                        undoBtn._showingRefined = true;
+                        undoBtn.innerHTML = '<i class="fas fa-undo"></i>';
+                        undoBtn.title = request.mode === 'create_from_task' ? 'Undo AI-created description' : 'Undo AI refined description';
+                        undoBtn.style.display = '';
                     }
                 }
+                textareaEl.value = refinedText;
+                textareaEl.dispatchEvent(new Event('input', { bubbles: true }));
+                markPricingDirty();
+                if (typeof completeProTrialFeature === 'function') completeProTrialFeature('ai_refine', 'AI Refine');
+                if (typeof qdMaybeShowProUpgradePrompt === 'function') {
+                    qdMaybeShowProUpgradePrompt('ai_refine_success', {
+                        featureKey: 'ai_refine',
+                        featureLabel: 'AI Refine',
+                        message: request.mode === 'create_from_task'
+                            ? 'AI drafted this description. Keep it with Pro access.'
+                            : 'AI made this easier. Keep it with Pro access.'
+                    });
+                }
             } catch (error) {
-                console.error('AI refine failed:', error);
-                var toast = document.createElement('div');
-                toast.textContent = 'AI refine failed - try again';
-                toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#333;color:white;padding:10px 15px;border-radius:4px;font-size:14px;z-index:9999;';
-                document.body.appendChild(toast);
-                setTimeout(function(){ toast.remove(); }, 3000);
+                console.error('AI description request failed:', error);
+                var errorMessage = error && error.message ? error.message : 'AI description request failed. Please try again.';
+                if (typeof qdAlert === 'function') {
+                    qdAlert(errorMessage);
+                } else {
+                    var toast = document.createElement('div');
+                    toast.setAttribute('role', 'alert');
+                    toast.textContent = errorMessage;
+                    toast.style.cssText = 'position:fixed;bottom:20px;right:20px;max-width:calc(100vw - 40px);background:#333;color:white;padding:10px 15px;border-radius:4px;font-size:14px;z-index:9999;';
+                    document.body.appendChild(toast);
+                    setTimeout(function(){ toast.remove(); }, 4000);
+                }
             } finally {
                 btnEl.innerHTML = originalBtnHTML;
                 btnEl.disabled = false;
+                btnEl.removeAttribute('aria-busy');
             }
         }
 
@@ -5330,16 +5502,17 @@
             const descScope = btnEl.closest('.description-refine-scope') || btnEl.closest('tr');
             const textarea = descScope ? descScope.querySelector('.item-description-textarea') : null;
             if (!textarea) return;
+            const createdByAi = btnEl._aiDescriptionMode === 'create_from_task';
             if (btnEl._showingRefined) {
                 textarea.value = btnEl._previousDescription;
                 btnEl._showingRefined = false;
                 btnEl.innerHTML = '<i class="fas fa-redo"></i>';
-                btnEl.title = 'Redo AI refined description';
+                btnEl.title = createdByAi ? 'Redo AI-created description' : 'Redo AI refined description';
             } else {
                 textarea.value = btnEl._refinedDescription;
                 btnEl._showingRefined = true;
                 btnEl.innerHTML = '<i class="fas fa-undo"></i>';
-                btnEl.title = 'Undo AI refined description';
+                btnEl.title = createdByAi ? 'Undo AI-created description' : 'Undo AI refined description';
             }
             textarea.dispatchEvent(new Event('input', { bubbles: true }));
             markPricingDirty();
