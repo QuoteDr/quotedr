@@ -6933,6 +6933,25 @@ Example:
             showItemSearchResults();
         }
 
+        function setLineItemNameFromService(serviceName) {
+            const name = String(serviceName || '').trim();
+            if (!name) return;
+            const description = document.getElementById('lineDescription');
+            const quickSearch = document.getElementById('itemQuickSearch');
+            if (description) description.value = name;
+            if (quickSearch) quickSearch.value = name;
+            clearAddLineItemValidationField('lineDescription');
+            checkIfNewItem();
+        }
+
+        function isLikelyTruncatedServiceName(itemName, serviceName) {
+            const currentName = String(itemName || '').trim();
+            const fullName = String(serviceName || '').trim();
+            if (!currentName || currentName.length >= fullName.length) return false;
+            if (!fullName.toLowerCase().startsWith(currentName.toLowerCase())) return false;
+            return /[a-z0-9]/i.test(fullName.charAt(currentName.length));
+        }
+
         function showItemSearchResults() {
             const q = (document.getElementById('itemQuickSearch')?.value || '').toLowerCase().trim();
             const dropdown = document.getElementById('itemSearchDropdown');
@@ -6996,8 +7015,8 @@ Example:
                 if (opt.value === name) { opt.selected = true; break; }
             }
             autoFillPricing();
-            // Clear search
-            document.getElementById('itemQuickSearch').value = '';
+            // Keep the selected service name visible now that Quick Search is also the item-name field.
+            setLineItemNameFromService(name);
             document.getElementById('itemSearchDropdown').style.display = 'none';
         }
 
@@ -7449,9 +7468,8 @@ Example:
                         localStorage.setItem('ald_custom_items', JSON.stringify(items));
                         updatePricingOptions();
                         serviceSelect.value = newSvc.trim();
-                        // Auto-fill description and show save button
-                        const descField = document.getElementById('lineDescription');
-                        if (descField && !descField.value.trim()) descField.value = newSvc.trim();
+                        // Replace any partial search text with the complete new service name.
+                        setLineItemNameFromService(newSvc);
                         const saveBtn = document.getElementById('saveNewItemBtn');
                         if (saveBtn) saveBtn.style.display = 'inline-block';
                     } else { serviceSelect.selectedIndex = 1; }
@@ -7498,15 +7516,13 @@ Example:
             const serviceSelect = document.getElementById('lineService');
             const selectedOption = serviceSelect.options[serviceSelect.selectedIndex];
 
+            if (selectedOption && selectedOption.value && selectedOption.value !== 'custom' && selectedOption.value !== '__add_new_service__') {
+                setLineItemNameFromService(selectedOption.text);
+            }
             if (selectedOption && selectedOption.dataset.unitType) {
                 populateLineUnitTypeDropdown(selectedOption.dataset.unitType);
                 document.getElementById('lineRate').value = selectedOption.dataset.rate;
                 setLinePriceTbdState(selectedOption.dataset.priceTbd === '1');
-                if (selectedOption.value !== 'custom') {
-                    document.getElementById('lineDescription').value = selectedOption.text;
-                }
-                clearAddLineItemValidationField('lineDescription');
-                checkIfNewItem();
                 document.getElementById('lineItemDescription').value = selectedOption.dataset.itemDescription || '';
                 resetAddLineDescriptionRefineState();
                 // Pre-fill material cost if saved
@@ -8419,6 +8435,9 @@ Example:
                 const matchedService = services.find(s => s.name === item.serviceName);
                 if (matchedService) {
                     document.getElementById('lineService').value = matchedService.name;
+                    if (isLikelyTruncatedServiceName(item.description, matchedService.name)) {
+                        setLineItemNameFromService(matchedService.name);
+                    }
                 }
             }
 
