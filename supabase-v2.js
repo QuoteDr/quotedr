@@ -3080,9 +3080,7 @@ function qdNormalizeUnit(unit) {
 }
 
 function qdMeasurementDecimals(value) {
-    value = Math.abs(parseFloat(value) || 0);
-    if (value >= 100) return 0;
-    if (value >= 10) return 1;
+    // Quantity inputs support hundredths, so display precision should not shrink as values grow.
     return 2;
 }
 
