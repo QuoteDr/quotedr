@@ -1853,6 +1853,7 @@
             var quote = (allQuotes || []).find(function(q) { return q.id === quoteId; });
             if (!quote) { qdAlert('Could not find that quote. Please refresh and try again.'); return; }
             window._portalAssignQuoteId = quoteId;
+            resetPortalAssignmentSearch();
             var d = quote.data || {};
             document.getElementById('portalAssignQuoteTitle').textContent = (d.quoteTitle || quote.client_name || quote.quote_number || 'Selected quote');
             document.getElementById('portalAssignSelectedWrap').style.display = '';
@@ -1875,6 +1876,7 @@
             window._portalAssignQuoteId = '';
             window._portalMergeMode = false;
             window._portalMergeSelected = {};
+            resetPortalAssignmentSearch();
             document.getElementById('portalAssignQuoteTitle').textContent = 'Manage all client portals';
             document.getElementById('portalAssignSelectedWrap').style.display = 'none';
             document.getElementById('portalAssignCreateWrap').style.display = 'none';
@@ -1906,6 +1908,29 @@
             }
         }
 
+        function resetPortalAssignmentSearch() {
+            var searchInput = document.getElementById('portalAssignSearch');
+            if (searchInput) searchInput.value = '';
+        }
+
+        function clearPortalAssignmentSearch() {
+            resetPortalAssignmentSearch();
+            renderPortalAssignmentList();
+            var searchInput = document.getElementById('portalAssignSearch');
+            if (searchInput) searchInput.focus();
+        }
+
+        function portalMatchesAssignmentSearch(portal, query) {
+            if (!query) return true;
+            return [
+                portal && portal.name,
+                portal && portal.clientName,
+                portal && portal.clientEmail
+            ].some(function(value) {
+                return normalizePortalDashboardValue(value).includes(query);
+            });
+        }
+
         function renderPortalAssignmentList() {
             var wrap = document.getElementById('portalAssignList');
             if (!wrap) return;
@@ -1917,9 +1942,18 @@
                 wrap.innerHTML = '<div class="text-muted small border rounded p-3">No portals exist yet. Click Add New Portal to create one.</div>';
                 return;
             }
+            var searchInput = document.getElementById('portalAssignSearch');
+            var searchQuery = normalizePortalDashboardValue(searchInput && searchInput.value);
+            var visiblePortals = portals.filter(function(portal) {
+                return portalMatchesAssignmentSearch(portal, searchQuery);
+            });
+            if (!visiblePortals.length) {
+                wrap.innerHTML = '<div class="text-muted small border rounded p-3 text-center">No portals match your search.<br><button type="button" class="btn btn-link btn-sm p-0 mt-1" onclick="clearPortalAssignmentSearch()">Clear search</button></div>';
+                return;
+            }
             window._portalMergeSelected = window._portalMergeSelected || {};
             var mergeMode = !!window._portalMergeMode;
-            wrap.innerHTML = portals.map(function(portal) {
+            wrap.innerHTML = visiblePortals.map(function(portal) {
                 var selected = portal.quoteIds.includes(quoteId);
                 var portalDom = escapeHtml(portalDomId(portal.id));
                 var docCount = portalDocumentCount(portal);
@@ -4943,6 +4977,11 @@ function renderBusinessInsights(quotes) {
                 <button type="button" class="btn btn-outline-warning btn-sm" onclick="startPortalMergeMode()"><i class="fas fa-code-merge me-1"></i>Merge Portals</button>
                 <button type="button" class="btn btn-outline-secondary btn-sm" onclick="renderPortalAssignmentList()"><i class="fas fa-rotate me-1"></i>Refresh</button>
               </div>
+            </div>
+            <div class="input-group input-group-sm mb-2">
+              <span class="input-group-text" aria-hidden="true"><i class="fas fa-search"></i></span>
+              <input type="search" class="form-control" id="portalAssignSearch" placeholder="Search portal name, client, or email" aria-label="Search portals by portal name, client name, or email" autocomplete="off" oninput="renderPortalAssignmentList()">
+              <button type="button" class="btn btn-outline-secondary" onclick="clearPortalAssignmentSearch()">Clear</button>
             </div>
             <div id="portalMergeActions"></div>
             <div id="portalAssignList"></div>
