@@ -1,0 +1,2 @@
+# Keep shared portal URLs clean while resolving through the existing portal page.
+/p/* /client-portal.html?p=:splat 302

@@ -2554,13 +2554,24 @@
 
     // Get URL parameters
     const urlParams = new URLSearchParams(window.location.search);
+
+    function portalShortTokenFromLocation() {
+      const queryToken = String(urlParams.get('p') || '').trim();
+      if (queryToken) return queryToken;
+      const match = String(window.location.pathname || '').match(/^\/p\/([^/?#]+)/i);
+      if (!match) return '';
+      try { return decodeURIComponent(match[1]); } catch (_) { return match[1]; }
+    }
+
+    const portalShortToken = portalShortTokenFromLocation();
     const clientEmail = urlParams.get('email');
     const clientName = urlParams.get('client'); // backward compat
-    const contractorId = urlParams.get('contractor');
+    let contractorId = urlParams.get('contractor');
     const portalQuoteId = urlParams.get('quote') || urlParams.get('id');
-    const portalToken = urlParams.get('token') || '';
-    const portalAnchorId = urlParams.get('portal_anchor') || portalQuoteId || '';
-    const portalId = urlParams.get('portal');
+    const portalToken = urlParams.get('token') || portalShortToken || '';
+    let portalAnchorId = urlParams.get('portal_anchor') || portalQuoteId || '';
+    let portalId = urlParams.get('portal');
+    let portalBootstrapResult = null;
     const portalThemeStudioMode = ['1', 'true', 'studio'].includes(String(urlParams.get('theme_studio') || '').toLowerCase());
     const requestedAdminView = ['1', 'true', 'admin'].includes(String(urlParams.get('admin') || urlParams.get('view') || '').toLowerCase());
     let portalIsAdminView = false;
@@ -2723,15 +2734,30 @@
         return;
       }
 
-      if ((!clientName && !clientEmail && !portalQuoteId && !portalId) || !contractorId) {
+      if ((!clientName && !clientEmail && !portalQuoteId && !portalId && !portalShortToken) || (!contractorId && !portalShortToken)) {
         alert('Missing client or contractor parameters');
+        return;
+      }
+
+      if (portalShortToken) {
+        try {
+          await resolveShortPortalContext();
+        } catch (error) {
+          console.error('Could not resolve short portal link:', error);
+          alert('This portal link is invalid or has expired. Please ask your contractor to resend it.');
+          return;
+        }
+      }
+
+      if (!contractorId) {
+        alert('This portal link is missing its contractor information.');
         return;
       }
 
       await detectPortalMode();
 
       // Set client name (title-cased) — will be updated from quote data later
-      clientNameEl.textContent = titleCase(clientName || clientEmail || 'Client');
+      clientNameEl.textContent = titleCase(portalResolvedClientName || clientName || clientEmail || 'Client');
 
       // Get contractor company name
       await getContractorName();
@@ -2761,6 +2787,22 @@
       const data = await resp.json().catch(function() { return {}; });
       if (!resp.ok || data.error) throw new Error(data.error || 'Secure portal request failed');
       return data;
+    }
+
+    async function resolveShortPortalContext() {
+      if (!portalShortToken) return;
+      const result = await secureClientDocumentRequest({
+        action: 'portal',
+        token: portalToken
+      });
+      const documents = Array.isArray(result.documents) ? result.documents : [];
+      portalBootstrapResult = result;
+      contractorId = String(result.contractorId || '').trim();
+      portalAnchorId = String(result.anchorId || result.anchor?.id || '').trim();
+      portalId = String(result.portalId || documents[0]?.data?.portal_id || '').trim();
+      portalResolvedClientName = documents[0]?.client_name || documents[0]?.data?.clientName || documents[0]?.data?.client_name || '';
+      if (!contractorId || !portalAnchorId) throw new Error('Short portal link could not be resolved');
+      restorePortalUnlockState();
     }
 
     async function detectPortalMode() {
@@ -3255,11 +3297,12 @@
     async function loadQuotes() {
       try {
         if (portalToken && portalAnchorId) {
-          const portalResult = await secureClientDocumentRequest({
+          const portalResult = portalBootstrapResult || await secureClientDocumentRequest({
             action: 'portal',
             documentId: portalAnchorId,
             token: portalToken
           });
+          portalBootstrapResult = null;
           const quotes = dedupePortalDocuments(portalResult.documents || []);
           if (quotes.length > 0) {
             portalResolvedClientName = quotes[0].client_name || quotes[0].data?.clientName || quotes[0].data?.client_name || '';
@@ -5338,13 +5381,14 @@
       const _cp = new URLSearchParams(window.location.search);
       const cpEmail = _cp.get('email');
       const cpName = _cp.get('client');
-      const contractorId = _cp.get('contractor');
+      const resolvedContractorId = _cp.get('contractor') || contractorId || '';
       const displayedClientName = clientNameEl && clientNameEl.textContent ? clientNameEl.textContent.trim() : '';
       const resolvedClientName = cpName || portalResolvedClientName || displayedClientName || '';
 
       // Check if already unlocked
-      const cpPortal = _cp.get('portal') || '';
-      const unlockKey = `portal_unlocked_${cpEmail || cpName || cpPortal}_${contractorId}_${cpPortal}`;
+      const cpPortal = _cp.get('portal') || portalId || '';
+      const cpQuoteId = _cp.get('quote') || portalAnchorId || '';
+      const unlockKey = `portal_unlocked_${cpEmail || cpName || cpPortal}_${resolvedContractorId}_${cpPortal}`;
       if (sessionStorage.getItem(unlockKey)) {
         hidePinGate();
         return;
@@ -5359,7 +5403,7 @@
             'apikey': supabaseKey,
             'Authorization': 'Bearer ' + supabaseKey
           },
-          body: JSON.stringify({ clientName: resolvedClientName, clientEmail: cpEmail, contractorId, quoteId: _cp.get('quote'), portalId: cpPortal, pin: enteredPin })
+          body: JSON.stringify({ clientName: resolvedClientName, clientEmail: cpEmail, contractorId: resolvedContractorId, quoteId: cpQuoteId, portalId: cpPortal, pin: enteredPin })
         });
         const result = await res.json();
         if (result.valid) {
@@ -5391,21 +5435,23 @@
       document.getElementById('portalContent').style.display = 'block';
     }
 
-    // Check on load
-    window.addEventListener('load', () => {
+    function restorePortalUnlockState() {
       const _lp = new URLSearchParams(window.location.search);
       const _email = _lp.get('email');
       const _name = _lp.get('client');
-      const _cid = _lp.get('contractor');
-      const _portal = _lp.get('portal') || '';
+      const _cid = _lp.get('contractor') || contractorId || '';
+      const _portal = _lp.get('portal') || portalId || '';
 
-      if ((!_email && !_name && !_lp.get('quote') && !_portal) || !_cid) return;
+      if ((!_email && !_name && !_lp.get('quote') && !_portal && !portalShortToken) || !_cid) return;
 
       const unlockKey = `portal_unlocked_${_email || _name || _portal}_${_cid}_${_portal}`;
       if (sessionStorage.getItem(unlockKey)) {
         hidePinGate();
       }
-    });
+    }
+
+    // Check on load and again after a short link resolves its portal context.
+    window.addEventListener('load', restorePortalUnlockState);
     </script>
 </body>
 </html>

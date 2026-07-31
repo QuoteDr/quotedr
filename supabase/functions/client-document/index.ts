@@ -102,8 +102,8 @@ function base64Url(bytes: Uint8Array) {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
-function createShareToken() {
-  const bytes = new Uint8Array(32);
+function createShareToken(byteLength = 32) {
+  const bytes = new Uint8Array(byteLength);
   crypto.getRandomValues(bytes);
   return base64Url(bytes);
 }
@@ -556,6 +556,20 @@ async function fetchQuoteById(id: string) {
   return data as QuoteRow | null;
 }
 
+async function fetchQuoteByShareToken(token: string) {
+  if (!token) throw new Error("Missing secure portal token");
+  const tokenHash = await sha256Hex(token);
+  const supabase = adminClient();
+  const { data, error } = await supabase
+    .from("quotes")
+    .select("*")
+    .eq("public_share_token_hash", tokenHash)
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data as QuoteRow | null;
+}
+
 async function fetchQuoteOwnershipById(id: string) {
   const supabase = adminClient();
   const { data, error } = await supabase
@@ -604,7 +618,7 @@ async function createLink(req: Request, body: Record<string, unknown>) {
   const row = await fetchQuoteOwnershipById(documentId);
   if (!row || row.user_id !== user.id) return json({ error: "Document not found" }, 404);
 
-  const token = createShareToken();
+  const token = createShareToken(mode === "portal" ? 16 : 32);
   const tokenHash = await sha256Hex(token);
   const supabase = adminClient();
   const { error } = await supabase
@@ -644,7 +658,10 @@ async function viewDocument(body: Record<string, unknown>) {
 async function portalDocuments(body: Record<string, unknown>) {
   const documentId = normalizeId(body.documentId || body.id);
   const token = String(body.token || "").trim();
-  const { target: anchor } = await assertTokenAccess(documentId, token, documentId);
+  const anchor = documentId
+    ? (await assertTokenAccess(documentId, token, documentId)).target
+    : await fetchQuoteByShareToken(token);
+  if (!anchor) throw new Error("Invalid or expired secure portal token");
   const supabase = adminClient();
   let query = supabase
     .from("quotes")
@@ -659,7 +676,13 @@ async function portalDocuments(body: Record<string, unknown>) {
   const docs = (data as QuoteRow[] || [])
     .filter((row) => row.id === anchor.id || (portalVisible(row) && samePortalGroup(anchor, row)))
     .map(sanitizeQuoteRow);
-  return json({ anchor: compactDocumentResult(anchor), documents: docs });
+  return json({
+    anchor: compactDocumentResult(anchor),
+    anchorId: anchor.id,
+    contractorId: anchor.user_id,
+    portalId: activePortalId,
+    documents: docs,
+  });
 }
 
 async function signedStorageUrl(path: string | null | undefined) {

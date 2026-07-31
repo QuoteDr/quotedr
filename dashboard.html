@@ -1989,28 +1989,77 @@
         function renderPortalPinEditor(portal, portalClientUrl) {
             var pin = String(portal.pin || '').trim();
             var pinText = pin || 'Not set';
+            var linkReady = !!(portal.secureToken && portal.secureAnchorId);
+            var clientLinkValue = linkReady ? portalClientUrl : 'Preparing clean link...';
             return '<div class="border rounded p-3 mt-2 bg-light">' +
                 '<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2">' +
                 '<div><strong><i class="fas fa-key me-1"></i>Portal PIN</strong><div class="small text-muted">Clients use this PIN to unlock this portal.</div></div>' +
                 '<div class="px-3 py-2 rounded text-center" style="background:#fff;border:1px solid #d8e0ea;min-width:120px;font-size:1.5rem;font-weight:800;letter-spacing:0.35rem;color:#1a2940;">' + escapeHtml(pinText) + '</div>' +
                 '</div>' +
-                '<div class="input-group input-group-sm mb-2"><span class="input-group-text">Client link</span><input class="form-control" value="' + escapeHtml(portalClientUrl) + '" readonly><button class="btn btn-outline-secondary" type="button" onclick="copyPortalPinBundle(' + jsAttr(portal.id) + ')"><i class="fas fa-copy me-1"></i>Copy Link</button></div>' +
+                '<div class="input-group input-group-sm mb-2"><span class="input-group-text">Client link</span><input class="form-control" value="' + escapeHtml(clientLinkValue) + '" readonly><button class="btn btn-outline-secondary" type="button" onclick="copyPortalPinBundle(' + jsAttr(portal.id) + ')" ' + (linkReady ? '' : 'disabled') + '><i class="fas ' + (linkReady ? 'fa-copy' : 'fa-spinner fa-spin') + ' me-1"></i>' + (linkReady ? 'Copy Link' : 'Preparing') + '</button></div>' +
                 '<button type="button" class="btn btn-outline-warning btn-sm" onclick="changePortalPin(' + jsAttr(portal.id) + ')"><i class="fas fa-rotate me-1"></i>Generate New PIN</button>' +
                 '</div>';
         }
 
-        function togglePortalPinEditor(portalId) {
+        async function ensurePortalStableShare(portal) {
+            var existing = {
+                token: String(portal && portal.secureToken || '').trim(),
+                anchorId: String(portal && portal.secureAnchorId || '').trim(),
+                createdAt: String(portal && portal.secureCreatedAt || '').trim()
+            };
+            if (existing.token && existing.anchorId) return existing;
+            if (typeof createSecureClientShareLink !== 'function') throw new Error('Secure portal links are unavailable');
+            var anchor = (portal && portal.quotes || []).find(function(row) {
+                return row && row.id && !(row.data && row.data.portal_placeholder);
+            }) || (portal && portal.quotes && portal.quotes[0]);
+            if (!anchor || !anchor.id) throw new Error('This portal needs a document before its clean link can be created');
+            anchor = await loadDashboardFullQuote(anchor);
+            var share = await createSecureClientShareLink(anchor.id, '', { mode: 'portal' });
+            if (!share || !share.token) throw new Error('Could not create the clean portal link');
+            var stableShare = {
+                token: share.token,
+                anchorId: share.portalAnchorId || share.id || anchor.id,
+                createdAt: new Date().toISOString()
+            };
+            await persistPortalStableShare(portal.quotes || [], stableShare);
+            portal.secureToken = stableShare.token;
+            portal.secureAnchorId = stableShare.anchorId;
+            portal.secureCreatedAt = stableShare.createdAt;
+            return stableShare;
+        }
+
+        async function togglePortalPinEditor(portalId) {
             window._portalPinEditorId = window._portalPinEditorId === portalId ? '' : portalId;
             renderPortalAssignmentList();
+            if (window._portalPinEditorId !== portalId) return;
+            var portal = buildPortalRegistry(allQuotes).find(function(p) { return p.id === portalId; });
+            if (!portal || (portal.secureToken && portal.secureAnchorId)) return;
+            try {
+                await ensurePortalStableShare(portal);
+                renderPortalAssignmentList();
+            } catch (error) {
+                console.error('Could not prepare clean portal link:', error);
+                qdAlert(error.message || 'Could not prepare the clean portal link.');
+                window._portalPinEditorId = '';
+                renderPortalAssignmentList();
+            }
         }
 
         async function copyPortalPinBundle(portalId) {
             var portal = buildPortalRegistry(allQuotes).find(function(p) { return p.id === portalId; });
             if (!portal) return;
+            var btn = typeof event !== 'undefined' && event.target ? event.target.closest('button') : null;
+            try {
+                var stableShare = await ensurePortalStableShare(portal);
+                portal.secureToken = stableShare.token;
+                portal.secureAnchorId = stableShare.anchorId;
+            } catch (error) {
+                qdAlert(error.message || 'Could not prepare the clean portal link.');
+                return;
+            }
             var contractor = (portal.quotes && portal.quotes[0] && portal.quotes[0].user_id) || (window.currentUser && window.currentUser.id) || '';
             var url = portalUrlForDashboard(Object.assign({}, portal, { contractorId: contractor }), window._portalAssignQuoteId || '');
             await navigator.clipboard.writeText(url).catch(function(){});
-            var btn = event.target.closest('button');
             if (btn) {
                 var orig = btn.innerHTML;
                 btn.innerHTML = '<i class="fas fa-check me-1"></i>Link Copied';
@@ -2668,7 +2717,17 @@
             }
         }
 
+        function shortPortalUrlForDashboard(token) {
+            var cleanToken = String(token || '').trim();
+            return cleanToken ? 'https://quotedr.io/p/' + encodeURIComponent(cleanToken) : '';
+        }
+
         function portalUrlForDashboard(portal, quoteId, options) {
+            var secureToken = String(portal.secureToken || '').trim();
+            var isLocalPortalPreview = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+            if (secureToken && !(options && options.admin) && !isLocalPortalPreview) {
+                return shortPortalUrlForDashboard(secureToken);
+            }
             var params = [];
             if (portal.clientEmail) params.push('email=' + encodeURIComponent(portal.clientEmail));
             params.push('client=' + encodeURIComponent(portal.clientName || portal.name || 'Client'));
@@ -2676,7 +2735,6 @@
             if (portal.id && !String(portal.id).startsWith('legacy-')) params.push('portal=' + encodeURIComponent(portal.id));
             if (quoteId) params.push('quote=' + encodeURIComponent(quoteId));
             var secureAnchorId = String(portal.secureAnchorId || '').trim();
-            var secureToken = String(portal.secureToken || '').trim();
             if (secureAnchorId && secureToken) {
                 params.push('id=' + encodeURIComponent(secureAnchorId));
                 params.push('token=' + encodeURIComponent(secureToken));
