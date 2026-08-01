@@ -50,7 +50,7 @@ assert(
 );
 
 assert(
-  /var _savedActiveId = localStorage\.getItem\("ald_active_quote_id"\);[\s\S]*?if \(quoteIsPortalLockedForBuilder\(result\.data\)\) \{[\s\S]*?await handlePortalLockedBuilderLoad\(result\.data\);[\s\S]*?return;[\s\S]*?\}/.test(storage),
+  /var _savedActiveIdRaw = localStorage\.getItem\("ald_active_quote_id"\);[\s\S]*?var _savedActiveId = quoteStorageNormalizeCloudId\(_savedActiveIdRaw\);[\s\S]*?if \(quoteIsPortalLockedForBuilder\(result\.data\)\) \{[\s\S]*?await handlePortalLockedBuilderLoad\(result\.data\);[\s\S]*?return;[\s\S]*?\}/.test(storage),
   'Last-opened quote restore should block portal-visible documents before applying quote data'
 );
 

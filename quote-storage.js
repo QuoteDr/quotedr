@@ -28,6 +28,30 @@
             return negative ? -amount : amount;
         }
 
+        function quoteStorageNormalizeCloudId(value) {
+            var normalized = String(value || '').trim();
+            return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(normalized) ? normalized : '';
+        }
+
+        function quoteStorageRecoveredQuoteNumber(value, savedAt) {
+            var base = String(value || 'RECOVERED').trim() || 'RECOVERED';
+            base = base.replace(/\s+/g, '-').slice(0, 60);
+            var stamp = String(savedAt || '').replace(/\D/g, '').slice(0, 14);
+            if (!stamp) stamp = new Date().toISOString().replace(/\D/g, '').slice(0, 14);
+            return base + '-RECOVERED-' + stamp;
+        }
+
+        function quoteStorageOperationHasInvalidQuoteId(operation) {
+            var target = operation && operation.target || {};
+            var action = String(target.action || operation && operation.action || '').toLowerCase();
+            if (target.table !== 'quotes' || (action !== 'update' && action !== 'delete')) return false;
+            var idFilter = (target.filters || []).find(function(filter) {
+                return filter && filter.column === 'id' && (!filter.operator || filter.operator === 'eq');
+            });
+            var candidate = idFilter ? idFilter.value : operation.entityId;
+            return !quoteStorageNormalizeCloudId(candidate);
+        }
+
         function quoteStorageData(row) {
             return row && row.data ? row.data : {};
         }
@@ -902,7 +926,12 @@
             var isChangeOrder = window._quoteDocumentType === 'change_order';
             var statusEl = document.getElementById('quoteStatus');
             var status = statusEl ? statusEl.value : (isChangeOrder ? 'draft' : 'draft');
-            var supabaseId = window._supabaseQuoteId || null;
+            var rawSupabaseId = window._supabaseQuoteId || null;
+            var supabaseId = quoteStorageNormalizeCloudId(rawSupabaseId) || null;
+            if (rawSupabaseId && !supabaseId) {
+                window._supabaseQuoteId = null;
+                try { localStorage.removeItem('ald_active_quote_id'); } catch (e) {}
+            }
             var loadedData = window._loadedQuoteData || window._currentQuoteData || {};
             var dividerLabels = (typeof getQuoteDividerLabels === 'function') ? getQuoteDividerLabels() : { singular: 'Room', plural: 'Rooms' };
             if (isChangeOrder && supabaseId && window._parentQuoteId && supabaseId === window._parentQuoteId) {
@@ -1093,13 +1122,17 @@
                 if (document.getElementById('changeOrderReason')) document.getElementById('changeOrderReason').value = data.changeReason || '';
                 if (typeof updateChangeOrderModeUI === 'function') updateChangeOrderModeUI();
             }, 0);
-            // Restore Supabase ID so autosave overwrites the correct record
-            if (data.supabaseId) {
-                window._supabaseQuoteId = data.supabaseId;
+            // Restore Supabase ID so autosave overwrites the correct record.
+            var restoredSupabaseId = quoteStorageNormalizeCloudId(data.supabaseId);
+            if (restoredSupabaseId) {
+                window._supabaseQuoteId = restoredSupabaseId;
                 localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
                 window._quoteFullyLoaded = true;
+            } else if (data.supabaseId) {
+                window._supabaseQuoteId = null;
+                localStorage.removeItem('ald_active_quote_id');
             }
-            window._loadedQuoteData = Object.assign({}, data, { supabaseId: window._supabaseQuoteId || data.supabaseId || null });
+            window._loadedQuoteData = Object.assign({}, data, { supabaseId: quoteStorageNormalizeCloudId(window._supabaseQuoteId || data.supabaseId) || null });
             renderRooms();
             initDone = wasInitDone;
             unsavedChanges = false; // clean slate after load
@@ -1422,8 +1455,21 @@ async function saveQuote() {
             if (!payload || typeof payload !== 'object' || !Array.isArray(payload.rooms)) return null;
             var quote = JSON.parse(JSON.stringify(payload));
             var entityId = String(operation.entityId || '');
-            if (!quote.supabaseId && entityId && entityId.indexOf('quote-number:') !== 0) quote.supabaseId = entityId;
-            if (!quote._serverUpdatedAt && operation.baseVersion) quote._serverUpdatedAt = operation.baseVersion;
+            var payloadCloudId = quoteStorageNormalizeCloudId(quote.supabaseId);
+            var operationCloudId = quoteStorageNormalizeCloudId(entityId);
+            var invalidIdentity = quoteStorageOperationHasInvalidQuoteId(operation) || (!!quote.supabaseId && !payloadCloudId);
+            quote.supabaseId = payloadCloudId || operationCloudId || null;
+            if (invalidIdentity) {
+                quote.supabaseId = null;
+                quote._serverUpdatedAt = null;
+                quote.serverUpdatedAt = null;
+                quote.quoteNumber = quoteStorageRecoveredQuoteNumber(quote.quoteNumber, operation.localSavedAt);
+                if (!/\(Recovered Copy\)$/i.test(String(quote.quoteTitle || ''))) {
+                    quote.quoteTitle = (String(quote.quoteTitle || operation.entityLabel || 'Quote').trim() || 'Quote') + ' (Recovered Copy)';
+                }
+            } else if (!quote._serverUpdatedAt && operation.baseVersion) {
+                quote._serverUpdatedAt = operation.baseVersion;
+            }
             quote._quoteDrBackup = {
                 format: 'quotedr-quote-backup-v1',
                 exportedAt: new Date().toISOString(),
@@ -1912,7 +1958,9 @@ async function saveQuote() {
 
             // Check for ?load=ID in URL - load quote from Supabase
             const urlParams = new URLSearchParams(window.location.search);
-            const loadId = urlParams.get('load');
+            const requestedLoadId = urlParams.get('load');
+            const loadId = quoteStorageNormalizeCloudId(requestedLoadId);
+            if (requestedLoadId && !loadId) console.warn('Ignored an invalid quote id in the page URL.');
             if (loadId && typeof loadQuoteFromSupabase === 'function') {
                 try {
                     const { data, error } = await loadQuoteFromSupabase(loadId);
@@ -2178,7 +2226,9 @@ async function saveQuote() {
                     }
                     updateDraftWarning();
                 } else if (!_urlp.get('load') && !_urlp.get('shownotes')) {
-                    var _savedActiveId = localStorage.getItem("ald_active_quote_id");
+                    var _savedActiveIdRaw = localStorage.getItem("ald_active_quote_id");
+                    var _savedActiveId = quoteStorageNormalizeCloudId(_savedActiveIdRaw);
+                    if (_savedActiveIdRaw && !_savedActiveId) localStorage.removeItem('ald_active_quote_id');
                     if (_savedActiveId && typeof loadQuoteFromSupabase === "function") {
                         // Reload the last opened quote from Supabase directly
                         window._supabaseQuoteId = _savedActiveId;

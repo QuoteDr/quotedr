@@ -58,6 +58,52 @@ function qdDurableSaveError(error, fallback) {
     return wrapped;
 }
 
+function qdNormalizeQuoteUuid(value) {
+    var normalized = String(value || '').trim();
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(normalized) ? normalized : '';
+}
+
+function qdDurableTargetIdentifierError(target) {
+    target = target || {};
+    if (target.table !== 'quotes') return null;
+    var action = String(target.action || '').toLowerCase();
+    var candidate;
+    var hasCandidate = false;
+    if (action === 'update' || action === 'delete') {
+        var idFilter = (target.filters || []).find(function(filter) {
+            return filter && filter.column === 'id' && (!filter.operator || filter.operator === 'eq');
+        });
+        candidate = idFilter && idFilter.value;
+        hasCandidate = true;
+    } else if (action === 'insert' && target.values && !Array.isArray(target.values) &&
+        Object.prototype.hasOwnProperty.call(target.values, 'id')) {
+        candidate = target.values.id;
+        hasCandidate = true;
+    }
+    if (!hasCandidate || qdNormalizeQuoteUuid(candidate)) return null;
+    var error = new Error('QuoteDr stopped a cloud save because its quote ID was invalid. The local quote remains available for recovery.');
+    error.code = 'QD_INVALID_IDENTIFIER';
+    error.details = 'Invalid quote id: ' + String(candidate);
+    return error;
+}
+
+function qdNormalizeQuoteIdentityForSave(quoteData) {
+    if (!quoteData || !quoteData.supabaseId) return;
+    var supplied = String(quoteData.supabaseId).trim();
+    var normalized = qdNormalizeQuoteUuid(supplied);
+    if (normalized) {
+        quoteData.supabaseId = normalized;
+        return;
+    }
+    quoteData.supabaseId = null;
+    quoteData._serverUpdatedAt = null;
+    quoteData.serverUpdatedAt = null;
+    try {
+        if (localStorage.getItem('ald_active_quote_id') === supplied) localStorage.removeItem('ald_active_quote_id');
+    } catch (e) {}
+    if (typeof window !== 'undefined' && String(window._supabaseQuoteId || '') === supplied) window._supabaseQuoteId = null;
+}
+
 function qdDurableVersionsMatch(left, right) {
     if (left === undefined || left === null || right === undefined || right === null) return false;
     if (String(left) === String(right)) return true;
@@ -403,6 +449,10 @@ function qdRegisterAllDurableSaveAdapters() {
 async function qdDurableSupabaseOperation(options) {
     options = options || {};
     if (!options.entityType || !options.entityId || !options.target) throw new Error('Durable Supabase operation is incomplete.');
+    var identifierError = qdDurableTargetIdentifierError(options.target);
+    if (identifierError) {
+        return { state: 'local_failed', saveState: 'local_failed', data: null, error: qdDurableSaveError(identifierError) };
+    }
     if (window.QuoteDrSave) {
         qdRegisterDurableSaveAdapter(options.entityType);
         return window.QuoteDrSave.save({
@@ -1203,6 +1253,7 @@ async function saveQuote(quoteData) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
 
+    qdNormalizeQuoteIdentityForSave(quoteData);
     var editCheck = await verifyQuoteIsEditableBeforeSave(user.id, quoteData);
     if (editCheck.error) return { error: editCheck.error };
     if (!editCheck.editable) return quotePortalLockedSaveError(quoteData, editCheck.row);

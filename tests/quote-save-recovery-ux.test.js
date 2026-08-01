@@ -38,6 +38,9 @@ function extractFunction(source, name) {
 const context = { console, Date, JSON, Promise, String, Array, parseInt };
 vm.createContext(context);
 [
+  'quoteStorageNormalizeCloudId',
+  'quoteStorageRecoveredQuoteNumber',
+  'quoteStorageOperationHasInvalidQuoteId',
   'quoteStorageRecoveryQuoteFromOperation',
   'quoteStorageRecoveryCandidates'
 ].forEach(name => vm.runInContext(extractFunction(quoteStorage, name), context));

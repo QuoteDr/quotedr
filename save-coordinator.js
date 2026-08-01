@@ -213,6 +213,43 @@
         return [userId || 'anonymous', entityType || 'unknown', entityId || 'default'].join('::');
     }
 
+    function isUuidIdentifier(value) {
+        return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value || '').trim());
+    }
+
+    function quoteOperationIdentifierError(operation) {
+        var target = operation && operation.target || {};
+        if (target.table !== 'quotes') return null;
+        var action = String(target.action || operation.action || '').toLowerCase();
+        var candidate;
+        var hasCandidate = false;
+        if (action === 'update' || action === 'delete') {
+            var idFilter = (target.filters || []).find(function(filter) {
+                return filter && filter.column === 'id' && (!filter.operator || filter.operator === 'eq');
+            });
+            candidate = idFilter ? idFilter.value : operation.entityId;
+            hasCandidate = true;
+        } else if (action === 'insert' && target.values && !Array.isArray(target.values) &&
+            Object.prototype.hasOwnProperty.call(target.values, 'id')) {
+            candidate = target.values.id;
+            hasCandidate = true;
+        }
+        if (!hasCandidate || isUuidIdentifier(candidate)) return null;
+        var error = new Error('This retained quote has an invalid cloud ID and cannot be retried safely. Resolve it below, or export and remove the failed save.');
+        error.code = 'QD_INVALID_IDENTIFIER';
+        error.details = 'Invalid quote id: ' + String(candidate);
+        return error;
+    }
+
+    async function quarantineMalformedOperations() {
+        var operations = await getAllStoreValues(OUTBOX_STORE);
+        for (var i = 0; i < operations.length; i++) {
+            var operation = operations[i];
+            var error = quoteOperationIdentifierError(operation);
+            if (error && operation.state !== 'action_required') await markActionRequired(operation, error);
+        }
+    }
+
     function errorObject(error) {
         if (!error) return { message: 'Cloud save failed without an error response.' };
         if (typeof error === 'string') return { message: error };
@@ -375,7 +412,7 @@
                     detail: { operation: operation, result: result, version: cloudVersion }
                 }));
                 await notify();
-                setTimeout(function() { flushSavedOperation(current, { force: true }); }, 0);
+                setTimeout(function() { flushSavedOperation(current, { force: true, ifAvailable: true }); }, 0);
                 return publicResult('local_pending', current, result, null);
             }
             return publicResult('cloud_saved', operation, result, null);
@@ -415,7 +452,7 @@
             successorSnapshot.cloudBaseVersion = current.baseVersion;
             await putStoreValue(SNAPSHOT_STORE, successorSnapshot);
             await notify();
-            setTimeout(function() { flushSavedOperation(current, { force: true }); }, 0);
+            setTimeout(function() { flushSavedOperation(current, { force: true, ifAvailable: true }); }, 0);
             return publicResult('local_pending', current, result, null);
         }
         if (current && current.operationId === operation.operationId && current.revision === operation.revision) {
@@ -455,6 +492,23 @@
         await notify();
         if (current.entityType === 'quote' && current.attempts >= RECOVERY_GUIDANCE_ATTEMPTS) scheduleRecoveryGuidance(current, { localFailed: false });
         return publicResult(current.state, current, null, error);
+    }
+
+    async function markActionRequired(operation, error) {
+        var current = await getStoreValue(OUTBOX_STORE, operation.key);
+        if (!current || current.revision !== operation.revision) return publicResult('action_required', operation, null, error);
+        current.state = 'action_required';
+        current.nextAttemptAt = 0;
+        current.lastError = errorObject(error);
+        await putStoreValue(OUTBOX_STORE, current);
+        var snapshot = await getStoreValue(SNAPSHOT_STORE, operation.key) || {};
+        snapshot.state = 'action_required';
+        snapshot.lastError = current.lastError;
+        await putStoreValue(SNAPSHOT_STORE, snapshot);
+        clearRecoveryGuidance(current);
+        captureVaultIncident(current).catch(function() {});
+        await notify();
+        return publicResult('action_required', current, null, current.lastError);
     }
 
     async function markPortalLocked(operation, error) {
@@ -506,6 +560,8 @@
         options = options || {};
         var latest = await getStoreValue(OUTBOX_STORE, operation.key);
         if (!latest || latest.revision !== operation.revision) return publicResult('cloud_saved', operation, null, null);
+        var identifierError = quoteOperationIdentifierError(latest);
+        if (identifierError) return markActionRequired(latest, identifierError);
         if (!options.force && latest.nextAttemptAt && latest.nextAttemptAt > Date.now()) {
             return publicResult(latest.state || 'local_pending', latest, null, latest.lastError);
         }
@@ -522,6 +578,10 @@
             normalizedAdapterResult(result, latest, adapter);
             return markAcknowledged(latest, result);
         } catch (error) {
+            var normalizedError = errorObject(error);
+            if (String(normalizedError.code) === 'QD_INVALID_IDENTIFIER' || /invalid input syntax for type uuid/i.test(normalizedError.message)) {
+                return markActionRequired(latest, error);
+            }
             if (isPortalLockedError(error) && latest.entityType === 'quote' && latest.target && latest.target.requireCurrentQuoteBase === true) {
                 return markPortalLocked(latest, error);
             }
@@ -530,9 +590,15 @@
     }
 
     async function flushSavedOperation(operation, options) {
+        options = options || {};
         if (navigator.locks && typeof navigator.locks.request === 'function') {
-            return navigator.locks.request('quotedr-durable-save-flush', { ifAvailable: true }, function(lock) {
-                if (!lock) return publicResult('local_pending', operation, null, { message: 'Another QuoteDr tab is syncing this account.' });
+            if (options.ifAvailable === true) {
+                return navigator.locks.request('quotedr-durable-save-flush', { ifAvailable: true }, function(lock) {
+                    if (!lock) return publicResult('local_pending', operation, null, null);
+                    return flushOperation(operation, options);
+                });
+            }
+            return navigator.locks.request('quotedr-durable-save-flush', function() {
                 return flushOperation(operation, options);
             });
         }
@@ -546,7 +612,7 @@
         var results = [];
         for (var i = 0; i < operations.length; i++) {
             var operation = operations[i];
-            if (operation.state === 'conflict') continue;
+            if (operation.state === 'conflict' || operation.state === 'action_required') continue;
             results.push(await flushOperation(operation, options));
         }
         await notify();
@@ -662,7 +728,7 @@
         await notify();
         if (holdExistingConflict) return publicResult('conflict', operation, null, operation.lastError);
         if (options.background === true) {
-            setTimeout(function() { flushSavedOperation(operation, { force: true }); }, 0);
+            setTimeout(function() { flushSavedOperation(operation, { force: true, ifAvailable: true }); }, 0);
             return publicResult('local_pending', operation, null, null);
         }
         return flushSavedOperation(operation, { force: true });
@@ -673,7 +739,7 @@
         var key = entityKey(userId, entityType, String(entityId));
         var pending = await getStoreValue(OUTBOX_STORE, key);
         if (!pending) return true;
-        if (pending.state === 'conflict') {
+        if (pending.state === 'conflict' || pending.state === 'action_required') {
             openRecoveryCenter();
             return false;
         }
@@ -687,12 +753,18 @@
         var operations = [];
         try { operations = await getAllStoreValues(OUTBOX_STORE); } catch (e) {}
         var conflicts = operations.filter(function(item) { return item.state === 'conflict'; });
+        var actionRequired = operations.filter(function(item) { return item.state === 'action_required'; });
+        var retryable = operations.filter(function(item) {
+            return item.state !== 'conflict' && item.state !== 'action_required';
+        });
         var meta = null;
         try { meta = await getStoreValue(META_STORE, 'lastCloudAckAt'); } catch (e) {}
         return {
-            state: lastLocalFailure ? 'local_failed' : (conflicts.length ? 'conflict' : (operations.length ? 'local_pending' : 'cloud_saved')),
+            state: lastLocalFailure ? 'local_failed' : (actionRequired.length ? 'action_required' : (conflicts.length ? 'conflict' : (operations.length ? 'local_pending' : 'cloud_saved'))),
             pendingCount: operations.length,
             conflictCount: conflicts.length,
+            actionRequiredCount: actionRequired.length,
+            retryableCount: retryable.length,
             lastCloudAckAt: meta && meta.value ? meta.value : null,
             lastLocalFailure: lastLocalFailure,
             operations: operations
@@ -751,9 +823,8 @@
         return publicResult('conflict', operation, null, operation.lastError);
     }
 
-    async function discardPending(entityType, entityId, options) {
+    async function discardPendingByKey(key, options) {
         options = options || {};
-        var key = entityKey(await currentUserId(options.ownerId), entityType, String(entityId));
         var operation = await getStoreValue(OUTBOX_STORE, key);
         var snapshot = await getStoreValue(SNAPSHOT_STORE, key) || null;
         if (snapshot) {
@@ -769,6 +840,95 @@
         }
         await notify();
         return { state: operation || snapshot ? 'discarded' : 'missing' };
+    }
+
+    async function discardPending(entityType, entityId, options) {
+        options = options || {};
+        var key = entityKey(await currentUserId(options.ownerId), entityType, String(entityId));
+        return discardPendingByKey(key, options);
+    }
+
+    function isRecoverableMalformedQuoteOperation(operation) {
+        return !!(operation && operation.state === 'action_required' && operation.entityType === 'quote' &&
+            operation.action !== 'delete' && operation.payload && typeof operation.payload === 'object' &&
+            Array.isArray(operation.payload.rooms));
+    }
+
+    function recoveredQuoteNumber(payload) {
+        var base = String(payload && payload.quoteNumber || 'RECOVERED').trim() || 'RECOVERED';
+        base = base.replace(/\s+/g, '-').slice(0, 60);
+        var stamp = new Date().toISOString().replace(/\D/g, '').slice(0, 14);
+        return base + '-RECOVERED-' + stamp;
+    }
+
+    async function findMalformedQuoteCloudMatches(operation) {
+        var quoteNumber = String(operation && operation.payload && operation.payload.quoteNumber || '').trim();
+        if (!quoteNumber || typeof _supabase === 'undefined') return { checked: false, matches: [], quoteNumber: quoteNumber };
+        var ownerId = isUuidIdentifier(operation && operation.userId) ? operation.userId : await currentUserId();
+        if (!isUuidIdentifier(ownerId)) return { checked: false, matches: [], quoteNumber: quoteNumber };
+        var result = await _supabase
+            .from('quotes')
+            .select('id,quote_number,client_name,updated_at')
+            .eq('user_id', ownerId)
+            .eq('quote_number', quoteNumber)
+            .order('updated_at', { ascending: false });
+        if (result.error) throw result.error;
+        return { checked: true, matches: result.data || [], quoteNumber: quoteNumber };
+    }
+
+    async function resolveMalformedQuoteOperation(key, options) {
+        options = options || {};
+        var operation = await getStoreValue(OUTBOX_STORE, key);
+        if (!isRecoverableMalformedQuoteOperation(operation)) {
+            return { state: 'local_failed', error: { message: 'This retained save cannot be repaired automatically. Export it before removing the failed entry.' } };
+        }
+        var lookup;
+        try {
+            lookup = await findMalformedQuoteCloudMatches(operation);
+        } catch (error) {
+            return { state: 'local_failed', error: errorObject(error) };
+        }
+        if (lookup.matches.length) {
+            return {
+                state: 'cloud_copy_found',
+                matches: lookup.matches,
+                quoteNumber: lookup.quoteNumber
+            };
+        }
+        if (options.saveIfMissing !== true) {
+            return {
+                state: 'cloud_copy_missing',
+                cloudChecked: lookup.checked,
+                quoteNumber: lookup.quoteNumber
+            };
+        }
+        if (typeof saveQuoteToSupabase !== 'function') {
+            return { state: 'local_failed', error: { message: 'The quote cloud-save service is not available on this page.' } };
+        }
+        var payload = cloneValue(operation.payload);
+        var now = new Date().toISOString();
+        payload.supabaseId = null;
+        payload._serverUpdatedAt = null;
+        payload.serverUpdatedAt = null;
+        payload._remoteUpdatePending = false;
+        payload.forceNew = true;
+        payload._forceNewQuote = true;
+        payload.savedAt = now;
+        payload._clientEditedAt = now;
+        payload.quoteNumber = recoveredQuoteNumber(payload);
+        if (!/\(Recovered Copy\)$/i.test(String(payload.quoteTitle || ''))) {
+            payload.quoteTitle = (String(payload.quoteTitle || operation.entityLabel || 'Quote').trim() || 'Quote') + ' (Recovered Copy)';
+        }
+        payload.portal_visible = false;
+        payload.portal_id = '';
+        payload.portal_name = '';
+        payload.portal_added_at = null;
+        var result = await saveQuoteToSupabase(payload);
+        if (result && result.state === 'cloud_saved' && !result.error) {
+            await discardPendingByKey(key, { state: 'recovered_as_new' });
+            return Object.assign({}, result, { recoveredQuoteNumber: payload.quoteNumber });
+        }
+        return result || { state: 'local_failed', error: { message: 'The recovered quote did not receive a cloud acknowledgement.' } };
     }
 
     async function resolveConflict(key, strategy) {
@@ -1204,6 +1364,10 @@
             button.classList.add('qd-sync-error');
             icon = 'fa-triangle-exclamation';
             text = 'Save needs attention';
+        } else if (status.state === 'action_required') {
+            button.classList.add('qd-sync-error');
+            icon = 'fa-triangle-exclamation';
+            text = 'Save needs attention';
         } else if (status.state === 'conflict') {
             button.classList.add('qd-sync-error');
             icon = 'fa-code-compare';
@@ -1235,22 +1399,28 @@
             var conflictActions = operation.state === 'conflict' ? '<div class="qd-recovery-actions mt-2"><button type="button" class="btn btn-sm btn-primary" data-qd-use-local data-qd-operation-key="' + escapeHtml(operation.key) + '"><i class="fas fa-laptop me-1"></i>Use My Version</button>' +
                 (operation.entityType === 'quote' ? '<button type="button" class="btn btn-sm btn-outline-primary" data-qd-use-cloud data-qd-operation-key="' + escapeHtml(operation.key) + '"><i class="fas fa-cloud-arrow-down me-1"></i>Load Cloud Copy</button>' : '') + '</div>' : '';
             var quoteExportAction = operation.entityType === 'quote' ? '<div class="qd-recovery-actions mt-2"><button type="button" class="btn btn-sm btn-outline-success" data-qd-export-quote data-qd-operation-key="' + escapeHtml(operation.key) + '"><i class="fas fa-download me-1"></i>Export Quote Backup</button></div>' : '';
+            var actionRequiredActions = operation.state === 'action_required' ? '<div class="qd-recovery-actions mt-2">' +
+                (isRecoverableMalformedQuoteOperation(operation) ? '<button type="button" class="btn btn-sm btn-primary" data-qd-resolve-quote data-qd-operation-key="' + escapeHtml(operation.key) + '"><i class="fas fa-magnifying-glass me-1"></i>Resolve Failed Save</button>' : '') +
+                '<button type="button" class="btn btn-sm btn-outline-danger" data-qd-discard-failed data-qd-operation-key="' + escapeHtml(operation.key) + '"><i class="fas fa-download me-1"></i>Export &amp; Remove Failed Save</button></div>' : '';
+            var stateLabel = operation.state === 'action_required' ? 'action required' : (operation.state || 'local_pending');
             return '<div class="qd-recovery-row">' +
                 '<div class="qd-recovery-title">' + escapeHtml(operation.entityLabel || operation.entityType) + '</div>' +
-                '<div class="qd-recovery-meta">' + escapeHtml(operation.state || 'local_pending') + ' | Saved locally ' + escapeHtml(new Date(operation.localSavedAt).toLocaleString()) + ' | Attempts: ' + escapeHtml(operation.attempts || 0) + '</div>' +
+                '<div class="qd-recovery-meta">' + escapeHtml(stateLabel) + ' | Saved locally ' + escapeHtml(new Date(operation.localSavedAt).toLocaleString()) + ' | Attempts: ' + escapeHtml(operation.attempts || 0) + '</div>' +
                 (lastError ? '<div class="qd-recovery-error">' + escapeHtml(lastError) + '</div>' : '') +
                 conflictActions +
                 quoteExportAction +
+                actionRequiredActions +
                 '</div>';
         }).join('') : (status.lastLocalFailure
             ? '<div class="qd-recovery-row"><div class="qd-recovery-title text-danger">This change is not safely retained</div><div class="qd-recovery-error">' + escapeHtml(status.lastLocalFailure.message || 'Local browser storage failed.') + '</div><div class="qd-recovery-meta">Export a recovery file now. For a file larger than 50 MB, keep the original selected file available for re-upload.</div>' +
                 (emergencyRecovery && emergencyRecovery.operation && emergencyRecovery.operation.entityType === 'quote' ? '<div class="qd-recovery-actions mt-2"><button type="button" class="btn btn-sm btn-outline-success" data-qd-export-quote data-qd-operation-key="' + escapeHtml(emergencyRecovery.operation.key) + '"><i class="fas fa-download me-1"></i>Export Quote Backup</button></div>' : '') + '</div>'
             : '<div class="text-muted py-3">There are no pending saves. Your latest changes are confirmed in the cloud.</div>');
         var exportDisabled = status.operations.length || status.lastLocalFailure ? '' : ' disabled title="There are no pending saves to export"';
+        var retryAction = status.retryableCount ? '<button type="button" class="btn btn-primary btn-sm" data-qd-retry><i class="fas fa-rotate me-1"></i>Retry Now</button>' : '';
         overlay.innerHTML = '<div id="qdSaveRecoveryDialog" role="dialog" aria-modal="true" aria-labelledby="qdSaveRecoveryTitle">' +
             '<div class="qd-recovery-header"><div><div class="h5 mb-0" id="qdSaveRecoveryTitle"><i class="fas fa-shield-halved me-2"></i>Sync &amp; Recovery</div><div class="small text-muted mt-1">Local copies remain here until the cloud confirms them.</div></div><button type="button" class="btn btn-sm btn-outline-secondary" data-qd-close aria-label="Close"><i class="fas fa-xmark"></i></button></div>' +
             '<div class="qd-recovery-body">' + rows + '</div>' +
-            '<div class="qd-recovery-footer"><button type="button" class="btn btn-outline-secondary btn-sm" data-qd-export' + exportDisabled + '><i class="fas fa-download me-1"></i>Export Recovery Bundle</button><button type="button" class="btn btn-primary btn-sm" data-qd-retry><i class="fas fa-rotate me-1"></i>Retry Now</button><button type="button" class="btn btn-secondary btn-sm" data-qd-close>Close</button></div>' +
+            '<div class="qd-recovery-footer"><button type="button" class="btn btn-outline-secondary btn-sm" data-qd-export' + exportDisabled + '><i class="fas fa-download me-1"></i>Export Recovery Bundle</button>' + retryAction + '<button type="button" class="btn btn-secondary btn-sm" data-qd-close>Close</button></div>' +
             '</div>';
         overlay.addEventListener('click', function(event) {
             if (event.target === overlay || event.target.closest('[data-qd-close]')) overlay.remove();
@@ -1285,6 +1455,92 @@
                 await resolveConflict(button.getAttribute('data-qd-operation-key'), 'use_cloud');
             });
         });
+        overlay.querySelectorAll('[data-qd-resolve-quote]').forEach(function(button) {
+            button.addEventListener('click', async function() {
+                var operationKey = button.getAttribute('data-qd-operation-key');
+                var operation = status.operations.find(function(item) { return item.key === operationKey; });
+                if (!operation) return;
+                button.disabled = true;
+                button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Checking Cloud';
+                var result = await resolveMalformedQuoteOperation(operationKey);
+                if (result && result.state === 'cloud_copy_found') {
+                    try {
+                        await exportQuoteOperation(operation);
+                    } catch (error) {
+                        button.disabled = false;
+                        button.innerHTML = '<i class="fas fa-triangle-exclamation me-1"></i>Backup Failed - Try Again';
+                        return;
+                    }
+                    overlay.style.display = 'none';
+                    var count = result.matches.length;
+                    var message = 'QuoteDr found ' + count + ' cloud cop' + (count === 1 ? 'y' : 'ies') + ' with quote number ' + (result.quoteNumber || '') + '. A backup of the retained local copy was downloaded. Remove this obsolete retry? This will not change or delete the cloud cop' + (count === 1 ? 'y.' : 'ies.');
+                    var confirmed = typeof qdConfirm === 'function' ? await qdConfirm(message, {
+                        title: 'Cloud Copy Found', okText: 'Remove Obsolete Retry', cancelText: 'Keep It', type: 'warning'
+                    }) : window.confirm(message);
+                    if (confirmed) await discardPendingByKey(operationKey, { state: 'cloud_copy_confirmed' });
+                    overlay.remove();
+                    openRecoveryCenter();
+                    return;
+                }
+                if (result && result.state === 'cloud_copy_missing') {
+                    overlay.style.display = 'none';
+                    var missingMessage = result.cloudChecked
+                        ? 'No cloud quote with this quote number was found. Save the retained version as a separate recovered quote?'
+                        : 'This retained quote could not be matched by quote number. Save it as a separate recovered quote?';
+                    var saveConfirmed = typeof qdConfirm === 'function' ? await qdConfirm(missingMessage, {
+                        title: 'No Matching Cloud Copy', okText: 'Save Recovered Copy', cancelText: 'Cancel', type: 'warning'
+                    }) : window.confirm(missingMessage);
+                    if (!saveConfirmed) {
+                        overlay.style.display = '';
+                        button.disabled = false;
+                        button.innerHTML = '<i class="fas fa-magnifying-glass me-1"></i>Resolve Failed Save';
+                        return;
+                    }
+                    result = await resolveMalformedQuoteOperation(operationKey, { saveIfMissing: true });
+                }
+                overlay.remove();
+                if (result && result.state === 'cloud_saved' && !result.error) {
+                    var successMessage = 'Recovered quote saved to the cloud as ' + (result.recoveredQuoteNumber || 'a new quote') + '.';
+                    if (typeof qdAlert === 'function') qdAlert(successMessage, { title: 'Recovered Quote Saved', type: 'success' });
+                    else window.alert(successMessage);
+                } else {
+                    var resolutionError = result && result.error && result.error.message || 'The failed save could not be resolved automatically.';
+                    if (typeof qdAlert === 'function') qdAlert(resolutionError, { title: 'Recovery Not Finished', type: 'warning' });
+                    else window.alert(resolutionError);
+                    openRecoveryCenter();
+                }
+            });
+        });
+        overlay.querySelectorAll('[data-qd-discard-failed]').forEach(function(button) {
+            button.addEventListener('click', async function() {
+                var operationKey = button.getAttribute('data-qd-operation-key');
+                var operation = status.operations.find(function(item) { return item.key === operationKey; });
+                if (!operation) return;
+                button.disabled = true;
+                button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Exporting Backup';
+                try {
+                    if (operation.entityType === 'quote') await exportQuoteOperation(operation);
+                    else await exportRecovery();
+                } catch (error) {
+                    button.disabled = false;
+                    button.innerHTML = '<i class="fas fa-triangle-exclamation me-1"></i>Export Failed - Try Again';
+                    return;
+                }
+                overlay.style.display = 'none';
+                var confirmed = typeof qdConfirm === 'function' ? await qdConfirm('The backup was downloaded. Remove this failed save from this browser\'s retry list? This does not delete any cloud quote.', {
+                    title: 'Remove Failed Save?', okText: 'Remove Failed Save', cancelText: 'Keep It', okClass: 'btn-danger', type: 'warning'
+                }) : window.confirm('Backup downloaded. Remove this failed save from this browser?');
+                if (!confirmed) {
+                    overlay.style.display = '';
+                    button.disabled = false;
+                    button.innerHTML = '<i class="fas fa-download me-1"></i>Export & Remove Failed Save';
+                    return;
+                }
+                await discardPendingByKey(operationKey, { state: 'discarded_after_backup' });
+                overlay.remove();
+                openRecoveryCenter();
+            });
+        });
         overlay.querySelectorAll('[data-qd-export-quote]').forEach(function(button) {
             button.addEventListener('click', async function() {
                 var operationKey = button.getAttribute('data-qd-operation-key');
@@ -1312,7 +1568,8 @@
                 button.innerHTML = '<i class="fas fa-triangle-exclamation me-1"></i>Export Failed - Try Again';
             }
         });
-        overlay.querySelector('[data-qd-retry]').addEventListener('click', async function(event) {
+        var retryButton = overlay.querySelector('[data-qd-retry]');
+        if (retryButton) retryButton.addEventListener('click', async function(event) {
             var button = event.currentTarget;
             button.disabled = true;
             button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Retrying';
@@ -1382,6 +1639,7 @@
             await openDatabase();
             await migrateLegacySnapshots();
             if (typeof window.qdRegisterAllDurableSaveAdapters === 'function') window.qdRegisterAllDurableSaveAdapters();
+            await quarantineMalformedOperations();
             requestPersistentStorage();
             await notify();
             await flush({ force: true });
@@ -1418,6 +1676,8 @@
         pauseEntity: pauseEntity,
         updateConflictPayload: updateConflictPayload,
         discardPending: discardPending,
+        discardPendingByKey: discardPendingByKey,
+        resolveMalformedQuote: resolveMalformedQuoteOperation,
         resolveConflict: resolveConflict,
         exportRecovery: exportRecovery,
         openRecoveryCenter: openRecoveryCenter,
