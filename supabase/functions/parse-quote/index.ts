@@ -6,77 +6,16 @@ import {
   startAiUsage,
 } from "../_shared/ai-guard.ts";
 
+import {
+  formatVoiceRoomTranscript,
+  normalizePaintQuantities,
+  splitVoiceRoomSections,
+} from "../_shared/voice-quote-measurements.mjs";
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-function roundQuantity(value: number) {
-  if (!isFinite(value)) return 0;
-  return Math.round(value * 100) / 100;
-}
-
-function extractRoomDimensions(text: string) {
-  const lower = String(text || '').toLowerCase();
-  const dimMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:ft|feet|foot|')?\s*(?:x|by)\s*(\d+(?:\.\d+)?)\s*(?:ft|feet|foot|')?/);
-  if (!dimMatch) return null;
-  const length = parseFloat(dimMatch[1]);
-  const width = parseFloat(dimMatch[2]);
-  if (!isFinite(length) || !isFinite(width) || length <= 0 || width <= 0) return null;
-  let height = 8;
-  let heightProvided = false;
-  const heightMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:ft|feet|foot|')?\s*(?:high|height|ceilings?|walls?)/)
-    || lower.match(/(?:ceiling|wall)\s*(?:height|is|are)?\s*(\d+(?:\.\d+)?)\s*(?:ft|feet|foot|')?/);
-  if (heightMatch) {
-    const parsedHeight = parseFloat(heightMatch[1]);
-    if (isFinite(parsedHeight) && parsedHeight > 0) {
-      height = parsedHeight;
-      heightProvided = true;
-    }
-  }
-  return {
-    length,
-    width,
-    height,
-    heightProvided,
-    floorArea: roundQuantity(length * width),
-    wallArea: roundQuantity((length + width) * 2 * height),
-  };
-}
-
-function normalizePaintQuantities(parsed: any, transcript: string) {
-  const dims = extractRoomDimensions(transcript);
-  if (!dims || !parsed || !Array.isArray(parsed.rooms)) return parsed;
-  parsed.rooms.forEach((room: any) => {
-    if (!room || !Array.isArray(room.items)) return;
-    room.dimensions = {
-      length: dims.length,
-      width: dims.width,
-      height: dims.height,
-      heightProvided: dims.heightProvided,
-      floorArea: dims.floorArea,
-      wallArea: dims.wallArea,
-    };
-    room.items.forEach((item: any) => {
-      const label = `${item.category || ''} ${item.description || ''} ${item.spokenPhrase || ''}`.toLowerCase();
-      const isPaint = label.includes('paint') || label.includes('painting');
-      if (!isPaint) return;
-      if (label.includes('wall')) {
-        item.quantity = dims.wallArea;
-        item.unit = item.unit || 'sqft';
-        item.calculation = `Wall paint sqft = perimeter x height = (${dims.length}+${dims.width})x2x${dims.height} = ${dims.wallArea} sqft`;
-        item.needsMeasurement = dims.heightProvided ? undefined : 'ceiling_height';
-        item.total = roundQuantity((parseFloat(item.rate) || 0) * dims.wallArea);
-      } else if (label.includes('ceiling')) {
-        item.quantity = dims.floorArea;
-        item.unit = item.unit || 'sqft';
-        item.calculation = `Ceiling paint sqft = length x width = ${dims.length}x${dims.width} = ${dims.floorArea} sqft`;
-        item.total = roundQuantity((parseFloat(item.rate) || 0) * dims.floorArea);
-      }
-    });
-  });
-  return parsed;
-}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -102,6 +41,12 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'OpenAI key not configured' }, 500, corsHeaders);
     }
 
+    const roomSections = splitVoiceRoomSections(transcript);
+    const voiceTranscriptForModel = formatVoiceRoomTranscript(transcript);
+    const roomBoundaryRule = roomSections.length > 1
+      ? `- The transcript contains ${roomSections.length} numbered room sections. Return exactly ${roomSections.length} room objects, one per section. The room object's sourceOrder must match its section number.`
+      : '- Set sourceOrder to the 1-based order in which each room or area is first mentioned.';
+
     const systemPrompt = `You are a renovation quoting assistant. Parse the contractor's spoken description into a structured quote.
 
 Return ONLY valid JSON in this exact format:
@@ -109,6 +54,7 @@ Return ONLY valid JSON in this exact format:
   "rooms": [
     {
       "name": "Room/Area Name",
+      "sourceOrder": 1,
       "items": [
         {
           "category": "Category Name",
@@ -129,8 +75,11 @@ Categories to use (pick the closest match):
 Demolition, Concrete & Masonry, Waterproofing, Rough Framing, Windows & Exterior Doors, Rough Plumbing, Rough Electrical, HVAC / Ductwork, Insulation, Drywall, Tile & Stone, Flooring, Interior Doors, Trim & Millwork, Cabinets & Vanities, Finish Plumbing, Finish Electrical, Carpentry & Baseboards, Painting, Cleaning & Disposal, Miscellaneous
 
 Rules:
-- Group items logically by room or area
-- If the transcript says "next room", start a new room/area at that point and keep following items in that new room.
+- Include every room or area and every requested item. There is no three-room limit.
+- Keep rooms in the exact order the contractor first mentions them.
+- Never combine separately named rooms or areas unless the contractor explicitly describes them as one combined area.
+- Treat every "next room" marker and every numbered ROOM SECTION label as a hard boundary. Never skip, merge, or reorder those sections.
+${roomBoundaryRule}
 - If no specific price is mentioned, set rate and total to 0 (contractor will fill in)
 - Use realistic unit types: sqft, lf, ea, hr, ls (lump sum)
 - Keep descriptions concise and professional
@@ -174,34 +123,60 @@ Rules:
     }
 
     const model = Deno.env.get('OPENAI_VOICE_MODEL') || 'gpt-4o-mini';
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: systemPrompt + materialsRef + learningRef },
-          { role: 'user', content: transcript }
-        ],
-        temperature: 0.3,
-        max_tokens: usageGuard.policy.maxOutputTokens,
-      }),
+    const baseMessages = [
+      { role: 'system', content: systemPrompt + materialsRef + learningRef },
+      { role: 'user', content: voiceTranscriptForModel },
+    ];
+    const requestQuoteCompletion = async (messages: any[]) => {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature: 0.3,
+          max_tokens: usageGuard.policy.maxOutputTokens,
+        }),
+      });
+      if (!response.ok) {
+        const err = await response.text();
+        throw new Error(`OpenAI error: ${err}`);
+      }
+      return await response.json();
+    };
+    const parseCompletion = (data: any) => {
+      const content = String(data?.choices?.[0]?.message?.content || '').trim();
+      const jsonStr = content.replace(/^```json?\n?/, '').replace(/\n?```$/, '');
+      return { content, parsed: JSON.parse(jsonStr) };
+    };
+    const combineUsage = (first: any, second: any) => ({
+      prompt_tokens: Number(first?.prompt_tokens || 0) + Number(second?.prompt_tokens || 0),
+      completion_tokens: Number(first?.completion_tokens || 0) + Number(second?.completion_tokens || 0),
+      total_tokens: Number(first?.total_tokens || 0) + Number(second?.total_tokens || 0),
     });
 
-    if (!response.ok) {
-      const err = await response.text();
-      throw new Error(`OpenAI error: ${err}`);
+    let data = await requestQuoteCompletion(baseMessages);
+    let completion = parseCompletion(data);
+    let roomRepairUsed = false;
+    if (roomSections.length > 1 && (!Array.isArray(completion.parsed?.rooms) || completion.parsed.rooms.length !== roomSections.length)) {
+      roomRepairUsed = true;
+      const actualCount = Array.isArray(completion.parsed?.rooms) ? completion.parsed.rooms.length : 0;
+      const repairInstruction = `Your response returned ${actualCount} room objects, but the transcript has ${roomSections.length} hard-bounded room sections. Return a complete replacement JSON object with exactly ${roomSections.length} rooms. Keep one room per numbered section and preserve section order. Do not combine or omit any section.`;
+      const repairData = await requestQuoteCompletion(baseMessages.concat([
+        { role: 'assistant', content: completion.content },
+        { role: 'user', content: repairInstruction },
+      ]));
+      repairData.usage = combineUsage(data.usage || {}, repairData.usage || {});
+      data = repairData;
+      completion = parseCompletion(data);
     }
-
-    const data = await response.json();
-    const content = data.choices[0].message.content.trim();
-    
-    // Strip markdown code blocks if present
-    const jsonStr = content.replace(/^```json?\n?/, '').replace(/\n?```$/, '');
-    const parsed = normalizePaintQuantities(JSON.parse(jsonStr), transcript);
+    if (roomSections.length > 1 && (!Array.isArray(completion.parsed?.rooms) || completion.parsed.rooms.length !== roomSections.length)) {
+      throw new Error('AI could not preserve every spoken room. Please generate again; your transcript is still available.');
+    }
+    const parsed = normalizePaintQuantities(completion.parsed, transcript);
     await usageGuard.recordSuccess({
       model,
       usage: data.usage || {},
@@ -209,6 +184,8 @@ Rules:
         label: usageGuard.policy.label,
         customItemCategories: customItems && typeof customItems === 'object' ? Object.keys(customItems).length : 0,
         learnedMappings: Array.isArray(learnedMappings) ? learnedMappings.length : 0,
+        roomSections: roomSections.length,
+        roomRepairUsed,
       },
     });
 

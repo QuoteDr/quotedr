@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Voice Measurements Fixture</title>
+  <style>
+    html, body, iframe { width: 100%; height: 100%; margin: 0; border: 0; }
+  </style>
+</head>
+<body>
+  <iframe id="builderFixture" title="QuoteDr AI Voice measurements fixture"></iframe>
+  <script>
+    (function() {
+      localStorage.setItem('ald_builder_guide_hidden', '1');
+      var frame = document.getElementById('builderFixture');
+      frame.addEventListener('load', function() {
+        var app = frame.contentWindow;
+        if (!app || typeof app.showAiVoiceMeasurementModal !== 'function') return;
+        var rooms = ['Room One', 'Room Two', 'Room Three', 'Room Four', 'Room Five', 'Room Six'].map(function(name, index) {
+          return {
+            name: name,
+            dimensions: {
+              length: index === 5 ? undefined : 10 + index,
+              width: index === 5 ? undefined : 11 + index,
+              height: 8,
+              heightProvided: false
+            },
+            items: [{
+              category: 'Painting',
+              description: 'Paint walls',
+              unit: 'sqft',
+              rate: 2,
+              needsMeasurement: index === 5 ? 'room_dimensions' : 'ceiling_height'
+            }]
+          };
+        });
+        app.showAiVoiceMeasurementModal({ rooms: rooms })
+          .then(function(result) {
+            var finalRoom = result.rooms[result.rooms.length - 1];
+            document.body.setAttribute('data-fixture-resolved', 'true');
+            document.body.setAttribute('data-fixture-room-count', String(result.rooms.length));
+            document.body.setAttribute('data-fixture-final-wall-area', String(finalRoom.dimensions.wallArea));
+          })
+          .catch(function(error) {
+            document.body.setAttribute('data-fixture-error', error && error.message ? error.message : String(error));
+          });
+      });
+      frame.src = '../quote-builder.html';
+    })();
+  </script>
+</body>
+</html>
