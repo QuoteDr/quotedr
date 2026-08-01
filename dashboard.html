@@ -483,6 +483,7 @@
             var pools = [];
             try { pools = pools.concat(allQuotes || []); } catch (e) {}
             try { pools = pools.concat(junkQuotes || []); } catch (e) {}
+            try { pools = pools.concat(dashboardPortalPlaceholderRows || []); } catch (e) {}
             return pools.find(function(row) { return String(row.id) === String(quoteId); }) || null;
         }
 
@@ -566,6 +567,9 @@
         var dashboardManualPaymentReports = {};
         var selectedClientFilesFilter = null;
         let junkQuotes = []; // Recently deleted quotes/invoices, retained temporarily
+        let dashboardPortalPlaceholderRows = []; // Legacy metadata rows stay out of quote views
+        let dashboardEmptyPortals = []; // Empty portals persist independently from quote rows
+        const DASHBOARD_EMPTY_PORTALS_KEY = 'client_portals';
         const JUNK_RETENTION_DAYS = 30;
         const JUNK_RETENTION_MS = JUNK_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
@@ -759,7 +763,7 @@
         async function loadDashboardFullQuote(quoteOrId) {
             var quote = typeof quoteOrId === 'object'
                 ? quoteOrId
-                : (allQuotes || []).concat(junkQuotes || []).find(function(row) { return row.id === quoteOrId; });
+                : dashboardQuoteRowById(quoteOrId);
             var quoteId = quote && quote.id ? quote.id : quoteOrId;
             if (!quoteId) throw new Error('Quote not found');
             if (dashboardFullQuoteRows[quoteId]) return dashboardFullQuoteRows[quoteId];
@@ -781,13 +785,27 @@
             return !!(quoteData(quote).junk_deleted_at);
         }
 
+        function quoteIsPortalPlaceholder(quote) {
+            var data = quoteData(quote);
+            if (data.portal_placeholder === true) return true;
+            var quoteNumber = String((quote && quote.quote_number) || data.quoteNumber || '').trim();
+            var quoteTitle = String(data.quoteTitle || data.title || '').trim();
+            var total = parseFloat((quote && quote.total) || data.grandTotal || 0) || 0;
+            var hasRooms = Array.isArray(data.rooms) && data.rooms.length > 0;
+            return /^PORTAL-[A-Z0-9]{7,12}$/i.test(quoteNumber) && /\bPortal$/i.test(quoteTitle) && total === 0 && !hasRooms;
+        }
+
         async function setDashboardQuotesFromCloud(rows) {
             dashboardFullQuoteRows = Object.create(null);
             var currentRows = await purgeExpiredJunkQuotes(rows || []);
-            junkQuotes = currentRows.filter(quoteIsJunked).sort(function(a, b) {
+            junkQuotes = currentRows.filter(function(row) {
+                return quoteIsJunked(row) && !quoteIsPortalPlaceholder(row);
+            }).sort(function(a, b) {
                 return new Date(quoteData(b).junk_deleted_at || 0) - new Date(quoteData(a).junk_deleted_at || 0);
             });
-            allQuotes = autocleanDuplicates(currentRows.filter(function(q) { return !quoteIsJunked(q); }));
+            var activeRows = currentRows.filter(function(q) { return !quoteIsJunked(q); });
+            dashboardPortalPlaceholderRows = activeRows.filter(quoteIsPortalPlaceholder);
+            allQuotes = autocleanDuplicates(activeRows.filter(function(q) { return !quoteIsPortalPlaceholder(q); }));
             updateJunkBadge();
             return allQuotes;
         }
@@ -923,13 +941,13 @@
 
         async function refreshQuotes() {
             try {
-                const [{ data, error }] = await Promise.all([listQuoteSummariesFromSupabase(), refreshDashboardManualPaymentReports()]);
+                const [{ data, error }] = await Promise.all([listQuoteSummariesFromSupabase(), refreshDashboardManualPaymentReports(), loadDashboardEmptyPortals()]);
                 if (error === 'Not authenticated') {
                     // Retry after delay - session may not be ready yet
                     setTimeout(async function() {
                         const retry = await listQuoteSummariesFromSupabase();
                         if (!retry.error) {
-                            await refreshDashboardManualPaymentReports();
+                            await Promise.all([refreshDashboardManualPaymentReports(), loadDashboardEmptyPortals()]);
                             await setDashboardQuotesFromCloud(retry.data || []);
                             renderDashboardResults();
                             updateStats(allQuotes);
@@ -1788,9 +1806,103 @@
             return String(portalId || '').replace(/[^a-zA-Z0-9_-]/g, '_');
         }
 
+        function normalizeDashboardEmptyPortal(record) {
+            if (!record || typeof record !== 'object') return null;
+            var id = String(record.id || '').trim();
+            var name = String(record.name || '').trim();
+            if (!id || !name) return null;
+            return {
+                id: id,
+                name: name,
+                clientName: String(record.clientName || name).trim() || name,
+                clientEmail: String(record.clientEmail || '').trim(),
+                pin: String(record.pin || '').trim(),
+                theme: record.theme && typeof record.theme === 'object' ? Object.assign({}, record.theme) : {},
+                createdAt: String(record.createdAt || '').trim() || new Date().toISOString(),
+                updatedAt: String(record.updatedAt || '').trim()
+            };
+        }
+
+        function dashboardEmptyPortalRecordById(portalId) {
+            return (dashboardEmptyPortals || []).find(function(record) {
+                return String(record.id) === String(portalId);
+            }) || null;
+        }
+
+        async function loadDashboardEmptyPortals() {
+            if (!window.currentUser || !_supabase) return dashboardEmptyPortals;
+            try {
+                var result = await _supabase.from('user_data').select('value').eq('user_id', window.currentUser.id).eq('key', DASHBOARD_EMPTY_PORTALS_KEY).maybeSingle();
+                if (result.error) throw result.error;
+                var records = Array.isArray(result.data?.value) ? result.data.value : [];
+                dashboardEmptyPortals = records.map(normalizeDashboardEmptyPortal).filter(Boolean);
+            } catch (error) {
+                console.warn('Could not load empty client portals:', error.message || error);
+                return dashboardEmptyPortals;
+            }
+            return dashboardEmptyPortals;
+        }
+
+        async function saveDashboardEmptyPortals(records, label) {
+            var byId = {};
+            (records || []).map(normalizeDashboardEmptyPortal).filter(Boolean).forEach(function(record) {
+                byId[record.id] = record;
+            });
+            var normalized = Object.values(byId).sort(function(a, b) {
+                return a.name.localeCompare(b.name) || a.clientName.localeCompare(b.clientName);
+            });
+            var result = await saveUserDataValue(DASHBOARD_EMPTY_PORTALS_KEY, normalized, {
+                entityType: 'client_portal',
+                entityLabel: label || 'Client portals'
+            });
+            if (result && result.error) throw new Error(result.error.message || result.error);
+            dashboardEmptyPortals = normalized;
+            return dashboardEmptyPortals;
+        }
+
+        async function upsertDashboardEmptyPortal(record, label) {
+            var normalized = normalizeDashboardEmptyPortal(record);
+            if (!normalized) throw new Error('Portal details are incomplete');
+            var existing = dashboardEmptyPortalRecordById(normalized.id);
+            if (existing) normalized.createdAt = existing.createdAt || normalized.createdAt;
+            normalized.updatedAt = new Date().toISOString();
+            var next = (dashboardEmptyPortals || []).filter(function(item) { return item.id !== normalized.id; });
+            next.push(normalized);
+            await saveDashboardEmptyPortals(next, label);
+            return normalized;
+        }
+
+        async function removeDashboardEmptyPortal(portalId, label) {
+            if (!dashboardEmptyPortalRecordById(portalId)) return dashboardEmptyPortals;
+            var next = (dashboardEmptyPortals || []).filter(function(record) {
+                return String(record.id) !== String(portalId);
+            });
+            return await saveDashboardEmptyPortals(next, label);
+        }
+
         function buildPortalRegistry(quotes) {
             var map = {};
-            (quotes || []).forEach(function(q) {
+            (dashboardEmptyPortals || []).forEach(function(record) {
+                map[record.id] = {
+                    id: record.id,
+                    legacy: false,
+                    name: record.name,
+                    clientName: record.clientName,
+                    clientEmail: record.clientEmail,
+                    pin: record.pin,
+                    secureToken: '',
+                    secureAnchorId: '',
+                    secureCreatedAt: '',
+                    registryRecord: record,
+                    registryTheme: record.theme || {},
+                    quoteIds: [],
+                    quotes: []
+                };
+            });
+            var seenRows = {};
+            (quotes || []).concat(dashboardPortalPlaceholderRows || []).forEach(function(q) {
+                if (!q || !q.id || seenRows[q.id]) return;
+                seenRows[q.id] = true;
                 var d = q.data || {};
                 if (!d.portal_visible) return;
                 var key = quotePortalKey(q);
@@ -1807,6 +1919,8 @@
                         secureToken: String(d.portal_share_token || '').trim(),
                         secureAnchorId: String(d.portal_share_anchor_id || '').trim(),
                         secureCreatedAt: String(d.portal_share_created_at || '').trim(),
+                        registryRecord: null,
+                        registryTheme: {},
                         quoteIds: [],
                         quotes: []
                     };
@@ -1825,7 +1939,7 @@
 
         function portalDocumentCount(portal) {
             return (portal && portal.quotes || []).filter(function(q) {
-                return !(q.data && q.data.portal_placeholder);
+                return !quoteIsPortalPlaceholder(q);
             }).length;
         }
 
@@ -1837,7 +1951,8 @@
             var quoteWithPortalLogo = (portal && portal.quotes || []).find(function(q) {
                 return q.data && q.data.portal_theme && q.data.portal_theme.portalLogo;
             });
-            return quoteWithPortalLogo ? quoteWithPortalLogo.data.portal_theme : {};
+            if (quoteWithPortalLogo) return quoteWithPortalLogo.data.portal_theme;
+            return portal && portal.registryTheme ? portal.registryTheme : {};
         }
 
         function cleanPortalColor(value, fallback) {
@@ -2011,13 +2126,16 @@
             var pin = String(portal.pin || '').trim();
             var pinText = pin || 'Not set';
             var linkReady = !!(portal.secureToken && portal.secureAnchorId);
-            var clientLinkValue = linkReady ? portalClientUrl : 'Preparing clean link...';
+            var hasDocuments = portalDocumentCount(portal) > 0;
+            var clientLinkValue = linkReady ? portalClientUrl : (hasDocuments ? 'Preparing clean link...' : 'Add a document to create a client link');
+            var linkButtonIcon = linkReady ? 'fa-copy' : (hasDocuments ? 'fa-spinner fa-spin' : 'fa-ban');
+            var linkButtonText = linkReady ? 'Copy Link' : (hasDocuments ? 'Preparing' : 'Unavailable');
             return '<div class="border rounded p-3 mt-2 bg-light">' +
                 '<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2">' +
                 '<div><strong><i class="fas fa-key me-1"></i>Portal PIN</strong><div class="small text-muted">Clients use this PIN to unlock this portal.</div></div>' +
                 '<div class="px-3 py-2 rounded text-center" style="background:#fff;border:1px solid #d8e0ea;min-width:120px;font-size:1.5rem;font-weight:800;letter-spacing:0.35rem;color:#1a2940;">' + escapeHtml(pinText) + '</div>' +
                 '</div>' +
-                '<div class="input-group input-group-sm mb-2"><span class="input-group-text">Client link</span><input class="form-control" value="' + escapeHtml(clientLinkValue) + '" readonly><button class="btn btn-outline-secondary" type="button" onclick="copyPortalPinBundle(' + jsAttr(portal.id) + ')" ' + (linkReady ? '' : 'disabled') + '><i class="fas ' + (linkReady ? 'fa-copy' : 'fa-spinner fa-spin') + ' me-1"></i>' + (linkReady ? 'Copy Link' : 'Preparing') + '</button></div>' +
+                '<div class="input-group input-group-sm mb-2"><span class="input-group-text">Client link</span><input class="form-control" value="' + escapeHtml(clientLinkValue) + '" readonly><button class="btn btn-outline-secondary" type="button" onclick="copyPortalPinBundle(' + jsAttr(portal.id) + ')" ' + (linkReady ? '' : 'disabled') + '><i class="fas ' + linkButtonIcon + ' me-1"></i>' + linkButtonText + '</button></div>' +
                 '<button type="button" class="btn btn-outline-warning btn-sm" onclick="changePortalPin(' + jsAttr(portal.id) + ')"><i class="fas fa-rotate me-1"></i>Generate New PIN</button>' +
                 '</div>';
         }
@@ -2031,8 +2149,8 @@
             if (existing.token && existing.anchorId) return existing;
             if (typeof createSecureClientShareLink !== 'function') throw new Error('Secure portal links are unavailable');
             var anchor = (portal && portal.quotes || []).find(function(row) {
-                return row && row.id && !(row.data && row.data.portal_placeholder);
-            }) || (portal && portal.quotes && portal.quotes[0]);
+                return row && row.id && !quoteIsPortalPlaceholder(row);
+            });
             if (!anchor || !anchor.id) throw new Error('This portal needs a document before its clean link can be created');
             anchor = await loadDashboardFullQuote(anchor);
             var share = await createSecureClientShareLink(anchor.id, '', { mode: 'portal' });
@@ -2054,6 +2172,7 @@
             renderPortalAssignmentList();
             if (window._portalPinEditorId !== portalId) return;
             var portal = buildPortalRegistry(allQuotes).find(function(p) { return p.id === portalId; });
+            if (portal && portalDocumentCount(portal) === 0) return;
             if (!portal || (portal.secureToken && portal.secureAnchorId)) return;
             try {
                 await ensurePortalStableShare(portal);
@@ -2094,8 +2213,12 @@
             if (!(await qdConfirm('Generate a new PIN for "' + portal.name + '"? The old PIN will stop working for this portal.'))) return;
             var newPin = Math.floor(1000 + Math.random() * 9000).toString();
             try {
+                var registryRecord = dashboardEmptyPortalRecordById(portalId);
+                if (registryRecord) {
+                    await upsertDashboardEmptyPortal(Object.assign({}, registryRecord, { pin: newPin }), 'Portal PIN');
+                }
                 for (var i = 0; i < portal.quoteIds.length; i++) {
-                    var row = (allQuotes || []).find(function(q) { return q.id === portal.quoteIds[i]; });
+                    var row = dashboardQuoteRowById(portal.quoteIds[i]);
                     if (!row) continue;
                     row = await loadDashboardFullQuote(row);
                     var data = Object.assign({}, row.data || {}, { portal_pin: newPin });
@@ -2382,8 +2505,12 @@
             if (theme && portalLogo) theme.portalLogo = portalLogo;
             setPortalThemeSaveState(portalId, 'saving', 'Saving theme...');
             try {
+                var registryRecord = dashboardEmptyPortalRecordById(portalId);
+                if (registryRecord) {
+                    await upsertDashboardEmptyPortal(Object.assign({}, registryRecord, { theme: theme || {} }), 'Portal theme');
+                }
                 for (var i = 0; i < portal.quoteIds.length; i++) {
-                    var row = (allQuotes || []).find(function(q) { return q.id === portal.quoteIds[i]; });
+                    var row = dashboardQuoteRowById(portal.quoteIds[i]);
                     if (!row) continue;
                     row = await loadDashboardFullQuote(row);
                     var data = Object.assign({}, row.data || {});
@@ -2495,22 +2622,22 @@
                 for (var id in rowsById) {
                     var item = rowsById[id];
                     var row = await loadDashboardFullQuote(item.row);
+                    if (quoteIsPortalPlaceholder(row) && String(item.sourcePortalId) !== String(targetPortal.id)) {
+                        var placeholderDelete = await qdDurableQuoteRowsDelete([row.id]);
+                        if (placeholderDelete.error) throw placeholderDelete.error;
+                        continue;
+                    }
                     var originalData = row.data || {};
-                    var isSourcePlaceholder = originalData.portal_placeholder && String(item.sourcePortalId) !== String(targetPortal.id);
                     var data = Object.assign({}, originalData, {
-                        portal_visible: !isSourcePlaceholder,
+                        portal_visible: true,
                         portal_id: durablePortalId,
                         portal_name: targetPortal.name,
                         portal_client_name: targetPortal.clientName || targetPortal.name,
                         portal_client_email: targetPortal.clientEmail || '',
                         portal_pin: targetPin
                     });
-                    if (data.portal_visible) {
-                        stampPortalAddedAt(data);
-                        data = applyPortalStableShareToData(data, targetShare);
-                    } else {
-                        data = clearPortalAssignmentForEdit(data);
-                    }
+                    stampPortalAddedAt(data);
+                    data = applyPortalStableShareToData(data, targetShare);
                     if (hasTargetTheme) {
                         data.portal_theme = targetTheme;
                     } else {
@@ -2518,6 +2645,15 @@
                     }
                     var result = await qdDurableQuoteRowUpdate(row.id, { data: data }, 'Merge client portals');
                     if (result.error) throw result.error;
+                }
+                var selectedEmptyIds = selectedIds.filter(function(id) { return !!dashboardEmptyPortalRecordById(id); });
+                if (selectedEmptyIds.length) {
+                    var keepEmptyTarget = docCount === 0 && (!targetPortal.quoteIds || targetPortal.quoteIds.length === 0);
+                    var mergedRegistry = (dashboardEmptyPortals || []).filter(function(record) {
+                        if (!selectedIds.includes(String(record.id))) return true;
+                        return keepEmptyTarget && String(record.id) === String(targetPortal.id);
+                    });
+                    await saveDashboardEmptyPortals(mergedRegistry, 'Merge client portals');
                 }
                 window._portalMergeMode = false;
                 window._portalMergeSelected = {};
@@ -2548,7 +2684,7 @@
             if (duplicateInPortal && !idsToUpdate.includes(duplicateInPortal.id)) idsToUpdate.push(duplicateInPortal.id);
             try {
                 for (var i = 0; i < idsToUpdate.length; i++) {
-                    var row = (allQuotes || []).find(function(q) { return q.id === idsToUpdate[i]; });
+                    var row = dashboardQuoteRowById(idsToUpdate[i]);
                     if (!row) continue;
                     row = await loadDashboardFullQuote(row);
                     if (duplicateInPortal && row.id === duplicateInPortal.id) {
@@ -2589,6 +2725,7 @@
                     var result = await qdDurableQuoteRowUpdate(row.id, updatePayload, 'Portal assignment');
                     if (result.error) throw result.error;
                 }
+                await removeDashboardEmptyPortal(portalId, 'Activate client portal');
                 await refreshQuotes();
                 renderPortalAssignmentList();
             } catch(err) {
@@ -2623,35 +2760,15 @@
                     var result = await qdDurableQuoteRowUpdate(quoteId, { data: data }, 'Portal assignment');
                     if (result.error) throw result.error;
                 } else {
-                    var session = await _supabase.auth.getSession();
-                    var userId = session.data?.session?.user?.id;
-                    if (!userId) throw new Error('Not logged in');
-                    var placeholderData = {
-                        portal_visible: true,
-                        portal_placeholder: true,
-                        portal_id: portalId,
-                        portal_name: portalName,
-                        portal_client_name: clientName,
-                        portal_client_email: clientEmail,
-                        portal_pin: pin,
+                    await upsertDashboardEmptyPortal({
+                        id: portalId,
+                        name: portalName,
                         clientName: clientName,
                         clientEmail: clientEmail,
-                        quoteTitle: portalName + ' Portal',
-                        projectAddress: '',
-                        rooms: [],
-                        terms: [],
-                        termsExplicit: false
-                    };
-                    stampPortalAddedAt(placeholderData);
-                    var insertResult = await qdDurableQuoteRowInsert({
-                        user_id: userId,
-                        client_name: clientName,
-                        quote_number: 'PORTAL-' + Date.now().toString(36).toUpperCase(),
-                        total: 0,
-                        status: 'draft',
-                        data: placeholderData
-                    }, portalName + ' portal');
-                    if (insertResult.error) throw insertResult.error;
+                        pin: pin,
+                        theme: {},
+                        createdAt: new Date().toISOString()
+                    }, 'Create empty client portal');
                 }
                 await refreshQuotes();
                 document.getElementById('portalAssignCreateWrap').style.display = window._portalAssignQuoteId ? '' : 'none';
@@ -2702,8 +2819,12 @@
             var portal = buildPortalRegistry(allQuotes).find(function(p) { return p.id === portalId; });
             if (!portal) return;
             try {
+                var registryRecord = dashboardEmptyPortalRecordById(portalId);
+                if (registryRecord) {
+                    await upsertDashboardEmptyPortal(Object.assign({}, registryRecord, { name: newName }), 'Rename portal');
+                }
                 for (var i = 0; i < portal.quoteIds.length; i++) {
-                    var row = (allQuotes || []).find(function(q) { return q.id === portal.quoteIds[i]; });
+                    var row = dashboardQuoteRowById(portal.quoteIds[i]);
                     if (!row) continue;
                     row = await loadDashboardFullQuote(row);
                     var data = Object.assign({}, row.data || {}, { portal_name: newName });
@@ -2723,10 +2844,16 @@
             var docCount = portalDocumentCount(portal);
             if (!(await qdConfirm('Remove this portal from ' + docCount + ' document' + (docCount === 1 ? '' : 's') + '?'))) return;
             try {
+                await removeDashboardEmptyPortal(portalId, 'Delete client portal');
                 for (var i = 0; i < portal.quoteIds.length; i++) {
-                    var row = (allQuotes || []).find(function(q) { return q.id === portal.quoteIds[i]; });
+                    var row = dashboardQuoteRowById(portal.quoteIds[i]);
                     if (!row) continue;
                     row = await loadDashboardFullQuote(row);
+                    if (quoteIsPortalPlaceholder(row)) {
+                        var placeholderDelete = await qdDurableQuoteRowsDelete([row.id]);
+                        if (placeholderDelete.error) throw placeholderDelete.error;
+                        continue;
+                    }
                     var data = clearPortalAssignmentForEdit(row.data || {});
                     var result = await qdDurableQuoteRowUpdate(row.id, { data: data }, 'Delete portal assignment');
                     if (result.error) throw result.error;
@@ -3398,7 +3525,7 @@
                 if (result.error === 'Not authenticated' && attempts < 3) {
                     setTimeout(loadWithRetry, 800 * attempts);
                 } else if (!result.error) {
-                    await refreshDashboardManualPaymentReports();
+                    await Promise.all([refreshDashboardManualPaymentReports(), loadDashboardEmptyPortals()]);
                     await setDashboardQuotesFromCloud(result.data || []);
                     renderDashboardResults();
                     updateStats(allQuotes);
