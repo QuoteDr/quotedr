@@ -56,6 +56,8 @@ assert(builder.includes('ai-voice-review-match-source'), 'AI Voice review should
 assert(builder.includes('ai-voice-review-trade-rule'), 'AI Voice review should expose an explicit trade-rule picker');
 assert(builder.includes('_resolveVoiceTradeRuleSelection'), 'AI Voice review should resolve a selected trade rule before quote creation');
 assert(/function _syncAiVoiceTradeRuleSelection[\s\S]*?_replaceVoiceReviewItem\(row\.item, preview\)/.test(builder), 'choosing a trade rule should replace the provisional item and refresh its review values');
+assert(!builder.includes('saveTasks.push(incrementAiTradeRuleUsage'), 'trade-rule usage telemetry must not block verified quote creation');
+assert(!builder.includes('await Promise.all(usageTasks)'), 'keeping AI suggestions must not wait on noncritical usage telemetry');
 assert(builder.includes('_voiceRuleSelectionHasLearnedMapping'), 'remembered saved-item corrections should override the same wrong trade-rule match');
 assert(!builder.includes("console.log('[QuoteDr AI Voice] Opening review for parse result:'"), 'AI Voice should not log parsed customer scope');
 assert(voiceRuleMatcher.includes('selectRuleMatches'), 'AI Voice matcher should rank and group overlapping trade rules');

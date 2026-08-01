@@ -18533,6 +18533,7 @@ Example:
             if (!_voiceReviewResult) return;
             var saveTasks = [];
             var ruleSuggestionCandidates = [];
+            var confirmedRuleIds = [];
             var decisions = {};
             for (var validationIndex = 0; validationIndex < _voiceReviewRows.length; validationIndex++) {
                 var validationRow = _voiceReviewRows[validationIndex];
@@ -18588,9 +18589,7 @@ Example:
                     var rebuiltRuleItem = _buildVoiceTradeRuleChoiceItem(decision.tradeChoice, row);
                     _replaceVoiceReviewItem(row.item, rebuiltRuleItem);
                     _applyAiVoiceReviewQuantityEdit(row, index);
-                    if (typeof incrementAiTradeRuleUsage === 'function') {
-                        saveTasks.push(incrementAiTradeRuleUsage(decision.tradeChoice.rule.id).catch(function(){}));
-                    }
+                    confirmedRuleIds.push(decision.tradeChoice.rule.id);
                 } else if (confirmedExistingMapping) {
                     _clearAiTradeRuleReviewMetadata(row.item);
                     _applyVoiceMappedItem(row.item, row.mapping);
@@ -18631,6 +18630,11 @@ Example:
             _voiceReviewRows = [];
             _removeExcludedAiVoiceItems(reviewed);
             applyAIQuote(reviewed);
+            if (typeof incrementAiTradeRuleUsage === 'function') {
+                confirmedRuleIds.forEach(function(ruleId) {
+                    incrementAiTradeRuleUsage(ruleId).catch(function(){});
+                });
+            }
             _maybeSuggestAiTradeRule(ruleSuggestionCandidates).catch(function(e) { console.warn('AI trade rule suggestion failed:', e); });
         }
 
@@ -18662,19 +18666,21 @@ Example:
             var reviewed = _voiceReviewResult;
             _voiceReviewResult = null;
             _voiceReviewRows = [];
+            var confirmedRuleIds = [];
             if (typeof incrementAiTradeRuleUsage === 'function') {
                 var seenRuleIds = {};
-                var usageTasks = [];
                 ((reviewed && reviewed.rooms) || []).forEach(function(room) {
                     ((room && room.items) || []).forEach(function(item) {
                         if (!item || !item.aiTradeRuleId || seenRuleIds[item.aiTradeRuleId]) return;
                         seenRuleIds[item.aiTradeRuleId] = true;
-                        usageTasks.push(incrementAiTradeRuleUsage(item.aiTradeRuleId).catch(function(){}));
+                        confirmedRuleIds.push(item.aiTradeRuleId);
                     });
                 });
-                await Promise.all(usageTasks);
             }
             applyAIQuote(reviewed);
+            confirmedRuleIds.forEach(function(ruleId) {
+                incrementAiTradeRuleUsage(ruleId).catch(function(){});
+            });
         }
 
         async function submitVoiceQuote() {
