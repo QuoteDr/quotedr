@@ -5284,13 +5284,13 @@
                 '<p class="text-muted mb-3" id="aiDescriptionModeIntro">Choose whether to polish the description field or build a complete description from task notes.</p>' +
                 '<div class="row g-3">' +
                 '<div class="col-12 col-md-6">' +
-                '<button type="button" class="btn btn-outline-primary w-100 h-100 p-3 text-start" data-ai-description-mode="refine_existing">' +
+                '<button type="button" class="btn btn-outline-primary ai-description-mode-choice w-100 h-100 p-3 text-start" data-ai-description-mode="refine_existing">' +
                 '<strong class="d-block mb-1">Refine what I\'ve written</strong>' +
                 '<span class="small text-muted d-block">Improve the wording already in the description field while keeping its meaning.</span>' +
                 '</button>' +
                 '</div>' +
                 '<div class="col-12 col-md-6">' +
-                '<button type="button" class="btn btn-outline-primary w-100 h-100 p-3 text-start" data-ai-description-mode="create_from_task">' +
+                '<button type="button" class="btn btn-outline-primary ai-description-mode-choice w-100 h-100 p-3 text-start" data-ai-description-mode="create_from_task">' +
                 '<strong class="d-block mb-1">Describe the task to create the description</strong>' +
                 '<span class="small text-muted d-block">Turn a task explanation or rough notes into a polished, client-ready description.</span>' +
                 '</button>' +
@@ -5466,7 +5466,7 @@
                 }
                 textareaEl.value = refinedText;
                 textareaEl.dispatchEvent(new Event('input', { bubbles: true }));
-                markPricingDirty();
+                if (!textareaEl.closest('#addLineModal')) markPricingDirty();
                 if (typeof completeProTrialFeature === 'function') completeProTrialFeature('ai_refine', 'AI Refine');
                 if (typeof qdMaybeShowProUpgradePrompt === 'function') {
                     qdMaybeShowProUpgradePrompt('ai_refine_success', {
@@ -5515,7 +5515,7 @@
                 btnEl.title = createdByAi ? 'Undo AI-created description' : 'Undo AI refined description';
             }
             textarea.dispatchEvent(new Event('input', { bubbles: true }));
-            markPricingDirty();
+            if (!textarea.closest('#addLineModal')) markPricingDirty();
         }
 
         async function deleteCustomItem(category, name) {

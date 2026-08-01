@@ -92,6 +92,21 @@ h3.card-title,
     color: #fff !important;
 }
 
+#aiDescriptionModeModal .ai-description-mode-choice:hover,
+#aiDescriptionModeModal .ai-description-mode-choice:focus,
+#aiDescriptionModeModal .ai-description-mode-choice:focus-visible {
+    background: #eaf3ff !important;
+    border-color: var(--qd-blue) !important;
+    color: var(--qd-blue-dark) !important;
+    box-shadow: 0 0 0 0.2rem rgba(26, 86, 160, 0.2) !important;
+}
+
+#aiDescriptionModeModal .ai-description-mode-choice:active {
+    background: #dbeafe !important;
+    border-color: var(--qd-blue-dark) !important;
+    color: var(--qd-blue-dark) !important;
+}
+
 .btn-warning {
     background: var(--qd-orange) !important;
     border-color: var(--qd-orange-dark) !important;

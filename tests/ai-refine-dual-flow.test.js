@@ -11,6 +11,8 @@ function assert(condition, message) {
 }
 
 const items = read('quote-items.js');
+const builder = read('quote-builder.html');
+const brandTheme = read('brand-theme.css');
 const edgeFunction = read('supabase/functions/ai-assistant/index.ts');
 const helperStart = items.indexOf('function buildAiDescriptionPrompt');
 const dialogStart = items.indexOf('function openAiDescriptionModeDialog');
@@ -50,6 +52,7 @@ assert(choiceMarkup.includes('Describe the task to create the description'), 'di
 assert(choiceMarkup.includes('data-ai-description-mode="refine_existing"'), 'refine choice should use an explicit mode');
 assert(choiceMarkup.includes('data-ai-description-mode="create_from_task"'), 'create choice should use an explicit mode');
 assert(choiceMarkup.includes('col-12 col-md-6'), 'choices should stack on mobile and share a row on desktop');
+assert(choiceMarkup.includes('ai-description-mode-choice'), 'choice buttons should expose a targeted styling hook');
 assert(createMarkup.includes('aria-live="polite"'), 'task validation should be announced accessibly');
 assert(createMarkup.includes('form id="aiDescriptionCreateForm"'), 'creation input should be keyboard-submittable');
 
@@ -60,6 +63,32 @@ const refineFunction = items.slice(
 assert(refineFunction.indexOf('await openAiDescriptionModeDialog') < refineFunction.indexOf("requireProFeature('ai_refine'"), 'choice should happen before the usage gate');
 assert(refineFunction.includes("if (!request.sourceText.trim()) { qdAlert('Please enter a description first.'); return; }"), 'empty refine input should retain current validation');
 assert(refineFunction.includes("body: JSON.stringify({ feature: 'ai_refine', refineMode: request.mode"), 'client should send mode in the existing usage bucket');
+assert(refineFunction.includes("if (!textareaEl.closest('#addLineModal')) markPricingDirty();"), 'Add Line Item refinement should not mark the quote dirty before the item is saved');
+
+const undoFunction = items.slice(
+  items.indexOf('function toggleRefinedDescription'),
+  items.indexOf('async function deleteCustomItem')
+);
+assert(undoFunction.includes("if (!textarea.closest('#addLineModal')) markPricingDirty();"), 'Add Line Item undo should not mark the quote dirty before the item is saved');
+
+const addLineStart = builder.indexOf('<div class="modal fade" id="addLineModal"');
+const manageItemsStart = builder.indexOf('<div class="modal fade" id="manageItemsModal"');
+assert(addLineStart >= 0 && manageItemsStart > addLineStart, 'Add Line Item modal markup should be discoverable');
+const addLineMarkup = builder.slice(addLineStart, manageItemsStart);
+assert(addLineMarkup.includes('description-refine-scope'), 'Add Line Item description should use the shared refine scope');
+assert(addLineMarkup.includes('id="lineItemDescription" class="form-control item-description-textarea"'), 'Add Line Item description should use the shared textarea hook');
+assert(addLineMarkup.includes('class="btn btn-sm btn-outline-primary refine-desc-btn"'), 'Add Line Item should expose AI Refine');
+assert(addLineMarkup.includes('class="btn btn-sm btn-outline-secondary undo-refine-desc-btn"'), 'Add Line Item should expose shared undo/redo behavior');
+assert(builder.includes("addLineModalEl.addEventListener('click', function(e)"), 'Add Line Item should delegate AI Refine clicks');
+assert(builder.includes('if (typeof refineDescription === \'function\') refineDescription(textarea, refineBtn);'), 'Add Line Item should invoke the shared dual-flow implementation');
+assert(builder.includes('function resetAddLineDescriptionRefineState()'), 'Add Line Item should reset stale AI undo state');
+assert(builder.includes("delete undoBtn._aiDescriptionMode;"), 'Add Line Item reset should clear the prior AI mode');
+assert(builder.includes('brand-theme.css?v=2026073101'), 'builder should load the updated choice contrast styles');
+assert(builder.includes('quote-items.js?v=2026073102'), 'builder should load the Add Line Item AI Refine client');
+
+assert(brandTheme.includes('#aiDescriptionModeModal .ai-description-mode-choice:hover'), 'choice hover styling should be scoped to the AI mode modal');
+assert(brandTheme.includes('#aiDescriptionModeModal .ai-description-mode-choice:focus-visible'), 'choice keyboard focus should share the accessible high-contrast state');
+assert(brandTheme.includes('background: #eaf3ff !important;'), 'choice hover and focus should use a light blue background');
 
 assert(edgeFunction.includes("refineMode === 'create_from_task'"), 'Edge Function should allowlist creation mode');
 assert(edgeFunction.includes(": 'refine_existing'"), 'missing or unknown modes should default to refinement');
