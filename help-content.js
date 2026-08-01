@@ -529,9 +529,11 @@
             title: 'Review AI Voice Items',
             summary: 'Check and correct AI-generated rooms, scope notes, items, quantities, rates, and saved-item matches before they land on the quote.',
             steps: [
+                'Compare each item with the original browser transcript shown at the top of review.',
                 'Review each suggested room and line item from top to bottom.',
                 'Fix item names, quantities, units, rates, and room placement as needed.',
-                'Map unclear AI phrases to saved items when you want QuoteDr to remember the correction.',
+                'Correct the phrase and choose either a saved line item or an AI Trade Rule when QuoteDr matched the wrong thing.',
+                'When several close trade rules match, choose the intended rule before adding verified items.',
                 'Review generated scope notes for client-facing wording.',
                 'Click Add Verified Items when the suggestions are ready for the quote.'
             ],

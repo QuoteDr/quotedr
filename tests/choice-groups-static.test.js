@@ -15,6 +15,8 @@ const viewer = read('interactive-quote-viewer.html');
 const dashboard = read('dashboard.html');
 const invoice = read('invoice-viewer.html');
 const supabase = read('supabase-v2.js');
+const voiceRuleMatcher = read('ai-voice-rule-matcher.js');
+const parseQuote = read('supabase/functions/parse-quote/index.ts');
 const tradeRulesSchema = read('supabase/ai_trade_rules.sql');
 const tradeRuleQuestionMigration = read('supabase/migrations/20260518110000_ai_trade_rule_questions.sql');
 
@@ -47,6 +49,18 @@ assert(!builder.includes('Choose Cancel to replace everything'), 'AI Voice shoul
 assert(builder.includes('ai-voice-review-quantity'), 'AI Voice review should let users correct parsed quantities before adding items');
 assert(builder.includes('aiVoiceReviewUnit'), 'AI Voice review should let users correct parsed units before adding items');
 assert(builder.includes('_applyAiVoiceReviewQuantityEdit'), 'AI Voice review should apply corrected quantity and unit values before quote creation');
+assert(builder.includes('ai-voice-rule-matcher.js?v='), 'AI Voice should load the deterministic trade-rule matcher');
+assert(builder.includes('aiVoiceOriginalTranscriptReview'), 'AI Voice review should show the original browser transcript');
+assert(builder.includes('ai-voice-review-phrase'), 'AI Voice review should let users correct the phrase used for a match');
+assert(builder.includes('ai-voice-review-match-source'), 'AI Voice review should let users choose saved-item or trade-rule correction');
+assert(builder.includes('ai-voice-review-trade-rule'), 'AI Voice review should expose an explicit trade-rule picker');
+assert(builder.includes('_resolveVoiceTradeRuleSelection'), 'AI Voice review should resolve a selected trade rule before quote creation');
+assert(/function _syncAiVoiceTradeRuleSelection[\s\S]*?_replaceVoiceReviewItem\(row\.item, preview\)/.test(builder), 'choosing a trade rule should replace the provisional item and refresh its review values');
+assert(builder.includes('_voiceRuleSelectionHasLearnedMapping'), 'remembered saved-item corrections should override the same wrong trade-rule match');
+assert(!builder.includes("console.log('[QuoteDr AI Voice] Opening review for parse result:'"), 'AI Voice should not log parsed customer scope');
+assert(voiceRuleMatcher.includes('selectRuleMatches'), 'AI Voice matcher should rank and group overlapping trade rules');
+assert(parseQuote.includes('exact, contiguous excerpt'), 'parse-quote should require verbatim spoken phrases');
+assert(parseQuote.includes('trim up a five-foot exterior door'), 'parse-quote should preserve distinguishing door measurements and qualifiers');
 assert(builder.includes('_repairAiTradeRuleReviewItem'), 'AI Voice review should repair stale trade-rule unit/rate from the matched saved item');
 assert(builder.includes('_voiceIsGenericFallbackUnit'), 'AI Voice wall paint should treat ls as a generic fallback unit');
 assert(builder.includes('_reconcileVoiceExplicitMeasurementQuantity'), 'AI Voice review should trust explicit spoken/calculated LF or sq ft before model guesses');

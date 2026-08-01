@@ -2129,6 +2129,7 @@
 </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-v2.js?v=2026080102"></script>
+    <script src="ai-voice-rule-matcher.js?v=2026080101"></script>
     <script src="save-coordinator.js?v=2026080102"></script>
     <script src="quote-media.js?v=2026071202"></script>
 <!-- Eruda mobile console (only loads with ?debug in URL) -->
@@ -16496,6 +16497,7 @@ Example:
         var _voiceRecording = false;
         var _voicePaused = false;
         var _voiceTranscriptFull = '';
+        var _voiceOriginalTranscript = '';
         var _voiceLastResultIndex = 0;
         var _voiceVerificationResolve = null;
         var _voiceVerificationItems = [];
@@ -16523,6 +16525,7 @@ Example:
                 return;
             }
             _voiceTranscriptFull = '';
+            _voiceOriginalTranscript = '';
             document.getElementById('voiceTranscript').textContent = 'Your words will appear here...';
             document.getElementById('voiceStatus').textContent = 'Tap the mic and describe the job';
             document.getElementById('voiceActions').style.display = 'none';
@@ -16663,6 +16666,7 @@ Example:
 
         function clearVoiceTranscript() {
             _voiceTranscriptFull = '';
+            _voiceOriginalTranscript = '';
             _voicePaused = false;
             _voiceRecording = false;
             if (_voiceRecognition) {
@@ -16765,6 +16769,7 @@ Example:
 
         function _voiceReviewConfidence(row) {
             var usage = row && row.mapping ? (parseInt(row.mapping.usage_count, 10) || 0) : 0;
+            if (row && row.item && row.item.aiTradeRuleAmbiguous) return { score: 35, label: 'Choose trade rule', rank: 0, reason: 'More than one close trade rule matches these words. Choose the one you meant.' };
             if (row && row.item && row.item.aiTradeRuleId) return { score: 98, label: '98% Trade rule', rank: 4, reason: 'Your trade rule created this item.' };
             if (row && row.duplicateOf !== undefined) return { score: 20, label: '20% Possible duplicate', rank: -1, reason: 'Looks covered by another parsed item, so it is unchecked by default.' };
             if (row && row.requiresChoice) return { score: 35, label: '35% Choose item', rank: 0, reason: 'You have multiple saved items that could match this phrase.' };
@@ -16907,6 +16912,9 @@ Example:
         }
 
         function _voiceRuleTextKey(value) {
+            if (window.QdAiVoiceRuleMatcher && typeof window.QdAiVoiceRuleMatcher.canonicalText === 'function') {
+                return window.QdAiVoiceRuleMatcher.canonicalText(value);
+            }
             return String(value || '')
                 .toLowerCase()
                 .replace(/[^a-z0-9\s]/g, ' ')
@@ -16917,6 +16925,9 @@ Example:
         }
 
         function _voiceRuleMatchesTranscript(rule, transcript) {
+            if (window.QdAiVoiceRuleMatcher && typeof window.QdAiVoiceRuleMatcher.matchRule === 'function') {
+                return !!window.QdAiVoiceRuleMatcher.matchRule(rule, transcript);
+            }
             var trigger = _voiceRuleTextKey(rule && rule.trigger_phrase);
             var text = _voiceRuleTextKey(transcript);
             if (!trigger || !text) return false;
@@ -17087,7 +17098,7 @@ Example:
             }) || null;
         }
 
-        function _buildAiTradeRuleVoiceItem(rule, transcript, answerLabel) {
+        function _buildAiTradeRuleVoiceItem(rule, transcript, answerLabel, matchInfo) {
             var savedItem = _findVoiceSavedItemForMapped(rule);
             var count = _extractVoiceRuleCount(rule, transcript);
             var eachQty = parseFloat(rule.quantity_value || 1) || 1;
@@ -17105,7 +17116,7 @@ Example:
                 unitType: unit,
                 rate: rate,
                 total: _voiceRoundQuantity(quantity * rate),
-                spokenPhrase: rule.trigger_phrase || description,
+                spokenPhrase: (matchInfo && matchInfo.spokenPhrase) || rule.trigger_phrase || description,
                 calculation: rule.quantity_mode === 'fixed'
                     ? calculationLabel + 'fixed ' + quantity + ' ' + unit
                     : calculationLabel + eachQty + ' ' + unit + ' x ' + count + ' ' + (rule.count_unit_label || 'count') + ' = ' + quantity + ' ' + unit,
@@ -17113,8 +17124,50 @@ Example:
                 laborTime: normalizeLaborTime((savedItem && savedItem.laborTime) || rule.laborTime),
                 notes: rule.user_note || '',
                 aiTradeRuleId: rule.id,
+                aiTradeRuleTrigger: rule.trigger_phrase || '',
                 aiTradeRuleAnswer: answerLabel || ''
             };
+        }
+
+        function _decorateAiTradeRuleReviewItem(item, selection) {
+            if (!item || !selection) return item;
+            var seen = {};
+            item.aiTradeRuleCandidates = (selection.candidates || []).map(function(candidate) {
+                var rule = candidate && candidate.rule ? candidate.rule : candidate;
+                if (!rule || !rule.id || seen[rule.id]) return null;
+                seen[rule.id] = true;
+                return {
+                    id: rule.id,
+                    trigger_phrase: rule.trigger_phrase || '',
+                    rule_type: _aiVoiceTradeRuleType(rule)
+                };
+            }).filter(Boolean);
+            item.aiTradeRuleAmbiguous = !!selection.ambiguous;
+            return item;
+        }
+
+        function _voiceRuleSelections(rules, transcript) {
+            if (window.QdAiVoiceRuleMatcher && typeof window.QdAiVoiceRuleMatcher.selectRuleMatches === 'function') {
+                return window.QdAiVoiceRuleMatcher.selectRuleMatches(rules, transcript);
+            }
+            return (rules || []).filter(function(rule) {
+                return rule && rule.active !== false && _voiceRuleMatchesTranscript(rule, transcript);
+            }).map(function(rule) {
+                var fallbackMatch = { rule: rule, spokenPhrase: transcript || rule.trigger_phrase || '' };
+                return { rule: rule, match: fallbackMatch, candidates: [fallbackMatch], ambiguous: false, spokenPhrase: fallbackMatch.spokenPhrase };
+            });
+        }
+
+        function _voiceRuleSelectionHasLearnedMapping(selection, mappings) {
+            var phrase = selection && (selection.spokenPhrase || (selection.match && selection.match.spokenPhrase));
+            var phraseKey = _voicePhraseKey(phrase);
+            var canonicalPhrase = _voiceRuleTextKey(phrase);
+            if (!phraseKey && !canonicalPhrase) return false;
+            return (mappings || []).some(function(mapping) {
+                if (!mapping) return false;
+                if (phraseKey && mapping.phrase_key === phraseKey) return true;
+                return canonicalPhrase && _voiceRuleTextKey(mapping.spoken_phrase || '') === canonicalPhrase;
+            });
         }
 
         function _ensureAiTradeRuleTargetRoom(result) {
@@ -17124,7 +17177,7 @@ Example:
             return targetRoom;
         }
 
-        function _applyAiTradeRuleOptionToResult(result, rule, option, transcript) {
+        function _applyAiTradeRuleOptionToResult(result, rule, option, transcript, matchInfo, selection) {
             if (!result || !rule || !option) return result;
             var optionRule = Object.assign({}, rule, {
                 mapped_item_category: option.mapped_item_category,
@@ -17137,8 +17190,9 @@ Example:
                 default_count: option.default_count,
                 user_note: option.user_note || rule.user_note || ''
             });
-            _ensureAiTradeRuleTargetRoom(result).items.push(_buildAiTradeRuleVoiceItem(optionRule, transcript, option.label));
-            if (typeof incrementAiTradeRuleUsage === 'function') incrementAiTradeRuleUsage(rule.id).catch(function(){});
+            var item = _buildAiTradeRuleVoiceItem(optionRule, transcript, option.label, matchInfo);
+            _decorateAiTradeRuleReviewItem(item, selection);
+            _ensureAiTradeRuleTargetRoom(result).items.push(item);
             return result;
         }
 
@@ -17161,7 +17215,7 @@ Example:
                     var card = document.createElement('div');
                     card.className = 'border rounded p-3 mb-3';
                     card.innerHTML = ''
-                        + '<div class="small text-muted mb-1">You said "' + _escapeHtml(rule.trigger_phrase || '') + '"</div>'
+                        + '<div class="small text-muted mb-1">Words matched from transcript: "' + _escapeHtml((entry.matchInfo && entry.matchInfo.spokenPhrase) || rule.trigger_phrase || '') + '"</div>'
                         + '<div class="fw-semibold mb-2">' + _escapeHtml(rule.clarification_question || 'Which option should QuoteDr use?') + '</div>'
                         + '<div class="d-grid gap-2">'
                         + options.map(function(option, optionIndex) {
@@ -17192,7 +17246,7 @@ Example:
             _voiceClarificationPending.forEach(function(entry, index) {
                 var checked = document.querySelector('input[name="aiVoiceClarification' + index + '"]:checked');
                 var option = entry.options[parseInt(checked.value, 10)];
-                _applyAiTradeRuleOptionToResult(_voiceClarificationResult, entry.rule, option, _voiceClarificationTranscript);
+                _applyAiTradeRuleOptionToResult(_voiceClarificationResult, entry.rule, option, _voiceClarificationTranscript, entry.matchInfo, entry.selection);
             });
             var result = _voiceClarificationResult;
             var resolve = _voiceClarificationResolve;
@@ -17205,29 +17259,35 @@ Example:
             if (resolve) resolve(result);
         }
 
-        async function _applyAiTradeRulesToVoiceResult(result, transcript) {
+        async function _applyAiTradeRulesToVoiceResult(result, transcript, learnedMappings) {
             if (!result || !Array.isArray(result.rooms) || typeof getUserAiTradeRules !== 'function') return result;
             var rules = [];
             try { rules = await getUserAiTradeRules(); } catch(e) { rules = []; }
-            var activeRules = (rules || []).filter(function(rule) { return rule && rule.active !== false && _voiceRuleMatchesTranscript(rule, transcript); });
-            if (!activeRules.length) return result;
-            _suppressAiItemsCoveredByTradeRules(result, activeRules);
+            _aiVoiceTradeRulesCache = (rules || []).filter(function(rule) { return rule && rule.active !== false; });
+            var selections = _voiceRuleSelections(_aiVoiceTradeRulesCache, transcript).filter(function(selection) {
+                return !_voiceRuleSelectionHasLearnedMapping(selection, learnedMappings);
+            });
+            if (!selections.length) return result;
+            _suppressAiItemsCoveredByTradeRules(result, selections.map(function(selection) { return selection.rule; }));
             var targetRoom = _ensureAiTradeRuleTargetRoom(result);
             var pendingQuestions = [];
-            activeRules.forEach(function(rule) {
+            selections.forEach(function(selection) {
+                var rule = selection.rule;
+                var matchInfo = selection.match || { spokenPhrase: selection.spokenPhrase || transcript };
                 if (_aiVoiceTradeRuleType(rule) === 'question') {
                     var options = _normalizeClarificationOptions(rule);
                     if (!options.length) return;
                     var matched = _findClarificationAnswer(rule, transcript);
                     if (matched) {
-                        _applyAiTradeRuleOptionToResult(result, rule, matched, transcript);
+                        _applyAiTradeRuleOptionToResult(result, rule, matched, transcript, matchInfo, selection);
                     } else {
-                        pendingQuestions.push({ rule: rule, options: options });
+                        pendingQuestions.push({ rule: rule, options: options, matchInfo: matchInfo, selection: selection });
                     }
                     return;
                 }
-                targetRoom.items.push(_buildAiTradeRuleVoiceItem(rule, transcript, ''));
-                if (typeof incrementAiTradeRuleUsage === 'function') incrementAiTradeRuleUsage(rule.id).catch(function(){});
+                var item = _buildAiTradeRuleVoiceItem(rule, transcript, '', matchInfo);
+                _decorateAiTradeRuleReviewItem(item, selection);
+                targetRoom.items.push(item);
             });
             if (pendingQuestions.length) return await showAiVoiceClarificationModal(result, transcript, pendingQuestions);
             return result;
@@ -17362,6 +17422,166 @@ Example:
                     || String(item.name || '').trim().toLowerCase() === key
                     || ((item.category || 'Miscellaneous') + ' - ' + (item.name || '')).toLowerCase() === key;
             }) || null;
+        }
+
+        function _voiceTradeRuleChoiceValue(rule, option, optionIndex) {
+            var value = 'rule|' + String(rule && rule.id || '');
+            if (option) value += '|option|' + String(option.id || optionIndex || 0);
+            return value;
+        }
+
+        function _voiceTradeRuleChoices() {
+            var choices = [];
+            (_aiVoiceTradeRulesCache || []).filter(function(rule) {
+                return rule && rule.active !== false && rule.id;
+            }).forEach(function(rule) {
+                if (_aiVoiceTradeRuleType(rule) === 'question') {
+                    _normalizeClarificationOptions(rule).forEach(function(option, optionIndex) {
+                        choices.push({
+                            value: _voiceTradeRuleChoiceValue(rule, option, optionIndex),
+                            rule: rule,
+                            option: option,
+                            label: '"' + (rule.trigger_phrase || 'Question rule') + '" - ' + option.label + ' -> ' + option.mapped_item_name
+                        });
+                    });
+                    return;
+                }
+                var quantityText = rule.quantity_mode === 'fixed'
+                    ? (rule.quantity_value || 1) + ' ' + (rule.mapped_unit || 'ls') + ' fixed'
+                    : (rule.quantity_value || 1) + ' ' + (rule.mapped_unit || 'ls') + ' per ' + (rule.count_unit_label || 'count');
+                choices.push({
+                    value: _voiceTradeRuleChoiceValue(rule),
+                    rule: rule,
+                    option: null,
+                    label: '"' + (rule.trigger_phrase || 'Trade rule') + '" -> ' + (rule.mapped_item_name || 'Saved item') + ' (' + quantityText + ')'
+                });
+            });
+            return choices;
+        }
+
+        function _resolveVoiceTradeRuleSelection(value) {
+            var key = String(value || '');
+            if (!key) return null;
+            return _voiceTradeRuleChoices().find(function(choice) { return choice.value === key; }) || null;
+        }
+
+        function _voiceTradeRuleChoicesForRow(row) {
+            var candidateOrder = {};
+            (((row && row.item && row.item.aiTradeRuleCandidates) || [])).forEach(function(candidate, index) {
+                if (candidate && candidate.id) candidateOrder[candidate.id] = index;
+            });
+            return _voiceTradeRuleChoices().sort(function(left, right) {
+                var leftOrder = candidateOrder[left.rule.id];
+                var rightOrder = candidateOrder[right.rule.id];
+                var leftCandidate = leftOrder !== undefined;
+                var rightCandidate = rightOrder !== undefined;
+                if (leftCandidate && rightCandidate) return leftOrder - rightOrder;
+                if (leftCandidate !== rightCandidate) return leftCandidate ? -1 : 1;
+                return left.label.localeCompare(right.label);
+            });
+        }
+
+        function _currentVoiceTradeRuleChoiceValue(row) {
+            if (!row || !row.item || !row.item.aiTradeRuleId) return '';
+            var answer = String(row.item.aiTradeRuleAnswer || '').trim().toLowerCase();
+            var choice = _voiceTradeRuleChoices().find(function(candidate) {
+                if (!candidate.rule || candidate.rule.id !== row.item.aiTradeRuleId) return false;
+                if (!candidate.option) return !answer;
+                return String(candidate.option.label || '').trim().toLowerCase() === answer;
+            });
+            return choice ? choice.value : '';
+        }
+
+        function _voiceTradeRuleOptionsHtml(row) {
+            var selectedValue = row && row.item && row.item.aiTradeRuleAmbiguous ? '' : _currentVoiceTradeRuleChoiceValue(row);
+            var choices = _voiceTradeRuleChoicesForRow(row);
+            var html = '<option value="">' + (choices.length ? 'Choose the intended trade rule...' : 'No active trade rules available') + '</option>';
+            choices.forEach(function(choice) {
+                html += '<option value="' + _escapeHtml(choice.value) + '"' + (choice.value === selectedValue ? ' selected' : '') + '>' + _escapeHtml(choice.label) + '</option>';
+            });
+            return html;
+        }
+
+        function _buildVoiceTradeRuleChoiceItem(choice, row) {
+            if (!choice || !choice.rule) return null;
+            var sourceTranscript = _voiceOriginalTranscript || (row && row.phrase) || '';
+            var matchInfo = { spokenPhrase: (row && row.phrase) || choice.rule.trigger_phrase || '' };
+            var rule = choice.rule;
+            var answerLabel = '';
+            if (choice.option) {
+                answerLabel = choice.option.label || '';
+                rule = Object.assign({}, choice.rule, {
+                    mapped_item_category: choice.option.mapped_item_category,
+                    mapped_item_name: choice.option.mapped_item_name,
+                    mapped_unit: choice.option.mapped_unit,
+                    mapped_price: choice.option.mapped_price,
+                    quantity_mode: choice.option.quantity_mode,
+                    quantity_value: choice.option.quantity_value,
+                    count_unit_label: choice.option.count_unit_label,
+                    default_count: choice.option.default_count,
+                    user_note: choice.option.user_note || choice.rule.user_note || ''
+                });
+            }
+            return _decorateAiTradeRuleReviewItem(
+                _buildAiTradeRuleVoiceItem(rule, sourceTranscript, answerLabel, matchInfo),
+                { candidates: [{ rule: choice.rule }], ambiguous: false }
+            );
+        }
+
+        function _replaceVoiceReviewItem(target, replacement) {
+            if (!target || !replacement) return target;
+            Object.keys(target).forEach(function(key) { delete target[key]; });
+            Object.assign(target, replacement);
+            return target;
+        }
+
+        function _clearAiTradeRuleReviewMetadata(item) {
+            if (!item) return item;
+            var hadTradeRule = !!item.aiTradeRuleId;
+            delete item.aiTradeRuleId;
+            delete item.aiTradeRuleTrigger;
+            delete item.aiTradeRuleAnswer;
+            delete item.aiTradeRuleCandidates;
+            delete item.aiTradeRuleAmbiguous;
+            if (hadTradeRule) delete item.calculation;
+            return item;
+        }
+
+        function _syncAiVoiceReviewMatchSource(index) {
+            var source = document.getElementById('aiVoiceReviewMatchSource' + index);
+            var savedWrap = document.getElementById('aiVoiceSavedItemMatchWrap' + index);
+            var tradeWrap = document.getElementById('aiVoiceTradeRuleMatchWrap' + index);
+            var rememberWrap = document.getElementById('aiVoiceRememberWrap' + index);
+            var savedInput = document.getElementById('aiVoiceReviewMatch' + index);
+            var tradeSelect = document.getElementById('aiVoiceReviewTradeRule' + index);
+            var useTradeRule = source && source.value === 'trade_rule';
+            if (savedWrap) savedWrap.classList.toggle('d-none', useTradeRule);
+            if (tradeWrap) tradeWrap.classList.toggle('d-none', !useTradeRule);
+            if (rememberWrap) rememberWrap.classList.toggle('d-none', useTradeRule);
+            if (savedInput) savedInput.disabled = useTradeRule;
+            if (tradeSelect) tradeSelect.disabled = !useTradeRule;
+        }
+
+        function _syncAiVoiceTradeRuleSelection(index) {
+            var row = _voiceReviewRows[index];
+            var tradeSelect = document.getElementById('aiVoiceReviewTradeRule' + index);
+            var choice = _resolveVoiceTradeRuleSelection(tradeSelect && tradeSelect.value);
+            if (!row || !choice) return;
+            var preview = _buildVoiceTradeRuleChoiceItem(choice, row);
+            if (!preview) return;
+            _replaceVoiceReviewItem(row.item, preview);
+            var quantityInput = document.getElementById('aiVoiceReviewQuantity' + index);
+            var unitInput = document.getElementById('aiVoiceReviewUnit' + index);
+            var previewText = document.getElementById('aiVoiceParsedPreview' + index);
+            if (quantityInput) quantityInput.value = _voiceRoundQuantity(preview.quantity || 1);
+            if (unitInput) unitInput.value = preview.unit || preview.unitType || 'ls';
+            if (previewText) {
+                var displayRate = parseFloat(preview.rate !== undefined ? preview.rate : preview.price) || 0;
+                previewText.textContent = (preview.description || 'Item')
+                    + ' - ' + formatQuoteQuantityDisplay(preview.quantity || 1, preview.unit || preview.unitType || 'ls')
+                    + ' @ ' + qdFormatMoney(displayRate)
+                    + (preview.calculation ? ' - ' + preview.calculation : '');
+            }
         }
 
         function _voiceMappingAsItem(mapping) {
@@ -17978,6 +18198,24 @@ Example:
             });
         }
 
+        function _renderAiVoiceOriginalTranscriptReview() {
+            var wrap = document.getElementById('aiVoiceOriginalTranscriptReview');
+            var text = document.getElementById('aiVoiceOriginalTranscriptText');
+            if (!wrap || !text) return;
+            var transcript = String(_voiceOriginalTranscript || '').trim();
+            wrap.classList.toggle('d-none', !transcript);
+            text.textContent = transcript;
+        }
+
+        function _voiceReviewTranscriptPhrase(value) {
+            var phrase = String(value || '').trim();
+            if (!phrase || !_voiceOriginalTranscript || !window.QdAiVoiceRuleMatcher || typeof window.QdAiVoiceRuleMatcher.matchRule !== 'function') {
+                return phrase;
+            }
+            var match = window.QdAiVoiceRuleMatcher.matchRule({ trigger_phrase: phrase }, _voiceOriginalTranscript);
+            return match && match.spokenPhrase ? match.spokenPhrase : phrase;
+        }
+
         function _buildVoiceReviewRows(result, mappings) {
             var rows = [];
             var mappingByPhrase = {};
@@ -17987,7 +18225,8 @@ Example:
             (result.rooms || []).forEach(function(aiRoom, roomIndex) {
                 (aiRoom.items || []).forEach(function(item, itemIndex) {
                     _reconcileVoiceExplicitMeasurementQuantity(item);
-                    var phrase = item.spokenPhrase || item.description || '';
+                    var phrase = _voiceReviewTranscriptPhrase(item.spokenPhrase || item.description || '');
+                    item.spokenPhrase = phrase;
                     var phraseKey = _voicePhraseKey(phrase);
                     var mapping = mappingByPhrase[phraseKey] || null;
                     var exact = mapping ? null : _findExactVoiceItem(item);
@@ -18069,7 +18308,9 @@ Example:
                 var badgeClass = row.duplicateOf !== undefined ? 'bg-secondary' : (row.sortRank >= 2 ? 'bg-success' : (row.mapping ? 'bg-info text-dark' : 'bg-warning text-dark'));
                 var includeChecked = row.duplicateOf !== undefined ? '' : 'checked';
                 var helper = '';
-                if (row.requiresChoice) {
+                if (item.aiTradeRuleAmbiguous) {
+                    helper = '<div class="alert alert-warning py-2 px-3 small mt-2 mb-0"><strong>Several close trade rules match.</strong> Choose the intended rule before adding this item.</div>';
+                } else if (row.requiresChoice) {
                     helper = '<div class="alert alert-warning py-2 px-3 small mt-2 mb-0">You have multiple saved items for this kind of work. Choose the right one, or check Remember this phrase so QuoteDr stops asking for this wording.</div>';
                 } else if (row.duplicateOf !== undefined) {
                     helper = '<div class="alert alert-secondary py-2 px-3 small mt-2 mb-0">Possible duplicate inside this same parsed room. It is unchecked by default, but you can add it if this is separate work.</div>';
@@ -18089,6 +18330,8 @@ Example:
                     list.insertAdjacentHTML('beforeend', _voiceReviewRoomHeader(row));
                 }
                 var card = document.createElement('div');
+                var usesTradeRule = !!item.aiTradeRuleId;
+                var hasTradeRuleChoices = _voiceTradeRuleChoices().length > 0;
                 card.className = 'border rounded p-3 mb-3 ai-voice-review-card' + (row.duplicateOf !== undefined ? ' bg-light' : '');
                 card.innerHTML = ''
                     + '<div class="d-flex flex-wrap justify-content-between gap-2 mb-2">'
@@ -18098,9 +18341,11 @@ Example:
                     + '</div>'
                     + '<span class="badge ' + badgeClass + ' align-self-start">' + _escapeHtml(row.confidence) + '</span>'
                     + '</div>'
-                    + '<div class="small text-muted">What AI heard</div><div class="fw-semibold mb-2">"' + _escapeHtml(row.phrase || item.description || 'Item') + '"</div>'
+                    + '<label class="form-label small fw-semibold mb-1" for="aiVoiceReviewPhrase' + index + '">Phrase used for this match</label>'
+                    + '<input class="form-control form-control-sm ai-voice-review-phrase mb-1" id="aiVoiceReviewPhrase' + index + '" data-row-index="' + index + '" value="' + _escapeHtml(row.phrase || item.description || 'Item') + '" spellcheck="true">'
+                    + '<div class="small text-muted mb-2">The original browser transcript is shown above. Correct this phrase if needed; saved corrections remember the edited wording.</div>'
                     + '<div class="small text-muted">AI parsed</div>'
-                    + '<div class="mb-2">' + _escapeHtml(item.description || 'Item') + ' - ' + _escapeHtml(formatQuoteQuantityDisplay(item.quantity || 1, item.unit || item.unitType || 'ls')) + ' @ ' + qdFormatMoney(displayRate) + calculation + '</div>'
+                    + '<div class="mb-2" id="aiVoiceParsedPreview' + index + '">' + _escapeHtml(item.description || 'Item') + ' - ' + _escapeHtml(formatQuoteQuantityDisplay(item.quantity || 1, item.unit || item.unitType || 'ls')) + ' @ ' + qdFormatMoney(displayRate) + calculation + '</div>'
                     + '<div class="row g-2 mb-2">'
                     + '<div class="col-6 col-md-4">'
                     + '<label class="form-label small fw-semibold" for="aiVoiceReviewQuantity' + index + '">Quantity</label>'
@@ -18114,16 +18359,32 @@ Example:
                     + '<div class="small text-muted">Fix wrong sq ft or LF before adding.</div>'
                     + '</div>'
                     + '</div>'
+                    + '<div class="border rounded p-3 bg-light-subtle">'
+                    + '<label class="form-label small fw-semibold" for="aiVoiceReviewMatchSource' + index + '">Correct this match</label>'
+                    + '<select class="form-select form-select-sm ai-voice-review-match-source" id="aiVoiceReviewMatchSource' + index + '" data-row-index="' + index + '">'
+                    + '<option value="saved_item"' + (usesTradeRule ? '' : ' selected') + '>Saved line item</option>'
+                    + '<option value="trade_rule"' + (usesTradeRule ? ' selected' : '') + ((!hasTradeRuleChoices && !usesTradeRule) ? ' disabled' : '') + '>Trade rule</option>'
+                    + '</select>'
+                    + '<div class="small text-muted mt-1 mb-2">Wrong match? Choose whether you meant one of your saved pricing items or one of your trade rules.</div>'
+                    + '<div id="aiVoiceSavedItemMatchWrap' + index + '"' + (usesTradeRule ? ' class="d-none"' : '') + '>'
                     + '<label class="form-label small fw-semibold" for="aiVoiceReviewMatch' + index + '">Match to saved item</label>'
-                    + '<input class="form-control ai-voice-review-match" id="aiVoiceReviewMatch' + index + '" list="aiVoiceItemOptions" data-row-index="' + index + '" value="' + _escapeHtml(selectedText || '') + '" placeholder="' + (row.requiresChoice ? 'Choose which saved item this means...' : 'Start typing a saved item name...') + '">'
+                    + '<input class="form-control ai-voice-review-match" id="aiVoiceReviewMatch' + index + '" list="aiVoiceItemOptions" data-row-index="' + index + '" value="' + _escapeHtml(selectedText || '') + '" placeholder="' + (row.requiresChoice ? 'Choose which saved item this means...' : 'Start typing a saved item name...') + '"' + (usesTradeRule ? ' disabled' : '') + '>'
                     + suggestions
+                    + '</div>'
+                    + '<div id="aiVoiceTradeRuleMatchWrap' + index + '"' + (usesTradeRule ? '' : ' class="d-none"') + '>'
+                    + '<label class="form-label small fw-semibold" for="aiVoiceReviewTradeRule' + index + '">Match to trade rule</label>'
+                    + '<select class="form-select ai-voice-review-trade-rule" id="aiVoiceReviewTradeRule' + index + '" data-row-index="' + index + '"' + (usesTradeRule ? '' : ' disabled') + '>'
+                    + _voiceTradeRuleOptionsHtml(row)
+                    + '</select>'
+                    + '</div>'
                     + helper
-                    + '<div class="d-flex flex-wrap gap-3 align-items-center mt-2">'
+                    + '<div class="d-flex flex-wrap gap-3 align-items-center mt-2' + (usesTradeRule ? ' d-none' : '') + '" id="aiVoiceRememberWrap' + index + '">'
                     + '<div class="form-check">'
                     + '<input class="form-check-input ai-voice-review-remember" type="checkbox" id="aiVoiceReviewRemember' + index + '" data-row-index="' + index + '" ' + (selectedText ? 'checked' : '') + '>'
                     + '<label class="form-check-label small" for="aiVoiceReviewRemember' + index + '">' + (row.requiresChoice ? 'Remember this choice / do not ask again' : 'Remember this phrase') + '</label>'
                     + '</div>'
                     + '<input class="form-control form-control-sm ai-voice-review-note" data-row-index="' + index + '" placeholder="Optional note" style="max-width:320px;">'
+                    + '</div>'
                     + '</div>';
                 list.appendChild(card);
             });
@@ -18133,6 +18394,17 @@ Example:
                     if (input) input.value = this.getAttribute('data-value') || '';
                 });
             });
+            list.querySelectorAll('.ai-voice-review-match-source').forEach(function(select) {
+                select.addEventListener('change', function() {
+                    _syncAiVoiceReviewMatchSource(parseInt(this.getAttribute('data-row-index'), 10));
+                });
+            });
+            list.querySelectorAll('.ai-voice-review-trade-rule').forEach(function(select) {
+                select.addEventListener('change', function() {
+                    _syncAiVoiceTradeRuleSelection(parseInt(this.getAttribute('data-row-index'), 10));
+                });
+            });
+            _voiceReviewRows.forEach(function(row, index) { _syncAiVoiceReviewMatchSource(index); });
         }
 
         function _applyAiVoiceReviewQuantityEdit(row, index) {
@@ -18151,19 +18423,19 @@ Example:
             row.item.total = _voiceRoundQuantity((parseFloat(row.item.quantity) || 0) * (parseFloat(row.item.rate || row.item.price || 0) || 0));
         }
 
-        async function showAiVoiceReview(result) {
+        async function showAiVoiceReview(result, existingMappings) {
             if (!result || !Array.isArray(result.rooms)) {
                 applyAIQuote(result);
                 return;
             }
-            console.log('[QuoteDr AI Voice] Opening review for parse result:', result);
-            var mappings = [];
-            if (typeof getUserLearnedMappings === 'function') {
+            var mappings = Array.isArray(existingMappings) ? existingMappings : [];
+            if (!Array.isArray(existingMappings) && typeof getUserLearnedMappings === 'function') {
                 try { mappings = await getUserLearnedMappings(); } catch(e) { mappings = []; }
             }
             _voiceReviewResult = result;
             _voiceReviewItems = _flattenVoicePricingItems();
             _voiceReviewRows = _buildVoiceReviewRows(result, mappings);
+            _renderAiVoiceOriginalTranscriptReview();
             _renderAiVoiceScopeNotesReview();
             _renderAiVoiceReviewModal();
             var reviewModalEl = document.getElementById('aiVoiceReviewModal');
@@ -18261,25 +18533,73 @@ Example:
             if (!_voiceReviewResult) return;
             var saveTasks = [];
             var ruleSuggestionCandidates = [];
+            var decisions = {};
+            for (var validationIndex = 0; validationIndex < _voiceReviewRows.length; validationIndex++) {
+                var validationRow = _voiceReviewRows[validationIndex];
+                var validationInclude = document.getElementById('aiVoiceReviewInclude' + validationIndex);
+                if (validationInclude && !validationInclude.checked) continue;
+                var phraseInput = document.getElementById('aiVoiceReviewPhrase' + validationIndex);
+                var sourceInput = document.getElementById('aiVoiceReviewMatchSource' + validationIndex);
+                var savedInput = document.getElementById('aiVoiceReviewMatch' + validationIndex);
+                var tradeInput = document.getElementById('aiVoiceReviewTradeRule' + validationIndex);
+                var source = sourceInput ? sourceInput.value : (validationRow.item.aiTradeRuleId ? 'trade_rule' : 'saved_item');
+                var phrase = phraseInput && phraseInput.value.trim()
+                    ? phraseInput.value.trim()
+                    : (validationRow.phrase || validationRow.item.description || '');
+                var tradeChoice = source === 'trade_rule' ? _resolveVoiceTradeRuleSelection(tradeInput && tradeInput.value) : null;
+                var savedSelection = source === 'saved_item' ? _resolveVoiceReviewSelection(savedInput && savedInput.value) : null;
+                if (source === 'trade_rule' && !tradeChoice) {
+                    qdAlert('Choose the intended trade rule for "' + phrase + '" before adding verified items.');
+                    if (tradeInput) tradeInput.focus();
+                    return;
+                }
+                if (source === 'saved_item' && validationRow.item.aiTradeRuleId && !savedSelection) {
+                    qdAlert('Choose the saved line item you meant for "' + phrase + '", or switch back to Trade rule.');
+                    if (savedInput) savedInput.focus();
+                    return;
+                }
+                decisions[validationIndex] = {
+                    source: source,
+                    phrase: phrase,
+                    tradeChoice: tradeChoice,
+                    savedSelection: savedSelection
+                };
+            }
             _voiceReviewRows.forEach(function(row, index) {
                 var include = document.getElementById('aiVoiceReviewInclude' + index);
                 if (include && !include.checked) {
                     row.item._excludeFromQuote = true;
                     return;
                 }
+                var decision = decisions[index] || {
+                    source: row.item.aiTradeRuleId ? 'trade_rule' : 'saved_item',
+                    phrase: row.phrase || row.item.description || ''
+                };
+                row.phrase = decision.phrase;
+                row.phraseKey = _voicePhraseKey(decision.phrase);
+                row.item.spokenPhrase = decision.phrase;
                 var input = document.getElementById('aiVoiceReviewMatch' + index);
                 var remember = document.getElementById('aiVoiceReviewRemember' + index);
                 var note = document.querySelector('.ai-voice-review-note[data-row-index="' + index + '"]');
                 var typedValue = input ? input.value : '';
                 var confirmedExistingMapping = row.mapping && typedValue.trim().toLowerCase() === _voiceMappingDisplay(row.mapping).trim().toLowerCase();
-                var selected = confirmedExistingMapping ? null : _resolveVoiceReviewSelection(typedValue);
-                if (confirmedExistingMapping) {
+                var selected = decision.savedSelection || (confirmedExistingMapping ? null : _resolveVoiceReviewSelection(typedValue));
+                if (decision.source === 'trade_rule') {
+                    var rebuiltRuleItem = _buildVoiceTradeRuleChoiceItem(decision.tradeChoice, row);
+                    _replaceVoiceReviewItem(row.item, rebuiltRuleItem);
+                    _applyAiVoiceReviewQuantityEdit(row, index);
+                    if (typeof incrementAiTradeRuleUsage === 'function') {
+                        saveTasks.push(incrementAiTradeRuleUsage(decision.tradeChoice.rule.id).catch(function(){}));
+                    }
+                } else if (confirmedExistingMapping) {
+                    _clearAiTradeRuleReviewMetadata(row.item);
                     _applyVoiceMappedItem(row.item, row.mapping);
                     _applyAiVoiceReviewQuantityEdit(row, index);
                     if (typeof incrementLearnedMappingUsage === 'function') {
                         saveTasks.push(incrementLearnedMappingUsage(row.mapping.id).catch(function(){}));
                     }
                 } else if (selected) {
+                    _clearAiTradeRuleReviewMetadata(row.item);
                     _applyVoiceMappedItem(row.item, selected);
                     _applyAiVoiceReviewQuantityEdit(row, index);
                     if (remember && remember.checked && typeof saveLearnedMapping === 'function') {
@@ -18292,6 +18612,7 @@ Example:
                         }));
                     }
                 } else {
+                    _clearAiTradeRuleReviewMetadata(row.item);
                     _applyAiVoiceReviewQuantityEdit(row, index);
                 }
             });
@@ -18325,19 +18646,41 @@ Example:
             return result;
         }
 
-        function skipAiVoiceReview() {
+        async function skipAiVoiceReview() {
+            var ambiguousIndex = _voiceReviewRows.findIndex(function(row) {
+                return row && row.item && row.item.aiTradeRuleAmbiguous;
+            });
+            if (ambiguousIndex >= 0) {
+                qdAlert('Choose the intended trade rule for each close match before keeping the AI suggestions.');
+                var tradeSelect = document.getElementById('aiVoiceReviewTradeRule' + ambiguousIndex);
+                if (tradeSelect) tradeSelect.focus();
+                return;
+            }
             var modal = bootstrap.Modal.getInstance(document.getElementById('aiVoiceReviewModal'));
             if (modal) modal.hide();
             _forceCloseAiVoiceReviewModal();
             var reviewed = _voiceReviewResult;
             _voiceReviewResult = null;
             _voiceReviewRows = [];
+            if (typeof incrementAiTradeRuleUsage === 'function') {
+                var seenRuleIds = {};
+                var usageTasks = [];
+                ((reviewed && reviewed.rooms) || []).forEach(function(room) {
+                    ((room && room.items) || []).forEach(function(item) {
+                        if (!item || !item.aiTradeRuleId || seenRuleIds[item.aiTradeRuleId]) return;
+                        seenRuleIds[item.aiTradeRuleId] = true;
+                        usageTasks.push(incrementAiTradeRuleUsage(item.aiTradeRuleId).catch(function(){}));
+                    });
+                });
+                await Promise.all(usageTasks);
+            }
             applyAIQuote(reviewed);
         }
 
         async function submitVoiceQuote() {
             var transcript = _voiceTranscriptFull.trim();
             if (!transcript) return;
+            _voiceOriginalTranscript = transcript;
             _voiceRecording = false;
             _voicePaused = false;
             if (_voiceRecognition) {
@@ -18352,6 +18695,7 @@ Example:
                 if (typeof getSupabaseFunctionAuthHeaders !== 'function') {
                     throw new Error('Please sign in again before using AI voice quote.');
                 }
+                const learnedMappings = (typeof getUserLearnedMappings === 'function') ? await getUserLearnedMappings() : [];
                 const response = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/parse-quote', {
                     method: 'POST',
                     headers: await getSupabaseFunctionAuthHeaders(),
@@ -18360,7 +18704,7 @@ Example:
                         customItems: (function() {
                             try { return JSON.parse(localStorage.getItem('ald_custom_items') || '{}'); } catch(e) { return {}; }
                         })(),
-                        learnedMappings: (typeof getUserLearnedMappings === 'function') ? await getUserLearnedMappings() : []
+                        learnedMappings: learnedMappings
                     })
                 });
                 if (!response.ok) throw new Error('Server error: ' + response.status);
@@ -18369,9 +18713,9 @@ Example:
                 document.getElementById('voiceLoading').style.display = 'none';
                 await _hideBootstrapModalAndWait('voiceQuoteModal');
                 const templatedResult = await _applyAiVoiceTemplatesToResult(result, transcript);
-                const ruledResult = await _applyAiTradeRulesToVoiceResult(templatedResult, transcript);
+                const ruledResult = await _applyAiTradeRulesToVoiceResult(templatedResult, transcript, learnedMappings);
                 const measuredResult = await showAiVoiceMeasurementModal(ruledResult);
-                await showAiVoiceReview(measuredResult);
+                await showAiVoiceReview(measuredResult, learnedMappings);
             } catch(err) {
                 console.error('Voice quote error:', err);
                 document.getElementById('voiceLoading').style.display = 'none';
@@ -19722,7 +20066,7 @@ Example:
             <div class="modal-content">
                 <div class="modal-header" style="background:#1a56a0; color:white;">
                     <h5 class="modal-title"><i class="fas fa-brain me-2"></i>Review AI Voice Items</h5>
-                    <button type="button" class="btn-close btn-close-white" onclick="skipAiVoiceReview()"></button>
+                    <button type="button" class="btn-close btn-close-white" onclick="skipAiVoiceReview()" aria-label="Keep AI suggestions and close review"></button>
                 </div>
                 <div class="modal-body">
                     <div class="alert alert-light border d-flex flex-wrap justify-content-between gap-2 align-items-center">
@@ -19730,7 +20074,12 @@ Example:
                             <div class="fw-semibold">Check the items before they land on the quote.</div>
                             <div class="small text-muted" id="aiVoiceReviewSummary"></div>
                         </div>
-                        <div class="small text-muted">Type any saved item name to teach QuoteDr what that phrase means.</div>
+                        <div class="small text-muted">Correct a phrase, then choose a saved line item or trade rule to teach QuoteDr what you meant.</div>
+                    </div>
+                    <div class="alert alert-primary border d-none" id="aiVoiceOriginalTranscriptReview">
+                        <div class="fw-semibold mb-1"><i class="fas fa-quote-left me-1" aria-hidden="true"></i>Original browser transcript</div>
+                        <div id="aiVoiceOriginalTranscriptText" style="white-space:pre-wrap;"></div>
+                        <div class="small mt-2">This is the transcript supplied to QuoteDr. The words on each item below identify the excerpt used for that match.</div>
                     </div>
                     <datalist id="aiVoiceItemOptions"></datalist>
                     <div id="aiVoiceScopeNotesReview"></div>

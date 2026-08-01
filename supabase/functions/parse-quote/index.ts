@@ -117,7 +117,7 @@ Return ONLY valid JSON in this exact format:
           "unit": "unit",
           "rate": 0,
           "total": 0,
-          "spokenPhrase": "short phrase the contractor said for this item",
+          "spokenPhrase": "exact verbatim excerpt the contractor said for this item",
           "calculation": "brief quantity math when dimensions are used"
         }
       ]
@@ -136,7 +136,9 @@ Rules:
 - Keep descriptions concise and professional
 - If the contractor mentions a bathroom, create a separate room for it
 - IMPORTANT: If a user price list is provided, match items to it as closely as possible and use those exact prices and unit types. Only use $0 for items not in the price list.
-- Preserve each requested service in spokenPhrase so the app can ask the user to verify and remember it later.
+- spokenPhrase must be an exact, contiguous excerpt from the supplied transcript. Copy it verbatim; never summarize, paraphrase, or replace it with a familiar price-list or learned-mapping phrase.
+- Keep every distinguishing word the contractor spoke in spokenPhrase, including dimensions, numbers, materials, locations, and qualifiers such as interior or exterior. For example, preserve "trim up a five-foot exterior door" instead of shortening it to "trim up a door".
+- A price-list or learned-dictionary match may set description, category, unit, and rate, but it must never rewrite spokenPhrase.
 - When dimensions are provided, calculate quantities with explicit trade math. Do not use vague rules of thumb when a formula is available.
 - Wall paint formula is mandatory: wall paint sqft = room perimeter x wall height. Perimeter = (length + width) x 2. Example: a 12ft x 12ft room with 8ft walls has wall paint = (12+12)x2x8 = 384 sqft. Do not use floor area x 2 for wall paint.
 - Ceiling paint sqft = length x width.
