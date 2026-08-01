@@ -219,7 +219,11 @@
 
     function quoteOperationIdentifierError(operation) {
         var target = operation && operation.target || {};
-        if (target.table !== 'quotes') return null;
+        var isQuoteOperation = target.table === 'quotes' || operation && operation.entityType === 'quote';
+        if (!isQuoteOperation) return null;
+        var lastError = operation && operation.lastError || {};
+        var lastErrorText = [lastError.message, lastError.details, lastError.hint].filter(Boolean).join(' ');
+        var uuidFailure = String(lastError.code || '') === '22P02' || /invalid input syntax for type uuid/i.test(lastErrorText);
         var action = String(target.action || operation.action || '').toLowerCase();
         var candidate;
         var hasCandidate = false;
@@ -227,17 +231,19 @@
             var idFilter = (target.filters || []).find(function(filter) {
                 return filter && filter.column === 'id' && (!filter.operator || filter.operator === 'eq');
             });
-            candidate = idFilter ? idFilter.value : operation.entityId;
+            candidate = idFilter ? idFilter.value : operation && operation.payload && operation.payload.supabaseId || operation.entityId;
             hasCandidate = true;
         } else if (action === 'insert' && target.values && !Array.isArray(target.values) &&
             Object.prototype.hasOwnProperty.call(target.values, 'id')) {
             candidate = target.values.id;
             hasCandidate = true;
         }
-        if (!hasCandidate || isUuidIdentifier(candidate)) return null;
+        if ((!hasCandidate || isUuidIdentifier(candidate)) && !uuidFailure) return null;
         var error = new Error('This retained quote has an invalid cloud ID and cannot be retried safely. Resolve it below, or export and remove the failed save.');
         error.code = 'QD_INVALID_IDENTIFIER';
-        error.details = 'Invalid quote id: ' + String(candidate);
+        error.details = candidate === undefined || candidate === null || candidate === ''
+            ? lastErrorText || 'The retained quote ID is missing.'
+            : 'Invalid quote id: ' + String(candidate);
         return error;
     }
 

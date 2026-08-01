@@ -43,12 +43,17 @@
 
         function quoteStorageOperationHasInvalidQuoteId(operation) {
             var target = operation && operation.target || {};
+            var isQuoteOperation = target.table === 'quotes' || operation && operation.entityType === 'quote';
+            if (!isQuoteOperation) return false;
+            var lastError = operation && operation.lastError || {};
+            var lastErrorText = [lastError.message, lastError.details, lastError.hint].filter(Boolean).join(' ');
+            if (String(lastError.code || '') === '22P02' || /invalid input syntax for type uuid/i.test(lastErrorText)) return true;
             var action = String(target.action || operation && operation.action || '').toLowerCase();
-            if (target.table !== 'quotes' || (action !== 'update' && action !== 'delete')) return false;
+            if (action !== 'update' && action !== 'delete') return false;
             var idFilter = (target.filters || []).find(function(filter) {
                 return filter && filter.column === 'id' && (!filter.operator || filter.operator === 'eq');
             });
-            var candidate = idFilter ? idFilter.value : operation.entityId;
+            var candidate = idFilter ? idFilter.value : operation && operation.payload && operation.payload.supabaseId || operation.entityId;
             return !quoteStorageNormalizeCloudId(candidate);
         }
 

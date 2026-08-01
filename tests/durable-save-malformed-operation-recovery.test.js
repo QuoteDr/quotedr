@@ -57,6 +57,15 @@ const malformedError = coordinatorContext.quoteOperationIdentifierError({
   target: { table: 'quotes', action: 'update', filters: [{ column: 'id', value: 'undefined' }] }
 });
 assert.strictEqual(malformedError.code, 'QD_INVALID_IDENTIFIER', 'malformed quote IDs should be quarantined');
+const legacyUuidError = coordinatorContext.quoteOperationIdentifierError({
+  entityType: 'quote',
+  entityId: 'undefined',
+  action: 'update',
+  target: {},
+  lastError: { code: '22P02', message: 'invalid input syntax for type uuid: \"undefined\"' },
+  payload: { supabaseId: 'undefined', rooms: [] }
+});
+assert.strictEqual(legacyUuidError.code, 'QD_INVALID_IDENTIFIER', 'legacy quote retries should be quarantined from their stored UUID error even without target metadata');
 assert.strictEqual(coordinatorContext.quoteOperationIdentifierError({
   entityId: 'quote-number:Q-1',
   action: 'insert',
@@ -130,6 +139,13 @@ assert.strictEqual(recovered.supabaseId, null, 'a malformed backup should not pr
 assert.strictEqual(recovered._serverUpdatedAt, null, 'a malformed backup should not preserve the bad server version');
 assert(recovered.quoteNumber.startsWith('Q-742459980-RECOVERED-'), 'a malformed backup should reopen as a separate quote number');
 assert(recovered.quoteTitle.endsWith('(Recovered Copy)'), 'a malformed backup should be visibly identified');
+const legacyRecovered = quoteContext.quoteStorageRecoveryQuoteFromOperation({
+  ...malformedOperation,
+  target: {},
+  lastError: { code: '22P02', message: 'invalid input syntax for type uuid: \"undefined\"' }
+});
+assert.strictEqual(legacyRecovered.supabaseId, null, 'legacy UUID failures should export without the malformed cloud ID');
+assert(legacyRecovered.quoteNumber.includes('-RECOVERED-'), 'legacy UUID failures should reopen as a separate recovered quote');
 
 const recoverySaveCalls = [];
 const recoveryDiscardCalls = [];
