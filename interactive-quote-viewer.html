@@ -1327,6 +1327,12 @@
             .item-description span[id$="_full"] {
                 display: inline !important;
             }
+            .scope-description span[id$="_short"] {
+                display: none !important;
+            }
+            .scope-description span[id$="_full"] {
+                display: inline !important;
+            }
         }
     </style>
 
@@ -2403,6 +2409,24 @@ if (location.search.includes('debug')) {
             }
             var preview = raw.slice(0, limit).replace(/\s+\S*$/, '');
             return '<div class="text-muted mb-1 item-description">' +
+                '<span id="' + id + '_short">' + formatDescriptionText(preview) + '...</span>' +
+                '<span id="' + id + '_full" style="display:none;">' + formatDescriptionText(raw) + '</span>' +
+                '<button type="button" class="item-desc-toggle" onclick="toggleViewerDescription(\'' + id + '\', this)">Show more</button>' +
+                '</div>';
+        }
+
+        function renderExpandableScopeNotes(text, id) {
+            var raw = String(text || '').trim();
+            if (!raw) return '';
+            var viewerStyle = resolveViewerDocumentStyle();
+            var limit = parseInt(viewerStyle.scopePreviewLength, 10);
+            if (!isFinite(limit)) limit = 400;
+            limit = Math.max(120, Math.min(limit, 1200));
+            if (raw.length <= limit) {
+                return '<div class="scope-description">' + formatDescriptionText(raw) + '</div>';
+            }
+            var preview = raw.slice(0, limit).replace(/\s+\S*$/, '');
+            return '<div class="scope-description">' +
                 '<span id="' + id + '_short">' + formatDescriptionText(preview) + '...</span>' +
                 '<span id="' + id + '_full" style="display:none;">' + formatDescriptionText(raw) + '</span>' +
                 '<button type="button" class="item-desc-toggle" onclick="toggleViewerDescription(\'' + id + '\', this)">Show more</button>' +
@@ -4412,7 +4436,7 @@ if (location.search.includes('debug')) {
                 `;
 
                 if (showScopeNotes && room.scopeNotes) {
-                    html += `<div class="alert alert-light border mb-3"><div class="fw-semibold small text-muted mb-1"><i class="fas fa-clipboard-list me-1"></i>Scope / Notes</div>${escapeHtml(room.scopeNotes).replace(/\n/g, '<br>')}</div>`;
+                    html += `<div class="alert alert-light border mb-3"><div class="fw-semibold small text-muted mb-1"><i class="fas fa-clipboard-list me-1"></i>Scope / Notes</div>${renderExpandableScopeNotes(room.scopeNotes, 'room_scope_' + roomIdx)}</div>`;
                 }
 
                 if (pricingMode === 'total') {
