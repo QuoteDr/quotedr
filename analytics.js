@@ -6,11 +6,23 @@
     var POSTHOG_TOKEN = 'phc_yXxbouoPwjD2ce8uchnRYcJ72DvUEwysGgJkCsHPFDgN';
     var POSTHOG_API_HOST = 'https://us.i.posthog.com';
     var POSTHOG_UI_HOST = 'https://us.posthog.com';
-    var POSTHOG_ASSET_HOST = 'https://us-assets.i.posthog.com';
     var DISABLE_KEY = 'quotedr_analytics_opt_out';
     var ONCE_PREFIX = 'quotedr_analytics_once:';
-
+    var CANONICAL_ORIGIN = 'https://quotedr.io';
     var SENSITIVE_KEY_RE = /(email|phone|address|client|customer|name|signature|message|note|notes|description|url|link|token|key|password|pin)/i;
+    var EVENT_SENSITIVE_KEY_RE = /(email|phone|address|client|customer|signature|message|note|notes|description|token|password|pin|query|search|hash)/i;
+    var BOT_RE = /(bot|crawler|spider|headless|lighthouse|pagespeed|preview|slurp|facebookexternalhit|whatsapp|bingpreview|uptimerobot)/i;
+    var MARKETING_ROUTES = {
+        '/landing': true,
+        '/about': true,
+        '/contact': true,
+        '/pricing': true,
+        '/tutorials': true,
+        '/whats-new': true,
+        '/blog': true,
+        '/terms': true,
+        '/privacy': true
+    };
 
     function storageGet(key) {
         try { return window.localStorage ? window.localStorage.getItem(key) : null; } catch(e) { return null; }
@@ -29,10 +41,75 @@
         return storageGet(DISABLE_KEY) === '1' || dnt === '1' || dnt === 'yes';
     }
 
-    function safePageName() {
-        var path = window.location && window.location.pathname ? window.location.pathname : '';
-        var file = path.split('/').pop() || 'index.html';
-        return file.replace(/\.html$/i, '') || 'home';
+    function isKnownBot(userAgent) {
+        return BOT_RE.test(String(userAgent || ''));
+    }
+
+    function isAnalyticsHostAllowed(hostname) {
+        var host = String(hostname || '').trim().toLowerCase().replace(/\.$/, '');
+        return host === 'quotedr.io' || host === 'www.quotedr.io';
+    }
+
+    function isAvailable() {
+        var hostname = window.location && window.location.hostname;
+        var userAgent = window.navigator && window.navigator.userAgent;
+        return isAnalyticsHostAllowed(hostname) && !isKnownBot(userAgent) && !isDisabled();
+    }
+
+    function safePathSegment(segment) {
+        var decoded = String(segment || '');
+        try { decoded = decodeURIComponent(decoded); } catch(e) {}
+        if (/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(decoded)) return ':id';
+        if (/^\d{8,}$/.test(decoded)) return ':id';
+        if (/^[A-Za-z0-9_-]{24,}$/.test(decoded)) return ':id';
+        return decoded.replace(/[^A-Za-z0-9._~-]/g, '-').slice(0, 64);
+    }
+
+    function safeRoute(pathname) {
+        var path = String(pathname === undefined
+            ? ((window.location && window.location.pathname) || '/')
+            : pathname);
+        path = path.split('?')[0].split('#')[0].replace(/\\/g, '/');
+        var parts = path.split('/').filter(Boolean).map(safePathSegment);
+        var route = '/' + parts.join('/');
+        route = route.replace(/\/(index\.html|index)$/i, '');
+        route = route.replace(/\.html$/i, '');
+        route = route.replace(/\/{2,}/g, '/');
+        if (route === '/' || route === '') route = '/landing';
+        if (route === '/blog/') route = '/blog';
+        return route.slice(0, 120);
+    }
+
+    function isMarketingRoute(route) {
+        route = safeRoute(route);
+        return !!MARKETING_ROUTES[route] || route.indexOf('/blog/') === 0;
+    }
+
+    function siteArea(route) {
+        route = safeRoute(route);
+        if (isMarketingRoute(route)) return 'marketing';
+        if (route === '/interactive-quote-viewer' || route === '/invoice-viewer' || route === '/client-portal') return 'client';
+        return 'app';
+    }
+
+    function safePageName(pathname) {
+        var route = safeRoute(pathname);
+        if (route === '/landing') return 'landing';
+        return route.replace(/^\//, '').replace(/\//g, ':') || 'landing';
+    }
+
+    function safeReferrerDomain(value) {
+        var raw = String(value || '').trim();
+        if (!raw) return 'direct';
+        try {
+            var parsed = new URL(raw, CANONICAL_ORIGIN);
+            var hostname = String(parsed.hostname || '').toLowerCase().replace(/^www\./, '');
+            if (!hostname) return 'direct';
+            return hostname === 'quotedr.io' ? 'quotedr.io' : hostname.slice(0, 120);
+        } catch(e) {
+            var fallback = raw.toLowerCase().replace(/^www\./, '').replace(/[^a-z0-9.-]/g, '');
+            return fallback.slice(0, 120) || 'direct';
+        }
     }
 
     function currentPlan() {
@@ -64,11 +141,65 @@
             if (typeof value === 'object' && value !== null) return;
             clean[key] = value;
         });
+        var route = safeRoute();
+        var area = siteArea(route);
         clean.app = 'quotedr';
-        clean.page = safePageName();
+        clean.page = safePageName(route);
+        clean.route = route;
+        clean.site_area = area;
+        clean.audience = area === 'marketing' ? 'visitor' : 'member';
         var plan = currentPlan();
         if (plan) clean.plan = plan;
         return clean;
+    }
+
+    function sanitizeUrlValue(value) {
+        try {
+            var parsed = new URL(String(value || ''), CANONICAL_ORIGIN);
+            return CANONICAL_ORIGIN + safeRoute(parsed.pathname);
+        } catch(e) {
+            return CANONICAL_ORIGIN + safeRoute();
+        }
+    }
+
+    function sanitizePostHogEvent(event) {
+        if (!event || typeof event !== 'object' || !isAvailable()) return null;
+        var route = safeRoute();
+        var area = siteArea(route);
+        var properties = Object.assign({}, event.properties || {});
+
+        Object.keys(properties).forEach(function(key) {
+            if (EVENT_SENSITIVE_KEY_RE.test(key)) delete properties[key];
+        });
+
+        properties.$current_url = sanitizeUrlValue(properties.$current_url || CANONICAL_ORIGIN + route);
+        properties.$pathname = route;
+        properties.$host = 'quotedr.io';
+        delete properties.$initial_current_url;
+        delete properties.$referrer;
+        delete properties.$initial_referrer;
+        delete properties.$search_engine;
+        delete properties.$set;
+        delete properties.$set_once;
+
+        var referrerDomain = safeReferrerDomain(properties.referrer_domain || properties.$referring_domain || document.referrer);
+        properties.$referring_domain = referrerDomain;
+        properties.referrer_domain = referrerDomain;
+        properties.route = route;
+        properties.site_area = area;
+        properties.audience = area === 'marketing' ? 'visitor' : (properties.audience || 'member');
+        properties.app = 'quotedr';
+
+        if (area === 'marketing') {
+            delete properties.$elements;
+            delete properties.$element_id;
+            delete properties.$element_text;
+            delete properties.$element_class;
+            delete properties.$element_href;
+        }
+
+        event.properties = properties;
+        return event;
     }
 
     function ensurePostHogStub() {
@@ -77,13 +208,14 @@
     }
 
     function init() {
-        if (!POSTHOG_TOKEN || isDisabled()) return;
+        if (!POSTHOG_TOKEN || !isAvailable()) return;
         ensurePostHogStub();
         if (!window.posthog || window.posthog.__quotedrInitialized) return;
         window.posthog.__quotedrInitialized = true;
         window.posthog.init(POSTHOG_TOKEN, {
             api_host: POSTHOG_API_HOST,
             ui_host: POSTHOG_UI_HOST,
+            before_send: sanitizePostHogEvent,
             loaded: function(posthog) {
                 try {
                     posthog.set_config({
@@ -102,6 +234,7 @@
             person_profiles: 'identified_only',
             mask_all_element_attributes: true,
             mask_all_text: true,
+            custom_blocked_useragents: [BOT_RE],
             session_recording: {
                 maskAllInputs: true,
                 maskTextSelector: 'body',
@@ -113,7 +246,7 @@
     }
 
     function capture(name, props) {
-        if (!name || isDisabled()) return;
+        if (!name || !isAvailable()) return;
         init();
         try {
             if (window.posthog && typeof window.posthog.capture === 'function') {
@@ -135,7 +268,7 @@
     }
 
     function identifyUser(user) {
-        if (!user || !user.id || isDisabled()) return;
+        if (!user || !user.id || !isAvailable()) return;
         init();
         try {
             if (window.posthog && typeof window.posthog.identify === 'function') {
@@ -172,12 +305,24 @@
         optOut: optOut,
         optIn: optIn,
         bucketMoney: bucketMoney,
-        isDisabled: isDisabled
+        isDisabled: isDisabled,
+        isAvailable: isAvailable,
+        _test: {
+            safeRoute: safeRoute,
+            siteArea: siteArea,
+            safeReferrerDomain: safeReferrerDomain,
+            sanitizeProperties: sanitizeProperties,
+            sanitizePostHogEvent: sanitizePostHogEvent,
+            isAnalyticsHostAllowed: isAnalyticsHostAllowed,
+            isKnownBot: isKnownBot
+        }
     };
 
     init();
-    if (!isDisabled()) {
-        capture('page_viewed', { path: safePageName() });
+    if (isAvailable()) {
+        var route = safeRoute();
+        var page = safePageName(route);
+        capture('page_viewed', { referrer_domain: safeReferrerDomain(document.referrer) });
         var openEvents = {
             'dashboard': 'dashboard_opened',
             'quote-builder': 'quote_builder_opened',
@@ -186,9 +331,9 @@
             'invoice-viewer': 'invoice_viewed',
             'interactive-quote-viewer': 'quote_client_viewed',
             'onboarding': 'onboarding_opened',
-            'pricing': 'pricing_opened'
+            'pricing': 'pricing_opened',
+            'contact': 'contact_opened'
         };
-        var page = safePageName();
-        if (openEvents[page]) capture(openEvents[page]);
+        if (openEvents[page]) capture(openEvents[page], { referrer_domain: safeReferrerDomain(document.referrer) });
     }
 })(window, document);

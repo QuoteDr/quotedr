@@ -60,6 +60,73 @@
 			font-weight: 800;
 			text-transform: uppercase;
 		}
+		.traffic-summary-grid {
+			display: grid;
+			grid-template-columns: repeat(5, minmax(0, 1fr));
+			border: 1px solid #d8e4f2;
+			border-radius: 8px;
+			background: #f8fbff;
+			overflow: hidden;
+		}
+		.traffic-summary-metric {
+			padding: 0.9rem 1rem;
+			border-right: 1px solid #d8e4f2;
+			min-width: 0;
+		}
+		.traffic-summary-metric:last-child {
+			border-right: 0;
+		}
+		.traffic-summary-value {
+			color: #0f3460;
+			font-size: 1.45rem;
+			font-weight: 800;
+			line-height: 1.1;
+		}
+		.traffic-data-table {
+			width: 100%;
+			table-layout: fixed;
+		}
+		.traffic-data-table th,
+		.traffic-data-table td {
+			padding: 0.55rem 0.4rem;
+			vertical-align: middle;
+			word-break: break-word;
+		}
+		.traffic-live-dot {
+			display: inline-block;
+			width: 8px;
+			height: 8px;
+			border-radius: 50%;
+			background: #198754;
+			box-shadow: 0 0 0 4px rgba(25,135,84,0.12);
+			margin-right: 0.45rem;
+		}
+		.traffic-ranked-row {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 1rem;
+			padding: 0.5rem 0;
+			border-bottom: 1px solid #edf2f7;
+		}
+		.traffic-ranked-row:last-child {
+			border-bottom: 0;
+		}
+		@media (max-width: 767px) {
+			.traffic-summary-grid {
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+			}
+			.traffic-summary-metric {
+				border-bottom: 1px solid #d8e4f2;
+			}
+			.traffic-summary-metric:nth-child(2n) {
+				border-right: 0;
+			}
+			.traffic-summary-metric:last-child {
+				grid-column: 1 / -1;
+				border-bottom: 0;
+			}
+		}
 		.recording-privacy-preview {
 			display: grid;
 			grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -452,6 +519,7 @@ if (location.search.includes('debug')) {
 					<div class="admin-settings-heading"><i class="fas fa-shield-halved me-1"></i>Administrator</div>
 					<div class="list-group shadow-sm settings-tab-list" id="adminSettingsTabs">
 						<a href="#" id="analyticsBriefTabLink" data-settings-tab="analytics" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('analytics',this);return false;"><i class="fas fa-chart-line me-2" style="color:#198754"></i>Analytics Brief</a>
+						<a href="#" id="siteTrafficTabLink" data-settings-tab="site-traffic" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('site-traffic',this);return false;"><i class="fas fa-globe me-2" style="color:#1a56a0"></i>Site Traffic</a>
 						<a href="#" id="userMessagesTabLink" data-settings-tab="user-messages" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('user-messages',this);return false;"><i class="fas fa-bullhorn me-2" style="color:#f97316"></i>User Messages</a>
 						<a href="#" id="adminControlsTabLink" data-settings-tab="admin-controls" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('admin-controls',this);return false;"><i class="fas fa-sliders me-2" style="color:#1a56a0"></i>Admin Controls</a>
 						<a href="#" id="saveIncidentsTabLink" data-settings-tab="save-incidents" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('save-incidents',this);return false;"><i class="fas fa-shield-halved me-2" style="color:#dc3545"></i>Save Incidents <span id="saveIncidentsNavBadge" class="badge bg-danger ms-1" style="display:none;">0</span></a>
@@ -1501,6 +1569,38 @@ Sarah Jones, 905-555-5678"></textarea>
 					</div>
 				</div><!-- /tab-help -->
 
+				<div id="tab-site-traffic" style="display:none;">
+					<div class="settings-card">
+						<div class="d-flex align-items-start justify-content-between gap-3 flex-wrap mb-3">
+							<div>
+								<h5 class="mb-1"><i class="fas fa-globe me-2" style="color:#1a56a0"></i>Site Traffic</h5>
+								<p class="text-muted small mb-0">Anonymous marketing activity from PostHog. Active now means activity within the last five minutes.</p>
+							</div>
+							<div class="d-flex align-items-center gap-2 flex-wrap">
+								<div class="btn-group btn-group-sm" role="group" aria-label="Traffic date range">
+									<button type="button" class="btn btn-outline-primary" data-traffic-days="1" onclick="loadSiteTraffic(1)">24 hours</button>
+									<button type="button" class="btn btn-outline-primary active" data-traffic-days="7" onclick="loadSiteTraffic(7)">7 days</button>
+									<button type="button" class="btn btn-outline-primary" data-traffic-days="30" onclick="loadSiteTraffic(30)">30 days</button>
+								</div>
+								<button type="button" class="btn btn-outline-secondary btn-sm" onclick="loadSiteTraffic(siteTrafficDays)" title="Refresh traffic" aria-label="Refresh traffic"><i class="fas fa-rotate"></i></button>
+								<a id="siteTrafficPostHogLink" class="btn btn-outline-secondary btn-sm" href="https://us.posthog.com/project/411455/web" target="_blank" rel="noopener"><i class="fas fa-arrow-up-right-from-square me-1"></i>PostHog</a>
+							</div>
+						</div>
+						<div class="d-flex align-items-center justify-content-between gap-3 flex-wrap mb-3">
+							<div class="form-check form-switch mb-0">
+								<input class="form-check-input" type="checkbox" id="siteTrafficAutoRefresh" checked onchange="setSiteTrafficPolling(true)">
+								<label class="form-check-label small" for="siteTrafficAutoRefresh">Refresh every 30 seconds while this panel is open</label>
+							</div>
+							<div id="siteTrafficUpdatedAt" class="small text-muted"></div>
+						</div>
+						<div id="siteTrafficStatus" class="alert alert-light border mb-3">
+							<div class="fw-semibold mb-1">Ready to read marketing traffic.</div>
+							<div class="small text-muted">Open this panel after deploying the analytics-traffic function and setting the PostHog personal API key.</div>
+						</div>
+						<div id="siteTrafficContent" style="display:none;"></div>
+					</div>
+				</div><!-- /tab-site-traffic -->
+
 				<div id="tab-analytics" style="display:none;">
 					<div class="settings-card">
 						<div class="d-flex align-items-start justify-content-between gap-3 flex-wrap mb-3">
@@ -2024,7 +2124,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			? Array.from(window.QuoteDrAdmin.emails)
 			: ['info@alddirect.ca', 'ald.direct.contracting@gmail.com'];
 		const QUOTEDR_ANALYTICS_ADMIN_EMAILS = QUOTEDR_ADMIN_EMAILS;
-			const QUOTEDR_ADMIN_TABS = ['analytics', 'user-messages', 'admin-controls', 'save-incidents'];
+		const QUOTEDR_ADMIN_TABS = ['analytics', 'site-traffic', 'user-messages', 'admin-controls', 'save-incidents'];
 
 		function isQuoteDrAdminUser(user) {
 			if (window.QuoteDrAdmin) return window.QuoteDrAdmin.isAdminUser(user);
@@ -2040,11 +2140,11 @@ Sarah Jones, 905-555-5678"></textarea>
 				var isAdmin = isQuoteDrAdminUser(user);
 				var adminGroup = document.getElementById('adminSettingsGroup');
 				if (adminGroup) adminGroup.style.display = isAdmin ? '' : 'none';
-				['analyticsBriefTabLink', 'userMessagesTabLink', 'adminControlsTabLink', 'saveIncidentsTabLink'].forEach(function(id) {
+				['analyticsBriefTabLink', 'siteTrafficTabLink', 'userMessagesTabLink', 'adminControlsTabLink', 'saveIncidentsTabLink'].forEach(function(id) {
 					var tabLink = document.getElementById(id);
 					if (tabLink) tabLink.style.display = isAdmin ? '' : 'none';
 				});
-				['tab-analytics', 'tab-user-messages', 'tab-admin-controls', 'tab-save-incidents'].forEach(function(id) {
+				['tab-analytics', 'tab-site-traffic', 'tab-user-messages', 'tab-admin-controls', 'tab-save-incidents'].forEach(function(id) {
 					var tabPanel = document.getElementById(id);
 					if (!isAdmin && tabPanel) tabPanel.style.display = 'none';
 				});
@@ -2162,6 +2262,184 @@ Sarah Jones, 905-555-5678"></textarea>
 					'<div class="small text-muted mt-2">Make sure the Supabase function is deployed and the <code>POSTHOG_PERSONAL_API_KEY</code> secret is set.</div>';
 			}
 		}
+
+		var siteTrafficDays = 7;
+		var siteTrafficTimer = null;
+		var siteTrafficLoading = false;
+
+		function trafficTime(value) {
+			var date = new Date(value || '');
+			if (isNaN(date.getTime())) return 'Unknown';
+			var seconds = Math.max(0, Math.round((Date.now() - date.getTime()) / 1000));
+			if (seconds < 60) return seconds + ' sec ago';
+			if (seconds < 3600) return Math.round(seconds / 60) + ' min ago';
+			if (seconds < 86400) return Math.round(seconds / 3600) + ' hr ago';
+			return date.toLocaleString();
+		}
+
+		function trafficMetricHtml(label, value, detail) {
+			return '<div class=\'traffic-summary-metric\'>' +
+				'<div class=\'small text-muted mb-1\'>' + escapeAnalyticsHtml(label) + '</div>' +
+				'<div class=\'traffic-summary-value\'>' + escapeAnalyticsHtml(value) + '</div>' +
+				(detail ? '<div class=\'small text-muted mt-1\'>' + escapeAnalyticsHtml(detail) + '</div>' : '') +
+			'</div>';
+		}
+
+		function trafficSessionTableHtml(title, items, active) {
+			var rows = (items || []).map(function(item) {
+				return '<tr>' +
+					'<td><strong>' + escapeAnalyticsHtml(item.visitorLabel || 'Visitor') + '</strong>' +
+						(active ? '<div class=\'small text-success\'><span class=\'traffic-live-dot\'></span>Active</div>' : '<div class=\'small text-muted\'>' + escapeAnalyticsHtml(trafficTime(item.lastSeen)) + '</div>') +
+					'</td>' +
+					'<td><strong>' + escapeAnalyticsHtml(item.route || '/unknown') + '</strong>' +
+						'<div class=\'small text-muted\'>' + escapeAnalyticsHtml(item.pageViews || 0) + ' page view' + (Number(item.pageViews) === 1 ? '' : 's') + '</div></td>' +
+					'<td>' + escapeAnalyticsHtml(item.location || 'Location unavailable') + '</td>' +
+					'<td>' + escapeAnalyticsHtml(item.device || 'Unknown') +
+						'<div class=\'small text-muted\'>' + escapeAnalyticsHtml(item.referrerDomain || 'direct') + '</div></td>' +
+				'</tr>';
+			}).join('');
+			if (!rows) rows = '<tr><td colspan=\'4\' class=\'text-muted py-3\'>No matching visitors yet.</td></tr>';
+			return '<section class=\'mt-4\'><h6>' + escapeAnalyticsHtml(title) + '</h6>' +
+				'<div class=\'table-responsive\'><table class=\'table table-sm traffic-data-table mb-0\'>' +
+					'<thead><tr><th style=\'width:22%\'>Visitor</th><th style=\'width:28%\'>Latest page</th><th style=\'width:27%\'>Approximate region</th><th style=\'width:23%\'>Device / source</th></tr></thead>' +
+					'<tbody>' + rows + '</tbody>' +
+				'</table></div></section>';
+		}
+
+		function trafficIntentTableHtml(title, items, showEmailState) {
+			var rows = (items || []).map(function(item) {
+				var emailState = showEmailState
+					? '<span class=\'badge ' + (item.emailed ? 'bg-success' : 'text-bg-light border') + ' ms-1\'>' + (item.emailed ? 'Email sent' : 'Logged only') + '</span>'
+					: '';
+				return '<tr>' +
+					'<td><strong>' + escapeAnalyticsHtml(item.visitorLabel || 'Visitor') + '</strong></td>' +
+					'<td>' + escapeAnalyticsHtml(item.label || item.event || 'Activity') + emailState + '</td>' +
+					'<td>' + escapeAnalyticsHtml(item.route || '/unknown') + '</td>' +
+					'<td>' + escapeAnalyticsHtml(item.location || 'Location unavailable') + '<div class=\'small text-muted\'>' + escapeAnalyticsHtml(item.referrerDomain || 'direct') + '</div></td>' +
+					'<td class=\'text-nowrap\'>' + escapeAnalyticsHtml(trafficTime(item.occurredAt)) + '</td>' +
+				'</tr>';
+			}).join('');
+			if (!rows) rows = '<tr><td colspan=\'5\' class=\'text-muted py-3\'>No high-intent activity in this range.</td></tr>';
+			return '<section class=\'mt-4\'><h6>' + escapeAnalyticsHtml(title) + '</h6>' +
+				'<div class=\'table-responsive\'><table class=\'table table-sm traffic-data-table mb-0\'>' +
+					'<thead><tr><th>Visitor</th><th>Intent</th><th>Page</th><th>Region / source</th><th>When</th></tr></thead>' +
+					'<tbody>' + rows + '</tbody>' +
+				'</table></div></section>';
+		}
+
+		function trafficRankedHtml(title, items, labelKey, valueKey) {
+			var rows = (items || []).map(function(item) {
+				return '<div class=\'traffic-ranked-row\'><span>' + escapeAnalyticsHtml(item[labelKey] || 'Unknown') + '</span>' +
+					'<strong>' + escapeAnalyticsHtml(item[valueKey] || 0) + '</strong></div>';
+			}).join('');
+			if (!rows) rows = '<div class=\'small text-muted py-2\'>Nothing recorded yet.</div>';
+			return '<section><h6>' + escapeAnalyticsHtml(title) + '</h6>' + rows + '</section>';
+		}
+
+		function renderSiteTraffic(data) {
+			var summary = data.summary || {};
+			var statusEl = document.getElementById('siteTrafficStatus');
+			var contentEl = document.getElementById('siteTrafficContent');
+			var updatedEl = document.getElementById('siteTrafficUpdatedAt');
+			var posthogLink = document.getElementById('siteTrafficPostHogLink');
+			if (posthogLink && data.posthogUrl) posthogLink.href = data.posthogUrl;
+
+			statusEl.className = 'alert alert-success mb-3';
+			statusEl.innerHTML = '<div class=\'fw-semibold\'><span class=\'traffic-live-dot\'></span>Marketing traffic connected</div>' +
+				'<div class=\'small mt-1\'>Only normalized public routes, referral domains, coarse regions, and generated visitor labels appear here. Raw IP addresses and product or client data are excluded.</div>';
+			updatedEl.textContent = 'Updated ' + new Date(data.generatedAt || Date.now()).toLocaleTimeString();
+
+			var metrics =
+				'<div class=\'traffic-summary-grid\'>' +
+					trafficMetricHtml('Active now', summary.activeVisitors || 0, 'Last ' + (data.liveMinutes || 5) + ' minutes') +
+					trafficMetricHtml('Unique visitors', summary.uniqueVisitors || 0, data.days + '-day range') +
+					trafficMetricHtml('Page views', summary.pageViews || 0, '') +
+					trafficMetricHtml('Sessions', summary.sessions || 0, '') +
+					trafficMetricHtml('High intent', summary.highIntentVisits || 0, (summary.highIntentVisitors || 0) + ' visitors') +
+				'</div>';
+
+			var rankings =
+				'<div class=\'row g-4 mt-2\'>' +
+					'<div class=\'col-md-6\'>' + trafficRankedHtml('Top pages', data.topPages, 'route', 'pageViews') + '</div>' +
+					'<div class=\'col-md-6\'>' + trafficRankedHtml('Approximate regions', data.regions, 'label', 'visitors') + '</div>' +
+					'<div class=\'col-md-6\'>' + trafficRankedHtml('Referral domains', data.referrers, 'domain', 'visitors') + '</div>' +
+					'<div class=\'col-md-6\'>' + trafficRankedHtml('Devices', data.devices, 'label', 'visitors') + '</div>' +
+				'</div>';
+
+			var alertNotice = data.alertFeedReady
+				? ''
+				: '<div class=\'alert alert-warning small mt-4 mb-0\'>' + escapeAnalyticsHtml(data.alertFeedMessage || 'Visitor alerts are not configured yet.') + '</div>';
+
+			contentEl.innerHTML =
+				metrics +
+				trafficSessionTableHtml('Active now', data.activeVisitors || [], true) +
+				trafficIntentTableHtml('Recent high-intent activity', data.highIntent || [], false) +
+				trafficSessionTableHtml('Recent sessions', data.recentSessions || [], false) +
+				rankings +
+				trafficIntentTableHtml('Administrator alert feed', data.alerts || [], true) +
+				alertNotice;
+			contentEl.style.display = '';
+		}
+
+		function updateSiteTrafficRangeButtons() {
+			document.querySelectorAll('[data-traffic-days]').forEach(function(button) {
+				button.classList.toggle('active', Number(button.getAttribute('data-traffic-days')) === siteTrafficDays);
+			});
+		}
+
+		async function loadSiteTraffic(days) {
+			if (siteTrafficLoading) return;
+			siteTrafficDays = [1, 7, 30].indexOf(Number(days)) !== -1 ? Number(days) : 7;
+			updateSiteTrafficRangeButtons();
+			var statusEl = document.getElementById('siteTrafficStatus');
+			siteTrafficLoading = true;
+			statusEl.className = 'alert alert-info mb-3';
+			statusEl.innerHTML = '<span class=\'spinner-border spinner-border-sm me-2\'></span>Reading anonymous marketing activity from PostHog...';
+			try {
+				var headers = await getQBAuthHeader();
+				if (!headers) throw new Error('Please sign in again before loading site traffic.');
+				var response = await fetch(SUPABASE_URL + '/functions/v1/analytics-traffic', {
+					method: 'POST',
+					headers: headers,
+					body: JSON.stringify({ days: siteTrafficDays, liveMinutes: 5 })
+				});
+				var data = await response.json().catch(function() { return {}; });
+				if (!response.ok || data.error) throw new Error(data.error || 'Could not load site traffic');
+				renderSiteTraffic(data);
+				if (typeof qdCaptureEvent === 'function') qdCaptureEvent('site_traffic_opened', { days: siteTrafficDays });
+			} catch (error) {
+				statusEl.className = 'alert alert-warning mb-3';
+				statusEl.innerHTML = '<div class=\'fw-bold mb-1\'>Site Traffic is not ready yet.</div>' +
+					'<div class=\'small\'>' + escapeAnalyticsHtml(error.message || error) + '</div>' +
+					'<div class=\'small text-muted mt-2\'>Deploy the analytics-traffic function and set POSTHOG_PERSONAL_API_KEY in Supabase secrets.</div>';
+			} finally {
+				siteTrafficLoading = false;
+			}
+		}
+
+		function siteTrafficPanelIsVisible() {
+			var panel = document.getElementById('tab-site-traffic');
+			return !!panel && panel.style.display !== 'none';
+		}
+
+		function setSiteTrafficPolling(startNow) {
+			if (siteTrafficTimer) {
+				clearInterval(siteTrafficTimer);
+				siteTrafficTimer = null;
+			}
+			var toggle = document.getElementById('siteTrafficAutoRefresh');
+			if (!startNow || !siteTrafficPanelIsVisible() || (toggle && !toggle.checked)) return;
+			if (document.visibilityState !== 'hidden') loadSiteTraffic(siteTrafficDays);
+			siteTrafficTimer = setInterval(function() {
+				if (document.visibilityState !== 'hidden' && siteTrafficPanelIsVisible()) {
+					loadSiteTraffic(siteTrafficDays);
+				}
+			}, 30000);
+		}
+
+		document.addEventListener('visibilitychange', function() {
+			if (siteTrafficPanelIsVisible()) setSiteTrafficPolling(true);
+		});
 
 		function broadcastDateToInput(value) {
 			if (!value) return '';
@@ -2525,6 +2803,7 @@ Sarah Jones, 905-555-5678"></textarea>
 				if (name === 'user-messages') loadBroadcastAdminMessages();
 				if (name === 'admin-controls') syncRecordingPrivacyControls();
 				if (name === 'save-incidents') loadSaveRecoveryIncidents();
+				setSiteTrafficPolling(name === 'site-traffic');
 				if (name === 'help') {
 				loadQuoteTipsSettingsUI();
 				renderBuilderTutorialSettingsUI();
@@ -2567,6 +2846,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			{ tab: 'payments', keywords: ['payment','stripe','deposit','credit card','pay','invoice payment','checkout'], label: 'Payments' },
 			{ tab: 'help', keywords: ['help','tips','tip','tutorial','guide','onboarding','youtube','video','learn','support'], label: 'Help, Tips & Tutorial' },
 			{ tab: 'analytics', adminOnly: true, keywords: ['analytics','posthog','brief','report','summary','funnel','conversion','session','rage click','users'], label: 'AI Analytics Brief' },
+			{ tab: 'site-traffic', adminOnly: true, keywords: ['site traffic','visitors','live','active','region','country','city','referral','device','posthog','marketing'], label: 'Site Traffic' },
 			{ tab: 'user-messages', adminOnly: true, keywords: ['user messages','broadcast','announcement','maintenance','message users','admin'], label: 'User Messages' },
 			{ tab: 'admin-controls', adminOnly: true, keywords: ['admin','recording','privacy','hide','mask','blur','price','pricing','tutorial','video'], label: 'Admin Controls' },
 			{ tab: 'account', keywords: ['account','subscription','billing','plan','upgrade','pro'], label: 'Account' },
@@ -2739,7 +3019,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			if (isQuoteDrAdminUser(window.currentUser)) loadSaveRecoveryIncidents();
 			// Restore last active tab, unless the URL asks for a specific settings area.
 			var hashTab = (window.location.hash || '').replace(/^#/, '');
-			var allowedHashTabs = ['business', 'quotes', 'pricing', 'notifications', 'payments', 'portal', 'integrations', 'help', 'analytics', 'user-messages', 'admin-controls', 'save-incidents', 'account', 'feedback'];
+			var allowedHashTabs = ['business', 'quotes', 'pricing', 'notifications', 'payments', 'portal', 'integrations', 'help', 'analytics', 'site-traffic', 'user-messages', 'admin-controls', 'save-incidents', 'account', 'feedback'];
 			var requestedTab = getRequestedSettingsTab();
 			var lastTab = requestedTab || (allowedHashTabs.indexOf(hashTab) !== -1 ? hashTab : (localStorage.getItem('ald_settings_tab') || 'business'));
 			if (QUOTEDR_ADMIN_TABS.indexOf(lastTab) !== -1 && !isQuoteDrAdminUser(window.currentUser)) lastTab = 'business';

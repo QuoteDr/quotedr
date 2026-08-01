@@ -38,6 +38,12 @@ verify_jwt = false
 [functions.analytics-brief]
 verify_jwt = false
 
+[functions.analytics-traffic]
+verify_jwt = false
+
+[functions.visitor-alert]
+verify_jwt = false
+
 [functions.hd-price-sync]
 verify_jwt = false
 

@@ -50,6 +50,14 @@
         var result = await response.json().catch(function() { return {}; });
         if (!response.ok) throw new Error(result.error || 'Signup failed');
         setStatus(form, result.alreadySubscribed ? 'You are already on the list.' : 'You are on the list. I will only send the useful stuff.', 'success');
+        try {
+          if (window.QuoteDrAnalytics && typeof window.QuoteDrAnalytics.capture === 'function') {
+            window.QuoteDrAnalytics.capture('newsletter_signup_completed', {
+              source: getSource(form),
+              already_subscribed: !!result.alreadySubscribed
+            });
+          }
+        } catch (analyticsError) {}
         form.reset();
       } catch (err) {
         setStatus(form, 'Could not sign you up right now. You can also email support@quotedr.io.', 'error');
