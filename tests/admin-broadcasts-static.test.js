@@ -10,6 +10,7 @@ const dashboard = read('dashboard.html');
 const builder = read('quote-builder.html');
 const loader = read('app-broadcasts.js');
 const migration = read('supabase/migrations/20260621120000_admin_broadcast_messages.sql');
+const adminEmailMigration = read('supabase/migrations/20260802005740_add_admin_email_routing.sql');
 
 assert(settings.includes('id="userMessagesTabLink"'), 'settings should expose an admin-only User Messages tab link');
 assert(settings.includes('id="tab-user-messages"'), 'settings should include the User Messages admin panel');
@@ -39,6 +40,9 @@ assert(migration.includes('create table if not exists public.app_broadcast_recei
 assert(migration.includes('alter table public.app_broadcast_messages enable row level security'), 'messages table should enable RLS');
 assert(migration.includes('alter table public.app_broadcast_receipts enable row level security'), 'receipts table should enable RLS');
 assert(migration.includes("lower(coalesce(auth.jwt() ->> 'email', '')) = 'info@alddirect.ca'"), 'migration should restrict admin policies to info@alddirect.ca');
+assert(adminEmailMigration.includes("'admin@quotedr.io'"), 'current admin policies should allow the QuoteDr administrator mailbox');
+assert(adminEmailMigration.includes("'info@alddirect.ca'"), 'current admin policies should retain the owner fallback');
+assert(adminEmailMigration.includes("'ald.direct.contracting@gmail.com'"), 'current admin policies should retain the tutorial fallback');
 assert(migration.includes('to authenticated'), 'migration should grant authenticated policies');
 assert(migration.includes('auth.uid() = user_id'), 'receipts policies should scope rows to the current user');
 

@@ -476,6 +476,7 @@
     <script src="change-orders.js?v=1778060200"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-v2.js?v=2026080102"></script>
+    <script src="admin-access.js?v=2026080201"></script>
     <script src="save-coordinator.js?v=2026080102"></script>
     <script src="app-broadcasts.js?v=1779131000"></script>
     <script>
@@ -545,7 +546,9 @@
         }
 
         async function refreshDashboardSaveIncidents(user) {
-            var isAdmin = String(user && user.email || '').trim().toLowerCase() === 'info@alddirect.ca';
+            var isAdmin = window.QuoteDrAdmin
+                ? window.QuoteDrAdmin.isAdminUser(user)
+                : ['admin@quotedr.io', 'info@alddirect.ca', 'ald.direct.contracting@gmail.com'].indexOf(String(user && user.email || '').trim().toLowerCase()) !== -1;
             var desktop = document.getElementById('dashboardSaveIncidentsBtn');
             var mobile = document.getElementById('dashboardSaveIncidentsMobile');
             if (desktop) desktop.style.display = isAdmin ? '' : 'none';

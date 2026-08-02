@@ -48,7 +48,10 @@
             var sessionResult = await _supabase.auth.getSession();
             var user = sessionResult && sessionResult.data && sessionResult.data.session && sessionResult.data.session.user;
             if (!user) return false;
-            if (String(user.email || '').toLowerCase() === 'info@alddirect.ca') return true;
+            var isAdmin = window.QuoteDrAdmin
+                ? window.QuoteDrAdmin.isAdminUser(user)
+                : ['admin@quotedr.io', 'info@alddirect.ca', 'ald.direct.contracting@gmail.com'].indexOf(String(user.email || '').trim().toLowerCase()) !== -1;
+            if (isAdmin) return true;
             var cachedRolloutKey = 'quotedr_durable_save_rollout_cached:' + user.id;
             var cachedRollout = null;
             try { cachedRollout = localStorage.getItem(cachedRolloutKey); } catch (e) {}

@@ -21,6 +21,8 @@ interface EmailData {
   to: string;
   subject: string;
   html: string;
+  fromName?: string;
+  replyTo?: string;
 }
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -28,6 +30,44 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+function escapeHtml(value: unknown) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.length <= 320;
+}
+
+function safeSenderName(value: unknown) {
+  return String(value ?? "QuoteDr")
+    .replace(/[<>\r\n"]/g, "")
+    .trim()
+    .slice(0, 80) || "QuoteDr";
+}
+
+function safeSubjectPart(value: unknown, fallback: string) {
+  return String(value ?? fallback)
+    .replace(/[\r\n]+/g, " ")
+    .trim()
+    .slice(0, 120) || fallback;
+}
+
+async function loadBusinessProfile(userId: string): Promise<Record<string, unknown>> {
+  const { data, error } = await supabase
+    .from("user_data")
+    .select("value")
+    .eq("user_id", userId)
+    .eq("key", "business_profile")
+    .maybeSingle();
+  if (error || !data?.value || typeof data.value !== "object") return {};
+  return data.value as Record<string, unknown>;
+}
+
 
 async function sendEmail(emailData: EmailData): Promise<Response> {
   const response = await fetch("https://api.resend.com/emails", {
@@ -37,7 +77,8 @@ async function sendEmail(emailData: EmailData): Promise<Response> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: "noreply@quotedr.app",
+      from: safeSenderName(emailData.fromName) + " <quotes@quotedr.io>",
+      reply_to: emailData.replyTo || undefined,
       to: emailData.to,
       subject: emailData.subject,
       html: emailData.html,
@@ -48,17 +89,29 @@ async function sendEmail(emailData: EmailData): Promise<Response> {
 }
 
 async function sendFollowUpEmail(quote: Quote): Promise<boolean> {
+  const profile = await loadBusinessProfile(quote.user_id);
+  const companyName = safeSubjectPart(
+    profile.business_name || profile.companyName || profile.businessName || profile.company_name,
+    "Your Contractor",
+  );
+  const recipient = String(quote.data.clientEmail || "").trim().toLowerCase();
+  if (!isValidEmail(recipient)) return false;
+  const replyToCandidate = String(profile.emailReplyTo || profile.email || profile.business_email || "").trim().toLowerCase();
+  const replyTo = isValidEmail(replyToCandidate) ? replyToCandidate : "";
+
   const emailData: EmailData = {
-    to: quote.data.clientEmail,
-    subject: "Following up on your quote",
+    to: recipient,
+    fromName: companyName,
+    replyTo,
+    subject: "Following up on " + safeSubjectPart(quote.data.quoteNumber, "your quote") + " from " + companyName,
     html: `
       <html>
         <body>
-          <p>Hello ${quote.client_name || "there"},</p>
-          <p>I wanted to follow up on the quote I sent you for ${quote.data.quoteNumber}.</p>
+          <p>Hello ${escapeHtml(quote.client_name || "there")},</p>
+          <p>I wanted to follow up on the quote I sent you for ${escapeHtml(quote.data.quoteNumber)}.</p>
           <p>You can view and sign your quote here:</p>
-          <p><a href="${quote.data.quoteUrl}">View Quote</a></p>
-          <p>Best regards,<br>The QuoteDr Team</p>
+          <p><a href="${escapeHtml(quote.data.quoteUrl)}">View Quote</a></p>
+          <p>Best regards,<br>${escapeHtml(companyName)}</p>
         </body>
       </html>
     `,

@@ -11,6 +11,7 @@ const portal = read('client-portal.html');
 const settings = read('settings.html');
 const dashboard = read('dashboard.html');
 const migration = read('supabase/migrations/20260712150000_save_recovery_records.sql');
+const adminEmailMigration = read('supabase/migrations/20260802005740_add_admin_email_routing.sql');
 const edge = read('supabase/functions/save-recovery/index.ts');
 const emailEdge = read('supabase/functions/send-quote-email/index.ts');
 const qbEdge = read('supabase/functions/qb-sync/index.ts');
@@ -19,7 +20,8 @@ const config = read('supabase/config.toml');
 
 assert(
   coordinator.includes('async function resolveRolloutEnabled') &&
-    coordinator.includes("user.email || '').toLowerCase() === 'info@alddirect.ca'") &&
+    coordinator.includes('window.QuoteDrAdmin.isAdminUser(user)') &&
+    coordinator.includes("'admin@quotedr.io'") &&
     coordinator.includes(".eq('key', 'durable_save_rollout')") &&
     coordinator.includes("localStorage.getItem('quotedr_durable_save_enabled')"),
   'Durable saves should roll out to the admin first, then explicit account cohorts, with a local rollback override'
@@ -190,6 +192,12 @@ assert(
     migration.includes("interval '30 days'") &&
     migration.includes('purge-save-recovery-records'),
   'Recovery records should be owner/admin protected and automatically expire on the required schedule'
+);
+
+assert(
+  adminEmailMigration.includes("'admin@quotedr.io'") &&
+    adminEmailMigration.includes('Users can read own save recovery records'),
+  'Current recovery RLS should authorize the new QuoteDr administrator mailbox'
 );
 
 assert(

@@ -19,9 +19,11 @@ const POSTHOG_PROJECT_ID = Deno.env.get("POSTHOG_PROJECT_ID") ?? "411455";
 const POSTHOG_HOST = Deno.env.get("POSTHOG_HOST") ?? "https://us.posthog.com";
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
 const QUOTEDR_ADMIN_EMAILS = new Set([
+  "admin@quotedr.io",
   "info@alddirect.ca",
   "ald.direct.contracting@gmail.com",
-]);
+  ...(Deno.env.get("QUOTEDR_ADMIN_EMAILS") ?? "").split(","),
+].map((email) => email.trim().toLowerCase()).filter(Boolean));
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 

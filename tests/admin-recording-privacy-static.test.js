@@ -12,6 +12,7 @@ const privacy = read('recording-privacy.js');
 const theme = read('brand-theme.css');
 const analyticsBrief = read('supabase/functions/analytics-brief/index.ts');
 const adminMigration = read('supabase/migrations/20260713150000_expand_quotedr_admin_access.sql');
+const adminEmailMigration = read('supabase/migrations/20260802005740_add_admin_email_routing.sql');
 const browserFixture = read('tests/recording-privacy-browser-fixture.html');
 
 const inlineScripts = Array.from(settings.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi));
@@ -19,6 +20,7 @@ inlineScripts.forEach((match, index) => {
     assert.doesNotThrow(() => new vm.Script(match[1], { filename: `settings-inline-${index + 1}.js` }), `settings inline script ${index + 1} should parse`);
 });
 
+assert(adminAccess.includes('admin@quotedr.io'), 'new QuoteDr administrator email should be allowed');
 assert(adminAccess.includes('info@alddirect.ca'), 'owner administrator email should remain allowed');
 assert(adminAccess.includes('ald.direct.contracting@gmail.com'), 'tutorial administrator email should be allowed');
 assert(adminAccess.includes('isAdminUser'), 'shared admin helper should expose an admin check');
@@ -60,6 +62,11 @@ for (const source of [adminMigration, analyticsBrief]) {
     assert(source.includes('info@alddirect.ca'), 'backend admin gate should include the owner email');
     assert(source.includes('ald.direct.contracting@gmail.com'), 'backend admin gate should include the tutorial email');
 }
+for (const source of [adminAccess, adminEmailMigration, analyticsBrief]) {
+    assert(source.includes('admin@quotedr.io'), 'current admin gates should include the QuoteDr administrator mailbox');
+}
+assert(adminEmailMigration.includes('Admin can manage broadcast messages'), 'current migration should update broadcast management RLS');
+assert(adminEmailMigration.includes('Users can view own broadcast receipts'), 'current migration should let all admins inspect message receipts');
 assert(analyticsBrief.includes('verifyAdmin(req)'), 'analytics brief should enforce administrator access');
 assert(analyticsBrief.includes('403'), 'analytics brief should return forbidden for non-admin users');
 assert(adminMigration.includes('Admin can manage broadcast messages'), 'migration should update broadcast management RLS');

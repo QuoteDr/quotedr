@@ -5,9 +5,20 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
-const ALERT_EMAIL = Deno.env.get("QUOTEDR_SAVE_ALERT_EMAIL") ?? "";
-const ADMIN_EMAIL = (Deno.env.get("QUOTEDR_ADMIN_EMAIL") ?? "info@alddirect.ca").toLowerCase();
+const ADMIN_REPLY_EMAIL = (Deno.env.get("QUOTEDR_ADMIN_EMAIL") ?? "admin@quotedr.io").trim();
+const ALERT_EMAIL = (Deno.env.get("QUOTEDR_SAVE_ALERT_EMAIL") ?? ADMIN_REPLY_EMAIL).trim();
+const ADMIN_EMAILS = new Set([
+  "admin@quotedr.io",
+  "info@alddirect.ca",
+  "ald.direct.contracting@gmail.com",
+  ADMIN_REPLY_EMAIL,
+  ...(Deno.env.get("QUOTEDR_ADMIN_EMAILS") ?? "").split(","),
+].map((email) => email.trim().toLowerCase()).filter(Boolean));
 const MAX_BODY_BYTES = 5 * 1024 * 1024;
+
+function isAdminEmail(email: unknown) {
+  return ADMIN_EMAILS.has(String(email ?? "").trim().toLowerCase());
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -101,6 +112,7 @@ async function sendIncidentEmail(record: Record<string, unknown>, userEmail: str
     body: JSON.stringify({
       from: "QuoteDr Save Monitor <quotes@quotedr.io>",
       to: [ALERT_EMAIL],
+      reply_to: ADMIN_REPLY_EMAIL,
       subject,
       html,
     }),
@@ -241,7 +253,7 @@ serve(async (req) => {
         return json({ error: "Invalid recovery operation" }, 400);
       }
       validateRecoveryOperation(operation);
-      if (entityType === "admin_broadcast" && (user.email || "").toLowerCase() !== ADMIN_EMAIL) {
+      if (entityType === "admin_broadcast" && !isAdminEmail(user.email)) {
         return json({ error: "Admin access required" }, 403);
       }
       const { data: existing } = await service
@@ -296,7 +308,7 @@ serve(async (req) => {
     }
 
     if (action === "retry") {
-      if ((user.email || "").toLowerCase() !== ADMIN_EMAIL) return json({ error: "Admin access required" }, 403);
+      if (!isAdminEmail(user.email)) return json({ error: "Admin access required" }, 403);
       const operationId = text(body.operationId, 160);
       const { data: record, error } = await service.from("save_recovery_records").select("*").eq("operation_id", operationId).single();
       if (error || !record) return json({ error: "Recovery record not found" }, 404);
@@ -327,7 +339,7 @@ serve(async (req) => {
 
     if (action === "discard") {
       const operationId = text(body.operationId, 160);
-      const isAdmin = (user.email || "").toLowerCase() === ADMIN_EMAIL;
+      const isAdmin = isAdminEmail(user.email);
       let query = service.from("save_recovery_records").update({ status: "discarded", resolved_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("operation_id", operationId);
       if (!isAdmin) query = query.eq("user_id", user.id);
       const { error } = await query;

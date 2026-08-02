@@ -2122,7 +2122,7 @@ Sarah Jones, 905-555-5678"></textarea>
 
 		const QUOTEDR_ADMIN_EMAILS = window.QuoteDrAdmin
 			? Array.from(window.QuoteDrAdmin.emails)
-			: ['info@alddirect.ca', 'ald.direct.contracting@gmail.com'];
+			: ['admin@quotedr.io', 'info@alddirect.ca', 'ald.direct.contracting@gmail.com'];
 		const QUOTEDR_ANALYTICS_ADMIN_EMAILS = QUOTEDR_ADMIN_EMAILS;
 		const QUOTEDR_ADMIN_TABS = ['analytics', 'site-traffic', 'user-messages', 'admin-controls', 'save-incidents'];
 
@@ -3579,13 +3579,17 @@ Sarah Jones, 905-555-5678"></textarea>
 				if (feedbackSave.error) console.warn('Feedback DB deferred:', feedbackSave.error);
 			} catch(e) { console.warn('Feedback DB error:', e); }
 			try {
-				var ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso';
-				await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/send-feedback-email', {
+				var emailResponse = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/send-feedback-email', {
 					method: 'POST',
-					headers: { 'Content-Type': 'application/json', 'apikey': ANON_KEY },
+					headers: await getSupabaseFunctionAuthHeaders(),
 					body: JSON.stringify(payload)
 				});
-			} catch(e) { console.warn('Feedback email error:', e); }
+				if (!emailResponse.ok) throw new Error('Email notification could not be delivered');
+			} catch(e) {
+				console.warn('Feedback email error:', e);
+				resultEl.innerHTML = '<span class="text-warning"><i class="fas fa-exclamation-triangle me-1"></i>Your feedback was saved, but the email alert could not be delivered. Please also email support@quotedr.io.</span>';
+				return;
+			}
 			resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>Submitted! Thanks for the ' + (isFeature ? 'idea' : 'report') + ' 🙏</span>';
 			document.getElementById(isFeature ? 'featureDescription' : 'bugDescription').value = '';
 		}

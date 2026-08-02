@@ -200,7 +200,8 @@ Populated by `error-reporter.js` — catches unhandled JS errors and promise rej
 - Next step: deploy `qb-oauth` and `qb-sync`, then test the OAuth flow
 
 ### 🟡 Email Routing
-- `support@quotedr.io`, `privacy@quotedr.io`, `quotes@quotedr.io` need Cloudflare Email Routing set up
+- Google Workspace owns QuoteDr's inbound MX. Route `support@quotedr.io`, `privacy@quotedr.io`, and `feedback@quotedr.io` to `admin@quotedr.io` as Google Workspace aliases; keep Cloudflare Email Routing disabled.
+- `quotes@quotedr.io` and `welcome@quotedr.io` are verified Resend sender identities and should remain outbound-only.
 
 ### 🟡 Confirm Supabase Schema
 - Run `SELECT column_name FROM information_schema.columns WHERE table_name = 'quotes'` in Supabase SQL editor

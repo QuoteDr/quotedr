@@ -159,6 +159,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           from: "QuoteDr <welcome@quotedr.io>",
           to: [userData.user.email],
+          reply_to: Deno.env.get("QUOTEDR_ADMIN_EMAIL") || "admin@quotedr.io",
           subject: `Want to keep using ${label} after Play For a Day?`,
           html: emailHtml(name, label, featureKey),
         }),

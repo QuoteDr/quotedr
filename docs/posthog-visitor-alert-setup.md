@@ -14,7 +14,7 @@ POSTHOG_PROJECT_ID=411455
 POSTHOG_HOST=https://us.posthog.com
 POSTHOG_VISITOR_WEBHOOK_SECRET=<long random secret>
 RESEND_API_KEY=<existing QuoteDr Resend key>
-VISITOR_ALERT_EMAIL=info@alddirect.ca
+VISITOR_ALERT_EMAIL=admin@quotedr.io
 VISITOR_LABEL_SALT=<long random stable value>
 ```
 

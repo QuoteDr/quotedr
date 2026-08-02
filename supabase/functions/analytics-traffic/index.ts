@@ -14,9 +14,11 @@ const POSTHOG_PROJECT_ID = Deno.env.get('POSTHOG_PROJECT_ID') ?? '411455';
 const POSTHOG_HOST = (Deno.env.get('POSTHOG_HOST') ?? 'https://us.posthog.com').replace(/\/+$/, '');
 const VISITOR_LABEL_SALT = Deno.env.get('VISITOR_LABEL_SALT') ?? POSTHOG_PROJECT_ID;
 const QUOTEDR_ADMIN_EMAILS = new Set([
+  'admin@quotedr.io',
   'info@alddirect.ca',
   'ald.direct.contracting@gmail.com',
-]);
+  ...(Deno.env.get('QUOTEDR_ADMIN_EMAILS') ?? '').split(','),
+].map((email) => email.trim().toLowerCase()).filter(Boolean));
 const HIGH_INTENT_EVENTS = [
   'pricing_opened',
   'signup_gate_opened',

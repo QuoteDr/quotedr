@@ -126,6 +126,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         from: 'QuoteDr <welcome@quotedr.io>',
         to: [email],
+        reply_to: Deno.env.get('QUOTEDR_ADMIN_EMAIL') || 'admin@quotedr.io',
         subject: 'Welcome to QuoteDr! 🎉',
         html: htmlBody
       })

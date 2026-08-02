@@ -2,6 +2,7 @@
     'use strict';
 
     const ADMIN_EMAILS = Object.freeze([
+        'admin@quotedr.io',
         'info@alddirect.ca',
         'ald.direct.contracting@gmail.com'
     ]);
