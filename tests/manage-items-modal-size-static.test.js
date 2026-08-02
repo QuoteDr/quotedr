@@ -9,7 +9,7 @@ assert(source.includes('#manageItemsModal .modal-dialog'), 'Manage Items modal s
 assert(source.includes('width: 96vw !important;'), 'desktop Manage Items modal should nearly fill the viewport width');
 assert(source.includes('height: 92vh;'), 'desktop Manage Items modal should nearly fill the viewport height');
 assert(source.includes('#manageItemsModal .modal-body'), 'Manage Items modal body should have dedicated flex sizing');
-assert(source.includes('display: flex;\n                flex-direction: column;'), 'Manage Items modal should use a column flex shell');
+assert(/display:\s*flex;\s*flex-direction:\s*column;/.test(source), 'Manage Items modal should use a column flex shell');
 assert(source.includes('#manageItemsModal #customItemsList'), 'Manage Items item list should be explicitly sized');
 assert(source.includes('max-height: none !important;'), 'desktop item list should override the old 460px inline cap');
 assert(source.includes('max-width:96vw'), 'inline Manage Items fallback width should not keep the old 90vw cap');

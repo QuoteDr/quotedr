@@ -1302,6 +1302,7 @@ async function saveQuote(quoteData) {
             clientPhone: clientPhone,
             fullResolutionPhotosEnabled: await quoteFullResolutionPhotosEnabledForSave(),
             rooms: quoteData.rooms || [],
+            reviewProfile: quoteData.reviewProfile || null,
             terms: quoteData.terms || [],
             style: quoteData.style || {},
             payment_terms: quoteData.payment_terms || quoteData.paymentTerms || null,
@@ -2222,6 +2223,114 @@ function normalizeAiPhraseKey(phrase) {
         .trim();
 }
 
+const QUOTEDR_QUOTE_REVIEW_LEARNING_KEY = 'ai_quote_review_learning';
+const QUOTEDR_QUOTE_REVIEW_LEARNING_STORAGE_KEY = 'ald_ai_quote_review_learning';
+
+function getLocalQuoteReviewLearning() {
+    try {
+        var parsed = JSON.parse(localStorage.getItem(QUOTEDR_QUOTE_REVIEW_LEARNING_STORAGE_KEY) || 'null');
+        return parsed && typeof parsed === 'object' ? parsed : { version: 3, events: [] };
+    } catch (error) {
+        return { version: 3, events: [] };
+    }
+}
+
+async function getUserQuoteReviewLearning() {
+    var localLearning = getLocalQuoteReviewLearning();
+    const user = await getCurrentUser();
+    if (!user) return localLearning;
+    const { data, error } = await _supabase
+        .from('user_data')
+        .select('value')
+        .eq('user_id', user.id)
+        .eq('key', QUOTEDR_QUOTE_REVIEW_LEARNING_KEY)
+        .maybeSingle();
+    if (error) {
+        console.warn('AI quote review learning load failed:', error);
+        return localLearning;
+    }
+    var learning = data && data.value && typeof data.value === 'object' ? data.value : localLearning;
+    try {
+        localStorage.setItem(QUOTEDR_QUOTE_REVIEW_LEARNING_STORAGE_KEY, JSON.stringify(learning));
+    } catch (storageError) {}
+    return learning;
+}
+
+async function saveUserQuoteReviewLearning(learning) {
+    var safeLearning = learning && typeof learning === 'object' ? learning : { version: 3, events: [] };
+    try {
+        localStorage.setItem(QUOTEDR_QUOTE_REVIEW_LEARNING_STORAGE_KEY, JSON.stringify(safeLearning));
+    } catch (storageError) {}
+    const user = await getCurrentUser();
+    if (!user) return { data: safeLearning, error: null, localOnly: true };
+    return saveUserDataValue(QUOTEDR_QUOTE_REVIEW_LEARNING_KEY, safeLearning, {
+        entityType: 'quote_preferences',
+        entityLabel: 'AI quote copilot learning',
+        localStorageKey: QUOTEDR_QUOTE_REVIEW_LEARNING_STORAGE_KEY,
+        background: true
+    });
+}
+
+window.getUserQuoteReviewLearning = getUserQuoteReviewLearning;
+window.saveUserQuoteReviewLearning = saveUserQuoteReviewLearning;
+
+const QUOTEDR_STARTER_LIBRARY_PROFILE_KEY = 'ai_starter_library_profile';
+const QUOTEDR_STARTER_LIBRARY_PROFILE_STORAGE_KEY = 'ald_ai_starter_library_profile';
+
+function getLocalStarterLibraryProfile() {
+    try {
+        var parsed = JSON.parse(localStorage.getItem(QUOTEDR_STARTER_LIBRARY_PROFILE_STORAGE_KEY) || 'null');
+        return parsed && typeof parsed === 'object'
+            ? parsed
+            : { version: 1, offerStatus: 'not_seen', events: [] };
+    } catch (error) {
+        return { version: 1, offerStatus: 'not_seen', events: [] };
+    }
+}
+
+async function getUserStarterLibraryProfile() {
+    var localProfile = getLocalStarterLibraryProfile();
+    const user = await getCurrentUser();
+    if (!user) return localProfile;
+    const { data, error } = await _supabase
+        .from('user_data')
+        .select('value')
+        .eq('user_id', user.id)
+        .eq('key', QUOTEDR_STARTER_LIBRARY_PROFILE_KEY)
+        .maybeSingle();
+    if (error) {
+        console.warn('Starter library profile load failed:', error);
+        return localProfile;
+    }
+    var profile = data && data.value && typeof data.value === 'object'
+        ? data.value
+        : localProfile;
+    try {
+        localStorage.setItem(QUOTEDR_STARTER_LIBRARY_PROFILE_STORAGE_KEY, JSON.stringify(profile));
+    } catch (storageError) {}
+    return profile;
+}
+
+async function saveUserStarterLibraryProfile(profile) {
+    var safeProfile = profile && typeof profile === 'object'
+        ? profile
+        : { version: 1, offerStatus: 'not_seen', events: [] };
+    try {
+        localStorage.setItem(QUOTEDR_STARTER_LIBRARY_PROFILE_STORAGE_KEY, JSON.stringify(safeProfile));
+    } catch (storageError) {}
+    const user = await getCurrentUser();
+    if (!user) return { data: safeProfile, error: null, localOnly: true };
+    return saveUserDataValue(QUOTEDR_STARTER_LIBRARY_PROFILE_KEY, safeProfile, {
+        entityType: 'quote_preferences',
+        entityLabel: 'AI starter item library',
+        localStorageKey: QUOTEDR_STARTER_LIBRARY_PROFILE_STORAGE_KEY,
+        background: true
+    });
+}
+
+window.getUserStarterLibraryProfile = getUserStarterLibraryProfile;
+window.saveUserStarterLibraryProfile = saveUserStarterLibraryProfile;
+
 async function getUserLearnedMappings() {
     const user = await getCurrentUser();
     if (!user) return [];
@@ -2522,6 +2631,7 @@ const QUOTEDR_PLAN_FEATURES = {
         'quote_import',
         'ai_refine',
         'writing_suggestions',
+        'quote_completeness_review',
         'ikea_quoter',
         'job_tracker',
         'labor_tracker',
@@ -2541,6 +2651,7 @@ const QUOTEDR_PRO_FEATURE_LABELS = {
     labor_tracker: 'Labour Tracker',
     ai_refine: 'AI Refine',
     writing_suggestions: 'Quote Spell Check',
+    quote_completeness_review: 'AI Quote Copilot',
     quote_import: 'Legacy Quote Import',
     full_resolution_photos: 'Full-resolution item photos',
     quickbooks: 'QuickBooks sync',

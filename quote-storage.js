@@ -971,6 +971,9 @@
                 dividerPlural: dividerLabels.plural,
                 quoteDividerLabels: { singular: dividerLabels.singular, plural: dividerLabels.plural },
                 rooms: sanitizeQuoteRoomsForSave(rooms),
+                reviewProfile: (window.QuoteDrConstructionKnowledge && typeof window.QuoteDrConstructionKnowledge.normalizeReviewProfile === 'function')
+                    ? window.QuoteDrConstructionKnowledge.normalizeReviewProfile(window._quoteReviewProfile)
+                    : (window._quoteReviewProfile || null),
                 categoryStyles: getQuoteCategoryStylesSnapshot(),
                 roomCounter: roomCounter,
                 quoteAdjustment: getQuoteClientAdjustment(),
@@ -1100,6 +1103,7 @@
             if (document.getElementById('clientEmail'))    document.getElementById('clientEmail').value    = data.clientEmail || data.email || '';
             renderTermsCheckboxes(getQuoteTermsForRender(data));
             rooms = data.rooms || [];
+            window._quoteReviewProfile = data.reviewProfile || null;
             if (data.categoryStyles && typeof categoryStyles !== 'undefined') {
                 Object.assign(categoryStyles, data.categoryStyles || {});
                 try { localStorage.setItem('ald_category_styles', JSON.stringify(categoryStyles)); } catch(e) {}
@@ -1207,6 +1211,7 @@
                 if (el) el.value = '';
             });
             rooms = [];
+            window._quoteReviewProfile = null;
             renderRooms();
             document.getElementById('quoteNumber').value = nextQuoteNumberValue();
             checkQuoteNumberDuplicate();
@@ -2047,6 +2052,7 @@ async function saveQuote() {
         function startupNewQuote() {
             localStorage.removeItem("ald_active_quote_id");
             window._supabaseQuoteId = null;
+            window._quoteReviewProfile = null;
             localStorage.removeItem('ald_session_quote');
             var modal = bootstrap.Modal.getInstance(document.getElementById('startupModal'));
             if (modal) modal.hide();

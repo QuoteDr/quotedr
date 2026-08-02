@@ -56,16 +56,30 @@ assert(
   'Add/edit line item modal should include a reusable item description field separate from the item name and job note'
 );
 
+assert(
+  source.includes('modal-dialog modal-xl modal-dialog-scrollable line-item-editor-dialog') &&
+    source.includes('#addLineModal .line-item-editor-dialog') &&
+    source.includes('max-width: 1440px') &&
+    source.includes('height: calc(100vh - 4rem)'),
+  'Regular and Copilot line-item editors should share the large scrollable modal layout'
+);
+
+assert(
+  source.includes('height: calc(100dvh - 1rem)') &&
+    source.includes('#addLineModal .modal-footer { gap: 0.5rem; padding: 0.75rem; }'),
+  'The enlarged line-item modal should retain a compact viewport-safe mobile layout'
+);
+
 const saveLineItemBlock = source.slice(
   source.indexOf('function saveLineItemToDatabase()'),
   source.indexOf('function toggleDepositSection()')
 );
 
 assert(
-  saveLineItemBlock.includes('rate: rate') &&
-    saveLineItemBlock.includes('materialCost: materialCost') &&
-    saveLineItemBlock.includes('unitType: unitType') &&
-    saveLineItemBlock.includes('itemDescription: itemDescription'),
+  (saveLineItemBlock.includes('rate: rate') || saveLineItemBlock.includes('newItem.rate = rate')) &&
+    (saveLineItemBlock.includes('materialCost: materialCost') || saveLineItemBlock.includes('newItem.materialCost = materialCost')) &&
+    (saveLineItemBlock.includes('unitType: unitType') || saveLineItemBlock.includes('newItem.unitType = unitType')) &&
+    (saveLineItemBlock.includes('itemDescription: itemDescription') || saveLineItemBlock.includes('newItem.itemDescription = itemDescription')),
   'Saving a new quote line item to the database should persist rate, material cost, unit type, and reusable description'
 );
 

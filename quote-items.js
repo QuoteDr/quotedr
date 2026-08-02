@@ -26,6 +26,17 @@
         var manageOpenDetailSections = {};
         var dirtyPricingRows = new Set();
         var pricingOtherDirty = false;
+        var manageStarterLibraryState = {
+            tradeId: '',
+            roomType: '',
+            phaseId: '',
+            search: '',
+            selected: {},
+            drafts: {}
+        };
+        var manageStarterLibraryProfile = null;
+        var manageStarterProfilePromise = null;
+        var manageStarterOfferScheduled = false;
 
         function getManageItemsPortraitFields() {
             try {
@@ -2512,7 +2523,7 @@
 
             // Prefer whichever snapshot was saved most recently. A failed cloud sync must not
             // erase newer local edits on the next refresh.
-            _doRestoreItemsFromCloud().then(function(result) {
+            var itemRestorePromise = _doRestoreItemsFromCloud().then(function(result) {
                 if (!result.error && result.data && Object.keys(result.data).length > 0) {
                     var cloudItems = normalizeManageItemPhotoCollections(result.data);
                     var localUpdatedAt = getManageItemsLocalUpdatedAt();
@@ -2545,6 +2556,10 @@
                     }
                 }
             }).catch(function(){});
+            window._manageItemsReadyPromise = itemRestorePromise.then(function() {
+                maybeOfferStarterLibrary();
+                return customItems;
+            });
 
             // Restore templates from cloud (merge with local, cloud fills in missing ones)
             _restoreTemplatesFromCloud().catch(function(){});
@@ -2806,6 +2821,440 @@
             }
         }
 
+        function manageStarterLibraryApi() {
+            return window.QuoteDrStarterLibrary || null;
+        }
+
+        function manageStarterSavedItemCount() {
+            if (!customItems || typeof customItems !== 'object') return 0;
+            return Object.keys(customItems).reduce(function countCategory(total, category) {
+                if (category.indexOf('__') === 0 || !Array.isArray(customItems[category])) return total;
+                return total + customItems[category].filter(function validItem(item) {
+                    return !!(item && (item.name || item.description));
+                }).length;
+            }, 0);
+        }
+
+        function loadManageStarterLibraryProfile(forceReload) {
+            var starter = manageStarterLibraryApi();
+            if (!starter) return Promise.resolve(null);
+            if (forceReload === true) {
+                manageStarterLibraryProfile = null;
+                manageStarterProfilePromise = null;
+            }
+            if (manageStarterLibraryProfile) return Promise.resolve(manageStarterLibraryProfile);
+            if (manageStarterProfilePromise) return manageStarterProfilePromise;
+            manageStarterProfilePromise = Promise.resolve(
+                typeof getUserStarterLibraryProfile === 'function'
+                    ? getUserStarterLibraryProfile()
+                    : null
+            ).catch(function() {
+                return null;
+            }).then(function normalizeStarterProfile(profile) {
+                manageStarterLibraryProfile = starter.normalizeProfile(profile, {
+                    emptyDatabase: manageStarterSavedItemCount() === 0
+                });
+                return manageStarterLibraryProfile;
+            }).finally(function clearStarterProfilePromise() {
+                manageStarterProfilePromise = null;
+            });
+            return manageStarterProfilePromise;
+        }
+
+        function persistManageStarterLibraryProfile() {
+            if (!manageStarterLibraryProfile) return Promise.resolve(null);
+            if (typeof saveUserStarterLibraryProfile === 'function') {
+                return Promise.resolve(saveUserStarterLibraryProfile(manageStarterLibraryProfile)).catch(function(error) {
+                    console.warn('Starter library profile save failed:', error);
+                    return null;
+                });
+            }
+            try {
+                localStorage.setItem('ald_ai_starter_library_profile', JSON.stringify(manageStarterLibraryProfile));
+            } catch (error) {}
+            return Promise.resolve(manageStarterLibraryProfile);
+        }
+
+        async function setQuoteStarterSuggestOutsideDatabase(enabled) {
+            var profile = await loadManageStarterLibraryProfile();
+            if (!profile) return null;
+            profile.suggestOutsideDatabase = enabled === true;
+            profile.updatedAt = new Date().toISOString();
+            await persistManageStarterLibraryProfile();
+            return profile;
+        }
+
+        async function recordQuoteStarterLibraryAction(event) {
+            var starter = manageStarterLibraryApi();
+            var profile = await loadManageStarterLibraryProfile();
+            if (!starter || !profile) return null;
+            manageStarterLibraryProfile = starter.recordAction(profile, event, {
+                emptyDatabase: manageStarterSavedItemCount() === 0
+            });
+            await persistManageStarterLibraryProfile();
+            return manageStarterLibraryProfile;
+        }
+
+        async function dismissStarterLibraryOffer() {
+            var offer = document.getElementById('starterLibraryOffer');
+            if (offer) offer.remove();
+            var profile = await loadManageStarterLibraryProfile();
+            if (!profile) return;
+            profile.offerStatus = 'dismissed';
+            profile.updatedAt = new Date().toISOString();
+            await persistManageStarterLibraryProfile();
+        }
+
+        async function openStarterLibraryFromOffer() {
+            var offer = document.getElementById('starterLibraryOffer');
+            if (offer) offer.remove();
+            var profile = await loadManageStarterLibraryProfile();
+            if (profile) {
+                profile.offerStatus = 'opened';
+                profile.updatedAt = new Date().toISOString();
+                persistManageStarterLibraryProfile();
+            }
+            openManageStarterLibrary();
+        }
+
+        function maybeOfferStarterLibrary() {
+            if (manageStarterOfferScheduled || !manageStarterLibraryApi()) return;
+            manageStarterOfferScheduled = true;
+            setTimeout(async function showStarterOfferAfterRestore() {
+                if (manageStarterSavedItemCount() !== 0 || document.getElementById('starterLibraryOffer')) return;
+                var profile = await loadManageStarterLibraryProfile(true);
+                if (!profile || profile.offerStatus !== 'not_seen') return;
+                profile.offerStatus = 'opened';
+                profile.updatedAt = new Date().toISOString();
+                persistManageStarterLibraryProfile();
+
+                var offer = document.createElement('div');
+                offer.id = 'starterLibraryOffer';
+                offer.className = 'alert alert-light d-flex align-items-start justify-content-between gap-3 flex-wrap';
+                offer.innerHTML = '<div><div class="fw-bold text-dark"><i class="fas fa-book-open text-primary me-1"></i>Build your first item library</div>'
+                    + '<div class="small text-muted mt-1">Choose editable construction starter items for your trades. Every imported price starts as TBD.</div></div>'
+                    + '<div class="d-flex gap-2 flex-wrap"><button type="button" class="btn btn-sm btn-primary" onclick="openStarterLibraryFromOffer()"><i class="fas fa-arrow-right me-1"></i>Choose Starter Items</button>'
+                    + '<button type="button" class="btn btn-sm btn-outline-secondary" onclick="dismissStarterLibraryOffer()">Not now</button></div>';
+                var roomsContainer = document.getElementById('roomsContainer');
+                var target = roomsContainer && roomsContainer.closest('.card');
+                if (target && target.parentNode) target.parentNode.insertBefore(offer, target);
+                else document.body.appendChild(offer);
+            }, 700);
+        }
+
+        function starterTradeLabel(tradeId) {
+            var knowledgeApi = window.QuoteDrConstructionKnowledge;
+            var trade = knowledgeApi && knowledgeApi.getTrade(tradeId);
+            return trade && trade.label || tradeId || 'Trade';
+        }
+
+        function starterRoomLabel(roomTypeId) {
+            var knowledgeApi = window.QuoteDrConstructionKnowledge;
+            var roomType = knowledgeApi && knowledgeApi.getRoomType(roomTypeId);
+            return roomType && roomType.label || roomTypeId || 'Project';
+        }
+
+        function populateManageStarterFilters() {
+            var knowledgeApi = window.QuoteDrConstructionKnowledge;
+            var tradeSelect = document.getElementById('manageStarterTradeFilter');
+            var roomSelect = document.getElementById('manageStarterRoomFilter');
+            if (!knowledgeApi || !tradeSelect || !roomSelect) return;
+            if (!tradeSelect.options.length) {
+                tradeSelect.innerHTML = '<option value="">All trades</option>' + knowledgeApi.TRADE_GROUPS.map(function tradeGroup(group) {
+                    return '<optgroup label="' + manageItemsAttr(group.label) + '">' + group.trades.map(function tradeOption(trade) {
+                        return '<option value="' + manageItemsAttr(trade.id) + '">' + manageItemsEscape(trade.label) + '</option>';
+                    }).join('') + '</optgroup>';
+                }).join('');
+            }
+            if (!roomSelect.options.length) {
+                roomSelect.innerHTML = '<option value="">All project types</option>' + knowledgeApi.ROOM_TYPES.map(function roomOption(roomType) {
+                    return '<option value="' + manageItemsAttr(roomType.id) + '">' + manageItemsEscape(roomType.label) + '</option>';
+                }).join('');
+            }
+            tradeSelect.value = manageStarterLibraryState.tradeId || '';
+            roomSelect.value = manageStarterLibraryState.roomType || '';
+            populateManageStarterPhaseFilter();
+        }
+
+        function populateManageStarterPhaseFilter() {
+            var knowledgeApi = window.QuoteDrConstructionKnowledge;
+            var tradeSelect = document.getElementById('manageStarterTradeFilter');
+            var phaseSelect = document.getElementById('manageStarterPhaseFilter');
+            if (!knowledgeApi || !phaseSelect) return;
+            var trade = knowledgeApi.getTrade(tradeSelect && tradeSelect.value);
+            var phases = trade && Array.isArray(trade.phases) ? trade.phases : [];
+            phaseSelect.innerHTML = '<option value="">All phases</option>' + phases.map(function phaseOption(phase) {
+                return '<option value="' + manageItemsAttr(phase.id) + '">' + manageItemsEscape(phase.label) + '</option>';
+            }).join('');
+            phaseSelect.disabled = !phases.length;
+            if (phases.some(function phaseExists(phase) { return phase.id === manageStarterLibraryState.phaseId; })) {
+                phaseSelect.value = manageStarterLibraryState.phaseId;
+            } else {
+                manageStarterLibraryState.phaseId = '';
+                phaseSelect.value = '';
+            }
+        }
+
+        function manageStarterDraft(item) {
+            if (!manageStarterLibraryState.drafts[item.id]) {
+                manageStarterLibraryState.drafts[item.id] = {
+                    name: item.name,
+                    category: item.category,
+                    unitType: item.unitType,
+                    itemDescription: item.description
+                };
+            }
+            return manageStarterLibraryState.drafts[item.id];
+        }
+
+        function manageStarterVisibleItems() {
+            var starter = manageStarterLibraryApi();
+            if (!starter) return [];
+            return starter.query({
+                tradeId: manageStarterLibraryState.tradeId,
+                roomType: manageStarterLibraryState.roomType,
+                phaseId: manageStarterLibraryState.phaseId,
+                search: manageStarterLibraryState.search,
+                database: customItems,
+                profile: manageStarterLibraryProfile
+            });
+        }
+
+        function syncManageStarterSelectedCount() {
+            var selectedCount = Object.keys(manageStarterLibraryState.selected).filter(function selectedId(itemId) {
+                return manageStarterLibraryState.selected[itemId] === true;
+            }).length;
+            var countEl = document.getElementById('manageStarterSelectedCount');
+            var saveBtn = document.getElementById('manageStarterSaveBtn');
+            if (countEl) countEl.textContent = selectedCount + ' selected';
+            if (saveBtn) {
+                saveBtn.disabled = selectedCount === 0;
+                saveBtn.innerHTML = '<i class="fas fa-database me-1"></i>Save '
+                    + (selectedCount ? selectedCount + ' ' : '')
+                    + 'Selected to My Items';
+            }
+        }
+
+        function bindManageStarterLibraryList() {
+            var list = document.getElementById('manageStarterLibraryList');
+            if (!list || list._starterEventsBound) return;
+            list._starterEventsBound = true;
+            list.addEventListener('change', function starterListChange(event) {
+                var checkbox = event.target.closest('[data-starter-select]');
+                if (checkbox) {
+                    manageStarterLibraryState.selected[checkbox.getAttribute('data-starter-select')] = checkbox.checked;
+                    syncManageStarterSelectedCount();
+                    return;
+                }
+                var field = event.target.closest('[data-starter-edit]');
+                if (field) updateManageStarterDraftField(field);
+            });
+            list.addEventListener('input', function starterListInput(event) {
+                var field = event.target.closest('[data-starter-edit]');
+                if (field) updateManageStarterDraftField(field);
+            });
+        }
+
+        function updateManageStarterDraftField(field) {
+            var itemId = field.getAttribute('data-starter-id');
+            var fieldName = field.getAttribute('data-starter-edit');
+            if (!itemId || !fieldName) return;
+            var starter = manageStarterLibraryApi();
+            var item = starter && starter.getItem(itemId);
+            if (!item) return;
+            var draft = manageStarterDraft(item);
+            draft[fieldName] = field.value;
+        }
+
+        function renderManageStarterLibrary() {
+            var starter = manageStarterLibraryApi();
+            var list = document.getElementById('manageStarterLibraryList');
+            var summary = document.getElementById('manageStarterLibrarySummary');
+            if (!starter || !list) return;
+            var items = manageStarterVisibleItems();
+            var existingCount = items.filter(function existing(item) { return !!item.savedItem; }).length;
+            if (summary) {
+                summary.textContent = items.length + ' matching starter item' + (items.length === 1 ? '' : 's')
+                    + (existingCount ? ' - ' + existingCount + ' already in My Items' : '');
+            }
+            if (!items.length) {
+                list.innerHTML = '<div class="manage-empty-filter"><i class="fas fa-search me-1"></i>No starter items match these filters.</div>';
+                syncManageStarterSelectedCount();
+                return;
+            }
+            list.innerHTML = '<div class="manage-starter-list-header"><span></span><span>Item</span><span>Category</span><span>Unit</span><span>Client description</span></div>'
+                + items.map(function starterRow(item) {
+                    var draft = manageStarterDraft(item);
+                    var existing = !!item.savedItem;
+                    var selected = manageStarterLibraryState.selected[item.id] === true && !existing;
+                    if (existing) delete manageStarterLibraryState.selected[item.id];
+                    var phaseLabels = item.phases.map(function phaseLabel(phaseId) {
+                        var trade = window.QuoteDrConstructionKnowledge.getTrade(item.tradeId);
+                        var phase = trade && (trade.phases || []).find(function findPhase(candidate) { return candidate.id === phaseId; });
+                        return phase && phase.label || phaseId;
+                    });
+                    return '<div class="manage-starter-row" data-starter-row="' + manageItemsAttr(item.id) + '" data-existing="' + (existing ? '1' : '0') + '">'
+                        + '<div><input type="checkbox" class="form-check-input mt-2" data-starter-select="' + manageItemsAttr(item.id) + '"'
+                        + (selected ? ' checked' : '') + (existing ? ' disabled' : '') + ' aria-label="Select ' + manageItemsAttr(item.name) + '"></div>'
+                        + '<div data-starter-field="name"><input class="form-control form-control-sm fw-semibold" data-starter-id="' + manageItemsAttr(item.id) + '" data-starter-edit="name" value="' + manageItemsAttr(draft.name) + '"' + (existing ? ' disabled' : '') + '>'
+                        + '<div class="manage-starter-meta"><span class="badge text-bg-light border">' + manageItemsEscape(starterTradeLabel(item.tradeId)) + '</span>'
+                        + (phaseLabels.length ? '<span class="badge text-bg-light border">' + manageItemsEscape(phaseLabels.join(' + ')) + '</span>' : '')
+                        + (existing ? '<span class="badge text-bg-success"><i class="fas fa-check me-1"></i>Already in My Items</span>' : '<span class="badge text-bg-warning">Price TBD</span>')
+                        + '</div></div>'
+                        + '<div data-starter-field="category"><input class="form-control form-control-sm" data-starter-id="' + manageItemsAttr(item.id) + '" data-starter-edit="category" value="' + manageItemsAttr(draft.category) + '"' + (existing ? ' disabled' : '') + '></div>'
+                        + '<div data-starter-field="unit"><input class="form-control form-control-sm" list="unitTypeOptions" data-starter-id="' + manageItemsAttr(item.id) + '" data-starter-edit="unitType" value="' + manageItemsAttr(draft.unitType) + '"' + (existing ? ' disabled' : '') + '></div>'
+                        + '<div data-starter-field="description"><textarea class="form-control form-control-sm manage-starter-description" rows="2" data-starter-id="' + manageItemsAttr(item.id) + '" data-starter-edit="itemDescription"' + (existing ? ' disabled' : '') + '>' + manageItemsEscape(draft.itemDescription) + '</textarea></div>'
+                        + '</div>';
+                }).join('');
+            bindManageStarterLibraryList();
+            syncManageStarterSelectedCount();
+        }
+
+        function updateManageStarterLibraryFilters() {
+            var previousTrade = manageStarterLibraryState.tradeId;
+            manageStarterLibraryState.tradeId = document.getElementById('manageStarterTradeFilter')?.value || '';
+            manageStarterLibraryState.roomType = document.getElementById('manageStarterRoomFilter')?.value || '';
+            manageStarterLibraryState.search = document.getElementById('manageStarterSearch')?.value || '';
+            if (previousTrade !== manageStarterLibraryState.tradeId) populateManageStarterPhaseFilter();
+            manageStarterLibraryState.phaseId = document.getElementById('manageStarterPhaseFilter')?.value || '';
+            renderManageStarterLibrary();
+        }
+
+        function setManageStarterVisibleSelection(selected) {
+            manageStarterVisibleItems().forEach(function setVisible(item) {
+                if (!item.savedItem) manageStarterLibraryState.selected[item.id] = selected === true;
+            });
+            renderManageStarterLibrary();
+        }
+
+        async function activateManageStarterLibrary(options) {
+            options = options || {};
+            var modal = document.getElementById('manageItemsModal');
+            if (!modal || !manageStarterLibraryApi()) {
+                showManageItemsToast('Starter library is still loading. Please try again.', false);
+                return;
+            }
+            await loadManageStarterLibraryProfile();
+            if (options.tradeId && window.QuoteDrConstructionKnowledge.getTrade(options.tradeId)) {
+                manageStarterLibraryState.tradeId = options.tradeId;
+            }
+            if (options.roomType && window.QuoteDrConstructionKnowledge.getRoomType(options.roomType)) {
+                manageStarterLibraryState.roomType = options.roomType;
+            }
+            modal.classList.add('manage-starter-library-active');
+            populateManageStarterFilters();
+            var searchEl = document.getElementById('manageStarterSearch');
+            if (searchEl) searchEl.value = manageStarterLibraryState.search || '';
+            renderManageStarterLibrary();
+            document.getElementById('manageStarterLibraryTitle')?.scrollIntoView({ block: 'start' });
+        }
+
+        function openManageStarterLibrary(options) {
+            var modal = document.getElementById('manageItemsModal');
+            if (!modal) return;
+            if (!modal.classList.contains('show')) {
+                openManageItemsModal();
+                setTimeout(function activateAfterModalOpens() {
+                    activateManageStarterLibrary(options);
+                }, 250);
+                return;
+            }
+            activateManageStarterLibrary(options);
+        }
+
+        function closeManageStarterLibraryView() {
+            var modal = document.getElementById('manageItemsModal');
+            if (!modal) return;
+            modal.classList.remove('manage-starter-library-active');
+            renderAllItemsList();
+            document.getElementById('itemListTopAnchor')?.scrollIntoView({ block: 'start' });
+        }
+
+        async function saveSelectedStarterItems() {
+            var starter = manageStarterLibraryApi();
+            if (!starter) return;
+            var selectedIds = Object.keys(manageStarterLibraryState.selected).filter(function selectedId(itemId) {
+                return manageStarterLibraryState.selected[itemId] === true;
+            });
+            if (!selectedIds.length) {
+                showManageItemsToast('Choose at least one starter item.', false);
+                return;
+            }
+            var saveBtn = document.getElementById('manageStarterSaveBtn');
+            if (saveBtn) {
+                saveBtn.disabled = true;
+                saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving starter items';
+            }
+            pushUndoState();
+            var savedItems = [];
+            var skipped = 0;
+            selectedIds.forEach(function saveStarterItem(itemId) {
+                var catalogItem = starter.getItem(itemId);
+                var draft = catalogItem && manageStarterDraft(catalogItem);
+                var savedItem = catalogItem && starter.catalogItemToSavedItem(catalogItem, draft);
+                if (!savedItem || starter.findSavedItem(catalogItem, customItems)) {
+                    skipped += 1;
+                    delete manageStarterLibraryState.selected[itemId];
+                    return;
+                }
+                if (!customItems[savedItem.category]) customItems[savedItem.category] = [];
+                var duplicate = customItems[savedItem.category].some(function existingItem(item) {
+                    return starter.normalizeText(item && item.name) === starter.normalizeText(savedItem.name);
+                });
+                if (duplicate) {
+                    skipped += 1;
+                    delete manageStarterLibraryState.selected[itemId];
+                    return;
+                }
+                var category = savedItem.category;
+                delete savedItem.category;
+                customItems[category].push(savedItem);
+                if (!pricingDatabase[category]) pricingDatabase[category] = [];
+                pricingDatabase[category].push(Object.assign({}, savedItem, { _custom: true }));
+                rememberManageUnitType(savedItem.unitType);
+                savedItems.push({ itemId: itemId, category: category, item: savedItem, catalog: catalogItem });
+                delete manageStarterLibraryState.selected[itemId];
+            });
+
+            if (!savedItems.length) {
+                renderManageStarterLibrary();
+                showManageItemsToast(skipped ? 'Those starter items already exist in My Items.' : 'No starter items were saved.', false);
+                return;
+            }
+
+            persistManageItemsLocalSnapshot(customItems);
+            var cloudResult = null;
+            try {
+                cloudResult = await _doBackupItemsToCloud(customItems);
+            } catch (error) {
+                cloudResult = { error: error };
+            }
+            var profile = await loadManageStarterLibraryProfile();
+            if (profile) {
+                savedItems.forEach(function recordImport(saved) {
+                    manageStarterLibraryProfile = starter.recordAction(manageStarterLibraryProfile, {
+                        starterItemId: saved.itemId,
+                        action: 'imported',
+                        tradeId: saved.catalog.tradeId,
+                        roomType: manageStarterLibraryState.roomType
+                    });
+                });
+                manageStarterLibraryProfile.offerStatus = 'completed';
+                manageStarterLibraryProfile.updatedAt = new Date().toISOString();
+                await persistManageStarterLibraryProfile();
+            }
+            populateNewItemCategorySelect();
+            renderAllItemsList();
+            if (typeof updatePricingOptions === 'function') updatePricingOptions();
+            renderManageStarterLibrary();
+            showManageItemsToast(
+                'Saved ' + savedItems.length + ' starter item' + (savedItems.length === 1 ? '' : 's')
+                    + (skipped ? '; skipped ' + skipped + ' duplicate' + (skipped === 1 ? '' : 's') : '')
+                    + (cloudResult && cloudResult.error ? ' locally. Cloud sync will retry.' : ' to My Items.'),
+                !(cloudResult && cloudResult.error)
+            );
+        }
+
         function openManageItemsModal() {
             if (typeof qdCaptureEvent === 'function') {
                 qdCaptureEvent('manage_items_opened', { source: 'quote_builder' });
@@ -2818,6 +3267,7 @@
             const catSelect = document.getElementById('newItemCategory');
             if (!catSelect) { console.error('newItemCategory not found'); return; }
             const manageItemsModal = document.getElementById('manageItemsModal');
+            if (manageItemsModal) manageItemsModal.classList.remove('manage-starter-library-active');
             if (manageItemsModal && !manageItemsModal._renderCleanupBound) {
                 manageItemsModal._renderCleanupBound = true;
                 manageItemsModal.addEventListener('hidden.bs.modal', clearManageItemsRenderedContent);
@@ -5466,7 +5916,9 @@
                 }
                 textareaEl.value = refinedText;
                 textareaEl.dispatchEvent(new Event('input', { bubbles: true }));
-                if (!textareaEl.closest('#addLineModal')) markPricingDirty();
+                if (textareaEl.closest && textareaEl.closest('#manageItemsModal')) {
+                    markPricingDirty(textareaEl);
+                }
                 if (typeof completeProTrialFeature === 'function') completeProTrialFeature('ai_refine', 'AI Refine');
                 if (typeof qdMaybeShowProUpgradePrompt === 'function') {
                     qdMaybeShowProUpgradePrompt('ai_refine_success', {
@@ -5515,7 +5967,9 @@
                 btnEl.title = createdByAi ? 'Undo AI-created description' : 'Undo AI refined description';
             }
             textarea.dispatchEvent(new Event('input', { bubbles: true }));
-            if (!textarea.closest('#addLineModal')) markPricingDirty();
+            if (textarea.closest && textarea.closest('#manageItemsModal')) {
+                markPricingDirty(textarea);
+            }
         }
 
         async function deleteCustomItem(category, name) {
@@ -5562,6 +6016,17 @@
         window.applyManageDetailSectionState = applyManageDetailSectionState;
         window.openManageItemsModal = openManageItemsModal;
         window.closeManageItemsModal = closeManageItemsModal;
+        window.openManageStarterLibrary = openManageStarterLibrary;
+        window.closeManageStarterLibraryView = closeManageStarterLibraryView;
+        window.updateManageStarterLibraryFilters = updateManageStarterLibraryFilters;
+        window.setManageStarterVisibleSelection = setManageStarterVisibleSelection;
+        window.saveSelectedStarterItems = saveSelectedStarterItems;
+        window.dismissStarterLibraryOffer = dismissStarterLibraryOffer;
+        window.openStarterLibraryFromOffer = openStarterLibraryFromOffer;
+        window.loadManageStarterLibraryProfile = loadManageStarterLibraryProfile;
+        window.setQuoteStarterSuggestOutsideDatabase = setQuoteStarterSuggestOutsideDatabase;
+        window.recordQuoteStarterLibraryAction = recordQuoteStarterLibraryAction;
+        window.manageStarterSavedItemCount = manageStarterSavedItemCount;
         window.pushUndoState = pushUndoState;
         window.undoManageItems = undoManageItems;
         window.syncManageItemsUndoButtons = syncManageItemsUndoButtons;

@@ -1826,7 +1826,156 @@
             border-radius: 8px;
             background: #f8fafc;
         }
+        #manageStarterLibraryView {
+            display: none;
+            min-height: 0;
+        }
+        #manageItemsModal.manage-starter-library-active .manage-items-add-shell,
+        #manageItemsModal.manage-starter-library-active .manage-items-toolbar,
+        #manageItemsModal.manage-starter-library-active #customItemsList,
+        #manageItemsModal.manage-starter-library-active #itemListBottomAnchor,
+        #manageItemsModal.manage-starter-library-active #manageItemsFooterBar,
+        #manageItemsModal.manage-starter-library-active #manageItemsFooterPullTab {
+            display: none !important;
+        }
+        #manageItemsModal.manage-starter-library-active #manageStarterLibraryView {
+            display: block;
+        }
+        .manage-starter-heading {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 0.75rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid #dbe5ef;
+        }
+        .manage-starter-filters {
+            display: grid;
+            grid-template-columns: minmax(170px, 1fr) minmax(170px, 1fr) minmax(140px, 0.8fr) minmax(220px, 1.4fr);
+            gap: 0.65rem;
+            align-items: end;
+            padding: 0.75rem 0;
+        }
+        .manage-starter-list {
+            border: 1px solid #d7e2ed;
+            border-radius: 7px;
+            overflow: hidden;
+            background: #fff;
+        }
+        .manage-starter-list-header,
+        .manage-starter-row {
+            display: grid;
+            grid-template-columns: 36px minmax(170px, 1fr) minmax(145px, 0.7fr) minmax(100px, 0.45fr) minmax(280px, 1.8fr);
+            gap: 0.55rem;
+            align-items: start;
+        }
+        .manage-starter-list-header {
+            padding: 0.5rem 0.65rem;
+            background: #eef3f8;
+            border-bottom: 1px solid #d7e2ed;
+            color: #52677c;
+            font-size: 0.72rem;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+        .manage-starter-row {
+            padding: 0.65rem;
+            border-bottom: 1px solid #e6edf4;
+        }
+        .manage-starter-row:last-child {
+            border-bottom: 0;
+        }
+        .manage-starter-row[data-existing="1"] {
+            background: #f4f7fa;
+        }
+        .manage-starter-row .form-control,
+        .manage-starter-row .form-select {
+            min-width: 0;
+        }
+        .manage-starter-row .manage-starter-description {
+            resize: vertical;
+            min-height: 58px;
+        }
+        .manage-starter-meta {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            flex-wrap: wrap;
+            margin-top: 0.35rem;
+        }
+        .manage-starter-meta .badge {
+            font-size: 0.67rem;
+        }
+        .manage-starter-actionbar {
+            position: sticky;
+            bottom: 0;
+            z-index: 12;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.65rem 0;
+            margin-top: 0.65rem;
+            background: #fff;
+            border-top: 1px solid #dbe5ef;
+        }
+        #starterLibraryOffer {
+            border-left: 4px solid #1a56a0;
+            box-shadow: 0 3px 12px rgba(20, 59, 96, 0.1);
+        }
+        @media (max-width: 992px) {
+            .manage-starter-filters {
+                grid-template-columns: 1fr 1fr;
+            }
+            .manage-starter-list-header {
+                display: none;
+            }
+            .manage-starter-row {
+                grid-template-columns: 32px minmax(0, 1fr);
+            }
+            .manage-starter-row > [data-starter-field="category"],
+            .manage-starter-row > [data-starter-field="unit"],
+            .manage-starter-row > [data-starter-field="description"] {
+                grid-column: 2;
+            }
+            .manage-starter-row > [data-starter-field]::before {
+                display: block;
+                margin-bottom: 0.2rem;
+                color: #64748b;
+                font-size: 0.68rem;
+                font-weight: 800;
+                text-transform: uppercase;
+            }
+            .manage-starter-row > [data-starter-field="name"]::before { content: "Item"; }
+            .manage-starter-row > [data-starter-field="category"]::before { content: "Category"; }
+            .manage-starter-row > [data-starter-field="unit"]::before { content: "Unit"; }
+            .manage-starter-row > [data-starter-field="description"]::before { content: "Client description"; }
+        }
+        @media (max-width: 576px) {
+            .manage-starter-heading {
+                flex-direction: column;
+            }
+            .manage-starter-heading .btn {
+                width: 100%;
+            }
+            .manage-starter-filters {
+                grid-template-columns: 1fr;
+            }
+            .manage-starter-actionbar {
+                align-items: stretch;
+                flex-direction: column;
+            }
+            .manage-starter-actionbar .btn {
+                width: 100%;
+            }
+        }
         @media (min-width: 769px) {
+            #manageItemsModal.manage-starter-library-active #manageStarterLibraryView {
+                flex: 1 1 auto;
+                min-height: 0;
+                overflow-y: auto;
+                padding-right: 0.2rem;
+            }
             #manageItemsModal .modal-dialog {
                 width: 96vw !important;
                 max-width: 96vw !important;
@@ -2128,7 +2277,7 @@
 
 </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-v2.js?v=2026080102"></script>
+    <script src="supabase-v2.js?v=2026080201"></script>
     <script src="ai-voice-rule-matcher.js?v=2026080101"></script>
     <script src="save-coordinator.js?v=2026080102"></script>
     <script src="quote-media.js?v=2026071202"></script>
@@ -2197,6 +2346,7 @@ if (location.search.includes('debug')) {
                             <i class="fas fa-share-square me-1"></i>Quote Actions
                         </button>
                         <ul class="dropdown-menu w-100 quote-actions-menu">
+                            <li><a class="dropdown-item" href="javascript:void(0)" onclick="openQuoteCompletenessReview()"><i class="fas fa-clipboard-check me-2 text-primary"></i>Review Quote</a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="openQuoteSendSettingsModal(true)"><i class="fas fa-sliders-h me-2 text-primary"></i>Quote Settings</a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="generateInteractiveLink()"><i class="fas fa-link me-2 text-success"></i><span id="quoteGenerateLinkLabel">Generate Quote Link</span></a></li>
                             <li><a class="dropdown-item" href="javascript:void(0)" onclick="createChangeOrderFromCurrentQuote()" id="createChangeOrderMenuItem" style="display:none;"><i class="fas fa-file-circle-plus me-2 text-warning"></i>Create Change Order</a></li>
@@ -3182,7 +3332,7 @@ Example:
 
     <!-- Add Line Item Modal -->
     <div class="modal fade" id="addLineModal" tabindex="-1" data-enter-submit="#addLineItemBtn">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable line-item-editor-dialog">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Add Line Item</h5>
@@ -3511,6 +3661,7 @@ Example:
                         </div>
                         <div class="d-flex align-items-center gap-2 flex-wrap">
                             <span id="pricingUnsavedIndicator" class="badge bg-warning text-dark" style="display:none;">Unsaved changes</span>
+                            <button id="manageStarterLibraryBtn" onclick="openManageStarterLibrary()" class="btn btn-sm btn-outline-primary"><i class="fas fa-book-open"></i> Starter Library</button>
                             <button onclick="openChoiceGroupTemplateModal()" class="btn btn-sm btn-outline-primary"><i class="fas fa-layer-group"></i> Choice Group</button>
                             <button id="manageCategoryOrganizeBtn" onclick="openManageCategoryOrganizeMenu()" class="btn btn-sm btn-outline-primary" title="Choose alphabetical or custom category order"><i class="fas fa-sort"></i> Organize <span id="manage-category-order-mode-badge" class="badge text-bg-light ms-1">A-Z</span></button>
                             <button onclick="suggestChoiceGroupTemplates()" class="btn btn-sm btn-outline-secondary"><i class="fas fa-wand-magic-sparkles"></i> Suggest Groups</button>
@@ -3523,6 +3674,48 @@ Example:
                         <!-- Populated dynamically -->
                     </div>
                     <div id="itemListBottomAnchor"></div>
+                    <section id="manageStarterLibraryView" aria-labelledby="manageStarterLibraryTitle">
+                        <div class="manage-starter-heading">
+                            <div>
+                                <h5 id="manageStarterLibraryTitle" class="mb-1"><i class="fas fa-book-open text-primary me-1"></i>Construction Starter Library</h5>
+                                <div class="small text-muted">Choose useful starting items, review the wording, and save only what fits your business. Imported pricing is always marked TBD.</div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="closeManageStarterLibraryView()"><i class="fas fa-arrow-left me-1"></i>Back to My Items</button>
+                        </div>
+                        <div class="manage-starter-filters">
+                            <div>
+                                <label class="form-label small fw-bold mb-1" for="manageStarterTradeFilter">Trade</label>
+                                <select id="manageStarterTradeFilter" class="form-select form-select-sm" onchange="updateManageStarterLibraryFilters()"></select>
+                            </div>
+                            <div>
+                                <label class="form-label small fw-bold mb-1" for="manageStarterRoomFilter">Project / room type</label>
+                                <select id="manageStarterRoomFilter" class="form-select form-select-sm" onchange="updateManageStarterLibraryFilters()"></select>
+                            </div>
+                            <div>
+                                <label class="form-label small fw-bold mb-1" for="manageStarterPhaseFilter">Phase</label>
+                                <select id="manageStarterPhaseFilter" class="form-select form-select-sm" onchange="updateManageStarterLibraryFilters()"></select>
+                            </div>
+                            <div>
+                                <label class="form-label small fw-bold mb-1" for="manageStarterSearch">Search</label>
+                                <input id="manageStarterSearch" class="form-control form-control-sm" placeholder="Search names, descriptions, or categories..." oninput="updateManageStarterLibraryFilters()">
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap mb-2">
+                            <div id="manageStarterLibrarySummary" class="small text-muted"></div>
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-outline-primary" onclick="setManageStarterVisibleSelection(true)">Select visible</button>
+                                <button type="button" class="btn btn-outline-secondary" onclick="setManageStarterVisibleSelection(false)">Clear visible</button>
+                            </div>
+                        </div>
+                        <div id="manageStarterLibraryList" class="manage-starter-list" aria-live="polite"></div>
+                        <div class="manage-starter-actionbar">
+                            <div>
+                                <strong id="manageStarterSelectedCount">0 selected</strong>
+                                <div class="small text-muted">Existing personal items are never overwritten.</div>
+                            </div>
+                            <button type="button" id="manageStarterSaveBtn" class="btn btn-success" onclick="saveSelectedStarterItems()" disabled><i class="fas fa-database me-1"></i>Save Selected to My Items</button>
+                        </div>
+                    </section>
                 </div>
                 <div class="modal-footer justify-content-between flex-nowrap gap-2" id="manageItemsFooterBar" style="position:sticky;bottom:0;z-index:10;background:#fff;pointer-events:auto;touch-action:auto;padding:6px 8px;min-height:42px;overflow:visible;">
                     <div class="d-flex gap-2 flex-nowrap align-items-center">
@@ -7368,6 +7561,7 @@ Example:
         }
 
         function addLine(roomId) {
+            quoteReviewLineItemReturnContext = null;
             resetLineItemEditState();
             document.getElementById('currentRoomId').value = roomId;
             // Re-inject custom items into pricingDatabase in case Supabase load was async
@@ -8381,6 +8575,8 @@ Example:
 
         // Global variable to track if we're editing an existing item
         let editingItemIndex = null;
+        let quoteReviewLineItemContext = null;
+        let quoteReviewLineItemReturnContext = null;
 
         function resetAddLineDescriptionRefineState() {
             const undoBtn = document.querySelector('#addLineModal .undo-refine-desc-btn');
@@ -8396,6 +8592,15 @@ Example:
 
         function resetLineItemEditState() {
             editingItemIndex = null;
+            if (typeof quoteReviewLineItemContext !== 'undefined') quoteReviewLineItemContext = null;
+            document.getElementById('quoteReviewDraftNotice')?.remove();
+            const categorySelect = document.getElementById('lineCategory');
+            if (categorySelect) {
+                Array.from(categorySelect.options).forEach(function(option) {
+                    if (option.dataset && option.dataset.copilotDraftCategory === '1') option.remove();
+                });
+            }
+            if (typeof resetLineItemDescriptionRefineState === 'function') resetLineItemDescriptionRefineState();
             const modalTitle = document.querySelector('#addLineModal .modal-title');
             if (modalTitle) {
                 modalTitle.textContent = 'Add Line Item';
@@ -8416,10 +8621,12 @@ Example:
         });
 
         function editLineItem(roomId, itemIndex) {
+            quoteReviewLineItemReturnContext = null;
             const room = rooms.find(r => r.id === roomId);
             if (!room || !room.items[itemIndex]) return;
 
             const item = room.items[itemIndex];
+            if (typeof resetLineItemDescriptionRefineState === 'function') resetLineItemDescriptionRefineState();
 
             // Populate form with existing data
             document.getElementById('currentRoomId').value = roomId;
@@ -8829,6 +9036,7 @@ Example:
         async function confirmAddLine() {
             const roomId = parseInt(document.getElementById('currentRoomId').value);
             if (!validateAddLineItemRequiredFields()) return;
+            const copilotContext = typeof quoteReviewLineItemContext !== 'undefined' ? quoteReviewLineItemContext : null;
             const description = document.getElementById('lineDescription').value.trim();
             const itemDescription = document.getElementById('lineItemDescription').value.trim();
             const category = normalizeLineItemCategoryValue(document.getElementById('lineCategory'));
@@ -8949,6 +9157,11 @@ Example:
                     }
                 }
 
+                if (editingItemIndex === null && copilotContext && !copilotContext.addedRecorded) {
+                    copilotContext.addedRecorded = true;
+                    void recordQuoteReviewStarterAction('added_to_quote', copilotContext);
+                }
+
                 resetLineItemEditState();
 
                 renderRooms();
@@ -9014,6 +9227,7 @@ Example:
 
         async function saveLineItemToDatabase() {
             if (!validateAddLineItemRequiredFields()) return false;
+            const copilotContext = typeof quoteReviewLineItemContext !== 'undefined' ? quoteReviewLineItemContext : null;
             if (isLineItemOneTimeCategory()) {
                 qdAlert('Use Once categories are not saved to your item database. To save this item for reuse, choose Save in the New Category prompt or select a saved category first.', {
                     title: 'Use Once Category',
@@ -9053,6 +9267,10 @@ Example:
                 newItem.pricingMode = priceTbd ? 'tbd' : 'fixed';
                 newItem.supplierUrl = supplierUrl;
                 newItem.itemDescription = itemDescription;
+                if (copilotContext && copilotContext.starterSourceId) {
+                    newItem.starterSourceId = copilotContext.starterSourceId;
+                    newItem.starterCatalogVersion = copilotContext.starterCatalogVersion;
+                }
                 delete newItem.category;
                 var existingCustom = customItems[category].find(function(i) { return i && i.name === desc; });
                 if (existingCustom) {
@@ -9067,6 +9285,10 @@ Example:
                     localStorage.setItem('ald_custom_items_updated_at', new Date().toISOString());
                 }
                 savedLocally = true;
+                if (copilotContext && !copilotContext.savedRecorded) {
+                    copilotContext.savedRecorded = true;
+                    await recordQuoteReviewStarterAction('saved', copilotContext);
+                }
                 if (saveNewItemBtn) saveNewItemBtn.innerHTML = '<i class="fas fa-check me-1"></i>Saved Locally - Syncing';
                 // Update pricingDatabase in memory
                 if (!pricingDatabase[category]) pricingDatabase[category] = [];
@@ -13001,6 +13223,308 @@ Example:
             });
         }
 
+        function getQuoteCompletenessReviewState() {
+            var roomSnapshot = [];
+            var reviewProfileSnapshot = null;
+            try {
+                roomSnapshot = JSON.parse(JSON.stringify(Array.isArray(rooms) ? rooms : []));
+            } catch (error) {
+                roomSnapshot = [];
+            }
+            try {
+                reviewProfileSnapshot = JSON.parse(JSON.stringify(window._quoteReviewProfile || null));
+            } catch (error) {
+                reviewProfileSnapshot = null;
+            }
+            return {
+                documentType: window._quoteDocumentType || 'quote',
+                rooms: roomSnapshot,
+                reviewProfile: reviewProfileSnapshot
+            };
+        }
+
+        function normalizeQuoteReviewDraftValue(value) {
+            return String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+        }
+
+        function resetLineItemDescriptionRefineState() {
+            const undoBtn = document.querySelector('#addLineModal .undo-refine-desc-btn');
+            if (!undoBtn) return null;
+            undoBtn.style.display = 'none';
+            undoBtn.innerHTML = '<i class="fas fa-undo"></i>';
+            undoBtn.title = 'Undo AI refined description';
+            delete undoBtn._previousDescription;
+            delete undoBtn._refinedDescription;
+            delete undoBtn._showingRefined;
+            return undoBtn;
+        }
+
+        function applyQuoteReviewSuggestedDescription(suggestedDraft) {
+            const textarea = document.getElementById('lineItemDescription');
+            const nextText = String(suggestedDraft || '').trim();
+            if (!textarea || !nextText) return;
+            const previousText = textarea.value || '';
+            textarea.value = nextText;
+            textarea.dispatchEvent(new Event('input', { bubbles: true }));
+            const undoBtn = resetLineItemDescriptionRefineState();
+            if (undoBtn && previousText !== nextText) {
+                undoBtn._previousDescription = previousText;
+                undoBtn._refinedDescription = nextText;
+                undoBtn._showingRefined = true;
+                undoBtn.style.display = '';
+            }
+        }
+
+        function findQuoteReviewDraftCategory(payload) {
+            const requestedCategory = normalizeQuoteReviewDraftValue(payload && payload.suggestedCategory);
+            const categorySelect = document.getElementById('lineCategory');
+            if (requestedCategory && categorySelect) {
+                const matchingOption = Array.from(categorySelect.options).find(function(option) {
+                    return normalizeQuoteReviewDraftValue(option.value) === requestedCategory;
+                });
+                if (matchingOption) return matchingOption.value;
+            }
+            if (!payload || !payload.tradeId || !window.QuoteDrConstructionKnowledge) return '';
+            return Object.keys(pricingDatabase || {}).find(function(category) {
+                const detection = window.QuoteDrConstructionKnowledge.detectTradeScope({
+                    rooms: [{ items: [{ category: category, name: '' }] }]
+                });
+                return detection.allTradeIds.indexOf(payload.tradeId) !== -1;
+            }) || '';
+        }
+
+        function quoteReviewEditorItem(payload) {
+            const item = payload && payload.item && typeof payload.item === 'object' ? payload.item : {};
+            return {
+                category: String(item.category || payload && payload.suggestedCategory || '').trim(),
+                name: String(item.name || payload && payload.suggestedItemName || '').trim(),
+                unitType: String(item.unitType || '').trim(),
+                rate: parseFloat(item.rate) || 0,
+                materialCost: parseFloat(item.materialCost) || 0,
+                priceTbd: item.priceTbd === true || item.pricingMode === 'tbd',
+                supplierUrl: String(item.supplierUrl || '').trim(),
+                itemDescription: String(item.itemDescription || payload && payload.suggestedDraft || '').trim()
+            };
+        }
+
+        function setQuoteReviewDraftCategory(categoryName) {
+            const categorySelect = document.getElementById('lineCategory');
+            const cleanCategory = String(categoryName || '').trim();
+            if (!categorySelect || !cleanCategory) return '';
+            const existing = Array.from(categorySelect.options).find(function(option) {
+                return normalizeQuoteReviewDraftValue(option.value) === normalizeQuoteReviewDraftValue(cleanCategory);
+            });
+            if (existing) {
+                categorySelect.value = existing.value;
+                return existing.value;
+            }
+            Array.from(categorySelect.options).forEach(function(option) {
+                if (option.dataset && option.dataset.copilotDraftCategory === '1') option.remove();
+            });
+            const option = document.createElement('option');
+            option.value = cleanCategory;
+            option.textContent = cleanCategory + ' (Copilot draft)';
+            option.dataset.copilotDraftCategory = '1';
+            const addCategoryOption = Array.from(categorySelect.options).find(function(candidate) {
+                return candidate.value === '__add_new_category__';
+            });
+            categorySelect.insertBefore(option, addCategoryOption || null);
+            categorySelect.value = cleanCategory;
+            delete categorySelect.dataset.oneTimeCategory;
+            return cleanCategory;
+        }
+
+        function showQuoteReviewDraftNotice(payload) {
+            const modalBody = document.querySelector('#addLineModal .modal-body');
+            if (!modalBody) return;
+            document.getElementById('quoteReviewDraftNotice')?.remove();
+            const source = String(payload && payload.itemSource || 'wording');
+            const notice = document.createElement('div');
+            notice.id = 'quoteReviewDraftNotice';
+            notice.className = 'alert alert-info py-2 px-3 small mb-3';
+            if (source === 'saved') {
+                notice.innerHTML = '<i class="fas fa-database me-1"></i><strong>Your saved item.</strong> Current description, unit, and pricing were loaded from My Items.';
+            } else if (source === 'starter') {
+                notice.innerHTML = '<i class="fas fa-book-open me-1"></i><strong>Starter library item.</strong> It begins as Price TBD. Review it before adding, saving, or both.';
+            } else if (source === 'ai_generated') {
+                notice.className = 'alert alert-warning py-2 px-3 small mb-3';
+                notice.innerHTML = '<i class="fas fa-wand-magic-sparkles me-1"></i><strong>AI-generated draft.</strong> Verify every field. Nothing is added or saved until you choose an action below.';
+            } else {
+                notice.innerHTML = '<i class="fas fa-pen-to-square me-1"></i><strong>Copilot wording suggestion.</strong> Review it before saving changes.';
+            }
+            modalBody.insertBefore(notice, modalBody.firstChild);
+        }
+
+        function quoteReviewSavedItemOption(category, itemName) {
+            const services = pricingDatabase[category] || [];
+            const saved = services.find(function(item) {
+                return normalizeQuoteReviewDraftValue(item && item.name) === normalizeQuoteReviewDraftValue(itemName);
+            });
+            return saved || null;
+        }
+
+        function applyQuoteReviewEditorItem(payload) {
+            const item = quoteReviewEditorItem(payload);
+            const category = setQuoteReviewDraftCategory(item.category) || findQuoteReviewDraftCategory(payload);
+            const categorySelect = document.getElementById('lineCategory');
+            if (category && categorySelect) categorySelect.value = category;
+            updatePricingOptions();
+
+            const serviceSelect = document.getElementById('lineService');
+            const savedItem = payload.itemSource === 'saved' ? quoteReviewSavedItemOption(category, item.name) : null;
+            if (savedItem && serviceSelect) {
+                const matchingOption = Array.from(serviceSelect.options).find(function(option) {
+                    return normalizeQuoteReviewDraftValue(option.value) === normalizeQuoteReviewDraftValue(savedItem.name);
+                });
+                if (matchingOption) {
+                    serviceSelect.value = matchingOption.value;
+                    autoFillPricing();
+                }
+            }
+
+            document.getElementById('lineDescription').value = item.name;
+            document.getElementById('itemQuickSearch').value = item.name;
+            document.getElementById('lineItemDescription').value = item.itemDescription;
+            populateLineUnitTypeDropdown(item.unitType || 'Flatrate');
+            document.getElementById('lineQuantity').value = '1';
+            document.getElementById('lineRate').value = item.priceTbd ? '0' : String(item.rate);
+            setLinePriceTbdState(item.priceTbd);
+            document.getElementById('lineMaterialCost').value = String(item.materialCost);
+            calculateMaterialTotal();
+            const linkBtn = document.getElementById('supplierLinkBtn');
+            if (linkBtn) {
+                linkBtn.href = item.supplierUrl || '#';
+                linkBtn.style.display = item.supplierUrl ? 'inline-block' : 'none';
+            }
+            checkIfNewItem();
+        }
+
+        function quoteReviewItemActionContext(payload) {
+            if (!payload || !payload.itemSource) return null;
+            return {
+                itemSource: String(payload.itemSource),
+                starterSourceId: String(payload.starterSourceId || ''),
+                starterCatalogVersion: parseInt(payload.starterCatalogVersion || 0, 10) || 0,
+                tradeId: String(payload.tradeId || ''),
+                roomType: String(payload.roomType || ''),
+                roomId: String(payload.roomId || ''),
+                savedRecorded: false,
+                addedRecorded: false
+            };
+        }
+
+        function recordQuoteReviewStarterAction(action, context) {
+            if (!context || typeof window.recordQuoteStarterLibraryAction !== 'function') return Promise.resolve(null);
+            return Promise.resolve(window.recordQuoteStarterLibraryAction({
+                starterItemId: context.starterSourceId || '',
+                action: action,
+                tradeId: context.tradeId || '',
+                roomType: context.roomType || ''
+            })).catch(function(error) {
+                console.warn('Copilot item learning save failed:', error);
+                return null;
+            });
+        }
+
+        function openQuoteReviewLineItemDraft(payload) {
+            payload = payload || {};
+            const room = (Array.isArray(rooms) ? rooms : []).find(function(candidate) {
+                return String(candidate && candidate.id) === String(payload.roomId);
+            });
+            if (!room) {
+                if (typeof showToast === 'function') showToast('That room is no longer available. Run the review again.', 'warning');
+                return;
+            }
+            const targetName = normalizeQuoteReviewDraftValue(payload.targetItemName);
+            const matchingTargetIndexes = targetName
+                ? (Array.isArray(room.items) ? room.items : []).map(function(item, index) {
+                    return normalizeQuoteReviewDraftValue(item && (item.serviceName || item.description)) === targetName ? index : -1;
+                }).filter(function(index) { return index >= 0; })
+                : [];
+            if (matchingTargetIndexes.length > 1) {
+                if (typeof showToast === 'function') showToast('More than one item has that name. Open the item you want to edit directly.', 'warning');
+                return;
+            }
+            if (targetName && !matchingTargetIndexes.length) {
+                if (typeof showToast === 'function') showToast('That item is no longer available. Run the review again.', 'warning');
+                return;
+            }
+            const targetIndex = matchingTargetIndexes.length === 1 ? matchingTargetIndexes[0] : -1;
+
+            resetLineItemDescriptionRefineState();
+            if (targetIndex >= 0) {
+                editLineItem(room.id, targetIndex);
+                quoteReviewLineItemContext = null;
+                quoteReviewLineItemReturnContext = null;
+                applyQuoteReviewSuggestedDescription(payload.suggestedDraft);
+            } else {
+                addLine(room.id);
+                quoteReviewLineItemContext = quoteReviewItemActionContext(payload);
+                quoteReviewLineItemReturnContext = quoteReviewLineItemContext;
+                applyQuoteReviewEditorItem(payload);
+                const modalTitle = document.querySelector('#addLineModal .modal-title');
+                if (modalTitle) modalTitle.textContent = 'Add Copilot Item';
+            }
+            showQuoteReviewDraftNotice(payload);
+
+            const descriptionField = document.getElementById('lineItemDescription');
+            if (descriptionField) {
+                setTimeout(function focusQuoteReviewDraft() {
+                    descriptionField.focus();
+                    descriptionField.setSelectionRange(descriptionField.value.length, descriptionField.value.length);
+                }, 250);
+            }
+            if (typeof showToast === 'function') {
+                showToast(
+                    targetIndex >= 0
+                        ? 'Wording workspace opened. Review the draft, then save only if it is accurate.'
+                        : 'Copilot item opened. Nothing is added or saved until you choose an action.',
+                    'info'
+                );
+            }
+        }
+
+        function returnToQuoteReviewAfterLineItemModal() {
+            const returnContext = quoteReviewLineItemReturnContext;
+            quoteReviewLineItemReturnContext = null;
+            if (!returnContext || !window.QuoteDrCompletenessReview || typeof window.QuoteDrCompletenessReview.resumeAfterLineItemAction !== 'function') return;
+            setTimeout(function resumeQuoteReviewAfterLineItem() {
+                window.QuoteDrCompletenessReview.resumeAfterLineItemAction({
+                    added: returnContext.addedRecorded === true
+                });
+            }, 0);
+        }
+
+        function openQuoteCompletenessReview() {
+            if (!window.QuoteDrCompletenessReview || typeof window.QuoteDrCompletenessReview.open !== 'function') {
+                if (typeof showToast === 'function') showToast('Quote review is still loading. Please try again.', 'warning');
+                return;
+            }
+            var state = getQuoteCompletenessReviewState();
+            window.QuoteDrCompletenessReview.open({
+                state: state,
+                getState: getQuoteCompletenessReviewState,
+                reviewProfile: state.reviewProfile,
+                onReviewProfileChange: function saveQuoteReviewProfile(profile) {
+                    window._quoteReviewProfile = profile;
+                    if (window._loadedQuoteData) window._loadedQuoteData.reviewProfile = profile;
+                    if (window._currentQuoteData) window._currentQuoteData.reviewProfile = profile;
+                    if (typeof markUnsaved === 'function') markUnsaved();
+                },
+                savedItems: JSON.parse(JSON.stringify(customItems || {})),
+                getSavedItems: function getQuoteReviewSavedItems() {
+                    return JSON.parse(JSON.stringify(customItems || {}));
+                },
+                loadStarterProfile: window.loadManageStarterLibraryProfile,
+                onStarterPreferenceChange: window.setQuoteStarterSuggestOutsideDatabase,
+                onStarterAction: window.recordQuoteStarterLibraryAction,
+                onOpenStarterLibrary: function openQuoteReviewStarterLibrary() {
+                    if (typeof window.openManageStarterLibrary === 'function') window.openManageStarterLibrary();
+                },
+                onOpenLineItemDraft: openQuoteReviewLineItemDraft
+            });
+        }
+
         function renderRooms() {
             const container = document.getElementById('roomsContainer');
             ensureUniqueRoomIds();
@@ -16359,7 +16883,7 @@ Example:
         // Save/load/session core moved to quote-storage.js
     </script>
     <script src="change-orders.js?v=1778152100"></script>
-    <script src="quote-storage.js?v=2026080102"></script>
+    <script src="quote-storage.js?v=2026080201"></script>
     <script>
         // -- End Save / Load ------------------------------------------------------
 
@@ -16462,7 +16986,9 @@ Example:
 
         // Manage Items behavior lives in quote-items.js.
     </script>
-    <script src="quote-items.js?v=2026073102"></script>
+    <script src="quote-review-construction-knowledge.js?v=2026080201"></script>
+    <script src="quote-starter-item-library.js?v=2026080201"></script>
+    <script src="quote-items.js?v=2026080201"></script>
     <script src="quote-import.js?v=2026071202"></script>
     <script>
         // Load templates from localStorage on startup
@@ -18965,6 +19491,7 @@ Example:
             }
             var addLineModalEl = document.getElementById('addLineModal');
             if (addLineModalEl) {
+                addLineModalEl.addEventListener('hidden.bs.modal', returnToQuoteReviewAfterLineItemModal);
                 addLineModalEl.addEventListener('hidden.bs.modal', resetLineItemEditState);
                 addLineModalEl.addEventListener('click', function(e) {
                     var refineBtn = e.target.closest('.refine-desc-btn');
@@ -19226,13 +19753,55 @@ Example:
             margin-top: 4px;
             color: #6c757d;
         }
+        #addLineModal .line-item-editor-dialog {
+            width: calc(100vw - 4rem);
+            max-width: 1440px;
+            height: calc(100vh - 4rem);
+            margin: 2rem auto;
+        }
+        @supports (height: 100dvh) {
+            #addLineModal .line-item-editor-dialog {
+                height: calc(100dvh - 4rem);
+            }
+        }
+        #addLineModal .line-item-editor-dialog .modal-content {
+            height: 100%;
+            max-height: 100%;
+            overflow: hidden;
+            border-radius: 8px;
+            box-shadow: 0 18px 55px rgba(15, 23, 42, 0.3);
+        }
+        #addLineModal .modal-header,
+        #addLineModal .modal-footer {
+            flex: 0 0 auto;
+        }
+        #addLineModal .modal-body {
+            overflow-y: auto;
+            padding: 1.25rem 1.5rem;
+        }
+        #addLineModal .modal-footer {
+            padding: 0.85rem 1.5rem;
+        }
     @media (max-width: 768px) {
             .container-fluid { padding-left: 8px !important; padding-right: 8px !important; }
             .btn-sm { font-size: 0.75rem; padding: 4px 7px; }
             .modal-dialog { margin: 0.5rem; }
             .modal-content { font-size: 0.9rem; }
             .form-label { font-size: 0.85rem; margin-bottom: 2px; }
+            #addLineModal .line-item-editor-dialog {
+                width: calc(100vw - 1rem);
+                max-width: none;
+                height: calc(100vh - 1rem);
+                margin: 0.5rem;
+            }
+            @supports (height: 100dvh) {
+                #addLineModal .line-item-editor-dialog {
+                    height: calc(100dvh - 1rem);
+                }
+            }
+            #addLineModal .line-item-editor-dialog .modal-content { border-radius: 6px; }
             #addLineModal .modal-body { padding: 12px; }
+            #addLineModal .modal-footer { gap: 0.5rem; padding: 0.75rem; }
             table { font-size: 0.8rem; }
             td, th { padding: 4px 6px !important; }
         }
@@ -19755,6 +20324,7 @@ Example:
                 <span style="font-size:0.55rem;">Quote</span>
             </button>
             <ul class="dropdown-menu quote-actions-menu">
+                <li><a class="dropdown-item" href="javascript:void(0)" onclick="openQuoteCompletenessReview()"><i class="fas fa-clipboard-check me-2 text-primary"></i>Review Quote</a></li>
                 <li><a class="dropdown-item" href="javascript:void(0)" onclick="openQuoteSendSettingsModal(true)"><i class="fas fa-sliders-h me-2 text-primary"></i>Quote Settings</a></li>
                 <li><a class="dropdown-item" href="javascript:void(0)" onclick="generateInteractiveLink()"><i class="fas fa-link me-2 text-success"></i>Generate Link</a></li>
                 <li><a class="dropdown-item" href="javascript:void(0)" onclick="openCommunityTemplates()"><i class="fas fa-users me-2 text-success"></i>Community Templates</a></li>
@@ -20596,6 +21166,7 @@ Example:
 <script src="modal-help.js?v=1778055200"></script>
 <script src="quote-tips.js?v=1783300000"></script>
 <script src="quote-spellcheck.js?v=2026071602"></script>
+<script src="quote-completeness-review.js?v=2026080201"></script>
 <script>
         function _toggleAiBtn() {
             var btn = document.getElementById('qdAiBtn');

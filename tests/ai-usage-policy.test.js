@@ -17,6 +17,18 @@ function assert(condition, message) {
   assert(refine.hourlyLimit === 160, 'AI refine hourly limit should support bulk item cleanup');
   assert(refine.dailyLimit === 800, 'AI refine daily limit should support initial catalog cleanup');
 
+  const quoteReview = policy.getAiFeaturePolicy('quote_completeness_review');
+  assert(quoteReview.hourlyLimit === 40, 'quote review hourly limit should support normal estimating sessions');
+  assert(quoteReview.dailyLimit === 200, 'quote review daily limit should protect spend while supporting active use');
+  assert(quoteReview.maxInputChars === 16000, 'quote review should accept safely chunked quote scope');
+  assert(quoteReview.maxOutputTokens === 1800, 'quote copilot output should have room for three structured insights and optional wording');
+
+  const itemDraft = policy.getAiFeaturePolicy('quote_item_draft');
+  assert(itemDraft.hourlyLimit === 40, 'item draft hourly limit should support normal Copilot review sessions');
+  assert(itemDraft.dailyLimit === 160, 'item draft daily limit should cap generated item spend');
+  assert(itemDraft.maxInputChars === 3500, 'item drafts should accept only compact finding context');
+  assert(itemDraft.maxOutputTokens === 500, 'one structured item draft should use a small output cap');
+
   const floorPlan = policy.getAiFeaturePolicy('floor_plan');
   assert(floorPlan.hourlyLimit === 20, 'floor plan hourly limit should allow normal scan-heavy sessions');
   assert(floorPlan.dailyLimit === 80, 'floor plan daily limit should protect spend while staying generous');

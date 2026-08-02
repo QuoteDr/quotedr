@@ -63,13 +63,19 @@ const refineFunction = items.slice(
 assert(refineFunction.indexOf('await openAiDescriptionModeDialog') < refineFunction.indexOf("requireProFeature('ai_refine'"), 'choice should happen before the usage gate');
 assert(refineFunction.includes("if (!request.sourceText.trim()) { qdAlert('Please enter a description first.'); return; }"), 'empty refine input should retain current validation');
 assert(refineFunction.includes("body: JSON.stringify({ feature: 'ai_refine', refineMode: request.mode"), 'client should send mode in the existing usage bucket');
-assert(refineFunction.includes("if (!textareaEl.closest('#addLineModal')) markPricingDirty();"), 'Add Line Item refinement should not mark the quote dirty before the item is saved');
+assert(
+  /textareaEl\.closest && textareaEl\.closest\('#manageItemsModal'\)[\s\S]*markPricingDirty\(textareaEl\)/.test(refineFunction),
+  'AI Refine should mark pricing dirty only inside Manage Items, not before an Add Line Item is saved'
+);
 
 const undoFunction = items.slice(
   items.indexOf('function toggleRefinedDescription'),
   items.indexOf('async function deleteCustomItem')
 );
-assert(undoFunction.includes("if (!textarea.closest('#addLineModal')) markPricingDirty();"), 'Add Line Item undo should not mark the quote dirty before the item is saved');
+assert(
+  /textarea\.closest && textarea\.closest\('#manageItemsModal'\)[\s\S]*markPricingDirty\(textarea\)/.test(undoFunction),
+  'AI Refine undo should mark pricing dirty only inside Manage Items, not before an Add Line Item is saved'
+);
 
 const addLineStart = builder.indexOf('<div class="modal fade" id="addLineModal"');
 const manageItemsStart = builder.indexOf('<div class="modal fade" id="manageItemsModal"');
@@ -84,7 +90,7 @@ assert(builder.includes('if (typeof refineDescription === \'function\') refineDe
 assert(builder.includes('function resetAddLineDescriptionRefineState()'), 'Add Line Item should reset stale AI undo state');
 assert(builder.includes("delete undoBtn._aiDescriptionMode;"), 'Add Line Item reset should clear the prior AI mode');
 assert(builder.includes('brand-theme.css?v=2026073101'), 'builder should load the updated choice contrast styles');
-assert(builder.includes('quote-items.js?v=2026073102'), 'builder should load the Add Line Item AI Refine client');
+assert(/quote-items\.js\?v=\d+/.test(builder), 'builder should cache-bust the Add Line Item AI Refine client');
 
 assert(brandTheme.includes('#aiDescriptionModeModal .ai-description-mode-choice:hover'), 'choice hover styling should be scoped to the AI mode modal');
 assert(brandTheme.includes('#aiDescriptionModeModal .ai-description-mode-choice:focus-visible'), 'choice keyboard focus should share the accessible high-contrast state');

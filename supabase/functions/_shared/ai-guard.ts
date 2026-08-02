@@ -82,6 +82,44 @@ function adminClient() {
   return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 }
 
+const PRO_TRIAL_GRACE_MS = 30 * 60 * 1000;
+
+function subscriptionAllowsProAccess(value: any) {
+  const status = String(value?.status || "").toLowerCase();
+  const plan = String(value?.plan || "basic").toLowerCase();
+  return ["active", "trialing"].includes(status) && plan === "pro";
+}
+
+function trialAllowsFeatureAccess(value: any, feature: string, now = new Date()) {
+  const trial = value && typeof value === "object" ? value[feature] : null;
+  const expiresAt = trial?.expires_at ? new Date(trial.expires_at) : null;
+  if (!expiresAt || Number.isNaN(expiresAt.getTime())) return false;
+  return now.getTime() <= expiresAt.getTime() + PRO_TRIAL_GRACE_MS;
+}
+
+async function assertAiProAccess(supabaseAdmin: any, userId: string, feature: string) {
+  const { data, error } = await supabaseAdmin
+    .from("user_data")
+    .select("key,value")
+    .eq("user_id", userId)
+    .in("key", ["subscription_status", "pro_trial_usage"]);
+  if (error) {
+    throw new AiGuardError("AI entitlement check failed: " + error.message, 500, {
+      error: "AI entitlement check failed",
+      code: "ai_entitlement_check_failed",
+    });
+  }
+  const rows = Array.isArray(data) ? data : [];
+  const subscription = rows.find((row: any) => row?.key === "subscription_status")?.value;
+  const trialUsage = rows.find((row: any) => row?.key === "pro_trial_usage")?.value;
+  if (subscriptionAllowsProAccess(subscription) || trialAllowsFeatureAccess(trialUsage, feature)) return;
+  throw new AiGuardError("AI Quote Copilot requires QuoteDr Pro or active Play For a Day access.", 403, {
+    error: "AI Quote Copilot requires QuoteDr Pro or active Play For a Day access.",
+    code: "ai_pro_required",
+    feature,
+  });
+}
+
 async function countUsage(supabaseAdmin: any, userId: string, feature: string, sinceIso: string) {
   const { count, error } = await supabaseAdmin
     .from("ai_usage_events")
@@ -108,10 +146,19 @@ function limitReached(policy: any, windowName: "hour" | "day", used: number) {
   });
 }
 
-export async function startAiUsage(req: Request, options: { feature: string; endpoint: string; inputChars?: number }) {
+export async function startAiUsage(req: Request, options: {
+  feature: string;
+  endpoint: string;
+  inputChars?: number;
+  requiresPro?: boolean;
+  entitlementFeature?: string;
+}) {
   const policy = getAiFeaturePolicy(options.feature);
   const { user } = await getAuthenticatedUser(req);
   const supabaseAdmin = adminClient();
+  if (options.requiresPro) {
+    await assertAiProAccess(supabaseAdmin, user.id, options.entitlementFeature || options.feature);
+  }
   const now = new Date();
   const hourAgo = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
   const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
