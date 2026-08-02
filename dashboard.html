@@ -4818,6 +4818,73 @@ function renderBusinessInsights(quotes) {
             presetEl.value = getDashboardQuoteDividerPresetValue(singular, plural);
         }
 
+        function hideNewQuoteModalForDividerPrompt() {
+            var modalEl = document.getElementById('newQuoteModal');
+            if (!modalEl || !window.bootstrap || !modalEl.classList.contains('show')) return Promise.resolve(false);
+            return new Promise(function(resolve) {
+                var finished = false;
+                var done = function() {
+                    if (finished) return;
+                    finished = true;
+                    modalEl.removeEventListener('hidden.bs.modal', done);
+                    resolve(true);
+                };
+                modalEl.addEventListener('hidden.bs.modal', done, { once: true });
+                try {
+                    bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+                } catch(e) {
+                    modalEl.classList.remove('show');
+                    modalEl.style.display = 'none';
+                    modalEl.setAttribute('aria-hidden', 'true');
+                    document.querySelectorAll('.modal-backdrop').forEach(function(backdrop) { backdrop.remove(); });
+                    document.body.classList.remove('modal-open');
+                    done();
+                    return;
+                }
+                setTimeout(done, 450);
+            });
+        }
+
+        function showNewQuoteModalAfterDividerPrompt() {
+            var modalEl = document.getElementById('newQuoteModal');
+            if (!modalEl || !window.bootstrap) return;
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+            setTimeout(function() {
+                var btn = document.getElementById('newQuoteCreateBtn');
+                if (btn) btn.focus();
+            }, 250);
+        }
+
+        function settleQuoteDividerPrompt(value) {
+            var resolve = window._quoteDividerPromptResolve;
+            window._quoteDividerPromptResolve = null;
+            if (!resolve) return;
+            var modalEl = document.getElementById('quoteDividerPromptModal');
+            var finished = false;
+            var done = function() {
+                if (finished) return;
+                finished = true;
+                if (modalEl) modalEl.removeEventListener('hidden.bs.modal', done);
+                resolve(value);
+            };
+            if (!modalEl || !window.bootstrap || !modalEl.classList.contains('show')) {
+                done();
+                return;
+            }
+            modalEl.addEventListener('hidden.bs.modal', done, { once: true });
+            try {
+                bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+            } catch(e) {
+                modalEl.classList.remove('show');
+                modalEl.style.display = 'none';
+                document.querySelectorAll('.modal-backdrop').forEach(function(backdrop) { backdrop.remove(); });
+                document.body.classList.remove('modal-open');
+                done();
+                return;
+            }
+            setTimeout(done, 450);
+        }
+
         function askQuoteDividerForNewQuote() {
             var prefs = getDashboardQuoteDividerPrefs();
             if (prefs.dividerPromptMode === 'ask') {
@@ -4850,19 +4917,11 @@ function renderBusinessInsights(quotes) {
                 if (errorEl) errorEl.textContent = 'Enter both singular and plural wording.';
                 return;
             }
-            var modalEl = document.getElementById('quoteDividerPromptModal');
-            if (modalEl && window.bootstrap) bootstrap.Modal.getOrCreateInstance(modalEl).hide();
-            var resolve = window._quoteDividerPromptResolve;
-            window._quoteDividerPromptResolve = null;
-            if (resolve) resolve({ singular: singular, plural: plural });
+            settleQuoteDividerPrompt({ singular: singular, plural: plural });
         }
 
         function cancelQuoteDividerPrompt() {
-            var modalEl = document.getElementById('quoteDividerPromptModal');
-            if (modalEl && window.bootstrap) bootstrap.Modal.getOrCreateInstance(modalEl).hide();
-            var resolve = window._quoteDividerPromptResolve;
-            window._quoteDividerPromptResolve = null;
-            if (resolve) resolve(null);
+            settleQuoteDividerPrompt(null);
         }
 
         function openNewQuoteModal() {
@@ -4907,7 +4966,7 @@ function renderBusinessInsights(quotes) {
             errEl.textContent = '';
             await maybePromptSaveNewQuoteClient(clientDraft);
             btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Creating...';
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Preparing...';
 
             // Auto-generate quote number if blank
             if (!quoteNum) {
@@ -4930,12 +4989,20 @@ function renderBusinessInsights(quotes) {
                 document.getElementById('newQuoteNumber').focus();
                 return;
             }
+            var dividerPromptExpected = getDashboardQuoteDividerPrefs().dividerPromptMode === 'ask';
+            var newQuoteModalHiddenForDivider = false;
+            if (dividerPromptExpected) {
+                btn.innerHTML = '<i class="fas fa-tags me-1"></i>Choose Wording...';
+                newQuoteModalHiddenForDivider = await hideNewQuoteModalForDividerPrompt();
+            }
             var dividerLabels = await askQuoteDividerForNewQuote();
             if (!dividerLabels) {
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fas fa-arrow-right me-1"></i>Create & Open Builder';
+                if (newQuoteModalHiddenForDivider) showNewQuoteModalAfterDividerPrompt();
                 return;
             }
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Creating...';
 
             try {
                 var result = await saveQuoteToSupabase({
@@ -4967,6 +5034,7 @@ function renderBusinessInsights(quotes) {
                 errEl.textContent = 'Error: ' + e.message;
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fas fa-arrow-right me-1"></i>Create & Open Builder';
+                if (newQuoteModalHiddenForDivider) showNewQuoteModalAfterDividerPrompt();
             }
         }
 
