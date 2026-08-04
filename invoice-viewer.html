@@ -866,6 +866,7 @@ if (location.search.includes('debug')) {
     <script src="help-content.js?v=1777741200"></script>
     <script src="modal-help.js?v=1777741200"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="card-payment-rules.js?v=2026080301"></script>
     <script src="supabase-v2.js?v=2026080102"></script>
     <script src="save-coordinator.js?v=2026080401"></script>
     <script src="quote-discounts.js?v=1783218460"></script>
@@ -2207,10 +2208,13 @@ if (location.search.includes('debug')) {
         function normalizeInvoicePaymentOptions(settings) {
             if (settings && Number(settings.version || 0) >= 2 && settings.manual && settings.stripe) return settings;
             settings = settings || {};
+            var cardPaymentEnabled = window.QuoteDrCardPaymentRules
+                ? window.QuoteDrCardPaymentRules.documentEnabled(settings, invoiceData)
+                : settings.stripe_enabled === true;
             return {
                 version: 1,
                 invoice: { fullPaymentEnabled: settings.accept_full_payment !== false },
-                stripe: { enabled: settings.stripe_enabled === true, ready: settings.stripe_ready === true },
+                stripe: { enabled: cardPaymentEnabled, ready: cardPaymentEnabled && settings.stripe_ready === true },
                 manual: {
                     etransfer: { enabled: settings.accept_etransfer !== false, email: settings.etransfer_email || '' },
                     cheque: { enabled: settings.accept_cheque !== false, payee: settings.cheque_payee || '' },
@@ -2326,7 +2330,7 @@ if (location.search.includes('debug')) {
             if (stripe.ready && fullPaymentEnabled && paymentTargetId) {
                 buttonHtml += '<button type="button" class="btn btn-success btn-lg px-5 mb-3 w-100" onclick="handleClientInvoicePayment()">';
                 buttonHtml += '<i class="fas fa-credit-card me-2"></i>Pay Invoice - ' + formatMoney(balanceCents / 100, _iCurrency) + '</button>';
-                buttonHtml += '<div class="text-muted small mb-3"><i class="fab fa-stripe me-1"></i>Secure card payment powered by Stripe</div>';
+                buttonHtml += '<div class="text-muted small mb-3"><i class="fab fa-stripe me-1"></i>Secure card payment powered by Stripe. The amount shown is your invoice balance.</div>';
             } else if (stripe.enabled && fullPaymentEnabled) {
                 buttonHtml += '<div class="alert alert-light border small text-start mb-3"><i class="fas fa-credit-card me-1"></i>Card payment is temporarily unavailable. You can still use a direct payment method below.</div>';
             }

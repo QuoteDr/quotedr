@@ -992,6 +992,7 @@
                 _serverUpdatedAt: window._quoteServerUpdatedAt || loadedData._serverUpdatedAt || loadedData.updated_at || null,
                 currency: (function(){ try { return JSON.parse(localStorage.getItem('ald_quote_prefs')||'{}').currency||'CAD'; } catch(e){return 'CAD';} })(),
                 paymentSettings: (typeof getLocalPaymentSettingsSnapshot === 'function') ? getLocalPaymentSettingsSnapshot() : null,
+                card_payment: loadedData.card_payment || loadedData.cardPayment || null,
                 paymentStatus: loadedData.paymentStatus || '',
                 payments: Array.isArray(loadedData.payments) ? loadedData.payments : [],
                 deposit_paid: loadedData.deposit_paid === true,

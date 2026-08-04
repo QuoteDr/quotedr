@@ -412,7 +412,24 @@ function sanitizeQuoteRow(row: QuoteRow) {
   };
 }
 
-async function loadPaymentOptions(userId: string) {
+function cardPaymentEnabledForDocument(row: QuoteRow, settings: Record<string, unknown>) {
+  if (settings.stripe_enabled !== true) return false;
+  const data = rowData(row);
+  const decision = data.card_payment || data.cardPayment;
+  if (
+    decision &&
+    typeof decision === "object" &&
+    Number((decision as Record<string, unknown>).version || 0) >= 1 &&
+    typeof (decision as Record<string, unknown>).enabled === "boolean"
+  ) {
+    return (decision as Record<string, unknown>).enabled === true;
+  }
+  // Documents shared before Card Payment Rules keep the prior account-wide behavior.
+  return true;
+}
+
+async function loadPaymentOptions(row: QuoteRow) {
+  const userId = row.user_id;
   const supabase = adminClient();
   const [{ data: settingsRow }, { data: connectionRow }] = await Promise.all([
     supabase.from("user_data").select("value").eq("user_id", userId).eq("key", "payment_settings").maybeSingle(),
@@ -422,6 +439,7 @@ async function loadPaymentOptions(userId: string) {
     ? settingsRow.value as Record<string, unknown>
     : {};
   const connectionReady = connectionRow?.status === "ready" && connectionRow?.charges_enabled === true;
+  const cardPaymentEnabled = cardPaymentEnabledForDocument(row, settings);
   const defaultPercent = Math.min(100, Math.max(1, Number(settings.deposit_default_pct || 50)));
   const defaultFixedCents = Math.max(0, Math.round(Number(settings.deposit_default_fixed_cents || 0)));
   const defaultKind = settings.deposit_default_kind === "fixed" && defaultFixedCents > 0 ? "fixed" : "percent";
@@ -436,8 +454,8 @@ async function loadPaymentOptions(userId: string) {
     },
     invoice: { fullPaymentEnabled: settings.accept_full_payment !== false },
     stripe: {
-      enabled: settings.stripe_enabled === true,
-      ready: settings.stripe_enabled === true && connectionReady,
+      enabled: cardPaymentEnabled,
+      ready: cardPaymentEnabled && connectionReady,
       status: connectionRow?.status || "not_connected",
     },
     manual: {
@@ -712,7 +730,7 @@ async function viewDocument(body: Record<string, unknown>) {
   const token = String(body.token || "").trim();
   const portalAnchorId = normalizeId(body.portalAnchorId || body.portal_anchor);
   const { target } = await assertTokenAccess(documentId, token, portalAnchorId);
-  const paymentOptions = await loadPaymentOptions(target.user_id);
+  const paymentOptions = await loadPaymentOptions(target);
   return json({ document: sanitizeQuoteRow(target), paymentOptions });
 }
 

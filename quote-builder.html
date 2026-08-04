@@ -2277,6 +2277,7 @@
 
 </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="card-payment-rules.js?v=2026080301"></script>
     <script src="supabase-v2.js?v=2026080201"></script>
     <script src="ai-voice-rule-matcher.js?v=2026080101"></script>
     <script src="save-coordinator.js?v=2026080401"></script>
@@ -14242,6 +14243,7 @@ Example:
                 var el = document.getElementById(pair[0]);
                 if (el) el.checked = pair[1] !== false;
             });
+            loadDocumentCardPaymentControl('invoice');
         }
 
         async function saveInvoiceSettings(showToast) {
@@ -14319,6 +14321,203 @@ Example:
             }
         }
 
+        function cardPaymentRulesApi() {
+            return window.QuoteDrCardPaymentRules || null;
+        }
+
+        function clientSafePaymentSettings(settings) {
+            var api = cardPaymentRulesApi();
+            if (api && typeof api.publicPaymentSettings === 'function') return api.publicPaymentSettings(settings);
+            return Object.assign({}, settings || {});
+        }
+
+        function builderDocumentTotalCents() {
+            var totalText = document.getElementById('grandTotalDisplay')?.textContent || '0';
+            var total = parseFloat(String(totalText).replace(/[^0-9.-]/g, '')) || 0;
+            return Math.max(0, Math.round(total * 100));
+        }
+
+        function builderCardPaymentDocumentData(context) {
+            if (context === 'invoice') return window._currentInvoiceData || {};
+            return window._currentQuoteData || window._loadedQuoteData || {};
+        }
+
+        function builderCardPaymentModeElement(context) {
+            return document.getElementById(context === 'invoice' ? 'invoiceCardPaymentMode' : 'quoteCardPaymentMode');
+        }
+
+        function builderCardPaymentSummaryElement(context) {
+            return document.getElementById(context === 'invoice' ? 'invoiceCardPaymentRuleSummary' : 'quoteCardPaymentRuleSummary');
+        }
+
+        function builderCardPaymentMoney(cents) {
+            var prefs = getBuilderTaxPrefs();
+            try {
+                return new Intl.NumberFormat(undefined, { style: 'currency', currency: prefs.currency || 'CAD' }).format(Math.max(0, Number(cents || 0)) / 100);
+            } catch(e) {
+                return '$' + (Math.max(0, Number(cents || 0)) / 100).toFixed(2);
+            }
+        }
+
+        function loadDocumentCardPaymentControl(context) {
+            var api = cardPaymentRulesApi();
+            var control = builderCardPaymentModeElement(context);
+            if (!api || !control) return;
+            var existing = api.documentDecision(builderCardPaymentDocumentData(context));
+            control.value = existing ? existing.mode : 'auto';
+            updateDocumentCardPaymentControl(context);
+        }
+
+        function updateDocumentCardPaymentControl(context) {
+            var api = cardPaymentRulesApi();
+            var control = builderCardPaymentModeElement(context);
+            var summary = builderCardPaymentSummaryElement(context);
+            if (!api || !control || !summary) return;
+            var settings = getLocalPaymentSettingsSnapshot() || {};
+            var normalized = api.normalizeSettings(settings);
+            var totalCents = builderDocumentTotalCents();
+            var decision = api.buildDecision(settings, totalCents, control.value);
+            var documentLabel = context === 'invoice' ? 'invoice' : 'quote';
+            if (!normalized.stripeEnabled) {
+                summary.textContent = 'Card payment is off in Payments settings. Manual payment methods are unchanged.';
+            } else if (decision.mode === 'offer') {
+                summary.textContent = 'Card payment will be offered on this ' + documentLabel + ' when Stripe is ready.';
+            } else if (decision.mode === 'disable') {
+                summary.textContent = 'Card payment will stay off for this ' + documentLabel + '. Manual payment methods are unchanged.';
+            } else if (normalized.rule === 'always') {
+                summary.textContent = 'Your account rule offers card payment on every job.' + (decision.prompt ? ' You will review it before sharing.' : '');
+            } else if (decision.qualified) {
+                summary.textContent = 'This ' + builderCardPaymentMoney(totalCents) + ' ' + documentLabel + ' meets your ' + builderCardPaymentMoney(normalized.thresholdCents) + ' threshold.' + (decision.prompt ? ' You will review it before sharing.' : '');
+            } else {
+                summary.textContent = 'This ' + builderCardPaymentMoney(totalCents) + ' ' + documentLabel + ' is below your ' + builderCardPaymentMoney(normalized.thresholdCents) + ' threshold, so card payment stays off unless you choose Offer.';
+            }
+        }
+
+        function ensureCardPaymentReviewModal() {
+            if (document.getElementById('cardPaymentReviewModal')) return;
+            document.body.insertAdjacentHTML('beforeend', [
+                '<div class="modal fade" id="cardPaymentReviewModal" tabindex="-1" aria-labelledby="cardPaymentReviewTitle" aria-describedby="cardPaymentReviewReason">',
+                '  <div class="modal-dialog modal-dialog-centered">',
+                '    <div class="modal-content">',
+                '      <div class="modal-header bg-primary text-white">',
+                '        <h5 class="modal-title" id="cardPaymentReviewTitle"><i class="fas fa-credit-card me-2"></i>Card Payment Review</h5>',
+                '        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cancel and close"></button>',
+                '      </div>',
+                '      <div class="modal-body">',
+                '        <div class="alert alert-light border" id="cardPaymentReviewReason"></div>',
+                '        <div class="form-check form-switch mb-3">',
+                '          <input class="form-check-input" type="checkbox" id="cardPaymentReviewEnabled">',
+                '          <label class="form-check-label fw-semibold" for="cardPaymentReviewEnabled" id="cardPaymentReviewEnabledLabel">Offer Stripe card payment on this document</label>',
+                '          <div class="form-text">This document choice is separate from deposits and direct payment methods.</div>',
+                '        </div>',
+                '        <div class="border rounded p-3" id="cardPaymentBufferReview" style="display:none;">',
+                '          <div class="form-check form-switch">',
+                '            <input class="form-check-input" type="checkbox" id="cardPaymentReviewBuffer">',
+                '            <label class="form-check-label fw-semibold" for="cardPaymentReviewBuffer" id="cardPaymentReviewBufferLabel">Review pricing buffer with Markup All</label>',
+                '          </div>',
+                '          <div class="form-text mt-2" id="cardPaymentReviewBufferHelp"></div>',
+                '        </div>',
+                '      </div>',
+                '      <div class="modal-footer">',
+                '        <button type="button" class="btn btn-outline-secondary me-auto" data-bs-dismiss="modal">Cancel sending</button>',
+                '        <button type="button" class="btn btn-outline-danger" id="cardPaymentReviewSkip">Skip card payment</button>',
+                '        <button type="button" class="btn btn-primary" id="cardPaymentReviewContinue">Continue</button>',
+                '      </div>',
+                '    </div>',
+                '  </div>',
+                '</div>'
+            ].join(''));
+        }
+
+        function promptDocumentCardPaymentReview(context, decision, totalCents) {
+            ensureCardPaymentReviewModal();
+            var modalEl = document.getElementById('cardPaymentReviewModal');
+            var documentLabel = context === 'invoice' ? 'invoice' : 'quote';
+            var reason = document.getElementById('cardPaymentReviewReason');
+            var enabled = document.getElementById('cardPaymentReviewEnabled');
+            var enabledLabel = document.getElementById('cardPaymentReviewEnabledLabel');
+            var bufferWrap = document.getElementById('cardPaymentBufferReview');
+            var buffer = document.getElementById('cardPaymentReviewBuffer');
+            var bufferLabel = document.getElementById('cardPaymentReviewBufferLabel');
+            var bufferHelp = document.getElementById('cardPaymentReviewBufferHelp');
+            var thresholdText = decision.rule === 'threshold'
+                ? ' meets your ' + builderCardPaymentMoney(decision.thresholdCents) + ' threshold'
+                : ' qualifies under your every-job rule';
+            reason.innerHTML = '<strong>' + (context === 'invoice' ? 'Invoice' : 'Quote') + ' total: ' + builderCardPaymentMoney(totalCents) + '.</strong> This document' + thresholdText + '. Review each choice before sharing.';
+            enabled.checked = decision.enabled === true;
+            enabledLabel.textContent = 'Offer Stripe card payment on this ' + documentLabel;
+            buffer.checked = false;
+            bufferWrap.style.display = decision.bufferPercent > 0 ? '' : 'none';
+            bufferLabel.textContent = 'Review the suggested ' + decision.bufferPercent + '% pricing buffer with Markup All';
+            bufferHelp.textContent = 'Markup All opens next so you can adjust or cancel. It replaces room-level markup, keeps individual item markup, and never adds a separate card-fee line.';
+
+            return new Promise(function(resolve) {
+                var result = null;
+                var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                document.getElementById('cardPaymentReviewSkip').onclick = function() {
+                    result = { mode: 'disable', reviewBuffer: false };
+                    modal.hide();
+                };
+                document.getElementById('cardPaymentReviewContinue').onclick = function() {
+                    result = { mode: enabled.checked ? 'offer' : 'disable', reviewBuffer: buffer.checked === true };
+                    modal.hide();
+                };
+                modalEl.addEventListener('hidden.bs.modal', function() {
+                    resolve(result);
+                }, { once: true });
+                modalEl.addEventListener('shown.bs.modal', function() {
+                    enabled.focus();
+                }, { once: true });
+                modal.show();
+            });
+        }
+
+        async function reviewDocumentCardPaymentRules(context, documentData) {
+            var api = cardPaymentRulesApi();
+            if (!api) return { cardPayment: null, bufferApplied: false };
+            documentData = documentData || {};
+            var settings = documentData.paymentSettings || documentData.payment_settings || getLocalPaymentSettingsSnapshot() || {};
+            var control = builderCardPaymentModeElement(context);
+            var existing = api.documentDecision(documentData);
+            var mode = control ? control.value : (existing ? existing.mode : 'auto');
+            var totalCents = Math.max(0, Math.round(Number(documentData.grandTotal || documentData.total || 0) * 100)) || builderDocumentTotalCents();
+            var decision = api.buildDecision(settings, totalCents, mode);
+            var bufferApplied = false;
+
+            if (decision.prompt) {
+                var response = await promptDocumentCardPaymentReview(context, decision, totalCents);
+                if (!response) return null;
+                if (control) control.value = response.mode;
+                decision = api.buildDecision(settings, totalCents, response.mode);
+                updateDocumentCardPaymentControl(context);
+                if (response.reviewBuffer && decision.bufferPercent > 0 && typeof applyGlobalMarkup === 'function') {
+                    var markupResult = await applyGlobalMarkup({
+                        suggestedPercent: decision.bufferPercent,
+                        title: 'Review Pricing Buffer',
+                        message: 'Review the pricing buffer to apply with Markup All (0-100%). Nothing changes if you cancel.',
+                        skipSuccessAlert: true
+                    });
+                    bufferApplied = !!(markupResult && markupResult.applied);
+                    if (bufferApplied) {
+                        var updatedTotalCents = builderDocumentTotalCents();
+                        var invoiceWarning = context === 'invoice' ? ' Check it against the accepted quote before sending.' : '';
+                        var continueSending = await qdConfirm(
+                            'Markup All applied ' + markupResult.percent + '%. The updated ' + (context === 'invoice' ? 'invoice' : 'quote') + ' total is ' + builderCardPaymentMoney(updatedTotalCents) + '.' + invoiceWarning,
+                            { title: 'Review Updated Total', okText: 'Continue', cancelText: 'Review quote first', type: 'warning' }
+                        );
+                        if (!continueSending) return null;
+                    }
+                }
+            }
+
+            return { cardPayment: api.snapshot(decision), bufferApplied: bufferApplied };
+        }
+
+        window.loadDocumentCardPaymentControl = loadDocumentCardPaymentControl;
+        window.updateDocumentCardPaymentControl = updateDocumentCardPaymentControl;
+        window.reviewDocumentCardPaymentRules = reviewDocumentCardPaymentRules;
+        window.clientSafePaymentSettings = clientSafePaymentSettings;
+
         function getLocalBusinessProfileSnapshot() {
             try {
                 return JSON.parse(localStorage.getItem('ald_business_profile') || '{}');
@@ -14379,9 +14578,12 @@ Example:
             }
             var invoiceId = 'invoice_' + Date.now();
             var invoiceData = buildInvoiceData(invoiceId);
+            var latestBusinessProfile = null;
+            var latestPaymentSettings = null;
+            var approvedChangeOrderRows = null;
             if (typeof loadBusinessProfile === 'function') {
                 try {
-                    var latestBusinessProfile = await loadBusinessProfile();
+                    latestBusinessProfile = await loadBusinessProfile();
                     if (latestBusinessProfile) {
                         latestBusinessProfile.hidden_profile_fields = getLocalHiddenProfileFieldsSnapshot();
                         invoiceData.businessProfile = latestBusinessProfile;
@@ -14393,7 +14595,7 @@ Example:
             }
             if (typeof loadPaymentSettings === 'function') {
                 try {
-                    var latestPaymentSettings = await loadPaymentSettings();
+                    latestPaymentSettings = await loadPaymentSettings();
                     if (latestPaymentSettings) invoiceData.paymentSettings = latestPaymentSettings;
                 } catch(e) {
                     console.warn('Could not load latest payment settings for invoice:', e);
@@ -14404,12 +14606,31 @@ Example:
                     var coRes = await _supabase.from('quotes').select('*').eq('parent_quote_id', window._supabaseQuoteId).order('change_order_number', { ascending: true });
                     if (coRes.error) coRes = await _supabase.from('quotes').select('*').contains('data', { parentQuoteId: window._supabaseQuoteId });
                     if (coRes.data && coRes.data.length) {
-                        invoiceData = QuoteDrChangeOrders.mergeApprovedIntoInvoice(invoiceData, coRes.data);
+                        approvedChangeOrderRows = coRes.data;
+                        invoiceData = QuoteDrChangeOrders.mergeApprovedIntoInvoice(invoiceData, approvedChangeOrderRows);
                     }
                 } catch(e) {
                     console.warn('Could not include approved change orders in invoice:', e);
                 }
             }
+            if (typeof reviewDocumentCardPaymentRules === 'function') {
+                var cardPaymentReview = await reviewDocumentCardPaymentRules('invoice', invoiceData);
+                if (!cardPaymentReview) return null;
+                if (cardPaymentReview.bufferApplied) {
+                    invoiceData = buildInvoiceData(invoiceId);
+                    if (latestBusinessProfile) {
+                        latestBusinessProfile.hidden_profile_fields = getLocalHiddenProfileFieldsSnapshot();
+                        invoiceData.businessProfile = latestBusinessProfile;
+                        invoiceData.hiddenProfileFields = latestBusinessProfile.hidden_profile_fields;
+                    }
+                    if (latestPaymentSettings) invoiceData.paymentSettings = latestPaymentSettings;
+                    if (approvedChangeOrderRows && approvedChangeOrderRows.length) {
+                        invoiceData = QuoteDrChangeOrders.mergeApprovedIntoInvoice(invoiceData, approvedChangeOrderRows);
+                    }
+                }
+                if (cardPaymentReview.cardPayment) invoiceData.card_payment = cardPaymentReview.cardPayment;
+            }
+            invoiceData.paymentSettings = clientSafePaymentSettings(invoiceData.paymentSettings);
             var invoiceBaseUrl = getInvoiceBaseUrl();
             var invoiceUrl = invoiceBaseUrl + '?invoice=' + invoiceId;
             localStorage.setItem(invoiceId, JSON.stringify(invoiceData));
@@ -14993,15 +15214,21 @@ Example:
         }
 
         async function applyGlobalMarkup() {
-            const markupPercent = await qdPrompt('Enter markup percentage to apply to entire quote (0-100%):', '', {
-                title: 'Apply Markup'
-            });
-            if (markupPercent === null) return; // Cancelled
+            var options = arguments[0];
+            options = options && typeof options === 'object' ? options : {};
+            var suggestedPercent = Number(options.suggestedPercent);
+            var defaultValue = Number.isFinite(suggestedPercent) ? String(suggestedPercent) : '';
+            const markupPercent = await qdPrompt(
+                options.message || 'Enter markup percentage to apply to entire quote (0-100%):',
+                defaultValue,
+                { title: options.title || 'Apply Markup' }
+            );
+            if (markupPercent === null) return { applied: false }; // Cancelled
 
             const percent = parseFloat(markupPercent);
             if (isNaN(percent) || percent < 0 || percent > 100) {
-                qdAlert('Please enter a valid percentage between 0 and 100.');
-                return;
+                await qdAlert('Please enter a valid percentage between 0 and 100.');
+                return { applied: false, error: 'invalid_percentage' };
             }
 
             _pushUndo();
@@ -15014,7 +15241,10 @@ Example:
             renderRooms();
             if (typeof saveSessionQuote === 'function') saveSessionQuote();
             if (typeof markUnsaved === 'function') markUnsaved();
-            qdAlert('Room markup of ' + percent + '% applied to all rooms. Individual item markups were kept and added on top.');
+            if (!options.skipSuccessAlert) {
+                await qdAlert('Room markup of ' + percent + '% applied to all rooms. Individual item markups were kept and added on top.');
+            }
+            return { applied: true, percent: percent };
         }
 
         // Template Management Functions
@@ -20027,6 +20257,18 @@ Example:
                                 </div>
                                 <div class="col-md-6">
                                     <div class="send-settings-card h-100">
+                                        <label class="form-label fw-bold" for="quoteCardPaymentMode">Card Payment for This Quote</label>
+                                        <select id="quoteCardPaymentMode" class="form-select form-select-sm" onchange="updateDocumentCardPaymentControl('quote')">
+                                            <option value="auto">Use my Card Payment Rules</option>
+                                            <option value="offer">Offer card payment on this quote</option>
+                                            <option value="disable">Do not offer card payment</option>
+                                        </select>
+                                        <div id="quoteCardPaymentRuleSummary" class="text-muted small mt-2" aria-live="polite">Loading your card payment rule...</div>
+                                        <div class="text-muted small mt-2">This choice is separate from deposits, manual methods, and any optional pricing buffer.</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="send-settings-card h-100">
                                         <label class="form-label fw-bold">Approval Type<button type="button" class="qd-inline-help-btn" title="Help with approval type" aria-label="Help with approval type" onclick="QuoteDrModalHelp.openInline('approvalType'); return false;"><i class="fas fa-question"></i></button></label>
                                         <select id="quoteApprovalMode" class="form-select form-select-sm">
                                             <option value="approve">Accept quote</option>
@@ -20281,6 +20523,15 @@ Example:
                             <input class="form-check-input" type="checkbox" id="invoiceSettingsShowPaymentOptions" checked>
                             <label class="form-check-label fw-semibold" for="invoiceSettingsShowPaymentOptions">Show client payment options when enabled</label>
                         </div>
+                        <hr class="my-3">
+                        <label class="form-label fw-bold" for="invoiceCardPaymentMode">Card Payment for This Invoice</label>
+                        <select id="invoiceCardPaymentMode" class="form-select form-select-sm" onchange="updateDocumentCardPaymentControl('invoice')">
+                            <option value="auto">Use my Card Payment Rules</option>
+                            <option value="offer">Offer card payment on this invoice</option>
+                            <option value="disable">Do not offer card payment</option>
+                        </select>
+                        <div id="invoiceCardPaymentRuleSummary" class="text-muted small mt-2" aria-live="polite">Loading your card payment rule...</div>
+                        <div class="text-muted small mt-2">This document choice does not change your account rule or add a separate card fee.</div>
                     </div>
                 </div>
                 <div class="modal-footer justify-content-between gap-2">

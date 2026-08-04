@@ -1122,6 +1122,7 @@
             var activeStyle = getActiveQuoteStyleForSend();
             initQuoteStyleColourPickers();
             applyQuoteStyleToControls(Object.assign({}, savedDefault, activeStyle));
+            if (typeof loadDocumentCardPaymentControl === 'function') loadDocumentCardPaymentControl('quote');
             initCommitmentIconPickers();
 
             document.querySelectorAll('#stylePresets .quote-style-preset').forEach(function(btn) {
@@ -1311,7 +1312,17 @@
 
             try {
                 await saveQuoteStyleSkipPreference(skipSettingsOnGenerate);
-                if (styleModal) styleModal.hide();
+                if (styleModal) {
+                    var styleModalEl = document.getElementById('quoteStyleModal');
+                    if (styleModalEl && styleModalEl.classList.contains('show')) {
+                        await new Promise(function(resolve) {
+                            styleModalEl.addEventListener('hidden.bs.modal', resolve, { once: true });
+                            styleModal.hide();
+                        });
+                    } else {
+                        styleModal.hide();
+                    }
+                }
                 if (saveStatus) saveStatus.innerHTML = '<span style="color:#1a56a0;"><i class="fas fa-spinner fa-spin"></i> Saving quote...</span>';
                 const viewerUrl = await createInteractiveQuoteLink();
 
@@ -1392,6 +1403,10 @@
 
             } catch(err) {
                 hideQuoteGenerationProgress();
+                if (err && err.code === 'CARD_PAYMENT_REVIEW_CANCELLED') {
+                    if (saveStatus) saveStatus.innerHTML = '<span class="text-muted"><i class="fas fa-circle-info"></i> Quote generation cancelled so you can review payment or pricing choices.</span>';
+                    return;
+                }
                 if (err && err.code === 'PORTAL_LOCKED') {
                     if (saveStatus) saveStatus.innerHTML = '<span style="color:#1a56a0;"><i class="fas fa-lock"></i> Quote is in the client portal - returning to dashboard...</span>';
                     return;
@@ -1478,7 +1493,7 @@
                 try { await window._categoryStylesReadyPromise; } catch(e) {}
             }
 
-            const quoteData = collectQuoteData();
+            let quoteData = collectQuoteData();
             if (quoteData.type === 'change_order') {
                 var reason = (quoteData.changeReason || '').trim();
                 if (!reason) {
@@ -1486,6 +1501,21 @@
                     reasonError.code = 'CHANGE_ORDER_REASON_REQUIRED';
                     throw reasonError;
                 }
+            }
+            if (typeof reviewDocumentCardPaymentRules === 'function') {
+                var cardPaymentReview = await reviewDocumentCardPaymentRules('quote', quoteData);
+                if (!cardPaymentReview) {
+                    var cardPaymentCancelled = new Error('Card payment review cancelled.');
+                    cardPaymentCancelled.code = 'CARD_PAYMENT_REVIEW_CANCELLED';
+                    throw cardPaymentCancelled;
+                }
+                if (cardPaymentReview.bufferApplied) quoteData = collectQuoteData();
+                if (cardPaymentReview.cardPayment) quoteData.card_payment = cardPaymentReview.cardPayment;
+            }
+            if (typeof clientSafePaymentSettings === 'function') {
+                quoteData.paymentSettings = clientSafePaymentSettings(quoteData.paymentSettings);
+            }
+            if (quoteData.type === 'change_order') {
                 quoteData.status = 'pending_approval';
                 var statusEl = document.getElementById('quoteStatus');
                 if (statusEl) statusEl.value = 'pending_approval';
@@ -1547,6 +1577,10 @@
                 window.location.href = previewUrl.toString();
             } catch(err) {
                 hideQuoteGenerationProgress();
+                if (err && err.code === 'CARD_PAYMENT_REVIEW_CANCELLED') {
+                    if (saveStatus) saveStatus.innerHTML = '<span class="text-muted"><i class="fas fa-circle-info"></i> Preview cancelled so you can review payment or pricing choices.</span>';
+                    return;
+                }
                 if (err && err.code === 'PORTAL_LOCKED') {
                     if (saveStatus) saveStatus.innerHTML = '<span style="color:#1a56a0;"><i class="fas fa-lock"></i> Quote is in the client portal - returning to dashboard...</span>';
                     return;

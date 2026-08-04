@@ -148,6 +148,20 @@ async function paymentSettings(admin: any, userId: string) {
   return { settings: settingsRow?.value || {}, connection: connectionRow || null };
 }
 
+function cardPaymentEnabledForDocument(row: QuoteRow, settings: Record<string, any>) {
+  if (settings.stripe_enabled !== true) return false;
+  const data = rowData(row);
+  const decision = data.card_payment || data.cardPayment;
+  if (
+    decision &&
+    typeof decision === "object" &&
+    Number(decision.version || 0) >= 1 &&
+    typeof decision.enabled === "boolean"
+  ) return decision.enabled === true;
+  // Documents shared before Card Payment Rules keep the prior account-wide behavior.
+  return true;
+}
+
 function isInvoice(row: QuoteRow) {
   const data = rowData(row);
   const type = String(row.type || data.documentType || data.type || "").toLowerCase();
@@ -402,7 +416,7 @@ async function stripeSession(path: string, accountId: string, init: RequestInit 
 async function createCheckout(admin: any, body: Record<string, any>, row: QuoteRow, token: string, portalAnchorId: string, settings: any, connection: any, state: any) {
   const type = paymentType(body, row);
   assertPayable(row, type, state);
-  if (settings.stripe_enabled !== true || settings.accept_full_payment === false && type === "invoice_full") {
+  if (!cardPaymentEnabledForDocument(row, settings) || (settings.accept_full_payment === false && type === "invoice_full")) {
     throw new PaymentError("Card payment is not enabled for this document. Choose a manual payment method instead.", 403, "card_payment_disabled");
   }
   if (!connection || connection.status !== "ready" || connection.charges_enabled !== true) {

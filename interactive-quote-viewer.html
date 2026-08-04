@@ -1759,6 +1759,7 @@ if (location.search.includes('debug')) {
     <script src="quote-discounts.js?v=1783218460"></script>
     <script src="typed-signature.js?v=2026080301"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="card-payment-rules.js?v=2026080301"></script>
     <script src="supabase-v2.js?v=2026080102"></script>
     <script src="save-coordinator.js?v=2026080401"></script>
     <script src="change-orders.js?v=1778152100"></script>
@@ -5655,6 +5656,9 @@ if (location.search.includes('debug')) {
             if (window._securePaymentOptions) return window._securePaymentOptions;
             var legacy = quoteData && quoteData.paymentSettings;
             if (!legacy) return null;
+            var legacyCardPaymentEnabled = window.QuoteDrCardPaymentRules
+                ? window.QuoteDrCardPaymentRules.documentEnabled(legacy, quoteData)
+                : legacy.stripe_enabled === true;
             return {
                 version: 1,
                 deposit: {
@@ -5663,7 +5667,7 @@ if (location.search.includes('debug')) {
                     defaultPercent: Number(legacy.deposit_default_pct || 50),
                     defaultFixedCents: Number(legacy.deposit_default_fixed_cents || 0)
                 },
-                stripe: { enabled: legacy.stripe_enabled === true, ready: legacy.stripe_enabled === true },
+                stripe: { enabled: legacyCardPaymentEnabled, ready: legacyCardPaymentEnabled },
                 manual: {
                     etransfer: { enabled: legacy.accept_etransfer !== false, email: legacy.etransfer_email || '' },
                     cheque: { enabled: legacy.accept_cheque !== false, payee: legacy.cheque_payee || '' },
@@ -5767,7 +5771,7 @@ if (location.search.includes('debug')) {
 
             var stripe = _paymentOptions && _paymentOptions.stripe ? _paymentOptions.stripe : {};
             if (stripe.ready) {
-                stripeActions.innerHTML = '<button id="payDepositBtn" class="btn btn-warning btn-lg w-100 mb-3" onclick="handleDepositPayment()"><i class="fas fa-credit-card me-2"></i><span id="depositBtnLabel">Pay ' + escapeHtml(amountText) + ' securely by card</span></button><div class="small text-muted mb-3"><i class="fab fa-stripe me-1"></i>Secure checkout powered by Stripe.</div>';
+                stripeActions.innerHTML = '<button id="payDepositBtn" class="btn btn-warning btn-lg w-100 mb-3" onclick="handleDepositPayment()"><i class="fas fa-credit-card me-2"></i><span id="depositBtnLabel">Pay ' + escapeHtml(amountText) + ' securely by card</span></button><div class="small text-muted mb-3"><i class="fab fa-stripe me-1"></i>Secure checkout powered by Stripe. The amount shown is the deposit due.</div>';
             } else {
                 stripeActions.innerHTML = stripe.enabled
                     ? '<div class="alert alert-light border small text-start"><i class="fas fa-credit-card me-1"></i>Card payment is temporarily unavailable. You can still use any method below.</div>'
