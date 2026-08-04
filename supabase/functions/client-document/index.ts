@@ -25,6 +25,8 @@ type QuoteRow = {
   data?: Record<string, unknown>;
   created_at?: string;
   updated_at?: string;
+  accepted_at?: string | null;
+  accepted_by?: string | null;
   public_share_token_hash?: string | null;
 };
 
@@ -131,6 +133,60 @@ function quoteName(row: QuoteRow) {
 function displayQuoteName(row: QuoteRow) {
   const data = rowData(row);
   return String(data.portal_client_name || row.client_name || data.clientName || data.client_name || "Client").trim();
+}
+
+function normalizeSignerName(value: unknown) {
+  let text = String(value || "").trim();
+  try { text = text.normalize("NFKD"); } catch (_) {}
+  return text
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\u2018\u2019'`.-]/g, " ")
+    .replace(/[^a-zA-Z0-9\s]/g, " ")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function signerWordCount(value: unknown) {
+  const normalized = normalizeSignerName(value);
+  return normalized ? normalized.split(" ").length : 0;
+}
+
+function clientSignerCandidates(value: unknown) {
+  const raw = String(value || "").trim();
+  if (!raw) return [] as string[];
+  let candidates = [raw];
+  raw.split(/\s*(?:;|\/|\||&|\band\b)\s*/i).forEach((group) => {
+    const cleanGroup = String(group || "").trim();
+    if (!cleanGroup) return;
+    candidates.push(cleanGroup);
+    const commaParts = cleanGroup.split(",").map((part) => part.trim()).filter(Boolean);
+    if (commaParts.length === 2 && commaParts.every((part) => signerWordCount(part) === 1)) {
+      candidates.push(`${commaParts[1]} ${commaParts[0]}`);
+    } else if (commaParts.length > 1 && commaParts.every((part) => signerWordCount(part) >= 2)) {
+      candidates = candidates.concat(commaParts);
+    }
+  });
+  const seen = new Set<string>();
+  return candidates.filter((candidate) => {
+    const normalized = normalizeSignerName(candidate);
+    if (!normalized || seen.has(normalized)) return false;
+    seen.add(normalized);
+    return true;
+  });
+}
+
+function validateTypedSigner(row: QuoteRow, signerName: unknown) {
+  const entered = normalizeSignerName(signerName);
+  const candidates = clientSignerCandidates(displayQuoteName(row));
+  const normalizedCandidates = candidates.map(normalizeSignerName);
+  const exactMatch = !!entered && normalizedCandidates.includes(entered);
+  const hasFullName = signerWordCount(entered) >= 2;
+  return {
+    valid: exactMatch && hasFullName,
+    hasFullName,
+    hasClientName: candidates.length > 0 && displayQuoteName(row) !== "Client",
+  };
 }
 
 function quoteTitle(row: QuoteRow) {
@@ -452,12 +508,17 @@ function acceptedDepositDueCents(totalCents: number, terms: Record<string, unkno
 }
 
 function compactDocumentResult(row: QuoteRow) {
+  const data = rowData(row);
   return {
     id: row.id,
     status: row.status || "",
-    type: row.type || rowData(row).documentType || rowData(row).type || "quote",
+    type: row.type || data.documentType || data.type || "quote",
     total: row.total || 0,
     updated_at: row.updated_at || null,
+    accepted_at: row.accepted_at || data.accepted_at || null,
+    accepted_by: row.accepted_by || data.accepted_by || data.signed_by || null,
+    signed_at: data.signed_at || data.approved_at || data.accepted_at || row.accepted_at || null,
+    terms_accepted_at: data.terms_accepted_at || null,
   };
 }
 
@@ -865,15 +926,26 @@ async function updateDocument(req: Request, body: Record<string, unknown>) {
     }
   } else if (action === "client_update") {
     const topLevel = body.topLevel && typeof body.topLevel === "object" ? body.topLevel as Record<string, unknown> : {};
+    const patch = body.dataPatch && typeof body.dataPatch === "object" ? body.dataPatch as Record<string, unknown> : {};
     const requestedStatus = typeof topLevel.status === "string" ? String(topLevel.status).toLowerCase() : "";
     if (requestedStatus && !["accepted", "approved"].includes(requestedStatus)) {
       return json({ error: "Unsupported client document status" }, 400);
     }
+    const isTypedSignature = String(patch.signature_method || "").toLowerCase() === "typed";
+    const signerName = String(topLevel.accepted_by || patch.signature_text || patch.signed_by || "").trim().slice(0, 200);
+    if (requestedStatus && isTypedSignature) {
+      const signerValidation = validateTypedSigner(target, signerName);
+      if (!signerValidation.hasClientName) return json({ error: "This document does not have a client name to verify" }, 400);
+      if (!signerValidation.hasFullName) return json({ error: "Enter the client's full name" }, 400);
+      if (!signerValidation.valid) return json({ error: "Signer name does not match the client name on this document" }, 400);
+      if (patch.terms_accepted !== true) return json({ error: "Terms agreement is required before signing" }, 400);
+      if (!patch.signature_url && !patch.signature_data_url) return json({ error: "Typed signature evidence is missing" }, 400);
+    }
     if (requestedStatus) update.status = requestedStatus;
     if (typeof topLevel.client_name === "string") update.client_name = topLevel.client_name;
     if (requestedStatus) update.accepted_at = now;
-    if (typeof topLevel.accepted_by === "string") update.accepted_by = String(topLevel.accepted_by).trim().slice(0, 200);
-    const merged = mergeSafeData(existingData, body.dataPatch);
+    if (signerName) update.accepted_by = signerName;
+    const merged = mergeSafeData(existingData, patch);
     if (requestedStatus) {
       const documentStatus = String(target.status || existingData.status || "").toLowerCase();
       const validity = String(existingData.document_validity || existingData.documentValidity || "").toLowerCase();
@@ -897,6 +969,54 @@ async function updateDocument(req: Request, body: Record<string, unknown>) {
       merged.deposit_due_cents = acceptedDepositDueCents(acceptedTotalCents, terms);
       merged.accepted_at = now;
     }
+    if (requestedStatus && isTypedSignature) {
+      merged.signature_method = "typed";
+      merged.signature_text = signerName;
+      merged.signed_by = signerName;
+      merged.signed_at = now;
+      merged.approved_by = signerName;
+      merged.approved_at = now;
+      merged.terms_accepted = true;
+      merged.terms_accepted_at = now;
+      merged.terms_accepted_snapshot = Array.isArray(existingData.terms) ? existingData.terms.slice(0, 100) : [];
+    }
+    update.data = merged;
+  } else if (action === "record_signature") {
+    if (documentTypeLabel(target) !== "invoice") return json({ error: "Invoice signature action requires an invoice" }, 400);
+    const documentStatus = String(target.status || existingData.status || "").toLowerCase();
+    const validity = String(existingData.document_validity || existingData.documentValidity || "").toLowerCase();
+    if (documentStatus === "voided" || ["voided", "invalid", "superseded"].includes(validity)) {
+      return json({ error: "This document is no longer valid" }, 409);
+    }
+    const alreadySigned = existingData.invoice_acknowledged === true || !!(
+      (existingData.signature_url || existingData.signature_data_url) &&
+      (existingData.signed_at || existingData.invoice_acknowledged_at) &&
+      (existingData.signed_by || existingData.signature_text)
+    );
+    if (alreadySigned) return json({ result: compactDocumentResult(target), unchanged: true, alreadySigned: true });
+    const patch = body.dataPatch && typeof body.dataPatch === "object" ? body.dataPatch as Record<string, unknown> : {};
+    const signerName = String(patch.signature_text || patch.signed_by || "").trim().slice(0, 200);
+    const signerValidation = validateTypedSigner(target, signerName);
+    if (String(patch.signature_method || "").toLowerCase() !== "typed") return json({ error: "Typed signature evidence is required" }, 400);
+    if (!signerValidation.hasClientName) return json({ error: "This invoice does not have a client name to verify" }, 400);
+    if (!signerValidation.hasFullName) return json({ error: "Enter the client's full name" }, 400);
+    if (!signerValidation.valid) return json({ error: "Signer name does not match the client name on this invoice" }, 400);
+    if (patch.terms_accepted !== true) return json({ error: "Terms agreement is required before signing" }, 400);
+    if (!patch.signature_url && !patch.signature_data_url) return json({ error: "Typed signature evidence is missing" }, 400);
+    const merged = mergeSafeData(existingData, patch);
+    merged.signature_method = "typed";
+    merged.signature_text = signerName;
+    merged.signed_by = signerName;
+    merged.signed_at = now;
+    merged.accepted_by = signerName;
+    merged.accepted_at = now;
+    merged.terms_accepted = true;
+    merged.terms_accepted_at = now;
+    merged.terms_accepted_snapshot = Array.isArray(existingData.terms) ? existingData.terms.slice(0, 100) : [];
+    merged.invoice_acknowledged = true;
+    merged.invoice_acknowledged_at = now;
+    update.accepted_at = now;
+    update.accepted_by = signerName;
     update.data = merged;
   } else if (action === "decline_change_order") {
     update.status = "declined";
@@ -948,6 +1068,16 @@ async function updateDocument(req: Request, body: Record<string, unknown>) {
         metadata: { submitted_at: now },
       });
     }
+  } else if (action === "record_signature") {
+    const patch = body.dataPatch && typeof body.dataPatch === "object" ? body.dataPatch as Record<string, unknown> : {};
+    await recordClientActivity(supabase, updatedRow, "accepted", {
+      metadata: {
+        signed_at: now,
+        accepted_by: patch.signature_text || patch.signed_by || "",
+        signature_method: "typed",
+        signature_action: "invoice_acknowledgement",
+      },
+    });
   } else if (action === "decline_change_order") {
     await recordClientActivity(supabase, updatedRow, "declined", { metadata: { declined_at: now } });
   }

@@ -786,20 +786,41 @@
             margin: auto;
             align-self: flex-start;
         }
-        #signatureCanvas {
-            border: 2px dashed #adb5bd;
+        .typed-signature-preview {
+            min-height: 132px;
+            border: 2px solid #d7e0ea;
             border-radius: 8px;
-            cursor: crosshair;
-            touch-action: none;
-            width: 100%;
-            height: 160px;
-            display: block;
+            background: #f8fbff;
+            color: #7a8796;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            text-align: center;
+            font-size: 1rem;
+            overflow-wrap: anywhere;
         }
-        #signatureCanvas.signed { border-color: #28a745; border-style: solid; }
+        .typed-signature-preview.has-signature {
+            border-color: #28a745;
+            background: #fff;
+            color: #10233d;
+            font-family: "Segoe Script", "Brush Script MT", "Lucida Handwriting", cursive;
+            font-size: 2.35rem;
+            line-height: 1.2;
+        }
+        .typed-signature-legal {
+            color: #64748b;
+            font-size: 0.78rem;
+            line-height: 1.45;
+        }
         .signature-help {
             color: #64748b;
             font-size: 0.88rem;
             line-height: 1.45;
+        }
+        @media (max-width: 575.98px) {
+            .typed-signature-preview { min-height: 108px; }
+            .typed-signature-preview.has-signature { font-size: 1.9rem; }
         }
         @keyframes termsAgreementShake {
             0%, 100% { transform: translateX(0); }
@@ -1549,25 +1570,24 @@ if (location.search.includes('debug')) {
         </div>
 
         <!-- Signature Modal -->
-        <div class="sig-modal-overlay" id="sigModalOverlay">
+        <div class="sig-modal-overlay" id="sigModalOverlay" role="dialog" aria-modal="true" aria-labelledby="quoteSignatureModalTitle" aria-describedby="quoteSignatureModalDescription">
             <div class="sig-modal">
-                <h5 class="mb-2"><i class="fas fa-pen-nib text-primary"></i> Accept Quote</h5>
-                <p class="signature-help mb-3">Enter your full name, draw your signature, and confirm the terms to approve this quote.</p>
+                <h5 class="mb-2" id="quoteSignatureModalTitle"><i class="fas fa-pen-nib text-primary"></i> Accept Quote</h5>
+                <p class="signature-help mb-3" id="quoteSignatureModalDescription">Enter the full client name shown on this quote and confirm the terms. Your typed name becomes your electronic signature.</p>
                 <div class="alert alert-warning py-2 mb-3" id="signatureApprovalMessage" style="display:none;" role="alert"></div>
 
                 <div class="mb-3 signer-name-wrap" id="signerNameWrap">
-                    <label class="form-label fw-bold">Your Full Name <span class="text-danger">*</span></label>
-                    <input type="text" id="signerName" class="form-control" placeholder="e.g. Jane Smith">
+                    <label class="form-label fw-bold" for="signerName">Your Full Name <span class="text-danger">*</span></label>
+                    <input type="text" id="signerName" class="form-control" placeholder="e.g. Jane Smith" autocomplete="name" aria-describedby="signerNameHelp">
+                    <div class="form-text" id="signerNameHelp">This must match the client name associated with the quote.</div>
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label fw-bold">Draw Your Signature</label>
-                    <canvas id="signatureCanvas" width="500" height="160"></canvas>
-                    <div class="d-flex justify-content-end mt-1">
-                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearSignature()">
-                            <i class="fas fa-undo"></i> Clear
-                        </button>
-                    </div>
+                    <div class="form-label fw-bold" id="typedSignatureLabel">Typed Signature</div>
+                    <div class="typed-signature-preview" id="typedSignaturePreview" role="img" aria-labelledby="typedSignatureLabel" aria-live="polite">Your typed signature will appear here</div>
+                    <p class="typed-signature-legal mt-2 mb-0">
+                        Typing your matching full name and selecting Sign &amp; Approve records your electronic signature, agreement, and time of acceptance. Electronic-signature requirements can vary by jurisdiction; contact the contractor before signing if you have questions.
+                    </p>
                 </div>
 
                 <div class="form-check mb-3 terms-agreement-wrap" id="termsAgreementWrap">
@@ -1595,7 +1615,7 @@ if (location.search.includes('debug')) {
                     <i class="fas fa-triangle-exclamation"></i>
                     <div id="signerNameRequiredTitle">Full name required</div>
                 </div>
-                <div class="terms-required-modal-body">
+                <div class="terms-required-modal-body" id="signerNameRequiredMessage">
                     Please type your full name before signing and approving this quote.
                 </div>
                 <div class="terms-required-modal-footer">
@@ -1737,6 +1757,7 @@ if (location.search.includes('debug')) {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="quote-dialogs.js?v=2026071501"></script>
     <script src="quote-discounts.js?v=1783218460"></script>
+    <script src="typed-signature.js?v=2026080301"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-v2.js?v=2026080102"></script>
     <script src="save-coordinator.js?v=2026080102"></script>
@@ -5039,7 +5060,8 @@ if (location.search.includes('debug')) {
             var signedAtRaw = quoteData.signed_at || quoteData.approved_at || quoteData.accepted_at;
             var signedAt = signedAtRaw ? new Date(signedAtRaw).toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
             var sigPreview = document.getElementById('approvalSigPreview');
-            if (sigPreview && quoteData.signature_url) sigPreview.src = quoteData.signature_url;
+            var signatureSource = quoteData.signature_url || quoteData.signature_data_url || '';
+            if (sigPreview && signatureSource) sigPreview.src = signatureSource;
             var approvalMeta = document.getElementById('approvalMeta');
             if (approvalMeta) approvalMeta.textContent = 'Signed by ' + signedBy + (signedAt ? ' on ' + signedAt : '');
             var approvalBanner = document.getElementById('approvalBanner');
@@ -5087,8 +5109,53 @@ if (location.search.includes('debug')) {
             openSignatureModal();
         }
 
-        // --- Signature Pad ---
-        let sigCanvas, sigCtx, sigDrawing = false, sigHasStrokes = false;
+        // --- Typed Signature ---
+        function quoteSignatureClientName() {
+            var row = window._quoteRow || {};
+            return String(
+                quoteData.portal_client_name ||
+                quoteData.clientName ||
+                quoteData.client_name ||
+                row.client_name ||
+                (row.data && (row.data.portal_client_name || row.data.clientName || row.data.client_name)) ||
+                ''
+            ).trim();
+        }
+
+        function updateQuoteTypedSignaturePreview() {
+            var input = document.getElementById('signerName');
+            var preview = document.getElementById('typedSignaturePreview');
+            if (window.QuoteDrTypedSignature) {
+                QuoteDrTypedSignature.renderPreview(preview, input ? input.value : '');
+            }
+        }
+
+        function initQuoteTypedSignatureInput() {
+            var input = document.getElementById('signerName');
+            var help = document.getElementById('signerNameHelp');
+            var expectedName = quoteSignatureClientName();
+            if (help) {
+                help.textContent = expectedName
+                    ? 'Enter a full name listed for this quote: ' + expectedName
+                    : 'The quote must have an associated client name before it can be signed.';
+            }
+            if (input && input.dataset.typedSignatureReady !== '1') {
+                input.addEventListener('input', updateQuoteTypedSignaturePreview);
+                input.dataset.typedSignatureReady = '1';
+            }
+            updateQuoteTypedSignaturePreview();
+        }
+
+        function validateQuoteSignerName(name) {
+            var expectedName = quoteSignatureClientName();
+            if (!expectedName) return { matches: false, hasFullName: true, missingClient: true };
+            if (window.QuoteDrTypedSignature) {
+                return QuoteDrTypedSignature.matchClientName(name, expectedName);
+            }
+            var entered = String(name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+            var expected = expectedName.toLowerCase().replace(/\s+/g, ' ');
+            return { matches: entered === expected, hasFullName: entered.split(' ').filter(Boolean).length >= 2 };
+        }
 
         function openSignatureModal() {
             if (isContractorPreviewView()) {
@@ -5096,7 +5163,12 @@ if (location.search.includes('debug')) {
                 return;
             }
             document.getElementById('sigModalOverlay').classList.add('active');
-            if (!sigCanvas) initSignaturePad();
+            initQuoteTypedSignatureInput();
+            showSignatureApprovalMessage('', 'warning');
+            setTimeout(function() {
+                var input = document.getElementById('signerName');
+                if (input) input.focus();
+            }, 0);
         }
         function closeSignatureModal() {
             document.getElementById('sigModalOverlay').classList.remove('active');
@@ -5109,14 +5181,18 @@ if (location.search.includes('debug')) {
             el.textContent = message;
             el.style.display = message ? 'block' : 'none';
         }
-        function showSignerNameRequiredModal() {
+        function showSignerNameRequiredModal(message, title) {
             return new Promise(function(resolve) {
                 var modal = document.getElementById('signerNameRequiredModal');
                 var okBtn = document.getElementById('signerNameRequiredOkBtn');
+                var titleEl = document.getElementById('signerNameRequiredTitle');
+                var messageEl = document.getElementById('signerNameRequiredMessage');
                 if (!modal || !okBtn) {
                     resolve();
                     return;
                 }
+                if (titleEl) titleEl.textContent = title || 'Full name required';
+                if (messageEl) messageEl.textContent = message || 'Please type your full name before signing and approving this quote.';
                 var resolved = false;
                 function close() {
                     if (resolved) return;
@@ -5214,37 +5290,6 @@ if (location.search.includes('debug')) {
                 wrap.classList.remove('signer-name-attention');
             }, 1400);
         }
-        function initSignaturePad() {
-            sigCanvas = document.getElementById('signatureCanvas');
-            sigCtx = sigCanvas.getContext('2d');
-            sigCtx.strokeStyle = '#111';
-            sigCtx.lineWidth = 2.2;
-            sigCtx.lineCap = 'round';
-            sigCtx.lineJoin = 'round';
-
-            function pos(e) {
-                const r = sigCanvas.getBoundingClientRect();
-                const src = e.touches ? e.touches[0] : e;
-                return { x: (src.clientX - r.left) * (sigCanvas.width / r.width), y: (src.clientY - r.top) * (sigCanvas.height / r.height) };
-            }
-            function start(e) { e.preventDefault(); sigDrawing = true; const p = pos(e); sigCtx.beginPath(); sigCtx.moveTo(p.x, p.y); }
-            function draw(e)  { e.preventDefault(); if (!sigDrawing) return; const p = pos(e); sigCtx.lineTo(p.x, p.y); sigCtx.stroke(); sigHasStrokes = true; }
-            function end(e)   { e.preventDefault(); sigDrawing = false; if (sigHasStrokes) sigCanvas.classList.add('signed'); }
-
-            sigCanvas.addEventListener('mousedown',  start);
-            sigCanvas.addEventListener('mousemove',  draw);
-            sigCanvas.addEventListener('mouseup',    end);
-            sigCanvas.addEventListener('mouseleave', end);
-            sigCanvas.addEventListener('touchstart', start, { passive: false });
-            sigCanvas.addEventListener('touchmove',  draw,  { passive: false });
-            sigCanvas.addEventListener('touchend',   end,   { passive: false });
-        }
-        function clearSignature() {
-            if (!sigCanvas) return;
-            sigCtx.clearRect(0, 0, sigCanvas.width, sigCanvas.height);
-            sigCanvas.classList.remove('signed');
-            sigHasStrokes = false;
-        }
         function showExpiryNotice() {
             var el = document.getElementById('quoteExpiry');
             if (!el) return;
@@ -5280,19 +5325,9 @@ if (location.search.includes('debug')) {
             } catch(e) { console.warn('Could not mark quote viewed:', e); }
         }
 
-                function dataURLtoBlob(dataUrl) {
-            const arr = dataUrl.split(',');
-            const mime = arr[0].match(/:(.*?);/)[1];
-            const bstr = atob(arr[1]);
-            let n = bstr.length;
-            const u8arr = new Uint8Array(n);
-            while(n--) u8arr[n] = bstr.charCodeAt(n);
-            return new Blob([u8arr], { type: mime });
-        }
-
         async function saveSignatureToSupabase(quoteId, sigDataUrl, name) {
             try {
-                const blob = dataURLtoBlob(sigDataUrl);
+                const blob = QuoteDrTypedSignature.dataUrlToBlob(sigDataUrl);
                 const fileName = `${quoteId}/${Date.now()}.png`;
         
                 const { error: uploadError } = await _supabase.storage
@@ -5319,15 +5354,31 @@ if (location.search.includes('debug')) {
             const name = document.getElementById('signerName').value.trim();
             if (!name) {
                 showSignatureApprovalMessage('Please enter your full name.');
-                showSignerNameRequiredModal().then(emphasizeSignerName);
+                showSignerNameRequiredModal('Please type your full name before signing and approving this quote.').then(emphasizeSignerName);
                 return;
             }
-            if (!sigHasStrokes) { showSignatureApprovalMessage('Please draw your signature.'); return; }
+            var nameValidation = validateQuoteSignerName(name);
+            if (nameValidation.missingClient) {
+                showSignatureApprovalMessage('This quote does not have a client name to verify against. Please ask the contractor to correct it.');
+                showSignerNameRequiredModal('This quote does not have an associated client name. Please ask the contractor to correct and resend it.', 'Client name unavailable').then(emphasizeSignerName);
+                return;
+            }
+            if (!nameValidation.hasFullName) {
+                showSignatureApprovalMessage('Please enter your full first and last name.');
+                showSignerNameRequiredModal('Please enter your full first and last name as shown on this quote.').then(emphasizeSignerName);
+                return;
+            }
+            if (!nameValidation.matches) {
+                showSignatureApprovalMessage('The signer name must match the client name shown on this quote.');
+                showSignerNameRequiredModal('Enter a complete client name exactly as shown on this quote. Differences in capitalization and extra spaces are okay.', 'Name does not match').then(emphasizeSignerName);
+                return;
+            }
             if (!document.getElementById('termsCheck').checked) {
                 showSignatureApprovalMessage('Please agree to the terms and conditions.');
                 showTermsApprovalRequiredModal().then(emphasizeTermsAgreement);
                 return;
             }
+            document.getElementById('termsAccepted').value = 'true';
 
             var approveBtn = document.getElementById('signApproveBtn');
             var originalApproveHtml = approveBtn ? approveBtn.innerHTML : '';
@@ -5338,7 +5389,7 @@ if (location.search.includes('debug')) {
             showSignatureApprovalMessage('', 'warning');
 
             try {
-                const sigDataUrl = sigCanvas.toDataURL('image/png');
+                const sigDataUrl = QuoteDrTypedSignature.createSignatureDataUrl(name);
                 const now = new Date();
                 const dateStr = now.toLocaleDateString('en-CA', { year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit' });
 
@@ -5412,10 +5463,15 @@ if (location.search.includes('debug')) {
                             rooms: updatedRooms,
                             signature_url: signatureUrl,
                             signature_data_url: signatureUrl ? undefined : sigDataUrl,
+                            signature_method: 'typed',
+                            signature_text: name,
                             signed_by: name,
                             signed_at: now.toISOString(),
                             approved_by: name,
                             approved_at: now.toISOString(),
+                            terms_accepted: true,
+                            terms_accepted_at: now.toISOString(),
+                            terms_accepted_snapshot: Array.isArray(existingData.terms) ? existingData.terms.slice() : [],
                             client_upgraded: _hasClientChanges,
                             client_upgraded_at: _hasClientChanges ? now.toISOString() : undefined,
                             original_rooms: _hasClientChanges ? originalRoomsSnapshot : undefined,
@@ -5429,10 +5485,18 @@ if (location.search.includes('debug')) {
                         throw new Error('This quote link is missing its secure access token. Please ask the contractor to resend it.');
                     }
                     var secureUpdate = await updateSecureClientDocument(quoteId, shareToken, 'client_update', {
-                        topLevel: { status: updateData.status, client_name: updateData.client_name, accepted_at: now.toISOString(), accepted_by: name },
+                        topLevel: { status: updateData.status, client_name: updateData.client_name, accepted_by: name },
                         dataPatch: updateData.data
                     }, portalAnchorId);
                     if (secureUpdate && secureUpdate.error) throw secureUpdate.error;
+                    var secureDocument = secureUpdate && (secureUpdate.data || secureUpdate.result) || {};
+                    var authoritativeSignedAt = secureDocument.signed_at || secureDocument.accepted_at || now.toISOString();
+                    updateData.data.signed_at = authoritativeSignedAt;
+                    updateData.data.approved_at = authoritativeSignedAt;
+                    updateData.data.terms_accepted_at = authoritativeSignedAt;
+                    document.getElementById('approvedAt').value = authoritativeSignedAt;
+                    var signedDate = new Date(authoritativeSignedAt);
+                    document.getElementById('approvalMeta').textContent = 'Signed by ' + name + ' on ' + signedDate.toLocaleDateString('en-CA', { year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit' });
                     logPortalDocumentActivity('document_signed', { metadata: { signer_name_present: !!name } });
                     quoteData = Object.assign({}, quoteData, updateData.data, { status: updateData.status });
                     if (typeof qdCaptureEvent === 'function') {

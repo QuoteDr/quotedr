@@ -658,7 +658,7 @@ async function callStripeConnectFunction(action, payload) {
 
 async function updateSecureClientDocument(documentId, token, updateAction, payload, portalAnchorId) {
     if (!documentId || !token) return { error: 'Missing secure client link token' };
-    var businessUpdate = updateAction === 'client_update' || updateAction === 'decline_change_order';
+    var businessUpdate = updateAction === 'client_update' || updateAction === 'record_signature' || updateAction === 'decline_change_order';
     if (businessUpdate && window.QuoteDrSave) {
         qdRegisterSecureClientSaveAdapters();
         var dataPatch = payload && payload.dataPatch || {};
@@ -668,7 +668,7 @@ async function updateSecureClientDocument(documentId, token, updateAction, paylo
             entityType: entityType,
             adapterType: 'secure_client_document',
             entityId: documentId + ':' + (signed ? 'signature' : updateAction),
-            entityLabel: signed ? 'Client signature and approval' : (updateAction === 'decline_change_order' ? 'Client change order decision' : 'Client quote notes and selections'),
+            entityLabel: signed ? (updateAction === 'record_signature' ? 'Client invoice signature' : 'Client signature and approval') : (updateAction === 'decline_change_order' ? 'Client change order decision' : 'Client quote notes and selections'),
             ownerId: 'client-document:' + documentId,
             payload: {
                 documentId: documentId,

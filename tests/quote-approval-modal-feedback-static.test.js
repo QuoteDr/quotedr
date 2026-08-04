@@ -11,7 +11,13 @@ assert(source.includes('id="signerNameRequiredModal"'), 'name validation should 
 assert(source.includes('function showSignerNameRequiredModal'), 'quote viewer should centralize the missing-name pop-up behavior');
 assert(source.includes('function emphasizeSignerName'), 'quote viewer should animate and focus the full name field after the pop-up closes');
 assert(source.includes('signer-name-attention'), 'full name field should have a visible attention animation class');
-assert(/showSignerNameRequiredModal\(\)[\s\S]*\.then\(emphasizeSignerName\)/.test(source), 'name validation should show the pop-up, then animate the full name field');
+assert(/showSignerNameRequiredModal\([^)]*\)\.then\(emphasizeSignerName\)/.test(source), 'name validation should show the pop-up, then animate the full name field');
+assert(source.includes('id="typedSignaturePreview"'), 'quote approval should show a live typed-signature preview');
+assert(source.includes('QuoteDrTypedSignature.matchClientName'), 'quote approval should verify the typed signer against the quote client');
+assert(source.includes("signature_method: 'typed'"), 'quote approval should persist typed signature evidence');
+assert(source.includes('terms_accepted_at'), 'quote approval should persist a terms acknowledgement timestamp');
+assert(!source.includes('id="signatureCanvas"'), 'quote approval should no longer require a drawn-signature canvas');
+assert(!source.includes('sigHasStrokes'), 'quote approval should not retain drawn-signature state');
 assert(source.includes("showSignatureApprovalMessage('Please agree to the terms and conditions.'"), 'terms validation should show inside the signature modal');
 assert(source.includes('id="termsApprovalRequiredModal"'), 'terms validation should show a blocking pop-up modal before returning to signing');
 assert(source.includes('function showTermsApprovalRequiredModal'), 'quote viewer should centralize the missing-terms pop-up behavior');

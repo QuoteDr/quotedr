@@ -443,6 +443,73 @@
         }
 
         .terms-section { margin-top: 2rem; }
+        .invoice-signature-section { margin-top: 2rem; }
+        .invoice-signature-card {
+            border: 1px solid #dbe4ef;
+            border-top: 4px solid #1a56a0;
+            border-radius: 8px;
+            background: #fff;
+            box-shadow: 0 8px 24px rgba(15, 52, 96, 0.08);
+            padding: 1.25rem;
+        }
+        .invoice-signature-heading {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+        .invoice-signed-record {
+            display: none;
+            align-items: center;
+            gap: 1rem;
+            border: 1px solid #a9d8b6;
+            border-radius: 8px;
+            background: #f2fbf5;
+            padding: 1rem;
+        }
+        .invoice-signed-record.visible { display: flex; }
+        .invoice-signed-record img {
+            width: 180px;
+            max-width: 42%;
+            height: 64px;
+            object-fit: contain;
+            border: 1px solid #b9c8d8;
+            border-radius: 6px;
+            background: #fff;
+        }
+        .invoice-typed-signature-preview {
+            min-height: 132px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 1rem;
+            border: 2px solid #d7e0ea;
+            border-radius: 8px;
+            background: #f8fbff;
+            color: #7a8796;
+            overflow-wrap: anywhere;
+        }
+        .invoice-typed-signature-preview.has-signature {
+            border-color: #28a745;
+            background: #fff;
+            color: #10233d;
+            font-family: "Segoe Script", "Brush Script MT", "Lucida Handwriting", cursive;
+            font-size: 2.35rem;
+            line-height: 1.2;
+        }
+        .invoice-signature-legal {
+            color: #64748b;
+            font-size: 0.78rem;
+            line-height: 1.45;
+        }
+        .invoice-signing-terms {
+            border: 1px solid #dbe4ef;
+            border-radius: 8px;
+            padding: 0.7rem 0.85rem;
+            background: #f8fbff;
+        }
+        .invoice-signing-terms summary { cursor: pointer; font-weight: 700; color: #1a56a0; }
         .payment-method-list {
             display: grid;
             gap: 0.75rem;
@@ -514,6 +581,14 @@
             margin-top: 2px;
         }
 
+        @media (max-width: 575.98px) {
+            .invoice-signature-heading { display: block; }
+            .invoice-signature-heading .btn { width: 100%; margin-top: 0.75rem; }
+            .invoice-signed-record { align-items: flex-start; flex-direction: column; }
+            .invoice-signed-record img { width: 100%; max-width: 100%; }
+            .invoice-typed-signature-preview { min-height: 108px; }
+            .invoice-typed-signature-preview.has-signature { font-size: 1.9rem; }
+        }
         @media print {
             .d-print-none, .no-print { display: none !important; }
             body { background: white !important; }
@@ -662,6 +737,31 @@ if (location.search.includes('debug')) {
             </div>
         </div>
 
+        <!-- Invoice signature acknowledgement -->
+        <section class="invoice-signature-section" id="invoiceSignatureSection" aria-labelledby="invoiceSignatureHeading">
+            <div class="invoice-signature-card">
+                <div id="invoiceSignatureUnsigned">
+                    <div class="invoice-signature-heading">
+                        <div>
+                            <h5 class="mb-1" id="invoiceSignatureHeading"><i class="fas fa-file-signature me-2 text-primary"></i>Invoice Acknowledgement</h5>
+                            <p class="text-muted mb-0">Review the invoice and its terms, then sign with the full client name associated with this invoice.</p>
+                        </div>
+                        <button type="button" class="btn btn-primary d-print-none" id="openInvoiceSignatureBtn" onclick="openInvoiceSignatureModal()">
+                            <i class="fas fa-pen-nib me-1"></i>Review &amp; Sign Invoice
+                        </button>
+                    </div>
+                </div>
+                <div class="invoice-signed-record" id="invoiceSignedRecord" aria-live="polite">
+                    <img id="invoiceSignatureImage" src="" alt="Client's typed signature">
+                    <div>
+                        <div class="fw-bold text-success"><i class="fas fa-circle-check me-1"></i>Invoice signed</div>
+                        <div id="invoiceSignatureMeta" class="text-muted small"></div>
+                        <div class="text-muted small mt-1">The signer name, terms acknowledgement, and signing time are recorded with this invoice.</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- Warranty Badge -->
         <div class="warranty-section">
             <div class="text-center mb-2">
@@ -696,6 +796,51 @@ if (location.search.includes('debug')) {
         </div>
     </div>
 
+    <div class="modal fade" id="invoiceSignatureModal" tabindex="-1" aria-labelledby="invoiceSignatureModalTitle" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title" id="invoiceSignatureModalTitle"><i class="fas fa-pen-nib me-2 text-primary"></i>Sign Invoice</h5>
+                        <div class="text-muted small">Your typed name will be recorded as your electronic signature.</div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning py-2" id="invoiceSignatureStatus" style="display:none;" role="alert" aria-live="assertive"></div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold" for="invoiceSignerName">Your Full Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="invoiceSignerName" placeholder="e.g. Jane Smith" autocomplete="name" aria-describedby="invoiceSignerNameHelp">
+                        <div class="form-text" id="invoiceSignerNameHelp">This must match the client name associated with the invoice.</div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-label fw-bold" id="invoiceTypedSignatureLabel">Typed Signature</div>
+                        <div class="invoice-typed-signature-preview" id="invoiceTypedSignaturePreview" role="img" aria-labelledby="invoiceTypedSignatureLabel" aria-live="polite">Your typed signature will appear here</div>
+                        <p class="invoice-signature-legal mt-2 mb-0">
+                            Typing your matching full name and selecting Sign Invoice records your electronic signature, agreement, and time of acknowledgement. Electronic-signature requirements can vary by jurisdiction; contact the contractor before signing if you have questions.
+                        </p>
+                    </div>
+                    <details class="invoice-signing-terms mb-3" id="invoiceSigningTermsDetails">
+                        <summary>View invoice terms and conditions</summary>
+                        <div class="mt-2" id="invoiceSigningTermsContent"></div>
+                    </details>
+                    <div class="form-check border rounded p-3 ps-5">
+                        <input class="form-check-input" type="checkbox" id="invoiceTermsCheck">
+                        <label class="form-check-label" for="invoiceTermsCheck">
+                            I have reviewed this invoice and agree to the terms and conditions included with it.
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="invoiceSignBtn" onclick="confirmInvoiceSignature()">
+                        <i class="fas fa-check-circle me-1"></i>Sign Invoice
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <nav class="invoice-sticky-nav d-print-none" id="invoiceStickyNav" aria-label="Invoice navigation">
         <div class="invoice-sticky-nav-panel" id="invoiceStickyNavPanel">
             <div class="invoice-sticky-nav-header">
@@ -724,6 +869,7 @@ if (location.search.includes('debug')) {
     <script src="supabase-v2.js?v=2026080102"></script>
     <script src="save-coordinator.js?v=2026080102"></script>
     <script src="quote-discounts.js?v=1783218460"></script>
+    <script src="typed-signature.js?v=2026080301"></script>
     <script>
         const ROOM_COLORS = [
             'linear-gradient(135deg,#2d2d2d 0%,#111111 100%)',
@@ -1483,6 +1629,262 @@ if (location.search.includes('debug')) {
             } catch(e) { console.warn('Could not mark invoice viewed:', e); }
         }
 
+        function invoiceSignatureClientName() {
+            var row = window._invoiceRow || {};
+            return String(
+                invoiceData.portal_client_name ||
+                invoiceData.clientName ||
+                invoiceData.client_name ||
+                row.client_name ||
+                (row.data && (row.data.portal_client_name || row.data.clientName || row.data.client_name)) ||
+                ''
+            ).trim();
+        }
+
+        function invoiceHasSignature() {
+            return invoiceData.invoice_acknowledged === true || !!(
+                (invoiceData.signature_url || invoiceData.signature_data_url) &&
+                (invoiceData.signed_at || invoiceData.approved_at || invoiceData.accepted_at)
+            );
+        }
+
+        function formatInvoiceSignatureTime(value) {
+            if (!value) return '';
+            var date = new Date(value);
+            if (Number.isNaN(date.getTime())) return '';
+            return date.toLocaleDateString('en-CA', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function renderInvoiceSignatureState() {
+            var section = document.getElementById('invoiceSignatureSection');
+            var unsigned = document.getElementById('invoiceSignatureUnsigned');
+            var signed = document.getElementById('invoiceSignedRecord');
+            if (!section || !unsigned || !signed) return;
+            section.style.display = 'block';
+            var hasSignature = invoiceHasSignature();
+            unsigned.style.display = hasSignature ? 'none' : 'block';
+            signed.classList.toggle('visible', hasSignature);
+            if (!hasSignature) {
+                var openBtn = document.getElementById('openInvoiceSignatureBtn');
+                if (openBtn) openBtn.disabled = invoiceIsInvalid();
+                return;
+            }
+            var signatureSource = invoiceData.signature_url || invoiceData.signature_data_url || '';
+            var signatureImage = document.getElementById('invoiceSignatureImage');
+            if (signatureImage) {
+                signatureImage.src = signatureSource;
+                signatureImage.style.display = signatureSource ? 'block' : 'none';
+            }
+            var signer = invoiceData.signed_by || invoiceData.accepted_by || invoiceData.signature_text || 'Client';
+            var row = window._invoiceRow || {};
+            var signedAt = invoiceData.signed_at || invoiceData.invoice_acknowledged_at || invoiceData.accepted_at || row.accepted_at || '';
+            var meta = document.getElementById('invoiceSignatureMeta');
+            if (meta) meta.textContent = 'Signed by ' + signer + (signedAt ? ' on ' + formatInvoiceSignatureTime(signedAt) : '');
+        }
+
+        function getInvoiceSigningTerms() {
+            return (Array.isArray(invoiceData.terms) ? invoiceData.terms : []).filter(function(term) {
+                return String(term || '').trim();
+            });
+        }
+
+        function renderInvoiceSigningTerms() {
+            var target = document.getElementById('invoiceSigningTermsContent');
+            if (!target) return;
+            var terms = getInvoiceSigningTerms();
+            if (!terms.length) {
+                target.innerHTML = '<p class="text-muted small mb-0">No additional written terms are included with this invoice.</p>';
+                return;
+            }
+            target.innerHTML = '<ul class="list-group list-group-flush">' + terms.map(function(term) {
+                return '<li class="list-group-item bg-transparent px-0"><i class="fas fa-check-circle text-success me-1"></i>' + escapeHtml(term) + '</li>';
+            }).join('') + '</ul>';
+        }
+
+        function updateInvoiceTypedSignaturePreview() {
+            var input = document.getElementById('invoiceSignerName');
+            var preview = document.getElementById('invoiceTypedSignaturePreview');
+            if (window.QuoteDrTypedSignature) {
+                QuoteDrTypedSignature.renderPreview(preview, input ? input.value : '');
+            }
+        }
+
+        function showInvoiceSignatureStatus(message, type) {
+            var status = document.getElementById('invoiceSignatureStatus');
+            if (!status) return;
+            status.className = 'alert alert-' + (type || 'warning') + ' py-2';
+            status.textContent = message || '';
+            status.style.display = message ? 'block' : 'none';
+        }
+
+        function openInvoiceSignatureModal() {
+            if (invoiceIsInvalid()) {
+                window.alert('This invoice is no longer valid and cannot be signed.');
+                return;
+            }
+            if (invoiceHasSignature()) return;
+            if (isInvoiceContractorPreviewView()) {
+                window.alert('Signing is disabled inside the contractor preview. Send yourself a client invoice link to test the full signing flow.');
+                return;
+            }
+            var params = new URLSearchParams(window.location.search);
+            if (!params.get('id') || !params.get('token')) {
+                window.alert('This invoice link is missing its secure access token. Please ask the contractor to resend it.');
+                return;
+            }
+            var input = document.getElementById('invoiceSignerName');
+            var help = document.getElementById('invoiceSignerNameHelp');
+            var expectedName = invoiceSignatureClientName();
+            if (input) {
+                input.value = '';
+                input.classList.remove('is-invalid');
+                if (input.dataset.typedSignatureReady !== '1') {
+                    input.addEventListener('input', updateInvoiceTypedSignaturePreview);
+                    input.dataset.typedSignatureReady = '1';
+                }
+            }
+            if (help) {
+                help.textContent = expectedName
+                    ? 'Enter a full name listed for this invoice: ' + expectedName
+                    : 'The invoice must have an associated client name before it can be signed.';
+            }
+            var termsCheck = document.getElementById('invoiceTermsCheck');
+            if (termsCheck) termsCheck.checked = false;
+            var termsDetails = document.getElementById('invoiceSigningTermsDetails');
+            if (termsDetails) termsDetails.open = false;
+            renderInvoiceSigningTerms();
+            updateInvoiceTypedSignaturePreview();
+            showInvoiceSignatureStatus('');
+            var modalEl = document.getElementById('invoiceSignatureModal');
+            if (!modalEl) return;
+            modalEl.addEventListener('shown.bs.modal', function focusSigner() {
+                modalEl.removeEventListener('shown.bs.modal', focusSigner);
+                if (input) input.focus();
+            });
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
+
+        async function saveInvoiceSignatureToSupabase(invoiceId, signatureDataUrl) {
+            try {
+                var blob = QuoteDrTypedSignature.dataUrlToBlob(signatureDataUrl);
+                var fileName = invoiceId + '/' + Date.now() + '.png';
+                var upload = await _supabase.storage.from('signatures').upload(fileName, blob, { contentType: 'image/png' });
+                if (upload.error) throw upload.error;
+                var publicResult = _supabase.storage.from('signatures').getPublicUrl(fileName);
+                if (publicResult.error) throw publicResult.error;
+                return publicResult.data.publicUrl;
+            } catch (error) {
+                console.warn('Failed to upload invoice signature, using embedded signature evidence:', error);
+                return null;
+            }
+        }
+
+        async function confirmInvoiceSignature() {
+            var input = document.getElementById('invoiceSignerName');
+            var name = String(input && input.value || '').trim();
+            var expectedName = invoiceSignatureClientName();
+            if (!name) {
+                showInvoiceSignatureStatus('Please enter your full name.');
+                if (input) { input.classList.add('is-invalid'); input.focus(); }
+                return;
+            }
+            if (!expectedName) {
+                showInvoiceSignatureStatus('This invoice does not have a client name to verify. Please ask the contractor to correct and resend it.', 'danger');
+                if (input) input.focus();
+                return;
+            }
+            var nameMatch = QuoteDrTypedSignature.matchClientName(name, expectedName);
+            if (!nameMatch.hasFullName) {
+                showInvoiceSignatureStatus('Please enter your full first and last name as shown on this invoice.');
+                if (input) { input.classList.add('is-invalid'); input.focus(); }
+                return;
+            }
+            if (!nameMatch.matches) {
+                showInvoiceSignatureStatus('The signer name must match a complete client name shown on this invoice. Capitalization and extra spaces do not matter.');
+                if (input) { input.classList.add('is-invalid'); input.focus(); }
+                return;
+            }
+            var termsCheck = document.getElementById('invoiceTermsCheck');
+            if (!termsCheck || !termsCheck.checked) {
+                showInvoiceSignatureStatus('Please review and agree to the invoice terms before signing.');
+                if (termsCheck) termsCheck.focus();
+                return;
+            }
+            if (input) input.classList.remove('is-invalid');
+            var button = document.getElementById('invoiceSignBtn');
+            var originalButton = button ? button.innerHTML : '';
+            if (button) {
+                button.disabled = true;
+                button.innerHTML = '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Signing...';
+            }
+            showInvoiceSignatureStatus('');
+            logPortalDocumentActivity('signature_started', { metadata: { action: 'invoice_acknowledgement' } });
+            try {
+                var params = new URLSearchParams(window.location.search);
+                var invoiceId = params.get('id') || '';
+                var token = params.get('token') || '';
+                var portalAnchorId = params.get('portal_anchor') || '';
+                if (!invoiceId || !token || typeof updateSecureClientDocument !== 'function') throw new Error('This invoice link is missing its secure access token.');
+                var signatureDataUrl = QuoteDrTypedSignature.createSignatureDataUrl(name);
+                var signatureUrl = await saveInvoiceSignatureToSupabase(invoiceId, signatureDataUrl);
+                var clientTime = new Date().toISOString();
+                var result = await updateSecureClientDocument(invoiceId, token, 'record_signature', {
+                    dataPatch: {
+                        signature_url: signatureUrl,
+                        signature_data_url: signatureUrl ? undefined : signatureDataUrl,
+                        signature_method: 'typed',
+                        signature_text: name,
+                        signed_by: name,
+                        signed_at: clientTime,
+                        terms_accepted: true,
+                        terms_accepted_at: clientTime,
+                        invoice_acknowledged: true,
+                        invoice_acknowledged_at: clientTime
+                    }
+                }, portalAnchorId);
+                if (result && result.error) throw result.error;
+                var secureDocument = result && (result.data || result.result) || {};
+                var signedAt = secureDocument.signed_at || secureDocument.accepted_at || clientTime;
+                invoiceData = Object.assign({}, invoiceData, {
+                    signature_url: signatureUrl,
+                    signature_data_url: signatureUrl ? undefined : signatureDataUrl,
+                    signature_method: 'typed',
+                    signature_text: name,
+                    signed_by: name,
+                    signed_at: signedAt,
+                    accepted_by: name,
+                    accepted_at: signedAt,
+                    terms_accepted: true,
+                    terms_accepted_at: secureDocument.terms_accepted_at || signedAt,
+                    invoice_acknowledged: true,
+                    invoice_acknowledged_at: signedAt
+                });
+                if (window._invoiceRow) {
+                    window._invoiceRow.data = invoiceData;
+                    window._invoiceRow.accepted_at = signedAt;
+                    window._invoiceRow.accepted_by = name;
+                }
+                logPortalDocumentActivity('document_signed', { metadata: { signer_name_present: true, document_type: 'invoice' } });
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('invoiceSignatureModal')).hide();
+                renderInvoiceSignatureState();
+                if (typeof qdToast === 'function') qdToast({ title: 'Invoice Signed', message: 'Your signed acknowledgement was saved.', type: 'success' });
+            } catch (error) {
+                console.error('Invoice signature failed:', error);
+                showInvoiceSignatureStatus('Could not sign this invoice: ' + (error && error.message ? error.message : 'Please try again.'), 'danger');
+            } finally {
+                if (button) {
+                    button.disabled = false;
+                    button.innerHTML = originalButton;
+                }
+            }
+        }
+
         function loadInvoice() {
             const params = new URLSearchParams(window.location.search);
             const supabaseId = params.get('id');
@@ -1753,6 +2155,7 @@ if (location.search.includes('debug')) {
             if (termsEl) termsEl.textContent = settings.paymentTerms ? 'Payment terms: ' + settings.paymentTerms : '';
             // Store total for payment helpers
             window._invoiceTotal = invoiceIsInvalid() ? 0 : balanceDue;
+            renderInvoiceSignatureState();
         }
 
         function renderTerms() {
