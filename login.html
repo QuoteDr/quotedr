@@ -30,11 +30,13 @@
             width: 100%;
             max-width: 420px;
         }
+        .back-to-site { margin: 0; line-height: 1.25; text-align: left; }
         .logo-area {
             text-align: center;
             margin-bottom: 0.5rem;
             overflow: hidden;
         }
+        .logo-area img { width: 110%; max-width: 380px; height: auto; display: block; margin: -24% auto -39%; }
         .logo-area h1 {
             font-size: 2rem;
             font-weight: 800;
@@ -74,11 +76,11 @@ if (location.search.includes('debug')) {
 </head>
 <body>
     <div class="login-card">
-        <div style="text-align:left; margin-bottom: 8px;">
+        <div class="back-to-site">
             <a href="landing.html" style="color:#1a56a0; font-size:0.9rem; font-weight:600; text-decoration:none;">← Back to Site</a>
         </div>
         <div class="logo-area">
-            <img src="quotedr-logo.svg" alt="QuoteDr" style="width: 110%; max-width: 380px; height: auto; display: block; margin: -12% auto -39% auto;">
+            <img src="quotedr-logo.svg" alt="QuoteDr">
             <p id="loginTagline"></p>
             <script>
                 const taglines = [
