@@ -1514,6 +1514,32 @@ async function saveInvoiceForSharing(invoiceData) {
     return result;
 }
 
+function qdClientPropertiesForStorage(client) {
+    var crmProperties = client && client.crm && Array.isArray(client.crm.quoteDrProperties) ? client.crm.quoteDrProperties : [];
+    var properties = client && Array.isArray(client.properties) ? client.properties : crmProperties;
+    return properties.map(function(property) {
+        property = property || {};
+        return {
+            id: String(property.id || property.propertyId || '').trim(),
+            label: String(property.label || '').trim(),
+            address: String(property.address || '').trim(),
+            city: String(property.city || '').trim(),
+            phone: String(property.phone || '').trim(),
+            email: String(property.email || '').trim()
+        };
+    }).filter(function(property) {
+        return !!(property.address || property.city);
+    });
+}
+
+function qdClientCrmForStorage(client) {
+    var source = client && client.crm && typeof client.crm === 'object' && !Array.isArray(client.crm) ? client.crm : {};
+    var crm = Object.assign({}, source);
+    var properties = qdClientPropertiesForStorage(client);
+    if (properties.length) crm.quoteDrProperties = properties;
+    else delete crm.quoteDrProperties;
+    return crm;
+}
 // Save client to Supabase
 async function saveClientToSupabase(client) {
     const user = await getCurrentUser();
@@ -1526,7 +1552,7 @@ async function saveClientToSupabase(client) {
             address: client.address || '',
             city: client.city || '',
             notes: client.notes || '',
-            crm: client.crm || {},
+            crm: qdClientCrmForStorage(client),
             updated_at: new Date().toISOString()
         };
     return qdDurableSupabaseOperation({
@@ -2075,7 +2101,7 @@ async function saveAllClientsToSupabase(clientsArray) {
         address: c.address || '',
         city: c.city || '',
         notes: c.notes || '',
-        crm: c.crm || {},
+        crm: qdClientCrmForStorage(c),
         updated_at: new Date().toISOString()
     }));
     return qdDurableSupabaseOperation({

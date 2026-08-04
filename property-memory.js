@@ -535,6 +535,7 @@
 
     window.QuoteDrPropertyMemory = {
         open: openPropertyMemory,
+        normalizeAddress: normalizePropertyAddress,
         refreshForCurrentAddress: refreshForCurrentAddress,
         applyMarkupToQuote: applyPropertyMarkupToQuote,
         __test: {

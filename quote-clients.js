@@ -113,19 +113,88 @@
             };
         }
 
+        function normalizeClientPropertyAddress(value) {
+            if (window.QuoteDrPropertyMemory && typeof window.QuoteDrPropertyMemory.normalizeAddress === 'function') {
+                return window.QuoteDrPropertyMemory.normalizeAddress(value);
+            }
+            return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+        }
+
+        function normalizeClientProperty(property) {
+            const source = typeof property === 'string' ? { address: property } : (property || {});
+            const address = String(source.address || source.displayAddress || '').trim();
+            const city = String(source.city || '').trim();
+            const normalizedAddress = normalizeClientPropertyAddress([address, city].filter(Boolean).join(', '));
+            return {
+                id: String(source.id || source.propertyId || (normalizedAddress ? 'address:' + normalizedAddress : '')).trim(),
+                label: String(source.label || '').trim(),
+                address,
+                city,
+                phone: String(source.phone || '').trim(),
+                email: String(source.email || '').trim()
+            };
+        }
+
+        function normalizeClientProperties(source) {
+            source = source || {};
+            const embedded = source.crm && Array.isArray(source.crm.quoteDrProperties) ? source.crm.quoteDrProperties : [];
+            const candidates = [];
+            if (source.address || source.city) {
+                candidates.push({ address: source.address || '', city: source.city || '' });
+            }
+            candidates.push(...(Array.isArray(source.properties) ? source.properties : embedded));
+            const properties = [];
+            const byAddress = {};
+            candidates.forEach(function(candidate) {
+                const property = normalizeClientProperty(candidate);
+                const key = normalizeClientPropertyAddress([property.address, property.city].filter(Boolean).join(', '));
+                if (!key) return;
+                if (byAddress[key] !== undefined) {
+                    const existing = properties[byAddress[key]];
+                    ['id', 'label', 'address', 'city', 'phone', 'email'].forEach(function(field) {
+                        if (property[field]) existing[field] = property[field];
+                    });
+                    return;
+                }
+                byAddress[key] = properties.length;
+                properties.push(property);
+            });
+            return properties;
+        }
+
         function normalizeClientRecord(client, fallbackName) {
             const source = client || {};
             const name = (source.name || fallbackName || '').trim();
             const crm = normalizeClientCrm(source);
+            const properties = normalizeClientProperties(source);
+            const primaryProperty = properties[0] || {};
             return {
+                id: source.id || source.clientId || '',
                 name,
                 phone: source.phone || '',
                 email: source.email || '',
-                address: source.address || '',
-                city: source.city || '',
+                address: source.address || primaryProperty.address || '',
+                city: source.city || primaryProperty.city || '',
                 notes: crm.notes || '',
-                crm
+                crm,
+                properties
             };
+        }
+
+        function getClientProperties(client) {
+            return normalizeClientRecord(client, client && client.name).properties.slice();
+        }
+
+        function upsertClientProperty(client, propertyData) {
+            const normalized = normalizeClientRecord(client, client && client.name);
+            const property = normalizeClientProperty(propertyData);
+            if (!property.address && !property.city) return normalized;
+            return normalizeClientRecord({
+                ...normalized,
+                address: property.address || normalized.address,
+                city: property.city || normalized.city,
+                properties: normalized.properties.concat([property])
+            }, normalized.name);
         }
 
         function readClientCrmForm() {
@@ -220,12 +289,35 @@
             return merged;
         }
 
-        function fillClientInfo(clientName, clientData) {
-            document.getElementById('clientName').value = clientName;
-            if (clientData.phone)   document.getElementById('clientPhone').value = clientData.phone;
-            if (clientData.email)   document.getElementById('clientEmail').value = clientData.email;
-            if (clientData.address) document.getElementById('projectAddress').value = clientData.address;
+        function fillClientInfo(clientName, clientData, propertyData, clientKey) {
+            const client = normalizeClientRecord(clientData, clientName);
+            const property = normalizeClientProperty(propertyData || {
+                address: client.address,
+                city: client.city,
+                phone: client.phone,
+                email: client.email
+            });
+            const displayAddress = String(propertyData && propertyData.displayAddress || property.address || client.address || '').trim();
+            const values = {
+                clientName: clientName || client.name || '',
+                projectAddress: displayAddress,
+                clientPhone: property.phone || client.phone || '',
+                clientEmail: property.email || client.email || ''
+            };
+            const selectedClientId = String(client.id || clientKey || values.clientName).trim();
+            const selectedPropertyId = String(property.id || normalizeClientPropertyAddress(displayAddress)).trim();
+            Object.entries(values).forEach(function(entry) {
+                const input = document.getElementById(entry[0]);
+                if (!input) return;
+                input.value = entry[1];
+                input.dataset.selectedClientId = selectedClientId;
+                input.dataset.selectedClientKey = String(clientKey || clientName || '').trim();
+                input.dataset.selectedPropertyId = selectedPropertyId;
+            });
+            window._selectedQuoteClient = client;
+            window._selectedQuoteProperty = property;
             if (window.QuoteDrPropertyMemory) window.QuoteDrPropertyMemory.refreshForCurrentAddress();
+            if (typeof markUnsaved === 'function') markUnsaved();
         }
 
         function saveCurrentClient() {
@@ -235,7 +327,8 @@
             const address = document.getElementById('projectAddress').value.trim();
             if (!name) { alert('Please enter a client name first.'); return; }
             const existing = normalizeClientRecord(savedClients[name], name);
-            savedClients[name] = normalizeClientRecord({ ...existing, name, phone, email, address }, name);
+            const updated = normalizeClientRecord({ ...existing, name, phone, email, address }, name);
+            savedClients[name] = upsertClientProperty(updated, { address, city: updated.city, phone, email });
             persistClients();
             // Flash save status
             const el = document.getElementById('saveStatus');
@@ -286,7 +379,9 @@
             const email   = document.getElementById('newClientEmail').value.trim();
             const address = document.getElementById('newClientAddress').value.trim();
             if (!name) { alert('Please enter a client name.'); return; }
-            savedClients[name] = normalizeClientRecord({ name, phone, email, address, crm: readClientCrmForm() }, name);
+            const existing = normalizeClientRecord(savedClients[name], name);
+            const updated = normalizeClientRecord({ ...existing, name, phone, email, address, crm: readClientCrmForm() }, name);
+            savedClients[name] = upsertClientProperty(updated, { address, city: updated.city, phone, email });
             persistClients();
             clearClientForm();
             renderClientsList();
@@ -314,11 +409,14 @@
                     .map(label => '<span class="badge text-bg-light border me-1">' + escapeHtml(label) + '</span>')
                     .join('');
                 const escapedName = escapeHtml(c.name);
+                const propertyCount = getClientProperties(c).length;
+                const propertyBadge = propertyCount > 1 ? '<span class="badge text-bg-light border ms-1">' + propertyCount + ' properties</span>' : '';
+                const addressCell = c.address ? escapeHtml(c.address) + propertyBadge : '<span class="text-muted">-</span>';
                 html += `<tr>
                     <td><strong>${escapeHtml(c.name)}</strong>${crmBadges ? '<div class="mt-1">' + crmBadges + '</div>' : ''}</td>
                     <td>${c.phone ? escapeHtml(c.phone) : '<span class="text-muted">-</span>'}</td>
                     <td>${c.email ? escapeHtml(c.email) : '<span class="text-muted">-</span>'}</td>
-                    <td>${c.address ? escapeHtml(c.address) : '<span class="text-muted">-</span>'}</td>
+                    <td>${addressCell}</td>
                     <td>
                         <div class="d-flex gap-1">
                             <button class="btn btn-sm btn-outline-primary client-edit-btn" data-name="${escapedName}" title="Edit"><i class="fas fa-edit"></i></button>
@@ -351,6 +449,9 @@
         window.persistClients = persistClients;
         window.getAllClients = getAllClients;
         window.normalizeClientRecord = normalizeClientRecord;
+        window.normalizeClientProperty = normalizeClientProperty;
+        window.getClientProperties = getClientProperties;
+        window.upsertClientProperty = upsertClientProperty;
         window.fillClientInfo = fillClientInfo;
         window.saveCurrentClient = saveCurrentClient;
         window.openManageClientsModal = openManageClientsModal;

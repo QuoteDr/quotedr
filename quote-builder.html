@@ -2592,9 +2592,9 @@ if (location.search.includes('debug')) {
                     </div>
 
                     <!-- Client Information Section -->
-                    <div class="col-md-12 autocomplete-container">
+                    <div class="col-md-12 autocomplete-container contact-lookup-field">
                         <div class="d-flex justify-content-between align-items-center mb-1">
-                            <label class="mb-0"><strong>Client Name (Type to search):</strong></label>
+                            <label class="mb-0" for="clientName"><strong>Client Name (Type to search):</strong></label>
                             <div class="d-flex gap-2">
                                 <button onclick="saveCurrentClient()" class="btn btn-sm btn-outline-success" title="Save current client info to database">
                                     <i class="fas fa-user-plus"></i> Save Client
@@ -2604,14 +2604,14 @@ if (location.search.includes('debug')) {
                                 </button>
                             </div>
                         </div>
-                        <input type="text" id="clientName" class="form-control" spellcheck="true" placeholder="Start typing client name..."
-                               onkeyup="showClientSuggestions()" onblur="hideClientDropdown()">
-                        <div id="clientDropdown" class="autocomplete-dropdown"></div>
+                        <input type="text" id="clientName" class="form-control" spellcheck="true" placeholder="Start typing client name..." autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="clientDropdown">
+                        <div id="clientDropdown" class="autocomplete-dropdown contact-lookup-dropdown" role="listbox" aria-label="Saved clients and properties matching client name"></div>
                     </div>
 
-                    <div class="col-md-6 mt-3">
-                        <label><strong>Project Address:</strong></label>
-                        <input type="text" id="projectAddress" class="form-control" spellcheck="true" placeholder="123 Main St, Toronto">
+                    <div class="col-md-6 mt-3 contact-lookup-field">
+                        <label for="projectAddress"><strong>Project Address:</strong></label>
+                        <input type="text" id="projectAddress" class="form-control" spellcheck="true" placeholder="123 Main St, Toronto" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="projectAddressDropdown">
+                        <div id="projectAddressDropdown" class="autocomplete-dropdown contact-lookup-dropdown" role="listbox" aria-label="Saved clients and properties matching project address"></div>
                         <div class="property-memory-entry d-flex flex-wrap align-items-center gap-2 mt-2">
                             <button type="button" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-2" id="propertyMemoryBtn" aria-haspopup="dialog" aria-controls="propertyMemoryModal" aria-describedby="propertyMemoryAddressStatus" disabled>
                                 <i class="fas fa-house-circle-check" aria-hidden="true"></i>
@@ -2623,14 +2623,16 @@ if (location.search.includes('debug')) {
 
                     </div>
 
-                    <div class="col-md-6 mt-3">
-                        <label><strong>Phone Number:</strong></label>
-                        <input type="tel" id="clientPhone" class="form-control" spellcheck="true" placeholder="(416) 555-0123">
+                    <div class="col-md-6 mt-3 contact-lookup-field">
+                        <label for="clientPhone"><strong>Phone Number:</strong></label>
+                        <input type="tel" id="clientPhone" class="form-control" spellcheck="true" placeholder="(416) 555-0123" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="clientPhoneDropdown">
+                        <div id="clientPhoneDropdown" class="autocomplete-dropdown contact-lookup-dropdown" role="listbox" aria-label="Saved clients and properties matching phone number"></div>
                     </div>
 
-                    <div class="col-md-12 mt-3">
-                        <label><strong>Email Address:</strong></label>
-                        <input type="email" id="clientEmail" class="form-control" spellcheck="true" placeholder="client@email.com">
+                    <div class="col-md-12 mt-3 contact-lookup-field">
+                        <label for="clientEmail"><strong>Email Address:</strong></label>
+                        <input type="email" id="clientEmail" class="form-control" spellcheck="true" placeholder="client@email.com" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="clientEmailDropdown">
+                        <div id="clientEmailDropdown" class="autocomplete-dropdown contact-lookup-dropdown" role="listbox" aria-label="Saved clients and properties matching email address"></div>
                     </div>
 
                 </div>
@@ -20049,6 +20051,51 @@ Example:
             margin-top: 4px;
             color: #6c757d;
         }
+        .contact-lookup-field {
+            position: relative;
+        }
+        .contact-lookup-dropdown {
+            z-index: 1100;
+        }
+        button.contact-lookup-option {
+            display: block;
+            border: 0;
+            border-bottom: 1px solid #f0f0f0;
+            border-radius: 0;
+            background: #fff;
+            color: #172b3f;
+            white-space: normal;
+        }
+        .contact-lookup-option-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+        }
+        .contact-lookup-match-badge {
+            flex: 0 0 auto;
+            font-size: 0.7rem;
+        }
+        .contact-lookup-address {
+            display: block;
+            margin-top: 0.2rem;
+            font-weight: 650;
+            color: #34495e;
+        }
+        .contact-lookup-details {
+            overflow-wrap: anywhere;
+        }
+        @media (max-width: 575.98px) {
+            .contact-lookup-dropdown {
+                max-height: min(45vh, 320px);
+            }
+            button.contact-lookup-option {
+                padding: 12px;
+            }
+            .contact-lookup-option-heading {
+                align-items: flex-start;
+            }
+        }
         #addLineModal .line-item-editor-dialog {
             width: calc(100vw - 4rem);
             max-width: 1440px;
@@ -20105,6 +20152,7 @@ Example:
 </style>
 
     <script src="quote-clients.js?v=1777660402"></script>
+    <script src="quote-contact-property-lookup.js?v=2026080301"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
     <script src="ikea-quote.js?v=1778059000"></script>
 <script src="quote-style.js?v=2026071901"></script>

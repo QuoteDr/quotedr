@@ -2180,9 +2180,23 @@ async function saveQuote() {
                                 existing = obj;
                             }
                             result.data.forEach(function(sc) {
-                                if (sc.name && !existing[sc.name]) {
-                                    existing[sc.name] = { name: sc.name, phone: sc.phone || '', email: sc.email || '', address: sc.address || '', city: sc.city || '', notes: sc.notes || '', crm: sc.crm || {} };
+                                if (!sc.name) return;
+                                var cloudClient = { id: sc.id || '', name: sc.name, phone: sc.phone || '', email: sc.email || '', address: sc.address || '', city: sc.city || '', notes: sc.notes || '', crm: sc.crm || {} };
+                                if (typeof normalizeClientRecord !== 'function') {
+                                    if (!existing[sc.name]) existing[sc.name] = cloudClient;
+                                    return;
                                 }
+                                var normalizedCloud = normalizeClientRecord(cloudClient, sc.name);
+                                if (!existing[sc.name]) {
+                                    existing[sc.name] = normalizedCloud;
+                                    return;
+                                }
+                                var normalizedLocal = normalizeClientRecord(existing[sc.name], sc.name);
+                                existing[sc.name] = normalizeClientRecord(Object.assign({}, normalizedCloud, normalizedLocal, {
+                                    id: normalizedLocal.id || normalizedCloud.id,
+                                    crm: Object.assign({}, normalizedCloud.crm || {}, normalizedLocal.crm || {}),
+                                    properties: (normalizedCloud.properties || []).concat(normalizedLocal.properties || [])
+                                }), sc.name);
                             });
                             localStorage.setItem('ald_clients', JSON.stringify(existing));
                             loadSavedClients(); // refresh in-memory client list
