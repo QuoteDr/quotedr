@@ -1100,6 +1100,7 @@
             if (document.getElementById('quoteNumber'))    document.getElementById('quoteNumber').value    = data.quoteNumber || data.quote_number || '';
             if (document.getElementById('quoteStatus'))    document.getElementById('quoteStatus').value    = data.status || 'draft';
             if (document.getElementById('projectAddress')) document.getElementById('projectAddress').value = data.projectAddress || data.project_address || '';
+            if (window.QuoteDrPropertyMemory) window.QuoteDrPropertyMemory.refreshForCurrentAddress();
             if (document.getElementById('clientPhone'))    document.getElementById('clientPhone').value    = data.clientPhone || data.phone || '';
             if (document.getElementById('clientEmail'))    document.getElementById('clientEmail').value    = data.clientEmail || data.email || '';
             renderTermsCheckboxes(getQuoteTermsForRender(data));

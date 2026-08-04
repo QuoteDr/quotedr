@@ -225,6 +225,7 @@
             if (clientData.phone)   document.getElementById('clientPhone').value = clientData.phone;
             if (clientData.email)   document.getElementById('clientEmail').value = clientData.email;
             if (clientData.address) document.getElementById('projectAddress').value = clientData.address;
+            if (window.QuoteDrPropertyMemory) window.QuoteDrPropertyMemory.refreshForCurrentAddress();
         }
 
         function saveCurrentClient() {
