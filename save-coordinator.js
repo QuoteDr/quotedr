@@ -318,6 +318,16 @@
         );
     }
 
+    function isClientSchemaContractError(operation, error) {
+        var target = operation && operation.target || {};
+        var isClientOperation = target.table === 'clients' ||
+            operation && (operation.entityType === 'client' || operation.entityType === 'client_database');
+        if (!isClientOperation) return false;
+        var normalized = errorObject(error);
+        var text = [normalized.code, normalized.message, normalized.details, normalized.hint].join(' ');
+        return /PGRST204|42P10|schema cache|column .* does not exist|no unique or exclusion constraint matching the ON CONFLICT specification/i.test(text);
+    }
+
     function retryDelay(attempts) {
         var schedule = [5000, 15000, 60000, 5 * 60000, 15 * 60000, MAX_BACKOFF_MS];
         return schedule[Math.min(Math.max(attempts - 1, 0), schedule.length - 1)];
@@ -503,9 +513,14 @@
         return publicResult(current.state, current, null, error);
     }
 
-    async function markActionRequired(operation, error) {
+    async function markActionRequired(operation, error, options) {
+        options = options || {};
         var current = await getStoreValue(OUTBOX_STORE, operation.key);
         if (!current || current.revision !== operation.revision) return publicResult('action_required', operation, null, error);
+        if (options.recordAttempt === true) {
+            current.attempts = (parseInt(current.attempts, 10) || 0) + 1;
+            current.lastAttemptAt = new Date().toISOString();
+        }
         current.state = 'action_required';
         current.nextAttemptAt = 0;
         current.lastError = errorObject(error);
@@ -588,6 +603,9 @@
             return markAcknowledged(latest, result);
         } catch (error) {
             var normalizedError = errorObject(error);
+            if (isClientSchemaContractError(latest, error)) {
+                return markActionRequired(latest, error, { recordAttempt: true });
+            }
             if (String(normalizedError.code) === 'QD_INVALID_IDENTIFIER' || /invalid input syntax for type uuid/i.test(normalizedError.message)) {
                 return markActionRequired(latest, error);
             }
@@ -855,6 +873,26 @@
         options = options || {};
         var key = entityKey(await currentUserId(options.ownerId), entityType, String(entityId));
         return discardPendingByKey(key, options);
+    }
+
+    function isRecoverableClientSchemaOperation(operation) {
+        return !!(operation && operation.state === 'action_required' &&
+            isClientSchemaContractError(operation, operation.lastError));
+    }
+
+    async function retryActionRequiredByKey(key) {
+        var operation = await getStoreValue(OUTBOX_STORE, key);
+        if (!operation || operation.state !== 'action_required') return { state: 'missing' };
+        operation.state = operation.action === 'delete' ? 'delete_pending' : 'local_pending';
+        operation.nextAttemptAt = 0;
+        operation.lastError = null;
+        await putStoreValue(OUTBOX_STORE, operation);
+        var snapshot = await getStoreValue(SNAPSHOT_STORE, key) || {};
+        snapshot.state = operation.state;
+        snapshot.lastError = null;
+        await putStoreValue(SNAPSHOT_STORE, snapshot);
+        await notify();
+        return flushSavedOperation(operation, { force: true });
     }
 
     function isRecoverableMalformedQuoteOperation(operation) {
@@ -1410,6 +1448,7 @@
             var quoteExportAction = operation.entityType === 'quote' ? '<div class="qd-recovery-actions mt-2"><button type="button" class="btn btn-sm btn-outline-success" data-qd-export-quote data-qd-operation-key="' + escapeHtml(operation.key) + '"><i class="fas fa-download me-1"></i>Export Quote Backup</button></div>' : '';
             var actionRequiredActions = operation.state === 'action_required' ? '<div class="qd-recovery-actions mt-2">' +
                 (isRecoverableMalformedQuoteOperation(operation) ? '<button type="button" class="btn btn-sm btn-primary" data-qd-resolve-quote data-qd-operation-key="' + escapeHtml(operation.key) + '"><i class="fas fa-magnifying-glass me-1"></i>Resolve Failed Save</button>' : '') +
+                (isRecoverableClientSchemaOperation(operation) ? '<button type="button" class="btn btn-sm btn-primary" data-qd-resolve-retry data-qd-operation-key="' + escapeHtml(operation.key) + '"><i class="fas fa-rotate me-1"></i>Resolve Failed Save</button>' : '') +
                 '<button type="button" class="btn btn-sm btn-outline-danger" data-qd-discard-failed data-qd-operation-key="' + escapeHtml(operation.key) + '"><i class="fas fa-download me-1"></i>Export &amp; Remove Failed Save</button></div>' : '';
             var stateLabel = operation.state === 'action_required' ? 'action required' : (operation.state || 'local_pending');
             return '<div class="qd-recovery-row">' +
@@ -1518,6 +1557,25 @@
                     else window.alert(resolutionError);
                     openRecoveryCenter();
                 }
+            });
+        });
+        overlay.querySelectorAll('[data-qd-resolve-retry]').forEach(function(button) {
+            button.addEventListener('click', async function() {
+                var operationKey = button.getAttribute('data-qd-operation-key');
+                button.disabled = true;
+                button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Retrying Cloud Save';
+                var result = await retryActionRequiredByKey(operationKey);
+                overlay.remove();
+                if (result && result.state === 'cloud_saved' && !result.error) {
+                    var successMessage = 'The retained client save is now confirmed in the cloud.';
+                    if (typeof qdAlert === 'function') qdAlert(successMessage, { title: 'Save Resolved', type: 'success' });
+                    else window.alert(successMessage);
+                    return;
+                }
+                var retryError = result && result.error && result.error.message || 'The cloud schema is not ready yet. Your retained client data is still safe on this device.';
+                if (typeof qdAlert === 'function') qdAlert(retryError, { title: 'Save Still Needs Attention', type: 'warning' });
+                else window.alert(retryError);
+                openRecoveryCenter();
             });
         });
         overlay.querySelectorAll('[data-qd-discard-failed]').forEach(function(button) {
@@ -1686,6 +1744,7 @@
         updateConflictPayload: updateConflictPayload,
         discardPending: discardPending,
         discardPendingByKey: discardPendingByKey,
+        retryActionRequired: retryActionRequiredByKey,
         resolveMalformedQuote: resolveMalformedQuoteOperation,
         resolveConflict: resolveConflict,
         exportRecovery: exportRecovery,

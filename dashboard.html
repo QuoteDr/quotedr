@@ -477,7 +477,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-v2.js?v=2026080102"></script>
     <script src="admin-access.js?v=2026080201"></script>
-    <script src="save-coordinator.js?v=2026080102"></script>
+    <script src="save-coordinator.js?v=2026080401"></script>
     <script src="app-broadcasts.js?v=1779131000"></script>
     <script>
         function dashboardQuoteRowById(quoteId) {
@@ -4542,12 +4542,16 @@ function renderBusinessInsights(quotes) {
             localStorage.setItem('ald_clients', JSON.stringify(saved));
             window._newQuoteSelectedClient = saved[storageName];
             populateNewQuoteClientSuggestions();
+            var cloudResult = null;
             if (typeof saveClientToSupabase === 'function') {
-                saveClientToSupabase(saved[storageName]).catch(function(e) {
+                try {
+                    cloudResult = await saveClientToSupabase(saved[storageName]);
+                } catch(e) {
                     console.warn('Dashboard new quote client sync error:', e);
-                });
+                    cloudResult = { state: 'local_pending', error: e };
+                }
             }
-            return true;
+            return { savedLocally: true, cloudResult: cloudResult };
         }
 
         async function saveNewQuoteClientFromModal() {
@@ -4567,8 +4571,16 @@ function renderBusinessInsights(quotes) {
                 saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
             }
             try {
-                await saveNewQuoteClientDraft(clientDraft);
-                if (statusEl) statusEl.innerHTML = '<i class="fas fa-check-circle me-1"></i>Client saved to your database.';
+                var saveResult = await saveNewQuoteClientDraft(clientDraft);
+                var cloudResult = saveResult && saveResult.cloudResult;
+                var cloudSaved = cloudResult && (cloudResult.state === 'cloud_saved' || cloudResult.saveState === 'cloud_saved') && !cloudResult.error;
+                if (statusEl) {
+                    statusEl.classList.toggle('text-success', !!cloudSaved);
+                    statusEl.classList.toggle('text-warning', !cloudSaved);
+                    statusEl.innerHTML = cloudSaved
+                        ? '<i class="fas fa-check-circle me-1"></i>Client saved to your database.'
+                        : '<i class="fas fa-cloud-arrow-up me-1"></i>Client saved on this device and queued for cloud sync.';
+                }
             } catch(e) {
                 errEl.textContent = 'Unable to save client: ' + (e && e.message ? e.message : 'Unknown error');
             } finally {
