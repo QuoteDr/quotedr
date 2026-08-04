@@ -13594,6 +13594,15 @@ Example:
         function renderRooms() {
             const container = document.getElementById('roomsContainer');
             ensureUniqueRoomIds();
+            const automaticPropertyMarkupRoomsUpdated = window.QuoteDrPropertyMemory && typeof window.QuoteDrPropertyMemory.applyAutomaticMarkupToUnmarkedRooms === 'function'
+                ? window.QuoteDrPropertyMemory.applyAutomaticMarkupToUnmarkedRooms({ render: false, persist: false, undo: false })
+                : 0;
+            if (automaticPropertyMarkupRoomsUpdated) {
+                setTimeout(function() {
+                    if (typeof saveSessionQuote === 'function') saveSessionQuote();
+                    if (typeof markUnsaved === 'function') markUnsaved();
+                }, 0);
+            }
             const savedPhotosUpdated = syncCurrentQuotePhotosFromSavedItems();
             if (savedPhotosUpdated) {
                 setTimeout(function() {
@@ -17181,7 +17190,7 @@ Example:
     </script>
     <script src="change-orders.js?v=1778152100"></script>
     <script src="quote-storage.js?v=2026080201"></script>
-    <script src="property-memory.js?v=2026080301"></script>
+    <script src="property-memory.js?v=2026080302"></script>
     <script>
         // -- End Save / Load ------------------------------------------------------
 

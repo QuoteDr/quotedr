@@ -11,7 +11,7 @@ const clients = fs.readFileSync(path.join(root, 'quote-clients.js'), 'utf8');
 assert(builder.includes('id="propertyMemoryBtn"'), 'the quote address needs a Property Memory entry point');
 assert(builder.includes('id="propertyMemorySavedBadge"'), 'the address entry needs a saved-data badge');
 assert(builder.includes('aria-haspopup="dialog"') && builder.includes('aria-live="polite"'), 'the entry point should expose accessible dialog and status semantics');
-assert(builder.includes('property-memory.js?v=2026080301'), 'the Quote Builder should load the property-memory module');
+assert(builder.includes('property-memory.js?v=2026080302'), 'the Quote Builder should load the current Property Memory module');
 assert(builder.includes('@media (max-width: 767.98px)') && builder.includes('.property-memory-contact-grid'), 'property contacts should reflow on mobile');
 
 [
@@ -68,7 +68,27 @@ assert(applyBlock.includes('room.markup = percent'), 'confirmed property markup 
 assert(applyBlock.includes('_pushUndo') && applyBlock.includes('markUnsaved') && applyBlock.includes('saveSessionQuote'), 'property markup should be undoable and enter the normal quote save flow');
 assert(propertyMemory.includes('id="propertyMarkupApplyBtn" disabled'), 'the apply button must start disabled');
 assert(!/id="propertyMarkupApplyConfirm"[^>]*checked/.test(propertyMemory), 'the markup opt-in checkbox must never start selected');
-assert(propertyMemory.includes('Saving this rule never changes pricing.'), 'the pricing boundary must be visible in the modal');
+assert(propertyMemory.includes('Saving this rule does not change this quote. You can review and apply it to this quote separately.'), 'the pricing boundary must use the approved explanatory copy');
+assert(propertyMemory.includes('id="propertyMarkupAlwaysApply"') && propertyMemory.includes('role="switch"'), 'automatic property markup needs an accessible switch');
+assert(propertyMemory.includes('Always apply this markup for this property.'), 'automatic property markup needs the approved label');
+assert(propertyMemory.includes('including an explicit 0%'), 'the automatic behavior must explain that manual zero markup is preserved');
+assert(!/id="propertyMarkupAlwaysApply"[^>]*checked/.test(propertyMemory), 'automatic property markup must default off');
+assert(propertyMemory.includes('markupRule.alwaysApply === true'), 'legacy records should only opt in through an explicit true value');
+assert(saveBlock.includes('applyNow: false'), 'saving the automatic setting must not change the current quote');
+
+const autoStart = propertyMemory.indexOf('function applyAutomaticMarkupToUnmarkedRooms(options)');
+const autoEnd = propertyMemory.indexOf('function activateAutomaticMarkupRule', autoStart);
+const autoBlock = propertyMemory.slice(autoStart, autoEnd);
+assert(autoStart >= 0 && autoEnd > autoStart, 'automatic property markup should remain independently testable');
+assert(autoBlock.includes('return !roomHasManualRoomMarkup(room)'), 'automatic markup must skip every room with an explicit manual markup');
+assert(autoBlock.includes('skippedRoomIds.indexOf'), 'saving an enabled rule must protect rooms already in the current quote');
+assert(autoBlock.includes('room.markup = activeAutomaticMarkupRule.percent'), 'automatic markup should use the existing room markup model');
+assert(autoBlock.includes('if (room.hideMarkup === undefined) room.hideMarkup = true'), 'automatic markup should preserve existing visibility and default new visibility to hidden');
+assert(autoBlock.includes('saveSessionQuote') && autoBlock.includes('markUnsaved'), 'automatic pricing changes must enter the normal quote save flow');
+assert(autoBlock.includes('Existing manual room markups were kept.'), 'automatic application should visibly report its safe behavior');
+assert(propertyMemory.includes('activateAutomaticMarkupRule(record, normalizedAddress, { applyNow: true })'), 'selecting a saved property should activate its opted-in markup rule');
+assert(builder.includes('applyAutomaticMarkupToUnmarkedRooms({ render: false, persist: false, undo: false })'), 'newly rendered unmarked rooms should inherit an active property rule');
+
 
 assert(storage.includes('QuoteDrPropertyMemory.refreshForCurrentAddress()'), 'cloud/session quote restore should refresh the address badge');
 assert(clients.includes('QuoteDrPropertyMemory.refreshForCurrentAddress()'), 'saved-client address selection should refresh the address badge');

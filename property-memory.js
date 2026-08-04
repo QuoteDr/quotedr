@@ -8,6 +8,7 @@
     var addressInputTimer = null;
     var currentRecord = null;
     var currentNormalizedAddress = '';
+    var activeAutomaticMarkupRule = null;
 
     function normalizePropertyAddress(value) {
         var normalized = String(value || '').trim().toLowerCase();
@@ -98,7 +99,8 @@
             workHistory: cleanText(raw.workHistory),
             markupRule: {
                 percent: normalizeMarkupPercent(markupRule.percent),
-                note: cleanText(markupRule.note)
+                note: cleanText(markupRule.note),
+                alwaysApply: markupRule.alwaysApply === true
             },
             updatedAt: raw.updatedAt || null
         };
@@ -129,7 +131,7 @@
             var contact = normalized.propertyContacts[role];
             return !!(contact.name || contact.phone || contact.email);
         });
-        return textValues.some(Boolean) || contactValues || normalized.markupRule.percent !== null;
+        return textValues.some(Boolean) || contactValues || normalized.markupRule.percent !== null || normalized.markupRule.alwaysApply;
     }
 
     function getAddressInput() {
@@ -200,7 +202,14 @@
         }
         if (badge) badge.hidden = !hasSaved;
         if (status) {
-            status.textContent = loading ? 'Checking saved property information...' : (hasSaved ? 'Saved information is available for this address.' : '');
+            var automaticPercent = record && record.markupRule && record.markupRule.alwaysApply
+                ? normalizeMarkupPercent(record.markupRule.percent)
+                : null;
+            status.textContent = loading
+                ? 'Checking saved property information...'
+                : (automaticPercent !== null
+                    ? 'Saved information is available. Automatic ' + automaticPercent + '% markup is enabled for rooms without a manual room markup.'
+                    : (hasSaved ? 'Saved information is available for this address.' : ''));
         }
     }
 
@@ -210,6 +219,7 @@
         var sequence = ++addressLoadSequence;
         currentNormalizedAddress = normalizedAddress;
         currentRecord = null;
+        activeAutomaticMarkupRule = null;
         setEntryState(null, normalizedAddress, !!normalizedAddress);
         if (!normalizedAddress) return null;
         var record = await loadPropertyMemoryRecord(displayAddress);
@@ -217,6 +227,7 @@
         currentRecord = record;
         currentNormalizedAddress = normalizedAddress;
         setEntryState(record, normalizedAddress, false);
+        activateAutomaticMarkupRule(record, normalizedAddress, { applyNow: true });
         return record;
     }
 
@@ -286,7 +297,7 @@
             '        </fieldset>',
             '        <fieldset class="property-memory-section property-memory-markup-section">',
             '          <legend>Optional markup rule</legend>',
-            '          <div class="alert alert-warning py-2 small"><strong>Saving this rule never changes pricing.</strong> Applying it to a quote is always a separate, explicit action.</div>',
+            '          <div class="alert alert-warning py-2 small">Saving this rule does not change this quote. You can review and apply it to this quote separately.</div>',
             '          <div class="row g-3 align-items-end">',
             '            <div class="col-md-3"><label class="form-label" for="propertyMarkupPercent">Suggested room markup</label><div class="input-group"><input class="form-control" id="propertyMarkupPercent" type="number" min="0" max="100" step="0.1" inputmode="decimal"><span class="input-group-text">%</span></div></div>',
             '            <div class="col-md-9"><label class="form-label" for="propertyMarkupNote">Reason or review note</label><input class="form-control" id="propertyMarkupNote" placeholder="Why this property may need an adjustment..."></div>',
@@ -298,6 +309,12 @@
             '          </div>',
             '          <p class="small text-muted mt-1 mb-2">This replaces existing room markup percentages. Individual item markup remains unchanged.</p>',
             '          <button type="button" class="btn btn-outline-warning" id="propertyMarkupApplyBtn" disabled><i class="fas fa-percent me-1" aria-hidden="true"></i>Apply to this quote</button>',
+            '          <div class="form-check form-switch mt-4 pt-3 border-top">',
+            '            <input class="form-check-input" type="checkbox" role="switch" id="propertyMarkupAlwaysApply" aria-describedby="propertyMarkupAlwaysApplyHelp propertyMarkupAutomaticState">',
+            '            <label class="form-check-label fw-semibold" for="propertyMarkupAlwaysApply">Always apply this markup for this property.</label>',
+            '          </div>',
+            '          <p class="small text-muted mt-1 mb-1" id="propertyMarkupAlwaysApplyHelp">When enabled, Quote Dr automatically applies the saved percentage when this property is selected. Rooms with a manual room markup, including an explicit 0%, are left unchanged. Individual item markup is never changed.</p>',
+            '          <div class="small fw-semibold" id="propertyMarkupAutomaticState" aria-live="polite"></div>',
             '        </fieldset>',
             '      </div>',
             '      <div class="modal-footer">',
@@ -312,7 +329,11 @@
         document.body.appendChild(modal);
         document.getElementById('propertyMemorySaveBtn').addEventListener('click', savePropertyMemoryFromForm);
         document.getElementById('propertyMarkupApplyConfirm').addEventListener('change', updatePropertyMarkupApplyState);
-        document.getElementById('propertyMarkupPercent').addEventListener('input', updatePropertyMarkupApplyState);
+        document.getElementById('propertyMarkupPercent').addEventListener('input', function() {
+            updatePropertyMarkupApplyState();
+            updatePropertyMarkupAutomaticState();
+        });
+        document.getElementById('propertyMarkupAlwaysApply').addEventListener('change', updatePropertyMarkupAutomaticState);
         document.getElementById('propertyMarkupApplyBtn').addEventListener('click', applyPropertyMarkupToQuote);
         return modal;
     }
@@ -357,7 +378,10 @@
         setFieldValue('propertyMarkupNote', record.markupRule.note);
         var checkbox = document.getElementById('propertyMarkupApplyConfirm');
         if (checkbox) checkbox.checked = false;
+        var alwaysApplyCheckbox = document.getElementById('propertyMarkupAlwaysApply');
+        if (alwaysApplyCheckbox) alwaysApplyCheckbox.checked = record.markupRule.alwaysApply === true;
         updatePropertyMarkupApplyState();
+        updatePropertyMarkupAutomaticState();
         updateCurrentQuoteMarkupState();
     }
 
@@ -387,7 +411,11 @@
                 superintendent: { name: fieldValue('propertySuperintendentName'), phone: fieldValue('propertySuperintendentPhone'), email: fieldValue('propertySuperintendentEmail') }
             },
             workHistory: fieldValue('propertyWorkHistory'),
-            markupRule: { percent: fieldValue('propertyMarkupPercent'), note: fieldValue('propertyMarkupNote') },
+            markupRule: {
+                percent: fieldValue('propertyMarkupPercent'),
+                note: fieldValue('propertyMarkupNote'),
+                alwaysApply: !!document.getElementById('propertyMarkupAlwaysApply')?.checked
+            },
             updatedAt: new Date().toISOString()
         }, displayAddress, normalizedAddress);
     }
@@ -433,10 +461,20 @@
         var normalizedAddress = normalizePropertyAddress(displayAddress);
         if (!normalizedAddress) return;
         var saveButton = document.getElementById('propertyMemorySaveBtn');
+        var alwaysApplyCheckbox = document.getElementById('propertyMarkupAlwaysApply');
+        var rawMarkupPercent = fieldValue('propertyMarkupPercent');
+        var numericMarkupPercent = Number(rawMarkupPercent);
+        if (alwaysApplyCheckbox && alwaysApplyCheckbox.checked && (!rawMarkupPercent || !isFinite(numericMarkupPercent) || numericMarkupPercent < 0 || numericMarkupPercent > 100)) {
+            showFormStatus('Enter a markup percentage between 0 and 100 before enabling automatic markup.', 'warning');
+            var markupField = document.getElementById('propertyMarkupPercent');
+            if (markupField) markupField.focus();
+            return;
+        }
         var record = readFormRecord(displayAddress, normalizedAddress);
         writeLocalRecord(record);
         currentRecord = record;
         currentNormalizedAddress = normalizedAddress;
+        activateAutomaticMarkupRule(record, normalizedAddress, { applyNow: false });
         setEntryState(record, normalizedAddress, false);
         if (saveButton) {
             saveButton.disabled = true;
@@ -487,6 +525,80 @@
         if (button) button.disabled = !(checkbox && checkbox.checked && percent !== null && hasRooms);
     }
 
+    function updatePropertyMarkupAutomaticState() {
+        var checkbox = document.getElementById('propertyMarkupAlwaysApply');
+        var state = document.getElementById('propertyMarkupAutomaticState');
+        if (!state) return;
+        var rawPercent = fieldValue('propertyMarkupPercent');
+        var numericPercent = Number(rawPercent);
+        if (!checkbox || !checkbox.checked) {
+            state.className = 'small fw-semibold text-muted';
+            state.textContent = 'Automatic application is off. This quote changes only if you use Apply to this quote.';
+            return;
+        }
+        if (!rawPercent || !isFinite(numericPercent) || numericPercent < 0 || numericPercent > 100) {
+            state.className = 'small fw-semibold text-danger';
+            state.textContent = 'Enter a percentage from 0 to 100 before saving automatic application.';
+            return;
+        }
+        state.className = 'small fw-semibold text-primary';
+        state.textContent = 'When saved, Quote Dr will automatically apply ' + numericPercent + '% to rooms without a manual room markup whenever this property is selected.';
+    }
+
+    function automaticMarkupRuleFromRecord(record, normalizedAddress) {
+        var normalizedRecord = normalizePropertyMemoryRecord(record, record && record.displayAddress, normalizedAddress);
+        if (!normalizedRecord.markupRule.alwaysApply || normalizedRecord.markupRule.percent === null) return null;
+        return {
+            normalizedAddress: normalizedAddress || normalizedRecord.normalizedAddress,
+            percent: normalizedRecord.markupRule.percent,
+            note: normalizedRecord.markupRule.note
+        };
+    }
+
+    function roomHasManualRoomMarkup(room) {
+        if (!room || !Object.prototype.hasOwnProperty.call(room, 'markup')) return false;
+        return room.markup !== '' && room.markup !== null && room.markup !== undefined;
+    }
+
+    function applyAutomaticMarkupToUnmarkedRooms(options) {
+        options = options || {};
+        if (!activeAutomaticMarkupRule || typeof rooms === 'undefined' || !Array.isArray(rooms) || rooms.length === 0) return 0;
+        var skippedRoomIds = activeAutomaticMarkupRule.skipRoomIds || [];
+        var targets = rooms.filter(function(room) {
+            return !roomHasManualRoomMarkup(room) && skippedRoomIds.indexOf(String(room && room.id)) === -1;
+        });
+        if (!targets.length) return 0;
+        if (options.undo !== false && typeof _pushUndo === 'function') _pushUndo();
+        targets.forEach(function(room) {
+            room.markup = activeAutomaticMarkupRule.percent;
+            if (room.hideMarkup === undefined) room.hideMarkup = true;
+        });
+        if (options.render !== false && typeof renderRooms === 'function') renderRooms();
+        if (options.persist !== false) {
+            if (typeof saveSessionQuote === 'function') saveSessionQuote();
+            if (typeof markUnsaved === 'function') markUnsaved();
+        }
+        updateCurrentQuoteMarkupState();
+        if (options.announce !== false && typeof showToast === 'function') {
+            showToast(
+                activeAutomaticMarkupRule.percent + '% saved property markup applied to ' + targets.length + ' room' + (targets.length === 1 ? '' : 's') + '. Existing manual room markups were kept.',
+                'info'
+            );
+        }
+        return targets.length;
+    }
+
+    function activateAutomaticMarkupRule(record, normalizedAddress, options) {
+        options = options || {};
+        activeAutomaticMarkupRule = automaticMarkupRuleFromRecord(record, normalizedAddress);
+        if (!activeAutomaticMarkupRule) return 0;
+        activeAutomaticMarkupRule.skipRoomIds = options.applyNow === false && typeof rooms !== 'undefined' && Array.isArray(rooms)
+            ? rooms.map(function(room) { return String(room && room.id); })
+            : [];
+        if (options.applyNow === false) return 0;
+        return applyAutomaticMarkupToUnmarkedRooms(options);
+    }
+
     async function applyPropertyMarkupToQuote() {
         var checkbox = document.getElementById('propertyMarkupApplyConfirm');
         var rawPercent = fieldValue('propertyMarkupPercent');
@@ -518,6 +630,7 @@
 
     function onAddressInput() {
         clearTimeout(addressInputTimer);
+        activeAutomaticMarkupRule = null;
         setEntryState(null, normalizePropertyAddress(getCurrentDisplayAddress()), true);
         addressInputTimer = setTimeout(function() { refreshForCurrentAddress(); }, 350);
     }
@@ -538,13 +651,16 @@
         normalizeAddress: normalizePropertyAddress,
         refreshForCurrentAddress: refreshForCurrentAddress,
         applyMarkupToQuote: applyPropertyMarkupToQuote,
+        applyAutomaticMarkupToUnmarkedRooms: applyAutomaticMarkupToUnmarkedRooms,
         __test: {
             normalizeAddress: normalizePropertyAddress,
             storageKey: propertyMemoryStorageKey,
             localKey: propertyMemoryLocalKey,
             normalizeRecord: normalizePropertyMemoryRecord,
             hasMeaningfulData: propertyMemoryHasMeaningfulData,
-            normalizeMarkupPercent: normalizeMarkupPercent
+            normalizeMarkupPercent: normalizeMarkupPercent,
+            activateAutomaticMarkupRule: activateAutomaticMarkupRule,
+            roomHasManualRoomMarkup: roomHasManualRoomMarkup
         }
     };
 
