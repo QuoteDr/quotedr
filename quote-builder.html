@@ -3983,6 +3983,7 @@ Example:
     <script src="quote-discounts.js?v=2026081602"></script>
     <script src="app-broadcasts.js?v=1779131000"></script>
     <script src="quote-template-files.js?v=1778012600"></script>
+    <script src="community-starter-templates.js?v=1785751200"></script>
 
     <script>
         // Pricing Database - Adam's Rates (ALD Direct Inc. 2026)
@@ -16216,25 +16217,102 @@ Example:
             qdAlert(communityPayload.includePricing ? 'Template published to the community with pricing included.' : 'Template published to the community with pricing stripped to $0.');
         }
 
+        function getCommunityStarterTemplates() {
+            return Array.isArray(window.QuoteDrCommunityStarterTemplates)
+                ? window.QuoteDrCommunityStarterTemplates.slice()
+                : [];
+        }
+
         function communityTemplateCardHtml(template) {
             var rating = template.rating_count ? (template.rating_sum / template.rating_count).toFixed(1) : 'New';
             var roomCount = template.room_count || (template.rooms ? template.rooms.length : 0);
             var templateId = qdTemplateEscapeHtml(template.id);
             var includePricing = !!template.include_pricing;
+            var isStarter = template.is_starter === true;
+            var section = isStarter ? 'starter' : 'community';
             var creatorLabel = template.is_anonymous ? 'Anonymous contributor' : (template.creator_name || 'QuoteDr community');
-            return '<div class="col-md-6 col-xl-4 community-template-card" data-trade="' + qdTemplateEscapeHtml(template.trade || '') + '" data-region="' + qdTemplateEscapeHtml(template.region || '') + '" data-job="' + qdTemplateEscapeHtml(template.job_type || '') + '">' +
+            var sourceBadge = isStarter ? '<span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle">QuoteDr Starter</span>' : '';
+            var feedbackButtons = isStarter ? '' :
+                '<button class="btn btn-sm btn-outline-primary" onclick="rateCommunityTemplate(&quot;' + templateId + '&quot;,1)" title="Helpful" aria-label="Mark template helpful"><i class="fas fa-thumbs-up"></i></button>' +
+                '<button class="btn btn-sm btn-outline-secondary" onclick="rateCommunityTemplate(&quot;' + templateId + '&quot;,-1)" title="Not useful" aria-label="Mark template not useful"><i class="fas fa-thumbs-down"></i></button>' +
+                '<button class="btn btn-sm btn-outline-danger ms-auto" onclick="reportCommunityTemplate(&quot;' + templateId + '&quot;)" title="Report" aria-label="Report template"><i class="fas fa-flag"></i></button>';
+            return '<div class="col-md-6 col-xl-4 community-template-card" data-section="' + section + '" data-trade="' + qdTemplateEscapeHtml(template.trade || '') + '" data-region="' + qdTemplateEscapeHtml(template.region || '') + '" data-job="' + qdTemplateEscapeHtml(template.job_type || '') + '">' +
                 '<div class="border rounded h-100 p-3 bg-white">' +
                 '<div class="d-flex justify-content-between gap-2 mb-1"><strong>' + qdTemplateEscapeHtml(template.name) + '</strong><span class="badge bg-light text-dark">' + roomCount + ' room' + (roomCount !== 1 ? 's' : '') + '</span></div>' +
-                '<div class="mb-2"><span class="badge ' + (includePricing ? 'bg-warning text-dark' : 'bg-secondary') + '">' + (includePricing ? 'Pricing included' : 'No pricing') + '</span></div>' +
-                '<div class="small text-muted mb-2">' + qdTemplateEscapeHtml(template.trade || 'Trade') + ' • ' + qdTemplateEscapeHtml(template.region || 'Region') + (template.job_type ? ' • ' + qdTemplateEscapeHtml(template.job_type) : '') + '</div>' +
+                '<div class="d-flex flex-wrap gap-1 mb-2">' + sourceBadge + '<span class="badge ' + (includePricing ? 'bg-warning text-dark' : 'bg-secondary') + '">' + (includePricing ? 'Pricing included' : 'No pricing') + '</span></div>' +
+                '<div class="small text-muted mb-2">' + qdTemplateEscapeHtml(template.trade || 'Trade') + ' \u2022 ' + qdTemplateEscapeHtml(template.region || 'Region') + (template.job_type ? ' \u2022 ' + qdTemplateEscapeHtml(template.job_type) : '') + '</div>' +
                 '<p class="small mb-2">' + qdTemplateEscapeHtml(template.description || 'No description yet.') + '</p>' +
                 '<div class="small text-muted mb-3"><i class="fas fa-user me-1"></i>' + qdTemplateEscapeHtml(creatorLabel) + ' <span class="ms-2"><i class="fas fa-star me-1"></i>' + rating + '</span></div>' +
                 '<div class="d-flex gap-1 flex-wrap">' +
+                '<button class="btn btn-sm btn-outline-secondary" onclick="previewCommunityTemplate(&quot;' + templateId + '&quot;)"><i class="fas fa-eye me-1"></i>View Template</button>' +
                 '<button class="btn btn-sm btn-success" onclick="importCommunityTemplate(&quot;' + templateId + '&quot;)"><i class="fas fa-download me-1"></i>Add to My Templates</button>' +
-                '<button class="btn btn-sm btn-outline-primary" onclick="rateCommunityTemplate(&quot;' + templateId + '&quot;,1)" title="Helpful"><i class="fas fa-thumbs-up"></i></button>' +
-                '<button class="btn btn-sm btn-outline-secondary" onclick="rateCommunityTemplate(&quot;' + templateId + '&quot;,-1)" title="Not useful"><i class="fas fa-thumbs-down"></i></button>' +
-                '<button class="btn btn-sm btn-outline-danger ms-auto" onclick="reportCommunityTemplate(&quot;' + templateId + '&quot;)" title="Report"><i class="fas fa-flag"></i></button>' +
+                feedbackButtons +
                 '</div></div></div>';
+        }
+
+        function communityTemplateSectionHtml(section, title, detail, templates) {
+            if (!templates.length) return '';
+            return '<div class="col-12 community-template-section-heading" data-section="' + section + '">' +
+                '<div class="d-flex flex-wrap align-items-baseline justify-content-between gap-2 mt-1 mb-1">' +
+                '<h6 class="mb-0">' + qdTemplateEscapeHtml(title) + '</h6>' +
+                '<span class="small text-muted">' + qdTemplateEscapeHtml(detail) + '</span>' +
+                '</div></div>' + templates.map(communityTemplateCardHtml).join('');
+        }
+
+        function renderCommunityTemplatesList(starters, shared, warningHtml) {
+            var list = document.getElementById('communityTemplatesList');
+            if (!list) return;
+            var html = warningHtml || '';
+            html += communityTemplateSectionHtml('community', 'Shared by the Community', 'Templates published by QuoteDr users', shared);
+            html += communityTemplateSectionHtml('starter', 'QuoteDr Starter Library', 'Complete starting scopes you can tailor to any job', starters);
+            list.innerHTML = html || '<div class="col-12"><div class="alert alert-light border">No community templates yet.</div></div>';
+            filterCommunityTemplates();
+        }
+
+        function previewCommunityTemplate(id) {
+            var template = (window._communityTemplateCache || []).find(function(item) { return String(item.id) === String(id); });
+            if (!template) { qdAlert('Template not found. Refresh the marketplace and try again.'); return; }
+            var existing = document.getElementById('communityTemplatePreviewModal');
+            if (existing) existing.remove();
+            var includePricing = !!template.include_pricing;
+            var rooms = Array.isArray(template.rooms) ? template.rooms : [];
+            var itemCount = rooms.reduce(function(total, room) { return total + (Array.isArray(room.items) ? room.items.length : 0); }, 0);
+            var roomHtml = rooms.map(function(room, roomIndex) {
+                var items = Array.isArray(room.items) ? room.items : [];
+                var rows = items.map(function(item) {
+                    var quantity = item.quantity === undefined || item.quantity === null ? '' : item.quantity;
+                    var unit = item.unitType || item.unit || '';
+                    var reusableDescription = item.itemDescription || '';
+                    var priceCell = includePricing ? '<td class="text-end text-nowrap">' + qdFormatMoney(parseFloat(item.rate) || 0) + '</td>' : '';
+                    return '<tr>' +
+                        '<td><strong>' + qdTemplateEscapeHtml(item.description || item.serviceName || 'Line item') + '</strong>' +
+                        (reusableDescription ? '<div class="small text-muted mt-1">' + qdTemplateEscapeHtml(reusableDescription) + '</div>' : '') + '</td>' +
+                        '<td class="small">' + qdTemplateEscapeHtml(item.category || 'General') + '</td>' +
+                        '<td class="text-end text-nowrap">' + qdTemplateEscapeHtml(quantity) + (unit ? ' ' + qdTemplateEscapeHtml(unit) : '') + '</td>' + priceCell +
+                        '</tr>';
+                }).join('');
+                return '<section class="community-template-preview-room border-top pt-3 mb-4">' +
+                    '<div class="d-flex justify-content-between align-items-center gap-2 mb-2"><h6 class="mb-0"><i class="fas fa-door-open me-2 text-primary"></i>' + qdTemplateEscapeHtml(room.name || ('Room ' + (roomIndex + 1))) + '</h6><span class="badge bg-light text-dark">' + items.length + ' item' + (items.length !== 1 ? 's' : '') + '</span></div>' +
+                    '<div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead><tr><th>Line Item</th><th>Category</th><th class="text-end">Quantity</th>' + (includePricing ? '<th class="text-end">Rate</th>' : '') + '</tr></thead><tbody>' +
+                    (rows || '<tr><td colspan="4" class="text-muted small">No line items in this room.</td></tr>') +
+                    '</tbody></table></div></section>';
+            }).join('');
+            var modal = document.createElement('div');
+            modal.id = 'communityTemplatePreviewModal';
+            modal.className = 'modal fade';
+            modal.setAttribute('tabindex', '-1');
+            modal.innerHTML = '<div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">' +
+                '<div class="modal-header"><div><h5 class="modal-title"><i class="fas fa-eye me-2 text-primary"></i>' + qdTemplateEscapeHtml(template.name || 'Template Preview') + '</h5><div class="small text-muted mt-1">' + rooms.length + ' room' + (rooms.length !== 1 ? 's' : '') + ' \u2022 ' + itemCount + ' line item' + (itemCount !== 1 ? 's' : '') + '</div></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>' +
+                '<div class="modal-body"><p class="mb-3">' + qdTemplateEscapeHtml(template.description || '') + '</p>' +
+                (roomHtml || '<div class="alert alert-light border">This template does not contain any rooms yet.</div>') + '</div>' +
+                '<div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Close</button><button class="btn btn-success" onclick="importCommunityTemplate(&quot;' + qdTemplateEscapeHtml(template.id) + '&quot;)"><i class="fas fa-download me-1"></i>Add to My Templates</button></div>' +
+                '</div></div>';
+            document.body.appendChild(modal);
+            modal.addEventListener('hidden.bs.modal', function() {
+                if (document.getElementById('communityTemplatesModal')?.classList.contains('show')) document.body.classList.add('modal-open');
+                modal.remove();
+            });
+            new bootstrap.Modal(modal).show();
         }
 
         function filterCommunityTemplates() {
@@ -16247,6 +16325,13 @@ Example:
                     (!trade || card.getAttribute('data-trade') === trade) &&
                     (!region || (card.getAttribute('data-region') || '').toLowerCase().includes(region));
                 card.style.display = ok ? '' : 'none';
+            });
+            document.querySelectorAll('.community-template-section-heading').forEach(function(heading) {
+                var section = heading.getAttribute('data-section');
+                var hasVisibleCards = Array.from(document.querySelectorAll('.community-template-card[data-section="' + section + '"]')).some(function(card) {
+                    return card.style.display !== 'none';
+                });
+                heading.style.display = hasVisibleCards ? '' : 'none';
             });
         }
 
@@ -16277,6 +16362,7 @@ Example:
         async function loadCommunityTemplates() {
             var list = document.getElementById('communityTemplatesList');
             if (!list) return;
+            var starters = getCommunityStarterTemplates();
             var userResult = await _supabase.auth.getUser();
             if (!userResult.data?.user) {
                 list.innerHTML = '<div class="col-12"><div class="alert alert-warning">Please sign in to browse community templates.</div></div>';
@@ -16290,16 +16376,19 @@ Example:
                 .limit(100);
             if (result.error) {
                 console.warn('Community template load failed:', result.error);
-                list.innerHTML = '<div class="col-12"><div class="alert alert-warning">Community marketplace is not available yet. Deploy the marketplace migration, then refresh.</div></div>';
+                window._communityTemplateCache = starters;
+                renderCommunityTemplatesList(starters, [], '<div class="col-12"><div class="alert alert-warning py-2">User-shared templates could not be loaded right now. The QuoteDr Starter Library is still available below.</div></div>');
                 return;
             }
-            window._communityTemplateCache = result.data || [];
+            var shared = result.data || [];
+            var sharedIds = new Set(shared.map(function(template) { return String(template.id); }));
+            starters = starters.filter(function(template) { return !sharedIds.has(String(template.id)); });
+            window._communityTemplateCache = shared.concat(starters);
             if (!window._communityTemplateCache.length) {
                 list.innerHTML = '<div class="col-12"><div class="alert alert-light border">No community templates yet. Share one from Manage Templates to seed the marketplace.</div></div>';
                 return;
             }
-            list.innerHTML = window._communityTemplateCache.map(communityTemplateCardHtml).join('');
-            filterCommunityTemplates();
+            renderCommunityTemplatesList(starters, shared, '');
         }
 
         async function importCommunityTemplate(id) {

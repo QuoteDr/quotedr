@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "outputDirectory": "dist",
-  "fileCount": 104,
-  "totalBytes": 22528937,
-  "treeSha256": "d4559a950542e73953415249b23c398eb440296525aa23f3f80c823ca353a3f2",
+  "fileCount": 105,
+  "totalBytes": 22598533,
+  "treeSha256": "85e50a2a62adb2757a81c41ec03795c514bafa5d1219e1968ff8fe0c15410847",
   "files": [
     {
       "path": "404.html",
@@ -146,6 +146,11 @@
       "sha256": "63087d760f4bbd6a9ca7a1369963d478855bd7595020683f6e9a1fa335551aef"
     },
     {
+      "path": "community-starter-templates.js",
+      "bytes": 45163,
+      "sha256": "b4b2930b3d8e8cdd56810fa33a294a2cc2ac8368180bbf9971fc45a08bc960ce"
+    },
+    {
       "path": "contact.html",
       "bytes": 4775,
       "sha256": "bee2b05e880eeeac854508821a8093f9fc57736f04835c5e42f1c0e854db80be"
@@ -217,13 +222,13 @@
     },
     {
       "path": "interactive-quote-viewer.html",
-      "bytes": 320245,
-      "sha256": "e358a415c4473870b684fe0290b958ad53b1eca4c8908e7b49b2ca428a516a95"
+      "bytes": 321879,
+      "sha256": "db2f2f8c7322115fb3015b771063a10dbb59dec8ea881c84772bcb74c707c415"
     },
     {
       "path": "invoice-viewer.html",
-      "bytes": 135809,
-      "sha256": "d996a680192e646b4a05697b17efd0103e09163ec8ce5dc1edcc867e6199560a"
+      "bytes": 135906,
+      "sha256": "816c0686b851062e898041278094f43035cb9d7d6c57a91d8e405a0202039631"
     },
     {
       "path": "labor-tracker.html",
@@ -312,8 +317,8 @@
     },
     {
       "path": "quote-builder.html",
-      "bytes": 1361307,
-      "sha256": "4ddcb466158638d12e1959bb45e39521e1d3fde03c7d6cc329aa25b8b21000b5"
+      "bytes": 1379431,
+      "sha256": "536303530202208b34771df853299deb762da0b96bc57057ff26ed80f874d2c2"
     },
     {
       "path": "quote-calculators.js",
@@ -342,8 +347,8 @@
     },
     {
       "path": "quote-discounts.js",
-      "bytes": 3786,
-      "sha256": "96ed60c8cdc286710713eb34401f0e6e6b6f90383ec6d9748bf693bc18c906e0"
+      "bytes": 5374,
+      "sha256": "d383386eee0dcb987c67e3e4a43e3924647932f7f592921c246db587fe86ca65"
     },
     {
       "path": "quote-import.js",
@@ -352,8 +357,8 @@
     },
     {
       "path": "quote-items.js",
-      "bytes": 390988,
-      "sha256": "0db4d1a92b0607d4a1d4886078fcd02105df555dffab577fda563b033cf26ebf"
+      "bytes": 391478,
+      "sha256": "3ce90dd9f0851f5f9ac35066ed92116afaf4fcbfbb3a4f82d3ea7d39d2ae7613"
     },
     {
       "path": "quote-media.js",
@@ -382,8 +387,8 @@
     },
     {
       "path": "quote-style.js",
-      "bytes": 94385,
-      "sha256": "a77721343782214915a368575f721aac14aab38569c775b3e634936dfd9a67ab"
+      "bytes": 96885,
+      "sha256": "7f2d1a763f970c9da2ce8b46e29ca2402a698ccfcc1484194ddf46b1576cffee"
     },
     {
       "path": "quote-template-files.js",
