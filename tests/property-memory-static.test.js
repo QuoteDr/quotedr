@@ -11,8 +11,20 @@ const clients = fs.readFileSync(path.join(root, 'quote-clients.js'), 'utf8');
 assert(builder.includes('id="propertyMemoryBtn"'), 'the quote address needs a Property Memory entry point');
 assert(builder.includes('id="propertyMemorySavedBadge"'), 'the address entry needs a saved-data badge');
 assert(builder.includes('aria-haspopup="dialog"') && builder.includes('aria-live="polite"'), 'the entry point should expose accessible dialog and status semantics');
-assert(builder.includes('property-memory.js?v=2026080302'), 'the Quote Builder should load the current Property Memory module');
+assert(builder.includes('property-memory.js?v=2026080303'), 'the Quote Builder should load the current Property Memory module');
 assert(builder.includes('@media (max-width: 767.98px)') && builder.includes('.property-memory-contact-grid'), 'property contacts should reflow on mobile');
+assert(builder.includes('.property-memory-additional-contact') && builder.includes('.property-memory-contact-remove'), 'additional property contacts need responsive row and removal styles');
+assert(propertyMemory.includes('id="propertyAdditionalContacts"'), 'Property Memory needs a container for custom contacts');
+assert(propertyMemory.includes('id="propertyAddContactBtn"') && propertyMemory.includes('Add property contact'), 'Property Memory needs an accessible add-contact control');
+assert(propertyMemory.includes('id="propertyAdditionalContactsStatus"') && propertyMemory.includes('role="status"'), 'contact add/remove actions need an accessible status announcement');
+assert(propertyMemory.includes("input.setAttribute('data-property-contact-field', fieldName)"), 'custom rows should expose structured role, name, phone, and email fields');
+assert(propertyMemory.includes("removeButton.setAttribute('aria-label'"), 'custom contact removal needs a descriptive accessible label');
+assert(propertyMemory.includes("if (options.focusRole) roleInput.focus()"), 'adding a contact should move keyboard focus to its role field');
+assert(propertyMemory.includes('additional: normalizeAdditionalContacts(contacts.additional)'), 'legacy records should normalize custom contacts into the propertyContacts object');
+assert(propertyMemory.includes('additional: readAdditionalPropertyContacts()'), 'custom contacts must be collected when Property Memory is saved');
+assert(propertyMemory.includes('renderAdditionalPropertyContacts(record.propertyContacts.additional)'), 'saved custom contacts must be restored into the modal');
+assert(propertyMemory.includes("container.querySelectorAll('[data-property-additional-contact]')"), 'only address-level custom contact rows should be read');
+assert(propertyMemory.includes('}).filter(additionalContactHasData);'), 'fully blank custom contact rows must not be persisted');
 
 [
   'General site notes',

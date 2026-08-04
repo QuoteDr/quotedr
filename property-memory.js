@@ -9,6 +9,7 @@
     var currentRecord = null;
     var currentNormalizedAddress = '';
     var activeAutomaticMarkupRule = null;
+    var additionalContactSequence = 0;
 
     function normalizePropertyAddress(value) {
         var normalized = String(value || '').trim().toLowerCase();
@@ -56,6 +57,26 @@
         };
     }
 
+    function cleanAdditionalContact(contact) {
+        contact = contact || {};
+        return {
+            role: cleanText(contact.role),
+            name: cleanText(contact.name),
+            phone: cleanText(contact.phone),
+            email: cleanText(contact.email)
+        };
+    }
+
+    function additionalContactHasData(contact) {
+        contact = cleanAdditionalContact(contact);
+        return !!(contact.role || contact.name || contact.phone || contact.email);
+    }
+
+    function normalizeAdditionalContacts(contacts) {
+        if (!Array.isArray(contacts)) return [];
+        return contacts.map(cleanAdditionalContact).filter(additionalContactHasData);
+    }
+
     function normalizeMarkupPercent(value) {
         if (value === '' || value === null || value === undefined) return null;
         var percent = Number(value);
@@ -94,7 +115,8 @@
             propertyContacts: {
                 manager: cleanContact(contacts.manager),
                 tenant: cleanContact(contacts.tenant),
-                superintendent: cleanContact(contacts.superintendent)
+                superintendent: cleanContact(contacts.superintendent),
+                additional: normalizeAdditionalContacts(contacts.additional)
             },
             workHistory: cleanText(raw.workHistory),
             markupRule: {
@@ -131,6 +153,7 @@
             var contact = normalized.propertyContacts[role];
             return !!(contact.name || contact.phone || contact.email);
         });
+        contactValues = contactValues || normalized.propertyContacts.additional.some(additionalContactHasData);
         return textValues.some(Boolean) || contactValues || normalized.markupRule.percent !== null || normalized.markupRule.alwaysApply;
     }
 
@@ -289,6 +312,9 @@
             '          <div class="property-memory-contact-grid"><strong>Manager</strong><label class="visually-hidden" for="propertyManagerName">Manager name</label><input class="form-control" id="propertyManagerName" placeholder="Name"><label class="visually-hidden" for="propertyManagerPhone">Manager phone</label><input class="form-control" id="propertyManagerPhone" type="tel" placeholder="Phone"><label class="visually-hidden" for="propertyManagerEmail">Manager email</label><input class="form-control" id="propertyManagerEmail" type="email" placeholder="Email"></div>',
             '          <div class="property-memory-contact-grid"><strong>Tenant</strong><label class="visually-hidden" for="propertyTenantName">Tenant name</label><input class="form-control" id="propertyTenantName" placeholder="Name"><label class="visually-hidden" for="propertyTenantPhone">Tenant phone</label><input class="form-control" id="propertyTenantPhone" type="tel" placeholder="Phone"><label class="visually-hidden" for="propertyTenantEmail">Tenant email</label><input class="form-control" id="propertyTenantEmail" type="email" placeholder="Email"></div>',
             '          <div class="property-memory-contact-grid"><strong>Superintendent</strong><label class="visually-hidden" for="propertySuperintendentName">Superintendent name</label><input class="form-control" id="propertySuperintendentName" placeholder="Name"><label class="visually-hidden" for="propertySuperintendentPhone">Superintendent phone</label><input class="form-control" id="propertySuperintendentPhone" type="tel" placeholder="Phone"><label class="visually-hidden" for="propertySuperintendentEmail">Superintendent email</label><input class="form-control" id="propertySuperintendentEmail" type="email" placeholder="Email"></div>',
+            '          <div id="propertyAdditionalContacts" class="property-memory-additional-contacts" aria-describedby="propertyAdditionalContactsHelp"></div>',
+            '          <p class="small text-muted mb-2" id="propertyAdditionalContactsHelp">Add other property-specific contacts such as a concierge, board representative, or maintenance lead.</p>',
+            '          <button type="button" class="btn btn-outline-primary btn-sm" id="propertyAddContactBtn" aria-controls="propertyAdditionalContacts"><i class="fas fa-plus me-1" aria-hidden="true"></i>Add property contact</button><div class="visually-hidden" id="propertyAdditionalContactsStatus" role="status" aria-live="polite"></div>',
             '        </fieldset>',
             '        <fieldset class="property-memory-section">',
             '          <legend>Work history</legend>',
@@ -328,6 +354,9 @@
         var modal = wrapper.firstElementChild;
         document.body.appendChild(modal);
         document.getElementById('propertyMemorySaveBtn').addEventListener('click', savePropertyMemoryFromForm);
+        document.getElementById('propertyAddContactBtn').addEventListener('click', function() {
+            addAdditionalPropertyContact({}, { focusRole: true, announce: true });
+        });
         document.getElementById('propertyMarkupApplyConfirm').addEventListener('change', updatePropertyMarkupApplyState);
         document.getElementById('propertyMarkupPercent').addEventListener('input', function() {
             updatePropertyMarkupApplyState();
@@ -346,6 +375,101 @@
     function setFieldValue(id, value) {
         var field = document.getElementById(id);
         if (field) field.value = value === null || value === undefined ? '' : value;
+    }
+
+    function setAdditionalContactStatus(message) {
+        var status = document.getElementById('propertyAdditionalContactsStatus');
+        if (status) status.textContent = message || '';
+    }
+
+    function appendAdditionalContactInput(row, id, labelText, fieldName, type, placeholder, value) {
+        var label = document.createElement('label');
+        label.className = 'visually-hidden';
+        label.setAttribute('for', id);
+        label.textContent = labelText;
+
+        var input = document.createElement('input');
+        input.className = 'form-control';
+        input.id = id;
+        input.type = type || 'text';
+        input.placeholder = placeholder;
+        input.value = value || '';
+        input.autocomplete = 'off';
+        input.setAttribute('data-property-contact-field', fieldName);
+
+        row.appendChild(label);
+        row.appendChild(input);
+        return input;
+    }
+
+    function addAdditionalPropertyContact(contact, options) {
+        var container = document.getElementById('propertyAdditionalContacts');
+        if (!container) return null;
+        contact = cleanAdditionalContact(contact);
+        options = options || {};
+        additionalContactSequence += 1;
+        var rowId = 'propertyAdditionalContact' + additionalContactSequence;
+        var row = document.createElement('div');
+        row.className = 'property-memory-contact-grid property-memory-additional-contact';
+        row.setAttribute('data-property-additional-contact', '');
+        row.setAttribute('role', 'group');
+        row.setAttribute('aria-label', contact.role ? contact.role + ' property contact' : 'Additional property contact');
+
+        var roleInput = appendAdditionalContactInput(row, rowId + 'Role', 'Contact role', 'role', 'text', 'Role', contact.role);
+        appendAdditionalContactInput(row, rowId + 'Name', 'Contact name', 'name', 'text', 'Name', contact.name);
+        appendAdditionalContactInput(row, rowId + 'Phone', 'Contact phone', 'phone', 'tel', 'Phone', contact.phone);
+        appendAdditionalContactInput(row, rowId + 'Email', 'Contact email', 'email', 'email', 'Email', contact.email);
+
+        var removeButton = document.createElement('button');
+        removeButton.type = 'button';
+        removeButton.className = 'btn btn-outline-danger btn-sm property-memory-contact-remove';
+        removeButton.innerHTML = '<i class="fas fa-trash me-1" aria-hidden="true"></i>Remove';
+        function updateRowLabel() {
+            var role = cleanText(roleInput.value);
+            row.setAttribute('aria-label', role ? role + ' property contact' : 'Additional property contact');
+            removeButton.setAttribute('aria-label', role ? 'Remove ' + role + ' property contact' : 'Remove additional property contact');
+        }
+        roleInput.addEventListener('input', updateRowLabel);
+        updateRowLabel();
+        removeButton.addEventListener('click', function() {
+            row.remove();
+            setAdditionalContactStatus('Property contact removed.');
+            var addButton = document.getElementById('propertyAddContactBtn');
+            if (addButton) addButton.focus();
+        });
+        row.appendChild(removeButton);
+        container.appendChild(row);
+
+        if (options.announce) setAdditionalContactStatus('Property contact added. Enter a role and any available contact details.');
+        if (options.focusRole) roleInput.focus();
+        return row;
+    }
+
+    function renderAdditionalPropertyContacts(contacts) {
+        var container = document.getElementById('propertyAdditionalContacts');
+        if (!container) return;
+        container.textContent = '';
+        normalizeAdditionalContacts(contacts).forEach(function(contact) {
+            addAdditionalPropertyContact(contact);
+        });
+        setAdditionalContactStatus('');
+    }
+
+    function readAdditionalPropertyContacts() {
+        var container = document.getElementById('propertyAdditionalContacts');
+        if (!container) return [];
+        return Array.prototype.map.call(container.querySelectorAll('[data-property-additional-contact]'), function(row) {
+            function rowValue(fieldName) {
+                var input = row.querySelector('[data-property-contact-field="' + fieldName + '"]');
+                return input ? cleanText(input.value) : '';
+            }
+            return {
+                role: rowValue('role'),
+                name: rowValue('name'),
+                phone: rowValue('phone'),
+                email: rowValue('email')
+            };
+        }).filter(additionalContactHasData);
     }
 
     function setFormRecord(record, displayAddress, normalizedAddress) {
@@ -373,6 +497,7 @@
         setFieldValue('propertySuperintendentName', record.propertyContacts.superintendent.name);
         setFieldValue('propertySuperintendentPhone', record.propertyContacts.superintendent.phone);
         setFieldValue('propertySuperintendentEmail', record.propertyContacts.superintendent.email);
+        renderAdditionalPropertyContacts(record.propertyContacts.additional);
         setFieldValue('propertyWorkHistory', record.workHistory);
         setFieldValue('propertyMarkupPercent', record.markupRule.percent);
         setFieldValue('propertyMarkupNote', record.markupRule.note);
@@ -408,7 +533,8 @@
             propertyContacts: {
                 manager: { name: fieldValue('propertyManagerName'), phone: fieldValue('propertyManagerPhone'), email: fieldValue('propertyManagerEmail') },
                 tenant: { name: fieldValue('propertyTenantName'), phone: fieldValue('propertyTenantPhone'), email: fieldValue('propertyTenantEmail') },
-                superintendent: { name: fieldValue('propertySuperintendentName'), phone: fieldValue('propertySuperintendentPhone'), email: fieldValue('propertySuperintendentEmail') }
+                superintendent: { name: fieldValue('propertySuperintendentName'), phone: fieldValue('propertySuperintendentPhone'), email: fieldValue('propertySuperintendentEmail') },
+                additional: readAdditionalPropertyContacts()
             },
             workHistory: fieldValue('propertyWorkHistory'),
             markupRule: {
@@ -658,6 +784,8 @@
             localKey: propertyMemoryLocalKey,
             normalizeRecord: normalizePropertyMemoryRecord,
             hasMeaningfulData: propertyMemoryHasMeaningfulData,
+            normalizeAdditionalContacts: normalizeAdditionalContacts,
+            additionalContactHasData: additionalContactHasData,
             normalizeMarkupPercent: normalizeMarkupPercent,
             activateAutomaticMarkupRule: activateAutomaticMarkupRule,
             roomHasManualRoomMarkup: roomHasManualRoomMarkup

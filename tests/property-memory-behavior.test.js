@@ -71,6 +71,7 @@ async function run() {
   const empty = test.normalizeRecord({}, '123 Main Street', '123 main st');
   assert.strictEqual(test.hasMeaningfulData(empty), false, 'address metadata alone should not show the Saved badge');
   assert.strictEqual(empty.markupRule.alwaysApply, false, 'legacy records must keep automatic application off');
+  assert.strictEqual(empty.propertyContacts.additional.length, 0, 'legacy property records must gain an empty additional-contact list');
   const automaticRecord = test.normalizeRecord({
     markupRule: { percent: '14.5', alwaysApply: true }
   }, '123 Main Street', '123 main st');
@@ -79,6 +80,17 @@ async function run() {
 
   assert.strictEqual(test.hasMeaningfulData({ generalSiteNotes: 'Use rear entrance' }), true);
   assert.strictEqual(test.hasMeaningfulData({ propertyContacts: { manager: { name: 'Alex' } } }), true);
+  assert.strictEqual(test.hasMeaningfulData({ propertyContacts: { additional: [{ role: 'Concierge' }] } }), true, 'a custom property role should count as saved property information');
+  const additionalContacts = test.normalizeAdditionalContacts([
+    { role: ' Concierge ', name: ' Morgan ', phone: ' 555-0102 ', email: ' desk@example.com ' },
+    { role: ' ', name: '', phone: '', email: '' },
+    null
+  ]);
+  assert.strictEqual(additionalContacts.length, 1, 'blank custom contact rows must not be persisted');
+  assert.strictEqual(additionalContacts[0].role, 'Concierge');
+  assert.strictEqual(additionalContacts[0].name, 'Morgan');
+  assert.strictEqual(additionalContacts[0].phone, '555-0102');
+  assert.strictEqual(additionalContacts[0].email, 'desk@example.com');
   assert.strictEqual(test.hasMeaningfulData({ markupRule: { percent: 0 } }), true, 'an explicit zero-percent rule is still saved property information');
   assert.strictEqual(test.normalizeMarkupPercent('17.25'), 17.25);
   assert.strictEqual(test.normalizeMarkupPercent(180), 100);
@@ -87,14 +99,25 @@ async function run() {
 
   const normalized = test.normalizeRecord({
     clientName: 'Must not be copied',
+    clientPhone: 'Must not be copied',
     generalSiteNotes: '  Protect hardwood  ',
-    propertyContacts: { tenant: { name: ' Jamie ', email: ' tenant@example.com ' } },
+    propertyContacts: {
+      tenant: { name: ' Jamie ', email: ' tenant@example.com ' },
+      additional: [
+        { role: ' Board representative ', name: ' Robin ', phone: ' 555-0110 ', email: ' robin@example.com ' },
+        { role: '', name: '', phone: '', email: '' }
+      ]
+    },
     markupRule: { percent: '8.5', note: ' constrained access ' }
   }, '123 Main Street', '123 main st');
   assert.strictEqual(normalized.generalSiteNotes, 'Protect hardwood');
   assert.strictEqual(normalized.propertyContacts.tenant.name, 'Jamie');
+  assert.strictEqual(normalized.propertyContacts.additional.length, 1);
+  assert.strictEqual(normalized.propertyContacts.additional[0].role, 'Board representative');
+  assert.strictEqual(normalized.propertyContacts.additional[0].name, 'Robin');
   assert.strictEqual(normalized.markupRule.percent, 8.5);
   assert.strictEqual(Object.prototype.hasOwnProperty.call(normalized, 'clientName'), false, 'personal client fields must not enter property memory');
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(normalized, 'clientPhone'), false, 'client contact details must remain outside property memory');
 
   await api.applyMarkupToQuote();
   assert.deepStrictEqual(context.rooms.map(room => room.markup), [5, 20], 'unchecked markup must never affect the quote');

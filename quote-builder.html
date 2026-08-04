@@ -133,6 +133,23 @@
             align-items: center;
             margin-bottom: 0.65rem;
         }
+        .property-memory-additional-contacts:empty {
+            display: none;
+        }
+        .property-memory-additional-contact {
+            grid-template-columns: minmax(120px, 0.8fr) repeat(3, minmax(140px, 1fr)) auto;
+            padding: 0.75rem;
+            border: 1px solid #d8e2ec;
+            border-radius: 6px;
+            background: #f8fafc;
+        }
+        .property-memory-additional-contact .form-control {
+            min-width: 0;
+        }
+        .property-memory-contact-remove {
+            justify-self: end;
+            white-space: nowrap;
+        }
         .property-memory-contact-head {
             color: #6c757d;
             font-size: 0.78rem;
@@ -167,6 +184,13 @@
             }
             .property-memory-contact-grid strong {
                 color: #0f3460;
+            }
+            .property-memory-additional-contact {
+                grid-template-columns: minmax(0, 1fr);
+                padding: 0.75rem;
+            }
+            .property-memory-contact-remove {
+                justify-self: start;
             }
         }
         @media (max-width: 390px) {
@@ -17190,7 +17214,7 @@ Example:
     </script>
     <script src="change-orders.js?v=1778152100"></script>
     <script src="quote-storage.js?v=2026080201"></script>
-    <script src="property-memory.js?v=2026080302"></script>
+    <script src="property-memory.js?v=2026080303"></script>
     <script>
         // -- End Save / Load ------------------------------------------------------
 
