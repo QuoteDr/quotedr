@@ -64,3 +64,6 @@ verify_jwt = true
 
 [functions.send-quote-email]
 verify_jwt = true
+
+[functions.chatbot-feedback]
+verify_jwt = true

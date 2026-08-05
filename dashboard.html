@@ -668,7 +668,7 @@
                         '<div class="pt-1"><i class="fas ' + clientActivityIcon(event.event_type) + '"></i></div>' +
                         '<div class="flex-grow-1">' +
                             '<div class="fw-semibold">' + escapeHtml(title) + (unread ? ' <span class="badge bg-primary ms-1">New</span>' : '') + '</div>' +
-                            '<div class="small text-muted">' + escapeHtml(meta || 'Client document') + ' · ' + escapeHtml(timeAgo(event.created_at)) + '</div>' +
+                            '<div class="small text-muted">' + escapeHtml(meta || 'Client document') + ' Â· ' + escapeHtml(timeAgo(event.created_at)) + '</div>' +
                             message +
                         '</div>' +
                     '</div>' +
@@ -3543,7 +3543,7 @@
             clientActivityRefreshTimer = setInterval(refreshClientActivityAlerts, 60000);
         });
     </script>
-<script src="ai-assistant.js?v=1778194800"></script>
+<script src="chatbot-feedback-topics.js?v=2026080501"></script><script src="ai-assistant.js?v=1778194800"></script>
     <script>
         window.currentQuotes = [];
         var currentDashboardView = 'list';
