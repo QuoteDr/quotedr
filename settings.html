@@ -499,7 +499,7 @@ if (location.search.includes('debug')) {
 </script>
 <script src="error-reporter.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-v2.js?v=2026080701"></script>
+    <script src="supabase-v2.js?v=2026080802"></script>
     <script src="quickbooks-import.js?v=2026080801"></script>
     <script src="quickbooks-import-controller.js?v=2026080801"></script>
     <script src="account-access.js?v=2026080701"></script>
@@ -565,6 +565,7 @@ if (location.search.includes('debug')) {
 						<a href="#" id="saveIncidentsTabLink" data-settings-tab="save-incidents" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('save-incidents',this);return false;"><i class="fas fa-shield-halved me-2" style="color:#dc3545"></i>Save Incidents <span id="saveIncidentsNavBadge" class="badge bg-danger ms-1" style="display:none;">0</span></a>
 						<a href="#" id="chatbotFeedbackTabLink" data-settings-tab="chatbot-feedback" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('chatbot-feedback',this);return false;"><i class="fas fa-robot me-2" style="color:#7c3aed"></i>AI Chatbot <span id="chatbotFeedbackNavBadge" class="badge bg-danger ms-1" style="display:none;" aria-label="AI Chatbot topics needing attention">0</span></a>
 						<a href="ai-operations.html" id="aiOperationsDashboardLink" class="list-group-item list-group-item-action fw-semibold"><i class="fas fa-diagram-project me-2" style="color:#e87e2a"></i>AI Operations</a>
+						<a href="#" id="aiVoiceSupportTabLink" data-settings-tab="ai-voice-support" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('ai-voice-support',this);return false;"><i class="fas fa-headset me-2" style="color:#7c3aed"></i>AI Voice Support</a>
 					</div>
 				</div>
 			</div>
@@ -1971,6 +1972,29 @@ Sarah Jones, 905-555-5678"></textarea>
 					</div>
 				</div><!-- /tab-team -->
 
+				<div id="tab-ai-voice-support" style="display:none;">
+					<div class="settings-card">
+						<h5><i class="fas fa-headset me-2" style="color:#7c3aed"></i>AI Voice Support Review</h5>
+						<p class="text-muted small">Use only when a customer asks QuoteDr to investigate a reported AI Voice error, billing dispute, or possible billing adjustment or other support resolution. Every search is recorded with the administrator, customer account, reason, time, and transcript IDs accessed.</p>
+						<div class="alert alert-warning small"><i class="fas fa-lock me-1"></i>Do not browse transcripts for product research, training, or routine monitoring. Enter an exact customer account email and a real support case or investigation reason.</div>
+						<form class="row g-3" onsubmit="loadAiVoiceTranscriptSupport(event)">
+							<div class="col-md-5">
+								<label for="aiVoiceSupportEmail" class="form-label fw-semibold">Customer account email</label>
+								<input type="email" id="aiVoiceSupportEmail" class="form-control" autocomplete="off" required placeholder="customer@example.com">
+							</div>
+							<div class="col-md-5">
+								<label for="aiVoiceSupportCase" class="form-label fw-semibold">Support case or investigation reason</label>
+								<input type="text" id="aiVoiceSupportCase" class="form-control" minlength="5" maxlength="300" required placeholder="Email thread date or support case number">
+							</div>
+							<div class="col-md-2 d-flex align-items-end">
+								<button type="submit" id="aiVoiceSupportSearchBtn" class="btn btn-primary w-100"><i class="fas fa-search me-1"></i>Review</button>
+							</div>
+						</form>
+						<div id="aiVoiceSupportResults" class="mt-4 small text-muted" aria-live="polite">No customer transcripts loaded.</div>
+						<div class="text-center mt-2"><button type="button" id="aiVoiceSupportMoreBtn" class="btn btn-outline-primary btn-sm" style="display:none;" onclick="loadAiVoiceTranscriptSupport(null, true)"><i class="fas fa-chevron-down me-1"></i>Load Older</button></div>
+					</div>
+				</div><!-- /tab-ai-voice-support -->
+
 				<div id="tab-account" style="display:none;">
 					<div class="settings-card">
 						<h5><i class="fas fa-user-circle me-2" style="color:#6f42c1"></i>Account</h5>
@@ -3086,7 +3110,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			? Array.from(window.QuoteDrAdmin.emails)
 			: ['admin@quotedr.io', 'info@alddirect.ca', 'ald.direct.contracting@gmail.com'];
 		const QUOTEDR_ANALYTICS_ADMIN_EMAILS = QUOTEDR_ADMIN_EMAILS;
-		const QUOTEDR_ADMIN_TABS = ['analytics', 'site-traffic', 'user-messages', 'admin-controls', 'save-incidents', 'chatbot-feedback'];
+		const QUOTEDR_ADMIN_TABS = ['analytics', 'site-traffic', 'user-messages', 'admin-controls', 'save-incidents', 'chatbot-feedback', 'ai-voice-support'];
 
 		function isQuoteDrAdminUser(user) {
 			if (window.QuoteDrAdmin) return window.QuoteDrAdmin.isAdminUser(user);
@@ -3102,11 +3126,11 @@ Sarah Jones, 905-555-5678"></textarea>
 				var isAdmin = isQuoteDrAdminUser(user);
 				var adminGroup = document.getElementById('adminSettingsGroup');
 				if (adminGroup) adminGroup.style.display = isAdmin ? '' : 'none';
-				['analyticsBriefTabLink', 'siteTrafficTabLink', 'userMessagesTabLink', 'adminControlsTabLink', 'saveIncidentsTabLink', 'chatbotFeedbackTabLink', 'aiOperationsDashboardLink'].forEach(function(id) {
+				['analyticsBriefTabLink', 'siteTrafficTabLink', 'userMessagesTabLink', 'adminControlsTabLink', 'saveIncidentsTabLink', 'chatbotFeedbackTabLink', 'aiOperationsDashboardLink', 'aiVoiceSupportTabLink'].forEach(function(id) {
 					var tabLink = document.getElementById(id);
 					if (tabLink) tabLink.style.display = isAdmin ? '' : 'none';
 				});
-				['tab-analytics', 'tab-site-traffic', 'tab-user-messages', 'tab-admin-controls', 'tab-save-incidents', 'tab-chatbot-feedback'].forEach(function(id) {
+				['tab-analytics', 'tab-site-traffic', 'tab-user-messages', 'tab-admin-controls', 'tab-save-incidents', 'tab-chatbot-feedback', 'tab-ai-voice-support'].forEach(function(id) {
 					var tabPanel = document.getElementById(id);
 					if (!isAdmin && tabPanel) tabPanel.style.display = 'none';
 				});
@@ -3854,6 +3878,102 @@ Sarah Jones, 905-555-5678"></textarea>
 		window.saveChatbotFeedbackSettings = saveChatbotFeedbackSettings;
 		window.updateChatbotFeedbackTheme = updateChatbotFeedbackTheme;
 
+		function aiVoiceSupportStatusLabel(value) {
+			return ({
+				parsing: 'Parsing',
+				review_ready: 'Ready for review',
+				added_to_quote: 'Added to quote',
+				parse_failed: 'AI parse failed'
+			})[String(value || '')] || 'Saved';
+		}
+
+		var aiVoiceSupportOffset = 0;
+		var aiVoiceSupportAccountEmail = '';
+		var aiVoiceSupportCaseReference = '';
+		var aiVoiceSupportLoadedCount = 0;
+
+		function renderAiVoiceSupportRows(rows) {
+			return (rows || []).map(function(row) {
+				var date = new Date(row.created_at || '');
+				var dateText = isFinite(date.getTime()) ? date.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'Saved transcript';
+				return '<article class="border rounded p-3 mb-3 bg-white">'
+					+ '<div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-2"><div><div class="fw-semibold">' + escapeHtml(dateText) + '</div><div class="text-muted">' + (row.quote_number ? 'Quote ' + escapeHtml(row.quote_number) : 'No saved quote link') + '</div></div>'
+					+ '<div class="d-flex gap-1 flex-wrap"><span class="badge bg-primary">' + escapeHtml(aiVoiceSupportStatusLabel(row.status)) + '</span><span class="badge bg-light text-dark border">Audit: ' + escapeHtml(row.parser_audit_status || 'pending') + '</span></div></div>'
+					+ '<pre id="aiVoiceSupportTranscript' + escapeHtml(row.id) + '" class="bg-light border rounded p-2 mb-2" style="white-space:pre-wrap;font-family:inherit;max-height:300px;overflow:auto">' + escapeHtml(row.transcript) + '</pre>'
+					+ '<div class="text-end"><button type="button" class="btn btn-outline-primary btn-sm" onclick="copyAiVoiceSupportTranscript(\'' + escapeHtml(row.id) + '\')"><i class="fas fa-copy me-1"></i>Copy Transcript</button></div>'
+					+ '</article>';
+			}).join('');
+		}
+
+		async function loadAiVoiceTranscriptSupport(event, append) {
+			if (event) event.preventDefault();
+			var results = document.getElementById('aiVoiceSupportResults');
+			var button = document.getElementById('aiVoiceSupportSearchBtn');
+			var moreButton = document.getElementById('aiVoiceSupportMoreBtn');
+			if (!append) {
+				aiVoiceSupportAccountEmail = (document.getElementById('aiVoiceSupportEmail') || {}).value || '';
+				aiVoiceSupportCaseReference = (document.getElementById('aiVoiceSupportCase') || {}).value || '';
+				aiVoiceSupportOffset = 0;
+				aiVoiceSupportLoadedCount = 0;
+				if (moreButton) moreButton.style.display = 'none';
+			}
+			if (!results || !isQuoteDrAdminUser(window.currentUser)) return;
+			if (typeof findAiVoiceTranscriptsForSupport !== 'function') {
+				results.innerHTML = '<div class="alert alert-danger mb-0">AI Voice support review is not available yet.</div>';
+				return;
+			}
+			button.disabled = true;
+			if (moreButton) moreButton.disabled = true;
+			button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Reviewing';
+			if (!append) results.innerHTML = '<div class="alert alert-info mb-0"><span class="spinner-border spinner-border-sm me-2"></span>Loading the authorized customer transcript history and recording this access...</div>';
+			try {
+				var page = await findAiVoiceTranscriptsForSupport(aiVoiceSupportAccountEmail, aiVoiceSupportCaseReference, aiVoiceSupportOffset);
+				var rows = page.transcripts || [];
+				if (!rows.length) {
+					if (!append) results.innerHTML = '<div class="alert alert-light border mb-0">No submitted AI Voice transcripts were found for that exact account email. This access attempt was recorded.</div>';
+					if (moreButton) moreButton.style.display = 'none';
+					return;
+				}
+				aiVoiceSupportOffset = page.nextOffset;
+				aiVoiceSupportLoadedCount += rows.length;
+				if (append) {
+					var list = document.getElementById('aiVoiceSupportTranscriptList');
+					if (list) list.insertAdjacentHTML('beforeend', renderAiVoiceSupportRows(rows));
+				} else {
+					results.innerHTML = '<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2"><strong id="aiVoiceSupportLoadedCount"></strong><span class="text-muted">All saved transcripts are available in audited pages</span></div><div id="aiVoiceSupportTranscriptList">' + renderAiVoiceSupportRows(rows) + '</div>';
+				}
+				var loadedLabel = document.getElementById('aiVoiceSupportLoadedCount');
+				if (loadedLabel) loadedLabel.textContent = aiVoiceSupportLoadedCount + ' transcript' + (aiVoiceSupportLoadedCount === 1 ? '' : 's') + ' loaded';
+				if (moreButton) moreButton.style.display = page.hasMore ? '' : 'none';
+			} catch (error) {
+				if (!append) results.innerHTML = '<div class="alert alert-danger mb-0">' + escapeHtml(error.message || 'Could not load customer transcripts.') + '</div>';
+				else showToast(error.message || 'Could not load older customer transcripts.', 'danger');
+			} finally {
+				button.disabled = false;
+				if (moreButton) moreButton.disabled = false;
+				button.innerHTML = '<i class="fas fa-search me-1"></i>Review';
+			}
+		}
+
+		async function copyAiVoiceSupportTranscript(transcriptId) {
+			var source = document.getElementById('aiVoiceSupportTranscript' + transcriptId);
+			if (!source) return;
+			try {
+				await navigator.clipboard.writeText(source.textContent || '');
+				showToast('Transcript copied.', 'success');
+			} catch (error) {
+				var textarea = document.createElement('textarea');
+				textarea.value = source.textContent || '';
+				document.body.appendChild(textarea);
+				textarea.select();
+				document.execCommand('copy');
+				textarea.remove();
+				showToast('Transcript copied.', 'success');
+			}
+		}
+
+		window.loadAiVoiceTranscriptSupport = loadAiVoiceTranscriptSupport;
+		window.copyAiVoiceSupportTranscript = copyAiVoiceSupportTranscript;
 		function showTab(name, el) {
 				if (QUOTEDR_ADMIN_TABS.indexOf(name) !== -1 && !isQuoteDrAdminUser(window.currentUser)) {
 					name = 'business';
@@ -4124,7 +4244,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			}
 			// Restore last active tab, unless the URL asks for a specific settings area.
 			var hashTab = (window.location.hash || '').replace(/^#/, '');
-			var allowedHashTabs = ['business', 'quotes', 'pricing', 'notifications', 'payments', 'portal', 'integrations', 'help', 'team', 'analytics', 'site-traffic', 'user-messages', 'admin-controls', 'save-incidents', 'account', 'feedback'];
+			var allowedHashTabs = ['business', 'quotes', 'pricing', 'notifications', 'payments', 'portal', 'integrations', 'help', 'team', 'analytics', 'site-traffic', 'user-messages', 'admin-controls', 'save-incidents', 'chatbot-feedback', 'ai-voice-support', 'account', 'feedback'];
 			var requestedTab = getRequestedSettingsTab();
 			var lastTab = requestedTab || (allowedHashTabs.indexOf(hashTab) !== -1 ? hashTab : (localStorage.getItem('ald_settings_tab') || 'business'));
 			if (QUOTEDR_ADMIN_TABS.indexOf(lastTab) !== -1 && !isQuoteDrAdminUser(window.currentUser)) lastTab = 'business';

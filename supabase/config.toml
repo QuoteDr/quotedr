@@ -76,3 +76,6 @@ verify_jwt = false
 
 [functions.team-account]
 verify_jwt = true
+
+[functions.voice-transcripts]
+verify_jwt = true

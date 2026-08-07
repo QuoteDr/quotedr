@@ -2562,6 +2562,129 @@ async function saveUserStarterLibraryProfile(profile) {
 window.getUserStarterLibraryProfile = getUserStarterLibraryProfile;
 window.saveUserStarterLibraryProfile = saveUserStarterLibraryProfile;
 
+const QD_AI_VOICE_TRANSCRIPT_NOTICE_VERSION = '2026-08-07';
+const QD_AI_VOICE_TRANSCRIPT_PAGE_SIZE = 50;
+
+async function getAiVoiceTranscriptNoticePreference() {
+    const user = await getCurrentUser();
+    if (!user) throw new Error('Please sign in again before using AI Voice.');
+    const { data, error } = await _supabase
+        .from('ai_voice_transcript_preferences')
+        .select('notice_version,acknowledged_at')
+        .eq('user_id', user.id)
+        .maybeSingle();
+    if (error) throw error;
+    return data || null;
+}
+
+async function acknowledgeAiVoiceTranscriptNotice() {
+    const user = await getCurrentUser();
+    if (!user) throw new Error('Please sign in again before using AI Voice.');
+    const now = new Date().toISOString();
+    const { data, error } = await _supabase
+        .from('ai_voice_transcript_preferences')
+        .upsert({
+            user_id: user.id,
+            notice_version: QD_AI_VOICE_TRANSCRIPT_NOTICE_VERSION,
+            acknowledged_at: now,
+            updated_at: now
+        }, { onConflict: 'user_id' })
+        .select('notice_version,acknowledged_at')
+        .single();
+    if (error) throw error;
+    return data;
+}
+
+async function qdAiVoiceTranscriptFunction(body) {
+    if (typeof getSupabaseFunctionAuthHeaders !== 'function') {
+        throw new Error('Please sign in again before using AI Voice.');
+    }
+    const response = await fetch(SUPABASE_URL + '/functions/v1/voice-transcripts', {
+        method: 'POST',
+        headers: await getSupabaseFunctionAuthHeaders(),
+        body: JSON.stringify(body || {})
+    });
+    const data = await response.json().catch(function() { return {}; });
+    if (!response.ok) throw new Error(data.error || 'Voice transcript request failed.');
+    return data;
+}
+
+async function captureAiVoiceTranscript(transcript, context) {
+    context = context || {};
+    const result = await qdAiVoiceTranscriptFunction({
+        action: 'capture',
+        transcript: String(transcript || ''),
+        quoteId: context.quoteId || null,
+        quoteNumber: context.quoteNumber || ''
+    });
+    return result.transcript || null;
+}
+
+async function updateAiVoiceTranscript(transcriptId, status, context) {
+    context = context || {};
+    const result = await qdAiVoiceTranscriptFunction({
+        action: 'update',
+        id: transcriptId,
+        status: status,
+        auditStatus: context.auditStatus || 'pending',
+        auditPasses: context.auditPasses || 0,
+        quoteId: context.quoteId || null,
+        quoteNumber: context.quoteNumber
+    });
+    return result.transcript || null;
+}
+
+async function getUserAiVoiceTranscripts(offset, pageSize) {
+    const user = await getCurrentUser();
+    if (!user) throw new Error('Please sign in again to view transcript history.');
+    const safeOffset = Math.max(0, parseInt(offset, 10) || 0);
+    const safePageSize = Math.max(1, Math.min(100, parseInt(pageSize, 10) || QD_AI_VOICE_TRANSCRIPT_PAGE_SIZE));
+    const { data, error } = await _supabase
+        .from('ai_voice_transcripts')
+        .select('id,transcript,status,parser_audit_status,parser_audit_passes,quote_number,created_at,updated_at,added_to_quote_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .range(safeOffset, safeOffset + safePageSize - 1);
+    if (error) throw error;
+    return data || [];
+}
+
+async function deleteAiVoiceTranscript(transcriptId) {
+    const user = await getCurrentUser();
+    if (!user) throw new Error('Please sign in again to delete this transcript.');
+    const { error } = await _supabase
+        .from('ai_voice_transcripts')
+        .delete()
+        .eq('id', transcriptId)
+        .eq('user_id', user.id);
+    if (error) throw error;
+    return { success: true };
+}
+
+async function findAiVoiceTranscriptsForSupport(accountEmail, caseReference, offset) {
+    const result = await qdAiVoiceTranscriptFunction({
+        action: 'support_search',
+        accountEmail: accountEmail,
+        caseReference: caseReference,
+        offset: Math.max(0, parseInt(offset, 10) || 0)
+    });
+    return {
+        transcripts: result.transcripts || [],
+        nextOffset: Math.max(0, parseInt(result.nextOffset, 10) || 0),
+        hasMore: result.hasMore === true
+    };
+}
+
+window.QD_AI_VOICE_TRANSCRIPT_NOTICE_VERSION = QD_AI_VOICE_TRANSCRIPT_NOTICE_VERSION;
+window.QD_AI_VOICE_TRANSCRIPT_PAGE_SIZE = QD_AI_VOICE_TRANSCRIPT_PAGE_SIZE;
+window.getAiVoiceTranscriptNoticePreference = getAiVoiceTranscriptNoticePreference;
+window.acknowledgeAiVoiceTranscriptNotice = acknowledgeAiVoiceTranscriptNotice;
+window.captureAiVoiceTranscript = captureAiVoiceTranscript;
+window.updateAiVoiceTranscript = updateAiVoiceTranscript;
+window.getUserAiVoiceTranscripts = getUserAiVoiceTranscripts;
+window.deleteAiVoiceTranscript = deleteAiVoiceTranscript;
+window.findAiVoiceTranscriptsForSupport = findAiVoiceTranscriptsForSupport;
+
 async function getUserLearnedMappings() {
     const user = await getCurrentUser();
     if (!user) return [];
