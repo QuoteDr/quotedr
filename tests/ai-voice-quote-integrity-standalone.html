@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Voice To Quote Safety Review</title>
+  <style>
+    :root { color-scheme: light; font-family: Arial, sans-serif; color: #15263b; background: #eef2f6; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 24px; }
+    main { max-width: 920px; margin: 0 auto; background: #fff; border: 1px solid #cad4df; border-radius: 14px; overflow: hidden; box-shadow: 0 14px 36px rgba(15, 36, 61, .14); }
+    header { padding: 20px 24px; background: #1a56a0; color: #fff; }
+    h1 { margin: 0; font-size: 24px; }
+    section { padding: 20px 24px; border-top: 1px solid #dde4eb; }
+    .audit { background: #ecfdf3; border: 1px solid #86d7a4; border-radius: 10px; color: #176339; }
+    .transcript { background: #f6f8fa; border: 1px solid #d7dee6; border-radius: 10px; }
+    .card { border: 1px solid #ccd6e0; border-radius: 10px; }
+    .warning { margin-top: 16px; padding: 12px; background: #fff8df; border: 1px solid #e5bd44; border-radius: 8px; color: #664d03; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 16px; }
+    label { display: block; margin-bottom: 6px; font-weight: 700; }
+    select { width: 100%; min-height: 44px; padding: 8px 10px; border: 1px solid #aebbc9; border-radius: 7px; background: #fff; font-size: 16px; }
+    button { border: 0; border-radius: 8px; background: #164d88; color: #fff; padding: 12px 18px; font-weight: 700; font-size: 16px; }
+    button:disabled { background: #9aa8b7; }
+    footer { padding: 18px 24px; display: flex; justify-content: flex-end; }
+    .hidden { display: none; }
+    @media (max-width: 640px) { body { padding: 0; } main { border-radius: 0; } .row { grid-template-columns: 1fr; } }
+  </style>
+  <script src="../ai-voice-rule-matcher.js?v=2026080601"></script>
+</head>
+<body>
+  <main id="safetyReview" data-preserved-quantity="5">
+    <header><h1>Review AI Voice Items</h1></header>
+    <section class="audit"><strong>Independent AI cross-check corrected a potential omission or mismatch before this review.</strong></section>
+    <section class="transcript"><strong>Original browser transcript</strong><p id="originalTranscript">Trim up five exterior doors.</p></section>
+    <section class="card">
+      <strong>Exterior Door Area</strong>
+      <p><small>Phrase used for this match</small><br><strong id="matchedPhrase">Trim up five exterior doors</strong></p>
+      <p><small>AI parsed</small><br><strong>Exterior Door Trim — 5 each</strong></p>
+      <div class="warning" id="ruleWarning"><strong>QuoteDr will not guess here.</strong> The spoken wording includes a number, dimension, material, or qualifier that is not part of this trade rule. Choose the intended rule before adding this item.</div>
+      <div class="row">
+        <div>
+          <label for="matchSource">Correct this match</label>
+          <select id="matchSource">
+            <option value="saved_item">Saved line item</option>
+            <option value="trade_rule">Trade rule</option>
+          </select>
+        </div>
+        <div id="savedWrap">
+          <label for="savedItem">Match to saved item</label>
+          <select id="savedItem">
+            <option value="">Choose the intended saved item...</option>
+            <option value="exterior">Exterior Door Trim — $425/each</option>
+            <option value="regular">Regular Door Trim — $350/each</option>
+          </select>
+        </div>
+        <div id="ruleWrap" class="hidden">
+          <label for="tradeRule">Match to trade rule</label>
+          <select id="tradeRule">
+            <option value="">Choose the intended trade rule...</option>
+            <option value="generic">“trim up a door” → Regular Door Trim (35 LF per door)</option>
+          </select>
+        </div>
+      </div>
+    </section>
+    <footer><button id="addVerified" disabled>Add Verified Items</button></footer>
+  </main>
+  <script>
+    (function() {
+      var transcript = document.getElementById('originalTranscript').textContent;
+      var rule = { id: 'generic', trigger_phrase: 'trim up a door', active: true };
+      var selection = window.QdAiVoiceRuleMatcher.selectRuleMatches([rule], transcript)[0];
+      var review = document.getElementById('safetyReview');
+      review.setAttribute('data-requires-confirmation', selection && selection.ambiguous ? 'true' : 'false');
+      review.setAttribute('data-matched-count', String(window.QdAiVoiceRuleMatcher.extractCount(selection.spokenPhrase, 'door')));
+
+      var source = document.getElementById('matchSource');
+      var saved = document.getElementById('savedItem');
+      var trade = document.getElementById('tradeRule');
+      var button = document.getElementById('addVerified');
+      function sync() {
+        var useTradeRule = source.value === 'trade_rule';
+        document.getElementById('savedWrap').classList.toggle('hidden', useTradeRule);
+        document.getElementById('ruleWrap').classList.toggle('hidden', !useTradeRule);
+        button.disabled = useTradeRule ? !trade.value : !saved.value;
+      }
+      source.addEventListener('change', sync);
+      saved.addEventListener('change', sync);
+      trade.addEventListener('change', sync);
+      sync();
+    })();
+  </script>
+</body>
+</html>

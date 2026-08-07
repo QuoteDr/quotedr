@@ -12,6 +12,17 @@
         sixteen: '16', seventeen: '17', eighteen: '18', nineteen: '19', twenty: '20'
     };
     var IGNORED_WORDS = { a: true, an: true, the: true };
+    var CRITICAL_DETAIL_WORDS = {
+        exterior: true, interior: true, inside: true, outside: true,
+        painted: true, stained: true, cedar: true, oak: true, vinyl: true,
+        aluminum: true, aluminium: true, steel: true, wood: true, wooden: true,
+        composite: true, foot: true, feet: true, ft: true, inch: true, inches: true
+    };
+    var MEASUREMENT_UNITS = {
+        foot: true, feet: true, ft: true, inch: true, inches: true, cm: true, mm: true,
+        meter: true, metre: true, lf: true, sf: true, sqft: true
+    };
+    var DIMENSION_MARKERS = { x: true, by: true };
 
     function canonicalToken(value) {
         var token = String(value || '').toLowerCase();
@@ -77,6 +88,18 @@
             var extraTokens = (end - start + 1) - triggerTokens.length;
             var maxExtraTokens = Math.max(6, triggerTokens.length);
             if (extraTokens > maxExtraTokens) continue;
+            var matchedPositions = {};
+            positions.forEach(function(position) { matchedPositions[position] = true; });
+            var unmatchedTokens = transcriptTokens.slice(start, end + 1).filter(function(token, offset) {
+                return !matchedPositions[start + offset];
+            }).map(function(token) { return token.value; });
+            var criticalExtras = unmatchedTokens.filter(function(token) {
+                return /^\d+(?:\.\d+)?$/.test(token) || CRITICAL_DETAIL_WORDS[token];
+            });
+            var requiresConfirmation = criticalExtras.length > 0;
+            var confirmationReason = requiresConfirmation
+                ? 'The spoken wording includes a number, dimension, material, or qualifier that is not part of this trade rule.'
+                : '';
 
             var candidate = {
                 rule: rule,
@@ -88,7 +111,10 @@
                 extraTokens: extraTokens,
                 exactSequence: extraTokens === 0,
                 score: (triggerTokens.length * 20) - (extraTokens * 4) + (extraTokens === 0 ? 10 : 0),
-                spokenPhrase: String(transcript || '').slice(transcriptTokens[start].start, transcriptTokens[end].end).trim()
+                spokenPhrase: String(transcript || '').slice(transcriptTokens[start].start, transcriptTokens[end].end).trim(),
+                unmatchedTokens: unmatchedTokens,
+                requiresConfirmation: requiresConfirmation,
+                confirmationReason: confirmationReason
             };
             if (!best
                 || candidate.extraTokens < best.extraTokens
@@ -137,6 +163,34 @@
         return groups;
     }
 
+    function numericValue(token) {
+        var parsed = parseFloat(token && token.value);
+        return isFinite(parsed) ? parsed : null;
+    }
+
+    function extractCount(value, countLabel) {
+        var tokens = tokenize(value);
+        var labelTokens = tokenize(countLabel);
+        if (!tokens.length || !labelTokens.length) return null;
+        for (var labelStart = 0; labelStart <= tokens.length - labelTokens.length; labelStart++) {
+            var labelMatches = labelTokens.every(function(labelToken, offset) {
+                return tokens[labelStart + offset].value === labelToken.value;
+            });
+            if (!labelMatches) continue;
+            for (var numberIndex = labelStart - 1; numberIndex >= Math.max(0, labelStart - 4); numberIndex--) {
+                var count = numericValue(tokens[numberIndex]);
+                if (count === null) continue;
+                var between = tokens.slice(numberIndex + 1, labelStart).map(function(token) { return token.value; });
+                var previous = tokens[numberIndex - 1] && tokens[numberIndex - 1].value;
+                var next = tokens[numberIndex + 1] && tokens[numberIndex + 1].value;
+                if (DIMENSION_MARKERS[previous] || DIMENSION_MARKERS[next]) continue;
+                if (between.some(function(token) { return MEASUREMENT_UNITS[token] || DIMENSION_MARKERS[token]; })) continue;
+                return count;
+            }
+        }
+        return null;
+    }
+
     function selectRuleMatches(rules, transcript) {
         var matches = (rules || []).map(function(rule) {
             if (!rule || rule.active === false) return null;
@@ -146,11 +200,17 @@
         return groupOverlappingMatches(matches).map(function(group) {
             var candidates = group.matches.slice().sort(compareMatches);
             var selected = candidates[0];
+            var closeMatch = areCloseMatches(selected, candidates[1]);
+            var requiresConfirmation = !!selected.requiresConfirmation;
             return {
                 rule: selected.rule,
                 match: selected,
                 candidates: candidates,
-                ambiguous: areCloseMatches(selected, candidates[1]),
+                ambiguous: closeMatch || requiresConfirmation,
+                requiresConfirmation: requiresConfirmation,
+                confirmationReason: requiresConfirmation
+                    ? selected.confirmationReason
+                    : (closeMatch ? 'Several close trade rules match these words.' : ''),
                 spokenPhrase: selected.spokenPhrase
             };
         });
@@ -161,6 +221,7 @@
         tokenize: tokenize,
         matchRule: matchRule,
         selectRuleMatches: selectRuleMatches,
-        areCloseMatches: areCloseMatches
+        areCloseMatches: areCloseMatches,
+        extractCount: extractCount
     };
 });

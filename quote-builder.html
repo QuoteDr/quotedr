@@ -2358,7 +2358,7 @@
     <script src="card-payment-rules.js?v=2026080301"></script>
     <script src="supabase-v2.js?v=2026080801"></script>
     <script src="account-access.js?v=2026080701"></script>
-    <script src="ai-voice-rule-matcher.js?v=2026080101"></script>
+    <script src="ai-voice-rule-matcher.js?v=2026080601"></script>
     <script src="save-coordinator.js?v=2026080401"></script>
     <script src="quote-media.js?v=2026071202"></script>
 <!-- Eruda mobile console (only loads with ?debug in URL) -->
@@ -17727,7 +17727,8 @@ Example:
 
         function _voiceReviewConfidence(row) {
             var usage = row && row.mapping ? (parseInt(row.mapping.usage_count, 10) || 0) : 0;
-            if (row && row.item && row.item.aiTradeRuleAmbiguous) return { score: 35, label: 'Choose trade rule', rank: 0, reason: 'More than one close trade rule matches these words. Choose the one you meant.' };
+            if (row && row.item && row.item.aiTranscriptAuditNeedsReview) return { score: 20, label: 'Safety check', rank: -2, reason: row.item.aiTranscriptAuditReason || 'The processed item no longer reflects every spoken detail.' };
+            if (row && row.item && row.item.aiTradeRuleAmbiguous) return { score: 35, label: 'Choose trade rule', rank: 0, reason: row.item.aiTradeRuleAmbiguityReason || 'More than one close trade rule matches these words. Choose the one you meant.' };
             if (row && row.item && row.item.aiTradeRuleId) return { score: 98, label: '98% Trade rule', rank: 4, reason: 'Your trade rule created this item.' };
             if (row && row.duplicateOf !== undefined) return { score: 20, label: '20% Possible duplicate', rank: -1, reason: 'Looks covered by another parsed item, so it is unchecked by default.' };
             if (row && row.requiresChoice) return { score: 35, label: '35% Choose item', rank: 0, reason: 'You have multiple saved items that could match this phrase.' };
@@ -17967,6 +17968,144 @@ Example:
             return result;
         }
 
+        function _findAiParsedItemForRuleSelection(result, selection) {
+            if (!result || !Array.isArray(result.rooms) || !selection || !selection.rule) return null;
+            var spokenKey = _voiceRuleTextKey(selection.spokenPhrase || (selection.match && selection.match.spokenPhrase) || '');
+            var matches = [];
+            result.rooms.forEach(function(room, roomIndex) {
+                if (!room || !Array.isArray(room.items)) return;
+                room.items.forEach(function(item, itemIndex) {
+                    if (!item || item.aiTradeRuleId || !_voiceRuleMatchesParsedItem(selection.rule, item)) return;
+                    var itemKey = _voiceRuleTextKey(item.spokenPhrase || '');
+                    var score = 1;
+                    if (spokenKey && itemKey === spokenKey) score = 100;
+                    else if (spokenKey && itemKey && (spokenKey.indexOf(itemKey) >= 0 || itemKey.indexOf(spokenKey) >= 0)) score = 80;
+                    matches.push({ item: item, roomIndex: roomIndex, itemIndex: itemIndex, score: score });
+                });
+            });
+            matches.sort(function(left, right) {
+                return right.score - left.score || left.roomIndex - right.roomIndex || left.itemIndex - right.itemIndex;
+            });
+            return matches.length ? matches[0].item : null;
+        }
+
+        function _preserveAmbiguousAiRuleItem(result, selection) {
+            if (!selection || !selection.ambiguous) return false;
+            var item = _findAiParsedItemForRuleSelection(result, selection);
+            if (!item) return false;
+            item.aiTradeRuleId = selection.rule.id;
+            item.aiTradeRuleTrigger = selection.rule.trigger_phrase || '';
+            item.aiTradeRuleAnswer = '';
+            if (selection.spokenPhrase || (selection.match && selection.match.spokenPhrase)) {
+                item.spokenPhrase = selection.spokenPhrase || selection.match.spokenPhrase;
+            }
+            _decorateAiTradeRuleReviewItem(item, selection);
+            return true;
+        }
+
+        function _voiceAuditClaimItems(result) {
+            var items = [];
+            ((result && result.rooms) || []).forEach(function(room, roomIndex) {
+                ((room && room.items) || []).forEach(function(item, itemIndex) {
+                    if (item) items.push({ item: item, roomIndex: roomIndex, itemIndex: itemIndex });
+                });
+            });
+            return items;
+        }
+
+        function _voiceAuditClaimHasToken(value, expected) {
+            var expectedKey = _voiceRuleTextKey(expected);
+            var valueKey = _voiceRuleTextKey(value);
+            if (!expectedKey || !valueKey) return false;
+            return (' ' + valueKey + ' ').indexOf(' ' + expectedKey + ' ') >= 0;
+        }
+
+        function _voiceAuditClaimHasNumber(value, expected) {
+            if (window.QdAiVoiceRuleMatcher && typeof window.QdAiVoiceRuleMatcher.tokenize === 'function') {
+                return window.QdAiVoiceRuleMatcher.tokenize(value).some(function(token) {
+                    var parsed = parseFloat(token.value);
+                    return isFinite(parsed) && Math.abs(parsed - expected) < 0.001;
+                });
+            }
+            var pattern = new RegExp('(?:^|\\s)' + String(expected).replace('.', '\\.') + '(?:$|\\s)');
+            return pattern.test(String(value || ''));
+        }
+
+        function _voiceAuditClaimOutputText(item) {
+            return [item && item.description, item && item.serviceName, item && item.category, item && item.calculation, item && item.unit, item && item.unitType, item && item.aiTradeRuleTrigger].filter(Boolean).join(' ');
+        }
+
+        function _voiceAuditCountLikeUnit(unit) {
+            var normalized = String(unit || '').trim().toLowerCase();
+            return ['ea', 'each', 'unit', 'units', 'pc', 'pcs', 'piece', 'pieces', 'item', 'items'].indexOf(normalized) >= 0;
+        }
+
+        function _applyAiVoicePostProcessingAudit(result) {
+            var audit = result && result._voiceAudit;
+            var claims = audit && audit.claims;
+            if (!claims) return [];
+            var entries = _voiceAuditClaimItems(result);
+            entries.forEach(function(entry) {
+                delete entry.item.aiTranscriptAuditNeedsReview;
+                delete entry.item.aiTranscriptAuditReason;
+            });
+            var issues = [];
+            (claims.counts || []).forEach(function(claim) {
+                var matching = entries.filter(function(entry) {
+                    return _voiceAuditClaimHasToken((entry.item.spokenPhrase || '') + ' ' + _voiceAuditClaimOutputText(entry.item), claim.object);
+                });
+                var formulaOrBundleProof = matching.some(function(entry) {
+                    var calculation = entry.item.calculation || '';
+                    var description = (entry.item.description || '') + ' ' + (entry.item.serviceName || '');
+                    var ruleTrigger = entry.item.aiTradeRuleTrigger || '';
+                    return (_voiceAuditClaimHasToken(calculation, claim.object) && _voiceAuditClaimHasNumber(calculation, claim.count))
+                        || (_voiceAuditClaimHasToken(description, claim.object) && _voiceAuditClaimHasNumber(description, claim.count))
+                        || (_voiceAuditClaimHasToken(ruleTrigger, claim.object) && _voiceAuditClaimHasNumber(ruleTrigger, claim.count));
+                });
+                var eachQuantity = matching.reduce(function(total, entry) {
+                    if (!_voiceAuditCountLikeUnit(entry.item.unit || entry.item.unitType)) return total;
+                    var quantity = parseFloat(entry.item.quantity);
+                    return total + (isFinite(quantity) ? quantity : 0);
+                }, 0);
+                if (!formulaOrBundleProof && Math.abs(eachQuantity - claim.count) >= 0.001) {
+                    issues.push({ type: 'count', object: claim.object, count: claim.count });
+                }
+            });
+            (claims.qualifiers || []).forEach(function(claim) {
+                var matching = entries.filter(function(entry) {
+                    return _voiceAuditClaimHasToken((entry.item.spokenPhrase || '') + ' ' + _voiceAuditClaimOutputText(entry.item), claim.object);
+                });
+                if (!matching.some(function(entry) { return _voiceAuditClaimHasToken(_voiceAuditClaimOutputText(entry.item), claim.qualifier); })) {
+                    issues.push({ type: 'qualifier', object: claim.object, qualifier: claim.qualifier });
+                }
+            });
+            (claims.work || []).forEach(function(claim) {
+                var covered = entries.some(function(entry) {
+                    var text = (entry.item.spokenPhrase || '') + ' ' + _voiceAuditClaimOutputText(entry.item);
+                    return _voiceAuditClaimHasToken(text, claim.object) && (claim.actions || []).some(function(action) {
+                        return _voiceAuditClaimHasToken(text, action);
+                    });
+                });
+                if (!covered) issues.push({ type: 'work', object: claim.object });
+            });
+            issues.forEach(function(issue) {
+                var reason = issue.type === 'count'
+                    ? 'The spoken count of ' + issue.count + ' ' + issue.object + '(s) is not reflected in this processed item.'
+                    : issue.type === 'qualifier'
+                    ? 'The spoken qualifier "' + issue.qualifier + '" is not reflected in this processed item.'
+                    : 'A separately spoken ' + issue.object + ' task is not reflected after saved rules were applied.';
+                entries.filter(function(entry) {
+                    return _voiceAuditClaimHasToken((entry.item.spokenPhrase || '') + ' ' + _voiceAuditClaimOutputText(entry.item), issue.object);
+                }).forEach(function(entry) {
+                    entry.item.aiTranscriptAuditNeedsReview = true;
+                    entry.item.aiTranscriptAuditReason = reason;
+                });
+            });
+            audit.clientIssueCount = issues.length;
+            audit.clientIssues = issues;
+            return issues;
+        }
+
         function _voiceWordNumber(value) {
             var numbers = {
                 one: 1, two: 2, three: 3, four: 4, five: 5,
@@ -18033,6 +18172,10 @@ Example:
             var label = _voiceRuleTextKey(rule.count_unit_label || '');
             var text = String(transcript || '').toLowerCase();
             if (label) {
+                if (window.QdAiVoiceRuleMatcher && typeof window.QdAiVoiceRuleMatcher.extractCount === 'function') {
+                    var extracted = window.QdAiVoiceRuleMatcher.extractCount(text, label);
+                    if (isFinite(extracted) && extracted > 0) return extracted;
+                }
                 var escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                 var regex = new RegExp('(\\d+(?:\\.\\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\\s+' + escaped + 's?\\b');
                 var match = text.match(regex);
@@ -18064,7 +18207,8 @@ Example:
 
         function _buildAiTradeRuleVoiceItem(rule, transcript, answerLabel, matchInfo) {
             var savedItem = _findVoiceSavedItemForMapped(rule);
-            var count = _extractVoiceRuleCount(rule, transcript);
+            var matchedPhrase = (matchInfo && matchInfo.spokenPhrase) || rule.trigger_phrase || '';
+            var count = _extractVoiceRuleCount(rule, matchedPhrase);
             var eachQty = parseFloat(rule.quantity_value || 1) || 1;
             var quantity = rule.quantity_mode === 'fixed' ? eachQty : _voiceRoundQuantity(eachQty * count);
             var rate = parseFloat(rule.mapped_price || 0) || 0;
@@ -18107,6 +18251,7 @@ Example:
                 };
             }).filter(Boolean);
             item.aiTradeRuleAmbiguous = !!selection.ambiguous;
+            item.aiTradeRuleAmbiguityReason = selection.confirmationReason || '';
             return item;
         }
 
@@ -18232,12 +18377,15 @@ Example:
                 return !_voiceRuleSelectionHasLearnedMapping(selection, learnedMappings);
             });
             if (!selections.length) return result;
-            _suppressAiItemsCoveredByTradeRules(result, selections.map(function(selection) { return selection.rule; }));
+            _suppressAiItemsCoveredByTradeRules(result, selections.filter(function(selection) {
+                return !selection.ambiguous;
+            }).map(function(selection) { return selection.rule; }));
             var targetRoom = _ensureAiTradeRuleTargetRoom(result);
             var pendingQuestions = [];
             selections.forEach(function(selection) {
                 var rule = selection.rule;
                 var matchInfo = selection.match || { spokenPhrase: selection.spokenPhrase || transcript };
+                if (_preserveAmbiguousAiRuleItem(result, selection)) return;
                 if (_aiVoiceTradeRuleType(rule) === 'question') {
                     var options = _normalizeClarificationOptions(rule);
                     if (!options.length) return;
@@ -18593,6 +18741,7 @@ Example:
             delete item.aiTradeRuleAnswer;
             delete item.aiTradeRuleCandidates;
             delete item.aiTradeRuleAmbiguous;
+            delete item.aiTradeRuleAmbiguityReason;
             if (hadTradeRule) delete item.calculation;
             return item;
         }
@@ -19331,6 +19480,18 @@ Example:
             return rows;
         }
 
+        function _voiceAuditReviewCopy(result) {
+            var audit = result && result._voiceAudit;
+            if (!audit || (audit.status !== 'verified' && audit.status !== 'corrected')) return '';
+            if (parseInt(audit.clientIssueCount, 10) > 0) {
+                return ' Final safety check found ' + audit.clientIssueCount + ' processed item mismatch' + (audit.clientIssueCount === 1 ? '' : 'es') + ' that must be corrected below.';
+            }
+            if (audit.status === 'corrected') {
+                return ' Independent AI cross-check corrected a potential omission or mismatch before this review.';
+            }
+            return ' Independently cross-checked against the original transcript.';
+        }
+
         function _renderAiVoiceReviewModal() {
             var list = document.getElementById('aiVoiceReviewList');
             var options = document.getElementById('aiVoiceItemOptions');
@@ -19344,7 +19505,7 @@ Example:
             });
             var needsReview = _voiceReviewRows.filter(function(row) { return row.sortRank < 2; }).length;
             var duplicates = _voiceReviewRows.filter(function(row) { return row.duplicateOf !== undefined; }).length;
-            summary.textContent = _voiceReviewRows.length + ' item' + (_voiceReviewRows.length === 1 ? '' : 's') + ' parsed. ' + (_voiceReviewRows.length ? (needsReview ? needsReview + ' need a closer look.' : 'Everything has a strong match.') : 'Nothing is ready to add yet.') + (duplicates ? ' ' + duplicates + ' likely duplicate' + (duplicates === 1 ? '' : 's') + ' unchecked.' : '');
+            summary.textContent = _voiceReviewRows.length + ' item' + (_voiceReviewRows.length === 1 ? '' : 's') + ' parsed. ' + (_voiceReviewRows.length ? (needsReview ? needsReview + ' need a closer look.' : 'Everything has a strong match.') : 'Nothing is ready to add yet.') + (duplicates ? ' ' + duplicates + ' likely duplicate' + (duplicates === 1 ? '' : 's') + ' unchecked.' : '') + _voiceAuditReviewCopy(_voiceReviewResult);
             list.innerHTML = '';
             if (!_voiceReviewRows.length) {
                 list.innerHTML = '<div class="alert alert-warning mb-0">AI did not find any line items in that recording. Keep the recording and try again with more detail, or close this review and enter items manually.</div>';
@@ -19357,15 +19518,17 @@ Example:
                 var displayRate = _voiceReviewDisplayRate(row);
                 var badgeClass = row.duplicateOf !== undefined ? 'bg-secondary' : (row.sortRank >= 2 ? 'bg-success' : (row.mapping ? 'bg-info text-dark' : 'bg-warning text-dark'));
                 var includeChecked = row.duplicateOf !== undefined ? '' : 'checked';
-                var helper = '';
+                var helper = item.aiTranscriptAuditNeedsReview
+                    ? '<div class="alert alert-danger py-2 px-3 small mt-2 mb-0"><strong>Final safety check stopped this item.</strong> ' + _escapeHtml(item.aiTranscriptAuditReason || 'The processed item no longer reflects every spoken detail.') + '</div>'
+                    : '';
                 if (item.aiTradeRuleAmbiguous) {
-                    helper = '<div class="alert alert-warning py-2 px-3 small mt-2 mb-0"><strong>Several close trade rules match.</strong> Choose the intended rule before adding this item.</div>';
+                    helper += '<div class="alert alert-warning py-2 px-3 small mt-2 mb-0"><strong>QuoteDr will not guess here.</strong> ' + _escapeHtml(item.aiTradeRuleAmbiguityReason || 'Several close trade rules match these words.') + ' Choose the intended rule before adding this item.</div>';
                 } else if (row.requiresChoice) {
-                    helper = '<div class="alert alert-warning py-2 px-3 small mt-2 mb-0">You have multiple saved items for this kind of work. Choose the right one, or check Remember this phrase so QuoteDr stops asking for this wording.</div>';
+                    helper += '<div class="alert alert-warning py-2 px-3 small mt-2 mb-0">You have multiple saved items for this kind of work. Choose the right one, or check Remember this phrase so QuoteDr stops asking for this wording.</div>';
                 } else if (row.duplicateOf !== undefined) {
-                    helper = '<div class="alert alert-secondary py-2 px-3 small mt-2 mb-0">Possible duplicate inside this same parsed room. It is unchecked by default, but you can add it if this is separate work.</div>';
+                    helper += '<div class="alert alert-secondary py-2 px-3 small mt-2 mb-0">Possible duplicate inside this same parsed room. It is unchecked by default, but you can add it if this is separate work.</div>';
                 } else if (row.confidenceReason) {
-                    helper = '<div class="small text-muted mt-1">' + _escapeHtml(row.confidenceReason) + '</div>';
+                    helper += '<div class="small text-muted mt-1">' + _escapeHtml(row.confidenceReason) + '</div>';
                 }
                 var suggestions = '';
                 if (row.similar && row.similar.length) {
@@ -19645,20 +19808,20 @@ Example:
                     _applyVoiceMappedItem(row.item, row.mapping);
                     _applyAiVoiceReviewQuantityEdit(row, index);
                     if (typeof incrementLearnedMappingUsage === 'function') {
-                        saveTasks.push(incrementLearnedMappingUsage(row.mapping.id).catch(function(){}));
+                        saveTasks.push(function() { return incrementLearnedMappingUsage(row.mapping.id).catch(function(){}); });
                     }
                 } else if (selected) {
                     _clearAiTradeRuleReviewMetadata(row.item);
                     _applyVoiceMappedItem(row.item, selected);
                     _applyAiVoiceReviewQuantityEdit(row, index);
                     if (remember && remember.checked && typeof saveLearnedMapping === 'function') {
-                        saveTasks.push(saveLearnedMapping(row.phrase || row.item.description, selected, note ? note.value.trim() : '').then(function(result) {
+                        saveTasks.push(function() { return saveLearnedMapping(row.phrase || row.item.description, selected, note ? note.value.trim() : '').then(function(result) {
                             var uses = parseInt(result && result.data && result.data.usage_count, 10) || 0;
                             if (uses >= 2 && !row.item.aiTradeRuleId) ruleSuggestionCandidates.push({ row: row, selected: selected });
                             return result;
                         }).catch(function(e) {
                             console.warn('Could not save AI learned mapping:', e);
-                        }));
+                        }); });
                     }
                 } else {
                     _clearAiTradeRuleReviewMetadata(row.item);
@@ -19671,7 +19834,19 @@ Example:
                 if (!_voiceReviewResult.rooms || !_voiceReviewResult.rooms[roomIndex]) return;
                 _voiceReviewResult.rooms[roomIndex].scopeNotes = keep && keep.checked ? input.value.trim() : '';
             });
-            await Promise.all(saveTasks);
+            var remainingVoiceAuditIssues = _applyAiVoicePostProcessingAudit(_voiceReviewResult);
+            if (remainingVoiceAuditIssues.length) {
+                _voiceReviewRows.forEach(function(row) {
+                    var updatedConfidence = _voiceReviewConfidence(row);
+                    row.confidence = updatedConfidence.label;
+                    row.confidenceReason = updatedConfidence.reason;
+                    row.sortRank = updatedConfidence.rank;
+                });
+                _renderAiVoiceReviewModal();
+                qdAlert('The final transcript safety check still found a missing count, qualifier, or spoken task. Correct the highlighted item before adding it.');
+                return;
+            }
+            await Promise.all(saveTasks.map(function(runSaveTask) { return runSaveTask(); }));
             var modal = bootstrap.Modal.getInstance(document.getElementById('aiVoiceReviewModal'));
             if (modal) modal.hide();
             _forceCloseAiVoiceReviewModal();
@@ -19701,6 +19876,12 @@ Example:
         }
 
         async function skipAiVoiceReview() {
+            var remainingVoiceAuditIssues = _applyAiVoicePostProcessingAudit(_voiceReviewResult);
+            if (remainingVoiceAuditIssues.length) {
+                _renderAiVoiceReviewModal();
+                qdAlert('The final transcript safety check found a missing count, qualifier, or spoken task. Correct the highlighted item before keeping the AI suggestions.');
+                return;
+            }
             var ambiguousIndex = _voiceReviewRows.findIndex(function(row) {
                 return row && row.item && row.item.aiTradeRuleAmbiguous;
             });
@@ -19746,7 +19927,7 @@ Example:
             _setVoicePauseButton(false);
             document.getElementById('voiceActions').style.display = 'none';
             document.getElementById('voiceLoading').style.display = 'block';
-            document.getElementById('voiceStatus').textContent = 'AI is analyzing your description...';
+            document.getElementById('voiceStatus').textContent = 'AI is parsing and independently checking every spoken item...';
             try {
                 if (typeof getSupabaseFunctionAuthHeaders !== 'function') {
                     throw new Error('Please sign in again before using AI voice quote.');
@@ -19770,6 +19951,7 @@ Example:
                 await _hideBootstrapModalAndWait('voiceQuoteModal');
                 const templatedResult = await _applyAiVoiceTemplatesToResult(result, transcript);
                 const ruledResult = await _applyAiTradeRulesToVoiceResult(templatedResult, transcript, learnedMappings);
+                _applyAiVoicePostProcessingAudit(ruledResult);
                 const measuredResult = await showAiVoiceMeasurementModal(ruledResult);
                 await showAiVoiceReview(measuredResult, learnedMappings);
             } catch(err) {

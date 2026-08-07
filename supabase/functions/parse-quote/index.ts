@@ -11,6 +11,11 @@ import {
   normalizePaintQuantities,
   splitVoiceRoomSections,
 } from "../_shared/voice-quote-measurements.mjs";
+import {
+  buildVoiceQuoteAuditClaims,
+  criticalVoiceQuoteAuditIssues,
+  findVoiceQuoteAuditIssues,
+} from "../_shared/voice-quote-audit.mjs";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -127,7 +132,7 @@ ${roomBoundaryRule}
       { role: 'system', content: systemPrompt + materialsRef + learningRef },
       { role: 'user', content: voiceTranscriptForModel },
     ];
-    const requestQuoteCompletion = async (messages: any[]) => {
+    const requestQuoteCompletion = async (messages: any[], temperature = 0.2) => {
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -137,8 +142,9 @@ ${roomBoundaryRule}
         body: JSON.stringify({
           model,
           messages,
-          temperature: 0.3,
+          temperature,
           max_tokens: usageGuard.policy.maxOutputTokens,
+          response_format: { type: 'json_object' },
         }),
       });
       if (!response.ok) {
@@ -158,25 +164,70 @@ ${roomBoundaryRule}
       total_tokens: Number(first?.total_tokens || 0) + Number(second?.total_tokens || 0),
     });
 
-    let data = await requestQuoteCompletion(baseMessages);
+    const cloneQuote = (value: any) => JSON.parse(JSON.stringify(value || {}));
+    const roomCountIsValid = (value: any) => roomSections.length <= 1
+      || (Array.isArray(value?.rooms) && value.rooms.length === roomSections.length);
+    const issueCodes = (issues: any[]) => [...new Set((issues || [])
+      .map((issue: any) => String(issue?.code || ''))
+      .filter(Boolean))];
+
+    const initialData = await requestQuoteCompletion(baseMessages);
+    const initialCompletion = parseCompletion(initialData);
+    const initialNormalized = normalizePaintQuantities(cloneQuote(initialCompletion.parsed), transcript);
+    const initialIssues = findVoiceQuoteAuditIssues(initialNormalized, transcript);
+    const initialRoomCountValid = roomCountIsValid(initialNormalized);
+    const auditInstruction = `Act as an independent final estimator audit. Do not trust or merely approve the draft. Compare it word-for-word with the original numbered transcript and return a complete replacement JSON object in the exact same quote shape.
+
+Audit checklist:
+1. Account for every separately spoken job, room, and area exactly once.
+2. Preserve every explicit count in quote quantity or calculation. "Five exterior doors" means five doors, while "a five-foot exterior door" means one door with a five-foot dimension.
+3. Preserve distinguishing materials, dimensions, locations, and qualifiers such as interior versus exterior.
+4. Every spokenPhrase must be an exact contiguous excerpt from the original transcript, never a shortened familiar rule or price-list phrase.
+5. Keep all correct draft work while repairing omissions, duplicates, room merges, wrong quantities, or weakened descriptions.
+6. Return only the complete corrected JSON quote. Do not return an audit report or commentary.
+
+The deterministic pre-check found ${initialIssues.length} possible issue(s) across these categories: ${issueCodes(initialIssues).join(', ') || 'none'}. The transcript has ${roomSections.length} hard-bounded room section(s).`;
+    let data = await requestQuoteCompletion(baseMessages.concat([
+      { role: 'assistant', content: initialCompletion.content },
+      { role: 'user', content: auditInstruction },
+    ]), 0);
+    data.usage = combineUsage(initialData.usage || {}, data.usage || {});
     let completion = parseCompletion(data);
-    let roomRepairUsed = false;
-    if (roomSections.length > 1 && (!Array.isArray(completion.parsed?.rooms) || completion.parsed.rooms.length !== roomSections.length)) {
-      roomRepairUsed = true;
-      const actualCount = Array.isArray(completion.parsed?.rooms) ? completion.parsed.rooms.length : 0;
-      const repairInstruction = `Your response returned ${actualCount} room objects, but the transcript has ${roomSections.length} hard-bounded room sections. Return a complete replacement JSON object with exactly ${roomSections.length} rooms. Keep one room per numbered section and preserve section order. Do not combine or omit any section.`;
+    let parsed = normalizePaintQuantities(completion.parsed, transcript);
+    let remainingCriticalIssues = criticalVoiceQuoteAuditIssues(parsed, transcript);
+    let auditRepairUsed = false;
+
+    if (!roomCountIsValid(parsed) || remainingCriticalIssues.length) {
+      auditRepairUsed = true;
+      const actualCount = Array.isArray(parsed?.rooms) ? parsed.rooms.length : 0;
+      const repairInstruction = `The independent audit still failed deterministic safety checks. Return a complete replacement JSON object, not a patch. Preserve all correct work and fix every remaining issue. Required room sections: ${roomSections.length}; returned rooms: ${actualCount}; remaining issue categories: ${issueCodes(remainingCriticalIssues).join(', ') || 'room_count_mismatch'}. Recheck every spoken action and explicit count. Do not shorten spokenPhrase. Return JSON only.`;
       const repairData = await requestQuoteCompletion(baseMessages.concat([
         { role: 'assistant', content: completion.content },
         { role: 'user', content: repairInstruction },
-      ]));
+      ]), 0);
       repairData.usage = combineUsage(data.usage || {}, repairData.usage || {});
       data = repairData;
       completion = parseCompletion(data);
+      parsed = normalizePaintQuantities(completion.parsed, transcript);
+      remainingCriticalIssues = criticalVoiceQuoteAuditIssues(parsed, transcript);
     }
-    if (roomSections.length > 1 && (!Array.isArray(completion.parsed?.rooms) || completion.parsed.rooms.length !== roomSections.length)) {
+    if (!roomCountIsValid(parsed)) {
       throw new Error('AI could not preserve every spoken room. Please generate again; your transcript is still available.');
     }
-    const parsed = normalizePaintQuantities(completion.parsed, transcript);
+    if (remainingCriticalIssues.length) {
+      throw new Error('AI could not verify every spoken item and quantity. Please generate again; your transcript is still available.');
+    }
+    const finalIssues = findVoiceQuoteAuditIssues(parsed, transcript);
+    const auditChangedQuote = JSON.stringify(initialNormalized) !== JSON.stringify(parsed);
+    const roomRepairUsed = !initialRoomCountValid && roomCountIsValid(parsed);
+    const auditClaims = buildVoiceQuoteAuditClaims(transcript);
+    parsed._voiceAudit = {
+      status: auditChangedQuote || auditRepairUsed ? 'corrected' : 'verified',
+      passes: auditRepairUsed ? 3 : 2,
+      initialIssueCount: initialIssues.length,
+      remainingWarningCount: finalIssues.filter((issue: any) => issue.severity === 'warning').length,
+      claims: auditClaims,
+    };
     await usageGuard.recordSuccess({
       model,
       usage: data.usage || {},
@@ -186,6 +237,14 @@ ${roomBoundaryRule}
         learnedMappings: Array.isArray(learnedMappings) ? learnedMappings.length : 0,
         roomSections: roomSections.length,
         roomRepairUsed,
+        voiceAuditPasses: parsed._voiceAudit.passes,
+        voiceAuditChangedQuote: auditChangedQuote,
+        voiceAuditRepairUsed: auditRepairUsed,
+        voiceAuditInitialIssues: initialIssues.length,
+        voiceAuditRemainingWarnings: parsed._voiceAudit.remainingWarningCount,
+        voiceAuditWorkClaims: auditClaims.work.length,
+        voiceAuditCountClaims: auditClaims.counts.length,
+        voiceAuditQualifierClaims: auditClaims.qualifiers.length,
       },
     });
 
