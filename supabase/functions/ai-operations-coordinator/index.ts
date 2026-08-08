@@ -1,5 +1,10 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
+import {
+  coordinatorRequestNeedsOwnerReview,
+  isSyntheticCoordinatorTest,
+  SYNTHETIC_COORDINATOR_PREFIX,
+} from '../_shared/coordinator-review-sensitivity.mjs';
 
 // Trusted local receiver for the privacy-minimized AI Operations coordinator
 // inbox. This endpoint intentionally has no browser CORS, customer-table read,
@@ -20,7 +25,7 @@ const COORDINATOR_FROM_EMAIL = String(Deno.env.get('QUOTEDR_COORDINATOR_FROM_EMA
 
 const OWNER_NOTIFICATION_EMAIL = 'admin@quotedr.io';
 const REVIEW_BASE_URL = 'https://quotedr.io/ai-operations.html';
-const SYNTHETIC_PREFIX = '[SYNTHETIC COORDINATOR TEST]';
+const SYNTHETIC_PREFIX = SYNTHETIC_COORDINATOR_PREFIX;
 const TEST_SUBJECT_PREFIX = '[TEST — NO ACTION REQUIRED] QuoteDr code review notification';
 const BRIDGE_NAME = 'pinned_orchestrator_manual_bridge';
 const MAX_BODY_BYTES = 64 * 1024;
@@ -51,7 +56,6 @@ const REVIEW_DISPOSITIONS = new Set([
   'needs_owner_decision', 'dispatched_to_engineering', 'declined',
   'synthetic_dry_run_ready',
 ]);
-const SENSITIVE_TOPICS = new Set(['invoices_payments', 'account_plan']);
 
 type JsonMap = Record<string, unknown>;
 type AdminClient = SupabaseClient<any, 'public', any>;
@@ -224,7 +228,7 @@ function validatePrivacyBoundary(request: any) {
 }
 
 function syntheticTest(request: any) {
-  return String(payloadAt(request, 'case', 'subject') ?? '').startsWith(SYNTHETIC_PREFIX);
+  return isSyntheticCoordinatorTest(request);
 }
 
 function requestSnapshot(request: any) {
@@ -447,18 +451,7 @@ function heartbeatResult(request: any): JsonMap {
 }
 
 function requestIsSensitive(request: any) {
-  const risk = String(payloadAt(request, 'classification', 'risk_level') ?? 'low');
-  const topic = String(payloadAt(request, 'classification', 'topic_key') ?? 'other');
-  const flags = payloadAt(request, 'classification', 'escalation_flags');
-  const minimizedText = [
-    payloadAt(request, 'case', 'subject'),
-    payloadAt(request, 'case', 'summary'),
-    request?.task_brief,
-  ].join(' ');
-  const mandatoryReviewLanguage = /\b(?:billing|payment|refund|chargeback|data loss|privacy|access|security|breach|signature|legal|cross[- ]device|broad incident)\b/i;
-  return risk !== 'low' || SENSITIVE_TOPICS.has(topic)
-    || (Array.isArray(flags) && flags.length > 0)
-    || mandatoryReviewLanguage.test(minimizedText);
+  return coordinatorRequestNeedsOwnerReview(request);
 }
 
 async function recordReview(body: JsonMap) {

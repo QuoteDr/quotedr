@@ -11,6 +11,7 @@ import {
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = relative => fs.readFileSync(path.join(root, relative), 'utf8');
 const edge = read('supabase/functions/ai-operations-coordinator/index.ts');
+const sensitivity = read('supabase/functions/_shared/coordinator-review-sensitivity.mjs');
 const migration = read('supabase/migrations/20260808200503_ai_operations_coordinator_receiver.sql');
 const config = read('supabase/config.toml');
 const envExample = read('scripts/ai-operations-coordinator.env.example');
@@ -44,7 +45,9 @@ assert(edge.includes("'Idempotency-Key': `quotedr-aiops-test-${requestId}`"), 'e
 assert(edge.includes('deliveryConfirmed: notification.status === \'confirmed\''), 'provider acceptance must not be called delivery');
 assert(edge.includes("actualBridge !== 'pinned_orchestrator_manual_local_worktree'"), 'recorded local work must disclose the actual manual bridge');
 assert(edge.includes('deploymentAuthorized: false') && edge.includes('deploymentPerformed: false'), 'owner test decision must remain local-only');
-assert(edge.includes('refund|chargeback|data loss|privacy|access|security|breach|signature|legal'), 'mandatory owner-review language should include refund and security categories');
+assert(sensitivity.includes('refund|chargeback|financial|banking|data loss|privacy|access|security|breach|unauthori[sz]ed|expos'), 'mandatory owner-review language should include financial, privacy, security, access, and exposure categories');
+assert(sensitivity.includes('signature|legal|medical|health'), 'mandatory owner-review language should retain signature, legal, and medical categories');
+assert(!sensitivity.includes('request?.task_brief'), 'safety boilerplate must not be classified as issue content');
 
 assert(/\[functions\.ai-operations-coordinator\]\s*verify_jwt\s*=\s*false/.test(config), 'custom-token receiver should disable platform JWT verification only for its own function');
 assert(/\[functions\.ai-operations\]\s*verify_jwt\s*=\s*true/.test(config), 'existing browser admin function must retain JWT verification');
