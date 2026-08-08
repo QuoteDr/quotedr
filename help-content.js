@@ -711,8 +711,8 @@
             steps: [
                 'Enable payments when you are ready to accept card payments.',
                 'Set the default deposit percentage.',
-                'Choose whether clients see a deposit payment button on portal quotes.',
-                'Choose whether clients see a pay-in-full button on portal invoices.'
+                'Inside the client portal, choose whether clients see a deposit payment button on quote links.',
+                'Inside the client portal, choose whether clients see a pay-in-full button on invoice links.'
             ],
             tips: [
                 'Check payment settings before sending payment links to clients.',
