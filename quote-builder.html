@@ -14625,6 +14625,10 @@ Example:
             }
         }
 
+        function getLocalBusinessLogoSnapshot() {
+            return localStorage.getItem('ald_company_logo') || localStorage.getItem('ald_logo') || '';
+        }
+
         function getLocalHiddenProfileFieldsSnapshot() {
             try {
                 var hidden = JSON.parse(localStorage.getItem('ald_hidden_profile_fields') || '[]');
@@ -14664,7 +14668,10 @@ Example:
                 currency: taxPrefs.currency,
                 paymentSettings: getLocalPaymentSettingsSnapshot(),
                 businessProfile: businessProfile,
+                businessLogo: getLocalBusinessLogoSnapshot(),
                 hiddenProfileFields: businessProfile.hidden_profile_fields,
+                brandingSnapshotVersion: 1,
+                brandingCapturedAt: new Date().toISOString(),
                 invoiceSettings: getInvoiceSettings()
             };
         }
@@ -14678,6 +14685,7 @@ Example:
             var invoiceId = 'invoice_' + Date.now();
             var invoiceData = buildInvoiceData(invoiceId);
             var latestBusinessProfile = null;
+            var latestBusinessLogo = invoiceData.businessLogo || '';
             var latestPaymentSettings = null;
             var approvedChangeOrderRows = null;
             if (typeof loadBusinessProfile === 'function') {
@@ -14692,6 +14700,18 @@ Example:
                     console.warn('Could not load latest business profile for invoice:', e);
                 }
             }
+            if (typeof loadLogoFromSupabase === 'function') {
+                try {
+                    var loadedBusinessLogo = await loadLogoFromSupabase();
+                    latestBusinessLogo = typeof loadedBusinessLogo === 'string' ? loadedBusinessLogo : '';
+                    invoiceData.businessLogo = latestBusinessLogo;
+                } catch(e) {
+                    console.warn('Could not load latest business logo for invoice:', e);
+                }
+            }
+            var brandingCapturedAt = new Date().toISOString();
+            invoiceData.brandingSnapshotVersion = 1;
+            invoiceData.brandingCapturedAt = brandingCapturedAt;
             if (typeof loadPaymentSettings === 'function') {
                 try {
                     latestPaymentSettings = await loadPaymentSettings();
@@ -14722,6 +14742,9 @@ Example:
                         invoiceData.businessProfile = latestBusinessProfile;
                         invoiceData.hiddenProfileFields = latestBusinessProfile.hidden_profile_fields;
                     }
+                    invoiceData.businessLogo = latestBusinessLogo;
+                    invoiceData.brandingSnapshotVersion = 1;
+                    invoiceData.brandingCapturedAt = brandingCapturedAt;
                     if (latestPaymentSettings) invoiceData.paymentSettings = latestPaymentSettings;
                     if (approvedChangeOrderRows && approvedChangeOrderRows.length) {
                         invoiceData = QuoteDrChangeOrders.mergeApprovedIntoInvoice(invoiceData, approvedChangeOrderRows);

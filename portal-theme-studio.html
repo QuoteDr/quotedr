@@ -661,7 +661,7 @@
       const { error } = await saveUserDataValue('portal_theme', theme, { entityType: 'portal_theme', entityLabel: 'Default portal theme', localStorageKey: 'portal-theme-studio-draft' });
       if (!error) {
         lastLoadedPortalTheme = Object.assign({}, theme);
-        setPortalThemeDefaultSaveState('saved', 'Default portal theme saved. Portals using the default will update.');
+        setPortalThemeDefaultSaveState('saved', 'Default portal theme saved. Portals using the default will update; portal-specific overrides stay unchanged.');
       } else {
         setPortalThemeDefaultSaveState('error', 'Could not save default theme.');
       }

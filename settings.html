@@ -1305,7 +1305,7 @@ Sarah Jones, 905-555-5678"></textarea>
 					<div class="card mb-3">
 						<div class="card-header bg-white border-bottom">
 							<h5 class="mb-0"><i class="fas fa-paint-brush me-2" style="color:#e87e2a"></i>Default Client Portal Appearance</h5>
-							<p class="text-muted mb-0 mt-1" style="font-size:0.9rem;">Customize the default client portal look. Individual portals can override this in Manage Portals.</p>
+							<p class="text-muted mb-0 mt-1" style="font-size:0.9rem;">Portals set to use the default update when this is saved. A portal-specific theme or logo remains in place until you choose Use Default Theme and Use business logo for that portal in Manage Portals.</p>
 						</div>
 						<div class="card-body">
 							<div class="portal-theme-launch-card mb-3">
@@ -3724,6 +3724,14 @@ Sarah Jones, 905-555-5678"></textarea>
 				type: 'warning'
 			})) return;
 			localStorage.removeItem('ald_company_logo');
+			localStorage.removeItem('ald_logo');
+			if (typeof saveLogoToSupabase === 'function') {
+				var result = await saveLogoToSupabase('');
+				if (result && result.error) {
+					console.warn('Logo cloud removal is pending:', result.error);
+					qdAlert('The logo was removed on this device, but the cloud change is still syncing. Keep QuoteDr open and retry any pending save before creating a client document.');
+				}
+			}
 			document.getElementById('logoPreviewImg').style.display = 'none';
 			document.getElementById('logoPreviewImg').src = '';
 			document.getElementById('logoPlaceholderIcon').style.display = '';
@@ -5269,7 +5277,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			const { error } = await saveUserDataValue('portal_theme', theme, { entityType: 'portal_theme', entityLabel: 'Default portal theme', localStorageKey: 'portal-theme-studio-draft' });
 			if (!error) {
 				lastLoadedPortalTheme = Object.assign({}, theme);
-				setPortalThemeDefaultSaveState('saved', 'Default portal theme saved. Portals using the default will update.');
+				setPortalThemeDefaultSaveState('saved', 'Default portal theme saved. Portals using the default will update; portal-specific overrides stay unchanged.');
 			} else {
 				setPortalThemeDefaultSaveState('error', 'Could not save default theme.');
 			}

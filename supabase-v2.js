@@ -696,7 +696,11 @@ async function loadSecureClientDocument(documentId, token, portalAnchorId) {
             token: token,
             portalAnchorId: portalAnchorId || ''
         }, false);
-        return { data: data.document, paymentOptions: data.paymentOptions || null };
+        return {
+            data: data.document,
+            paymentOptions: data.paymentOptions || null,
+            branding: data.branding || null
+        };
     } catch (error) {
         return { error: error };
     }
@@ -2312,22 +2316,26 @@ async function loadBusinessProfile() {
 async function saveLogoToSupabase(base64) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
-    localStorage.setItem('ald_company_logo', base64);
+    var logo = typeof base64 === 'string' ? base64.trim() : '';
+    if (logo) localStorage.setItem('ald_company_logo', logo);
+    else localStorage.removeItem('ald_company_logo');
     const result = await qdDurableSupabaseOperation({
         entityType: 'company_logo',
         entityId: 'account',
         entityLabel: 'Company logo',
-        payload: { logo: base64 },
-        target: { table: 'user_data', action: 'upsert', values: { user_id: user.id, key: 'company_logo', value: { logo: base64 }, updated_at: new Date().toISOString() }, onConflict: 'user_id,key' }
+        payload: { logo: logo },
+        target: { table: 'user_data', action: 'upsert', values: { user_id: user.id, key: 'company_logo', value: { logo: logo }, updated_at: new Date().toISOString() }, onConflict: 'user_id,key' }
     });
     return result;
 }
 
 async function loadLogoFromSupabase() {
+    var cachedLogo = localStorage.getItem('ald_company_logo');
     const user = await getCurrentUser();
-    if (!user) return localStorage.getItem('ald_company_logo');
+    if (!user) return cachedLogo;
     if (await qdUsesTeamAccountApi()) {
         var teamLogo = await qdTeamAccountCall('business.logo');
+        if (teamLogo.error) return cachedLogo;
         if (!teamLogo.error && typeof teamLogo.data === 'string' && teamLogo.data) {
             localStorage.setItem('ald_company_logo', teamLogo.data);
             return teamLogo.data;
@@ -2341,11 +2349,11 @@ async function loadLogoFromSupabase() {
         .eq('user_id', user.id)
         .eq('key', 'company_logo')
         .maybeSingle();
-    if (!error && data && data.value && data.value.logo) {
-        localStorage.setItem('ald_company_logo', data.value.logo);
-        return data.value.logo;
-    }
-    return localStorage.getItem('ald_company_logo');
+    if (error) return cachedLogo;
+    var cloudLogo = data && data.value && typeof data.value.logo === 'string' ? data.value.logo : '';
+    if (cloudLogo) localStorage.setItem('ald_company_logo', cloudLogo);
+    else localStorage.removeItem('ald_company_logo');
+    return cloudLogo || null;
 }
 
 async function savePaymentSettings(settings) {

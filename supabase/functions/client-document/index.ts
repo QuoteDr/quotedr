@@ -417,6 +417,97 @@ function sanitizeQuoteRow(row: QuoteRow) {
   };
 }
 
+const PUBLIC_BUSINESS_PROFILE_FIELDS = [
+  "business_name", "businessName", "company_name", "companyName",
+  "tagline", "companyTagline", "business_tagline",
+  "owner_name", "ownerName", "name",
+  "address", "streetAddress", "street_address",
+  "city", "province", "state", "postal_code", "postalCode", "postal",
+  "phone", "business_phone", "email", "business_email",
+  "hst_number", "hstNumber", "taxNumber", "tax_number",
+  "website", "url", "hidden_profile_fields", "hiddenProfileFields",
+];
+
+function sanitizePublicBusinessProfile(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const source = value as Record<string, unknown>;
+  const result: Record<string, unknown> = {};
+  for (const key of PUBLIC_BUSINESS_PROFILE_FIELDS) {
+    const field = source[key];
+    if (Array.isArray(field) && (key === "hidden_profile_fields" || key === "hiddenProfileFields")) {
+      result[key] = field.map((item) => String(item || "").slice(0, 80)).filter(Boolean).slice(0, 40);
+    } else if (typeof field === "string" || typeof field === "number") {
+      result[key] = String(field).slice(0, 1000);
+    }
+  }
+  return result;
+}
+
+const PUBLIC_PORTAL_THEME_STRING_FIELDS = [
+  "headerColor", "bgColor", "bgColor2", "textColor", "headerTextColor",
+  "headerDetailColor", "cardTextColor", "mutedTextColor", "buttonTextColor",
+  "bgStyle", "layoutStyle", "portalLogo", "logoSize", "headerDensity",
+  "buttonStyle", "cardStyle",
+];
+
+function sanitizePublicPortalTheme(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const source = value as Record<string, unknown>;
+  const result: Record<string, unknown> = {};
+  for (const key of PUBLIC_PORTAL_THEME_STRING_FIELDS) {
+    if (typeof source[key] === "string") result[key] = source[key];
+  }
+  for (const key of ["bgStrength", "logoScale"]) {
+    const rawValue = source[key];
+    if (rawValue === undefined || rawValue === null || String(rawValue).trim() === "") continue;
+    const numberValue = Number(rawValue);
+    if (Number.isFinite(numberValue)) result[key] = numberValue;
+  }
+  return result;
+}
+
+async function loadPublicAccountBranding(userId: string, includePortalTheme = false) {
+  try {
+    const keys = ["business_profile", "company_logo"];
+    if (includePortalTheme) keys.push("portal_theme");
+    const { data, error } = await adminClient()
+      .from("user_data")
+      .select("key,value")
+      .eq("user_id", userId)
+      .in("key", keys);
+    if (error) throw error;
+    const profile = (data || []).find((row) => row.key === "business_profile")?.value;
+    const logoValue = (data || []).find((row) => row.key === "company_logo")?.value;
+    const portalTheme = (data || []).find((row) => row.key === "portal_theme")?.value;
+    const logoRecord = logoValue && typeof logoValue === "object" && !Array.isArray(logoValue)
+      ? logoValue as Record<string, unknown>
+      : {};
+    return {
+      businessProfile: sanitizePublicBusinessProfile(profile),
+      businessLogo: typeof logoRecord.logo === "string" ? logoRecord.logo : "",
+      portalTheme: includePortalTheme ? sanitizePublicPortalTheme(portalTheme) : {},
+    };
+  } catch (error) {
+    console.error("public account branding load failed:", error);
+    return { businessProfile: {}, businessLogo: "", portalTheme: {} };
+  }
+}
+
+async function loadDocumentBrandingFallback(userId: string) {
+  const branding = await loadPublicAccountBranding(userId);
+  return { businessProfile: branding.businessProfile, businessLogo: branding.businessLogo };
+}
+
+async function loadPortalBranding(userId: string) {
+  return await loadPublicAccountBranding(userId, true);
+}
+
+function documentNeedsBrandingFallback(row: QuoteRow) {
+  const data = rowData(row);
+  return !Object.prototype.hasOwnProperty.call(data, "businessLogo")
+    || !Object.prototype.hasOwnProperty.call(data, "businessProfile");
+}
+
 function cardPaymentEnabledForDocument(row: QuoteRow, settings: Record<string, unknown>) {
   if (settings.stripe_enabled !== true) return false;
   const data = rowData(row);
@@ -740,8 +831,13 @@ async function viewDocument(body: Record<string, unknown>) {
   const token = String(body.token || "").trim();
   const portalAnchorId = normalizeId(body.portalAnchorId || body.portal_anchor);
   const { target } = await assertTokenAccess(documentId, token, portalAnchorId);
-  const paymentOptions = await loadPaymentOptions(target);
-  return json({ document: sanitizeQuoteRow(target), paymentOptions });
+  const [paymentOptions, branding] = await Promise.all([
+    loadPaymentOptions(target),
+    documentNeedsBrandingFallback(target)
+      ? loadDocumentBrandingFallback(target.user_id)
+      : Promise.resolve(null),
+  ]);
+  return json({ document: sanitizeQuoteRow(target), paymentOptions, branding });
 }
 
 async function portalDocuments(body: Record<string, unknown>) {
@@ -760,7 +856,10 @@ async function portalDocuments(body: Record<string, unknown>) {
     .order("created_at", { ascending: false });
   const activePortalId = portalId(anchor);
   if (activePortalId) query = query.eq("data->>portal_id", activePortalId);
-  const { data, error } = await query;
+  const [{ data, error }, branding] = await Promise.all([
+    query,
+    loadPortalBranding(anchor.user_id),
+  ]);
   if (error) throw error;
   const docs = (data as QuoteRow[] || [])
     .filter((row) => row.id === anchor.id || (portalVisible(row) && samePortalGroup(anchor, row)))
@@ -771,6 +870,7 @@ async function portalDocuments(body: Record<string, unknown>) {
     contractorId: anchor.user_id,
     portalId: activePortalId,
     documents: docs,
+    branding,
   });
 }
 

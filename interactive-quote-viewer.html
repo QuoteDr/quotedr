@@ -3,13 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#1a2940">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="QuoteDr">
-    <link rel="apple-touch-icon" href="/icons/icon-192.png">
-    <title>Your Quote - QuoteDr</title>
+    <meta name="theme-color" content="#475569">
+    <link id="quoteFavicon" rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23475569'/%3E%3Cpath d='M14 31 32 17l18 14v19H38V37H26v13H14z' fill='white'/%3E%3C/svg%3E">
+    <title>Your Quote</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="brand-theme.css?v=2026071302">
@@ -1374,7 +1370,7 @@ if (location.search.includes('debug')) {
         <!-- Header -->
         <section class="proposal-hero quote-header">
             <div class="proposal-logo-row">
-                <img id="businessLogoImg" src="quotedr-logo.svg" alt="Company Logo">
+                <img id="businessLogoImg" alt="" hidden>
             </div>
             <div class="proposal-hero-inner">
                 <div>
@@ -1766,9 +1762,92 @@ if (location.search.includes('debug')) {
 
     <script>
         let quoteData = {};
+        let quoteBrandingFallback = {};
+        let quoteSecureBrandingFallback = null;
+        const quoteNeutralFaviconHref = document.getElementById('quoteFavicon')?.href || '';
         const quoteStudioParams = new URLSearchParams(window.location.search);
         const quoteStudioMode = quoteStudioParams.get('quote_studio') === '1';
         const QUOTE_STUDIO_MESSAGE_VERSION = 1;
+
+        function quoteHasBrandingSnapshot(key) {
+            return Object.prototype.hasOwnProperty.call(quoteData || {}, key);
+        }
+
+        function quoteBrandingFallbackValue(key) {
+            if (quoteSecureBrandingFallback && Object.prototype.hasOwnProperty.call(quoteSecureBrandingFallback, key)) {
+                return quoteSecureBrandingFallback[key];
+            }
+            return quoteBrandingFallback ? quoteBrandingFallback[key] : undefined;
+        }
+
+        function resolvedQuoteBusinessProfile() {
+            if (quoteHasBrandingSnapshot('businessProfile')) {
+                return quoteData.businessProfile && typeof quoteData.businessProfile === 'object'
+                    ? quoteData.businessProfile
+                    : {};
+            }
+            var fallbackProfile = quoteBrandingFallbackValue('businessProfile');
+            return fallbackProfile && typeof fallbackProfile === 'object' ? fallbackProfile : {};
+        }
+
+        function resolvedQuoteBusinessLogo() {
+            if (quoteHasBrandingSnapshot('businessLogo')) {
+                return typeof quoteData.businessLogo === 'string' ? quoteData.businessLogo.trim() : '';
+            }
+            var fallbackLogo = quoteBrandingFallbackValue('businessLogo');
+            return typeof fallbackLogo === 'string' ? fallbackLogo.trim() : '';
+        }
+
+        function renderQuoteBranding() {
+            var profile = resolvedQuoteBusinessProfile();
+            var hidden = getViewerHiddenProfileFields(profile);
+            var companyName = profile.business_name || profile.company_name || profile.businessName || profile.companyName || '';
+            var visibleName = hidden.includes('businessName') ? '' : companyName;
+            var tagline = profile.tagline || profile.companyTagline || profile.business_tagline || '';
+            var nameEl = document.getElementById('companyNameDisplay');
+            var tagEl = document.getElementById('companyTaglineDisplay');
+            var infoEl = document.getElementById('businessInfoDisplay');
+            var logo = document.getElementById('businessLogoImg');
+            var favicon = document.getElementById('quoteFavicon');
+            var isChangeOrder = !!(window.QuoteDrChangeOrders && QuoteDrChangeOrders.isChangeOrder(quoteData));
+
+            if (nameEl) {
+                nameEl.textContent = visibleName;
+                nameEl.style.display = visibleName ? '' : 'none';
+            }
+            if (tagEl) {
+                tagEl.textContent = tagline;
+                tagEl.style.display = tagline ? '' : 'none';
+            }
+            if (Object.keys(profile).length) renderViewerBusinessInfo(profile);
+            else if (infoEl) {
+                infoEl.innerHTML = '';
+                infoEl.style.display = 'none';
+            }
+            document.title = visibleName
+                ? (isChangeOrder ? 'Change Order from ' : 'Quote from ') + visibleName
+                : (isChangeOrder ? 'Change Order' : 'Your Quote');
+
+            var source = resolvedQuoteBusinessLogo();
+            if (!logo || !source) {
+                if (logo) {
+                    logo.hidden = true;
+                    logo.removeAttribute('src');
+                    logo.alt = '';
+                }
+                if (favicon) favicon.href = quoteNeutralFaviconHref;
+                return;
+            }
+            logo.alt = (companyName || 'Contractor') + ' logo';
+            logo.onerror = function() {
+                logo.hidden = true;
+                logo.removeAttribute('src');
+                if (favicon) favicon.href = quoteNeutralFaviconHref;
+            };
+            logo.onload = function() { logo.hidden = false; };
+            if (favicon) favicon.href = source;
+            logo.src = source;
+        }
 
         const CATEGORY_ORDER = [
             'Demolition','Asbestos / Hazmat','Concrete & Masonry','Waterproofing',
@@ -1998,6 +2077,7 @@ if (location.search.includes('debug')) {
             applyViewerStyleTheme();
             applyViewerPreferences();
             renderQuote();
+            renderQuoteBranding();
             refreshAdminPreviewFullResolutionPhotos();
             applyCommitmentBanner();
             displayTerms();
@@ -2054,28 +2134,22 @@ if (location.search.includes('debug')) {
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', async function() {
             var savedLogo = localStorage.getItem('ald_company_logo') || localStorage.getItem('ald_logo');
-            if (savedLogo) {
-                var logoEl = document.getElementById('businessLogoImg');
-                if (logoEl) logoEl.src = savedLogo;
-            }
+            if (savedLogo) quoteBrandingFallback.businessLogo = savedLogo;
             if (!quoteStudioMode && typeof loadLogoFromSupabase === 'function') {
                 loadLogoFromSupabase().then(function(logo) {
-                    if (logo) {
-                        var logoEl = document.getElementById('businessLogoImg');
-                        if (logoEl) logoEl.src = logo;
-                    }
+                    quoteBrandingFallback.businessLogo = logo || '';
+                    if (Object.keys(quoteData || {}).length) renderQuoteBranding();
                 });
             }
             var bizProfile = {};
             try { bizProfile = JSON.parse(localStorage.getItem('ald_business_profile') || '{}'); } catch(e) {}
+            if (bizProfile && Object.keys(bizProfile).length) quoteBrandingFallback.businessProfile = bizProfile;
             if (!quoteStudioMode && typeof loadBusinessProfile === 'function') {
-                loadBusinessProfile().then(function(p) { if (p && p.business_name) bizProfile = p; });
+                loadBusinessProfile().then(function(p) {
+                    if (p && Object.keys(p).length) quoteBrandingFallback.businessProfile = p;
+                    if (Object.keys(quoteData || {}).length) renderQuoteBranding();
+                });
             }
-            var nameEl = document.getElementById('companyNameDisplay');
-            var tagEl = document.getElementById('companyTaglineDisplay');
-            if (nameEl && bizProfile.business_name) nameEl.textContent = bizProfile.business_name;
-            if (tagEl && bizProfile.tagline) tagEl.textContent = bizProfile.tagline;
-            else if (tagEl && !bizProfile.tagline) tagEl.style.display = 'none';
 
             if (quoteStudioMode) {
                 initializeQuoteStudioMode();
@@ -2185,6 +2259,9 @@ if (location.search.includes('debug')) {
                 const result = await loadSecureClientDocument(supabaseId, shareToken, portalAnchorId);
                 if (result && result.data && result.data.data) {
                     window._securePaymentOptions = result.paymentOptions || null;
+                    quoteSecureBrandingFallback = result.branding && typeof result.branding === 'object'
+                        ? result.branding
+                        : null;
                     quoteData = result.data.data;
                     quoteData.id = result.data.id;
                     quoteData.status = result.data.status || quoteData.status || '';
