@@ -1,5 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import {
+  ACCOUNT_PERMISSION,
+  AccountAccessError,
+  requireAccountPermissionWithDefault,
+} from "../_shared/account-authorization.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "https://axmoffknvblluibuitrq.supabase.co";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
@@ -136,19 +141,29 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
-  const user = await authenticatedUser(req);
-  if (!user) return json({ error: "Authentication required", code: "authentication_required" }, 401);
-  if (!SUPABASE_SERVICE_ROLE_KEY) return json({ error: "Payment setup is temporarily unavailable", code: "service_unavailable" }, 503);
-
-  const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   const body = await req.json().catch(() => ({}));
   const action = String(body.action || "status");
+  let access;
+  try {
+    const permission = action === "status" || action === "refresh"
+      ? ACCOUNT_PERMISSION.PAYMENTS_READ
+      : ACCOUNT_PERMISSION.PAYMENTS_MANAGE;
+    access = await requireAccountPermissionWithDefault(req, body.accountId, permission);
+  } catch (error) {
+    if (error instanceof AccountAccessError) return json({ error: error.message, code: error.code }, error.status);
+    return json({ error: "Payment setup is temporarily unavailable", code: "service_unavailable" }, 503);
+  }
+  if (!SUPABASE_SERVICE_ROLE_KEY) return json({ error: "Payment setup is temporarily unavailable", code: "service_unavailable" }, 503);
+
+  const user = access.user;
+  const accountOwnerId = access.ownerUserId;
+  const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   try {
     let { data: row, error: rowError } = await admin
       .from("stripe_connected_accounts")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", accountOwnerId)
       .maybeSingle();
     if (rowError) throw rowError;
 
@@ -157,7 +172,7 @@ Deno.serve(async (req) => {
         try {
           row = await syncAccount(admin, row);
         } catch (error) {
-          console.error("stripe-connect status sync failed", { userId: user.id, message: (error as Error).message });
+          console.error("stripe-connect status sync failed", { accountOwnerId, actorUserId: user.id, message: (error as Error).message });
           return json({ connection: publicConnection(row), warning: "Stripe status could not be refreshed. Showing the last known status." });
         }
       }
@@ -171,7 +186,7 @@ Deno.serve(async (req) => {
         const params = new URLSearchParams({
           type: "standard",
           country: String(body.country || "CA").toUpperCase() === "US" ? "US" : "CA",
-          "metadata[quotedr_user_id]": user.id,
+          "metadata[quotedr_user_id]": accountOwnerId,
           "metadata[quotedr_product]": "document_payments",
         });
         if (user.email) params.set("email", user.email);
@@ -179,12 +194,12 @@ Deno.serve(async (req) => {
           method: "POST",
           headers: {
             "Content-Type": "application/x-www-form-urlencoded",
-            "Idempotency-Key": `quotedr-connect-${user.id}`,
+            "Idempotency-Key": `quotedr-connect-${accountOwnerId}`,
           },
           body: params.toString(),
         });
         const values = {
-          user_id: user.id,
+          user_id: accountOwnerId,
           stripe_account_id: account.id,
           ...accountState(account),
         };
@@ -195,7 +210,7 @@ Deno.serve(async (req) => {
         const reenabled = await admin
           .from("stripe_connected_accounts")
           .update({ status: "pending", updated_at: new Date().toISOString() })
-          .eq("user_id", user.id)
+          .eq("user_id", accountOwnerId)
           .select()
           .single();
         if (reenabled.error) throw reenabled.error;
@@ -230,7 +245,7 @@ Deno.serve(async (req) => {
         });
         return json({ url: link.url });
       } catch (error) {
-        console.warn("Stripe login link unavailable; using Stripe Dashboard", { userId: user.id, message: (error as Error).message });
+        console.warn("Stripe login link unavailable; using Stripe Dashboard", { accountOwnerId, actorUserId: user.id, message: (error as Error).message });
         return json({ url: "https://dashboard.stripe.com/" });
       }
     }
@@ -240,7 +255,7 @@ Deno.serve(async (req) => {
       const disabled = await admin
         .from("stripe_connected_accounts")
         .update({ status: "disabled", updated_at: new Date().toISOString() })
-        .eq("user_id", user.id)
+        .eq("user_id", accountOwnerId)
         .select()
         .single();
       if (disabled.error) throw disabled.error;
@@ -250,7 +265,7 @@ Deno.serve(async (req) => {
     return json({ error: "Unknown Stripe setup action", code: "unknown_action" }, 400);
   } catch (error) {
     const id = supportId();
-    console.error("stripe-connect error", { supportId: id, userId: user.id, action, message: (error as Error).message });
+    console.error("stripe-connect error", { supportId: id, accountOwnerId, actorUserId: user.id, action, message: (error as Error).message });
     return json({
       error: "Stripe setup could not be completed. Please try again.",
       code: "stripe_setup_failed",

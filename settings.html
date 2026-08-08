@@ -463,7 +463,8 @@ if (location.search.includes('debug')) {
 </script>
 <script src="error-reporter.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-v2.js?v=2026080102"></script>
+    <script src="supabase-v2.js?v=2026080701"></script>
+    <script src="account-access.js?v=2026080701"></script>
     <script src="save-coordinator.js?v=2026080401"></script>
     <script src="analytics.js?v=1778059000"></script>
 </head>
@@ -512,6 +513,7 @@ if (location.search.includes('debug')) {
 					<a href="#" data-settings-tab="portal" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('portal',this);return false;"><i class="fas fa-paint-brush me-2" style="color:#e87e2a"></i>Portal Theme</a>
 					<a href="#" data-settings-tab="integrations" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('integrations',this);return false;"><i class="fas fa-plug me-2" style="color:#2b6cb0"></i>Integrations</a>
 					<a href="#" data-settings-tab="help" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('help',this);return false;"><i class="fas fa-circle-question me-2" style="color:#1a56a0"></i>Help</a>
+					<a href="#" data-settings-tab="team" data-account-permission="team.read" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('team',this);return false;"><i class="fas fa-users me-2" style="color:#0f766e"></i>Team</a>
 					<a href="#" data-settings-tab="account" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('account',this);return false;"><i class="fas fa-user-circle me-2" style="color:#6f42c1"></i>Account</a>
 					<a href="#" data-settings-tab="feedback" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('feedback',this);return false;"><i class="fas fa-comment-alt me-2" style="color:#28a745"></i>Feedback</a>
 				</div>
@@ -1802,6 +1804,92 @@ Sarah Jones, 905-555-5678"></textarea>
 					</div>
 				</div><!-- /tab-save-incidents --><div id="tab-chatbot-feedback" style="display:none;"><div class="settings-card"><div class="d-flex justify-content-between align-items-start gap-2 flex-wrap"><div><h5><i class="fas fa-robot me-2" style="color:#7c3aed"></i>AI Chatbot repeats</h5><p class="text-muted small mb-2">Privacy-safe trends from similar topics. No chat messages or user identities are stored.</p></div><button class="btn btn-outline-primary btn-sm" onclick="loadChatbotFeedback()">Refresh</button></div><div id="chatbotFeedbackSummary" class="small text-muted">Open this tab to load trends.</div><div id="chatbotFeedbackList" class="mt-3"></div></div></div><!-- /tab-chatbot-feedback -->
 
+				<div id="tab-team" style="display:none;">
+					<div class="settings-card">
+						<div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+							<div>
+								<h5 class="mb-1"><i class="fas fa-users me-2" style="color:#0f766e"></i>Team access</h5>
+								<p class="text-muted small mb-0">Give each person their own login. Access is controlled by permissions, and protected pricing never leaves the server.</p>
+							</div>
+							<button type="button" class="btn btn-outline-primary btn-sm" onclick="loadTeamSettings()"><i class="fas fa-rotate me-1"></i>Refresh</button>
+						</div>
+						<div id="teamSettingsMessage" class="alert alert-light border small" role="status">Open this tab to load your team.</div>
+						<section class="border rounded p-3 mb-4" data-account-permission="roles.manage" aria-labelledby="teamRoleTemplatesHeading">
+							<div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-2">
+								<div>
+									<h6 id="teamRoleTemplatesHeading" class="mb-1">Role templates</h6>
+									<p class="text-muted small mb-0">Duplicate a role, choose its capabilities, then set each field to Hidden, View, or Edit. Assign a one-person role when an estimator needs unique privacy.</p>
+								</div>
+								<button type="button" id="teamCreateRoleButton" class="btn btn-outline-primary btn-sm" onclick="openTeamRoleEditor()"><i class="fas fa-plus me-1"></i>Create role</button>
+							</div>
+							<div id="teamRoleTemplateList" class="text-muted small">No role templates loaded.</div>
+						</section>
+						<form id="teamInviteForm" class="row g-2 align-items-end mb-4" onsubmit="inviteTeamMember(event)" data-account-permission="team.manage">
+							<div class="col-md-6">
+								<label for="teamInviteEmail" class="form-label">Email address</label>
+								<input type="email" id="teamInviteEmail" class="form-control" autocomplete="email" required placeholder="estimator@company.com">
+							</div>
+							<div class="col-md-3">
+								<label for="teamInviteRole" class="form-label">Role</label>
+								<select id="teamInviteRole" class="form-select" required></select>
+							</div>
+							<div class="col-md-3 d-grid">
+								<button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane me-1"></i>Invite</button>
+							</div>
+						</form>
+						<div id="teamInviteLink" class="alert alert-warning small" style="display:none;"></div>
+						<h6>Members</h6>
+						<div id="teamMemberList" class="mb-4 text-muted small">No team data loaded.</div>
+						<h6>Pending invitations</h6>
+						<div id="teamInvitationList" class="text-muted small">No pending invitations.</div>
+					</div>
+
+					<div class="modal fade" id="teamRoleModal" tabindex="-1" aria-labelledby="teamRoleModalTitle" aria-hidden="true">
+						<div class="modal-dialog modal-lg modal-dialog-scrollable">
+							<form class="modal-content" id="teamRoleForm" onsubmit="saveTeamRoleTemplate(event)">
+								<div class="modal-header">
+									<div>
+										<h5 class="modal-title" id="teamRoleModalTitle">Create role</h5>
+										<div class="small text-muted" id="teamRoleModalSubtitle">Set what this role can do and which fields it can receive.</div>
+									</div>
+									<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+								</div>
+								<div class="modal-body">
+									<div id="teamRoleEditorMessage" class="alert alert-light border small" role="status" aria-live="polite">Hidden fields are removed by the server, not just hidden on screen.</div>
+									<div class="row g-3 mb-4">
+										<div class="col-md-6">
+											<label for="teamRoleName" class="form-label">Role name</label>
+											<input type="text" id="teamRoleName" class="form-control" maxlength="80" required autocomplete="off">
+										</div>
+										<div class="col-md-6">
+											<label for="teamRoleSource" class="form-label">Copy settings from</label>
+											<div class="input-group">
+												<select id="teamRoleSource" class="form-select" aria-describedby="teamRoleSourceHelp"></select>
+												<button type="button" class="btn btn-outline-secondary" onclick="applyTeamRoleSource()">Apply</button>
+											</div>
+											<div id="teamRoleSourceHelp" class="form-text">System roles stay unchanged; copying creates your own account role.</div>
+										</div>
+										<div class="col-12">
+											<label for="teamRoleDescription" class="form-label">Description</label>
+											<textarea id="teamRoleDescription" class="form-control" rows="2" maxlength="300"></textarea>
+										</div>
+									</div>
+									<h6>Capabilities</h6>
+									<p class="small text-muted">Capabilities control actions such as editing, sending, billing, or team management. Required prerequisites are selected automatically.</p>
+									<div id="teamRolePermissionList" class="mb-4"></div>
+									<h6>Field privacy and access</h6>
+									<p class="small text-muted">Hidden values are never returned to this role. View is read-only. Edit allows changes only when the matching capability is also enabled.</p>
+									<div id="teamRoleFieldList"></div>
+								</div>
+								<div class="modal-footer">
+									<button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+									<button type="submit" id="teamRoleSaveButton" class="btn btn-primary">Save role</button>
+								</div>
+							</form>
+						</div>
+					</div>
+				</div><!-- /tab-team -->
+
 				<div id="tab-account" style="display:none;">
 					<div class="settings-card">
 						<h5><i class="fas fa-user-circle me-2" style="color:#6f42c1"></i>Account</h5>
@@ -1855,11 +1943,16 @@ Sarah Jones, 905-555-5678"></textarea>
 			return data?.session?.access_token ? { 'Authorization': 'Bearer ' + data.session.access_token, 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON } : null;
 		}
 
+		function getQBAccountId() {
+			var account = window.QuoteDrAccount && QuoteDrAccount.active();
+			return account && account.accountId || null;
+		}
+
 		async function checkQBStatus() {
 			try {
 				const headers = await getQBAuthHeader();
 				if (!headers) return;
-				const resp = await fetch(SUPABASE_URL + '/functions/v1/qb-oauth', { method: 'POST', headers, body: JSON.stringify({ action: 'status' }) });
+				const resp = await fetch(SUPABASE_URL + '/functions/v1/qb-oauth', { method: 'POST', headers, body: JSON.stringify({ action: 'status', accountId: getQBAccountId() }) });
 				const data = await resp.json();
 				const statusEl = document.getElementById('qbStatus');
 				const connectBtn = document.getElementById('qbConnectBtn');
@@ -1895,7 +1988,7 @@ Sarah Jones, 905-555-5678"></textarea>
 				const res = await fetch(SUPABASE_URL + '/functions/v1/qb-oauth', {
 					method: 'POST',
 					headers,
-					body: JSON.stringify({ action: 'get_auth_url' })
+					body: JSON.stringify({ action: 'get_auth_url', accountId: getQBAccountId() })
 				});
 				const data = await res.json();
 				if (data.error) throw new Error(data.error);
@@ -1918,7 +2011,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			try {
 				const headers = await getQBAuthHeader();
 				if (!headers) return;
-				await fetch(SUPABASE_URL + '/functions/v1/qb-oauth', { method: 'POST', headers, body: JSON.stringify({ action: 'disconnect' }) });
+				await fetch(SUPABASE_URL + '/functions/v1/qb-oauth', { method: 'POST', headers, body: JSON.stringify({ action: 'disconnect', accountId: getQBAccountId() }) });
 				checkQBStatus();
 			} catch(e) { qdAlert('Error disconnecting: ' + e.message); }
 		}
@@ -1928,6 +2021,621 @@ Sarah Jones, 905-555-5678"></textarea>
 				return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
 			});
 		}
+
+		var quotedrTeamRoles = [];
+		var quotedrRoleCatalog = { permissions: [], fields: [] };
+		var quotedrRoleEditor = { roleId: null, member: null };
+
+		function teamSettingsMessage(message, type) {
+			var node = document.getElementById('teamSettingsMessage');
+			if (!node) return;
+			node.className = 'alert small ' + (type === 'error' ? 'alert-danger' : type === 'success' ? 'alert-success' : 'alert-light border');
+			node.textContent = message;
+		}
+
+		function appendTeamButton(parent, label, className, handler) {
+			var button = document.createElement('button');
+			button.type = 'button';
+			button.className = className;
+			button.textContent = label;
+			button.addEventListener('click', handler);
+			parent.appendChild(button);
+			return button;
+		}
+
+		function teamRoleEditorMessage(message, type) {
+			var node = document.getElementById('teamRoleEditorMessage');
+			if (!node) return;
+			node.className = 'alert small ' + (type === 'error' ? 'alert-danger' : type === 'success' ? 'alert-success' : 'alert-light border');
+			node.textContent = message;
+		}
+
+		function teamRoleCategoryLabel(value) {
+			return String(value || 'Other').replace(/[_-]+/g, ' ').replace(/\b\w/g, function(letter) { return letter.toUpperCase(); });
+		}
+
+		function teamRolePermissionInputs() {
+			return Array.prototype.slice.call(document.querySelectorAll('#teamRolePermissionList input[data-permission-key]'));
+		}
+
+		function teamRoleFieldSelects() {
+			return Array.prototype.slice.call(document.querySelectorAll('#teamRoleFieldList select[data-field-key]'));
+		}
+
+		function teamRolePermissionInput(permissionKey) {
+			return teamRolePermissionInputs().find(function(input) {
+				return input.getAttribute('data-permission-key') === permissionKey;
+			}) || null;
+		}
+
+		function checkedTeamRolePermissions() {
+			return new Set(teamRolePermissionInputs().filter(function(input) { return input.checked; }).map(function(input) {
+				return input.getAttribute('data-permission-key');
+			}));
+		}
+
+		function ensureTeamRolePermissionDependencies() {
+			var changed = true;
+			while (changed) {
+				changed = false;
+				var checked = checkedTeamRolePermissions();
+				(quotedrRoleCatalog.permissions || []).forEach(function(permission) {
+					if (!checked.has(permission.key)) return;
+					(permission.requires || []).forEach(function(requiredKey) {
+						var required = teamRolePermissionInput(requiredKey);
+						if (required && !required.checked) {
+							required.checked = true;
+							changed = true;
+						}
+					});
+				});
+			}
+		}
+
+		function removeTeamRolePermissionDependents(permissionKey) {
+			var changed = true;
+			var removed = new Set([permissionKey]);
+			while (changed) {
+				changed = false;
+				(quotedrRoleCatalog.permissions || []).forEach(function(permission) {
+					var input = teamRolePermissionInput(permission.key);
+					if (!input || !input.checked) return;
+					if ((permission.requires || []).some(function(required) { return removed.has(required); })) {
+						input.checked = false;
+						removed.add(permission.key);
+						changed = true;
+					}
+				});
+			}
+		}
+
+		function syncTeamRoleFieldSelections() {
+			var checked = checkedTeamRolePermissions();
+			teamRoleFieldSelects().forEach(function(select) {
+				var readPermission = select.getAttribute('data-read-permission');
+				var writePermission = select.getAttribute('data-write-permission');
+				if (select.value !== 'hidden' && readPermission && !checked.has(readPermission)) select.value = 'hidden';
+				if (select.value === 'write' && (!writePermission || !checked.has(writePermission))) {
+					select.value = readPermission && checked.has(readPermission) ? 'read' : 'hidden';
+				}
+			});
+		}
+
+		function handleTeamRolePermissionChange(input) {
+			if (input.checked) ensureTeamRolePermissionDependencies();
+			else removeTeamRolePermissionDependents(input.getAttribute('data-permission-key'));
+			syncTeamRoleFieldSelections();
+		}
+
+		function handleTeamRoleFieldChange(select) {
+			if (select.value === 'read' || select.value === 'write') {
+				var readPermission = teamRolePermissionInput(select.getAttribute('data-read-permission'));
+				if (readPermission) readPermission.checked = true;
+			}
+			if (select.value === 'write') {
+				var writePermission = teamRolePermissionInput(select.getAttribute('data-write-permission'));
+				if (writePermission) writePermission.checked = true;
+			}
+			ensureTeamRolePermissionDependencies();
+			syncTeamRoleFieldSelections();
+		}
+
+		function renderTeamRoleEditorControls() {
+			var permissionList = document.getElementById('teamRolePermissionList');
+			var fieldList = document.getElementById('teamRoleFieldList');
+			if (!permissionList || !fieldList) return;
+			permissionList.replaceChildren();
+			fieldList.replaceChildren();
+
+			var permissionGroups = new Map();
+			(quotedrRoleCatalog.permissions || []).forEach(function(permission) {
+				if (!permissionGroups.has(permission.category)) permissionGroups.set(permission.category, []);
+				permissionGroups.get(permission.category).push(permission);
+			});
+			var permissionIndex = 0;
+			permissionGroups.forEach(function(permissions, category) {
+				var group = document.createElement('fieldset');
+				group.className = 'border rounded p-3 mb-3';
+				var legend = document.createElement('legend');
+				legend.className = 'float-none w-auto px-2 fs-6 fw-semibold';
+				legend.textContent = teamRoleCategoryLabel(category);
+				group.appendChild(legend);
+				permissions.forEach(function(permission) {
+					var wrapper = document.createElement('div');
+					wrapper.className = 'form-check mb-2';
+					var input = document.createElement('input');
+					input.type = 'checkbox';
+					input.className = 'form-check-input';
+					input.id = 'teamRolePermission_' + permissionIndex++;
+					input.setAttribute('data-permission-key', permission.key);
+					input.addEventListener('change', function() { handleTeamRolePermissionChange(input); });
+					var label = document.createElement('label');
+					label.className = 'form-check-label';
+					label.htmlFor = input.id;
+					var name = document.createElement('span');
+					name.className = 'fw-semibold';
+					name.textContent = permission.name;
+					label.appendChild(name);
+					if (permission.sensitive) {
+						var badge = document.createElement('span');
+						badge.className = 'badge text-bg-warning ms-2';
+						badge.textContent = 'Sensitive';
+						label.appendChild(badge);
+					}
+					var description = document.createElement('div');
+					description.className = 'small text-muted';
+					description.textContent = permission.description;
+					label.appendChild(description);
+					wrapper.append(input, label);
+					group.appendChild(wrapper);
+				});
+				permissionList.appendChild(group);
+			});
+
+			var fieldGroups = new Map();
+			(quotedrRoleCatalog.fields || []).forEach(function(field) {
+				if (!fieldGroups.has(field.category)) fieldGroups.set(field.category, []);
+				fieldGroups.get(field.category).push(field);
+			});
+			fieldGroups.forEach(function(fields, category) {
+				var group = document.createElement('section');
+				group.className = 'border rounded p-3 mb-3';
+				var heading = document.createElement('h6');
+				heading.textContent = teamRoleCategoryLabel(category);
+				group.appendChild(heading);
+				fields.forEach(function(field) {
+					var row = document.createElement('div');
+					row.className = 'row g-2 align-items-center border-top py-2';
+					var text = document.createElement('div');
+					text.className = 'col-md-8';
+					var label = document.createElement('label');
+					label.className = 'fw-semibold d-block';
+					var selectId = 'teamRoleField_' + String(field.key).replace(/[^a-z0-9]/gi, '_');
+					label.htmlFor = selectId;
+					label.textContent = field.name;
+					if (field.sensitive) {
+						var sensitive = document.createElement('span');
+						sensitive.className = 'badge text-bg-warning ms-2';
+						sensitive.textContent = 'Private';
+						label.appendChild(sensitive);
+					}
+					var help = document.createElement('div');
+					help.className = 'small text-muted';
+					help.textContent = field.description;
+					text.append(label, help);
+					var control = document.createElement('div');
+					control.className = 'col-md-4';
+					var select = document.createElement('select');
+					select.id = selectId;
+					select.className = 'form-select form-select-sm';
+					select.setAttribute('data-field-key', field.key);
+					select.setAttribute('data-read-permission', field.readPermission || '');
+					select.setAttribute('data-write-permission', field.writePermission || '');
+					[['hidden', 'Hidden'], ['read', 'View']].concat(field.supportsWrite ? [['write', 'Edit']] : []).forEach(function(optionData) {
+						var option = document.createElement('option');
+						option.value = optionData[0];
+						option.textContent = optionData[1];
+						select.appendChild(option);
+					});
+					select.addEventListener('change', function() { handleTeamRoleFieldChange(select); });
+					control.appendChild(select);
+					row.append(text, control);
+					group.appendChild(row);
+				});
+				fieldList.appendChild(group);
+			});
+		}
+
+		function setTeamRoleEditorSelections(role) {
+			var permissions = new Set(role && Array.isArray(role.permissions) ? role.permissions : []);
+			teamRolePermissionInputs().forEach(function(input) {
+				input.checked = permissions.has(input.getAttribute('data-permission-key'));
+			});
+			var fields = role && role.fields && typeof role.fields === 'object' ? role.fields : {};
+			teamRoleFieldSelects().forEach(function(select) {
+				var level = fields[select.getAttribute('data-field-key')];
+				select.value = level === 'write' && select.querySelector('option[value="write"]')
+					? 'write'
+					: level === 'read' ? 'read' : 'hidden';
+			});
+			ensureTeamRolePermissionDependencies();
+			syncTeamRoleFieldSelections();
+		}
+
+		function applyTeamRoleSource() {
+			var sourceId = document.getElementById('teamRoleSource').value;
+			var role = quotedrTeamRoles.find(function(candidate) { return candidate.id === sourceId; });
+			setTeamRoleEditorSelections(role || null);
+			teamRoleEditorMessage(role ? 'Copied access settings from ' + role.name + '. Review them before saving.' : 'Start with no access.');
+		}
+
+		function showTeamRoleModal() {
+			var modalElement = document.getElementById('teamRoleModal');
+			if (window.bootstrap && bootstrap.Modal) bootstrap.Modal.getOrCreateInstance(modalElement).show();
+			else {
+				modalElement.classList.add('show');
+				modalElement.style.display = 'block';
+				modalElement.removeAttribute('aria-hidden');
+			}
+		}
+
+		function hideTeamRoleModal() {
+			var modalElement = document.getElementById('teamRoleModal');
+			if (window.bootstrap && bootstrap.Modal) bootstrap.Modal.getOrCreateInstance(modalElement).hide();
+			else {
+				modalElement.classList.remove('show');
+				modalElement.style.display = 'none';
+				modalElement.setAttribute('aria-hidden', 'true');
+			}
+		}
+
+		function openTeamRoleEditor(role, member, editExisting) {
+			if (!QuoteDrAccount.can(QuoteDrAccount.PERMISSIONS.ROLES_MANAGE)) return;
+			var sourceRole = role || quotedrTeamRoles.find(function(candidate) { return candidate.assignable; }) || null;
+			quotedrRoleEditor = {
+				roleId: editExisting && sourceRole && !sourceRole.system ? sourceRole.id : null,
+				member: member || null
+			};
+			var source = document.getElementById('teamRoleSource');
+			source.replaceChildren();
+			quotedrTeamRoles.filter(function(candidate) { return candidate.assignable; }).forEach(function(candidate) {
+				var option = document.createElement('option');
+				option.value = candidate.id;
+				option.textContent = candidate.name;
+				option.selected = sourceRole && sourceRole.id === candidate.id;
+				source.appendChild(option);
+			});
+			var title = document.getElementById('teamRoleModalTitle');
+			var subtitle = document.getElementById('teamRoleModalSubtitle');
+			var name = document.getElementById('teamRoleName');
+			var description = document.getElementById('teamRoleDescription');
+			if (quotedrRoleEditor.roleId) {
+				title.textContent = 'Edit ' + sourceRole.name;
+				subtitle.textContent = 'Changes apply to every member assigned to this role.';
+				name.value = sourceRole.name || '';
+				description.value = sourceRole.description || '';
+			} else if (member) {
+				var memberLabel = String(member.email || 'Team member').split('@')[0].replace(/[._-]+/g, ' ').trim();
+				title.textContent = 'Customize member access';
+				subtitle.textContent = 'This creates a private role template and assigns it only to ' + (member.email || 'this member') + '.';
+				name.value = (memberLabel || 'Member') + ' access';
+				description.value = 'Custom access for ' + (member.email || 'one team member') + '.';
+			} else {
+				title.textContent = sourceRole ? 'Duplicate ' + sourceRole.name : 'Create role';
+				subtitle.textContent = 'Create an account-specific role without changing the system template.';
+				name.value = sourceRole ? sourceRole.name + ' copy' : '';
+				description.value = sourceRole && sourceRole.description || '';
+			}
+			setTeamRoleEditorSelections(sourceRole);
+			teamRoleEditorMessage('Hidden fields are removed by the server, not just hidden on screen.');
+			showTeamRoleModal();
+			window.setTimeout(function() { name.focus(); }, 250);
+		}
+
+		function renderTeamRoleTemplates() {
+			var list = document.getElementById('teamRoleTemplateList');
+			if (!list) return;
+			list.replaceChildren();
+			quotedrTeamRoles.filter(function(role) { return role.assignable; }).forEach(function(role) {
+				var row = document.createElement('div');
+				row.className = 'border-top py-3 d-flex justify-content-between align-items-center gap-3 flex-wrap';
+				var text = document.createElement('div');
+				var title = document.createElement('div');
+				title.className = 'fw-semibold text-body';
+				title.textContent = role.name;
+				if (role.system) {
+					var badge = document.createElement('span');
+					badge.className = 'badge text-bg-light border ms-2';
+					badge.textContent = 'System template';
+					title.appendChild(badge);
+				}
+				var fieldValues = Object.values(role.fields || {});
+				var detail = document.createElement('div');
+				detail.className = 'small text-muted';
+				detail.textContent = String((role.permissions || []).length) + ' capabilities · ' +
+					String(fieldValues.length) + ' visible fields · ' +
+					String(fieldValues.filter(function(level) { return level === 'write'; }).length) + ' editable';
+				text.append(title, detail);
+				row.appendChild(text);
+				var actions = document.createElement('div');
+				actions.className = 'd-flex gap-2 flex-wrap';
+				if (!role.system) {
+					appendTeamButton(actions, 'Edit', 'btn btn-outline-primary btn-sm', function() { openTeamRoleEditor(role, null, true); });
+				}
+				appendTeamButton(actions, 'Duplicate', 'btn btn-outline-secondary btn-sm', function() { openTeamRoleEditor(role, null, false); });
+				if (!role.system) {
+					appendTeamButton(actions, 'Archive', 'btn btn-outline-danger btn-sm', function() { archiveTeamRoleTemplate(role); });
+				}
+				row.appendChild(actions);
+				list.appendChild(row);
+			});
+			if (!list.children.length) list.textContent = 'No assignable role templates are available.';
+		}
+
+		async function saveTeamRoleTemplate(event) {
+			event.preventDefault();
+			ensureTeamRolePermissionDependencies();
+			syncTeamRoleFieldSelections();
+			var button = document.getElementById('teamRoleSaveButton');
+			button.disabled = true;
+			teamRoleEditorMessage('Saving role and field rules...');
+			try {
+				var fieldAccess = {};
+				teamRoleFieldSelects().forEach(function(select) {
+					fieldAccess[select.getAttribute('data-field-key')] = select.value;
+				});
+				var result = await QuoteDrAccount.api('roles.save', {
+					roleId: quotedrRoleEditor.roleId,
+					name: document.getElementById('teamRoleName').value,
+					description: document.getElementById('teamRoleDescription').value,
+					permissionKeys: Array.from(checkedTeamRolePermissions()),
+					fieldAccess: fieldAccess
+				});
+				var savedRoleId = result.data && result.data.id;
+				if (quotedrRoleEditor.member && savedRoleId) {
+					await QuoteDrAccount.api('team.member.update', {
+						memberId: quotedrRoleEditor.member.id,
+						roleId: savedRoleId,
+						status: quotedrRoleEditor.member.status
+					});
+				}
+				hideTeamRoleModal();
+				teamSettingsMessage(quotedrRoleEditor.member ? 'Custom access saved and assigned.' : 'Role template saved.', 'success');
+				await loadTeamSettings();
+			} catch (error) {
+				teamRoleEditorMessage(error.message || 'The role could not be saved.', 'error');
+			} finally {
+				button.disabled = false;
+			}
+		}
+
+		async function archiveTeamRoleTemplate(role) {
+			if (!await qdConfirm({
+				title: 'Archive role?',
+				message: 'Archive ' + role.name + '? Reassign members and revoke pending invitations first.',
+				okText: 'Archive',
+				okClass: 'btn-danger',
+				type: 'danger'
+			})) return;
+			try {
+				await QuoteDrAccount.api('roles.archive', { roleId: role.id });
+				teamSettingsMessage('Role archived.', 'success');
+				await loadTeamSettings();
+			} catch (error) {
+				teamSettingsMessage(error.message || 'Role could not be archived.', 'error');
+			}
+		}
+
+		function customizeTeamMemberAccess(member) {
+			var role = quotedrTeamRoles.find(function(candidate) {
+				return member.role && candidate.id === member.role.id;
+			});
+			openTeamRoleEditor(role || null, member, false);
+		}
+
+		function renderTeamRoles() {
+			var select = document.getElementById('teamInviteRole');
+			if (!select) return;
+			select.replaceChildren();
+			quotedrTeamRoles.filter(function(role) { return role.assignable; }).forEach(function(role) {
+				var option = document.createElement('option');
+				option.value = role.id;
+				option.textContent = role.name;
+				select.appendChild(option);
+			});
+		}
+
+		function renderTeamMembers(members) {
+			var list = document.getElementById('teamMemberList');
+			if (!list) return;
+			list.replaceChildren();
+			(members || []).forEach(function(member) {
+				var row = document.createElement('div');
+				row.className = 'border rounded p-3 mb-2 d-flex justify-content-between align-items-center gap-3 flex-wrap';
+				var identity = document.createElement('div');
+				var title = document.createElement('div');
+				title.className = 'fw-semibold text-body';
+				title.textContent = member.email || 'Team member';
+				var detail = document.createElement('div');
+				detail.className = 'small text-muted';
+				detail.textContent = (member.role && member.role.name || 'Role') + ' · ' + member.status + (member.isOwner ? ' · Account owner' : '');
+				identity.append(title, detail);
+				row.appendChild(identity);
+				if (!member.isOwner && QuoteDrAccount.can(QuoteDrAccount.PERMISSIONS.TEAM_MANAGE)) {
+					var actions = document.createElement('div');
+					actions.className = 'd-flex gap-2 align-items-center flex-wrap';
+					var roleSelect = document.createElement('select');
+					roleSelect.className = 'form-select form-select-sm';
+					quotedrTeamRoles.filter(function(role) { return role.assignable; }).forEach(function(role) {
+						var option = document.createElement('option');
+						option.value = role.id;
+						option.textContent = role.name;
+						option.selected = member.role && member.role.id === role.id;
+						roleSelect.appendChild(option);
+					});
+					var statusSelect = document.createElement('select');
+					statusSelect.className = 'form-select form-select-sm';
+					['active', 'suspended'].forEach(function(status) {
+						var option = document.createElement('option');
+						option.value = status;
+						option.textContent = status === 'active' ? 'Active' : 'Suspended';
+						option.selected = member.status === status;
+						statusSelect.appendChild(option);
+					});
+					actions.append(roleSelect, statusSelect);
+					appendTeamButton(actions, 'Save', 'btn btn-outline-primary btn-sm', function() {
+						updateTeamMember(member.id, roleSelect.value, statusSelect.value);
+					});
+					if (QuoteDrAccount.can(QuoteDrAccount.PERMISSIONS.ROLES_MANAGE)) {
+						appendTeamButton(actions, 'Customize access', 'btn btn-outline-secondary btn-sm', function() {
+							customizeTeamMemberAccess(member);
+						});
+					}
+					appendTeamButton(actions, 'Remove', 'btn btn-outline-danger btn-sm', function() {
+						removeTeamMember(member.id, member.email);
+					});
+					row.appendChild(actions);
+				}
+				list.appendChild(row);
+			});
+			if (!list.children.length) list.textContent = 'No members yet.';
+		}
+
+		function renderTeamInvitations(invitations) {
+			var list = document.getElementById('teamInvitationList');
+			if (!list) return;
+			list.replaceChildren();
+			(invitations || []).forEach(function(invitation) {
+				var row = document.createElement('div');
+				row.className = 'border rounded p-3 mb-2 d-flex justify-content-between align-items-center gap-3';
+				var text = document.createElement('div');
+				text.className = 'text-body';
+				text.textContent = invitation.email + ' · expires ' + new Date(invitation.expires_at).toLocaleDateString();
+				row.appendChild(text);
+				if (QuoteDrAccount.can(QuoteDrAccount.PERMISSIONS.TEAM_MANAGE)) {
+					appendTeamButton(row, 'Revoke', 'btn btn-outline-danger btn-sm', function() {
+						revokeTeamInvitation(invitation.id);
+					});
+				}
+				list.appendChild(row);
+			});
+			if (!list.children.length) list.textContent = 'No pending invitations.';
+		}
+
+		async function loadTeamSettings() {
+			if (!window.QuoteDrAccount) return;
+			await QuoteDrAccount.init();
+			if (!QuoteDrAccount.can(QuoteDrAccount.PERMISSIONS.TEAM_READ)) {
+				teamSettingsMessage('You do not have permission to view the team.', 'error');
+				return;
+			}
+			teamSettingsMessage('Loading team access...');
+			try {
+				var requests = [
+					QuoteDrAccount.api('roles.list'),
+					QuoteDrAccount.api('team.list')
+				];
+				if (QuoteDrAccount.can(QuoteDrAccount.PERMISSIONS.ROLES_MANAGE)) {
+					requests.push(QuoteDrAccount.api('roles.catalog'));
+				}
+				var results = await Promise.all(requests);
+				quotedrTeamRoles = results[0].data || [];
+				quotedrRoleCatalog = results[2] && results[2].data || { permissions: [], fields: [] };
+				renderTeamRoles();
+				if (QuoteDrAccount.can(QuoteDrAccount.PERMISSIONS.ROLES_MANAGE)) {
+					renderTeamRoleEditorControls();
+					renderTeamRoleTemplates();
+				}
+				renderTeamMembers(results[1].data && results[1].data.members || []);
+				renderTeamInvitations(results[1].data && results[1].data.invitations || []);
+				QuoteDrAccount.applyDocumentAccess(document.getElementById('tab-team'));
+				teamSettingsMessage('Each member signs in separately. Protected data is enforced by the database and API.');
+			} catch (error) {
+				teamSettingsMessage(error.message || 'Team access could not be loaded.', 'error');
+			}
+		}
+
+		async function inviteTeamMember(event) {
+			event.preventDefault();
+			var email = document.getElementById('teamInviteEmail').value;
+			var roleId = document.getElementById('teamInviteRole').value;
+			teamSettingsMessage('Sending invitation...');
+			try {
+				var result = await QuoteDrAccount.api('team.invite', {
+					email: email,
+					roleId: roleId,
+					appOrigin: window.location.origin
+				});
+				document.getElementById('teamInviteEmail').value = '';
+				var linkBox = document.getElementById('teamInviteLink');
+				linkBox.replaceChildren();
+				if (result.data && result.data.inviteUrl) {
+					linkBox.style.display = '';
+					var copy = document.createElement('button');
+					copy.type = 'button';
+					copy.className = 'btn btn-sm btn-outline-dark ms-2';
+					copy.textContent = 'Copy invite link';
+					copy.addEventListener('click', function() {
+						navigator.clipboard.writeText(result.data.inviteUrl);
+					});
+					linkBox.append(document.createTextNode(result.data.emailDelivery === 'sent' ? 'Invitation sent.' : 'Email could not be sent; share this secure link instead.'), copy);
+				}
+				teamSettingsMessage('Invitation created.', 'success');
+				await loadTeamSettings();
+			} catch (error) {
+				teamSettingsMessage(error.message || 'Invitation failed.', 'error');
+			}
+		}
+
+		async function updateTeamMember(memberId, roleId, status) {
+			try {
+				await QuoteDrAccount.api('team.member.update', {
+					memberId: memberId,
+					roleId: roleId,
+					status: status
+				});
+				teamSettingsMessage('Team member updated.', 'success');
+				await loadTeamSettings();
+			} catch (error) {
+				teamSettingsMessage(error.message || 'Team member could not be updated.', 'error');
+			}
+		}
+
+		async function removeTeamMember(memberId, email) {
+			if (!await qdConfirm({
+				title: 'Remove team member?',
+				message: (email || 'This member') + ' will immediately lose access to this account.',
+				okText: 'Remove',
+				okClass: 'btn-danger',
+				type: 'danger'
+			})) return;
+			try {
+				await QuoteDrAccount.api('team.member.remove', { memberId: memberId });
+				teamSettingsMessage('Team member removed.', 'success');
+				await loadTeamSettings();
+			} catch (error) {
+				teamSettingsMessage(error.message || 'Team member could not be removed.', 'error');
+			}
+		}
+
+		async function revokeTeamInvitation(invitationId) {
+			try {
+				await QuoteDrAccount.api('team.invitation.revoke', { invitationId: invitationId });
+				teamSettingsMessage('Invitation revoked.', 'success');
+				await loadTeamSettings();
+			} catch (error) {
+				teamSettingsMessage(error.message || 'Invitation could not be revoked.', 'error');
+			}
+		}
+
+		window.loadTeamSettings = loadTeamSettings;
+		window.inviteTeamMember = inviteTeamMember;
+		window.updateTeamMember = updateTeamMember;
+		window.removeTeamMember = removeTeamMember;
+		window.revokeTeamInvitation = revokeTeamInvitation;
+		window.openTeamRoleEditor = openTeamRoleEditor;
+		window.applyTeamRoleSource = applyTeamRoleSource;
+		window.saveTeamRoleTemplate = saveTeamRoleTemplate;
 
 		function normalizeMatchName(value) {
 			return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -1943,7 +2651,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			const resp = await fetch(SUPABASE_URL + '/functions/v1/qb-sync', {
 				method: 'POST',
 				headers,
-				body: JSON.stringify({ action: action })
+				body: JSON.stringify({ action: action, accountId: getQBAccountId() })
 			});
 			const data = await resp.json();
 			if (!resp.ok || data.error) throw new Error(data.error || 'QuickBooks sync failed');
@@ -2853,6 +3561,7 @@ Sarah Jones, 905-555-5678"></textarea>
 				if (name === 'admin-controls') syncRecordingPrivacyControls();
 				if (name === 'save-incidents') loadSaveRecoveryIncidents();
 				if (name === 'chatbot-feedback') loadChatbotFeedback();
+				if (name === 'team') loadTeamSettings();
 				setSiteTrafficPolling(name === 'site-traffic');
 				if (name === 'help') {
 				loadQuoteTipsSettingsUI();
@@ -3065,11 +3774,37 @@ Sarah Jones, 905-555-5678"></textarea>
 			const { data: { session } } = await _supabase.auth.getSession();
 			if (!session) { window.location.href = 'login.html'; return; }
 			window.currentUser = session.user;
+			if (window.QuoteDrAccount) {
+				await QuoteDrAccount.init();
+				QuoteDrAccount.applyDocumentAccess();
+				if (QuoteDrAccount.usesTeamApi() && !QuoteDrAccount.can(QuoteDrAccount.PERMISSIONS.SETTINGS_MANAGE)) {
+					if (QuoteDrAccount.can(QuoteDrAccount.PERMISSIONS.TEAM_READ)) {
+						document.querySelectorAll('#settingsTabs [data-settings-tab]').forEach(function(link) {
+							link.style.display = link.getAttribute('data-settings-tab') === 'team' ? '' : 'none';
+						});
+						var search = document.getElementById('settingsSearch');
+						if (search && search.parentElement && search.parentElement.parentElement) {
+							search.parentElement.parentElement.style.display = 'none';
+						}
+						showTab('team', findSettingsTabLink('team'));
+						return;
+					}
+					var main = document.getElementById('settingsMain');
+					if (main) {
+						main.replaceChildren();
+						var card = document.createElement('div');
+						card.className = 'col-12';
+						card.innerHTML = '<div class=\'settings-card text-center py-5\'><i class=\'fas fa-lock fa-2x text-muted mb-3\'></i><h5>Account settings are owner-only</h5><p class=\'text-muted mb-3\'>You can build quotes and use shared company data without access to margins, payments, integrations, or billing.</p><a class=\'btn btn-primary\' href=\'dashboard.html\'>Back to dashboard</a></div>';
+						main.appendChild(card);
+					}
+					return;
+				}
+			}
 			applyAnalyticsAdminVisibility(window.currentUser);
 			if (isQuoteDrAdminUser(window.currentUser)) loadSaveRecoveryIncidents();
 			// Restore last active tab, unless the URL asks for a specific settings area.
 			var hashTab = (window.location.hash || '').replace(/^#/, '');
-			var allowedHashTabs = ['business', 'quotes', 'pricing', 'notifications', 'payments', 'portal', 'integrations', 'help', 'analytics', 'site-traffic', 'user-messages', 'admin-controls', 'save-incidents', 'account', 'feedback'];
+			var allowedHashTabs = ['business', 'quotes', 'pricing', 'notifications', 'payments', 'portal', 'integrations', 'help', 'team', 'analytics', 'site-traffic', 'user-messages', 'admin-controls', 'save-incidents', 'account', 'feedback'];
 			var requestedTab = getRequestedSettingsTab();
 			var lastTab = requestedTab || (allowedHashTabs.indexOf(hashTab) !== -1 ? hashTab : (localStorage.getItem('ald_settings_tab') || 'business'));
 			if (QUOTEDR_ADMIN_TABS.indexOf(lastTab) !== -1 && !isQuoteDrAdminUser(window.currentUser)) lastTab = 'business';

@@ -210,7 +210,8 @@
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-v2.js?v=2026080102"></script>
+    <script src="supabase-v2.js?v=2026080701"></script>
+    <script src="account-access.js?v=2026080701"></script>
 <script src="signup-gate.js?v=20260713"></script>
 <script>
 const testimonialReviews = [
@@ -385,6 +386,8 @@ async function startCheckout(plan) {
         }
 
         var cancelUrl = new URL('pricing.html?billing=' + selectedBillingInterval, window.location.href).href;
+        if (window.QuoteDrAccount) await QuoteDrAccount.init();
+        var activeAccount = window.QuoteDrAccount && QuoteDrAccount.active();
         var res = await fetch(SUPABASE_URL + '/functions/v1/stripe-checkout', {
             method: 'POST',
             headers: {
@@ -394,6 +397,7 @@ async function startCheckout(plan) {
             },
             body: JSON.stringify({
                 plan: plan,
+                accountId: activeAccount && activeAccount.accountId || null,
                 billingInterval: selectedBillingInterval,
                 successUrl: window.location.origin + '/quote-builder.html?subscribed=1',
                 cancelUrl: cancelUrl

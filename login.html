@@ -165,15 +165,22 @@ if (location.search.includes('debug')) {
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-v2.js?v=2026080102"></script>
+    <script src="supabase-v2.js?v=2026080701"></script>
+    <script src="account-access.js?v=2026080701"></script>
     <script>
         // _supabase, SUPABASE_URL, SUPABASE_ANON_KEY are provided by supabase-v2.js
 
         // Only auto-redirect if URL has ?redirect=1 (i.e. came here intentionally, not directly)
         const urlParams = new URLSearchParams(window.location.search);
+        function pendingTeamInviteUrl() {
+            var token = sessionStorage.getItem('quotedr_pending_invite_token') || '';
+            return token.length >= 32 ? 'team-invite.html?token=' + encodeURIComponent(token) : '';
+        }
         if (!urlParams.has('noredirect')) {
             _supabase.auth.getSession().then(async ({ data: { session } }) => {
                 if (session) {
+                    var inviteUrl = pendingTeamInviteUrl();
+                    if (inviteUrl) { window.location.href = inviteUrl; return; }
                     // Check localStorage first (fast path)
                     if (localStorage.getItem('ald_onboarding_complete')) {
                         window.location.href = 'quote-builder.html';
@@ -311,6 +318,8 @@ if (location.search.includes('debug')) {
         }
 
         async function checkOnboardingAndRedirect(user) {
+            var inviteUrl = pendingTeamInviteUrl();
+            if (inviteUrl) { window.location.href = inviteUrl; return; }
             try {
                 const { data } = await _supabase
                     .from('user_data')

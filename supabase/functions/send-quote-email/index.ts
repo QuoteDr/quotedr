@@ -1,5 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import {
+  ACCOUNT_PERMISSION,
+  AccountAccessError,
+  requireAccountPermissionWithDefault,
+} from "../_shared/account-authorization.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -79,6 +84,14 @@ Deno.serve(async (req) => {
     if (!SUPABASE_SERVICE_ROLE_KEY) return json({ error: "Email idempotency service is not configured" }, 500);
     service = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const requestBody = await req.json();
+    let access;
+    try {
+      access = await requireAccountPermissionWithDefault(req, requestBody.accountId, ACCOUNT_PERMISSION.QUOTES_SEND);
+    } catch (error) {
+      if (error instanceof AccountAccessError) return json({ error: error.message, code: error.code }, error.status);
+      throw error;
+    }
+    const accountOwnerId = access.ownerUserId;
     const {
       to, clientName, contractorName, companyName, quoteNumber, total, quoteUrl, message, isInvoice,
       emailSubject, emailIntro, emailButtonText, portalUrl, emailReplyTo, emailFooter, idempotencyKey
@@ -95,7 +108,7 @@ Deno.serve(async (req) => {
     const hashBody = { ...requestBody };
     delete hashBody.idempotencyKey;
     const hash = await payloadHash(hashBody);
-    const claim = await claimEmailOperation(service, user.id, operationKey, hash);
+    const claim = await claimEmailOperation(service, accountOwnerId, operationKey, hash);
     if (claim.response) return json({ ...claim.response, idempotentReplay: true });
     if (!claim.claimed) return json({ error: "This email request is already being processed. Check delivery before trying again." }, 409);
 

@@ -9,7 +9,7 @@ enable_signup = false
 verify_jwt = false
 
 [functions.qb-sync]
-verify_jwt = false
+verify_jwt = true
 
 [functions.stripe-checkout]
 verify_jwt = true
@@ -66,4 +66,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.chatbot-feedback]
+verify_jwt = true
+
+[functions.team-account]
 verify_jwt = true

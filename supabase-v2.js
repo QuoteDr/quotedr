@@ -40,6 +40,35 @@ async function getCurrentUser() {
     return currentUser;
 }
 
+async function qdUsesTeamAccountApi() {
+    if (!window.QuoteDrAccount) return false;
+    await window.QuoteDrAccount.init();
+    return window.QuoteDrAccount.usesTeamApi();
+}
+
+async function qdTeamAccountCall(action, payload) {
+    try {
+        var response = await window.QuoteDrAccount.api(action, payload || {});
+        return { data: response && response.data, response: response, error: null };
+    } catch (error) {
+        console.error('Team account API error:', action, error);
+        return {
+            data: null,
+            error: {
+                message: error && error.message || 'Account request failed',
+                code: error && error.code || 'account_request_failed',
+                supportId: error && error.supportId || ''
+            }
+        };
+    }
+}
+
+function qdActiveAccountId() {
+    var account = window.QuoteDrAccount && window.QuoteDrAccount.active();
+    return account && account.accountId || null;
+}
+window.qdActiveAccountId = qdActiveAccountId;
+
 const QD_DURABLE_ENTITY_TYPES = [
     'quote', 'invoice', 'item_database', 'item', 'client', 'client_database', 'template', 'term',
     'business_profile', 'company_logo', 'payment_settings', 'notification_settings', 'quote_preferences',
@@ -308,9 +337,58 @@ function qdApplyDurableFilters(query, filters) {
     return query;
 }
 
+function qdTeamTargetFilterValue(target, column) {
+    var filter = (target.filters || []).find(function(entry) {
+        return entry && entry.column === column && (!entry.operator || entry.operator === 'eq');
+    });
+    return filter && filter.value;
+}
+
+async function qdExecuteTeamAccountTarget(operation, target) {
+    if (target.table === 'quotes') {
+        if (target.action === 'delete') {
+            var deleteResult = await qdTeamAccountCall('quotes.delete', {
+                quoteId: qdTeamTargetFilterValue(target, 'id')
+            });
+            if (deleteResult.error) throw qdDurableSaveError(deleteResult.error);
+            return { data: deleteResult.data, error: null };
+        }
+        if (target.action === 'insert' || target.action === 'update') {
+            var quoteResult = await qdTeamAccountCall('quotes.save', {
+                operation: target.action,
+                quoteId: qdTeamTargetFilterValue(target, 'id'),
+                values: target.values || {},
+                baseVersion: operation.baseVersion || null,
+                forceNew: !!(operation.payload && (operation.payload.forceNew || operation.payload._forceNewQuote))
+            });
+            if (quoteResult.error) throw qdDurableSaveError(quoteResult.error);
+            return { data: quoteResult.data, error: null };
+        }
+    }
+    if (target.table === 'clients' && ['insert', 'update', 'upsert'].indexOf(target.action) !== -1) {
+        var clientResult = await qdTeamAccountCall('clients.save', {
+            clientId: qdTeamTargetFilterValue(target, 'id'),
+            values: target.values || {}
+        });
+        if (clientResult.error) throw qdDurableSaveError(clientResult.error);
+        return { data: clientResult.data, error: null };
+    }
+    if (target.table === 'clients' && target.action === 'replace') {
+        var clientsResult = await qdTeamAccountCall('clients.replace', {
+            values: Array.isArray(target.values) ? target.values : []
+        });
+        if (clientsResult.error) throw qdDurableSaveError(clientsResult.error);
+        return { data: clientsResult.data || [], error: null };
+    }
+    var denied = new Error('You do not have permission to change this account data.');
+    denied.code = 'permission_denied';
+    throw denied;
+}
+
 async function qdExecuteDurableSupabaseTarget(operation) {
     var target = operation && operation.target;
     if (!target || !target.table || !target.action) throw new Error('Durable save target is incomplete.');
+    if (await qdUsesTeamAccountApi()) return qdExecuteTeamAccountTarget(operation, target);
     var action = target.action;
     var values = target.values;
     var result;
@@ -581,10 +659,12 @@ async function getSupabaseOptionalUserFunctionHeaders() {
 
 async function callClientDocumentFunction(body, requireUser) {
     const headers = requireUser ? await getSupabaseFunctionAuthHeaders() : getSupabasePublicFunctionHeaders();
+    var requestBody = Object.assign({}, body || {});
+    if (requireUser) requestBody.accountId = qdActiveAccountId();
     const response = await fetch(CLIENT_DOCUMENT_FUNCTION_URL, {
         method: 'POST',
         headers: headers,
-        body: JSON.stringify(body || {})
+        body: JSON.stringify(requestBody)
     });
     const data = await response.json().catch(function() { return {}; });
     if (!response.ok || data.error) throw new Error(data.error || 'Secure client document request failed');
@@ -641,10 +721,14 @@ async function callDocumentPaymentFunction(body, requireUser) {
 
 async function callStripeConnectFunction(action, payload) {
     const headers = await getSupabaseFunctionAuthHeaders();
+    var account = window.QuoteDrAccount && window.QuoteDrAccount.active();
     const response = await fetch(STRIPE_CONNECT_FUNCTION_URL, {
         method: 'POST',
         headers: headers,
-        body: JSON.stringify(Object.assign({ action: action || 'status' }, payload || {}))
+        body: JSON.stringify(Object.assign({
+            action: action || 'status',
+            accountId: account && account.accountId || null
+        }, payload || {}))
     });
     const data = await response.json().catch(function() { return {}; });
     if (!response.ok || data.error) {
@@ -969,6 +1053,7 @@ async function loadOnboardingComplete() {
 async function listTemplates() {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
+    if (await qdUsesTeamAccountApi()) return qdTeamAccountCall('templates.list');
     
     const { data, error } = await _supabase
         .from('templates')
@@ -1075,6 +1160,7 @@ async function deleteTerm(termName) {
 async function listItems() {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
+    if (await qdUsesTeamAccountApi()) return qdTeamAccountCall('items.list');
     
     const { data, error } = await _supabase
         .from('items')
@@ -1138,6 +1224,7 @@ async function deleteItem(itemName) {
 async function listQuotes() {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
+    if (await qdUsesTeamAccountApi()) return qdTeamAccountCall('quotes.list');
     
     const { data, error } = await _supabase
         .from('quotes')
@@ -1156,6 +1243,15 @@ async function listQuotes() {
 async function listQuoteSummaries() {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
+    if (await qdUsesTeamAccountApi()) {
+        var teamResult = await qdTeamAccountCall('quotes.list');
+        if (teamResult.error) return teamResult;
+        return {
+            data: (teamResult.data || []).filter(function(row) {
+                return row.status !== 'backup' && row.quote_number !== '__ITEMS_BACKUP__';
+            })
+        };
+    }
 
     const result = await _supabase.rpc('quotedr_list_quote_summaries');
     if (!result.error) {
@@ -1225,6 +1321,11 @@ function quotePortalLockedSaveError(quoteData, row) {
 
 async function verifyQuoteIsEditableBeforeSave(userId, quoteData) {
     if (!quoteData || !quoteData.supabaseId) return { editable: true, row: null };
+    if (await qdUsesTeamAccountApi()) {
+        var teamQuote = await qdTeamAccountCall('quotes.get', { quoteId: quoteData.supabaseId });
+        if (teamQuote.error) return { editable: false, error: teamQuote.error, row: null };
+        return { editable: true, row: teamQuote.data || null };
+    }
     const { data, error } = await _supabase
         .from('quotes')
         .select('id,data,updated_at')
@@ -1339,7 +1440,8 @@ async function saveQuote(quoteData) {
         updated_at: now
     };
 
-    if (!quoteData.supabaseId && !quoteData.forceNew && !quoteData._forceNewQuote && quoteData.quoteNumber) {
+    if (!quoteData.supabaseId && !quoteData.forceNew && !quoteData._forceNewQuote && quoteData.quoteNumber &&
+        !await qdUsesTeamAccountApi()) {
         try {
             var existingResult = await _supabase
                 .from('quotes')
@@ -1568,6 +1670,7 @@ async function saveClientToSupabase(client) {
 async function listClientsFromSupabase() {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
+    if (await qdUsesTeamAccountApi()) return qdTeamAccountCall('clients.list');
     const { data, error } = await _supabase
         .from('clients')
         .select('*')
@@ -2011,6 +2114,11 @@ async function saveQuoteForSharing(quoteData) {
 async function deleteQuoteFromSupabase(quoteId) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
+    if (await qdUsesTeamAccountApi()) {
+        var teamDelete = await qdTeamAccountCall('quotes.delete', { quoteId: quoteId });
+        if (teamDelete.error) return teamDelete;
+        return { success: true, data: teamDelete.data, error: null };
+    }
 
     var existing = await _supabase.from('quotes').select('*').eq('id', quoteId).eq('user_id', user.id).maybeSingle();
     if (existing.error) return { error: existing.error };
@@ -2031,6 +2139,7 @@ async function deleteQuoteFromSupabase(quoteId) {
 async function loadQuoteByIdFromSupabase(supabaseId) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
+    if (await qdUsesTeamAccountApi()) return qdTeamAccountCall('quotes.get', { quoteId: supabaseId });
     const { data, error } = await _supabase
         .from('quotes')
         .select('*')
@@ -2041,6 +2150,7 @@ async function loadQuoteByIdFromSupabase(supabaseId) {
 }
 
 async function loadQuoteForViewing(supabaseId) {
+    if (await qdUsesTeamAccountApi()) return qdTeamAccountCall('quotes.get', { quoteId: supabaseId });
     const { data, error } = await _supabase
         .from('quotes')
         .select('*')
@@ -2053,6 +2163,9 @@ async function loadQuoteForViewing(supabaseId) {
 async function saveItemsToSupabase(itemsData) {
     const user = await getCurrentUser();
     if (!user) return { error: 'Not logged in' };
+    if (await qdUsesTeamAccountApi()) {
+        return { error: { message: 'You do not have permission to change saved items.', code: 'permission_denied' } };
+    }
     try {
         await prepareQuoteMediaForCloudSave(itemsData);
     } catch (error) {
@@ -2081,6 +2194,12 @@ async function saveItemsToSupabase(itemsData) {
 async function loadItemsFromSupabase() {
     const user = await getCurrentUser();
     if (!user) return { data: null, error: 'Not logged in' };
+    if (await qdUsesTeamAccountApi()) {
+        var teamItems = await qdTeamAccountCall('items.list');
+        if (teamItems.error) return teamItems;
+        var itemRows = teamItems.data || [];
+        return { data: itemRows[0] && itemRows[0].data || null, error: null };
+    }
     const { data, error } = await _supabase
         .from('items')
         .select('data')
@@ -2117,6 +2236,7 @@ async function saveAllClientsToSupabase(clientsArray) {
 async function loadClientsFromSupabase() {
     const user = await getCurrentUser();
     if (!user) return { data: null, error: 'Not logged in' };
+    if (await qdUsesTeamAccountApi()) return qdTeamAccountCall('clients.list');
     const { data, error } = await _supabase
         .from('clients')
         .select('*')
@@ -2165,6 +2285,14 @@ async function optimizeStoredPhotoBatch(cursor, batchSize) {
 async function loadBusinessProfile() {
     const user = await getCurrentUser();
     if (!user) return JSON.parse(localStorage.getItem('ald_business_profile') || '{}');
+    if (await qdUsesTeamAccountApi()) {
+        var teamProfile = await qdTeamAccountCall('business.get');
+        if (!teamProfile.error && teamProfile.data) {
+            localStorage.setItem('ald_business_profile', JSON.stringify(teamProfile.data));
+            return teamProfile.data;
+        }
+        return {};
+    }
     const { data, error } = await _supabase
         .from('user_data')
         .select('value')
@@ -2198,6 +2326,15 @@ async function saveLogoToSupabase(base64) {
 async function loadLogoFromSupabase() {
     const user = await getCurrentUser();
     if (!user) return localStorage.getItem('ald_company_logo');
+    if (await qdUsesTeamAccountApi()) {
+        var teamLogo = await qdTeamAccountCall('business.logo');
+        if (!teamLogo.error && typeof teamLogo.data === 'string' && teamLogo.data) {
+            localStorage.setItem('ald_company_logo', teamLogo.data);
+            return teamLogo.data;
+        }
+        localStorage.removeItem('ald_company_logo');
+        return null;
+    }
     const { data, error } = await _supabase
         .from('user_data')
         .select('value')
@@ -2228,6 +2365,16 @@ async function savePaymentSettings(settings) {
 async function loadPaymentSettings() {
     const user = await getCurrentUser();
     if (!user) return JSON.parse(localStorage.getItem('ald_payment_settings') || 'null');
+    if (await qdUsesTeamAccountApi()) {
+        localStorage.removeItem('ald_payment_settings');
+        if (!window.QuoteDrAccount.can(window.QuoteDrAccount.PERMISSIONS.PAYMENTS_READ)) return null;
+        var teamSettings = await qdTeamAccountCall('payments.get');
+        if (!teamSettings.error && teamSettings.data) {
+            localStorage.setItem('ald_payment_settings', JSON.stringify(teamSettings.data));
+            return teamSettings.data;
+        }
+        return null;
+    }
     const { data, error } = await _supabase
         .from('user_data')
         .select('value')
@@ -2698,6 +2845,10 @@ function subscriptionAllowsAccess(sub) {
 async function loadSubscriptionStatus() {
     const user = await getCurrentUser();
     if (!user) return JSON.parse(localStorage.getItem('ald_subscription') || 'null');
+    if (await qdUsesTeamAccountApi()) {
+        localStorage.removeItem('ald_subscription');
+        return null;
+    }
     const { data, error } = await _supabase
         .from('user_data')
         .select('value')
@@ -2717,12 +2868,29 @@ async function getCurrentPlan() {
     return normalizePlanName(sub.plan || 'basic');
 }
 
+let qdTeamEntitlementsPromise = null;
+window.addEventListener('quotedr-account-changed', function() { qdTeamEntitlementsPromise = null; });
+window.addEventListener('quotedr-account-ready', function() { qdTeamEntitlementsPromise = null; });
+
+async function qdTeamHasFeature(feature) {
+    if (!qdTeamEntitlementsPromise) {
+        qdTeamEntitlementsPromise = qdTeamAccountCall('entitlements.get').then(function(result) {
+            if (result.error || !result.data || !Array.isArray(result.data.features)) return [];
+            return result.data.features;
+        });
+    }
+    var features = await qdTeamEntitlementsPromise;
+    return features.indexOf(feature) !== -1;
+}
+
 async function hasFeature(feature) {
+    if (await qdUsesTeamAccountApi()) return qdTeamHasFeature(feature);
     const plan = await getCurrentPlan();
     return (QUOTEDR_PLAN_FEATURES[plan] || QUOTEDR_PLAN_FEATURES.basic).includes(feature);
 }
 
 async function isCurrentUserPro() {
+    if (await qdUsesTeamAccountApi()) return qdTeamHasFeature('ai_voice_quote');
     const sub = await loadSubscriptionStatus();
     return subscriptionAllowsAccess(sub) && normalizePlanName(sub.plan || 'basic') === 'pro';
 }

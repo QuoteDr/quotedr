@@ -1,5 +1,10 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
+import {
+  ACCOUNT_PERMISSION,
+  AccountAccessError,
+  requireAccountPermissionWithDefault,
+} from "../_shared/account-authorization.ts";
 
 // QuickBooks configuration
 const QB_CLIENT_ID = Deno.env.get("QB_CLIENT_ID") ?? "";
@@ -113,10 +118,16 @@ serve(async (req) => {
       return jsonResponse({ error: "Invalid or expired token" }, 401);
     }
 
-    const userId = authData.user.id;
-    
     // Parse request body
     const body = await req.json();
+    let access;
+    try {
+      access = await requireAccountPermissionWithDefault(req, body.accountId, ACCOUNT_PERMISSION.INTEGRATIONS_MANAGE);
+    } catch (error) {
+      if (error instanceof AccountAccessError) return jsonResponse({ error: error.message, code: error.code }, error.status);
+      throw error;
+    }
+    const userId = access.ownerUserId;
     const action = body.action;
 
     switch (action) {
@@ -484,7 +495,7 @@ async function handlePushInvoice(userId: string, invoiceData: any) {
     });
   } catch (error) {
     console.error("Error in handlePushInvoice:", error);
-    return jsonResponse({ error: error.message || "Failed to push invoice to QuickBooks" }, 500);
+    return jsonResponse({ error: error instanceof Error ? error.message : "Failed to push invoice to QuickBooks" }, 500);
   }
 }
 
@@ -501,7 +512,7 @@ async function handleGetCustomers(userId: string) {
     });
   } catch (error) {
     console.error("Error in handleGetCustomers:", error);
-    return jsonResponse({ error: error.message || "Failed to fetch customers from QuickBooks" }, 500);
+    return jsonResponse({ error: error instanceof Error ? error.message : "Failed to fetch customers from QuickBooks" }, 500);
   }
 }
 
@@ -518,7 +529,7 @@ async function handleGetItems(userId: string) {
     });
   } catch (error) {
     console.error("Error in handleGetItems:", error);
-    return jsonResponse({ error: error.message || "Failed to fetch items from QuickBooks" }, 500);
+    return jsonResponse({ error: error instanceof Error ? error.message : "Failed to fetch items from QuickBooks" }, 500);
   }
 }
 
@@ -606,6 +617,6 @@ async function handleGetInvoiceStatus(userId: string, invoiceId: string) {
     });
   } catch (error) {
     console.error("Error in handleGetInvoiceStatus:", error);
-    return jsonResponse({ error: error.message || "Failed to fetch invoice status from QuickBooks" }, 500);
+    return jsonResponse({ error: error instanceof Error ? error.message : "Failed to fetch invoice status from QuickBooks" }, 500);
   }
 }

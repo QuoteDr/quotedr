@@ -1,5 +1,10 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
+import {
+  ACCOUNT_PERMISSION,
+  AccountAccessError,
+  requireAccountPermissionWithDefault,
+} from "../_shared/account-authorization.ts";
 
 // QuickBooks configuration — secrets stored in Supabase vault, never hardcoded
 const QB_CLIENT_ID = Deno.env.get("QB_CLIENT_ID") ?? "";
@@ -67,10 +72,16 @@ serve(async (req) => {
       return jsonResponse({ error: "Invalid or expired token" }, 401);
     }
 
-    const userId = authData.user.id;
-    
     // Parse request body
     const body = await req.json();
+    let access;
+    try {
+      access = await requireAccountPermissionWithDefault(req, body.accountId, ACCOUNT_PERMISSION.INTEGRATIONS_MANAGE);
+    } catch (error) {
+      if (error instanceof AccountAccessError) return jsonResponse({ error: error.message, code: error.code }, error.status);
+      throw error;
+    }
+    const userId = access.ownerUserId;
     const action = body.action;
 
     switch (action) {
@@ -167,7 +178,7 @@ async function handleExchange(userId: string, code: string, realmId: string, sta
     return jsonResponse({ success: true, message: "QuickBooks connected successfully" });
   } catch (error) {
     console.error("Error in handleExchange:", error);
-    return jsonResponse({ error: error.message || "Failed to connect to QuickBooks" }, 500);
+    return jsonResponse({ error: error instanceof Error ? error.message : "Failed to connect to QuickBooks" }, 500);
   }
 }
 
@@ -248,7 +259,7 @@ async function handleRefresh(userId: string) {
     });
   } catch (error) {
     console.error("Error in handleRefresh:", error);
-    return jsonResponse({ error: error.message || "Failed to refresh token" }, 500);
+    return jsonResponse({ error: error instanceof Error ? error.message : "Failed to refresh token" }, 500);
   }
 }
 
@@ -278,7 +289,7 @@ async function handleStatus(userId: string) {
     });
   } catch (error) {
     console.error("Error in handleStatus:", error);
-    return jsonResponse({ error: error.message || "Failed to check connection status" }, 500);
+    return jsonResponse({ error: error instanceof Error ? error.message : "Failed to check connection status" }, 500);
   }
 }
 
@@ -298,6 +309,6 @@ async function handleDisconnect(userId: string) {
     return jsonResponse({ success: true, message: "QuickBooks disconnected successfully" });
   } catch (error) {
     console.error("Error in handleDisconnect:", error);
-    return jsonResponse({ error: error.message || "Failed to disconnect from QuickBooks" }, 500);
+    return jsonResponse({ error: error instanceof Error ? error.message : "Failed to disconnect from QuickBooks" }, 500);
   }
 }

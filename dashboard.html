@@ -475,7 +475,8 @@
     <script src="modal-help.js?v=1777741200"></script>
     <script src="change-orders.js?v=1778060200"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-v2.js?v=2026080102"></script>
+    <script src="supabase-v2.js?v=2026080701"></script>
+    <script src="account-access.js?v=2026080701"></script>
     <script src="admin-access.js?v=2026080201"></script>
     <script src="save-coordinator.js?v=2026080401"></script>
     <script src="app-broadcasts.js?v=1779131000"></script>
@@ -1085,7 +1086,7 @@
                         </div>
                         <div class="text-end d-flex flex-column align-items-end gap-1">
                             <div class="fw-bold">$${parseFloat(q.total || 0).toFixed(2)}</div>
-                            <select class="status-select status-${escapeHtml(displayStatus)}" onchange="updateQuoteStatus(${jsAttr(q.id)}, this.value)" ${isInvalid ? 'disabled title="Restore this invoice before changing its status"' : ''}>
+                            <select data-account-permission="quotes.send" class="status-select status-${escapeHtml(displayStatus)}" onchange="updateQuoteStatus(${jsAttr(q.id)}, this.value)" ${isInvalid ? 'disabled title="Restore this invoice before changing its status"' : ''}>
                                 <option value="draft" ${!isInvalid && status === 'draft' ? 'selected' : ''}>Draft</option>
                                 <option value="sent" ${!isInvalid && status === 'sent' ? 'selected' : ''}>Sent</option>
                                 <option value="viewed" ${!isInvalid && status === 'viewed' ? 'selected' : ''}>Viewed</option>
@@ -1098,7 +1099,7 @@
                                 <option value="approved" ${!isInvalid && status === 'approved' ? 'selected' : ''}>CO Approved</option>
                                 <option value="declined" ${!isInvalid && status === 'declined' ? 'selected' : ''}>Declined</option>
                             </select>
-                            <button class="btn btn-outline-danger" onclick="deleteQuote(${jsAttr(q.id)})">
+                            <button data-account-permission="quotes.delete" class="btn btn-outline-danger" onclick="deleteQuote(${jsAttr(q.id)})">
                                 <i class="fas fa-trash"></i>
                             </button>
                         </div>
@@ -1113,16 +1114,17 @@
                     ${pendingCos ? `<div class="alert alert-info py-1 px-2 mt-2 mb-0 small"><i class="fas fa-file-circle-plus me-1"></i><strong>${pendingCos} pending change order${pendingCos === 1 ? '' : 's'}</strong></div>` : ''}
                     ${status === 'in_review' ? `<button class="btn btn-warning btn-sm w-100 mt-2" onclick="openNotesReview(${jsAttr(q.id)}, ${jsAttr(clientName)})"><i class="fas fa-comments me-1"></i> Review Client Notes</button>` : ''}
                     ${(!isChangeOrder && (status === 'accepted' || status === 'invoiced')) ? `<button class="btn btn-warning btn-sm w-100 mt-1" onclick="openQuoteForChangeOrder(${jsAttr(q.id)})"><i class="fas fa-file-circle-plus me-1"></i>Create Change Order</button>` : ''}
-                    ${(isInvoice && !isInvalid) ? `<button class="btn btn-danger btn-sm w-100 mt-1" onclick="invalidateInvoice(${jsAttr(q.id)})"><i class="fas fa-ban me-1"></i> Mark Invoice No Longer Valid</button>` : ''}
-                    ${isInvalid ? `<button class="btn btn-outline-secondary btn-sm w-100 mt-1" onclick="restoreInvalidInvoice(${jsAttr(q.id)})"><i class="fas fa-rotate-left me-1"></i> Restore Invoice</button>` : ''}
+                    ${(isInvoice && !isInvalid) ? `<button data-account-permission="quotes.send" class="btn btn-danger btn-sm w-100 mt-1" onclick="invalidateInvoice(${jsAttr(q.id)})"><i class="fas fa-ban me-1"></i> Mark Invoice No Longer Valid</button>` : ''}
+                    ${isInvalid ? `<button data-account-permission="quotes.send" class="btn btn-outline-secondary btn-sm w-100 mt-1" onclick="restoreInvalidInvoice(${jsAttr(q.id)})"><i class="fas fa-rotate-left me-1"></i> Restore Invoice</button>` : ''}
                     ${reviewReady && !reviewSentAt ? `<button class="btn btn-outline-success btn-sm w-100 mt-1" onclick="sendGoogleReviewRequest(${jsAttr(q.id)}, ${jsAttr(clientName)}, ${jsAttr(clientEmail)})"><i class="fab fa-google me-1"></i> Request Review</button>` : ''}
-                    <button class="btn btn-sm w-100 mt-1 ${portalVisible ? 'btn-success' : 'btn-outline-secondary'}" onclick="openPortalAssignment(${jsAttr(q.id)})" title="${portalVisible ? 'Manage portal assignment' : 'Choose a client portal'}"><i class="fas ${portalVisible ? 'fa-eye' : 'fa-eye-slash'} me-1"></i> ${portalVisible ? 'In Portal' : 'Add to Portal'}</button>
-                    ${portalVisible ? `<button class="btn btn-outline-primary btn-sm w-100 mt-1" onclick="openClientDocumentPreview(${jsAttr(q.id)}, this)" title="Open this document exactly as the client sees it"><i class="fas fa-eye me-1"></i> Client View</button>` : ''}
-                    ${portalVisible ? `<button class="btn btn-outline-info btn-sm w-100 mt-1" onclick="shareClientPortal(${jsAttr(q.id)}, ${jsAttr(clientName)}, ${jsAttr(clientEmail)})" title="Share client portal"><i class="fas fa-external-link-alt me-1"></i> Client Portal</button>` : ''}
-                    ${(status === 'sent' || status === 'viewed') ? `<button class="btn btn-outline-primary btn-sm w-100 mt-1" onclick="sendFollowUpReminder(${jsAttr(q.id)}, ${jsAttr(clientName)}, ${jsAttr(clientEmail)})"><i class="fas fa-bell me-1"></i> Send Follow-up</button>` : ''}
+                    <button data-account-permission="quotes.send" class="btn btn-sm w-100 mt-1 ${portalVisible ? 'btn-success' : 'btn-outline-secondary'}" onclick="openPortalAssignment(${jsAttr(q.id)})" title="${portalVisible ? 'Manage portal assignment' : 'Choose a client portal'}"><i class="fas ${portalVisible ? 'fa-eye' : 'fa-eye-slash'} me-1"></i> ${portalVisible ? 'In Portal' : 'Add to Portal'}</button>
+                    ${portalVisible ? `<button data-account-permission="quotes.send" class="btn btn-outline-primary btn-sm w-100 mt-1" onclick="openClientDocumentPreview(${jsAttr(q.id)}, this)" title="Open this document exactly as the client sees it"><i class="fas fa-eye me-1"></i> Client View</button>` : ''}
+                    ${portalVisible ? `<button data-account-permission="quotes.send" class="btn btn-outline-info btn-sm w-100 mt-1" onclick="shareClientPortal(${jsAttr(q.id)}, ${jsAttr(clientName)}, ${jsAttr(clientEmail)})" title="Share client portal"><i class="fas fa-external-link-alt me-1"></i> Client Portal</button>` : ''}
+                    ${(status === 'sent' || status === 'viewed') ? `<button data-account-permission="quotes.send" class="btn btn-outline-primary btn-sm w-100 mt-1" onclick="sendFollowUpReminder(${jsAttr(q.id)}, ${jsAttr(clientName)}, ${jsAttr(clientEmail)})"><i class="fas fa-bell me-1"></i> Send Follow-up</button>` : ''}
                 </div>
             `;
             }).join('');
+            if (window.QuoteDrAccount) QuoteDrAccount.applyDocumentAccess(el);
         }
 
         function filterQuotes() {
@@ -3209,7 +3211,7 @@
                 var res = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/send-quote-email', {
                     method: 'POST',
                     headers: await getSupabaseFunctionAuthHeaders(),
-                    body: JSON.stringify({ to: clientEmail, clientName: clientName, contractorName: '', companyName: '', quoteNumber: quote.quote_number || '', total: quote.total || 0, quoteUrl: viewerUrl, message: (function(){ try { var ns = JSON.parse(localStorage.getItem('ald_notification_settings') || '{}'); return ns.followupMessage || "Just following up on the quote I sent you! Let me know if you have any questions or if you're ready to proceed."; } catch(e) { return "Just following up on the quote I sent you!"; } })(), idempotencyKey: followUpOperationId })
+                    body: JSON.stringify({ accountId: qdActiveAccountId(), to: clientEmail, clientName: clientName, contractorName: '', companyName: '', quoteNumber: quote.quote_number || '', total: quote.total || 0, quoteUrl: viewerUrl, message: (function(){ try { var ns = JSON.parse(localStorage.getItem('ald_notification_settings') || '{}'); return ns.followupMessage || "Just following up on the quote I sent you! Let me know if you have any questions or if you're ready to proceed."; } catch(e) { return "Just following up on the quote I sent you!"; } })(), idempotencyKey: followUpOperationId })
                 });
                 var data = await res.json();
                 if (data.error) throw new Error(data.error);
@@ -3244,6 +3246,7 @@
                     method: 'POST',
                     headers: await getSupabaseFunctionAuthHeaders(),
                     body: JSON.stringify({
+                        accountId: qdActiveAccountId(),
                         to: clientEmail,
                         clientName: clientName,
                         contractorName: '',

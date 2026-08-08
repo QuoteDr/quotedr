@@ -1,5 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import {
+  ACCOUNT_PERMISSION,
+  AccountAccessError,
+  requireAccountPermissionWithDefault,
+} from "../_shared/account-authorization.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -63,6 +68,14 @@ Deno.serve(async (req) => {
     if (userError || !user?.id || !user.email) return json({ error: "Your session is no longer valid. Please sign in again." }, 401);
 
     const body = await req.json().catch(() => ({}));
+    let access;
+    try {
+      access = await requireAccountPermissionWithDefault(req, body.accountId, ACCOUNT_PERMISSION.BILLING_MANAGE);
+    } catch (error) {
+      if (error instanceof AccountAccessError) return json({ error: error.message, code: error.code }, error.status);
+      throw error;
+    }
+    const accountOwnerId = access.ownerUserId;
     const plan = normalizePlan(body.plan);
     const billingInterval = normalizeBillingInterval(body.billingInterval);
     if (!plan) return json({ error: "Choose a valid QuoteDr plan" }, 400);
@@ -83,13 +96,13 @@ Deno.serve(async (req) => {
       "line_items[0][quantity]": "1",
       "success_url": successUrl,
       "cancel_url": cancelUrl,
-      "client_reference_id": user.id,
-      "metadata[userId]": user.id,
+      "client_reference_id": accountOwnerId,
+      "metadata[userId]": accountOwnerId,
       "metadata[plan]": plan,
       "metadata[billing_interval]": billingInterval,
       "allow_promotion_codes": "true",
       "subscription_data[trial_period_days]": "14",
-      "subscription_data[metadata][userId]": user.id,
+      "subscription_data[metadata][userId]": accountOwnerId,
       "subscription_data[metadata][plan]": plan,
       "subscription_data[metadata][billing_interval]": billingInterval,
     });

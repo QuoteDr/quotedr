@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang='en'>
+<head>
+    <meta charset='utf-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1'>
+    <meta name='referrer' content='no-referrer'>
+    <title>Join a QuoteDr team</title>
+    <link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css' rel='stylesheet'>
+    <link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css'>
+    <style>
+        * { box-sizing:border-box; }
+        body { min-height:100vh; margin:0; background:#f3f7fb; color:#1a2940; display:flex; align-items:center; font-family:system-ui,-apple-system,'Segoe UI',sans-serif; }
+        main.container { width:100%; padding:0 16px; }
+        .invite-card { width:min(620px,100%); margin:32px auto; border:0; border-radius:18px; background:#fff; box-shadow:0 18px 48px rgba(15,52,96,.14); overflow:hidden; }
+        .invite-card .card-body { padding:32px; }
+        .invite-card .text-center { text-align:center; }
+        .invite-card img { display:block; margin:0 auto; }
+        .invite-card .alert { padding:12px 16px; border:1px solid #d8e1eb; border-radius:10px; margin-bottom:16px; }
+        .invite-card .btn { display:inline-block; padding:10px 16px; border:1px solid transparent; border-radius:9px; text-decoration:none; text-align:center; cursor:pointer; }
+        .invite-card .btn-primary { color:#fff; background:#1a56a0; }
+        .invite-card .w-100 { width:100%; }
+        .invite-card .form-control { width:100%; padding:10px 12px; border:1px solid #bdc9d7; border-radius:8px; }
+        .invite-card .form-label { display:block; margin-bottom:6px; font-weight:600; }
+        .invite-card .text-muted { color:#62748a !important; }
+        .brand { color:#0f3460; font-weight:800; letter-spacing:-.02em; }
+        @media (min-width:768px) { .invite-card .card-body { padding:48px; } }
+    </style>
+</head>
+<body>
+    <main class='container'>
+        <section class='card invite-card'>
+            <div class='card-body p-4 p-md-5'>
+                <div class='text-center mb-4'>
+                    <img src='quotedr-logo.svg' alt='QuoteDr' style='height:64px;max-width:240px'>
+                    <h1 class='h3 brand mt-3'>Join your QuoteDr team</h1>
+                    <p class='text-muted mb-0'>Use your own login. Your access follows the permissions assigned by the account owner.</p>
+                </div>
+                <div id='inviteStatus' class='alert alert-light border' role='status'>Checking your invitation...</div>
+                <div id='inviteSignedOut' style='display:none'>
+                    <p>Sign in with the exact email address that received this invitation.</p>
+                    <a id='inviteSignInLink' class='btn btn-primary w-100' href='login.html?noredirect=1'>Sign in to continue</a>
+                </div>
+                <form id='inviteAcceptForm' style='display:none'>
+                    <div id='invitePasswordGroup' class='mb-3' style='display:none'>
+                        <label for='invitePassword' class='form-label'>Create a password</label>
+                        <input id='invitePassword' type='password' class='form-control' minlength='8' autocomplete='new-password'>
+                        <div class='form-text'>Use at least 8 characters. You will use this password with your invited email.</div>
+                    </div>
+                    <button id='inviteAcceptButton' type='submit' class='btn btn-primary w-100'>Accept invitation</button>
+                </form>
+                <div class='text-center mt-4'><a href='dashboard.html' class='text-muted small'>Back to QuoteDr</a></div>
+            </div>
+        </section>
+    </main>
+    <script src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'></script>
+    <script src='supabase-v2.js?v=2026080701'></script>
+    <script src='account-access.js?v=2026080701'></script>
+    <script>
+        (function() {
+            'use strict';
+            var params = new URLSearchParams(window.location.search || '');
+            var queryToken = params.get('token') || '';
+            var token = queryToken || sessionStorage.getItem('quotedr_pending_invite_token') || '';
+            if (queryToken && window.history && typeof window.history.replaceState === 'function') {
+                window.history.replaceState(null, document.title, window.location.pathname);
+            }
+            var statusNode = document.getElementById('inviteStatus');
+            var signedOutNode = document.getElementById('inviteSignedOut');
+            var form = document.getElementById('inviteAcceptForm');
+            var passwordGroup = document.getElementById('invitePasswordGroup');
+
+            function status(message, type) {
+                statusNode.className = 'alert ' + (type === 'error' ? 'alert-danger' : type === 'success' ? 'alert-success' : 'alert-light border');
+                statusNode.textContent = message;
+            }
+
+            function rememberToken() {
+                if (token) sessionStorage.setItem('quotedr_pending_invite_token', token);
+            }
+
+            async function start() {
+                if (!token || token.length < 32) {
+                    status('This invitation link is incomplete or invalid.', 'error');
+                    return;
+                }
+                rememberToken();
+                var sessionResult = await _supabase.auth.getSession();
+                var session = sessionResult.data && sessionResult.data.session;
+                if (!session) {
+                    status('Sign in with the invited email to continue.');
+                    signedOutNode.style.display = '';
+                    return;
+                }
+                var metadata = session.user.user_metadata || {};
+                var needsPassword = metadata.quotedr_team_invite === true && metadata.quotedr_password_created !== true;
+                passwordGroup.style.display = needsPassword ? '' : 'none';
+                document.getElementById('invitePassword').required = needsPassword;
+                form.style.display = '';
+                status('Signed in as ' + (session.user.email || 'your invited account') + '.');
+            }
+
+            form.addEventListener('submit', async function(event) {
+                event.preventDefault();
+                var button = document.getElementById('inviteAcceptButton');
+                button.disabled = true;
+                button.textContent = 'Joining team...';
+                try {
+                    var sessionResult = await _supabase.auth.getSession();
+                    var session = sessionResult.data && sessionResult.data.session;
+                    if (!session) throw new Error('Sign in before accepting this invitation.');
+                    var metadata = session.user.user_metadata || {};
+                    var needsPassword = metadata.quotedr_team_invite === true && metadata.quotedr_password_created !== true;
+                    if (needsPassword) {
+                        var password = document.getElementById('invitePassword').value;
+                        if (password.length < 8) throw new Error('Create a password with at least 8 characters.');
+                        var userUpdate = await _supabase.auth.updateUser({
+                            password: password,
+                            data: Object.assign({}, metadata, { quotedr_password_created: true })
+                        });
+                        if (userUpdate.error) throw userUpdate.error;
+                    }
+                    var result = await _supabase.functions.invoke('team-account', {
+                        body: { action: 'invitation.accept', token: token }
+                    });
+                    if (result.error) throw result.error;
+                    if (result.data && result.data.error) throw new Error(result.data.error);
+                    var accepted = result.data && Array.isArray(result.data.data) ? result.data.data[0] : null;
+                    var accountId = accepted && accepted.account_id;
+                    if (!accountId && result.data && Array.isArray(result.data.accounts) && result.data.accounts[0]) {
+                        accountId = result.data.accounts[0].accountId;
+                    }
+                    if (accountId) localStorage.setItem('quotedr_active_account_id', accountId);
+                    sessionStorage.removeItem('quotedr_pending_invite_token');
+                    status('Invitation accepted. Opening your team account...', 'success');
+                    if (window.QuoteDrAccount) await QuoteDrAccount.init({ force: true });
+                    setTimeout(function() { window.location.href = 'dashboard.html'; }, 500);
+                } catch (error) {
+                    status(error.message || 'This invitation could not be accepted.', 'error');
+                    button.disabled = false;
+                    button.textContent = 'Accept invitation';
+                }
+            });
+
+            start().catch(function(error) {
+                status(error.message || 'This invitation could not be checked.', 'error');
+            });
+        })();
+    </script>
+</body>
+</html>

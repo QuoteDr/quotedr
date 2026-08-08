@@ -2356,7 +2356,8 @@
 </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="card-payment-rules.js?v=2026080301"></script>
-    <script src="supabase-v2.js?v=2026080201"></script>
+    <script src="supabase-v2.js?v=2026080701"></script>
+    <script src="account-access.js?v=2026080701"></script>
     <script src="ai-voice-rule-matcher.js?v=2026080101"></script>
     <script src="save-coordinator.js?v=2026080401"></script>
     <script src="quote-media.js?v=2026071202"></script>
@@ -2581,7 +2582,7 @@ if (location.search.includes('debug')) {
                     <!-- Quote Number -->
                     <div class="col-md-12 mb-3">
                         <div class="quote-identity-grid">
-                            <div class="quote-number-block">
+                            <div class="quote-number-block" data-account-field="quotes.number" data-account-field-access="write">
                                 <div class="quote-number-heading">
                                     <label><strong>Quote #:</strong><button type="button" class="qd-inline-help-btn" title="Help with quote numbers" aria-label="Help with quote numbers" onclick="QuoteDrModalHelp.openInline('quoteNumber'); return false;"><i class="fas fa-question"></i></button></label>
                                     <div class="quote-number-actions" aria-label="Quote number actions">
@@ -2596,13 +2597,13 @@ if (location.search.includes('debug')) {
                                 <input type="text" id="quoteNumber" class="form-control quote-number-input" placeholder="2026-001" oninput="checkQuoteNumberDuplicate()">
                                 <span id="quoteNumWarning" style="display:none; color:#dc3545; font-size:0.85rem;"><i class="fas fa-exclamation-triangle"></i> Already used!</span>
                             </div>
-                            <div class="quote-title-block">
+                            <div class="quote-title-block" data-account-field="quotes.title" data-account-field-access="write">
                                 <label><strong>File Name:</strong></label>
                                 <input type="text" id="quoteTitle" class="form-control quote-title-input" spellcheck="true" placeholder="e.g., Michelle Bathroom" oninput="markUnsaved()">
                             </div>
                             <div class="quote-status-block">
                                 <label class="text-muted small fw-semibold">Status</label>
-                                <select id="quoteStatus" class="form-select form-select-sm" style="font-size:0.8rem;" onchange="markUnsaved(); updateChangeOrderModeUI();">
+                                <select id="quoteStatus" data-account-permission="quotes.send" class="form-select form-select-sm" style="font-size:0.8rem;" onchange="markUnsaved(); updateChangeOrderModeUI();">
                                     <option value="draft">Draft</option>
                                     <option value="sent">Sent</option>
                                     <option value="accepted">Accepted</option>
@@ -2616,7 +2617,7 @@ if (location.search.includes('debug')) {
                     </div>
 
                     <!-- Client Information Section -->
-                    <div class="col-md-12 autocomplete-container contact-lookup-field">
+                    <div class="col-md-12 autocomplete-container contact-lookup-field" data-account-field="quotes.client_name" data-account-field-access="write">
                         <div class="d-flex justify-content-between align-items-center mb-1">
                             <label class="mb-0" for="clientName"><strong>Client Name (Type to search):</strong></label>
                             <div class="d-flex gap-2">
@@ -2632,7 +2633,7 @@ if (location.search.includes('debug')) {
                         <div id="clientDropdown" class="autocomplete-dropdown contact-lookup-dropdown" role="listbox" aria-label="Saved clients and properties matching client name"></div>
                     </div>
 
-                    <div class="col-md-6 mt-3 contact-lookup-field">
+                    <div class="col-md-6 mt-3 contact-lookup-field" data-account-field="quotes.project_address" data-account-field-access="write">
                         <label for="projectAddress"><strong>Project Address:</strong></label>
                         <input type="text" id="projectAddress" class="form-control" spellcheck="true" placeholder="123 Main St, Toronto" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="projectAddressDropdown">
                         <div id="projectAddressDropdown" class="autocomplete-dropdown contact-lookup-dropdown" role="listbox" aria-label="Saved clients and properties matching project address"></div>
@@ -2647,13 +2648,13 @@ if (location.search.includes('debug')) {
 
                     </div>
 
-                    <div class="col-md-6 mt-3 contact-lookup-field">
+                    <div class="col-md-6 mt-3 contact-lookup-field" data-account-field="quotes.client_phone" data-account-field-access="write">
                         <label for="clientPhone"><strong>Phone Number:</strong></label>
                         <input type="tel" id="clientPhone" class="form-control" spellcheck="true" placeholder="(416) 555-0123" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="clientPhoneDropdown">
                         <div id="clientPhoneDropdown" class="autocomplete-dropdown contact-lookup-dropdown" role="listbox" aria-label="Saved clients and properties matching phone number"></div>
                     </div>
 
-                    <div class="col-md-12 mt-3 contact-lookup-field">
+                    <div class="col-md-12 mt-3 contact-lookup-field" data-account-field="quotes.client_email" data-account-field-access="write">
                         <label for="clientEmail"><strong>Email Address:</strong></label>
                         <input type="email" id="clientEmail" class="form-control" spellcheck="true" placeholder="client@email.com" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="clientEmailDropdown">
                         <div id="clientEmailDropdown" class="autocomplete-dropdown contact-lookup-dropdown" role="listbox" aria-label="Saved clients and properties matching email address"></div>
@@ -2664,7 +2665,7 @@ if (location.search.includes('debug')) {
         </div>
 
         <!-- Terms & Conditions Section (Collapsible) -->
-        <div class="card mb-4">
+        <div class="card mb-4" data-account-field="quotes.terms" data-account-field-access="write">
             <div class="card-body py-3">
                 <div onclick="var el=document.getElementById('termsCollapse'); var icon=this.querySelector('.fa-chevron-down,.fa-chevron-right'); if(el.style.display==='none'){el.style.display='';icon.className='fas fa-chevron-down me-1';}else{el.style.display='none';icon.className='fas fa-chevron-right me-1';}" style="cursor:pointer; user-select:none;" class="d-flex align-items-center">
                     <i class="fas fa-chevron-right me-1 text-muted" style="font-size:0.75rem; width:12px;"></i>
@@ -2683,7 +2684,7 @@ if (location.search.includes('debug')) {
         </div>
 
         <!-- Room Breaks Section -->
-        <div class="card mb-4">
+        <div class="card mb-4" data-account-field="quotes.scope" data-account-field-access="write">
             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <!-- Desktop buttons (hidden on mobile) -->
                 <div class="btn-group d-none d-md-flex room-toolbar ms-auto" role="group">
@@ -2693,13 +2694,13 @@ if (location.search.includes('debug')) {
                     <a href="javascript:void(0)" onclick="openMaterialEstimator()" class="btn btn-sm btn-quick-room" title="Build a quick room quote from room dimensions">
                         <i class="fas fa-ruler-combined"></i> <span data-divider-label="quick-add-singular">Quick Add Room</span>
                     </a>
-                    <a href="javascript:void(0)" onclick="saveTemplate()" class="btn btn-sm btn-save-template" title="Save all current rooms as a quote template">
+                    <a href="javascript:void(0)" data-account-permission="templates.manage" onclick="saveTemplate()" class="btn btn-sm btn-save-template" title="Save all current rooms as a quote template">
                         <i class="fas fa-save"></i> Save Quote Template
                     </a>
                     <a href="javascript:void(0)" onclick="openTemplatesMenu(this)" class="btn btn-sm btn-templates" title="Load existing templates">
                         <i class="fas fa-folder-open"></i> Templates
                     </a>
-                    <a href="javascript:void(0)" onclick="openManageItemsModal()" class="btn btn-sm btn-manage" title="Add custom line items to the pricing database">
+                    <a href="javascript:void(0)" data-account-permission="items.manage" onclick="openManageItemsModal()" class="btn btn-sm btn-manage" title="Add custom line items to the pricing database">
                         <i class="fas fa-database"></i> Manage Items
                     </a>
                     <a href="javascript:void(0)" onclick="applyGlobalMarkup()" class="btn btn-sm btn-markup" title="Apply markup to all rooms">
@@ -2725,12 +2726,12 @@ if (location.search.includes('debug')) {
                             <i class="fas fa-ellipsis-v"></i> More
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="#" onclick="saveTemplate(); return false;"><i class="fas fa-save me-2"></i>Save Quote Template</a></li>
+                            <li data-account-permission="templates.manage"><a class="dropdown-item" href="#" onclick="saveTemplate(); return false;"><i class="fas fa-save me-2"></i>Save Quote Template</a></li>
                             <li><a class="dropdown-item" href="#" onclick="openTemplatesMenu(this); return false;"><i class="fas fa-folder-open me-2"></i>Load Template</a></li>
                             <li><a class="dropdown-item" href="#" onclick="openCommunityTemplates(); return false;"><i class="fas fa-users me-2"></i>Community Templates</a></li>
                             <li><a class="dropdown-item" href="#" onclick="toggleTimelines(); return false;"><i class="fas fa-eye-slash me-2"></i>Toggle Timelines</a></li>
                             <li><a class="dropdown-item" href="#" onclick="applyGlobalMarkup(); return false;"><i class="fas fa-percent me-2"></i>Markup All</a></li>
-                            <li><a class="dropdown-item" href="#" onclick="openManageItemsModal(); return false;"><i class="fas fa-database me-2"></i>Manage Items</a></li>
+                            <li data-account-permission="items.manage"><a class="dropdown-item" href="#" onclick="openManageItemsModal(); return false;"><i class="fas fa-database me-2"></i>Manage Items</a></li>
                             <li><a class="dropdown-item" href="#" onclick="toggleStickyTotal(); return false;"><i class="fas fa-dollar-sign me-2"></i>Toggle Total Bar</a></li>
                         </ul>
                     </div>
@@ -2763,7 +2764,7 @@ if (location.search.includes('debug')) {
         <!-- Pricing Summary -->
         <div class="row">
             <div class="col-12">
-                <div class="grand-total quote-total-card">
+                <div class="grand-total quote-total-card" data-account-field="quotes.customer_pricing" data-account-field-access="write">
                     <div class="quote-total-header">
                         <h4 class="quote-total-title"><i class="fas fa-calculator"></i> Quote Total</h4>
                         <div class="quote-total-status">Client-ready estimate</div>
@@ -16381,6 +16382,7 @@ Example:
                     method: 'POST',
                     headers: await getSupabaseFunctionAuthHeaders(),
                     body: JSON.stringify({
+                        accountId: qdActiveAccountId(),
                         to: email,
                         clientName: invoiceData.clientName || '',
                         contractorName: contractorName,
@@ -16864,6 +16866,7 @@ Example:
                     method: 'POST',
                     headers: await getSupabaseFunctionAuthHeaders(),
                     body: JSON.stringify({
+                        accountId: qdActiveAccountId(),
                         to: email,
                         clientName: qData.clientName || '',
                         contractorName: profile.ownerName || profile.name || '',
@@ -20744,7 +20747,7 @@ Example:
             <i class="fas fa-location-dot d-block" style="font-size:1rem;"></i>
             <span data-divider-label="bottom-nav-plural" style="font-size:0.55rem;">Rooms</span>
         </a>
-        <a href="javascript:void(0)" onclick="openManageItemsModal()" class="btn btn-dark btn-sm" style="flex:1; flex-direction:column; display:flex; align-items:center; justify-content:center; padding:4px 2px; min-width:0;">
+        <a href="javascript:void(0)" data-account-permission="items.manage" onclick="openManageItemsModal()" class="btn btn-dark btn-sm" style="flex:1; flex-direction:column; display:flex; align-items:center; justify-content:center; padding:4px 2px; min-width:0;">
             <i class="fas fa-database d-block" style="font-size:1rem;"></i>
             <span style="font-size:0.55rem;">Items</span>
         </a>

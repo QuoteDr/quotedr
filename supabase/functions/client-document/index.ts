@@ -1,5 +1,10 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import {
+  ACCOUNT_PERMISSION,
+  AccountAccessError,
+  requireAccountPermissionWithDefault,
+} from "../_shared/account-authorization.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "https://axmoffknvblluibuitrq.supabase.co";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso";
@@ -687,15 +692,20 @@ async function assertTokenAccess(documentId: string, token: string, portalAnchor
 }
 
 async function createLink(req: Request, body: Record<string, unknown>) {
-  const user = await userFromAuthHeader(req);
-  if (!user) return json({ error: "Authentication required" }, 401);
+  let access;
+  try {
+    access = await requireAccountPermissionWithDefault(req, body.accountId, ACCOUNT_PERMISSION.QUOTES_SEND);
+  } catch (error) {
+    if (error instanceof AccountAccessError) return json({ error: error.message, code: error.code }, error.status);
+    throw error;
+  }
 
   const documentId = normalizeId(body.documentId || body.id);
   const mode = String(body.mode || "document");
   if (!documentId) return json({ error: "Missing document id" }, 400);
 
   const row = await fetchQuoteOwnershipById(documentId);
-  if (!row || row.user_id !== user.id) return json({ error: "Document not found" }, 404);
+  if (!row || row.user_id !== access.ownerUserId) return json({ error: "Document not found" }, 404);
 
   const token = createShareToken(mode === "portal" ? 16 : 32);
   const tokenHash = await sha256Hex(token);
@@ -709,7 +719,7 @@ async function createLink(req: Request, body: Record<string, unknown>) {
       updated_at: new Date().toISOString(),
     })
     .eq("id", row.id)
-    .eq("user_id", user.id);
+    .eq("user_id", access.ownerUserId);
   if (error) throw error;
 
   const baseUrl = String(body.baseUrl || "").trim();
