@@ -39,6 +39,14 @@ import {
   assertAccountRoleOwner,
   normalizeAccountRoleSave
 } from '../_shared/account-role-policy.mjs';
+import {
+  buildQboInvoiceCsv,
+  normalizeQboInvoiceProfile,
+  preflightQboInvoiceExport,
+  qboInvoiceCsvFilename,
+  QBO_INVOICE_MAX_DOCUMENTS,
+  QBO_INVOICE_MAX_ROWS
+} from '../_shared/accounting-qbo-invoice-export.mjs';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -93,6 +101,8 @@ const accountingExportSelect = [
 ].join(',');
 const accountingExportLimit = 500;
 const accountingExportSourceLimit = 2001;
+const qboInvoiceProfileKey = 'accounting_qbo_invoice_csv_profile_v1';
+const qboInvoiceSourceLimit = 1001;
 
 const accountPlanFeatures: Record<string, string[]> = {
   basic: [
@@ -259,6 +269,126 @@ async function accountingExport(req: Request, accountId: unknown, body: Record<s
       filename: accountingExportFilename(),
       documentCount: built.documentCount,
       lineCount: built.lineCount
+    }
+  });
+}
+
+async function loadQboInvoiceProfile(ownerUserId: string) {
+  const result = await serviceClient()
+    .from('user_data')
+    .select('value')
+    .eq('user_id', ownerUserId)
+    .eq('key', qboInvoiceProfileKey)
+    .maybeSingle();
+  if (result.error) throw result.error;
+  return normalizeQboInvoiceProfile(result.data && result.data.value);
+}
+
+async function qboInvoiceProfile(req: Request, accountId: unknown, body: Record<string, unknown>) {
+  const owner = await requireAccountingExportOwner(req, accountId);
+  const mode = cleanText(body.mode, 20);
+  if (mode === 'save') {
+    const profile = normalizeQboInvoiceProfile(body.profile);
+    const saved = await serviceClient()
+      .from('user_data')
+      .upsert({ user_id: owner.ownerUserId, key: qboInvoiceProfileKey, value: profile }, { onConflict: 'user_id,key' });
+    if (saved.error) throw saved.error;
+    return json({ data: { profile } });
+  }
+  return json({ data: { profile: await loadQboInvoiceProfile(owner.ownerUserId) } });
+}
+
+function qboInvoiceDateFilters(body: Record<string, unknown>) {
+  const raw = body.filters && typeof body.filters === 'object'
+    ? body.filters as Record<string, unknown>
+    : {};
+  const rawFrom = cleanText(raw.fromDate, 20);
+  const rawTo = cleanText(raw.toDate, 20);
+  const fromDate = normalizeAccountingExportDate(rawFrom);
+  const toDate = normalizeAccountingExportDate(rawTo);
+  if ((rawFrom && !fromDate) || (rawTo && !toDate)) {
+    throw new AccountAccessError('Use valid QBO export dates.', 400, 'invalid_date');
+  }
+  if (fromDate && toDate && fromDate > toDate) {
+    throw new AccountAccessError('The start date must be on or before the end date.', 400, 'invalid_date_range');
+  }
+  return { fromDate, toDate };
+}
+
+function qboInvoiceDocumentIds(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  const ids = [...new Set(value.map((entry) => cleanText(entry, 80)).filter(Boolean))];
+  if (ids.length > QBO_INVOICE_MAX_DOCUMENTS) {
+    throw new AccountAccessError(`Choose no more than ${QBO_INVOICE_MAX_DOCUMENTS} QBO invoices at once.`, 400, 'too_many_documents');
+  }
+  if (ids.some((id) => !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))) {
+    throw new AccountAccessError('One or more selected invoices are invalid.', 400, 'invalid_document');
+  }
+  return ids;
+}
+
+async function qboInvoiceRows(ownerUserId: string, filters: { fromDate: string; toDate: string }, documentIds: string[]) {
+  let query = serviceClient()
+    .from('quotes')
+    .select(accountingExportSelect)
+    .eq('user_id', ownerUserId)
+    .neq('quote_number', '__ITEMS_BACKUP__');
+  if (filters.fromDate) query = query.gte('quote_date', filters.fromDate);
+  if (filters.toDate) query = query.lte('quote_date', filters.toDate);
+  if (documentIds.length) query = query.in('id', documentIds);
+  const result = await query
+    .order('quote_date', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(documentIds.length || qboInvoiceSourceLimit);
+  if (result.error) throw result.error;
+  if (documentIds.length && (result.data || []).length !== documentIds.length) {
+    throw new AccountAccessError('One or more selected invoices are unavailable.', 404, 'document_unavailable');
+  }
+  return { rows: result.data || [], truncated: !documentIds.length && (result.data || []).length >= qboInvoiceSourceLimit };
+}
+
+async function qboInvoiceExport(req: Request, accountId: unknown, body: Record<string, unknown>) {
+  const owner = await requireAccountingExportOwner(req, accountId);
+  const mode = cleanText(body.mode, 20) === 'csv' ? 'csv' : 'preflight';
+  const filters = qboInvoiceDateFilters(body);
+  const documentIds = qboInvoiceDocumentIds(body.documentIds);
+  if (mode === 'csv' && !documentIds.length) {
+    throw new AccountAccessError('Choose at least one QBO-ready invoice.', 400, 'document_required');
+  }
+  const [profile, source] = await Promise.all([
+    loadQboInvoiceProfile(owner.ownerUserId),
+    qboInvoiceRows(owner.ownerUserId, filters, documentIds)
+  ]);
+  const preflight = preflightQboInvoiceExport(source.rows, profile);
+  if (mode === 'preflight') {
+    return json({
+      data: {
+        profile: preflight.profile,
+        documents: preflight.documents.map(({ rows, ...document }) => document),
+        totals: preflight.totals,
+        limits: { invoices: QBO_INVOICE_MAX_DOCUMENTS, rows: QBO_INVOICE_MAX_ROWS },
+        truncated: source.truncated
+      }
+    });
+  }
+  const selected = preflight.documents.filter((document) => documentIds.includes(document.id));
+  if (selected.length !== documentIds.length || selected.some((document) => !document.included)) {
+    throw new AccountAccessError('Every selected invoice must pass the current QBO preflight.', 409, 'qbo_preflight_failed');
+  }
+  let built;
+  try {
+    built = buildQboInvoiceCsv(selected);
+  } catch (error) {
+    throw new AccountAccessError((error as Error).message, 400, 'qbo_batch_invalid');
+  }
+  return json({
+    data: {
+      csv: built.csv,
+      filename: qboInvoiceCsvFilename(),
+      documentCount: built.documentCount,
+      lineCount: built.lineCount,
+      profile: preflight.profile.name,
+      total: preflight.totals.includedTotal
     }
   });
 }
@@ -1117,6 +1247,8 @@ Deno.serve(async (req) => {
     if (action === 'payments.get') return await getPaymentSettings(req, accountId);
     if (action === 'entitlements.get') return await getEntitlements(req, accountId);
     if (action === 'accounting.export') return await accountingExport(req, accountId, body);
+    if (action === 'accounting.qbo_invoice_profile') return await qboInvoiceProfile(req, accountId, body);
+    if (action === 'accounting.qbo_invoice_export') return await qboInvoiceExport(req, accountId, body);
     if (action === 'quotes.list') return await listQuotes(req, accountId, body);
     if (action === 'quotes.get') return await getQuote(req, accountId, body);
     if (action === 'quotes.save') return await saveQuote(req, accountId, body);

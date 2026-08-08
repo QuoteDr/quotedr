@@ -28,7 +28,7 @@ assert(edge.includes(".select(accountingExportSelect)"), 'the accounting API sho
 assert(edge.includes(".neq('quote_number', '__ITEMS_BACKUP__')"), 'backup pseudo-documents must be excluded');
 assert(core.includes('neutralizeCsvFormula') && core.includes("^[\\u0000-\\u0020]*[=+\\-@]"), 'CSV text must be neutralized against formula injection');
 
-const exportHandler = edge.slice(edge.indexOf('async function accountingExport('), edge.indexOf('async function getQuote('));
+const exportHandler = edge.slice(edge.indexOf('async function accountingExport('), edge.indexOf('async function qboInvoiceProfile('));
 assert(exportHandler && !/\.insert\(|\.update\(|\.delete\(|\.upsert\(/.test(exportHandler), 'accounting export handler must remain read-only');
 assert(!core.includes('materialCost') && !core.includes('supplierUrl') && !core.includes('internalNotes'), 'CSV serializer must not map sensitive pricing or note fields');
 assert(docs.includes('Document-level totals appear only on the first line') && docs.includes('formula') && docs.includes('owner'), 'CSV behavior and privacy boundary must be documented');

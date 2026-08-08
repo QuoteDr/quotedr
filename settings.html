@@ -461,6 +461,24 @@
 			overflow: auto;
 			padding-right: 0.2rem;
 		}
+		.qbo-invoice-export-document-list {
+			display: grid;
+			gap: 0.6rem;
+			max-height: min(46vh, 520px);
+			overflow: auto;
+			padding-right: 0.2rem;
+		}
+		.qbo-invoice-export-document {
+			display: flex;
+			align-items: center;
+			gap: 0.7rem;
+			background: #fff;
+			cursor: pointer;
+		}
+		.qbo-invoice-export-document:has(input:disabled) {
+			cursor: default;
+			background: #fffdf7;
+		}
 		@media (max-width: 992px) {
 			.portal-studio-shell {
 				grid-template-columns: 1fr;
@@ -485,6 +503,12 @@
 			}
 			.accounting-export-document-list {
 				max-height: none;
+			}
+			.qbo-invoice-export-document-list {
+				max-height: none;
+			}
+			.qbo-invoice-export-document {
+				align-items: start;
 			}
 		}
 	</style>
@@ -1059,6 +1083,18 @@ Sarah Jones, 905-555-5678"></textarea>
 					</button>
 				</div>
 				<div class="small text-muted mt-2"><i class="fas fa-shield-halved me-1"></i>Owner only. The file omits material costs, profit, markup rules, suppliers, internal notes, payment-provider metadata, and client-access tokens.</div>
+			</div>
+			<div id="qboInvoiceExportOwnerSection" class="border-top mt-4 pt-4" style="display:none;">
+				<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+					<div>
+						<div class="fw-bold"><i class="fas fa-file-csv me-1 text-success"></i>QuickBooks Online invoice CSV</div>
+						<div class="text-muted small mt-1">Prepare only issued, unpaid invoices that match your saved QBO profile. QuoteDr will never create a QuickBooks transaction from this screen.</div>
+					</div>
+					<button type="button" class="btn btn-outline-success btn-sm flex-shrink-0" id="qboInvoiceExportBtn" onclick="QuoteDrQboInvoiceExportUI.open()">
+						<i class="fas fa-file-arrow-down me-1"></i>Export QBO Invoice CSV
+					</button>
+				</div>
+				<div class="small text-muted mt-2"><i class="fas fa-shield-halved me-1"></i>Owner only. The preflight excludes costs, margins, markups, suppliers, internal notes, provider IDs, tokens, paid invoices, and accepted quotes.</div>
 			</div>
 		</div>
 
@@ -2032,6 +2068,47 @@ Sarah Jones, 905-555-5678"></textarea>
 		</div>
 	</div>
 
+	<div class="modal fade" id="qboInvoiceExportModal" tabindex="-1" aria-labelledby="qboInvoiceExportTitle" aria-hidden="true">
+		<div class="modal-dialog modal-xl modal-dialog-scrollable modal-fullscreen-sm-down">
+			<div class="modal-content">
+				<div class="modal-header">
+					<div>
+						<h5 class="modal-title mb-1" id="qboInvoiceExportTitle"><i class="fas fa-file-csv me-2 text-success"></i>Export QBO Invoice CSV</h5>
+						<div class="small text-muted">Review first. This does not create invoices, payments, or any other QuickBooks transaction.</div>
+					</div>
+					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+				</div>
+				<div class="modal-body">
+					<div class="alert alert-info py-2 small">
+						<i class="fas fa-circle-info me-1"></i>Only issued and unpaid invoices can pass. Accepted quotes, paid or partly paid invoices, voids, discounts/adjustments, missing due dates, and unmapped customers, products, or tax codes stay out of the file.
+					</div>
+					<div class="d-flex flex-column flex-md-row gap-2 align-items-md-center justify-content-between border rounded p-3 bg-light mb-3">
+						<div><div class="fw-semibold" id="qboInvoiceProfileStatus">Selected profile: loading…</div><div class="small text-muted">Mappings use exact QuoteDr text. They are never guessed from a similar name.</div></div>
+						<button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#qboInvoiceProfileModal"><i class="fas fa-sliders me-1"></i>Configure QBO profile</button>
+					</div>
+					<div class="row g-3 align-items-end mb-3">
+						<div class="col-sm-6 col-lg-4"><label class="form-label fw-semibold" for="qboInvoiceExportFromDate">From date</label><input type="date" class="form-control" id="qboInvoiceExportFromDate"></div>
+						<div class="col-sm-6 col-lg-4"><label class="form-label fw-semibold" for="qboInvoiceExportToDate">To date</label><input type="date" class="form-control" id="qboInvoiceExportToDate"></div>
+						<div class="col-lg-4"><button type="button" class="btn btn-outline-success w-100" id="qboInvoiceReviewBtn" onclick="QuoteDrQboInvoiceExportUI.review()"><i class="fas fa-clipboard-check me-1"></i>Review QBO readiness</button></div>
+					</div>
+					<div id="qboInvoiceExportMessage" class="alert alert-light py-2 small mb-3" role="status" aria-live="polite">Save or review the selected QBO profile, then check invoice readiness.</div>
+					<div class="d-flex align-items-center justify-content-between gap-2 border-bottom pb-2 mb-2"><span class="fw-semibold">Invoices that passed preflight</span><span class="badge text-bg-light border" id="qboInvoiceSelectionCount">0 selected</span></div>
+					<div id="qboInvoiceDocumentList" class="qbo-invoice-export-document-list" aria-label="QBO invoice preflight results"></div>
+					<details class="mt-3 small"><summary class="fw-semibold text-success" style="cursor:pointer;">QBO CSV scope and privacy</summary><p class="text-muted mt-2 mb-0">Columns are invoice number, customer, invoice date, due date, product/service, description, quantity, rate, item amount, currency, and item tax code. The server builds this from client-facing invoice values only. It never includes internal cost, margin, markup, suppliers, private notes, payment-provider data, credentials, or customer-access tokens.</p></details>
+				</div>
+				<div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button><button type="button" class="btn btn-success" id="qboInvoiceDownloadBtn" onclick="QuoteDrQboInvoiceExportUI.exportSelected()" disabled><i class="fas fa-download me-1"></i>Download QBO Invoice CSV</button></div>
+			</div>
+		</div>
+	</div>
+
+	<div class="modal fade" id="qboInvoiceProfileModal" tabindex="-1" aria-labelledby="qboInvoiceProfileTitle" aria-hidden="true">
+		<div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down"><div class="modal-content"><div class="modal-header"><div><h5 class="modal-title" id="qboInvoiceProfileTitle">QBO invoice profile</h5><div class="small text-muted">Use exact names/codes from the connected QuickBooks company and its import template.</div></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+			<div class="modal-body"><div class="row g-3"><div class="col-md-7"><label class="form-label fw-semibold" for="qboInvoiceProfileName">Profile name</label><input class="form-control" id="qboInvoiceProfileName" maxlength="80" placeholder="e.g. Ontario QBO invoices"></div><div class="col-md-5"><label class="form-label fw-semibold" for="qboInvoiceTaxExemptCode">QBO tax-exempt code</label><input class="form-control" id="qboInvoiceTaxExemptCode" maxlength="120" placeholder="e.g. NON"></div></div>
+				<div class="form-check form-switch my-3"><input class="form-check-input" type="checkbox" id="qboInvoiceAllowCreateCustomers"><label class="form-check-label" for="qboInvoiceAllowCreateCustomers">I deliberately want QBO’s import flow to create customers without a saved mapping</label><div class="form-text">Leave this off to require an exact saved customer mapping for every invoice.</div></div>
+				<div class="row g-3"><div class="col-md-6"><label class="form-label fw-semibold" for="qboInvoiceCustomerMappings">Customer mappings</label><textarea class="form-control font-monospace small" id="qboInvoiceCustomerMappings" rows="6" placeholder="QuoteDr customer => Exact QBO customer"></textarea></div><div class="col-md-6"><label class="form-label fw-semibold" for="qboInvoiceItemMappings">Product/service mappings</label><textarea class="form-control font-monospace small" id="qboInvoiceItemMappings" rows="6" placeholder="QuoteDr line description => Exact QBO product/service"></textarea></div><div class="col-12"><label class="form-label fw-semibold" for="qboInvoiceTaxMappings">Tax mappings</label><textarea class="form-control font-monospace small" id="qboInvoiceTaxMappings" rows="4" placeholder="QuoteDr tax label => Exact QBO item tax code"></textarea><div class="form-text">One mapping per line, using <code>QuoteDr value =&gt; QBO value</code>. The preflight blocks missing or conflicting mappings instead of guessing.</div></div></div></div>
+			<div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-success" id="qboInvoiceSaveProfileBtn" onclick="QuoteDrQboInvoiceExportUI.saveProfile()"><i class="fas fa-save me-1"></i>Save QBO profile</button></div></div></div>
+	</div>
+
 	<div class="modal fade" id="accountingTransactionExportModal" tabindex="-1" aria-labelledby="accountingTransactionExportTitle" aria-hidden="true">
 		<div class="modal-dialog modal-xl modal-dialog-scrollable modal-fullscreen-sm-down">
 			<div class="modal-content">
@@ -2102,6 +2179,7 @@ Sarah Jones, 905-555-5678"></textarea>
 	<script src="modal-help.js?v=1777741200"></script>
 	<script src="quote-tips.js?v=2026080801"></script>
 	<script src="accounting-export-ui.js?v=2026080801"></script>
+	<script src="qbo-invoice-export-ui.js?v=2026080808"></script>
 	<script>
 		// ── Tab Navigation ──────────────────────────────────────────────────
 		// === QuickBooks Integration ===
