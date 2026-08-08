@@ -160,6 +160,7 @@ const legacyPlaceholder = {
   };
   const savedEmptyPortals = [];
   const quoteUpdates = [];
+  const finishedPortalActions = [];
   const createContext = {
     window: { _portalAssignQuoteId: '' },
     allQuotes: [],
@@ -169,6 +170,7 @@ const legacyPlaceholder = {
     quoteClientEmail() { return 'fallback@example.com'; },
     async upsertDashboardEmptyPortal(portal) { savedEmptyPortals.push(portal); },
     async refreshQuotes() {},
+    async finishPendingDashboardPortalAction(quoteId) { finishedPortalActions.push(quoteId); },
     renderPortalAssignmentList() {},
     async loadDashboardFullQuote(quote) { return quote; },
     stampPortalAddedAt(data) { data.portal_added_at = 'now'; },
@@ -193,6 +195,7 @@ const legacyPlaceholder = {
   assert.strictEqual(savedEmptyPortals.length, 1, 'Creating a portal for a selected quote should not add an empty registry record');
   assert.strictEqual(quoteUpdates.length, 1, 'Creating a portal from a quote should preserve the existing assignment flow');
   assert.strictEqual(quoteUpdates[0].values.data.portal_id, 'portal-new');
+  assert.deepStrictEqual(finishedPortalActions, ['quote-1'], 'a pending share action should resume after portal creation');
 
   console.log('dashboard empty portal registry test passed');
 })().catch((error) => {

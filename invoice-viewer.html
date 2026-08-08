@@ -859,11 +859,11 @@ if (location.search.includes('debug')) {
     </nav>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="help-content.js?v=1777741200"></script>
+    <script src="help-content.js?v=2026080801"></script>
     <script src="modal-help.js?v=1777741200"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="card-payment-rules.js?v=2026080301"></script>
-    <script src="supabase-v2.js?v=2026080701"></script>
+    <script src="supabase-v2.js?v=2026080801"></script>
     <script src="save-coordinator.js?v=2026080401"></script>
     <script src="quote-discounts.js?v=1783218460"></script>
     <script src="typed-signature.js?v=2026080301"></script>
@@ -1791,12 +1791,12 @@ if (location.search.includes('debug')) {
             }
             if (invoiceHasSignature()) return;
             if (isInvoiceContractorPreviewView()) {
-                window.alert('Signing is disabled inside the contractor preview. Send yourself a client invoice link to test the full signing flow.');
+                window.alert('Signing is disabled inside the contractor preview. Open the invoice through a client portal to test the full signing flow.');
                 return;
             }
             var params = new URLSearchParams(window.location.search);
             if (!params.get('id') || !params.get('token')) {
-                window.alert('This invoice link is missing its secure access token. Please ask the contractor to resend it.');
+                window.alert('Open this invoice from the client portal, or ask the contractor to resend the portal link.');
                 return;
             }
             var input = document.getElementById('invoiceSignerName');
@@ -1969,12 +1969,12 @@ if (location.search.includes('debug')) {
                                 renderTerms();
                                 return;
                             }
-                            document.getElementById('invoiceContainer').innerHTML = '<div class="alert alert-warning">This invoice link is missing its secure access token. Please ask the contractor to resend the invoice link.</div>';
+                            document.getElementById('invoiceContainer').innerHTML = '<div class="alert alert-warning">Open this invoice from the client portal, or ask the contractor to resend the portal link.</div>';
                         }).catch(function() {
-                            document.getElementById('invoiceContainer').innerHTML = '<div class="alert alert-warning">This invoice link is missing its secure access token. Please ask the contractor to resend the invoice link.</div>';
+                            document.getElementById('invoiceContainer').innerHTML = '<div class="alert alert-warning">Open this invoice from the client portal, or ask the contractor to resend the portal link.</div>';
                         });
                     } else {
-                        document.getElementById('invoiceContainer').innerHTML = '<div class="alert alert-warning">This invoice link is missing its secure access token. Please ask the contractor to resend the invoice link.</div>';
+                        document.getElementById('invoiceContainer').innerHTML = '<div class="alert alert-warning">Open this invoice from the client portal, or ask the contractor to resend the portal link.</div>';
                     }
                     return;
                 }
@@ -2436,7 +2436,7 @@ if (location.search.includes('debug')) {
                 return;
             }
             if (!_invoiceIdForPayment) {
-                alert('This invoice needs to be saved before card payment is available. Please use the shared invoice link.');
+                alert('This invoice needs to be saved before card payment is available. Please reopen it from the client portal.');
                 return;
             }
             if (typeof callDocumentPaymentFunction !== 'function') return;

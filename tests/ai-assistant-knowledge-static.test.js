@@ -46,8 +46,8 @@ assert(helpContent.includes('Manage Items > Choice Group'), 'contextual help sho
 assert(helpContent.includes('AI Memory'), 'contextual help should mention AI Memory');
 assert(helpContent.includes('AI Trade Rules'), 'contextual help should mention AI Trade Rules');
 assert(helpContent.includes('Voice Templates'), 'contextual help should mention Voice Templates');
-assert(helpContent.includes('deposit payment button on quote links'), 'contextual help should mention deposits on quote links');
-assert(helpContent.includes('pay-in-full button on invoice links'), 'contextual help should mention full invoice payments');
+assert(helpContent.includes('deposit payment button on portal quotes'), 'contextual help should mention deposits on portal quotes');
+assert(helpContent.includes('pay-in-full button on portal invoices'), 'contextual help should mention full portal invoice payments');
 
 assert(helpPage.includes('How do I create a saved choice group?'), 'FAQ should cover saved choice groups');
 assert(helpPage.includes('How can I let a client pick one of a few materials?'), 'FAQ should cover client material choices');

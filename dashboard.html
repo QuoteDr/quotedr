@@ -471,11 +471,11 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="quote-dialogs.js?v=2026071501"></script>
-    <script src="help-content.js?v=1777741200"></script>
+    <script src="help-content.js?v=2026080801"></script>
     <script src="modal-help.js?v=1777741200"></script>
     <script src="change-orders.js?v=1778060200"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-v2.js?v=2026080701"></script>
+    <script src="supabase-v2.js?v=2026080801"></script>
     <script src="account-access.js?v=2026080701"></script>
     <script src="admin-access.js?v=2026080201"></script>
     <script src="save-coordinator.js?v=2026080401"></script>
@@ -1105,7 +1105,7 @@
                         </div>
                     </div>
                     ${isInvalid ? `<div class="alert alert-danger py-2 px-2 mt-2 mb-0 small"><i class="fas fa-ban me-1"></i><strong>No longer valid.</strong> This invoice remains in the client portal for reference only and cannot be paid.</div>` : ''}
-                    ${status === 'accepted' && q.data && q.data.client_upgraded ? `<div class="alert alert-warning py-1 px-2 mt-2 mb-0 small"><i class="fas fa-bolt me-1"></i><strong>Client made upgrades</strong> when signing - <a href="interactive-quote-viewer.html?id=${encodeURIComponent(q.id)}" class="alert-link">review quote</a></div>` : ''}
+                    ${status === 'accepted' && q.data && q.data.client_upgraded ? `<div class="alert alert-warning py-1 px-2 mt-2 mb-0 small"><i class="fas fa-bolt me-1"></i><strong>Client made upgrades</strong> when signing - <a href="interactive-quote-viewer.html?id=${encodeURIComponent(q.id)}&preview=1&admin_preview=1" class="alert-link">review quote</a></div>` : ''}
                     ${portalVisible ? `<div class="portal-locked-note mt-2"><i class="fas fa-shield-halved me-1"></i>This document is locked while it is in the client portal. Remove from portal or duplicate as a revision to edit.</div>` : ''}
                     ${depositPaid ? `<div class="alert alert-success py-1 px-2 mt-2 mb-0 small"><i class="fas fa-credit-card me-1"></i><strong>${escapeHtml(depositAmount)} paid</strong>${depositPayment && depositPayment.paid_at ? ' on ' + escapeHtml(formatDate(depositPayment.paid_at)) : ''}</div>` : ''}
                     ${manualPaymentReport ? `<div class="alert alert-warning py-2 px-2 mt-2 mb-0 small"><div><i class="fas fa-clock me-1"></i><strong>Client reports ${escapeHtml(manualPaymentAmount)} ${escapeHtml(manualPaymentPurpose)} by ${escapeHtml(dashboardManualPaymentLabel(manualPaymentReport))}.</strong> Confirm only after you receive it.</div><div class="d-flex gap-1 mt-2 flex-wrap"><button class="btn btn-success btn-sm" onclick="decideDashboardManualPayment(${jsAttr(manualPaymentReport.id)}, 'confirmed')"><i class="fas fa-check me-1"></i>Confirm received</button><button class="btn btn-outline-danger btn-sm" onclick="decideDashboardManualPayment(${jsAttr(manualPaymentReport.id)}, 'rejected')"><i class="fas fa-xmark me-1"></i>Not received</button></div></div>` : ''}
@@ -1117,10 +1117,9 @@
                     ${(isInvoice && !isInvalid) ? `<button data-account-permission="quotes.send" class="btn btn-danger btn-sm w-100 mt-1" onclick="invalidateInvoice(${jsAttr(q.id)})"><i class="fas fa-ban me-1"></i> Mark Invoice No Longer Valid</button>` : ''}
                     ${isInvalid ? `<button data-account-permission="quotes.send" class="btn btn-outline-secondary btn-sm w-100 mt-1" onclick="restoreInvalidInvoice(${jsAttr(q.id)})"><i class="fas fa-rotate-left me-1"></i> Restore Invoice</button>` : ''}
                     ${reviewReady && !reviewSentAt ? `<button class="btn btn-outline-success btn-sm w-100 mt-1" onclick="sendGoogleReviewRequest(${jsAttr(q.id)}, ${jsAttr(clientName)}, ${jsAttr(clientEmail)})"><i class="fab fa-google me-1"></i> Request Review</button>` : ''}
-                    <button data-account-permission="quotes.send" class="btn btn-sm w-100 mt-1 ${portalVisible ? 'btn-success' : 'btn-outline-secondary'}" onclick="openPortalAssignment(${jsAttr(q.id)})" title="${portalVisible ? 'Manage portal assignment' : 'Choose a client portal'}"><i class="fas ${portalVisible ? 'fa-eye' : 'fa-eye-slash'} me-1"></i> ${portalVisible ? 'In Portal' : 'Add to Portal'}</button>
+                    <button data-account-permission="quotes.send" class="btn btn-sm w-100 mt-1 ${portalVisible ? 'btn-success' : 'btn-outline-primary'}" onclick="shareDocumentThroughPortal(${jsAttr(q.id)}, ${jsAttr(clientName)}, ${jsAttr(clientEmail)})" title="Ensure this document is in the correct portal and copy the portal link"><i class="fas fa-folder-tree me-1"></i> Share via Client Portal</button>
                     ${portalVisible ? `<button data-account-permission="quotes.send" class="btn btn-outline-primary btn-sm w-100 mt-1" onclick="openClientDocumentPreview(${jsAttr(q.id)}, this)" title="Open this document exactly as the client sees it"><i class="fas fa-eye me-1"></i> Client View</button>` : ''}
-                    ${portalVisible ? `<button data-account-permission="quotes.send" class="btn btn-outline-info btn-sm w-100 mt-1" onclick="shareClientPortal(${jsAttr(q.id)}, ${jsAttr(clientName)}, ${jsAttr(clientEmail)})" title="Share client portal"><i class="fas fa-external-link-alt me-1"></i> Client Portal</button>` : ''}
-                    ${(status === 'sent' || status === 'viewed') ? `<button data-account-permission="quotes.send" class="btn btn-outline-primary btn-sm w-100 mt-1" onclick="sendFollowUpReminder(${jsAttr(q.id)}, ${jsAttr(clientName)}, ${jsAttr(clientEmail)})"><i class="fas fa-bell me-1"></i> Send Follow-up</button>` : ''}
+                    ${(status === 'sent' || status === 'viewed') ? `<button data-account-permission="quotes.send" class="btn btn-outline-primary btn-sm w-100 mt-1" onclick="sendFollowUpReminder(${jsAttr(q.id)}, ${jsAttr(clientName)}, ${jsAttr(clientEmail)})"><i class="fas fa-bell me-1"></i> Email Portal Follow-up</button>` : ''}
                 </div>
             `;
             }).join('');
@@ -2172,6 +2171,66 @@
             return stableShare;
         }
 
+        function dashboardPortalForDocument(quote) {
+            if (!quote || !quote.id) return null;
+            var portalId = String(quote.data && quote.data.portal_id || '').trim();
+            return buildPortalRegistry(allQuotes).find(function(portal) {
+                return (portalId && String(portal.id) === portalId) || (portal.quoteIds || []).includes(quote.id);
+            }) || null;
+        }
+
+        async function dashboardPortalUrlForDocument(quote) {
+            if (!quote || !quote.data || quote.data.portal_visible !== true) {
+                throw new Error('Add this document to the correct client portal first.');
+            }
+            var portal = dashboardPortalForDocument(quote);
+            if (!portal) throw new Error('Could not find the assigned client portal. Refresh and try again.');
+            var stableShare = await ensurePortalStableShare(portal);
+            portal.secureToken = stableShare.token;
+            portal.secureAnchorId = stableShare.anchorId;
+            var contractor = (portal.quotes && portal.quotes[0] && portal.quotes[0].user_id) || (window.currentUser && window.currentUser.id) || '';
+            return portalUrlForDashboard(Object.assign({}, portal, { contractorId: contractor }), quote.id);
+        }
+
+        function queueDashboardPortalAction(action) {
+            window._pendingDashboardPortalAction = action;
+            var modalEl = document.getElementById('portalAssignModal');
+            if (!modalEl) return;
+            modalEl.addEventListener('hidden.bs.modal', function clearCancelledPortalAction() {
+                if (window._pendingDashboardPortalAction === action) window._pendingDashboardPortalAction = null;
+            }, { once: true });
+        }
+
+        async function finishPendingDashboardPortalAction(quoteId) {
+            var pending = window._pendingDashboardPortalAction;
+            if (!pending || pending.quoteId !== quoteId) return;
+            window._pendingDashboardPortalAction = null;
+            var modalEl = document.getElementById('portalAssignModal');
+            var modal = modalEl ? bootstrap.Modal.getInstance(modalEl) : null;
+            if (modal) modal.hide();
+            var quote = (allQuotes || []).find(function(row) { return row.id === quoteId; });
+            if (!quote) throw new Error('The portal assignment saved, but the document could not be reloaded.');
+            if (pending.type === 'followup') {
+                await sendFollowUpReminder(quoteId, pending.clientName, pending.clientEmail, {
+                    email: pending.email,
+                    skipPrompt: true
+                });
+                return;
+            }
+            await shareClientPortal(quoteId, pending.clientName, pending.clientEmail, { autoCopy: true });
+        }
+
+        async function shareDocumentThroughPortal(quoteId, clientName, clientEmail) {
+            var quote = (allQuotes || []).find(function(row) { return row.id === quoteId; });
+            if (!quote) { qdAlert('Could not find that document. Please refresh and try again.'); return; }
+            if (quote.data && quote.data.portal_visible === true) {
+                await shareClientPortal(quoteId, clientName, clientEmail, { autoCopy: true });
+                return;
+            }
+            queueDashboardPortalAction({ type: 'share', quoteId: quoteId, clientName: clientName, clientEmail: clientEmail });
+            openPortalAssignment(quoteId);
+        }
+
         async function togglePortalPinEditor(portalId) {
             window._portalPinEditorId = window._portalPinEditorId === portalId ? '' : portalId;
             renderPortalAssignmentList();
@@ -2733,6 +2792,7 @@
                 await removeDashboardEmptyPortal(portalId, 'Activate client portal');
                 await refreshQuotes();
                 renderPortalAssignmentList();
+                await finishPendingDashboardPortalAction(quoteId);
             } catch(err) {
                 qdAlert('Could not assign portal: ' + err.message);
             }
@@ -2778,6 +2838,7 @@
                 await refreshQuotes();
                 document.getElementById('portalAssignCreateWrap').style.display = window._portalAssignQuoteId ? '' : 'none';
                 renderPortalAssignmentList();
+                if (quoteId) await finishPendingDashboardPortalAction(quoteId);
             } catch(err) {
                 qdAlert('Could not create portal: ' + err.message);
             }
@@ -2941,6 +3002,7 @@
             openPortalAssignment: openPortalAssignment,
             openPortalManager: openPortalManager,
             openClientDocumentPreview: openClientDocumentPreview,
+            shareDocumentThroughPortal: shareDocumentThroughPortal,
             showNewPortalForm: showNewPortalForm,
             renderPortalAssignmentList: renderPortalAssignmentList,
             startPortalMergeMode: startPortalMergeMode,
@@ -2963,7 +3025,8 @@
             previewPortalFromDashboard: previewPortalFromDashboard
         });
 
-        async function shareClientPortal(quoteId, clientName, savedEmail) {
+        async function shareClientPortal(quoteId, clientName, savedEmail, options) {
+            options = options || {};
             // Dismiss any stale Bootstrap backdrop before opening
             document.querySelectorAll('.modal-backdrop').forEach(function(el) { el.remove(); });
             document.body.classList.remove('modal-open');
@@ -3015,6 +3078,9 @@
                 }
 
                 var selectedData = (selectedQuote && selectedQuote.data) || {};
+                if (selectedQuote && selectedData.portal_visible !== true) {
+                    throw new Error('Add this document to the correct client portal before sharing access.');
+                }
                 var selectedEmail = savedEmail || selectedData.clientEmail || selectedData.email || selectedData.client_email || '';
                 var selectedName = selectedData.portal_client_name || clientName || (selectedQuote && selectedQuote.client_name) || selectedData.clientName || selectedData.client_name || '';
                 var selectedPortalId = selectedData.portal_id || '';
@@ -3110,6 +3176,22 @@
                 adminUrlEl = document.getElementById('portalAdminUrlDisplay');
                 if (adminUrlEl) adminUrlEl.value = adminUrl;
                 document.getElementById('portalPinDisplay').textContent = pin;
+                if (options.autoCopy !== false && url) {
+                    var copied = false;
+                    try {
+                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                            await navigator.clipboard.writeText(url);
+                            copied = true;
+                        }
+                    } catch(copyError) {}
+                    if (typeof qdToast === 'function') {
+                        qdToast({
+                            title: copied ? 'Portal Link Copied' : 'Portal Link Ready',
+                            message: copied ? 'Paste the client portal link into a message or email.' : 'Use Copy in the portal window to copy the client link.',
+                            type: copied ? 'success' : 'info'
+                        });
+                    }
+                }
 
             } catch(err) {
                 console.error('shareClientPortal error:', err);
@@ -3122,7 +3204,7 @@
 
         function copyPortalUrl() {
             var url = document.getElementById('portalUrlDisplay').value;
-            navigator.clipboard.writeText(url).catch(function(){});
+            if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).catch(function(){});
             var btn = event.target.closest('button');
             if (btn) { var orig = btn.innerHTML; btn.innerHTML = '<i class="fas fa-check"></i>'; setTimeout(function(){ btn.innerHTML = orig; }, 1500); }
         }
@@ -3192,34 +3274,58 @@
             return String(value || '').trim().toLowerCase();
         }
 
-        async function sendFollowUpReminder(quoteId, clientName, savedEmail) {
+        async function sendFollowUpReminder(quoteId, clientName, savedEmail, options) {
+            options = options || {};
             var quote = allQuotes.find(function(q) { return q.id === quoteId; });
             if (!quote) return;
-            var clientEmail = await qdPrompt('Send follow-up reminder to:', savedEmail || '', {
-                title: 'Send Follow-Up'
-            });
+            var clientEmail = options.skipPrompt
+                ? String(options.email || savedEmail || '').trim()
+                : await qdPrompt('Email the client portal follow-up to:', savedEmail || '', { title: 'Email Portal Follow-Up' });
             if (!clientEmail || !clientEmail.includes('@')) { if (clientEmail !== null) qdAlert('Invalid email'); return; }
-            var btn = event.target.closest('button');
+            var btn = (typeof event !== 'undefined' && event.target) ? event.target.closest('button') : null;
+            if (!quote.data || quote.data.portal_visible !== true) {
+                queueDashboardPortalAction({
+                    type: 'followup',
+                    quoteId: quoteId,
+                    clientName: clientName,
+                    clientEmail: savedEmail,
+                    email: clientEmail
+                });
+                openPortalAssignment(quoteId);
+                return;
+            }
             if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Sending...'; }
             try {
-                var viewerBaseUrl = window.location.origin + '/interactive-quote-viewer.html';
-                var share = await createSecureClientShareLink(quoteId, viewerBaseUrl, { mode: 'document' });
-                var viewerUrl = share && share.url ? share.url : '';
-                if (!viewerUrl) throw new Error('Could not create secure quote link.');
+                var portalUrl = await dashboardPortalUrlForDocument(quote);
                 var followUpOperationEntity = quoteId + ':' + clientEmail;
                 var followUpOperationId = qdGetExternalOperationId('email_followup', followUpOperationEntity);
                 var res = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/send-quote-email', {
                     method: 'POST',
                     headers: await getSupabaseFunctionAuthHeaders(),
-                    body: JSON.stringify({ accountId: qdActiveAccountId(), to: clientEmail, clientName: clientName, contractorName: '', companyName: '', quoteNumber: quote.quote_number || '', total: quote.total || 0, quoteUrl: viewerUrl, message: (function(){ try { var ns = JSON.parse(localStorage.getItem('ald_notification_settings') || '{}'); return ns.followupMessage || "Just following up on the quote I sent you! Let me know if you have any questions or if you're ready to proceed."; } catch(e) { return "Just following up on the quote I sent you!"; } })(), idempotencyKey: followUpOperationId })
+                    body: JSON.stringify({
+                        accountId: qdActiveAccountId(),
+                        to: clientEmail,
+                        clientName: clientName,
+                        contractorName: '',
+                        companyName: '',
+                        quoteNumber: quote.quote_number || '',
+                        total: quote.total || 0,
+                        quoteUrl: portalUrl,
+                        portalUrl: portalUrl,
+                        isInvoice: dashboardIsInvoiceDocument(quote),
+                        documentType: quote.data && (quote.data.documentType || quote.data.type) || quote.type || 'quote',
+                        emailKind: 'portal_followup',
+                        message: (function(){ try { var ns = JSON.parse(localStorage.getItem('ald_notification_settings') || '{}'); return ns.followupMessage || "Just following up on the document in your client portal. Let me know if you have any questions or if you're ready to proceed."; } catch(e) { return "Just following up on the document in your client portal."; } })(),
+                        idempotencyKey: followUpOperationId
+                    })
                 });
                 var data = await res.json();
                 if (data.error) throw new Error(data.error);
                 qdCompleteExternalOperation('email_followup', followUpOperationEntity);
-                if (btn) { btn.innerHTML = '<i class="fas fa-check me-1"></i>Sent!'; setTimeout(function() { btn.disabled = false; btn.innerHTML = '<i class="fas fa-bell me-1"></i> Send Follow-up'; }, 3000); }
+                if (btn) { btn.innerHTML = '<i class="fas fa-check me-1"></i>Sent!'; setTimeout(function() { btn.disabled = false; btn.innerHTML = '<i class="fas fa-bell me-1"></i> Email Portal Follow-up'; }, 3000); }
             } catch(e) {
                 qdAlert('Failed to send: ' + e.message);
-                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-bell me-1"></i> Send Follow-up'; }
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-bell me-1"></i> Email Portal Follow-up'; }
             }
         }
 
@@ -3254,6 +3360,7 @@
                         quoteNumber: quote.quote_number || 'Google Review',
                         total: quote.total || 0,
                         quoteUrl: reviewLink,
+                        emailKind: 'google_review',
                         message: message,
                         idempotencyKey: reviewOperationId
                     })
@@ -3547,7 +3654,7 @@
         });
     </script>
 <script src="chatbot-feedback-topics.js?v=2026080801"></script>
-<script src="ai-assistant.js?v=1778194800"></script>
+<script src="ai-assistant.js?v=2026080801"></script>
     <script>
         window.currentQuotes = [];
         var currentDashboardView = 'list';
@@ -5310,7 +5417,7 @@ function renderBusinessInsights(quotes) {
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header" style="background:#1a2940; color:white;">
-        <h5 class="modal-title"><i class="fas fa-external-link-alt me-2"></i>Client Portal Access</h5>
+        <h5 class="modal-title"><i class="fas fa-folder-tree me-2"></i>Share via Client Portal</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body text-center">
@@ -5318,8 +5425,8 @@ function renderBusinessInsights(quotes) {
         <div class="text-start mb-3">
           <label class="form-label fw-bold small mb-1" style="color:#1a2940;">CLIENT VIEWER LINK</label>
           <div class="input-group">
-            <input type="text" class="form-control form-control-sm" id="portalUrlDisplay" readonly aria-label="Client viewer link">
-            <button class="btn btn-outline-secondary btn-sm" onclick="copyPortalUrl()" title="Copy client viewer link" aria-label="Copy client viewer link"><i class="fas fa-copy"></i></button>
+            <input type="text" class="form-control form-control-sm" id="portalUrlDisplay" readonly aria-label="Client portal link">
+            <button class="btn btn-outline-secondary btn-sm" onclick="copyPortalUrl()" title="Copy client portal link" aria-label="Copy client portal link"><i class="fas fa-copy"></i></button>
             <button class="btn btn-outline-primary btn-sm" onclick="openPortalClientUrl()" title="View client portal" aria-label="View client portal"><i class="fas fa-arrow-up-right-from-square me-1"></i>View</button>
           </div>
           <div class="form-text">Client-facing link that requires the PIN below.</div>

@@ -15,6 +15,70 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
+const PORTAL_EMAIL_KINDS = new Set([
+  "portal_quote",
+  "portal_invoice",
+  "portal_change_order",
+  "portal_followup",
+]);
+
+function isQuoteDrPortalUrl(value: unknown) {
+  try {
+    const url = new URL(String(value || "").trim());
+    const host = url.hostname.toLowerCase();
+    if (url.protocol !== "https:" || (host !== "quotedr.io" && host !== "www.quotedr.io") || (url.port && url.port !== "443")) return false;
+    if (["admin", "view", "theme_studio"].some((name) => ["1", "true", "admin", "studio"].includes(String(url.searchParams.get(name) || "").toLowerCase()))) return false;
+    if (/^\/p\/[^/?#]+\/?$/i.test(url.pathname)) return true;
+    if (!/^\/client-portal(?:\.html)?\/?$/i.test(url.pathname)) return false;
+    return !!(url.searchParams.get("token") || url.searchParams.get("p"));
+  } catch (_) {
+    return false;
+  }
+}
+
+function isExternalReviewUrl(value: unknown) {
+  try {
+    const url = new URL(String(value || "").trim());
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch (_) {
+    return false;
+  }
+}
+
+function portalTokenFromUrl(value: unknown) {
+  try {
+    const url = new URL(String(value || "").trim());
+    const shortMatch = url.pathname.match(/^\/p\/([^/?#]+)\/?$/i);
+    return String(shortMatch ? decodeURIComponent(shortMatch[1]) : (url.searchParams.get("token") || url.searchParams.get("p") || "")).trim();
+  } catch (_) {
+    return "";
+  }
+}
+
+async function sha256Hex(value: string) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function portalLinkBelongsToAccount(service: any, ownerUserId: string, value: unknown) {
+  const token = portalTokenFromUrl(value);
+  if (!/^[a-zA-Z0-9_-]{16,200}$/.test(token)) return false;
+  const tokenHash = await sha256Hex(token);
+  const result = await service
+    .from("quotes")
+    .select("id,data")
+    .eq("user_id", ownerUserId)
+    .eq("public_share_token_hash", tokenHash)
+    .limit(1)
+    .maybeSingle();
+  if (result.error) throw result.error;
+  const row = result.data;
+  if (!row || !row.data || row.data.portal_visible !== true) return false;
+  const url = new URL(String(value));
+  const requestedAnchor = String(url.searchParams.get("portal_anchor") || url.searchParams.get("id") || "").trim();
+  return !requestedAnchor || requestedAnchor === String(row.id);
+}
+
 function json(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
@@ -93,13 +157,32 @@ Deno.serve(async (req) => {
     }
     const accountOwnerId = access.ownerUserId;
     const {
-      to, clientName, contractorName, companyName, quoteNumber, total, quoteUrl, message, isInvoice,
-      emailSubject, emailIntro, emailButtonText, portalUrl, emailReplyTo, emailFooter, idempotencyKey
+      to, clientName, contractorName, companyName, quoteNumber, total, quoteUrl: requestedQuoteUrl, message, isInvoice,
+      emailSubject, emailIntro, emailButtonText, portalUrl, emailReplyTo, emailFooter, idempotencyKey,
+      emailKind, documentType
     } = requestBody;
     operationKey = String(idempotencyKey || "").trim();
 
-    if (!to || !quoteUrl) {
-      return new Response(JSON.stringify({ error: "Missing required fields: to, quoteUrl" }), {
+    const normalizedEmailKind = String(emailKind || "").trim().toLowerCase();
+    const isPortalEmail = PORTAL_EMAIL_KINDS.has(normalizedEmailKind);
+    const isReviewEmail = normalizedEmailKind === "google_review";
+    if (!isPortalEmail && !isReviewEmail) {
+      return json({ error: "Missing or invalid email kind" }, 400);
+    }
+
+    const primaryUrl = String(isPortalEmail ? (portalUrl || requestedQuoteUrl) : requestedQuoteUrl || "").trim();
+    if (isPortalEmail && !isQuoteDrPortalUrl(primaryUrl)) {
+      return json({ error: "QuoteDr document emails must use a secure client portal link" }, 400);
+    }
+    if (isPortalEmail && !await portalLinkBelongsToAccount(service, accountOwnerId, primaryUrl)) {
+      return json({ error: "The client portal link is invalid, removed, or belongs to another account" }, 403);
+    }
+    if (isReviewEmail && !isExternalReviewUrl(primaryUrl)) {
+      return json({ error: "Review request link must be a valid web URL" }, 400);
+    }
+
+    if (!to || !primaryUrl) {
+      return new Response(JSON.stringify({ error: "Missing required fields: to, portal link" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
@@ -129,9 +212,13 @@ Deno.serve(async (req) => {
 
     const fromName = companyName || contractorName || "QuoteDr";
     const greeting = clientName ? `Hi ${clientName},` : "Hi there,";
-    const quoteRef = quoteNumber ? `${isInvoice ? "Invoice" : "Quote"} #${quoteNumber}` : (isInvoice ? "Your Invoice" : "Your Quote");
+    const requestedDocumentType = String(documentType || "").toLowerCase();
+    const normalizedDocumentType = normalizedEmailKind === "portal_change_order" || requestedDocumentType === "change_order"
+      ? "change_order"
+      : (isInvoice || requestedDocumentType === "invoice" ? "invoice" : "quote");
+    const documentTitle = normalizedDocumentType === "change_order" ? "Change Order" : (normalizedDocumentType === "invoice" ? "Invoice" : "Quote");
+    const quoteRef = quoteNumber ? `${documentTitle} #${quoteNumber}` : `Your ${documentTitle}`;
     const totalStr = total ? `$${parseFloat(total).toFixed(2)}` : "";
-    const docType = isInvoice ? "invoice" : "quote";
     const customMessage = message ? `<p style="color:#555; line-height:1.6;">${withBreaks(message)}</p>` : "";
 
     const subject = emailSubject
@@ -140,15 +227,13 @@ Deno.serve(async (req) => {
 
     const introParagraph = emailIntro
       ? `<p style="color:#555; line-height:1.6; margin:0 0 24px;">${withBreaks(emailIntro)}</p>`
-      : `<p style="color:#555; line-height:1.6; margin:0 0 24px;">${escapeHtml(contractorName || fromName || "Your contractor")} has sent you ${escapeHtml(quoteRef)}${totalStr ? ` for <strong>${escapeHtml(totalStr)}</strong>` : ""}. Click below to view your ${docType}.</p>`;
+      : isPortalEmail
+        ? `<p style="color:#555; line-height:1.6; margin:0 0 24px;">${escapeHtml(contractorName || fromName || "Your contractor")} has shared ${escapeHtml(quoteRef)}${totalStr ? ` for <strong>${escapeHtml(totalStr)}</strong>` : ""} in your secure client portal.</p>`
+        : `<p style="color:#555; line-height:1.6; margin:0 0 24px;">${escapeHtml(contractorName || fromName || "Your contractor")} sent you this request.</p>`;
 
-    const btnText = emailButtonText || (isInvoice ? "View Invoice" : "View Quote");
+    const btnText = emailButtonText || (isPortalEmail ? "Open Client Portal" : "Open Link");
     const replyTo = emailReplyTo || undefined;
     const footerExtra = emailFooter ? `<br>${withBreaks(emailFooter)}` : "";
-    const documentLabel = isInvoice ? "invoice" : "quote";
-    const portalParagraph = portalUrl
-      ? `<p style="color:#555; font-size:0.92rem; line-height:1.6; margin:0 0 24px;">You can also view this ${documentLabel} in your client portal.<br><a href="${escapeHtml(portalUrl)}" style="color:#1a56a0; font-weight:700;">Open Client Portal</a></p>`
-      : "";
 
     const html = `
 <!DOCTYPE html>
@@ -169,7 +254,7 @@ Deno.serve(async (req) => {
           ${introParagraph}
 
           <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:8px 0 32px;">
-            <a href="${escapeHtml(quoteUrl)}" style="display:inline-block; background:#e87e2a; color:white; font-weight:700; font-size:1rem; padding:16px 40px; border-radius:50px; text-decoration:none; letter-spacing:0.3px;">
+            <a href="${escapeHtml(primaryUrl)}" style="display:inline-block; background:#e87e2a; color:white; font-weight:700; font-size:1rem; padding:16px 40px; border-radius:50px; text-decoration:none; letter-spacing:0.3px;">
               ${escapeHtml(btnText)}
             </a>
           </td></tr></table>
@@ -177,16 +262,14 @@ Deno.serve(async (req) => {
           ${quoteNumber || totalStr ? `
           <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa; border-radius:8px; margin-bottom:24px;">
             <tr><td style="padding:20px;">
-              ${quoteNumber ? `<div style="margin-bottom:8px;"><span style="color:#999; font-size:0.85rem;">${isInvoice ? "Invoice" : "Quote"} Number</span><br><strong style="color:#333;">#${escapeHtml(quoteNumber)}</strong></div>` : ""}
+              ${quoteNumber ? `<div style="margin-bottom:8px;"><span style="color:#999; font-size:0.85rem;">${escapeHtml(documentTitle)} Number</span><br><strong style="color:#333;">#${escapeHtml(quoteNumber)}</strong></div>` : ""}
               ${totalStr ? `<div><span style="color:#999; font-size:0.85rem;">Total</span><br><strong style="color:#0f3460; font-size:1.2rem;">${escapeHtml(totalStr)}</strong></div>` : ""}
             </td></tr>
           </table>` : ""}
 
-          ${portalParagraph}
-
           <p style="color:#999; font-size:0.8rem; margin:0;">
             If the button doesn't work, copy and paste this link into your browser:<br>
-            <a href="${escapeHtml(quoteUrl)}" style="color:#1a56a0; word-break:break-all;">${escapeHtml(quoteUrl)}</a>
+            <a href="${escapeHtml(primaryUrl)}" style="color:#1a56a0; word-break:break-all;">${escapeHtml(primaryUrl)}</a>
           </p>
         </td></tr>
 

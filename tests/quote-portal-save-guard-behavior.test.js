@@ -3,8 +3,8 @@ const assert = require('assert');
 const vm = require('vm');
 
 const source = fs.readFileSync('supabase-v2.js', 'utf8');
-const helperMatch = source.match(/function quotePortalLockedSaveError\(quoteData, row\) \{[\s\S]*?\n\}\n\nasync function verifyQuoteIsEditableBeforeSave\(userId, quoteData\) \{[\s\S]*?\n\}/);
-const ownVersionMatch = source.match(/function qdAdoptOwnLatestQuoteVersion\(quoteData, row\) \{[\s\S]*?\n\}/);
+const helperMatch = source.match(/function quotePortalLockedSaveError\(quoteData, row\) \{[\s\S]*?\r?\n\}\r?\n\r?\nasync function verifyQuoteIsEditableBeforeSave\(userId, quoteData\) \{[\s\S]*?\r?\n\}/);
+const ownVersionMatch = source.match(/function qdAdoptOwnLatestQuoteVersion\(quoteData, row\) \{[\s\S]*?\r?\n\}/);
 
 assert(helperMatch, 'Supabase saves should define a reusable stored-row portal lock guard');
 assert(ownVersionMatch, 'Quote saves should define a same-editor version adoption guard');
@@ -28,6 +28,7 @@ function makeSupabase(response, calls) {
   const lockEvents = [];
   const context = {
     _supabase: makeSupabase({ data: null, error: null }, calls),
+    qdUsesTeamAccountApi: async function() { return false; },
     CustomEvent: function(type, options) { return { type, detail: options.detail }; },
     dispatchEvent(event) { lockEvents.push(event); }
   };

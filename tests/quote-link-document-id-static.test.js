@@ -18,23 +18,27 @@ assert(
   'saveQuoteForSharing should preserve the known quote id when an acknowledgement omits its row'
 );
 
-const linkFunction = styleSource.match(/async function createInteractiveQuoteLink\(\) \{[\s\S]*?\r?\n        \}\r?\n\r?\n        async function previewInteractiveQuote/);
-assert(linkFunction, 'createInteractiveQuoteLink should exist');
+const linkFunction = styleSource.match(/async function saveQuoteForPortalSharing\(\) \{[\s\S]*?\r?\n        \}\r?\n\r?\n        function getQuoteAdminPreviewUrl/);
+assert(linkFunction, 'saveQuoteForPortalSharing should exist');
 assert(
   /const savedRow = Array\.isArray\(result\.data\) \? result\.data\[0\] : result\.data;/.test(linkFunction[0]),
-  'quote link creation should accept either an array or object save acknowledgement'
+  'portal sharing save should accept either an array or object save acknowledgement'
 );
 assert(
   /const supabaseId = \(savedRow && savedRow\.id\) \|\| quoteData\.supabaseId \|\| window\._supabaseQuoteId;/.test(linkFunction[0]),
-  'quote link creation should recover the document id from every authoritative save location'
+  'portal sharing save should recover the document id from every authoritative save location'
 );
 assert(
-  linkFunction[0].indexOf('if (!supabaseId)') < linkFunction[0].indexOf('createSecureClientShareLink(supabaseId'),
-  'quote link creation should reject a missing id before requesting a secure link'
+  linkFunction[0].includes('if (!supabaseId)') && !linkFunction[0].includes('createSecureClientShareLink'),
+  'portal sharing should reject a missing id without minting a standalone document token'
 );
 assert(
-  linkFunction[0].indexOf('window._supabaseQuoteId = supabaseId;') < linkFunction[0].indexOf('createSecureClientShareLink(supabaseId'),
-  'the saved quote id should be adopted before secure-link creation'
+  linkFunction[0].includes('window._supabaseQuoteId = supabaseId;') && linkFunction[0].includes('return quoteData;'),
+  'the saved quote id should be adopted before portal assignment'
+);
+assert(
+  linkFunction[0].includes('saveQuoteForSharing(quoteData, { markShared: false })'),
+  'opening the portal picker should save without marking a draft as sent'
 );
 assert(
   Number((builderSource.match(/supabase-v2\.js\?v=(\d+)/) || [])[1]) >= 2026071901 &&

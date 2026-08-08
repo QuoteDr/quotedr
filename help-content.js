@@ -98,7 +98,7 @@
                 'Choose a visual style and accent colour.',
                 'Set the client pricing detail, deposit display, approval type, and expiry.',
                 'Write or adjust the client message.',
-                'Generate the client link when the settings look right.'
+                'Continue to the client portal when the settings look right.'
             ],
             tips: [
                 'Use less pricing detail for simple jobs and more detail for larger projects.',
@@ -107,12 +107,12 @@
             helpUrl: 'help.html#sending-quotes'
         },
         interactiveLinkModal: {
-            title: 'Quote Ready',
-            summary: 'Share the client quote link by copying it, emailing it, or opening the client view.',
+            title: 'Share through Client Portal',
+            summary: 'Choose the correct client portal before copying, opening, or emailing access.',
             steps: [
-                'Copy the link to send by text, email, or messenger.',
-                'Or enter the client email and send directly from QuoteDr.',
-                'Open Client View to preview exactly what the client will see.'
+                'Choose the portal that belongs to this client and job.',
+                'Copy, open, or email the portal link from QuoteDr.',
+                'Use Contractor Preview to check the document without creating a client share link.'
             ],
             tips: [
                 'Previewing the client view before sending catches most small mistakes.',
@@ -121,12 +121,12 @@
             helpUrl: 'help.html#sending-quotes'
         },
         sendInvoiceModal: {
-            title: 'Invoice Ready',
-            summary: 'Use this modal to send or open the invoice generated from the current quote.',
+            title: 'Share Invoice through Client Portal',
+            summary: 'Choose the correct portal, then copy, open, or email the portal link for this invoice.',
             steps: [
-                'Wait for the sharing save to finish.',
-                'Email the invoice directly or open it in a new tab.',
-                'Confirm the invoice total and client details before sending.'
+                'Wait for the cloud save to finish.',
+                'Choose the client portal that belongs to this job.',
+                'Copy, open, or email the portal link after checking the total and client details.'
             ],
             tips: [
                 'The invoice uses the current quote rooms, items, total, and terms.',
@@ -388,11 +388,11 @@
             helpUrl: 'help.html#building-quotes'
         },
         portalShareModal: {
-            title: 'Client Portal Access',
+            title: 'Share via Client Portal',
             summary: 'Share a secure portal link and PIN with your client.',
             steps: [
-                'Copy the portal link and PIN together.',
-                'Send both to the client through your preferred channel.',
+                'Copy the portal link.',
+                'Provide the PIN separately when the client needs it.',
                 'Reset the PIN if you need to revoke old access.'
             ],
             tips: [
@@ -408,11 +408,11 @@
                 'Choose the client portal or project folder the document belongs to.',
                 'Review the quote or invoice being attached before saving.',
                 'Save the portal assignment so the document appears in the client portal.',
-                'Use Client Portal Access when you are ready to share the portal link and PIN.'
+                'Use Share via Client Portal when you are ready to copy or open the portal link.'
             ],
             tips: [
                 'Use portal grouping when one client has multiple quotes, invoices, or change orders for the same job.',
-                'Portal assignments are internal until you share portal access with the client.'
+                'A document must be assigned before QuoteDr will create its portal share link.'
             ],
             helpUrl: 'help.html#clients-data'
         },
@@ -438,12 +438,12 @@
                 'Enter the deposit amount or choose a percentage shortcut.',
                 'Check the invoice total shown below the amount.',
                 'Open Stripe Checkout and send or complete the payment flow.',
-                'Use Settings > Payments to control the deposit payment button on quote links and the pay-in-full button on invoice links.'
+                'Use Settings > Payments to control payment buttons on quotes and invoices inside the client portal.'
             ],
             tips: [
                 'Use the 25%, 50%, and Full buttons to avoid manual math.',
                 'Confirm Stripe is connected before sending payment links to clients.',
-                'Deposit payment button on quote links is for deposits; pay-in-full button on invoice links is for full balances.'
+                'Deposit buttons are for quotes; pay-in-full buttons are for invoices.'
             ],
             helpUrl: 'help.html#invoices-payments'
         },
@@ -707,12 +707,12 @@
         },
         stripePayments: {
             title: 'Stripe Payments',
-            summary: 'Stripe payment settings control whether clients see payment buttons on quote and invoice links.',
+            summary: 'Stripe payment settings control whether clients see payment buttons on portal quotes and invoices.',
             steps: [
                 'Enable payments when you are ready to accept card payments.',
                 'Set the default deposit percentage.',
-                'Choose whether clients see a deposit payment button on quote links.',
-                'Choose whether clients see a pay-in-full button on invoice links.'
+                'Choose whether clients see a deposit payment button on portal quotes.',
+                'Choose whether clients see a pay-in-full button on portal invoices.'
             ],
             tips: [
                 'Check payment settings before sending payment links to clients.',

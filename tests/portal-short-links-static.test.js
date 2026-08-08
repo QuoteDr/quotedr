@@ -49,8 +49,10 @@ assert(
 );
 
 assert(
-  edgeFunction.includes('createShareToken(mode === "portal" ? 16 : 32)'),
-  'New portal links should use a compact 128-bit token while document links retain 256-bit tokens'
+  edgeFunction.includes('createShareToken(16)') &&
+    edgeFunction.includes('if (mode !== "portal")') &&
+    !edgeFunction.includes('createShareToken(32)'),
+  'New links should use compact 128-bit portal tokens and standalone document tokens should be retired'
 );
 
 const productionContext = {
@@ -141,6 +143,7 @@ const ensureContext = {
     return { token: 'minted-token', portalAnchorId: 'quote-1' };
   },
   loadDashboardFullQuote: async (row) => row,
+  quoteIsPortalPlaceholder: () => false,
   persistPortalStableShare: async (rows, share) => stableShareCalls.push({ rows, share }),
   Date,
   Error,

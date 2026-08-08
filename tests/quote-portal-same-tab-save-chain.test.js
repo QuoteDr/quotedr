@@ -70,6 +70,14 @@ function createContext(options = {}) {
       portal_visible: false
     }),
     confirmQuotePortalLockBeforePublish: async () => true,
+    findBuilderPortalStableShare: () => ({ token: '', anchorId: '', createdAt: '' }),
+    applyBuilderPortalStableShare: (data, share) => {
+      if (share && share.token && share.anchorId) {
+        data.portal_share_token = share.token;
+        data.portal_share_anchor_id = share.anchorId;
+      }
+      return data;
+    },
     updateLegacyInvoicePortalRows: async () => {},
     saveQuoteForSharing: async quote => {
       calls.saves.push(JSON.parse(JSON.stringify(quote)));

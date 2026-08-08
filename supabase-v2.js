@@ -344,6 +344,14 @@ function qdTeamTargetFilterValue(target, column) {
     return filter && filter.value;
 }
 
+function qdMergeExistingPortalData(nextData, existingData) {
+    var merged = Object.assign({}, nextData || {});
+    Object.keys(existingData || {}).forEach(function(key) {
+        if (/^portal_/i.test(key)) merged[key] = existingData[key];
+    });
+    return merged;
+}
+
 async function qdExecuteTeamAccountTarget(operation, target) {
     if (target.table === 'quotes') {
         if (target.action === 'delete') {
@@ -418,6 +426,11 @@ async function qdExecuteDurableSupabaseTarget(operation) {
         var existingResult = await existingQuery.limit(1).maybeSingle();
         if (existingResult.error) throw qdDurableSaveError(existingResult.error, 'Could not verify an idempotent insert.');
         if (existingResult.data) {
+            if (target.preserveExistingPortalData && values && values.data && existingResult.data.data) {
+                var mergedPortalData = qdMergeExistingPortalData(values.data, existingResult.data.data);
+                values = Object.assign({}, values, { data: mergedPortalData });
+                target.values = values;
+            }
             action = 'update';
             target.filters = [{ column: 'id', value: existingResult.data.id }];
         }
@@ -690,6 +703,10 @@ async function callClientDocumentFunction(body, requireUser) {
 async function createSecureClientShareLink(documentId, baseUrl, options) {
     options = options || {};
     if (!documentId) throw new Error('Missing document id for secure client link');
+    var mode = String(options.mode || 'portal').trim().toLowerCase();
+    if (mode !== 'portal') {
+        throw new Error('Standalone document links are retired. Share this document through its client portal.');
+    }
     if (window.QuoteDrSave) {
         var quoteReady = await window.QuoteDrSave.requireCloudAck('quote', documentId);
         var invoiceReady = quoteReady ? await window.QuoteDrSave.requireCloudAck('invoice', documentId) : false;
@@ -699,7 +716,7 @@ async function createSecureClientShareLink(documentId, baseUrl, options) {
         action: 'create_link',
         documentId: documentId,
         baseUrl: baseUrl || '',
-        mode: options.mode || 'document'
+        mode: mode
     }, true);
 }
 
@@ -1582,6 +1599,8 @@ async function saveInvoiceForSharing(invoiceData) {
     }
     const now = new Date().toISOString();
     const invoiceQuoteNumber = qdCanonicalInvoiceNumber(invoiceData.quoteNumber || invoiceData.quote_number || '');
+    const invoiceHasExplicitPortalAssignment = Object.prototype.hasOwnProperty.call(invoiceData, 'portal_visible') ||
+        Object.prototype.hasOwnProperty.call(invoiceData, 'portal_id');
     const payload = {
         user_id: user.id,
         data: {
@@ -1614,7 +1633,8 @@ async function saveInvoiceForSharing(invoiceData) {
             action: isUpdate ? 'update' : 'insert',
             values: payload,
             filters: isUpdate ? [{ column: 'id', value: invoiceData.supabaseId }] : [],
-            dedupe: !isUpdate ? { filters: [{ column: 'quote_number', value: invoiceQuoteNumber }], select: 'id,updated_at' } : null,
+            dedupe: !isUpdate ? { filters: [{ column: 'quote_number', value: invoiceQuoteNumber }], select: 'id,updated_at,data' } : null,
+            preserveExistingPortalData: !isUpdate && !invoiceHasExplicitPortalAssignment,
             versionRead: isUpdate ? { table: 'quotes', column: 'updated_at', filters: [{ column: 'id', value: invoiceData.supabaseId }] } : null,
             verifyRevision: true,
             verifyVersionValue: payload.updated_at,
@@ -2057,6 +2077,8 @@ var loadQuoteFromSupabase = loadQuoteByIdFromSupabase;
 
 // Save a quote to Supabase for sharing
 async function saveQuoteForSharing(quoteData) {
+    var options = arguments[1] || {};
+    var markShared = options.markShared !== false;
     const user = await getCurrentUser();
     if (!user) return { error: 'Not authenticated' };
     var editCheck = await verifyQuoteIsEditableBeforeSave(user.id, quoteData);
@@ -2085,6 +2107,14 @@ async function saveQuoteForSharing(quoteData) {
         quoteData.supabaseId = initialRow.id;
         quoteData._serverUpdatedAt = initialRow.updated_at || null;
     }
+    var isChangeOrder = quoteData.type === 'change_order' || quoteData.documentType === 'change_order';
+    var priorStatus = quoteData.status || 'draft';
+    var savedStatus = markShared
+        ? (isChangeOrder
+            ? (priorStatus === 'draft' ? 'pending_approval' : priorStatus)
+            : (priorStatus === 'draft' ? 'sent' : priorStatus))
+        : priorStatus;
+    if (markShared) quoteData.status = savedStatus;
     const payload = {
             id: quoteData.supabaseId,
             user_id: user.id,
@@ -2092,7 +2122,7 @@ async function saveQuoteForSharing(quoteData) {
             quote_number: quoteData.quoteNumber || '',
             total: quoteData.grandTotal || quoteData.total || 0,
             data: quoteData,
-            status: (quoteData.type === 'change_order' || quoteData.documentType === 'change_order') ? (quoteData.status === 'draft' ? 'pending_approval' : (quoteData.status || 'pending_approval')) : 'sent',
+            status: savedStatus,
             type: quoteData.type || quoteData.documentType || 'quote',
             parent_quote_id: quoteData.parentQuoteId || null,
             change_order_number: quoteData.changeOrderNumber || null,

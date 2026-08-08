@@ -52,15 +52,12 @@ assert(
 );
 
 
-assert(!quoteFollowup.includes('noreply@quotedr.app'), 'Automated follow-ups must not use the retired quotedr.app sender');
 assert(
-  quoteFollowup.includes('<quotes@quotedr.io>') &&
-    quoteFollowup.includes('loadBusinessProfile(quote.user_id)') &&
-    quoteFollowup.includes('reply_to: emailData.replyTo') &&
-    quoteFollowup.includes('to: recipient') &&
-    quoteFollowup.includes('if (!isValidEmail(recipient)) return false') &&
-    quoteFollowup.includes('safeSubjectPart(quote.data.quoteNumber'),
-  'Quote follow-ups should use Resend, carry contractor branding, reply to the contractor, and still go only to the client'
+  quoteFollowup.includes('portal_followup_required') &&
+    quoteFollowup.includes('sent: 0') &&
+    !quoteFollowup.includes('api.resend.com') &&
+    !quoteFollowup.includes('quote.data.quoteUrl'),
+  'The legacy automated direct-link follow-up endpoint should remain a no-send retired stub'
 );
 
 assert(
@@ -68,6 +65,12 @@ assert(
     quoteEmail.includes('reply_to: replyTo') &&
     quoteEmail.includes('<quotes@quotedr.io>'),
   'Manual quote and invoice emails should preserve their client recipient and contractor reply-to behavior'
+);
+assert(
+  quoteEmail.includes('portalLinkBelongsToAccount') &&
+    quoteEmail.includes('.eq("user_id", ownerUserId)') &&
+    quoteEmail.includes('row.data.portal_visible !== true'),
+  'Portal emails should verify that the link is still active and belongs to the sending account'
 );
 assert(
   welcomeEmail.includes("reply_to: Deno.env.get('QUOTEDR_ADMIN_EMAIL') || 'admin@quotedr.io'") &&

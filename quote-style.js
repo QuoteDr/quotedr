@@ -1238,7 +1238,7 @@
 
         async function generateInteractiveLink() {
             if (rooms.length === 0) {
-                alert('Please add at least one room before generating an interactive quote.');
+                alert('Please add at least one room before sharing this quote in the client portal.');
                 return;
             }
             markQuoteNumberUsed(document.getElementById('quoteNumber')?.value);
@@ -1259,7 +1259,7 @@
                 var isChangeOrder = document.body?.classList.contains('change-order-mode');
                 generateBtn.innerHTML = settingsOnly
                     ? '<i class="fas fa-check me-1"></i>Done'
-                    : '<i class="fas fa-share-square me-1"></i>' + (isChangeOrder ? 'Send Change Order' : 'Generate Quote Link');
+                    : '<i class="fas fa-folder-open me-1"></i>' + (isChangeOrder ? 'Share Change Order in Portal' : 'Continue to Client Portal');
             }
             var modalEl = document.getElementById('quoteStyleModal');
             var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
@@ -1324,58 +1324,55 @@
                     }
                 }
                 if (saveStatus) saveStatus.innerHTML = '<span style="color:#1a56a0;"><i class="fas fa-spinner fa-spin"></i> Saving quote...</span>';
-                const viewerUrl = await createInteractiveQuoteLink();
+                const quoteData = await saveQuoteForPortalSharing();
+                const previewUrl = getQuoteAdminPreviewUrl(quoteData);
 
                 if (saveStatus) saveStatus.innerHTML = '<span style="color:green;"><i class="fas fa-check"></i> Quote saved!</span>';
                 hideQuoteGenerationProgress();
 
-                // Show the link modal
+                // Show portal-only sharing options. The portal action performs
+                // assignment before it prepares, copies, opens, or emails a URL.
                 let modal = document.getElementById('interactiveLinkModal');
                 if (!modal) {
                     document.body.insertAdjacentHTML('beforeend', `
                         <div class="modal fade" id="interactiveLinkModal" tabindex="-1">
                             <div class="modal-dialog">
                                 <div class="modal-content">
-                                    <div class="modal-header bg-success text-white">
-                                        <h5 class="modal-title"><i class="fas fa-check-circle"></i> Quote Ready!</h5>
+                                    <div class="modal-header bg-primary text-white">
+                                        <h5 class="modal-title"><i class="fas fa-folder-tree me-1"></i> Share through Client Portal</h5>
                                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                                     </div>
                                     <div class="modal-body">
-                                        <p class="text-muted small mb-2">Share this link with your client:</p>
-                                        <div class="input-group mb-3">
-                                            <input type="text" id="interactiveLinkInput" class="form-control" readonly>
-                                            <button class="btn btn-outline-secondary" onclick="copyInteractiveLink()" title="Copy to clipboard">
-                                                <i class="fas fa-copy"></i> Copy
-                                            </button>
+                                        <div class="alert alert-light border small mb-3">
+                                            QuoteDr will add this document to the client portal you choose. Clients receive the portal link, while the quote remains available inside that portal.
                                         </div>
-                                        <!-- Email to client -->
+                                        <div class="input-group mb-3">
+                                            <span class="input-group-text"><i class="fas fa-shield-halved"></i></span>
+                                            <input type="text" id="quotePortalLinkInput" class="form-control" value="Choose a client portal to prepare its link" readonly aria-label="Client portal link">
+                                        </div>
                                         <div style="border:1px solid #dee2e6; border-radius:8px; padding:14px; background:#f8f9fa; margin-bottom:12px;">
-                                            <div class="fw-bold small mb-2"><i class="fas fa-envelope me-1" style="color:#1a56a0;"></i>Email directly to client</div>
+                                            <div class="fw-bold small mb-2"><i class="fas fa-envelope me-1" style="color:#1a56a0;"></i>Email client portal link</div>
                                             <input type="email" id="sendQuoteEmail" class="form-control form-control-sm mb-2" placeholder="Client email address">
                                             <textarea id="sendQuoteMessage" class="form-control form-control-sm mb-2" rows="2" placeholder="Optional personal message (e.g. Great chatting with you! Let me know if you have any questions.)"></textarea>
                                             <button class="btn btn-primary btn-sm w-100" onclick="sendQuoteByEmail()" id="sendQuoteEmailBtn">
-                                                <i class="fas fa-paper-plane me-1"></i>Send Quote by Email
+                                                <i class="fas fa-paper-plane me-1"></i>Email Portal Link
                                             </button>
-                                            <div class="form-check mt-2">
-                                                <input class="form-check-input" type="checkbox" id="quoteAddToPortalEmail" checked>
-                                                <label class="form-check-label small" for="quoteAddToPortalEmail">Add to client portal and include portal link in email</label>
-                                            </div>
                                             <div class="row g-2 mt-2">
                                                 <div class="col-sm-6">
-                                                    <button type="button" class="btn btn-outline-secondary btn-sm w-100" onclick="copyInteractiveLink()" id="copyQuoteLinkBtn">
-                                                        <i class="fas fa-link me-1"></i>Copy Quote Link
+                                                    <button type="button" class="btn btn-outline-secondary btn-sm w-100" onclick="shareCurrentQuotePortal('copy')" id="copyQuotePortalLinkBtn">
+                                                        <i class="fas fa-copy me-1"></i>Choose Portal &amp; Copy Link
                                                     </button>
                                                 </div>
                                                 <div class="col-sm-6">
-                                                    <button type="button" class="btn btn-outline-primary btn-sm w-100" onclick="publishCurrentQuoteToPortal()" id="addQuoteToPortalBtn">
-                                                        <i class="fas fa-folder-plus me-1"></i>Add to Portal
+                                                    <button type="button" class="btn btn-outline-primary btn-sm w-100" onclick="shareCurrentQuotePortal('open')" id="openQuotePortalBtn">
+                                                        <i class="fas fa-arrow-up-right-from-square me-1"></i>Choose Portal &amp; Open
                                                     </button>
                                                 </div>
                                             </div>
                                             <div id="sendQuoteEmailResult" class="mt-2 small"></div>
                                         </div>
                                         <a id="openViewerBtn" href="#" class="btn btn-outline-success w-100" onclick="saveSessionQuote(); window.location.href=this.href; return false;">
-                                            <i class="fas fa-external-link-alt me-1"></i>Open Client View
+                                            <i class="fas fa-eye me-1"></i>Contractor Preview
                                         </a>
                                     </div>
                                 </div>
@@ -1383,11 +1380,10 @@
                         </div>
                     `);
                 }
-                document.getElementById('interactiveLinkInput').value = viewerUrl;
-                document.getElementById('openViewerBtn').href = viewerUrl;
-                window._currentQuoteUrl = viewerUrl;
+                document.getElementById('quotePortalLinkInput').value = 'Choose a client portal to prepare its link';
+                document.getElementById('openViewerBtn').href = previewUrl;
+                window._currentQuoteUrl = '';
                 window._currentQuotePortalUrl = '';
-                if (typeof updateQuotePortalButton === 'function') updateQuotePortalButton(!!(window._currentQuoteData && window._currentQuoteData.portal_visible));
                 // Pre-fill client email if available
                 var clientEmail = document.getElementById('clientEmail')?.value.trim();
                 var sendEmailEl = document.getElementById('sendQuoteEmail');
@@ -1479,11 +1475,11 @@
         window.updateQuoteDepositTermControls = updateQuoteDepositTermControls;
         window.buildQuotePaymentTerms = buildQuotePaymentTerms;
 
-        async function createInteractiveQuoteLink() {
+        async function saveQuoteForPortalSharing() {
             _quoteStyle = readQuoteStyleFromControls();
             syncQuoteStyleGlobal();
             if (_quoteStyle.depositMode === 'show' && _quoteStyle.depositKind === 'fixed' && Number(_quoteStyle.depositFixedCents || 0) <= 0) {
-                throw new Error('Enter a fixed deposit amount greater than $0 before creating the client link.');
+                throw new Error('Enter a fixed deposit amount greater than $0 before sharing this document.');
             }
             if (document.getElementById('quoteSaveDefaultStyle')?.checked) {
                 await saveQuoteStyleDefaults(false);
@@ -1515,18 +1511,13 @@
             if (typeof clientSafePaymentSettings === 'function') {
                 quoteData.paymentSettings = clientSafePaymentSettings(quoteData.paymentSettings);
             }
-            if (quoteData.type === 'change_order') {
-                quoteData.status = 'pending_approval';
-                var statusEl = document.getElementById('quoteStatus');
-                if (statusEl) statusEl.value = 'pending_approval';
-            }
             quoteData.style = JSON.parse(JSON.stringify(_quoteStyle));
             quoteData.payment_terms = buildQuotePaymentTerms(_quoteStyle, quoteData);
             quoteData.quoted_total_cents = Math.max(0, Math.round((parseFloat(quoteData.grandTotal || quoteData.total || 0) || 0) * 100));
             quoteData.deposit_due_cents = quoteDepositDueCents(quoteData.quoted_total_cents, quoteData.payment_terms);
             if (window._supabaseQuoteId) quoteData.supabaseId = window._supabaseQuoteId;
 
-            const result = await saveQuoteForSharing(quoteData);
+            const result = await saveQuoteForSharing(quoteData, { markShared: false });
             if (result.error) throw result.error;
 
             const savedRow = Array.isArray(result.data) ? result.data[0] : result.data;
@@ -1540,17 +1531,25 @@
             window._currentQuoteData = quoteData;
             window._loadedQuoteData = Object.assign({}, window._loadedQuoteData || {}, quoteData);
             localStorage.setItem("ald_active_quote_id", window._supabaseQuoteId);
+            return quoteData;
+        }
 
-            const _base = window.location.href.split('?')[0].split('#')[0].replace(/quote-builder(\.html)?\/?$/, '');
-            if (typeof createSecureClientShareLink !== 'function') {
-                throw new Error('Secure client links are not available. Please refresh and try again.');
-            }
-            const share = await createSecureClientShareLink(supabaseId, _base + 'interactive-quote-viewer.html', { mode: 'document' });
-            if (!share || !share.url || share.url.indexOf('token=') < 0) {
-                throw new Error('Could not create the secure client link.');
-            }
-            window._currentQuoteUrl = share.url;
-            return share.url;
+        function getQuoteAdminPreviewUrl(quoteData) {
+            quoteData = quoteData || window._currentQuoteData || {};
+            var documentId = quoteData.supabaseId || window._supabaseQuoteId || '';
+            if (!documentId) throw new Error('Quote must finish saving before previewing it.');
+            var _base = window.location.href.split('?')[0].split('#')[0].replace(/quote-builder(\.html)?\/?$/, '');
+            var previewUrl = new URL(_base + 'interactive-quote-viewer.html');
+            previewUrl.searchParams.set('id', documentId);
+            previewUrl.searchParams.set('preview', '1');
+            previewUrl.searchParams.set('admin_preview', '1');
+            return previewUrl.toString();
+        }
+
+        // Kept as an internal compatibility wrapper for contractor preview code.
+        // It no longer creates or returns a public standalone document token.
+        async function createInteractiveQuoteLink() {
+            return getQuoteAdminPreviewUrl(await saveQuoteForPortalSharing());
         }
 
         async function previewInteractiveQuote() {

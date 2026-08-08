@@ -1756,7 +1756,7 @@ if (location.search.includes('debug')) {
     <script src="typed-signature.js?v=2026080301"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="card-payment-rules.js?v=2026080301"></script>
-    <script src="supabase-v2.js?v=2026080701"></script>
+    <script src="supabase-v2.js?v=2026080801"></script>
     <script src="save-coordinator.js?v=2026080401"></script>
     <script src="change-orders.js?v=1778152100"></script>
 
@@ -2253,7 +2253,8 @@ if (location.search.includes('debug')) {
             const shareToken = params.get('token') || '';
             const portalAnchorId = params.get('portal_anchor') || '';
 
-            // Secure flow: public client links must include ?id=...&token=...
+            // Secure flow: documents opened from the client portal include
+            // ?id=...&token=... plus the portal anchor.
             const supabaseId = quoteId;
             if (supabaseId && shareToken && typeof loadSecureClientDocument === 'function') {
                 const result = await loadSecureClientDocument(supabaseId, shareToken, portalAnchorId);
@@ -2298,7 +2299,7 @@ if (location.search.includes('debug')) {
                         }
                     } catch(e) {}
                 }
-                qdAlert('This quote link is missing its secure access token. Please ask the contractor to resend the quote link.');
+                qdAlert('Open this quote from the client portal, or ask the contractor to resend the portal link.');
                 return;
         }
 
@@ -5560,7 +5561,7 @@ if (location.search.includes('debug')) {
                     };
 
                     if (!shareToken || typeof updateSecureClientDocument !== 'function') {
-                        throw new Error('This quote link is missing its secure access token. Please ask the contractor to resend it.');
+                        throw new Error('Open this quote from the client portal, or ask the contractor to resend the portal link.');
                     }
                     var secureUpdate = await updateSecureClientDocument(quoteId, shareToken, 'client_update', {
                         topLevel: { status: updateData.status, client_name: updateData.client_name, accepted_by: name },

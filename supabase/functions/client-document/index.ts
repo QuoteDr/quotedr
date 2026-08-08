@@ -387,6 +387,31 @@ function portalVisible(row: QuoteRow) {
   return data.portal_visible === true;
 }
 
+function isPortalShareBaseUrl(value: unknown) {
+    const raw = String(value || "").trim();
+    if (!raw) return true;
+    try {
+      const url = new URL(raw);
+      const host = url.hostname.toLowerCase();
+      const isProductionPortal = url.protocol === "https:" &&
+        (host === "quotedr.io" || host === "www.quotedr.io") &&
+        (!url.port || url.port === "443");
+      let supabaseHost = "";
+      try { supabaseHost = new URL(SUPABASE_URL).hostname.toLowerCase(); } catch (_) {}
+      const isLocalSupabase = supabaseHost === "localhost" || supabaseHost === "127.0.0.1";
+      const isLocalPortal = isLocalSupabase &&
+        (host === "localhost" || host === "127.0.0.1") &&
+        (url.protocol === "http:" || url.protocol === "https:");
+      const reservedParams = ["admin", "view", "theme_studio", "id", "token", "p", "portal_anchor"];
+      const hasReservedParam = reservedParams.some((name) => url.searchParams.has(name));
+      return (isProductionPortal || isLocalPortal) &&
+        !hasReservedParam &&
+        /^\/client-portal(?:\.html)?\/?$/i.test(url.pathname);
+    } catch (_) {
+      return false;
+    }
+}
+
 function samePortalGroup(anchor: QuoteRow, target: QuoteRow) {
   if (!anchor || !target || anchor.user_id !== target.user_id) return false;
   const anchorPortalId = portalId(anchor);
@@ -401,6 +426,28 @@ function samePortalGroup(anchor: QuoteRow, target: QuoteRow) {
 }
 
 function sanitizeQuoteRow(row: QuoteRow) {
+  const safeData = { ...rowData(row) };
+  [
+    "portal_pin",
+    "portalPin",
+    "share_token",
+    "shareToken",
+    "portal_token",
+    "portalToken",
+    "portal_share_token",
+    "portalShareToken",
+    "portal_share_anchor_id",
+    "portal_share_created_at",
+    "public_share_token",
+    "public_share_token_hash",
+    "publicShareToken",
+    "publicShareTokenHash",
+    "_saveMeta",
+    "_editorInstanceId",
+    "_serverUpdatedAt",
+    "_remoteUpdatePending",
+  ].forEach((key) => delete safeData[key]);
+  if (safeData.businessProfile) safeData.businessProfile = sanitizePublicBusinessProfile(safeData.businessProfile);
   return {
     id: row.id,
     user_id: row.user_id,
@@ -411,7 +458,7 @@ function sanitizeQuoteRow(row: QuoteRow) {
     parent_quote_id: row.parent_quote_id || null,
     change_order_number: row.change_order_number || null,
     total: row.total || 0,
-    data: row.data || {},
+    data: safeData,
     created_at: row.created_at || null,
     updated_at: row.updated_at || null,
   };
@@ -742,18 +789,8 @@ async function fetchQuoteByShareToken(token: string) {
     .limit(1)
     .maybeSingle();
   if (error) throw error;
-  return data as QuoteRow | null;
-}
-
-async function fetchQuoteOwnershipById(id: string) {
-  const supabase = adminClient();
-  const { data, error } = await supabase
-    .from("quotes")
-    .select("id,user_id")
-    .eq("id", id)
-    .maybeSingle();
-  if (error) throw error;
-  return data as Pick<QuoteRow, "id" | "user_id"> | null;
+  const row = data as QuoteRow | null;
+  return row && portalVisible(row) ? row : null;
 }
 
 async function assertTokenAccess(documentId: string, token: string, portalAnchorId?: string) {
@@ -762,7 +799,7 @@ async function assertTokenAccess(documentId: string, token: string, portalAnchor
   if (!target) throw new Error("Document not found");
   const tokenHash = await sha256Hex(token);
 
-  if (target.public_share_token_hash === tokenHash) {
+  if (portalVisible(target) && target.public_share_token_hash === tokenHash) {
     return { target, anchor: target };
   }
 
@@ -771,6 +808,7 @@ async function assertTokenAccess(documentId: string, token: string, portalAnchor
     const anchor = await fetchQuoteById(anchorId);
     if (
       anchor &&
+      portalVisible(anchor) &&
       anchor.public_share_token_hash === tokenHash &&
       samePortalGroup(anchor, target) &&
       (target.id === anchor.id || portalVisible(target))
@@ -792,36 +830,73 @@ async function createLink(req: Request, body: Record<string, unknown>) {
   }
 
   const documentId = normalizeId(body.documentId || body.id);
-  const mode = String(body.mode || "document");
+  const mode = String(body.mode || "portal").trim().toLowerCase();
   if (!documentId) return json({ error: "Missing document id" }, 400);
+  if (mode !== "portal") {
+    return json({
+      error: "Standalone document links are retired. Share this document through its client portal.",
+      code: "portal_required",
+    }, 400);
+  }
 
-  const row = await fetchQuoteOwnershipById(documentId);
+  const row = await fetchQuoteById(documentId);
   if (!row || row.user_id !== access.ownerUserId) return json({ error: "Document not found" }, 404);
+  if (!portalVisible(row)) {
+    return json({
+      error: "Add this document to a client portal before creating its share link.",
+      code: "portal_assignment_required",
+    }, 409);
+  }
 
-  const token = createShareToken(mode === "portal" ? 16 : 32);
+  const baseUrl = String(body.baseUrl || "").trim();
+  if (!isPortalShareBaseUrl(baseUrl)) {
+    return json({
+      error: "Client share links must open the QuoteDr client portal.",
+      code: "portal_url_required",
+    }, 400);
+  }
+
+  const token = createShareToken(16);
   const tokenHash = await sha256Hex(token);
+  const createdAt = new Date().toISOString();
+  const nextData = {
+    ...rowData(row),
+    portal_share_token: token,
+    portal_share_anchor_id: row.id,
+    portal_share_created_at: createdAt,
+  };
   const supabase = adminClient();
-  const { error } = await supabase
+  let updateQuery = supabase
     .from("quotes")
     .update({
+      data: nextData,
       public_share_token_hash: tokenHash,
-      public_share_token_created_at: new Date().toISOString(),
+      public_share_token_created_at: createdAt,
       public_share_token_last4: token.slice(-4),
-      updated_at: new Date().toISOString(),
+      updated_at: createdAt,
     })
     .eq("id", row.id)
     .eq("user_id", access.ownerUserId);
+  if (row.updated_at) updateQuery = updateQuery.eq("updated_at", row.updated_at);
+  const { data: updatedRow, error } = await updateQuery.select("id").maybeSingle();
   if (error) throw error;
+  if (!updatedRow) {
+    return json({
+      error: "The document changed while its portal link was being prepared. Refresh and try again.",
+      code: "document_changed",
+    }, 409);
+  }
 
-  const baseUrl = String(body.baseUrl || "").trim();
   const params = new URLSearchParams({ id: row.id, token });
-  if (mode === "portal") params.set("portal_anchor", row.id);
+  params.set("portal_anchor", row.id);
   const url = baseUrl ? `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}${params.toString()}` : "";
 
   return json({
     id: row.id,
     token,
-    portalAnchorId: mode === "portal" ? row.id : "",
+    mode: "portal",
+    portalAnchorId: row.id,
+    createdAt,
     url,
   });
 }

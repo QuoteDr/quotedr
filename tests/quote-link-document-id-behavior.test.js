@@ -3,11 +3,12 @@ const path = require('path');
 const vm = require('vm');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'quote-style.js'), 'utf8');
-const match = source.match(/async function createInteractiveQuoteLink\(\) \{[\s\S]*?\r?\n        \}\r?\n\r?\n        async function previewInteractiveQuote/);
-if (!match) throw new Error('createInteractiveQuoteLink should exist');
+const match = source.match(/async function saveQuoteForPortalSharing\(\) \{[\s\S]*?\r?\n        \}\r?\n\r?\n        function getQuoteAdminPreviewUrl/);
+if (!match) throw new Error('saveQuoteForPortalSharing should exist');
 
-const functionSource = match[0].replace(/\r?\n\r?\n        async function previewInteractiveQuote$/, '');
-let secureLinkDocumentId = null;
+const functionSource = match[0].replace(/\r?\n\r?\n        function getQuoteAdminPreviewUrl$/, '');
+let secureLinkCalls = 0;
+let saveOptions = null;
 const stored = {};
 const context = {
   window: {
@@ -23,15 +24,15 @@ const context = {
   collectQuoteData: () => ({ quoteNumber: 'Q-100', type: 'quote', rooms: [] }),
   buildQuotePaymentTerms: () => ({ version: 2, deposit_required: true, kind: 'percent', percent: 50 }),
   quoteDepositDueCents: () => 0,
-  saveQuoteForSharing: async () => ({
+  saveQuoteForSharing: async (_quoteData, options) => {
+    saveOptions = options;
+    return ({
     state: 'cloud_saved',
     data: [{ id: 'saved-quote-id', updated_at: '2026-07-15T20:00:00.000Z' }],
     error: null
-  }),
-  createSecureClientShareLink: async (documentId) => {
-    secureLinkDocumentId = documentId;
-    return { url: 'https://quotedr.io/interactive-quote-viewer.html?id=saved-quote-id&token=test' };
+    });
   },
+  createSecureClientShareLink: async () => { secureLinkCalls += 1; throw new Error('standalone token should not be requested'); },
   console,
   JSON,
   Error,
@@ -40,13 +41,12 @@ const context = {
 };
 
 vm.createContext(context);
-vm.runInContext(`var _quoteStyle = {}; ${functionSource}; this.createLink = createInteractiveQuoteLink;`, context);
+vm.runInContext(`var _quoteStyle = {}; ${functionSource}; this.saveForPortal = saveQuoteForPortalSharing;`, context);
 
 (async () => {
-  const url = await context.createLink();
-  if (secureLinkDocumentId !== 'saved-quote-id') {
-    throw new Error('secure link creation should receive the id from an array-shaped save acknowledgement');
-  }
+  const savedQuote = await context.saveForPortal();
+  if (secureLinkCalls !== 0) throw new Error('saving for portal assignment should not mint a standalone token');
+  if (!saveOptions || saveOptions.markShared !== false) throw new Error('preparing the portal picker should preserve draft status');
   if (context.window._supabaseQuoteId !== 'saved-quote-id') {
     throw new Error('the current quote should adopt the saved cloud id');
   }
@@ -56,7 +56,7 @@ vm.runInContext(`var _quoteStyle = {}; ${functionSource}; this.createLink = crea
   if (stored.ald_active_quote_id !== 'saved-quote-id') {
     throw new Error('the active quote id should be persisted locally');
   }
-  if (!url.includes('token=test')) throw new Error('the secure client URL should be returned');
+  if (savedQuote.supabaseId !== 'saved-quote-id') throw new Error('the saved quote should be returned for portal assignment');
   console.log('quote link document id behavior test passed');
 })().catch((error) => {
   console.error(error);

@@ -169,7 +169,7 @@
       id: 'deposits-payments',
       icon: 'fa-credit-card',
       title: 'Deposits and payments can be built in',
-      body: 'Set payment options in Settings, then choose whether quote or invoice links show deposits, full payment, e-transfer, cash, cheque, or card options.',
+      body: 'Set payment options in Settings, then choose whether quotes or invoices inside the client portal show deposits, full payment, e-transfer, cash, cheque, or card options.',
       topicId: 'depositModal',
       helpUrl: 'help.html#invoices-payments',
       videoUrl: 'videos/tutorials/invoice-payments.mp4'

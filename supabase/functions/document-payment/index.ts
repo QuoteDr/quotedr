@@ -116,12 +116,13 @@ async function assertDocumentAccess(admin: any, body: Record<string, any>) {
   const target = await fetchQuote(admin, documentId);
   if (!target) throw new PaymentError("Document not found", 404, "document_not_found");
   const tokenHash = await sha256Hex(token);
-  if (target.public_share_token_hash === tokenHash) return { target, token, portalAnchorId };
+  if (portalVisible(target) && target.public_share_token_hash === tokenHash) return { target, token, portalAnchorId };
 
   if (portalAnchorId && portalAnchorId !== documentId) {
     const anchor = await fetchQuote(admin, portalAnchorId);
     if (
       anchor &&
+      portalVisible(anchor) &&
       anchor.public_share_token_hash === tokenHash &&
       samePortalGroup(anchor, target) &&
       (target.id === anchor.id || portalVisible(target))
