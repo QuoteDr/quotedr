@@ -25,6 +25,14 @@ import {
   sanitizeTemplateRow,
   stripRestrictedWriteFields
 } from '../_shared/account-data-policy.mjs';
+import {
+  accountingExportFilename,
+  accountingSummary,
+  buildAccountingCsv,
+  filterAccountingRows,
+  normalizeAccountingExportDate,
+  normalizeAccountingExportFilters
+} from '../_shared/accounting-export.mjs';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -70,6 +78,15 @@ const quoteColumns = new Set([
   'valid_until', 'subtotal', 'tax_rate', 'tax_amount', 'total', 'status',
   'notes', 'type', 'parent_quote_id', 'change_order_number', 'data'
 ]);
+
+const accountingExportSelect = [
+  'id', 'quote_number', 'client_name', 'client_address', 'client_city',
+  'client_phone', 'client_email', 'quote_date', 'subtotal', 'tax_rate',
+  'tax_amount', 'total', 'status', 'type', 'parent_quote_id',
+  'change_order_number', 'data', 'created_at', 'updated_at'
+].join(',');
+const accountingExportLimit = 500;
+const accountingExportSourceLimit = 2001;
 
 const accountPlanFeatures: Record<string, string[]> = {
   basic: [
@@ -121,6 +138,123 @@ async function listQuotes(req: Request, accountId: unknown, body: Record<string,
   const rows = [];
   for (const row of result.data || []) rows.push(await quoteView(auth, row, canReadPricing, fieldAccess));
   return json({ data: rows });
+}
+
+async function requireAccountingExportOwner(req: Request, accountId: unknown) {
+  const context = await loadAccountContext(req);
+  const requestedAccountId = cleanText(accountId, 80);
+  const ownedAccounts = context.accounts.filter((account: Record<string, unknown>) => {
+    return account.ownerUserId === context.user.id;
+  });
+  if (!requestedAccountId) {
+    if (context.accounts.length > 0 && ownedAccounts.length === 0) {
+      throw new AccountAccessError('Accounting exports are available only to the account owner.', 403, 'owner_required');
+    }
+    return {
+      accountId: ownedAccounts[0] && ownedAccounts[0].accountId || null,
+      ownerUserId: context.user.id,
+      user: context.user
+    };
+  }
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestedAccountId)) {
+    throw new AccountAccessError('Choose an account', 400, 'account_required');
+  }
+  const selected = context.accounts.find((account: Record<string, unknown>) => {
+    return account.accountId === requestedAccountId;
+  }) as Record<string, unknown> | undefined;
+  if (!selected || selected.ownerUserId !== context.user.id) {
+    throw new AccountAccessError('Accounting exports are available only to the account owner.', 403, 'owner_required');
+  }
+  return {
+    accountId: requestedAccountId,
+    ownerUserId: context.user.id,
+    user: context.user
+  };
+}
+
+function accountingExportFilters(body: Record<string, unknown>) {
+  const raw = body.filters && typeof body.filters === 'object'
+    ? body.filters as Record<string, unknown>
+    : {};
+  const rawFrom = cleanText(raw.fromDate, 20);
+  const rawTo = cleanText(raw.toDate, 20);
+  const fromDate = normalizeAccountingExportDate(rawFrom);
+  const toDate = normalizeAccountingExportDate(rawTo);
+  if ((rawFrom && !fromDate) || (rawTo && !toDate)) {
+    throw new AccountAccessError('Use valid accounting export dates.', 400, 'invalid_date');
+  }
+  if (fromDate && toDate && fromDate > toDate) {
+    throw new AccountAccessError('The start date must be on or before the end date.', 400, 'invalid_date_range');
+  }
+  const filters = normalizeAccountingExportFilters({ ...raw, fromDate, toDate });
+  if (!filters.statuses.length) {
+    throw new AccountAccessError('Choose at least one document status.', 400, 'status_required');
+  }
+  return filters;
+}
+
+function accountingExportDocumentIds(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  const ids = [...new Set(value.map((entry) => cleanText(entry, 80)).filter(Boolean))];
+  if (ids.length > accountingExportLimit) {
+    throw new AccountAccessError(`Choose no more than ${accountingExportLimit} documents at once.`, 400, 'too_many_documents');
+  }
+  if (ids.some((id) => !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))) {
+    throw new AccountAccessError('One or more selected documents are invalid.', 400, 'invalid_document');
+  }
+  return ids;
+}
+
+async function accountingExport(req: Request, accountId: unknown, body: Record<string, unknown>) {
+  const owner = await requireAccountingExportOwner(req, accountId);
+  const filters = accountingExportFilters(body);
+  const mode = cleanText(body.mode, 20) === 'csv' ? 'csv' : 'list';
+  const documentIds = accountingExportDocumentIds(body.documentIds);
+  if (mode === 'csv' && documentIds.length === 0) {
+    throw new AccountAccessError('Choose at least one document to export.', 400, 'document_required');
+  }
+
+  let query = serviceClient()
+    .from('quotes')
+    .select(accountingExportSelect)
+    .eq('user_id', owner.ownerUserId)
+    .neq('quote_number', '__ITEMS_BACKUP__');
+  if (filters.fromDate) query = query.gte('quote_date', filters.fromDate);
+  if (filters.toDate) query = query.lte('quote_date', filters.toDate);
+  if (mode === 'csv') query = query.in('id', documentIds);
+
+  const result = await query
+    .order('quote_date', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(mode === 'csv' ? documentIds.length : accountingExportSourceLimit);
+  if (result.error) throw result.error;
+  if (mode === 'csv' && (result.data || []).length !== documentIds.length) {
+    throw new AccountAccessError('One or more selected documents are unavailable.', 404, 'document_unavailable');
+  }
+
+  const eligible = filterAccountingRows(result.data || [], filters);
+  if (mode === 'list') {
+    const selected = eligible.slice(0, accountingExportLimit);
+    return json({
+      data: {
+        documents: selected.map(accountingSummary),
+        truncated: eligible.length > accountingExportLimit || (result.data || []).length >= accountingExportSourceLimit,
+        limit: accountingExportLimit
+      }
+    });
+  }
+  if (eligible.length !== documentIds.length) {
+    throw new AccountAccessError('A selected document no longer matches the export filters.', 409, 'document_filter_changed');
+  }
+  const built = buildAccountingCsv(eligible);
+  return json({
+    data: {
+      csv: built.csv,
+      filename: accountingExportFilename(),
+      documentCount: built.documentCount,
+      lineCount: built.lineCount
+    }
+  });
 }
 
 async function getQuote(req: Request, accountId: unknown, body: Record<string, unknown>) {
@@ -963,6 +1097,7 @@ Deno.serve(async (req) => {
     if (action === 'business.logo') return await getLogo(req, accountId);
     if (action === 'payments.get') return await getPaymentSettings(req, accountId);
     if (action === 'entitlements.get') return await getEntitlements(req, accountId);
+    if (action === 'accounting.export') return await accountingExport(req, accountId, body);
     if (action === 'quotes.list') return await listQuotes(req, accountId, body);
     if (action === 'quotes.get') return await getQuote(req, accountId, body);
     if (action === 'quotes.save') return await saveQuote(req, accountId, body);
