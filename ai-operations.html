@@ -186,6 +186,14 @@
       border-radius: 9px;
       padding: 0.8rem;
     }
+    .brief-preview {
+      background: #f8fafc;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 0.76rem;
+      line-height: 1.45;
+      min-height: 280px;
+      white-space: pre-wrap;
+    }
     .demo-banner { background: #eef2ff; border-color: #c7d2fe; color: #3730a3; }
     @media (max-width: 1199px) { .queue-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     @media (max-width: 767px) {
@@ -379,13 +387,13 @@
           <div class="form-check mt-3" id="actionConfirmationWrap"><input class="form-check-input" type="checkbox" id="actionConfirmation"><label class="form-check-label small" for="actionConfirmation" id="actionConfirmationLabel">I reviewed this action.</label></div>
           <div class="small mt-3" id="actionStatus" role="status"></div>
         </div>
-        <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary" id="actionSubmit">Save</button></div>
+        <div class="modal-footer"><button type="button" class="btn btn-outline-primary d-none" id="actionCopyBrief"><i class="fas fa-copy me-1"></i>Copy brief</button><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button><button type="submit" class="btn btn-primary" id="actionSubmit">Save</button></div>
       </form>
     </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="ai-operations-core.js?v=2026080801"></script>
-  <script src="ai-operations.js?v=2026080801"></script>
+  <script src="ai-operations-core.js?v=2026080802"></script>
+  <script src="ai-operations.js?v=2026080802"></script>
 </body>
 </html>

@@ -203,6 +203,75 @@
     return (hours / 24).toFixed(1) + 'd';
   }
 
+  function humanizeKey(value) {
+    return safeText(value).replace(/_/g, ' ').replace(/\b\w/g, function(letter) { return letter.toUpperCase(); });
+  }
+
+  function buildCoordinatorBrief(input) {
+    input = input || {};
+    var supportCase = input.supportCase || input.case || {};
+    var workItem = input.workItem || {};
+    var subject = safeText(valueOf(supportCase, 'subject')) || 'Untitled support case';
+    var summary = safeText(valueOf(supportCase, 'summary')) || 'No case summary recorded.';
+    var topicKey = safeText(valueOf(supportCase, 'topicKey', 'topic_key')) || 'other';
+    var improvementType = safeText(valueOf(supportCase, 'improvementType', 'improvement_type')) || 'feature';
+    var riskLevel = safeText(valueOf(supportCase, 'riskLevel', 'risk_level')) || 'low';
+    var sensitiveFlags = valueOf(supportCase, 'sensitiveFlags', 'sensitive_flags');
+    if (!Array.isArray(sensitiveFlags)) sensitiveFlags = [];
+    var workaround = safeText(valueOf(supportCase, 'safeWorkaround', 'safe_workaround')) ||
+      'No safe workaround is recorded. Preserve the affected data and route decisions for owner review.';
+    var responseStatus = safeText(valueOf(supportCase, 'immediateResponseStatus', 'immediate_response_status')) || 'not recorded';
+    var responseDraft = safeText(valueOf(supportCase, 'immediateResponseDraft', 'immediate_response_draft')) || 'No customer response is recorded.';
+    var productImpact = safeText(input.productImpact || valueOf(supportCase, 'productImpact', 'product_impact')) || summary;
+    var proposedSolution = safeText(valueOf(workItem, 'proposedSolution', 'proposed_solution')) ||
+      safeText(valueOf(supportCase, 'possibleSolution', 'possible_solution')) || 'No proposed solution recorded.';
+    var evidenceNotes = safeText(input.evidenceNotes) || 'No additional evidence, links, or notes provided.';
+    var requestedOutcome = safeText(input.requestedEngineeringOutcome || input.requestedOutcome) ||
+      'Investigate the report, implement the smallest compatible improvement, and return focused test and local UI verification evidence.';
+    var flags = sensitiveFlags.map(function(flag) { return SENSITIVE_FLAGS[flag] || humanizeKey(flag); });
+
+    return [
+      '# QuoteDr engineering coordinator brief',
+      '',
+      'Handoff mode: Manual coordinator handoff only. No live coordinator integration or agent launch is performed.',
+      'Case: ' + caseReference(supportCase) + ' - ' + subject,
+      '',
+      '## Case summary',
+      summary,
+      '',
+      '## Classification',
+      '- Topic: ' + (TOPICS[topicKey] || humanizeKey(topicKey)),
+      '- Improvement type: ' + ((IMPROVEMENTS[improvementType] && IMPROVEMENTS[improvementType].label) || humanizeKey(improvementType)),
+      '- Risk level: ' + humanizeKey(riskLevel),
+      '- Escalation flags: ' + (flags.length ? flags.join(', ') : 'None recorded'),
+      '',
+      '## Current customer-safe response',
+      '- Response status: ' + humanizeKey(responseStatus),
+      '- Safe workaround: ' + workaround,
+      '- Current reviewed/draft response: ' + responseDraft,
+      '',
+      '## Product impact',
+      productImpact,
+      '',
+      '## Proposed solution',
+      proposedSolution,
+      '',
+      '## Evidence, links, or notes',
+      evidenceNotes,
+      '',
+      '## Requested engineering outcome',
+      requestedOutcome,
+      '',
+      '## Safety and approval boundaries',
+      '- This handoff prepares and records a reviewable task brief; it does not contact Codex or launch an agent.',
+      '- Do not push, merge, or deploy without explicit owner authorization and the existing deployment approval workflow.',
+      '- Do not state that a fix is live until verification and a deployed release are recorded and owner-approved wording is used.',
+      '- Do not send customer messages or grant goodwill credits from this handoff.',
+      '- Preserve customer data and keep sensitive billing, payment, data, privacy, access, signature, conflict, and incident matters under human review.',
+      '- Customer email is intentionally omitted from this engineering brief.'
+    ].join('\n');
+  }
+
   function createDemoOverview(nowValue) {
     var now = toDate(nowValue) || new Date();
     function ago(hours) { return new Date(now.getTime() - hours * 3600000).toISOString(); }
@@ -221,6 +290,22 @@
       { id: 'work-5', caseId: 'case-5', title: 'Guard unsupported connected-account checkout', status: 'verified', automaticallyCreated: true, verificationSummary: 'Focused checkout tests and local invoice flow passed.', verifiedAt: ago(3), createdAt: ago(120), updatedAt: ago(3) },
       { id: 'work-6', caseId: 'case-6', title: 'Refresh dashboard status after viewer navigation', status: 'verified', automaticallyCreated: true, verificationSummary: 'Navigation fixture and dashboard refresh checks passed.', verifiedAt: ago(28), createdAt: ago(192), updatedAt: ago(28) }
     ];
+    workItems.forEach(function(item) {
+      item.coordinatorHandoffStatus = 'not_sent';
+      item.coordinatorHandoffCount = 0;
+      item.coordinatorBrief = '';
+    });
+    workItems[1].coordinatorHandoffStatus = 'handed_off';
+    workItems[1].coordinatorHandoffAt = ago(1.5);
+    workItems[1].coordinatorHandoffByEmail = 'local-demo@quotedr.test';
+    workItems[1].coordinatorHandoffCount = 1;
+    workItems[1].coordinatorBrief = buildCoordinatorBrief({
+      supportCase: cases[1],
+      workItem: workItems[1],
+      productImpact: 'Duplicate imports can corrupt a contractor\'s saved-item catalog and make later quote pricing unreliable.',
+      evidenceNotes: 'Customer report notes a reconnect immediately before the duplicate import. Compare QuickBooks IDs and import-run behavior.',
+      requestedEngineeringOutcome: 'Reproduce the reconnect path, add an idempotency guard, and return focused import tests plus a safe cleanup recommendation.'
+    });
     var deployApprovals = [
       { id: 'deploy-5', workItemId: 'work-5', status: 'pending', requestedAt: ago(3), createdAt: ago(3), updatedAt: ago(3) },
       { id: 'deploy-6', workItemId: 'work-6', status: 'approved', requestedAt: ago(28), decisionAt: ago(24), deployedAt: ago(20), releaseReference: 'release-2026.08.07', createdAt: ago(28), updatedAt: ago(20) }
@@ -255,6 +340,7 @@
     containsLiveFixClaim: containsLiveFixClaim,
     containsReleaseDatePromise: containsReleaseDatePromise,
     buildImmediateResponseDraft: buildImmediateResponseDraft,
+    buildCoordinatorBrief: buildCoordinatorBrief,
     deriveQueues: deriveQueues,
     calculateMetrics: calculateMetrics,
     caseReference: caseReference,

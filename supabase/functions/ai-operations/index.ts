@@ -2,7 +2,8 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 
 // This endpoint records and gates human decisions. It intentionally has no
-// email, deployment, billing, Stripe, or account-credit integration.
+// email, Codex/coordinator transport, agent-launch, deployment, merge, billing,
+// Stripe, or account-credit integration.
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -45,6 +46,46 @@ const SENSITIVE_FLAGS = new Set([
   'billing', 'payments', 'data_loss', 'privacy', 'access',
   'legal_signature', 'cross_device', 'broad_incident',
 ]);
+const TOPIC_LABELS: Record<string, string> = {
+  ai_voice_to_quote: 'AI Voice to Quote',
+  choice_groups: 'Choice Groups',
+  invoices_payments: 'Invoices & Payments',
+  quotes_approvals: 'Quotes, Sending & Approvals',
+  quote_builder: 'Quote Builder',
+  saved_items_pricing: 'Saved Items & Pricing',
+  client_portal: 'Client Portal',
+  clients_contacts: 'Clients & Contacts',
+  dashboard_sync: 'Dashboard & Sync',
+  templates: 'Templates',
+  ai_quote_copilot: 'AI Quote Copilot',
+  smart_import: 'Smart Import',
+  floor_plan_scanner: 'Floor Plan Scanner',
+  quickbooks: 'QuickBooks',
+  job_tracking_expenses: 'Job Tracking & Expenses',
+  change_orders: 'Change Orders',
+  photos_media: 'Photos & Files',
+  notifications_followups: 'Notifications & Follow-ups',
+  account_plan: 'Account & Plan',
+  assistant_help: 'AI Assistant & Help',
+  support_feedback: 'Feedback & Missing Features',
+  other: 'Other',
+};
+const IMPROVEMENT_LABELS: Record<string, string> = {
+  documentation: 'Documentation improvement',
+  ux: 'UX improvement',
+  bug: 'Bug fix',
+  feature: 'Feature',
+};
+const SENSITIVE_FLAG_LABELS: Record<string, string> = {
+  billing: 'Billing',
+  payments: 'Payments',
+  data_loss: 'Data loss',
+  privacy: 'Privacy',
+  access: 'Access',
+  legal_signature: 'Legal / signature',
+  cross_device: 'Cross-device conflict',
+  broad_incident: 'Broad incident',
+};
 const CREDIT_TYPES = new Set(['free_pro_month', 'account_credit', 'other']);
 const MAX_BODY_BYTES = 64 * 1024;
 
@@ -184,6 +225,115 @@ function buildImmediateResponse(customerName: string, safeWorkaround: string) {
   return `Hi ${name}, I’m sorry you hit this. Please pause any retries or edits to the affected record and keep the current data in place while I review it. I’m routing this for owner review now. I don’t have a release date to promise, and I’ll follow up with the safest verified next step.`;
 }
 
+function humanizeKey(value: unknown) {
+  return String(value ?? '').trim().replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function supportCaseReference(supportCase: any) {
+  const caseNumber = Number(supportCase?.case_number);
+  return Number.isFinite(caseNumber) && caseNumber > 0
+    ? `QD-AI-${String(caseNumber).padStart(4, '0')}`
+    : 'QD-AI';
+}
+
+function buildCoordinatorBriefRecord(
+  supportCase: any,
+  workItem: any,
+  productImpact: string,
+  evidenceNotes: string,
+  requestedEngineeringOutcome: string,
+) {
+  const sensitiveFlags = Array.isArray(supportCase.sensitive_flags) ? supportCase.sensitive_flags : [];
+  const flagLabels = sensitiveFlags.map((flag: string) => SENSITIVE_FLAG_LABELS[flag] || humanizeKey(flag));
+  const workaround = String(supportCase.safe_workaround || '').trim() ||
+    'No safe workaround is recorded. Preserve the affected data and route decisions for owner review.';
+  const responseDraft = String(supportCase.immediate_response_draft || '').trim() || 'No customer response is recorded.';
+  const proposedSolution = String(workItem.proposed_solution || supportCase.possible_solution || '').trim() ||
+    'No proposed solution recorded.';
+  const evidence = evidenceNotes || 'No additional evidence, links, or notes provided.';
+  const payload: JsonMap = {
+    schema_version: 1,
+    handoff_mode: 'manual_coordinator_handoff',
+    case: {
+      reference: supportCaseReference(supportCase),
+      subject: supportCase.subject,
+      summary: supportCase.summary,
+      customer_email_included: false,
+    },
+    classification: {
+      topic_key: supportCase.topic_key,
+      topic_label: TOPIC_LABELS[supportCase.topic_key] || humanizeKey(supportCase.topic_key),
+      improvement_type: supportCase.improvement_type,
+      improvement_label: IMPROVEMENT_LABELS[supportCase.improvement_type] || humanizeKey(supportCase.improvement_type),
+      risk_level: supportCase.risk_level,
+      escalation_flags: sensitiveFlags,
+      escalation_flag_labels: flagLabels,
+    },
+    current_customer_response: {
+      status: supportCase.immediate_response_status,
+      safe_workaround: workaround,
+      response_text: responseDraft,
+      sent_by_dashboard: false,
+    },
+    product_impact: productImpact,
+    proposed_solution: proposedSolution,
+    evidence_links_or_notes: evidence,
+    requested_engineering_outcome: requestedEngineeringOutcome,
+    safety_boundaries: {
+      live_coordinator_integration: false,
+      agent_launch_available: false,
+      deployment_available: false,
+      merge_available: false,
+      customer_messaging_available: false,
+      credit_grant_available: false,
+      owner_approval_still_required_for: ['deployment', 'fix_live_statement', 'customer_followup', 'goodwill_credit'],
+    },
+  };
+
+  const brief = [
+    '# QuoteDr engineering coordinator brief',
+    '',
+    'Handoff mode: Manual coordinator handoff only. No live coordinator integration or agent launch is performed.',
+    `Case: ${supportCaseReference(supportCase)} - ${supportCase.subject}`,
+    '',
+    '## Case summary',
+    String(supportCase.summary || 'No case summary recorded.'),
+    '',
+    '## Classification',
+    `- Topic: ${TOPIC_LABELS[supportCase.topic_key] || humanizeKey(supportCase.topic_key)}`,
+    `- Improvement type: ${IMPROVEMENT_LABELS[supportCase.improvement_type] || humanizeKey(supportCase.improvement_type)}`,
+    `- Risk level: ${humanizeKey(supportCase.risk_level || 'low')}`,
+    `- Escalation flags: ${flagLabels.length ? flagLabels.join(', ') : 'None recorded'}`,
+    '',
+    '## Current customer-safe response',
+    `- Response status: ${humanizeKey(supportCase.immediate_response_status || 'not recorded')}`,
+    `- Safe workaround: ${workaround}`,
+    `- Current reviewed/draft response: ${responseDraft}`,
+    '',
+    '## Product impact',
+    productImpact,
+    '',
+    '## Proposed solution',
+    proposedSolution,
+    '',
+    '## Evidence, links, or notes',
+    evidence,
+    '',
+    '## Requested engineering outcome',
+    requestedEngineeringOutcome,
+    '',
+    '## Safety and approval boundaries',
+    '- This handoff prepares and records a reviewable task brief; it does not contact Codex or launch an agent.',
+    '- Do not push, merge, or deploy without explicit owner authorization and the existing deployment approval workflow.',
+    '- Do not state that a fix is live until verification and a deployed release are recorded and owner-approved wording is used.',
+    '- Do not send customer messages or grant goodwill credits from this handoff.',
+    '- Preserve customer data and keep sensitive billing, payment, data, privacy, access, signature, conflict, and incident matters under human review.',
+    '- Customer email is intentionally omitted from this engineering brief.',
+  ].join('\n');
+
+  return { brief, payload };
+}
+
 function camelize(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(camelize);
   if (!value || typeof value !== 'object' || value instanceof Date) return value;
@@ -309,9 +459,12 @@ async function loadOverview(req: Request) {
     role: { email: actor.email, owner: OWNER_EMAILS.has(actor.email) },
     policy: {
       no_autosend: true,
+      live_coordinator_integration_available: false,
+      agent_launch_available: false,
       deployment_execution_available: false,
+      merge_execution_available: false,
       credit_grant_available: false,
-      owner_approval_required_for: ['deployment', 'fix_live_statement', 'goodwill_credit'],
+      owner_approval_required_for: ['deployment', 'fix_live_statement', 'customer_followup', 'goodwill_credit'],
     },
     metrics: buildMetrics(cases, workItems, approvals, followups),
     cases,
@@ -434,6 +587,67 @@ async function startEngineering(req: Request, body: JsonMap) {
   await client.from('ai_support_cases').update({ workflow_stage: 'engineering', updated_by: actor.id }).eq('id', workItem.case_id);
   await recordEvent(client, actor, workItem.case_id, 'engineering_started', {}, workItemId);
   return jsonResponse(camelize({ success: true, work_item: updated }) as JsonMap);
+}
+
+async function handoffEngineering(req: Request, body: JsonMap) {
+  const actor = await verifyCoordinator(req);
+  if (body.humanReviewed !== true) {
+    throw new OperationError('Human review confirmation is required before recording a coordinator handoff');
+  }
+  const client = adminClient();
+  const workItemId = uuid(body.workItemId, 'work item id');
+  const productImpact = requiredText(body.productImpact, 10000, 'Product impact');
+  const evidenceNotes = safeText(body.evidenceNotes, 10000, 'Evidence, links, or notes');
+  const requestedEngineeringOutcome = requiredText(
+    body.requestedEngineeringOutcome,
+    10000,
+    'Requested engineering outcome',
+  );
+  const workItem = await findWorkItem(client, workItemId);
+  if (workItem.status === 'cancelled') {
+    throw new OperationError('A cancelled engineering item cannot be handed off', 409);
+  }
+  const supportCase = await findCase(client, workItem.case_id);
+  const handoff = buildCoordinatorBriefRecord(
+    supportCase,
+    workItem,
+    productImpact,
+    evidenceNotes,
+    requestedEngineeringOutcome,
+  );
+  const previousCount = Number(workItem.coordinator_handoff_count || 0);
+  const now = new Date().toISOString();
+  const update = await client.from('ai_engineering_work_items').update({
+    coordinator_handoff_status: 'handed_off',
+    coordinator_handoff_at: now,
+    coordinator_handoff_by: actor.id,
+    coordinator_handoff_by_email: actor.email,
+    coordinator_handoff_count: previousCount + 1,
+    coordinator_brief: handoff.brief,
+    coordinator_brief_payload: handoff.payload,
+    updated_by: actor.id,
+  }).eq('id', workItemId)
+    .eq('coordinator_handoff_count', previousCount)
+    .select('*')
+    .maybeSingle();
+  if (update.error) {
+    console.error('Recording coordinator handoff', update.error);
+    throw new OperationError('Recording coordinator handoff failed', 500);
+  }
+  if (!update.data) throw new OperationError('The engineering item changed; review the latest state and try again', 409);
+
+  return jsonResponse(camelize({
+    success: true,
+    work_item: update.data,
+    coordinator_brief: handoff.brief,
+    coordinator_handoff_recorded: true,
+    external_delivery_performed: false,
+    agent_launched: false,
+    deployment_performed: false,
+    merge_performed: false,
+    customer_message_sent: false,
+    credit_granted: false,
+  }) as JsonMap);
 }
 
 async function submitVerification(req: Request, body: JsonMap) {
@@ -802,6 +1016,7 @@ Deno.serve(async (req) => {
     if (action === 'create_case') return await createCase(req, body);
     if (action === 'record_immediate_response') return await recordImmediateResponse(req, body);
     if (action === 'start_engineering') return await startEngineering(req, body);
+    if (action === 'handoff_engineering') return await handoffEngineering(req, body);
     if (action === 'submit_verification') return await submitVerification(req, body);
     if (action === 'verify_work_item') return await verifyWorkItem(req, body);
     if (action === 'decide_deployment') return await decideDeployment(req, body);
