@@ -528,6 +528,7 @@ if (location.search.includes('debug')) {
 						<a href="#" id="adminControlsTabLink" data-settings-tab="admin-controls" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('admin-controls',this);return false;"><i class="fas fa-sliders me-2" style="color:#1a56a0"></i>Admin Controls</a>
 						<a href="#" id="saveIncidentsTabLink" data-settings-tab="save-incidents" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('save-incidents',this);return false;"><i class="fas fa-shield-halved me-2" style="color:#dc3545"></i>Save Incidents <span id="saveIncidentsNavBadge" class="badge bg-danger ms-1" style="display:none;">0</span></a>
 						<a href="#" id="chatbotFeedbackTabLink" data-settings-tab="chatbot-feedback" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('chatbot-feedback',this);return false;"><i class="fas fa-robot me-2" style="color:#7c3aed"></i>AI Chatbot <span id="chatbotFeedbackNavBadge" class="badge bg-danger ms-1" style="display:none;" aria-label="AI Chatbot topics needing attention">0</span></a>
+						<a href="ai-operations.html" id="aiOperationsDashboardLink" class="list-group-item list-group-item-action fw-semibold"><i class="fas fa-diagram-project me-2" style="color:#e87e2a"></i>AI Operations</a>
 					</div>
 				</div>
 			</div>
@@ -2986,7 +2987,7 @@ Sarah Jones, 905-555-5678"></textarea>
 				var isAdmin = isQuoteDrAdminUser(user);
 				var adminGroup = document.getElementById('adminSettingsGroup');
 				if (adminGroup) adminGroup.style.display = isAdmin ? '' : 'none';
-				['analyticsBriefTabLink', 'siteTrafficTabLink', 'userMessagesTabLink', 'adminControlsTabLink', 'saveIncidentsTabLink', 'chatbotFeedbackTabLink'].forEach(function(id) {
+				['analyticsBriefTabLink', 'siteTrafficTabLink', 'userMessagesTabLink', 'adminControlsTabLink', 'saveIncidentsTabLink', 'chatbotFeedbackTabLink', 'aiOperationsDashboardLink'].forEach(function(id) {
 					var tabLink = document.getElementById(id);
 					if (tabLink) tabLink.style.display = isAdmin ? '' : 'none';
 				});

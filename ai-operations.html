@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#1a2940">
+  <title>QuoteDr - AI Operations</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="brand-theme.css?v=2026071302">
+  <script src="admin-access.js?v=2026071301"></script>
+  <script src="recording-privacy.js?v=2026071301"></script>
+  <style>
+    :root {
+      --ops-navy: #102f50;
+      --ops-blue: #1a56a0;
+      --ops-ink: #17283e;
+      --ops-muted: #66778a;
+      --ops-border: #d7e2ef;
+      --ops-bg: #eef4fb;
+      --ops-orange: #e87e2a;
+      --ops-purple: #7c3aed;
+    }
+    body {
+      background: var(--ops-bg);
+      color: var(--ops-ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      min-height: 100vh;
+    }
+    .ops-navbar {
+      min-height: 64px;
+      background: #f8fbff;
+      border-bottom: 1px solid var(--ops-border);
+    }
+    .ops-shell { max-width: 1560px; }
+    .page-title {
+      color: var(--ops-navy);
+      font-size: clamp(1.65rem, 3vw, 2.35rem);
+      font-weight: 800;
+      letter-spacing: -0.025em;
+    }
+    .eyebrow {
+      color: var(--ops-blue);
+      font-size: 0.74rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .ops-card {
+      background: #fff;
+      border: 1px solid var(--ops-border);
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(16, 47, 80, 0.055);
+    }
+    .safety-banner {
+      background: linear-gradient(135deg, #fff9ef, #fff);
+      border: 1px solid #f2d5a8;
+      border-left: 5px solid var(--ops-orange);
+      border-radius: 10px;
+    }
+    .gate-pill {
+      align-items: center;
+      background: #fff;
+      border: 1px solid #ead7b8;
+      border-radius: 999px;
+      color: #704414;
+      display: inline-flex;
+      font-size: 0.76rem;
+      font-weight: 700;
+      gap: 0.35rem;
+      padding: 0.28rem 0.65rem;
+    }
+    .metric-card { min-height: 112px; }
+    .metric-label {
+      color: var(--ops-muted);
+      font-size: 0.74rem;
+      font-weight: 800;
+      letter-spacing: 0.045em;
+      text-transform: uppercase;
+    }
+    .metric-value {
+      color: var(--ops-navy);
+      font-size: clamp(1.55rem, 3vw, 2.1rem);
+      font-weight: 800;
+      line-height: 1;
+    }
+    .metric-note { color: var(--ops-muted); font-size: 0.78rem; }
+    .queue-grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    .queue-column {
+      background: rgba(255,255,255,0.68);
+      border: 1px solid var(--ops-border);
+      border-radius: 12px;
+      min-height: 340px;
+      padding: 0.85rem;
+    }
+    .queue-heading { color: var(--ops-navy); font-size: 0.92rem; font-weight: 800; }
+    .queue-subtitle { color: var(--ops-muted); font-size: 0.72rem; min-height: 32px; }
+    .queue-count {
+      align-items: center;
+      background: #eaf2fb;
+      border-radius: 999px;
+      color: var(--ops-blue);
+      display: inline-flex;
+      font-size: 0.74rem;
+      font-weight: 800;
+      height: 26px;
+      justify-content: center;
+      min-width: 26px;
+      padding: 0 0.45rem;
+    }
+    .queue-list { display: grid; gap: 0.65rem; }
+    .queue-item {
+      background: #fff;
+      border: 1px solid #dce6f1;
+      border-radius: 9px;
+      cursor: pointer;
+      padding: 0.75rem;
+      text-align: left;
+      transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+      width: 100%;
+    }
+    .queue-item:hover, .queue-item:focus-visible {
+      border-color: #8eb5dd;
+      box-shadow: 0 7px 18px rgba(16, 47, 80, 0.09);
+      outline: none;
+      transform: translateY(-1px);
+    }
+    .queue-item-title { color: var(--ops-ink); font-size: 0.86rem; font-weight: 750; line-height: 1.25; }
+    .queue-item-meta { color: var(--ops-muted); font-size: 0.72rem; }
+    .empty-queue {
+      border: 1px dashed #c8d8e8;
+      border-radius: 9px;
+      color: var(--ops-muted);
+      font-size: 0.78rem;
+      padding: 1.35rem 0.75rem;
+      text-align: center;
+    }
+    .tag {
+      border: 1px solid transparent;
+      border-radius: 999px;
+      display: inline-flex;
+      font-size: 0.68rem;
+      font-weight: 800;
+      line-height: 1;
+      padding: 0.28rem 0.48rem;
+    }
+    .tag-docs { background: #e9f3ff; border-color: #c9ddf7; color: #174b82; }
+    .tag-ux { background: #f1ebff; border-color: #d9c8ff; color: #6430b4; }
+    .tag-bug { background: #fff0f0; border-color: #f2c9c9; color: #9f2626; }
+    .tag-feature { background: #e9f7ef; border-color: #c6e7d3; color: #17643a; }
+    .tag-risk { background: #fff5e7; border-color: #f3d2a5; color: #89500c; }
+    .feed-item { border-bottom: 1px solid #e7edf4; padding: 0.9rem 0; }
+    .feed-item:last-child { border-bottom: 0; }
+    .topic-row { display: grid; gap: 0.65rem; grid-template-columns: minmax(150px, 1.4fr) 3fr 36px; align-items: center; }
+    .topic-name { color: #33465b; font-size: 0.78rem; font-weight: 700; }
+    .topic-track { background: #edf3f8; border-radius: 999px; height: 8px; overflow: hidden; }
+    .topic-fill { background: linear-gradient(90deg, var(--ops-blue), #4f8bca); border-radius: inherit; height: 100%; }
+    .topic-count { color: var(--ops-muted); font-size: 0.76rem; font-weight: 800; text-align: right; }
+    .workflow-rail { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0.35rem; }
+    .workflow-step {
+      background: #edf2f7;
+      border-radius: 7px;
+      color: #748395;
+      font-size: 0.62rem;
+      font-weight: 800;
+      min-height: 42px;
+      padding: 0.45rem 0.25rem;
+      text-align: center;
+    }
+    .workflow-step.done { background: #dff2e8; color: #17643a; }
+    .workflow-step.current { background: #e6f0fb; box-shadow: inset 0 0 0 2px #76a7d7; color: #174b82; }
+    .detail-label { color: var(--ops-muted); font-size: 0.7rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+    .policy-list { display: grid; gap: 0.65rem; }
+    .policy-row { align-items: flex-start; display: flex; font-size: 0.8rem; gap: 0.6rem; }
+    .policy-row i { color: #198754; margin-top: 0.1rem; }
+    .access-gate { max-width: 580px; margin: 12vh auto; }
+    .offcanvas.ops-detail { width: min(620px, 100vw); }
+    .action-card {
+      background: #f7faff;
+      border: 1px solid #dbe6f2;
+      border-radius: 9px;
+      padding: 0.8rem;
+    }
+    .demo-banner { background: #eef2ff; border-color: #c7d2fe; color: #3730a3; }
+    @media (max-width: 1199px) { .queue-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 767px) {
+      .queue-grid { grid-template-columns: 1fr; }
+      .queue-column { min-height: auto; }
+      .workflow-rail { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .topic-row { grid-template-columns: minmax(120px, 1.4fr) 2fr 26px; }
+    }
+  </style>
+  <script>
+    if (location.search.includes('debug')) {
+      var debugScript = document.createElement('script');
+      debugScript.src = 'https://cdn.jsdelivr.net/npm/eruda';
+      debugScript.onload = function() { eruda.init(); };
+      document.head.appendChild(debugScript);
+    }
+  </script>
+  <script src="error-reporter.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-v2.js?v=2026080701"></script>
+  <script src="analytics.js?v=1778059000"></script>
+</head>
+<body>
+  <nav class="navbar ops-navbar px-3 px-md-4 py-2">
+    <div class="d-flex align-items-center gap-2">
+      <a href="settings.html?tab=chatbot-feedback" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>Settings</a>
+      <a href="dashboard.html" class="btn btn-link btn-sm text-decoration-none d-none d-sm-inline-flex">Dashboard</a>
+    </div>
+    <div class="position-absolute start-50 translate-middle-x fw-bold" style="color:#0f3460;">QuoteDr AI Operations</div>
+    <div class="d-flex align-items-center gap-2">
+      <span class="badge text-bg-light border d-none d-md-inline" id="roleBadge">Checking access</span>
+    </div>
+  </nav>
+
+  <div class="container access-gate" id="accessGate">
+    <div class="ops-card p-5 text-center">
+      <div class="spinner-border text-primary mb-3" role="status"><span class="visually-hidden">Loading</span></div>
+      <h1 class="h5 fw-bold">Opening AI Operations</h1>
+      <p class="text-muted small mb-0" id="accessGateMessage">Confirming administrator access and loading support queues.</p>
+    </div>
+  </div>
+
+  <main class="container-fluid ops-shell py-4 px-3 px-lg-4 d-none" id="operationsApp">
+    <div class="alert demo-banner d-none align-items-center justify-content-between gap-3" id="demoBanner" role="status">
+      <div><i class="fas fa-flask me-2"></i><strong>Local demo data.</strong> Nothing here is connected to Supabase or a customer account.</div>
+      <span class="badge bg-white text-primary border">Local simulation</span>
+    </div>
+
+    <header class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+      <div>
+        <div class="eyebrow mb-1">Support → verified improvement</div>
+        <h1 class="page-title mb-1">AI Operations Dashboard</h1>
+        <p class="text-muted mb-0">Give customers a safe answer now, then carry verified improvements through engineering and owner-controlled release gates.</p>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <button type="button" class="btn btn-outline-primary" id="refreshButton"><i class="fas fa-rotate me-1"></i>Refresh</button>
+        <button type="button" class="btn btn-primary" id="newCaseButton"><i class="fas fa-plus me-1"></i>New support case</button>
+      </div>
+    </header>
+
+    <section class="safety-banner p-3 p-md-4 mb-4" aria-labelledby="safetyHeading">
+      <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
+        <div style="max-width:760px;">
+          <h2 class="h6 fw-bold mb-1" id="safetyHeading"><i class="fas fa-shield-halved me-2 text-warning"></i>Human review stays in control</h2>
+          <p class="small mb-0 text-secondary">This dashboard prepares work and records evidence. It never sends a customer message, deploys code, or grants a credit.</p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          <span class="gate-pill"><i class="fas fa-user-check"></i>Owner approves deploy</span>
+          <span class="gate-pill"><i class="fas fa-user-check"></i>Owner approves “live”</span>
+          <span class="gate-pill"><i class="fas fa-user-check"></i>Owner approves credit</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="row g-3 mb-4" aria-label="Operational metrics">
+      <div class="col-6 col-xl"><div class="ops-card metric-card p-3"><div class="metric-label">Open cases</div><div class="metric-value mt-2" id="metricOpenCases">—</div><div class="metric-note mt-2" id="metricOpenNote">Across all stages</div></div></div>
+      <div class="col-6 col-xl"><div class="ops-card metric-card p-3"><div class="metric-label">Incoming</div><div class="metric-value mt-2" id="metricIncoming">—</div><div class="metric-note mt-2">Need a safe first response</div></div></div>
+      <div class="col-6 col-xl"><div class="ops-card metric-card p-3"><div class="metric-label">Avg first response</div><div class="metric-value mt-2" id="metricFirstResponse">—</div><div class="metric-note mt-2">Created to human-recorded response</div></div></div>
+      <div class="col-6 col-xl"><div class="ops-card metric-card p-3"><div class="metric-label">Bug → deploy</div><div class="metric-value mt-2" id="metricBugDeploy">—</div><div class="metric-note mt-2">Only verified recorded releases</div></div></div>
+      <div class="col-12 col-xl"><div class="ops-card metric-card p-3"><div class="metric-label">Owner gates waiting</div><div class="metric-value mt-2" id="metricOwnerGates">—</div><div class="metric-note mt-2">Deploy, live follow-up, or credit</div></div></div>
+    </section>
+
+    <section class="ops-card p-3 p-lg-4 mb-4" aria-labelledby="queuesHeading">
+      <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
+        <div><div class="eyebrow">Queues</div><h2 class="h5 fw-bold mb-0" id="queuesHeading">What needs attention now</h2></div>
+        <div class="small text-muted" id="lastUpdated">Not loaded yet</div>
+      </div>
+      <div class="queue-grid">
+        <section class="queue-column" aria-labelledby="incomingHeading">
+          <div class="d-flex justify-content-between gap-2 mb-1"><h3 class="queue-heading mb-0" id="incomingHeading"><i class="fas fa-inbox me-1 text-primary"></i>Incoming cases</h3><span class="queue-count" id="incomingCount">0</span></div>
+          <div class="queue-subtitle mb-3">Safe response and triage needed</div>
+          <div class="queue-list" id="incomingQueue"></div>
+        </section>
+        <section class="queue-column" aria-labelledby="engineeringHeading">
+          <div class="d-flex justify-content-between gap-2 mb-1"><h3 class="queue-heading mb-0" id="engineeringHeading"><i class="fas fa-code-branch me-1" style="color:#7c3aed"></i>Engineering</h3><span class="queue-count" id="engineeringCount">0</span></div>
+          <div class="queue-subtitle mb-3">Queued, implementing, or verifying</div>
+          <div class="queue-list" id="engineeringQueue"></div>
+        </section>
+        <section class="queue-column" aria-labelledby="deployHeading">
+          <div class="d-flex justify-content-between gap-2 mb-1"><h3 class="queue-heading mb-0" id="deployHeading"><i class="fas fa-shield-halved me-1 text-warning"></i>Deploy approval</h3><span class="queue-count" id="deployCount">0</span></div>
+          <div class="queue-subtitle mb-3">Verified work awaiting owner decision or release record</div>
+          <div class="queue-list" id="deployQueue"></div>
+        </section>
+        <section class="queue-column" aria-labelledby="followupHeading">
+          <div class="d-flex justify-content-between gap-2 mb-1"><h3 class="queue-heading mb-0" id="followupHeading"><i class="fas fa-reply me-1 text-success"></i>Customer follow-up</h3><span class="queue-count" id="followupCount">0</span></div>
+          <div class="queue-subtitle mb-3">Waiting on release, owner review, or manual send</div>
+          <div class="queue-list" id="followupQueue"></div>
+        </section>
+      </div>
+    </section>
+
+    <div class="row g-4">
+      <section class="col-lg-7" aria-labelledby="feedHeading">
+        <div class="ops-card p-3 p-lg-4 h-100">
+          <div class="eyebrow">Improvement feed</div>
+          <h2 class="h5 fw-bold mb-1" id="feedHeading">Feedback becoming product work</h2>
+          <p class="small text-muted mb-3">Every case is classified as documentation, UX, bug, or feature work.</p>
+          <div id="improvementFeed"></div>
+        </div>
+      </section>
+      <section class="col-lg-5" aria-labelledby="topicsHeading">
+        <div class="ops-card p-3 p-lg-4 mb-4">
+          <div class="eyebrow">Demand signal</div>
+          <h2 class="h5 fw-bold mb-1" id="topicsHeading">Common support topics</h2>
+          <p class="small text-muted mb-3">Based on recorded support cases, not raw chatbot text.</p>
+          <div class="d-grid gap-2" id="commonTopics"></div>
+        </div>
+        <div class="ops-card p-3 p-lg-4">
+          <div class="eyebrow">Boundaries</div>
+          <h2 class="h5 fw-bold mb-3">What the dashboard cannot do</h2>
+          <div class="policy-list">
+            <div class="policy-row"><i class="fas fa-circle-check"></i><span>No customer-facing autosend. Sensitive billing, payment, data, privacy, access, signature, conflict, and incident cases stay human-reviewed.</span></div>
+            <div class="policy-row"><i class="fas fa-circle-check"></i><span>Approval records do not execute deployments. A release reference and verification evidence must be recorded separately.</span></div>
+            <div class="policy-row"><i class="fas fa-circle-check"></i><span>Goodwill can be recommended and approved here, but granting it remains an external owner action.</span></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <div class="offcanvas offcanvas-end ops-detail" tabindex="-1" id="caseDetail" aria-labelledby="caseDetailTitle">
+    <div class="offcanvas-header border-bottom">
+      <div><div class="eyebrow" id="caseDetailReference">Support case</div><h2 class="offcanvas-title h5 fw-bold" id="caseDetailTitle">Case details</h2></div>
+      <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body" id="caseDetailBody"></div>
+  </div>
+
+  <div class="modal fade" id="newCaseModal" tabindex="-1" aria-labelledby="newCaseModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <form class="modal-content" id="newCaseForm">
+        <div class="modal-header">
+          <div><div class="eyebrow">Support intake</div><h2 class="modal-title h5 fw-bold" id="newCaseModalTitle">New customer case</h2></div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-light border small"><i class="fas fa-wand-magic-sparkles me-2 text-primary"></i>A safe response draft will be prepared for human review. It will not be sent.</div>
+          <div class="row g-3">
+            <div class="col-md-4"><label class="form-label fw-semibold" for="caseSource">Source</label><select class="form-select" id="caseSource" name="source"><option value="email">Email</option><option value="in_app">In-app</option><option value="chatbot">Chatbot signal</option><option value="phone">Phone</option><option value="other">Other</option></select></div>
+            <div class="col-md-4"><label class="form-label fw-semibold" for="customerName">Customer name</label><input class="form-control" id="customerName" name="customerName" maxlength="160" autocomplete="off"></div>
+            <div class="col-md-4"><label class="form-label fw-semibold" for="customerEmail">Customer email</label><input type="email" class="form-control" id="customerEmail" name="customerEmail" maxlength="320" autocomplete="off"></div>
+            <div class="col-12"><label class="form-label fw-semibold" for="caseSubject">Subject</label><input class="form-control" id="caseSubject" name="subject" maxlength="240" required></div>
+            <div class="col-12"><label class="form-label fw-semibold" for="caseSummary">What happened?</label><textarea class="form-control" id="caseSummary" name="summary" rows="3" maxlength="5000" required></textarea></div>
+            <div class="col-md-6"><label class="form-label fw-semibold" for="caseTopic">Support topic</label><select class="form-select" id="caseTopic" name="topicKey" required></select></div>
+            <div class="col-md-6"><label class="form-label fw-semibold" for="improvementType">Improvement type</label><select class="form-select" id="improvementType" name="improvementType" required><option value="documentation">Documentation improvement</option><option value="ux">UX improvement</option><option value="bug">Bug fix</option><option value="feature">Feature</option></select></div>
+            <div class="col-12"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="likelyBug" name="isLikelyBug"><label class="form-check-label fw-semibold" for="likelyBug">Likely product bug</label></div><div class="form-text">If a possible solution is also entered, an engineering work item is created automatically.</div></div>
+            <div class="col-12"><label class="form-label fw-semibold" for="possibleSolution">Possible solution <span class="text-muted fw-normal">(internal)</span></label><textarea class="form-control" id="possibleSolution" name="possibleSolution" rows="2" maxlength="5000"></textarea></div>
+            <div class="col-12"><label class="form-label fw-semibold" for="safeWorkaround">Safe current workaround</label><textarea class="form-control" id="safeWorkaround" name="safeWorkaround" rows="2" maxlength="5000"></textarea><div class="form-text">Leave blank if no safe workaround exists. The case will be routed for owner review with data-preservation guidance.</div></div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Sensitive matter flags</label>
+              <div class="row g-2" id="sensitiveFlagOptions"></div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <div class="small text-muted me-auto" id="newCaseStatus"></div>
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="createCaseSubmit"><i class="fas fa-inbox me-1"></i>Create intake</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal fade" id="actionModal" tabindex="-1" aria-labelledby="actionModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable">
+      <form class="modal-content" id="actionForm">
+        <div class="modal-header"><div><div class="eyebrow" id="actionModalEyebrow">Human action</div><h2 class="modal-title h5 fw-bold" id="actionModalTitle">Update workflow</h2></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body">
+          <div class="alert alert-light border small" id="actionModalHelp"></div>
+          <div class="d-grid gap-3" id="actionFields"></div>
+          <div class="form-check mt-3" id="actionConfirmationWrap"><input class="form-check-input" type="checkbox" id="actionConfirmation"><label class="form-check-label small" for="actionConfirmation" id="actionConfirmationLabel">I reviewed this action.</label></div>
+          <div class="small mt-3" id="actionStatus" role="status"></div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary" id="actionSubmit">Save</button></div>
+      </form>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="ai-operations-core.js?v=2026080801"></script>
+  <script src="ai-operations.js?v=2026080801"></script>
+</body>
+</html>

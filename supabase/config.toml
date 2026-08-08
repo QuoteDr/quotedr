@@ -68,5 +68,8 @@ verify_jwt = true
 [functions.chatbot-feedback]
 verify_jwt = true
 
+[functions.ai-operations]
+verify_jwt = true
+
 [functions.team-account]
 verify_jwt = true
