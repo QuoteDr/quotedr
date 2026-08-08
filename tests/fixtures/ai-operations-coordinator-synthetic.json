@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "syntheticTest": true,
+  "dashboardIntake": {
+    "source": "other",
+    "customerName": "",
+    "customerEmail": "",
+    "subject": "[SYNTHETIC COORDINATOR TEST] Harmless local fixture review",
+    "summary": "Exercise the coordinator inbox lifecycle with a non-executing test-only artifact.",
+    "topicKey": "support_feedback",
+    "improvementType": "bug",
+    "riskLevel": "low",
+    "sensitiveFlags": [],
+    "isLikelyBug": true,
+    "possibleSolution": "Add one clearly labeled test-only assertion or documentation fixture in an isolated local worktree.",
+    "safeWorkaround": "No workaround is needed because this is a synthetic test and no production behavior is affected."
+  },
+  "coordinatorRequest": {
+    "id": "00000000-0000-4000-8000-000000000101",
+    "case_id": "00000000-0000-4000-8000-000000000102",
+    "work_item_id": "00000000-0000-4000-8000-000000000103",
+    "handoff_revision": 1,
+    "state": "queued",
+    "task_brief": "# Synthetic coordinator test\n\nReview a harmless test-only fixture. Do not access customer data, launch an agent, push, merge, deploy, send a customer message, or grant credit.",
+    "task_payload": {
+      "schema_version": 2,
+      "case": {
+        "reference": "QD-AI-TEST-0001",
+        "subject": "[SYNTHETIC COORDINATOR TEST] Harmless local fixture review",
+        "summary": "Exercise only the coordinator lifecycle with a non-executing test artifact.",
+        "customer_name_included": false,
+        "customer_email_included": false
+      },
+      "classification": {
+        "topic_key": "support_feedback",
+        "topic_label": "Feedback & Missing Features",
+        "improvement_type": "bug",
+        "improvement_label": "Bug fix",
+        "risk_level": "low",
+        "escalation_flags": []
+      },
+      "privacy": {
+        "privacy_minimized": true,
+        "customer_name_included": false,
+        "customer_email_included": false,
+        "secure_links_or_tokens_included": false,
+        "redaction_applied": false
+      },
+      "coordinator_inbox": {
+        "owner_confirmed": true,
+        "state_on_submission": "queued",
+        "external_delivery_performed": false,
+        "trusted_local_coordinator_connected": false
+      },
+      "safety_boundaries": {
+        "live_codex_desktop_connection": false,
+        "agent_launch_available": false,
+        "deployment_available": false,
+        "merge_available": false,
+        "customer_messaging_available": false,
+        "credit_grant_available": false
+      }
+    },
+    "advisory_assessment": {
+      "advisory_only": true,
+      "confidence_not_authorization": true,
+      "human_review_first": false
+    },
+    "owner_confirmed": true,
+    "privacy_minimized": true,
+    "queued_at": "2026-08-08T20:00:00.000Z",
+    "available_at": "2026-08-08T20:00:00.000Z",
+    "attempt_count": 0,
+    "retry_count": 0,
+    "updated_at": "2026-08-08T20:00:00.000Z"
+  }
+}

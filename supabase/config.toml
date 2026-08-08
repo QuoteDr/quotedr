@@ -71,5 +71,8 @@ verify_jwt = true
 [functions.ai-operations]
 verify_jwt = true
 
+[functions.ai-operations-coordinator]
+verify_jwt = false
+
 [functions.team-account]
 verify_jwt = true
