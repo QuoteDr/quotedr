@@ -96,7 +96,12 @@
     var approvalByWork = new Map((overview.deployApprovals || []).map(function(item) { return [item.workItemId, item]; }));
     var followupByCase = new Map((overview.followups || []).map(function(item) { return [item.caseId, item]; }));
     var goodwillByCase = new Map((overview.goodwillRecommendations || []).map(function(item) { return [item.caseId, item]; }));
-    return { cases: cases, workItems: workItems, workByCase: workByCase, approvalByWork: approvalByWork, followupByCase: followupByCase, goodwillByCase: goodwillByCase };
+    var inboxByWork = new Map();
+    (overview.coordinatorInbox || []).forEach(function(item) {
+      var current = inboxByWork.get(item.workItemId);
+      if (!current || Number(item.handoffRevision || 0) > Number(current.handoffRevision || 0)) inboxByWork.set(item.workItemId, item);
+    });
+    return { cases: cases, workItems: workItems, workByCase: workByCase, approvalByWork: approvalByWork, followupByCase: followupByCase, goodwillByCase: goodwillByCase, inboxByWork: inboxByWork };
   }
 
   async function callOperations(action, payload) {
@@ -217,11 +222,42 @@
     }).join('');
   }
 
+  function confidenceBadge(value, suffix) {
+    var confidence = String(value || 'low').toLowerCase();
+    return '<span class="confidence-badge confidence-' + escapeHtml(confidence) + '">' + escapeHtml(humanize(confidence)) + (suffix ? ' ' + escapeHtml(suffix) : '') + '</span>';
+  }
+
+  function renderCoordinatorInbox() {
+    var maps = caseMaps();
+    var inbox = (state.overview.coordinatorInbox || []).slice().sort(function(a, b) {
+      return new Date(b.queuedAt || b.createdAt || 0) - new Date(a.queuedAt || a.createdAt || 0);
+    });
+    byId('coordinatorInboxCount').textContent = inbox.filter(function(item) { return ['queued', 'claimed', 'retry_required'].indexOf(item.state) !== -1; }).length;
+    byId('coordinatorInbox').innerHTML = inbox.length ? inbox.slice(0, 12).map(function(item) {
+      var workItem = maps.workItems.get(item.workItemId);
+      var supportCase = maps.cases.get(item.caseId || workItem && workItem.caseId);
+      var assessment = item.advisoryAssessment || {};
+      var recommendation = assessment.recommendation || {};
+      var errorCopy = item.state === 'retry_required' && item.lastErrorMessage
+        ? '<div class="small text-warning-emphasis mt-2"><i class="fas fa-triangle-exclamation me-1"></i>' + escapeHtml(item.lastErrorMessage) + '</div>'
+        : '';
+      return '<button type="button" class="coordinator-inbox-item" data-open-case="' + escapeHtml(supportCase && supportCase.id || item.caseId) + '">' +
+        '<div class="d-flex justify-content-between align-items-start gap-2 mb-2"><span class="queue-item-meta fw-bold">' + escapeHtml(supportCase ? core.caseReference(supportCase) : 'Engineering request') + ' · revision ' + escapeHtml(item.handoffRevision || 1) + '</span><span class="tag inbox-state inbox-state-' + escapeHtml(item.state) + '">' + escapeHtml(humanize(item.state)) + '</span></div>' +
+        '<div class="queue-item-title">' + escapeHtml(supportCase && supportCase.subject || workItem && workItem.title || 'Coordinator request') + '</div>' +
+        '<div class="d-flex flex-wrap gap-1 mt-2">' + confidenceBadge((assessment.classification || {}).confidence, 'classification') + confidenceBadge(recommendation.confidence, 'next step') + '</div>' +
+        '<div class="small text-muted mt-2">' + escapeHtml(recommendation.label || 'Review the stored engineering request') + '</div>' +
+        errorCopy +
+        '<div class="queue-item-meta mt-2"><i class="fas fa-lock me-1"></i>Owner confirmed · privacy minimized · ' + escapeHtml(relativeTime(item.queuedAt || item.createdAt)) + '</div>' +
+      '</button>';
+    }).join('') : '<div class="empty-queue" style="grid-column:1/-1"><i class="fas fa-inbox d-block mb-2 text-primary"></i>No owner-confirmed engineering request is queued yet.</div>';
+  }
+
   function renderAll() {
     if (!state.overview) return;
     if (!state.overview.metrics) state.overview.metrics = core.calculateMetrics(state.overview);
     renderMetrics(state.overview.metrics);
     renderQueues();
+    renderCoordinatorInbox();
     renderImprovementFeed();
     renderTopics(state.overview.metrics);
     byId('lastUpdated').textContent = 'Updated ' + formatDate(state.overview.generatedAt || new Date().toISOString());
@@ -255,15 +291,18 @@
     return '<button type="button" class="btn ' + (style || 'btn-outline-primary') + ' btn-sm" data-workflow-action="' + escapeHtml(action) + '"><i class="fas ' + icon + ' me-1"></i>' + escapeHtml(label) + '</button>';
   }
 
-  function renderActions(supportCase, workItem, approval, followup, goodwill) {
+  function renderActions(supportCase, workItem, approval, followup, goodwill, coordinatorRequest) {
     var role = state.overview.role || { owner: state.demo };
     var buttons = [];
+    var ownerOnlyNotice = '';
     if (!supportCase.firstResponseAt) buttons.push(actionButton('record_immediate_response', 'Record reviewed response', 'fa-comment-dots', 'btn-primary'));
-    if (workItem && workItem.status !== 'cancelled') {
-      var handoffLabel = workItem.coordinatorHandoffStatus === 'handed_off'
-        ? 'Send updated brief to engineering coordinator'
+    if (workItem && workItem.status !== 'cancelled' && role.owner) {
+      var handoffLabel = coordinatorRequest
+        ? 'Queue reviewed brief revision'
         : 'Send to engineering coordinator';
       buttons.push(actionButton('handoff_engineering', handoffLabel, 'fa-share-from-square', 'btn-primary'));
+    } else if (workItem && workItem.status !== 'cancelled' && !role.owner) {
+      ownerOnlyNotice = '<div class="small text-muted mt-2"><i class="fas fa-lock me-1"></i>Only an owner can submit or revise a coordinator inbox request.</div>';
     }
     if (workItem && ['queued', 'blocked'].indexOf(workItem.status) !== -1) buttons.push(actionButton('start_engineering', 'Start engineering', 'fa-code-branch'));
     if (workItem && workItem.status === 'in_progress') buttons.push(actionButton('submit_verification', 'Submit for verification', 'fa-flask'));
@@ -285,7 +324,30 @@
       buttons.push(actionButton('decline_goodwill', 'Decline goodwill', 'fa-ban', 'btn-outline-secondary'));
     }
     if (!workItem && supportCase.firstResponseAt && supportCase.workflowStage !== 'closed') buttons.push(actionButton('close_case', 'Close case', 'fa-circle-check'));
-    return buttons.length ? '<div class="d-flex flex-wrap gap-2">' + buttons.join('') + '</div>' : '<div class="small text-muted">No workflow action is available from this state.</div>';
+    return (buttons.length ? '<div class="d-flex flex-wrap gap-2">' + buttons.join('') + '</div>' : '<div class="small text-muted">No workflow action is available from this state.</div>') + ownerOnlyNotice;
+  }
+
+  function rationaleList(items) {
+    return '<ul class="rationale-list">' + (items || []).map(function(item) { return '<li>' + escapeHtml(item) + '</li>'; }).join('') + '</ul>';
+  }
+
+  function assessmentHtml(assessment) {
+    var classification = assessment.classification || {};
+    var recommendation = assessment.recommendation || {};
+    return '<div class="confidence-panel mb-3">' +
+      '<div class="d-flex justify-content-between align-items-start gap-2 mb-2"><div><div class="detail-label">Advisory confidence</div><div class="fw-semibold mt-1">Evidence, not authority</div></div>' + confidenceBadge(classification.confidence, 'classification') + '</div>' +
+      '<div class="small text-muted mb-3">' + escapeHtml(classification.summary || 'Confidence remains advisory and cannot authorize an action.') + '</div>' +
+      (assessment.humanReviewFirst ? '<div class="alert alert-warning py-2 small"><i class="fas fa-user-shield me-2"></i>Human-review-first applies regardless of confidence.</div>' : '') +
+      '<div class="action-card mb-2"><div class="d-flex justify-content-between gap-2"><div class="detail-label">Recommended next step</div>' + confidenceBadge(recommendation.confidence, 'confidence') + '</div><div class="fw-semibold mt-2">' + escapeHtml(recommendation.label || 'Human review required') + '</div><div class="mt-2">' + rationaleList(recommendation.why || []) + '</div></div>' +
+      '<div class="confidence-grid">' +
+        '<div class="action-card"><div class="detail-label mb-2">Issue evidence</div>' + rationaleList(assessment.evidence || []) + '</div>' +
+        '<div class="action-card"><div class="detail-label mb-2">Similar cases / patterns</div>' + rationaleList(assessment.patterns || []) + '</div>' +
+        '<div class="action-card"><div class="detail-label mb-2">Risk and policy gates</div>' + rationaleList((assessment.riskFlags || []).concat(assessment.policyGates || [])) + '</div>' +
+        '<div class="action-card"><div class="detail-label mb-2">Missing information</div>' + rationaleList(assessment.missingInformation || []) + '</div>' +
+      '</div>' +
+      '<div class="action-card mt-2"><div class="detail-label mb-2">Approvals still required</div>' + rationaleList(recommendation.ownerApprovalsStillRequired || []) + '</div>' +
+      '<div class="small text-muted mt-2"><i class="fas fa-circle-info me-1"></i>Goodwill is a recommendation only. No credit action exists in this dashboard.</div>' +
+    '</div>';
   }
 
   function renderCaseDetail(caseId) {
@@ -297,6 +359,8 @@
     var approval = workItem && maps.approvalByWork.get(workItem.id);
     var followup = maps.followupByCase.get(caseId);
     var goodwill = maps.goodwillByCase.get(caseId);
+    var coordinatorRequest = workItem && maps.inboxByWork.get(workItem.id);
+    var assessment = supportCase.advisoryAssessment || core.assessSupportCase({ supportCase: supportCase, workItem: workItem, approval: approval, followup: followup, goodwill: goodwill, coordinatorRequest: coordinatorRequest, overview: state.overview });
     byId('caseDetailReference').textContent = core.caseReference(supportCase) + ' · ' + topicLabel(supportCase.topicKey);
     byId('caseDetailTitle').textContent = supportCase.subject;
     var flags = (supportCase.sensitiveFlags || []).map(function(flag) { return '<span class="tag tag-risk">' + escapeHtml(core.SENSITIVE_FLAGS[flag] || humanize(flag)) + '</span>'; }).join('');
@@ -305,18 +369,33 @@
     var handoffBody = handoffStatus === 'handed_off'
       ? '<div>Recorded ' + escapeHtml(formatDate(workItem.coordinatorHandoffAt)) + ' · brief ' + escapeHtml(String(workItem.coordinatorHandoffCount || 1)) + '</div><div class="text-muted mt-1">Audit event recorded. Manual coordinator handoff only; no agent or external action was launched.</div><button type="button" class="btn btn-outline-primary btn-sm mt-2" data-copy-coordinator-brief><i class="fas fa-copy me-1"></i>Copy latest brief</button>'
       : 'No coordinator handoff is recorded. Use the reviewed brief action to prepare and copy one manually.';
+    var queueHandoffStatus = coordinatorRequest ? coordinatorRequest.state : handoffStatus;
+    var queueError = coordinatorRequest && coordinatorRequest.lastErrorMessage
+      ? '<div class="alert alert-warning small py-2 mt-2 mb-0"><strong>Retry reason:</strong> ' + escapeHtml(coordinatorRequest.lastErrorMessage) + (coordinatorRequest.availableAt ? '<br>Available after ' + escapeHtml(formatDate(coordinatorRequest.availableAt)) : '') + '</div>'
+      : '';
+    var queueHandoffBody = coordinatorRequest
+      ? '<div><strong>Internal queue:</strong> ' + escapeHtml(humanize(coordinatorRequest.state)) + ' · revision ' + escapeHtml(coordinatorRequest.handoffRevision || 1) + '</div><div class="text-muted mt-1">Owner confirmed ' + escapeHtml(formatDate(coordinatorRequest.queuedAt)) + '. Idempotency key: <code>' + escapeHtml(coordinatorRequest.idempotencyKey) + '</code></div>' +
+        (coordinatorRequest.claimedAt ? '<div class="text-muted mt-1">Claimed ' + escapeHtml(formatDate(coordinatorRequest.claimedAt)) + (coordinatorRequest.claimedByEmail ? ' by ' + escapeHtml(coordinatorRequest.claimedByEmail) : '') + '.</div>' : '<div class="text-muted mt-1">No trusted local coordinator has claimed this request.</div>') +
+        queueError +
+        '<div class="small text-muted mt-2">The stored brief is privacy-minimized and immutable for this revision. Queue state changes have append-only audit events.</div>' +
+        '<textarea class="form-control brief-preview mt-2" rows="12" readonly aria-label="Exact privacy-minimized structured task brief">' + escapeHtml(coordinatorRequest.taskBrief || workItem.coordinatorBrief || '') + '</textarea>' +
+        '<button type="button" class="btn btn-outline-primary btn-sm mt-2" data-copy-coordinator-brief><i class="fas fa-copy me-1"></i>Copy exact queued brief</button>'
+      : handoffStatus === 'handed_off'
+        ? '<div>A legacy manual handoff was recorded, but no durable inbox request exists. An owner can review and queue a new privacy-minimized revision.</div>'
+        : 'No internal coordinator request is recorded. Only an owner can review and queue a privacy-minimized engineering brief.';
     var deployBody = approval ? '<div>Requested ' + escapeHtml(formatDate(approval.requestedAt)) + '</div>' + (approval.releaseReference ? '<div class="text-muted mt-1">Release: ' + escapeHtml(approval.releaseReference) + '</div>' : '') : 'Created only after verification evidence is recorded.';
     var followupBody = followup ? (followup.draftBody ? '<div class="text-muted">' + escapeHtml(followup.draftBody) + '</div>' : 'Waiting for verified release evidence before live-fix wording can be prepared.') : 'No release follow-up is required yet.';
     var creditBody = goodwill ? '<div>' + escapeHtml(humanize(goodwill.creditType)) + '</div><div class="text-muted mt-1">' + escapeHtml(goodwill.recommendationReason || '') + '</div>' : 'Optional. Recommendation and owner approval do not grant a credit.';
     byId('caseDetailBody').innerHTML =
       '<div class="d-flex flex-wrap gap-2 mb-3">' + improvementTag(supportCase.improvementType) + (supportCase.riskLevel !== 'low' ? '<span class="tag tag-risk">' + escapeHtml(humanize(supportCase.riskLevel)) + '</span>' : '') + flags + '</div>' +
       '<div class="mb-4">' + workflowHtml(supportCase, workItem, approval, followup) + '</div>' +
+      assessmentHtml(assessment) +
       '<div class="mb-3"><div class="detail-label mb-1">Customer report</div><div>' + escapeHtml(supportCase.summary) + '</div><div class="small text-muted mt-2">' + escapeHtml(supportCase.customerName || 'Customer not named') + (supportCase.customerEmail ? ' · ' + escapeHtml(supportCase.customerEmail) : '') + ' · ' + escapeHtml(humanize(supportCase.source)) + '</div></div>' +
       '<div class="mb-3"><div class="detail-label mb-1">Safe immediate response</div><textarea class="form-control form-control-sm" rows="5" readonly>' + escapeHtml(supportCase.immediateResponseDraft || '') + '</textarea><div class="small text-muted mt-1">Status: ' + escapeHtml(humanize(supportCase.immediateResponseStatus)) + '. Dashboard delivery: never.</div></div>' +
       '<div class="mb-3"><div class="detail-label mb-1">Current workaround</div><div class="action-card small">' + escapeHtml(supportCase.safeWorkaround || 'No safe workaround. Preserve the affected data and route for owner review.') + '</div></div>' +
-      '<div class="d-grid gap-2 mb-4">' + detailStatusCard('Engineering', workItem && workItem.status, workBody) + detailStatusCard('Coordinator handoff', handoffStatus, handoffBody) + detailStatusCard('Deployment', approval && approval.status, deployBody) + detailStatusCard('Customer follow-up', followup && followup.status, followupBody) + detailStatusCard('Goodwill', goodwill && goodwill.status, creditBody) + '</div>' +
-      '<div class="detail-label mb-2">Available human actions</div>' + renderActions(supportCase, workItem, approval, followup, goodwill) +
-      '<div class="alert alert-light border small mt-4 mb-0"><i class="fas fa-lock me-2"></i>No action in this panel sends, deploys, or grants anything automatically.</div>';
+      '<div class="d-grid gap-2 mb-4">' + detailStatusCard('Engineering', workItem && workItem.status, workBody) + detailStatusCard('Coordinator inbox', queueHandoffStatus, queueHandoffBody) + detailStatusCard('Deployment', approval && approval.status, deployBody) + detailStatusCard('Customer follow-up', followup && followup.status, followupBody) + detailStatusCard('Goodwill', goodwill && goodwill.status, creditBody) + '</div>' +
+      '<div class="detail-label mb-2">Available human actions</div>' + renderActions(supportCase, workItem, approval, followup, goodwill, coordinatorRequest) +
+      '<div class="alert alert-light border small mt-4 mb-0"><i class="fas fa-lock me-2"></i>No action in this panel sends, deploys, launches, or grants anything automatically.</div>';
   }
 
   function openCase(caseId) {
@@ -347,12 +426,16 @@
     var approval = workItem && maps.approvalByWork.get(workItem.id);
     var followup = maps.followupByCase.get(state.selectedCaseId);
     var goodwill = maps.goodwillByCase.get(state.selectedCaseId);
+    var coordinatorRequest = workItem && maps.inboxByWork.get(workItem.id);
+    var advisoryAssessment = core.assessSupportCase({ supportCase: supportCase, workItem: workItem, approval: approval, followup: followup, goodwill: goodwill, coordinatorRequest: coordinatorRequest, overview: state.overview });
     var handoffProductImpact = supportCase && (supportCase.productImpact || supportCase.summary) || '';
     var handoffEvidenceNotes = workItem && (workItem.coordinatorNotes || workItem.implementationReference) || '';
     var handoffRequestedOutcome = 'Investigate the report, implement the smallest compatible improvement, and return focused test and local UI verification evidence.';
     var handoffBrief = core.buildCoordinatorBrief({
       supportCase: supportCase,
       workItem: workItem,
+      overview: state.overview,
+      advisoryAssessment: advisoryAssessment,
       productImpact: handoffProductImpact,
       evidenceNotes: handoffEvidenceNotes,
       requestedEngineeringOutcome: handoffRequestedOutcome
@@ -360,7 +443,7 @@
     var definitions = {
       record_immediate_response: { title: 'Record reviewed response', help: 'Confirm the customer was answered outside this dashboard. Live-fix claims and release-date promises are blocked.', confirm: 'I reviewed this response and sent it manually.', submit: 'Record response', fields: [{ name: 'responseText', label: 'Customer response', type: 'textarea', rows: 7, value: supportCase && supportCase.immediateResponseDraft }] },
       start_engineering: { title: 'Start engineering work', help: 'This marks the automatically created work item in progress. It does not modify code.', confirm: 'A coordinator is taking ownership of this work.', submit: 'Start work', fields: [] },
-      handoff_engineering: { title: 'Send to engineering coordinator', help: 'QuoteDr has no live Codex coordinator integration. Review this privacy-minimized brief, record the manual handoff, then copy it to the coordinator yourself. No agent or production action will launch.', confirm: 'I reviewed this exact brief and understand this records a manual coordinator handoff only.', submit: 'Record handoff', fields: [{ name: 'productImpact', label: 'Product impact', type: 'textarea', rows: 3, value: handoffProductImpact }, { name: 'evidenceNotes', label: 'Evidence, links, or internal notes', type: 'textarea', rows: 4, value: handoffEvidenceNotes, required: false, help: 'Do not add passwords, payment details, tokens, or unnecessary customer identifiers.' }, { name: 'requestedEngineeringOutcome', label: 'Requested engineering outcome', type: 'textarea', rows: 4, value: handoffRequestedOutcome }, { name: 'coordinatorBrief', label: 'Reviewable coordinator brief', type: 'preview', rows: 17, value: handoffBrief, help: 'Customer email is intentionally omitted. Copying is manual and does not start an agent.' }] },
+      handoff_engineering: { title: 'Send to engineering coordinator', help: 'Owner confirmation stores one privacy-minimized revision in QuoteDr’s internal coordinator inbox. QuoteDr has no live Codex Desktop connection and does not poll, deliver, or launch an agent.', confirm: 'I am the owner, reviewed this exact privacy-minimized brief, and approve storing it in the internal coordinator inbox. I understand no external action will launch.', submit: coordinatorRequest ? 'Queue reviewed revision' : 'Queue request', fields: [{ name: 'productImpact', label: 'Product impact', type: 'textarea', rows: 3, value: handoffProductImpact }, { name: 'evidenceNotes', label: 'Evidence, links, or internal notes', type: 'textarea', rows: 4, value: handoffEvidenceNotes, required: false, help: 'Customer identifiers, email addresses, secure links, and token-like values are redacted from the stored brief.' }, { name: 'requestedEngineeringOutcome', label: 'Requested engineering outcome', type: 'textarea', rows: 4, value: handoffRequestedOutcome }, { name: 'coordinatorBrief', label: 'Exact privacy-minimized queue brief', type: 'preview', rows: 20, value: handoffBrief, help: 'This exact brief is stored internally after owner confirmation. Copying or queueing it does not start a Codex task.' }] },
       submit_verification: { title: 'Submit for verification', help: 'Record the implementation reference and what the verifier should check.', confirm: 'The implementation is ready for independent verification.', submit: 'Request verification', fields: [{ name: 'implementationReference', label: 'Branch, commit, or worktree reference', type: 'text' }, { name: 'coordinatorNotes', label: 'What changed and what to verify', type: 'textarea', rows: 5 }] },
       verify_work_item: { title: 'Record verification', help: 'Verification requires a summary plus concrete evidence. This creates a pending deployment approval; it never deploys.', confirm: 'I verified this evidence against the implementation.', submit: 'Mark verified', fields: [{ name: 'verificationSummary', label: 'Verification summary', type: 'textarea', rows: 4 }, { name: 'verificationEvidence', label: 'Evidence (one item per line)', type: 'textarea', rows: 5, help: 'Examples: focused test passed, browser flow verified, release artifact inspected.' }] },
       approve_deployment: { title: 'Approve deployment', help: 'This records owner approval only. The dashboard cannot execute a deployment.', confirm: 'I am the owner and approve this verified work for deployment.', submit: 'Record approval', fields: [{ name: 'decisionNote', label: 'Owner decision note', type: 'textarea', rows: 3 }] },
@@ -377,7 +460,7 @@
     };
     var definition = definitions[action];
     if (!definition) return null;
-    definition.context = { supportCase: supportCase, workItem: workItem, approval: approval, followup: followup, goodwill: goodwill };
+    definition.context = { supportCase: supportCase, workItem: workItem, approval: approval, followup: followup, goodwill: goodwill, coordinatorRequest: coordinatorRequest, advisoryAssessment: advisoryAssessment };
     return definition;
   }
 
@@ -390,6 +473,8 @@
     return core.buildCoordinatorBrief({
       supportCase: context.supportCase,
       workItem: context.workItem,
+      overview: state.overview,
+      advisoryAssessment: context.advisoryAssessment,
       productImpact: productImpact && productImpact.value,
       evidenceNotes: evidenceNotes && evidenceNotes.value,
       requestedEngineeringOutcome: requestedOutcome && requestedOutcome.value
@@ -407,7 +492,7 @@
     var definition = actionDefinition(action);
     if (!definition) return;
     state.pendingAction = { action: action, definition: definition };
-    byId('actionModalEyebrow').textContent = /approve|decline|return/.test(action) ? 'Owner gate' : 'Human action';
+    byId('actionModalEyebrow').textContent = /approve|decline|return|handoff_engineering/.test(action) ? 'Owner gate' : 'Human action';
     byId('actionModalTitle').textContent = definition.title;
     byId('actionModalHelp').textContent = definition.help;
     byId('actionFields').innerHTML = definition.fields.map(fieldHtml).join('');
@@ -431,7 +516,7 @@
     var goodwill = context.goodwill;
     if (action === 'record_immediate_response') return { caseId: supportCase.id, responseText: fields.responseText };
     if (action === 'start_engineering') return { workItemId: workItem.id };
-    if (action === 'handoff_engineering') return { workItemId: workItem.id, productImpact: fields.productImpact, evidenceNotes: fields.evidenceNotes, requestedEngineeringOutcome: fields.requestedEngineeringOutcome, humanReviewed: true };
+    if (action === 'handoff_engineering') return { workItemId: workItem.id, productImpact: fields.productImpact, evidenceNotes: fields.evidenceNotes, requestedEngineeringOutcome: fields.requestedEngineeringOutcome, humanReviewed: true, ownerConfirmed: true, privacyReviewed: true };
     if (action === 'submit_verification') return { workItemId: workItem.id, implementationReference: fields.implementationReference, coordinatorNotes: fields.coordinatorNotes };
     if (action === 'verify_work_item') return { workItemId: workItem.id, verificationSummary: fields.verificationSummary, verificationEvidence: String(fields.verificationEvidence || '').split(/\r?\n/).map(function(item) { return item.trim(); }).filter(Boolean) };
     if (action === 'approve_deployment' || action === 'decline_deployment') return { approvalId: approval.id, decision: action === 'approve_deployment' ? 'approve' : 'decline', decisionNote: fields.decisionNote };
@@ -463,15 +548,22 @@
     if (action === 'record_immediate_response') { supportCase.immediateResponseDraft = payload.responseText; supportCase.immediateResponseStatus = 'sent'; supportCase.firstResponseAt = now; supportCase.workflowStage = workItem ? 'engineering' : 'follow_up'; }
     if (action === 'start_engineering') { workItem.status = 'in_progress'; workItem.startedAt = now; supportCase.workflowStage = 'engineering'; }
     if (action === 'handoff_engineering') {
-      var coordinatorBrief = core.buildCoordinatorBrief({ supportCase: supportCase, workItem: workItem, productImpact: payload.productImpact, evidenceNotes: payload.evidenceNotes, requestedEngineeringOutcome: payload.requestedEngineeringOutcome });
+      var handoffRecord = core.buildCoordinatorBriefData({ supportCase: supportCase, workItem: workItem, overview: state.overview, advisoryAssessment: context.advisoryAssessment, productImpact: payload.productImpact, evidenceNotes: payload.evidenceNotes, requestedEngineeringOutcome: payload.requestedEngineeringOutcome });
+      var coordinatorBrief = handoffRecord.brief;
       workItem.coordinatorHandoffStatus = 'handed_off';
       workItem.coordinatorHandoffAt = now;
       workItem.coordinatorHandoffByEmail = 'local-demo@quotedr.test';
       workItem.coordinatorHandoffCount = Number(workItem.coordinatorHandoffCount || 0) + 1;
       workItem.coordinatorBrief = coordinatorBrief;
-      workItem.coordinatorBriefPayload = { productImpact: payload.productImpact, evidenceNotes: payload.evidenceNotes, requestedEngineeringOutcome: payload.requestedEngineeringOutcome };
-      state.overview.events.unshift({ id: 'demo-handoff-event-' + Date.now(), caseId: supportCase.id, workItemId: workItem.id, eventType: 'engineering_coordinator_handoff_recorded', actorEmail: 'local-demo@quotedr.test', details: { handoffCount: workItem.coordinatorHandoffCount, externalDeliveryPerformed: false, agentLaunched: false }, occurredAt: now });
-      result = { coordinatorBrief: coordinatorBrief, coordinatorHandoffRecorded: true, externalDeliveryPerformed: false, agentLaunched: false };
+      workItem.coordinatorBriefPayload = handoffRecord.payload;
+      var inboxId = 'demo-inbox-' + Date.now();
+      var inboxRequest = { id: inboxId, caseId: supportCase.id, workItemId: workItem.id, handoffRevision: workItem.coordinatorHandoffCount, idempotencyKey: 'engineering-handoff:' + workItem.id + ':r' + workItem.coordinatorHandoffCount, state: 'queued', taskBrief: coordinatorBrief, taskPayload: handoffRecord.payload, advisoryAssessment: handoffRecord.advisoryAssessment, ownerConfirmed: true, privacyMinimized: true, submittedByEmail: 'local-demo@quotedr.test', queuedAt: now, availableAt: now, attemptCount: 0, retryCount: 0, createdAt: now, updatedAt: now };
+      if (!state.overview.coordinatorInbox) state.overview.coordinatorInbox = [];
+      if (!state.overview.coordinatorInboxEvents) state.overview.coordinatorInboxEvents = [];
+      state.overview.coordinatorInbox.unshift(inboxRequest);
+      state.overview.coordinatorInboxEvents.unshift({ id: 'demo-inbox-event-' + Date.now(), inboxId: inboxId, caseId: supportCase.id, workItemId: workItem.id, eventType: 'coordinator_inbox_queued', fromState: '', toState: 'queued', actorEmail: 'local-demo@quotedr.test', details: { handoffRevision: workItem.coordinatorHandoffCount, ownerConfirmed: true, privacyMinimized: true, externalDeliveryPerformed: false, agentLaunched: false }, occurredAt: now });
+      state.overview.events.unshift({ id: 'demo-handoff-event-' + Date.now(), caseId: supportCase.id, workItemId: workItem.id, eventType: 'engineering_coordinator_handoff_recorded', actorEmail: 'local-demo@quotedr.test', details: { handoffCount: workItem.coordinatorHandoffCount, coordinatorInboxId: inboxId, externalDeliveryPerformed: false, agentLaunched: false }, occurredAt: now });
+      result = { coordinatorBrief: coordinatorBrief, coordinatorRequest: inboxRequest, coordinatorHandoffRecorded: true, internalQueueRecorded: true, externalDeliveryPerformed: false, agentLaunched: false };
     }
     if (action === 'submit_verification') { workItem.status = 'verification_pending'; workItem.implementationReference = payload.implementationReference; workItem.coordinatorNotes = payload.coordinatorNotes; supportCase.workflowStage = 'verification'; }
     if (action === 'verify_work_item') {
@@ -488,6 +580,7 @@
     if (action === 'approve_goodwill' || action === 'decline_goodwill') { goodwill.status = payload.decision === 'approve' ? 'approved' : 'declined'; goodwill.decisionNote = payload.decisionNote; }
     if (action === 'close_case') { supportCase.workflowStage = 'closed'; supportCase.closedAt = now; }
     supportCase.updatedAt = now;
+    (state.overview.cases || []).forEach(function(item) { item.advisoryAssessment = core.assessSupportCase({ supportCase: item, overview: state.overview }); });
     state.overview.generatedAt = now;
     state.overview.metrics = core.calculateMetrics(state.overview);
     return result;
@@ -535,9 +628,9 @@
         var briefPreview = document.querySelector('[data-coordinator-brief-preview]');
         if (briefPreview) briefPreview.value = recordedBrief;
         byId('actionStatus').className = 'small mt-3 text-success';
-        byId('actionStatus').textContent = 'Coordinator handoff recorded. Copy the reviewed brief and paste it into the coordinator task manually; no agent or external action was launched.';
+        byId('actionStatus').textContent = 'Owner-confirmed request queued internally. No Codex task, agent, delivery, or production action was launched.';
         byId('actionCopyBrief').dataset.recorded = 'true';
-        byId('actionSubmit').textContent = 'Handoff recorded';
+        byId('actionSubmit').textContent = 'Queued internally';
         renderCaseDetail(state.selectedCaseId);
         completedHandoff = true;
         return;
@@ -610,6 +703,7 @@
       state.overview.followups.unshift({ id: 'demo-follow-' + Date.now(), caseId: caseId, workItemId: workId, status: 'waiting_on_release', draftBody: '', claimsFixLive: false, createdAt: now, updatedAt: now });
     }
     state.overview.generatedAt = now;
+    supportCase.advisoryAssessment = core.assessSupportCase({ supportCase: supportCase, overview: state.overview });
     state.overview.metrics = core.calculateMetrics(state.overview);
     return supportCase;
   }
@@ -673,8 +767,8 @@
         await copyText(document.querySelector('[data-coordinator-brief-preview]') && document.querySelector('[data-coordinator-brief-preview]').value);
         byId('actionStatus').className = 'small mt-3 text-success';
         byId('actionStatus').textContent = this.dataset.recorded === 'true'
-          ? 'Recorded brief copied. Paste it into the engineering coordinator task manually.'
-          : 'Draft brief copied. This does not record a handoff; use Record handoff after review.';
+          ? 'Exact queued brief copied. Copying does not contact Codex or start a task.'
+          : 'Draft brief copied. This does not queue a request; use the owner-confirmed queue action after review.';
       } catch (error) {
         byId('actionStatus').className = 'small mt-3 text-danger';
         byId('actionStatus').textContent = error.message || 'Could not copy the coordinator brief.';
@@ -687,8 +781,9 @@
       if (copyBriefButton) {
         var maps = caseMaps();
         var latestWorkItem = maps.workByCase.get(state.selectedCaseId);
+        var latestCoordinatorRequest = latestWorkItem && maps.inboxByWork.get(latestWorkItem.id);
         try {
-          await copyText(latestWorkItem && latestWorkItem.coordinatorBrief);
+          await copyText(latestCoordinatorRequest && latestCoordinatorRequest.taskBrief || latestWorkItem && latestWorkItem.coordinatorBrief);
           copyBriefButton.innerHTML = '<i class="fas fa-check me-1"></i>Brief copied';
         } catch (error) {
           window.alert(error.message || 'Could not copy the coordinator brief.');

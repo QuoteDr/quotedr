@@ -49,6 +49,46 @@ assert(coordinatorBrief.includes('Data loss, Cross-device conflict'), 'coordinat
 assert(coordinatorBrief.includes('No live coordinator integration or agent launch'), 'coordinator brief should disclose the manual handoff boundary');
 assert(coordinatorBrief.includes('Do not push, merge, or deploy'), 'coordinator brief should preserve owner release control');
 assert(!coordinatorBrief.includes('private@example.test'), 'coordinator brief should omit customer email');
+assert(coordinatorBrief.includes('## Advisory confidence and rationale'), 'coordinator brief should include advisory confidence and rationale');
+assert(coordinatorBrief.includes('confidence never bypasses the sensitive-case review gate'), 'sensitive confidence should preserve human review first');
+
+const sensitiveAssessmentOverview = {
+  cases: [{ id: 'sensitive-1', subject: 'Save conflict', summary: 'Two device copies differ.', topicKey: 'dashboard_sync', improvementType: 'bug', riskLevel: 'critical', sensitiveFlags: ['data_loss', 'cross_device'], isLikelyBug: true, possibleSolution: 'Compare two protected backups.', safeWorkaround: '' }],
+  workItems: [{ id: 'work-sensitive-1', caseId: 'sensitive-1', status: 'queued', proposedSolution: 'Compare two protected backups.' }],
+  deployApprovals: [], followups: [], goodwillRecommendations: [], coordinatorInbox: []
+};
+const sensitiveAssessment = core.assessSupportCase({ supportCase: sensitiveAssessmentOverview.cases[0], overview: sensitiveAssessmentOverview });
+assert.strictEqual(sensitiveAssessment.classification.confidence, 'high', 'classification confidence should be an evidence band');
+assert.strictEqual(sensitiveAssessment.humanReviewFirst, true, 'sensitive cases should stay human-review-first regardless of confidence');
+assert.strictEqual(sensitiveAssessment.recommendation.key, 'request_safe_evidence', 'no-workaround cases should prioritize safe evidence and data preservation');
+assert(sensitiveAssessment.policyGates.some(item => item.includes('never permission')), 'confidence should never authorize an automatic action');
+assert(sensitiveAssessment.recommendation.ownerApprovalsStillRequired.some(item => item.includes('Human review first')), 'sensitive recommendation should expose the remaining human gate');
+
+const documentationCase = { id: 'docs-1', subject: 'Help text unclear', summary: 'Secure-link steps were confusing.', topicKey: 'quotes_approvals', improvementType: 'documentation', riskLevel: 'low', sensitiveFlags: [], isLikelyBug: false, safeWorkaround: 'Use the secure-link action.', firstResponseAt: '2026-08-08T12:00:00.000Z' };
+const documentationAssessment = core.assessSupportCase({ supportCase: documentationCase, overview: { cases: [documentationCase], workItems: [], deployApprovals: [], followups: [], goodwillRecommendations: [], coordinatorInbox: [] } });
+assert.strictEqual(documentationAssessment.recommendation.key, 'close_documentation_ux', 'answered documentation cases should close as product-learning improvements');
+
+const privacyRecord = core.buildCoordinatorBriefData({
+  supportCase: {
+    id: 'privacy-1', caseNumber: 1050, customerName: 'Amanda Chen', customerEmail: 'amanda@example.test',
+    subject: 'Amanda Chen shared amanda@example.test', summary: 'Open https://example.test/view?token=secret-token-value and inspect the report.',
+    topicKey: 'dashboard_sync', improvementType: 'bug', riskLevel: 'low', sensitiveFlags: [], isLikelyBug: true,
+    possibleSolution: 'Mask secure values.', safeWorkaround: 'Pause changes.', immediateResponseStatus: 'sent',
+    immediateResponseDraft: 'Hi Amanda, use Bearer abcdefghijklmnopqrstuvwxyz only in the secure tool.', firstResponseAt: '2026-08-08T12:00:00.000Z'
+  },
+  workItem: { id: 'privacy-work-1', caseId: 'privacy-1', status: 'queued', proposedSolution: 'Mask secure values.' },
+  overview: { cases: [], workItems: [], deployApprovals: [], followups: [], goodwillRecommendations: [], coordinatorInbox: [] },
+  productImpact: 'Email amanda@example.test cannot be part of engineering storage.',
+  evidenceNotes: 'Secure evidence: https://example.test/view?signature=abc123',
+  requestedEngineeringOutcome: 'Add safe redaction.'
+});
+['amanda@example.test', 'Amanda Chen', 'secret-token-value', 'abcdefghijklmnopqrstuv'].forEach(privateValue => {
+  assert(!privacyRecord.brief.includes(privateValue), `privacy-minimized brief should omit ${privateValue}`);
+});
+assert(privacyRecord.brief.includes('[redacted secure link]'), 'secure links should be visibly redacted');
+assert.strictEqual(privacyRecord.payload.privacy.customer_email_included, false, 'structured payload should declare customer email omission');
+assert.strictEqual(privacyRecord.payload.privacy.secure_links_or_tokens_included, false, 'structured payload should declare secure-value omission');
+assert.strictEqual(privacyRecord.payload.coordinator_inbox.owner_confirmed, true, 'structured payload should require owner-confirmed inbox submission');
 
 const overview = core.createDemoOverview('2026-08-08T16:00:00.000Z');
 const queues = core.deriveQueues(overview);
@@ -65,6 +105,11 @@ assert.strictEqual(metrics.commonTopics[0].topicKey, 'dashboard_sync', 'common t
 assert.strictEqual(overview.workItems[0].coordinatorHandoffStatus, 'not_sent', 'demo should expose an engineering case ready for handoff testing');
 assert.strictEqual(overview.workItems[1].coordinatorHandoffStatus, 'handed_off', 'demo should show a completed coordinator handoff state');
 assert(overview.workItems[1].coordinatorBrief.includes('QuickBooks import duplicated saved items'), 'demo handoff should retain its structured brief');
+assert.strictEqual(overview.coordinatorInbox.length, 1, 'demo should include a durable internal coordinator request');
+assert.strictEqual(overview.coordinatorInbox[0].state, 'queued', 'demo coordinator request should be safely queued without external delivery');
+assert.strictEqual(overview.coordinatorInbox[0].ownerConfirmed, true, 'demo queue should show owner confirmation');
+assert.strictEqual(overview.coordinatorInbox[0].taskPayload.schema_version, 2, 'demo queue should retain the versioned privacy-minimized structured payload');
+assert.strictEqual(overview.cases[1].advisoryAssessment.recommendation.key, 'wait_for_trusted_coordinator', 'queued demo cases should recommend waiting for the trusted coordinator');
 assert.strictEqual(core.caseReference({ caseNumber: 42 }), 'QD-AI-0042');
 assert.strictEqual(core.formatDurationMinutes(90), '1.5h');
 

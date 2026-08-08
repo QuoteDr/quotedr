@@ -49,6 +49,27 @@
     broad_incident: 'Broad incident'
   });
 
+  var SENSITIVE_TOPIC_KEYS = Object.freeze(['invoices_payments', 'account_plan']);
+
+  var NEXT_STEPS = Object.freeze({
+    answer_safe_workaround: 'Answer with the current safe workaround',
+    request_safe_evidence: 'Request specific safe evidence and preserve customer data',
+    prepare_engineering_brief: 'Prepare an owner-reviewed engineering brief',
+    wait_for_trusted_coordinator: 'Wait for the trusted local coordinator to review the queued request',
+    review_coordinator_retry: 'Review the coordinator retry reason before another claim',
+    request_engineering_evidence: 'Request implementation evidence for verification',
+    wait_for_verification: 'Wait for independent verification evidence',
+    wait_for_owner_deploy_approval: 'Wait for owner deployment approval',
+    wait_for_external_release: 'Wait for a verified external release record',
+    prepare_customer_followup: 'Prepare a release-backed customer follow-up',
+    wait_for_owner_followup_approval: 'Wait for owner approval of customer-facing wording',
+    record_manual_followup: 'Record the owner-approved follow-up after it is sent manually',
+    recommend_goodwill_review: 'Recommend goodwill for owner review',
+    close_documentation_ux: 'Close as a documentation or UX improvement after the safe response',
+    close_feature_improvement: 'Record the feature opportunity and close the support loop',
+    close_support_loop: 'Close the verified support loop'
+  });
+
   function valueOf(record, camelKey, snakeKey) {
     if (!record) return undefined;
     if (Object.prototype.hasOwnProperty.call(record, camelKey)) return record[camelKey];
@@ -207,33 +228,371 @@
     return safeText(value).replace(/_/g, ' ').replace(/\b\w/g, function(letter) { return letter.toUpperCase(); });
   }
 
-  function buildCoordinatorBrief(input) {
+  function escapeRegExp(value) {
+    return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  function privacyMinimizeText(value, supportCase) {
+    var result = safeText(value);
+    var customerName = safeText(valueOf(supportCase || {}, 'customerName', 'customer_name'));
+    var customerEmail = safeText(valueOf(supportCase || {}, 'customerEmail', 'customer_email'));
+    if (customerEmail) result = result.replace(new RegExp(escapeRegExp(customerEmail), 'gi'), '[redacted customer email]');
+    result = result.replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[redacted email]');
+    result = result.replace(/\bhttps?:\/\/[^\s)\]}]+/gi, function(url) {
+      return /[?&](?:token|access_token|signature|sig|key|secret|auth)=/i.test(url)
+        ? '[redacted secure link]'
+        : url;
+    });
+    result = result.replace(/\b(?:bearer\s+[a-z0-9._~-]{16,}|eyj[a-z0-9_-]{20,}|sk-[a-z0-9_-]{16,})\b/gi, '[redacted token]');
+    if (customerName) {
+      result = result.replace(new RegExp('\\b' + escapeRegExp(customerName) + '\\b', 'gi'), '[customer]');
+      var givenName = customerName.split(/\s+/)[0];
+      if (givenName.length >= 3) result = result.replace(new RegExp('\\b' + escapeRegExp(givenName) + '\\b', 'gi'), '[customer]');
+    }
+    return result;
+  }
+
+  function latestFor(items, predicate, revisionKey) {
+    var matches = (Array.isArray(items) ? items : []).filter(predicate);
+    if (!matches.length) return null;
+    return matches.sort(function(a, b) {
+      var revisionDifference = Number(valueOf(b, revisionKey || 'handoffRevision', 'handoff_revision') || 0) - Number(valueOf(a, revisionKey || 'handoffRevision', 'handoff_revision') || 0);
+      if (revisionDifference) return revisionDifference;
+      return new Date(valueOf(b, 'updatedAt', 'updated_at') || valueOf(b, 'queuedAt', 'queued_at') || 0) - new Date(valueOf(a, 'updatedAt', 'updated_at') || valueOf(a, 'queuedAt', 'queued_at') || 0);
+    })[0];
+  }
+
+  function confidenceBand(points) {
+    if (points >= 6) return 'high';
+    if (points >= 4) return 'medium';
+    return 'low';
+  }
+
+  function assessSupportCase(input) {
+    input = input || {};
+    var supportCase = input.supportCase || input.case || {};
+    var overview = input.overview || {};
+    var cases = Array.isArray(overview.cases) ? overview.cases : [];
+    var workItems = Array.isArray(overview.workItems) ? overview.workItems : [];
+    var approvals = Array.isArray(overview.deployApprovals) ? overview.deployApprovals : [];
+    var followups = Array.isArray(overview.followups) ? overview.followups : [];
+    var goodwillItems = Array.isArray(overview.goodwillRecommendations) ? overview.goodwillRecommendations : [];
+    var inbox = Array.isArray(overview.coordinatorInbox) ? overview.coordinatorInbox : [];
+    var caseId = valueOf(supportCase, 'id');
+    var topicKey = safeText(valueOf(supportCase, 'topicKey', 'topic_key')) || 'other';
+    var improvementType = safeText(valueOf(supportCase, 'improvementType', 'improvement_type')) || 'feature';
+    var flags = valueOf(supportCase, 'sensitiveFlags', 'sensitive_flags');
+    if (!Array.isArray(flags)) flags = [];
+    var riskLevel = safeText(valueOf(supportCase, 'riskLevel', 'risk_level')) || 'low';
+    var isLikelyBug = !!valueOf(supportCase, 'isLikelyBug', 'is_likely_bug');
+    var possibleSolution = safeText(valueOf(supportCase, 'possibleSolution', 'possible_solution'));
+    var safeWorkaround = safeText(valueOf(supportCase, 'safeWorkaround', 'safe_workaround'));
+    var workItem = input.workItem || latestFor(workItems, function(item) { return valueOf(item, 'caseId', 'case_id') === caseId; });
+    var approval = input.approval || (workItem && latestFor(approvals, function(item) { return valueOf(item, 'workItemId', 'work_item_id') === valueOf(workItem, 'id'); }));
+    var followup = input.followup || latestFor(followups, function(item) { return valueOf(item, 'caseId', 'case_id') === caseId; });
+    var goodwill = input.goodwill || latestFor(goodwillItems, function(item) { return valueOf(item, 'caseId', 'case_id') === caseId; });
+    var coordinatorRequest = input.coordinatorRequest || (workItem && latestFor(inbox, function(item) { return valueOf(item, 'workItemId', 'work_item_id') === valueOf(workItem, 'id'); }));
+    var sameTopic = cases.filter(function(item) { return valueOf(item, 'id') !== caseId && valueOf(item, 'topicKey', 'topic_key') === topicKey; });
+    var sameClassification = sameTopic.filter(function(item) { return valueOf(item, 'improvementType', 'improvement_type') === improvementType; });
+    var sensitiveTopic = SENSITIVE_TOPIC_KEYS.indexOf(topicKey) !== -1;
+    var humanReviewFirst = flags.length > 0 || riskLevel !== 'low' || sensitiveTopic;
+    var evidence = [];
+    var patterns = [];
+    var missingInformation = [];
+    var policyGates = [];
+    var points = 0;
+
+    if (safeText(valueOf(supportCase, 'subject')) && safeText(valueOf(supportCase, 'summary'))) {
+      points += 1;
+      evidence.push('A subject and customer-impact summary are recorded.');
+    } else {
+      missingInformation.push('A complete issue subject and impact summary.');
+    }
+    if (TOPICS[topicKey]) {
+      points += 1;
+      evidence.push('The report maps to the controlled topic “' + TOPICS[topicKey] + '.”');
+    } else {
+      missingInformation.push('A controlled support topic.');
+    }
+    if (IMPROVEMENTS[improvementType]) {
+      points += 1;
+      evidence.push('The recorded improvement type is “' + IMPROVEMENTS[improvementType].label + '.”');
+    }
+    if ((improvementType === 'bug' && isLikelyBug) || (improvementType !== 'bug' && !isLikelyBug)) {
+      points += 1;
+      evidence.push('The likely-bug flag is consistent with the recorded improvement type.');
+    } else {
+      missingInformation.push('Resolve the mismatch between the likely-bug flag and improvement type.');
+    }
+    if (possibleSolution) {
+      points += 1;
+      evidence.push('A possible solution is recorded for engineering review.');
+    } else if (isLikelyBug) {
+      missingInformation.push('A safe reproduction theory or possible solution.');
+    }
+    if (workItem) {
+      points += 1;
+      evidence.push('An engineering work item exists with status “' + humanizeKey(valueOf(workItem, 'status')) + '.”');
+    } else if (isLikelyBug) {
+      missingInformation.push('An engineering work item linked to this likely bug.');
+    }
+    if (sameTopic.length) {
+      points += 1;
+      patterns.push(sameTopic.length + ' other recorded case' + (sameTopic.length === 1 ? ' shares' : 's share') + ' the “' + (TOPICS[topicKey] || humanizeKey(topicKey)) + '” topic.');
+    }
+    if (sameClassification.length) patterns.push(sameClassification.length + ' of those also share the same improvement type.');
+    if (!patterns.length) patterns.push('No close recorded pattern match is available yet; treat this as a single-case signal.');
+    if (safeWorkaround) evidence.push('A current safe workaround is recorded.');
+    else missingInformation.push('A verified safe workaround; preserve affected data until one is known.');
+
+    var riskLabels = flags.map(function(flag) { return SENSITIVE_FLAGS[flag] || humanizeKey(flag); });
+    if (sensitiveTopic && !riskLabels.length) riskLabels.push((TOPICS[topicKey] || humanizeKey(topicKey)) + ' is a human-review-first topic');
+    if (humanReviewFirst) policyGates.push('Human review comes first regardless of confidence because this case is sensitive or potentially high impact.');
+    policyGates.push('Confidence is advisory evidence, never permission to send, deploy, merge, launch an agent, or grant credit.');
+    policyGates.push('Owner approval remains required for deployment, fix-live wording, customer follow-up, and any goodwill decision.');
+
+    var recommendationKey = 'close_support_loop';
+    var recommendationWhy = [];
+    var recommendationConfidence = 'medium';
+    var firstResponseAt = valueOf(supportCase, 'firstResponseAt', 'first_response_at');
+    var workStatus = safeText(valueOf(workItem, 'status'));
+    var approvalStatus = safeText(valueOf(approval, 'status'));
+    var deployedAt = valueOf(approval, 'deployedAt', 'deployed_at');
+    var followupStatus = safeText(valueOf(followup, 'status'));
+    var requestState = safeText(valueOf(coordinatorRequest, 'state'));
+
+    if (!firstResponseAt) {
+      if (safeWorkaround) {
+        recommendationKey = 'answer_safe_workaround';
+        recommendationConfidence = 'high';
+        recommendationWhy.push('A safe workaround is recorded and no first response has been recorded yet.');
+      } else {
+        recommendationKey = 'request_safe_evidence';
+        recommendationConfidence = humanReviewFirst ? 'high' : 'medium';
+        recommendationWhy.push('No safe workaround is known, so data preservation and a narrow evidence request are safer than troubleshooting guesses.');
+      }
+    } else if (workItem) {
+      if (['queued', 'claimed'].indexOf(requestState) !== -1) {
+        recommendationKey = 'wait_for_trusted_coordinator';
+        recommendationConfidence = 'high';
+        recommendationWhy.push('An owner-confirmed, privacy-minimized request is already in the internal coordinator inbox.');
+      } else if (requestState === 'retry_required') {
+        recommendationKey = 'review_coordinator_retry';
+        recommendationConfidence = 'high';
+        recommendationWhy.push('The internal queue recorded a retry-required state; review its sanitized error before another claim.');
+      } else if (['queued', 'blocked'].indexOf(workStatus) !== -1) {
+        recommendationKey = 'prepare_engineering_brief';
+        recommendationConfidence = possibleSolution ? 'high' : 'medium';
+        recommendationWhy.push('Engineering-worthy work exists but no active internal coordinator request is recorded.');
+      } else if (workStatus === 'in_progress') {
+        recommendationKey = 'request_engineering_evidence';
+        recommendationConfidence = 'medium';
+        recommendationWhy.push('Implementation is in progress; the next safe gate is reviewable implementation and test evidence.');
+      } else if (workStatus === 'verification_pending') {
+        recommendationKey = 'wait_for_verification';
+        recommendationConfidence = 'high';
+        recommendationWhy.push('The work item is explicitly waiting for independent verification.');
+        if (!safeText(valueOf(workItem, 'verificationSummary', 'verification_summary'))) missingInformation.push('Independent verification summary and evidence.');
+      } else if (workStatus === 'verified' && (!approval || approvalStatus === 'pending')) {
+        recommendationKey = 'wait_for_owner_deploy_approval';
+        recommendationConfidence = 'high';
+        recommendationWhy.push('Verification is recorded, but the owner-controlled deployment gate is still pending.');
+      } else if (workStatus === 'verified' && approvalStatus === 'approved' && !deployedAt) {
+        recommendationKey = 'wait_for_external_release';
+        recommendationConfidence = 'high';
+        recommendationWhy.push('Owner approval is recorded, but no externally verified deployment is recorded.');
+      } else if (deployedAt && ['waiting_on_release', 'draft'].indexOf(followupStatus) !== -1) {
+        recommendationKey = 'prepare_customer_followup';
+        recommendationConfidence = 'high';
+        recommendationWhy.push('A verified release record exists, so a release-backed draft can be prepared for owner review.');
+      } else if (followupStatus === 'owner_review') {
+        recommendationKey = 'wait_for_owner_followup_approval';
+        recommendationConfidence = 'high';
+        recommendationWhy.push('Customer-facing wording is prepared but still requires owner approval.');
+      } else if (followupStatus === 'approved') {
+        recommendationKey = 'record_manual_followup';
+        recommendationConfidence = 'high';
+        recommendationWhy.push('Owner wording approval is recorded; the dashboard can only record a send completed elsewhere.');
+      } else if (followupStatus === 'sent' && humanReviewFirst && !goodwill) {
+        recommendationKey = 'recommend_goodwill_review';
+        recommendationConfidence = 'medium';
+        recommendationWhy.push('The customer-impacting loop is complete and the sensitive impact may warrant an owner-only goodwill review.');
+      } else if (workStatus === 'cancelled') {
+        recommendationKey = 'request_safe_evidence';
+        recommendationConfidence = 'low';
+        recommendationWhy.push('Engineering was cancelled, so the report needs new safe evidence before another product recommendation.');
+      } else {
+        recommendationWhy.push('Recorded workflow gates appear complete; confirm the customer has a safe resolution before closing.');
+      }
+    } else if (isLikelyBug) {
+      recommendationKey = possibleSolution ? 'prepare_engineering_brief' : 'request_safe_evidence';
+      recommendationConfidence = possibleSolution ? 'medium' : 'low';
+      recommendationWhy.push(possibleSolution ? 'A possible solution exists, but the expected engineering item is missing.' : 'The likely bug does not yet have enough implementation-safe evidence for engineering.');
+    } else if (['documentation', 'ux'].indexOf(improvementType) !== -1) {
+      recommendationKey = 'close_documentation_ux';
+      recommendationConfidence = 'high';
+      recommendationWhy.push('The case is classified as a non-code documentation or UX improvement and a first response is already recorded.');
+    } else if (improvementType === 'feature') {
+      recommendationKey = 'close_feature_improvement';
+      recommendationConfidence = 'medium';
+      recommendationWhy.push('The request can be retained as a product opportunity without implying a delivery commitment.');
+    }
+
+    var approvalsRequired = [];
+    if (recommendationKey === 'prepare_engineering_brief') approvalsRequired.push('Owner confirmation before the privacy-minimized brief enters the coordinator inbox.');
+    if (workItem) {
+      if (!approval || approvalStatus === 'pending') approvalsRequired.push('Owner approval before any deployment.');
+      if (!deployedAt) approvalsRequired.push('Verified external deployment evidence before any “fix is live” statement.');
+      if (followupStatus !== 'sent') approvalsRequired.push('Owner approval of exact customer follow-up wording before a manual send.');
+    }
+    approvalsRequired.push('Owner decision before any goodwill recommendation is acted on; the dashboard cannot grant credit.');
+    if (humanReviewFirst) approvalsRequired.unshift('Human review first for the recorded sensitive category, regardless of confidence.');
+
+    var classificationConfidence = confidenceBand(points);
+    return {
+      schemaVersion: 1,
+      generatedAt: new Date().toISOString(),
+      advisoryOnly: true,
+      confidenceNotAuthorization: true,
+      humanReviewFirst: humanReviewFirst,
+      classification: {
+        confidence: classificationConfidence,
+        label: humanizeKey(classificationConfidence) + ' evidence confidence',
+        summary: 'Recorded evidence ' + (classificationConfidence === 'high' ? 'strongly' : classificationConfidence === 'medium' ? 'partly' : 'weakly') + ' supports “' + ((IMPROVEMENTS[improvementType] && IMPROVEMENTS[improvementType].label) || humanizeKey(improvementType)) + '” in “' + (TOPICS[topicKey] || humanizeKey(topicKey)) + '.” This is not a probability or permission to act.'
+      },
+      recommendation: {
+        key: recommendationKey,
+        label: NEXT_STEPS[recommendationKey] || humanizeKey(recommendationKey),
+        confidence: recommendationConfidence,
+        why: recommendationWhy,
+        ownerApprovalsStillRequired: approvalsRequired
+      },
+      evidence: evidence,
+      patterns: patterns,
+      riskFlags: riskLabels.length ? riskLabels : ['No sensitive flag is recorded.'],
+      policyGates: policyGates,
+      missingInformation: missingInformation.length ? missingInformation : ['No material information gap is recorded for the recommended next gate.'],
+      goodwill: {
+        recommendationOnly: true,
+        reviewSuggested: humanReviewFirst && !goodwill,
+        creditActionAvailable: false
+      }
+    };
+  }
+
+  function snakeCaseObject(value) {
+    if (Array.isArray(value)) return value.map(snakeCaseObject);
+    if (!value || typeof value !== 'object' || value instanceof Date) return value;
+    return Object.keys(value).reduce(function(result, key) {
+      result[key.replace(/[A-Z]/g, function(letter) { return '_' + letter.toLowerCase(); })] = snakeCaseObject(value[key]);
+      return result;
+    }, {});
+  }
+
+  function briefList(items, fallback) {
+    return (Array.isArray(items) && items.length ? items : [fallback]).map(function(item) { return '- ' + item; });
+  }
+
+  function buildCoordinatorBriefData(input) {
     input = input || {};
     var supportCase = input.supportCase || input.case || {};
     var workItem = input.workItem || {};
-    var subject = safeText(valueOf(supportCase, 'subject')) || 'Untitled support case';
-    var summary = safeText(valueOf(supportCase, 'summary')) || 'No case summary recorded.';
+    var assessment = input.advisoryAssessment || assessSupportCase({
+      supportCase: supportCase,
+      workItem: workItem,
+      overview: input.overview || {}
+    });
+    var rawSubject = safeText(valueOf(supportCase, 'subject')) || 'Untitled support case';
+    var rawSummary = safeText(valueOf(supportCase, 'summary')) || 'No case summary recorded.';
     var topicKey = safeText(valueOf(supportCase, 'topicKey', 'topic_key')) || 'other';
     var improvementType = safeText(valueOf(supportCase, 'improvementType', 'improvement_type')) || 'feature';
     var riskLevel = safeText(valueOf(supportCase, 'riskLevel', 'risk_level')) || 'low';
     var sensitiveFlags = valueOf(supportCase, 'sensitiveFlags', 'sensitive_flags');
     if (!Array.isArray(sensitiveFlags)) sensitiveFlags = [];
-    var workaround = safeText(valueOf(supportCase, 'safeWorkaround', 'safe_workaround')) ||
+    var rawWorkaround = safeText(valueOf(supportCase, 'safeWorkaround', 'safe_workaround')) ||
       'No safe workaround is recorded. Preserve the affected data and route decisions for owner review.';
     var responseStatus = safeText(valueOf(supportCase, 'immediateResponseStatus', 'immediate_response_status')) || 'not recorded';
-    var responseDraft = safeText(valueOf(supportCase, 'immediateResponseDraft', 'immediate_response_draft')) || 'No customer response is recorded.';
-    var productImpact = safeText(input.productImpact || valueOf(supportCase, 'productImpact', 'product_impact')) || summary;
-    var proposedSolution = safeText(valueOf(workItem, 'proposedSolution', 'proposed_solution')) ||
+    var rawResponseDraft = safeText(valueOf(supportCase, 'immediateResponseDraft', 'immediate_response_draft')) || 'No customer response is recorded.';
+    var rawProductImpact = safeText(input.productImpact || valueOf(supportCase, 'productImpact', 'product_impact')) || rawSummary;
+    var rawProposedSolution = safeText(valueOf(workItem, 'proposedSolution', 'proposed_solution')) ||
       safeText(valueOf(supportCase, 'possibleSolution', 'possible_solution')) || 'No proposed solution recorded.';
-    var evidenceNotes = safeText(input.evidenceNotes) || 'No additional evidence, links, or notes provided.';
-    var requestedOutcome = safeText(input.requestedEngineeringOutcome || input.requestedOutcome) ||
+    var rawEvidenceNotes = safeText(input.evidenceNotes) || 'No additional evidence, links, or notes provided.';
+    var rawRequestedOutcome = safeText(input.requestedEngineeringOutcome || input.requestedOutcome) ||
       'Investigate the report, implement the smallest compatible improvement, and return focused test and local UI verification evidence.';
+    var subject = privacyMinimizeText(rawSubject, supportCase);
+    var summary = privacyMinimizeText(rawSummary, supportCase);
+    var workaround = privacyMinimizeText(rawWorkaround, supportCase);
+    var responseDraft = privacyMinimizeText(rawResponseDraft, supportCase);
+    var productImpact = privacyMinimizeText(rawProductImpact, supportCase);
+    var proposedSolution = privacyMinimizeText(rawProposedSolution, supportCase);
+    var evidenceNotes = privacyMinimizeText(rawEvidenceNotes, supportCase);
+    var requestedOutcome = privacyMinimizeText(rawRequestedOutcome, supportCase);
     var flags = sensitiveFlags.map(function(flag) { return SENSITIVE_FLAGS[flag] || humanizeKey(flag); });
+    var redactionApplied = [
+      [rawSubject, subject], [rawSummary, summary], [rawWorkaround, workaround], [rawResponseDraft, responseDraft],
+      [rawProductImpact, productImpact], [rawProposedSolution, proposedSolution], [rawEvidenceNotes, evidenceNotes],
+      [rawRequestedOutcome, requestedOutcome]
+    ].some(function(pair) { return pair[0] !== pair[1]; });
+    var assessmentPayload = snakeCaseObject(assessment);
+    var payload = {
+      schema_version: 2,
+      handoff_mode: 'owner_confirmed_internal_coordinator_inbox',
+      case: {
+        reference: caseReference(supportCase),
+        subject: subject,
+        summary: summary,
+        customer_name_included: false,
+        customer_email_included: false
+      },
+      classification: {
+        topic_key: topicKey,
+        topic_label: TOPICS[topicKey] || humanizeKey(topicKey),
+        improvement_type: improvementType,
+        improvement_label: (IMPROVEMENTS[improvementType] && IMPROVEMENTS[improvementType].label) || humanizeKey(improvementType),
+        risk_level: riskLevel,
+        escalation_flags: sensitiveFlags,
+        escalation_flag_labels: flags
+      },
+      advisory_assessment: assessmentPayload,
+      current_customer_response: {
+        status: responseStatus,
+        safe_workaround: workaround,
+        response_text: responseDraft,
+        sent_by_dashboard: false
+      },
+      product_impact: productImpact,
+      proposed_solution: proposedSolution,
+      evidence_links_or_notes: evidenceNotes,
+      requested_engineering_outcome: requestedOutcome,
+      privacy: {
+        privacy_minimized: true,
+        customer_name_included: false,
+        customer_email_included: false,
+        secure_links_or_tokens_included: false,
+        redaction_applied: redactionApplied
+      },
+      coordinator_inbox: {
+        owner_confirmed: true,
+        state_on_submission: 'queued',
+        external_delivery_performed: false,
+        trusted_local_coordinator_connected: false
+      },
+      safety_boundaries: {
+        live_codex_desktop_connection: false,
+        agent_launch_available: false,
+        deployment_available: false,
+        merge_available: false,
+        customer_messaging_available: false,
+        credit_grant_available: false,
+        owner_approval_still_required_for: ['deployment', 'fix_live_statement', 'customer_followup', 'goodwill_credit']
+      }
+    };
 
-    return [
+    var brief = [
       '# QuoteDr engineering coordinator brief',
       '',
-      'Handoff mode: Manual coordinator handoff only. No live coordinator integration or agent launch is performed.',
+      'Handoff mode: Owner-confirmed internal coordinator inbox. No live coordinator integration or agent launch is performed.',
+      'Future boundary: A separate trusted local coordinator process may later poll this queue, repeat approval and risk checks, and create a Codex task outside QuoteDr.',
       'Case: ' + caseReference(supportCase) + ' - ' + subject,
       '',
       '## Case summary',
@@ -245,31 +604,63 @@
       '- Risk level: ' + humanizeKey(riskLevel),
       '- Escalation flags: ' + (flags.length ? flags.join(', ') : 'None recorded'),
       '',
-      '## Current customer-safe response',
-      '- Response status: ' + humanizeKey(responseStatus),
-      '- Safe workaround: ' + workaround,
-      '- Current reviewed/draft response: ' + responseDraft,
+      '## Advisory confidence and rationale',
+      '- Classification confidence: ' + humanizeKey(assessment.classification.confidence) + ' (evidence band, not a probability or authorization)',
+      '- Recommended next step: ' + assessment.recommendation.label,
+      '- Next-step confidence: ' + humanizeKey(assessment.recommendation.confidence) + ' (advisory only)',
+      '- Human-review-first: ' + (assessment.humanReviewFirst ? 'Yes - confidence never bypasses the sensitive-case review gate.' : 'No sensitive gate is recorded, but human review is still required before action.'),
       '',
-      '## Product impact',
-      productImpact,
-      '',
-      '## Proposed solution',
-      proposedSolution,
-      '',
-      '## Evidence, links, or notes',
-      evidenceNotes,
-      '',
-      '## Requested engineering outcome',
-      requestedOutcome,
-      '',
-      '## Safety and approval boundaries',
-      '- This handoff prepares and records a reviewable task brief; it does not contact Codex or launch an agent.',
-      '- Do not push, merge, or deploy without explicit owner authorization and the existing deployment approval workflow.',
-      '- Do not state that a fix is live until verification and a deployed release are recorded and owner-approved wording is used.',
-      '- Do not send customer messages or grant goodwill credits from this handoff.',
-      '- Preserve customer data and keep sensitive billing, payment, data, privacy, access, signature, conflict, and incident matters under human review.',
-      '- Customer email is intentionally omitted from this engineering brief.'
-    ].join('\n');
+      '### Issue evidence',
+    ].concat(
+      briefList(assessment.evidence, 'No issue evidence recorded.'),
+      ['', '### Similar cases and patterns'],
+      briefList(assessment.patterns, 'No similar-case pattern recorded.'),
+      ['', '### Recommendation rationale'],
+      briefList(assessment.recommendation.why, 'No recommendation rationale recorded.'),
+      ['', '### Risk flags and policy gates'],
+      briefList((assessment.riskFlags || []).concat(assessment.policyGates || []), 'No risk or policy gate recorded.'),
+      ['', '### Missing information'],
+      briefList(assessment.missingInformation, 'No material information gap recorded.'),
+      ['', '### Owner approvals still required'],
+      briefList(assessment.recommendation.ownerApprovalsStillRequired, 'Human review is still required.'),
+      [
+        '',
+        '## Current customer-safe response',
+        '- Response status: ' + humanizeKey(responseStatus),
+        '- Safe workaround: ' + workaround,
+        '- Current reviewed/draft response: ' + responseDraft,
+        '',
+        '## Product impact',
+        productImpact,
+        '',
+        '## Proposed solution',
+        proposedSolution,
+        '',
+        '## Evidence, links, or notes',
+        evidenceNotes,
+        '',
+        '## Requested engineering outcome',
+        requestedOutcome,
+        '',
+        '## Privacy minimization',
+        '- Customer name and email are omitted from this engineering request.',
+        '- Email addresses, secure links, and token-like values are redacted before storage.',
+        '- Redaction applied to this brief: ' + (redactionApplied ? 'Yes' : 'No sensitive value detected'),
+        '',
+        '## Safety and approval boundaries',
+        '- This action stores an internal, reviewable queue request; it does not contact Codex Desktop or launch an agent.',
+        '- Do not push, merge, or deploy without explicit owner authorization and the existing deployment approval workflow.',
+        '- Do not state that a fix is live until verification and a deployed release are recorded and owner-approved wording is used.',
+        '- Do not send customer messages or grant goodwill credits from this handoff.',
+        '- Preserve customer data and keep sensitive billing, payment, data, privacy, access, signature, conflict, and incident matters under human review.'
+      ]
+    ).join('\n');
+
+    return { brief: brief, payload: payload, advisoryAssessment: assessment };
+  }
+
+  function buildCoordinatorBrief(input) {
+    return buildCoordinatorBriefData(input).brief;
   }
 
   function createDemoOverview(nowValue) {
@@ -299,13 +690,6 @@
     workItems[1].coordinatorHandoffAt = ago(1.5);
     workItems[1].coordinatorHandoffByEmail = 'local-demo@quotedr.test';
     workItems[1].coordinatorHandoffCount = 1;
-    workItems[1].coordinatorBrief = buildCoordinatorBrief({
-      supportCase: cases[1],
-      workItem: workItems[1],
-      productImpact: 'Duplicate imports can corrupt a contractor\'s saved-item catalog and make later quote pricing unreliable.',
-      evidenceNotes: 'Customer report notes a reconnect immediately before the duplicate import. Compare QuickBooks IDs and import-run behavior.',
-      requestedEngineeringOutcome: 'Reproduce the reconnect path, add an idempotency guard, and return focused import tests plus a safe cleanup recommendation.'
-    });
     var deployApprovals = [
       { id: 'deploy-5', workItemId: 'work-5', status: 'pending', requestedAt: ago(3), createdAt: ago(3), updatedAt: ago(3) },
       { id: 'deploy-6', workItemId: 'work-6', status: 'approved', requestedAt: ago(28), decisionAt: ago(24), deployedAt: ago(20), releaseReference: 'release-2026.08.07', createdAt: ago(28), updatedAt: ago(20) }
@@ -327,8 +711,77 @@
       goodwillRecommendations: [
         { id: 'credit-5', caseId: 'case-5', creditType: 'free_pro_month', status: 'recommended', recommendationReason: 'Payment interruption after setup effort.', createdAt: ago(2) }
       ],
-      events: []
+      coordinatorInbox: [],
+      coordinatorInboxEvents: [],
+      events: [],
+      role: { email: 'local-demo@quotedr.test', owner: true },
+      policy: {
+        noAutosend: true,
+        internalCoordinatorInboxOnly: true,
+        liveCodexDesktopConnectionAvailable: false,
+        trustedLocalCoordinatorConnected: false,
+        agentLaunchAvailable: false,
+        deploymentExecutionAvailable: false,
+        creditGrantAvailable: false,
+        ownerApprovalRequiredFor: ['coordinator_inbox_submission', 'deployment', 'fix_live_statement', 'customer_followup', 'goodwill_credit']
+      }
     };
+    var handoffAssessment = assessSupportCase({ supportCase: cases[1], workItem: workItems[1], overview: overview });
+    var handoffRecord = buildCoordinatorBriefData({
+      supportCase: cases[1],
+      workItem: workItems[1],
+      overview: overview,
+      advisoryAssessment: handoffAssessment,
+      productImpact: 'Duplicate imports can corrupt a contractor\'s saved-item catalog and make later quote pricing unreliable.',
+      evidenceNotes: 'Customer report notes a reconnect immediately before the duplicate import. Compare QuickBooks IDs and import-run behavior.',
+      requestedEngineeringOutcome: 'Reproduce the reconnect path, add an idempotency guard, and return focused import tests plus a safe cleanup recommendation.'
+    });
+    workItems[1].coordinatorBrief = handoffRecord.brief;
+    workItems[1].coordinatorBriefPayload = handoffRecord.payload;
+    overview.coordinatorInbox.push({
+      id: 'inbox-2-r1',
+      caseId: 'case-2',
+      workItemId: 'work-2',
+      handoffRevision: 1,
+      idempotencyKey: 'engineering-handoff:work-2:r1',
+      state: 'queued',
+      taskBrief: handoffRecord.brief,
+      taskPayload: handoffRecord.payload,
+      advisoryAssessment: handoffAssessment,
+      ownerConfirmed: true,
+      privacyMinimized: true,
+      submittedByEmail: 'local-demo@quotedr.test',
+      queuedAt: ago(1.5),
+      availableAt: ago(1.5),
+      attemptCount: 0,
+      retryCount: 0,
+      createdAt: ago(1.5),
+      updatedAt: ago(1.5)
+    });
+    overview.coordinatorInboxEvents.push({
+      id: 'inbox-event-2-r1',
+      inboxId: 'inbox-2-r1',
+      caseId: 'case-2',
+      workItemId: 'work-2',
+      eventType: 'coordinator_inbox_queued',
+      fromState: '',
+      toState: 'queued',
+      actorEmail: 'local-demo@quotedr.test',
+      details: { handoffRevision: 1, ownerConfirmed: true, privacyMinimized: true, externalDeliveryPerformed: false, agentLaunched: false },
+      occurredAt: ago(1.5)
+    });
+    overview.events.push({
+      id: 'demo-handoff-event-2-r1',
+      caseId: 'case-2',
+      workItemId: 'work-2',
+      eventType: 'engineering_coordinator_handoff_recorded',
+      actorEmail: 'local-demo@quotedr.test',
+      details: { handoffCount: 1, coordinatorInboxId: 'inbox-2-r1', externalDeliveryPerformed: false, agentLaunched: false },
+      occurredAt: ago(1.5)
+    });
+    cases.forEach(function(item) {
+      item.advisoryAssessment = assessSupportCase({ supportCase: item, overview: overview });
+    });
     overview.metrics = calculateMetrics(overview);
     return overview;
   }
@@ -337,9 +790,13 @@
     TOPICS: TOPICS,
     IMPROVEMENTS: IMPROVEMENTS,
     SENSITIVE_FLAGS: SENSITIVE_FLAGS,
+    NEXT_STEPS: NEXT_STEPS,
     containsLiveFixClaim: containsLiveFixClaim,
     containsReleaseDatePromise: containsReleaseDatePromise,
     buildImmediateResponseDraft: buildImmediateResponseDraft,
+    assessSupportCase: assessSupportCase,
+    privacyMinimizeText: privacyMinimizeText,
+    buildCoordinatorBriefData: buildCoordinatorBriefData,
     buildCoordinatorBrief: buildCoordinatorBrief,
     deriveQueues: deriveQueues,
     calculateMetrics: calculateMetrics,

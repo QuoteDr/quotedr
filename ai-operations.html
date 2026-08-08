@@ -186,6 +186,43 @@
       border-radius: 9px;
       padding: 0.8rem;
     }
+    .confidence-panel {
+      background: linear-gradient(135deg, #f4f8ff, #fff);
+      border: 1px solid #cddff1;
+      border-radius: 10px;
+      padding: 0.9rem;
+    }
+    .confidence-grid { display: grid; gap: 0.7rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .confidence-badge {
+      border: 1px solid #b9cfe5;
+      border-radius: 999px;
+      color: #174b82;
+      display: inline-flex;
+      font-size: 0.68rem;
+      font-weight: 800;
+      padding: 0.25rem 0.5rem;
+    }
+    .confidence-badge.confidence-high { background: #e7f6ee; border-color: #b8dfca; color: #17643a; }
+    .confidence-badge.confidence-medium { background: #fff7e8; border-color: #ecd29e; color: #7c4c0d; }
+    .confidence-badge.confidence-low { background: #fff0f0; border-color: #efc0c0; color: #942626; }
+    .rationale-list { color: #40546a; font-size: 0.76rem; margin-bottom: 0; padding-left: 1.1rem; }
+    .rationale-list li + li { margin-top: 0.28rem; }
+    .coordinator-inbox-grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .coordinator-inbox-item {
+      background: #fbfdff;
+      border: 1px solid #d7e2ef;
+      border-radius: 10px;
+      color: inherit;
+      padding: 0.85rem;
+      text-align: left;
+      width: 100%;
+    }
+    .coordinator-inbox-item:hover, .coordinator-inbox-item:focus-visible { border-color: #82acd5; outline: none; }
+    .inbox-state { background: #eef3f9; border: 1px solid #d3dfeb; color: #43576d; }
+    .inbox-state-queued { background: #e9f3ff; border-color: #c9ddf7; color: #174b82; }
+    .inbox-state-claimed { background: #f1ebff; border-color: #d9c8ff; color: #6430b4; }
+    .inbox-state-retry_required { background: #fff5e7; border-color: #f3d2a5; color: #89500c; }
+    .inbox-state-task_created { background: #e9f7ef; border-color: #c6e7d3; color: #17643a; }
     .brief-preview {
       background: #f8fafc;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
@@ -195,12 +232,16 @@
       white-space: pre-wrap;
     }
     .demo-banner { background: #eef2ff; border-color: #c7d2fe; color: #3730a3; }
-    @media (max-width: 1199px) { .queue-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 1199px) {
+      .queue-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .coordinator-inbox-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
     @media (max-width: 767px) {
       .queue-grid { grid-template-columns: 1fr; }
       .queue-column { min-height: auto; }
       .workflow-rail { grid-template-columns: repeat(4, minmax(0, 1fr)); }
       .topic-row { grid-template-columns: minmax(120px, 1.4fr) 2fr 26px; }
+      .confidence-grid, .coordinator-inbox-grid { grid-template-columns: 1fr; }
     }
   </style>
   <script>
@@ -303,6 +344,19 @@
           <div class="queue-list" id="followupQueue"></div>
         </section>
       </div>
+    </section>
+
+    <section class="ops-card p-3 p-lg-4 mb-4" aria-labelledby="coordinatorInboxHeading">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+        <div>
+          <div class="eyebrow">Administrator-only internal queue</div>
+          <h2 class="h5 fw-bold mb-1" id="coordinatorInboxHeading">Engineering coordinator inbox <span class="queue-count ms-1" id="coordinatorInboxCount">0</span></h2>
+          <p class="small text-muted mb-0">Owner-confirmed, privacy-minimized requests are stored here with durable revisions and audit history.</p>
+        </div>
+        <span class="gate-pill"><i class="fas fa-plug-circle-xmark"></i>No Codex Desktop connection</span>
+      </div>
+      <div class="alert alert-light border small py-2 mb-3"><i class="fas fa-shield-halved me-2 text-primary"></i>A separate trusted local coordinator may poll this queue in a later release only after its own approvals and risk checks. This dashboard does not poll, deliver, or launch an agent.</div>
+      <div class="coordinator-inbox-grid" id="coordinatorInbox"></div>
     </section>
 
     <div class="row g-4">
