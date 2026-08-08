@@ -71,6 +71,7 @@ assert(migration.includes('ai_engineering_coordinator_inbox_claim_key_idx'), 'cl
 assert(migration.includes('ai_engineering_coordinator_inbox_heartbeat_key_idx'), 'heartbeats should have durable idempotency');
 assert(migration.includes('coordinator_inbox_heartbeat'), 'heartbeat should be audited');
 assert(migration.includes("notification_kind in ('synthetic_test', 'owner_deploy_review')"), 'notification schema should distinguish the one test from future owner review notices');
+assert(migration.includes("pg_catalog.strpos(subject, '[TEST — NO ACTION REQUIRED] QuoteDr code review notification') = 1"), 'test notification subject should use valid PostgreSQL prefix enforcement');
 assert(migration.includes("check (not deployment_authorized)"), 'synthetic owner decision must be unable to authorize deployment');
 assert(!migration.toLowerCase().includes('grant delete'), 'receiver schema should grant no deletion');
 

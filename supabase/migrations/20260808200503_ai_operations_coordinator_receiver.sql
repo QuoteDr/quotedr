@@ -84,7 +84,7 @@ create table if not exists public.ai_engineering_coordinator_notifications (
   unique (inbox_id, notification_kind),
   check (
     notification_kind <> 'synthetic_test'
-    or pg_catalog.position('[TEST — NO ACTION REQUIRED] QuoteDr code review notification' in subject) = 1
+    or pg_catalog.strpos(subject, '[TEST — NO ACTION REQUIRED] QuoteDr code review notification') = 1
   ),
   check ((subject || ' ' || body_text || ' ' || title) !~* '[[:alnum:]._%+-]+@[[:alnum:].-]+\.[[:alpha:]]{2,}'),
   check ((subject || ' ' || body_text || ' ' || title || ' ' || review_url)
