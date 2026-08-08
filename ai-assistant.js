@@ -3,19 +3,8 @@
 var SUPABASE_URL = 'https://axmoffknvblluibuitrq.supabase.co';
 var ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso';
 var FUNCTION_URL = SUPABASE_URL + '/functions/v1/ai-assistant';
-var CHATBOT_FEEDBACK_URL = SUPABASE_URL + '/functions/v1/chatbot-feedback';
 var messages = [];
 var isOpen = false;
-
-function recordPrivacySafeChatbotTopic(question, answer) {
-  if (!window.QuoteDrChatbotFeedbackTopics || typeof getSupabaseFunctionAuthHeaders !== 'function') return;
-  var classified = window.QuoteDrChatbotFeedbackTopics.classify(question, answer, getQuoteDrAssistantContext());
-  if (!classified) return;
-  getSupabaseFunctionAuthHeaders().then(function(headers) {
-    return fetch(CHATBOT_FEEDBACK_URL, { method: 'POST', headers: headers, body: JSON.stringify({ action: 'record', topicKey: classified.topicKey, intentKey: classified.intentKey, surfaceKey: classified.surfaceKey }) });
-  }).catch(function() {});
-}
-
 
 // Suggested quick questions
 var SUGGESTIONS = [
@@ -251,7 +240,7 @@ function init() {
         <button id="qdAiSend" onclick="window._qdAiSend()">&#10148;</button>
       </div>
       <div style="text-align:center; padding: 6px 0 2px; font-size: 0.75rem;">
-        <a href="help.html" style="color:#1a56a0; text-decoration:none;">ðŸ“„ Need more help? View FAQ</a>
+        <a href="help.html" style="color:#1a56a0; text-decoration:none;">📄 Need more help? View FAQ</a>
       </div>
     </div>
   `;
@@ -417,7 +406,7 @@ function getQuoteDrLocalAssistantReply(text) {
       '3. In **AI Voice Review**, match what QuoteDr heard to the correct saved item.\n' +
       '4. Keep **Remember this** checked when you want QuoteDr to learn that phrase for next time.\n' +
       '5. Use **AI Memory** from the voice modal to edit or delete learned mappings later.\n\n' +
-      'For repeat rules like â€œcase a door means 35 LF of trim,â€ use **AI Trade Rules**. For packages like â€œstandard bedroom package,â€ use **Voice Templates**.';
+      'For repeat rules like “case a door means 35 LF of trim,” use **AI Trade Rules**. For packages like “standard bedroom package,” use **Voice Templates**.';
   }
 
   if (q.includes('payment') || q.includes('stripe') || q.includes('deposit')) {
@@ -490,7 +479,6 @@ window._qdAiSend = async function() {
         localLoadingEl.remove();
       }
       _addMsg(localReply, 'ai');
-      recordPrivacySafeChatbotTopic(text, localReply);
       return;
     }
 
@@ -516,7 +504,6 @@ window._qdAiSend = async function() {
       loadingEl.remove();
     }
     _addMsg(reply, 'ai');
-    recordPrivacySafeChatbotTopic(text, reply);
   } catch(e) {
     var loadingEl = document.getElementById(loadingId);
     if (loadingEl) {
@@ -533,7 +520,7 @@ function _addMsg(text, role) {
   // Simple markdown: convert **bold** and bullet points
   div.innerHTML = text
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\n- /g, '\nâ€¢ ')
+    .replace(/\n- /g, '\n• ')
     .replace(/\n/g, '<br>');
 
   msgEl.appendChild(div);

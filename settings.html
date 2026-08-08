@@ -498,7 +498,7 @@ if (location.search.includes('debug')) {
 			<div class="input-group">
 				<span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
 				<input type="text" id="settingsSearch" class="form-control" placeholder="Search settings... (e.g. logo, tax, reminder)" oninput="searchSettings(this.value)">
-				<button class="btn btn-outline-secondary" onclick="clearSearch()" style="display:none;" id="searchClearBtn">Ã¢Å“â€¢</button>
+				<button class="btn btn-outline-secondary" onclick="clearSearch()" style="display:none;" id="searchClearBtn">✕</button>
 			</div>
 			<div id="searchResults" class="mt-2" style="display:none;"></div>
 		</div>
@@ -526,7 +526,7 @@ if (location.search.includes('debug')) {
 						<a href="#" id="siteTrafficTabLink" data-settings-tab="site-traffic" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('site-traffic',this);return false;"><i class="fas fa-globe me-2" style="color:#1a56a0"></i>Site Traffic</a>
 						<a href="#" id="userMessagesTabLink" data-settings-tab="user-messages" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('user-messages',this);return false;"><i class="fas fa-bullhorn me-2" style="color:#f97316"></i>User Messages</a>
 						<a href="#" id="adminControlsTabLink" data-settings-tab="admin-controls" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('admin-controls',this);return false;"><i class="fas fa-sliders me-2" style="color:#1a56a0"></i>Admin Controls</a>
-						<a href="#" id="saveIncidentsTabLink" data-settings-tab="save-incidents" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('save-incidents',this);return false;"><i class="fas fa-shield-halved me-2" style="color:#dc3545"></i>Save Incidents <span id="saveIncidentsNavBadge" class="badge bg-danger ms-1" style="display:none;">0</span></a><a href="#" id="chatbotFeedbackTabLink" data-settings-tab="chatbot-feedback" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('chatbot-feedback',this);return false;"><i class="fas fa-robot me-2" style="color:#7c3aed"></i>AI Chatbot</a>
+						<a href="#" id="saveIncidentsTabLink" data-settings-tab="save-incidents" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('save-incidents',this);return false;"><i class="fas fa-shield-halved me-2" style="color:#dc3545"></i>Save Incidents <span id="saveIncidentsNavBadge" class="badge bg-danger ms-1" style="display:none;">0</span></a>
 					</div>
 				</div>
 			</div>
@@ -734,19 +734,19 @@ if (location.search.includes('debug')) {
 					<div class="col-sm-6">
 						<label class="form-label fw-bold">Currency</label>
 						<select class="form-select" id="currencySetting" style="max-width:200px;">
-							<option value="CAD">Ã°Å¸â€¡Â¨Ã°Å¸â€¡Â¦ CAD Ã¢â‚¬â€ Canadian Dollar</option>
-							<option value="USD">Ã°Å¸â€¡ÂºÃ°Å¸â€¡Â¸ USD Ã¢â‚¬â€ US Dollar</option>
-							<option value="GBP">Ã°Å¸â€¡Â¬Ã°Å¸â€¡Â§ GBP Ã¢â‚¬â€ British Pound</option>
-							<option value="EUR">Ã°Å¸â€¡ÂªÃ°Å¸â€¡Âº EUR Ã¢â‚¬â€ Euro</option>
-							<option value="AUD">Ã°Å¸â€¡Â¦Ã°Å¸â€¡Âº AUD Ã¢â‚¬â€ Australian Dollar</option>
-							<option value="NZD">Ã°Å¸â€¡Â³Ã°Å¸â€¡Â¿ NZD Ã¢â‚¬â€ New Zealand Dollar</option>
+							<option value="CAD">🇨🇦 CAD — Canadian Dollar</option>
+							<option value="USD">🇺🇸 USD — US Dollar</option>
+							<option value="GBP">🇬🇧 GBP — British Pound</option>
+							<option value="EUR">🇪🇺 EUR — Euro</option>
+							<option value="AUD">🇦🇺 AUD — Australian Dollar</option>
+							<option value="NZD">🇳🇿 NZD — New Zealand Dollar</option>
 						</select>
 					</div>
 					<div class="col-sm-6">
 						<label class="form-label fw-bold">Units of Measurement<button type="button" class="qd-inline-help-btn" title="Help with units of measurement" aria-label="Help with units of measurement" onclick="qdAlert('Choose Imperial for feet, inches, square feet, and linear feet. Choose Metric for meters, centimeters, and square meters. Quote Dr will use this preference in calculators, map measurements, quote rows, invoices, and client views.', { title: 'Units of Measurement', type: 'info' }); return false;"><i class="fas fa-question"></i></button></label>
 						<select class="form-select" id="measurementSystemSetting" style="max-width:240px;">
 							<option value="imperial">Imperial - ft, in, sq ft, LF</option>
-							<option value="metric">Metric - m, cm, mÃ‚Â²</option>
+							<option value="metric">Metric - m, cm, m²</option>
 						</select>
 						<div class="form-text">Controls measurements throughout Quote Dr. Currency is separate.</div>
 					</div>
@@ -840,7 +840,7 @@ if (location.search.includes('debug')) {
 		<!-- Import / Export Section -->
 		<div class="settings-card" id="pricing-import">
 			<h5><i class="fas fa-robot me-2" style="color:#7c3aed"></i>AI Import <span class="badge" style="background:#7c3aed; font-size:0.65rem;">Smart</span></h5>
-			<p class="text-muted small mb-3">Paste or upload anything Ã¢â‚¬â€ QuickBooks export, spreadsheet, old price list, contacts backup, messy notes. Our AI figures it out automatically.</p>
+			<p class="text-muted small mb-3">Paste or upload anything — QuickBooks export, spreadsheet, old price list, contacts backup, messy notes. Our AI figures it out automatically.</p>
 
 			<!-- Tabs -->
 			<ul class="nav nav-tabs mb-3" id="importTabs">
@@ -851,28 +851,28 @@ if (location.search.includes('debug')) {
 			<!-- Pricing Tab -->
 			<div id="importTabPricing">
 				<div class="alert alert-light border small p-2 mb-3" style="border-left: 3px solid #7c3aed !important;">
-					<strong>Works with:</strong> QuickBooks item list, Jobber services, Excel/CSV price lists, hand-typed notes, old invoices Ã¢â‚¬â€ any format.
+					<strong>Works with:</strong> QuickBooks item list, Jobber services, Excel/CSV price lists, hand-typed notes, old invoices — any format.
 					<details class="mt-1">
-						<summary class="text-primary" style="cursor:pointer; font-size:0.85rem;">How to export from QuickBooks / other apps Ã¢â€“Â¾</summary>
+						<summary class="text-primary" style="cursor:pointer; font-size:0.85rem;">How to export from QuickBooks / other apps ▾</summary>
 						<div class="mt-2" style="font-size:0.82rem; color:#555;">
-							<strong>QuickBooks:</strong> Lists Ã¢â€ â€™ Product &amp; Services Ã¢â€ â€™ Export to Excel Ã¢â€ â€™ paste below<br>
-							<strong>Jobber:</strong> Settings Ã¢â€ â€™ Services Ã¢â€ â€™ export or copy-paste the list<br>
-							<strong>Excel/CSV:</strong> Just upload the file Ã¢â‚¬â€ AI reads columns automatically<br>
-							<strong>Anything else:</strong> Copy &amp; paste whatever you have Ã¢â‚¬â€ AI will sort it out
+							<strong>QuickBooks:</strong> Lists → Product &amp; Services → Export to Excel → paste below<br>
+							<strong>Jobber:</strong> Settings → Services → export or copy-paste the list<br>
+							<strong>Excel/CSV:</strong> Just upload the file — AI reads columns automatically<br>
+							<strong>Anything else:</strong> Copy &amp; paste whatever you have — AI will sort it out
 						</div>
 					</details>
 				</div>
 
 				<!-- File upload -->
 				<div class="mb-3">
-					<label class="form-label fw-bold small">Upload a file <span class="text-muted fw-normal">(CSV, Excel export, TXT Ã¢â‚¬â€ any format)</span></label>
+					<label class="form-label fw-bold small">Upload a file <span class="text-muted fw-normal">(CSV, Excel export, TXT — any format)</span></label>
 					<input type="file" id="importPricingFile" accept=".csv,.txt,.xlsx,.xls,.tsv" class="form-control form-control-sm" onchange="previewImportFile('pricing')">
 				</div>
 
 				<!-- OR paste -->
 				<div class="mb-3">
 					<label class="form-label fw-bold small">Or paste your data here</label>
-					<textarea id="importPricingText" class="form-control" rows="6" placeholder="Paste anything Ã¢â‚¬â€ CSV rows, a price list, old invoice line items, QuickBooks export...
+					<textarea id="importPricingText" class="form-control" rows="6" placeholder="Paste anything — CSV rows, a price list, old invoice line items, QuickBooks export...
 Example:
 Tile installation, sqft, $8.50
 Drywall hanging, sqft, $3.00
@@ -893,24 +893,24 @@ Painting walls, sqft, $2.50"></textarea>
 				<div class="alert alert-light border small p-2 mb-3" style="border-left: 3px solid #1a56a0 !important;">
 					<strong>Works with:</strong> QuickBooks customer list, phone contacts export, spreadsheet, any text list of names &amp; numbers.
 					<details class="mt-1">
-						<summary class="text-primary" style="cursor:pointer; font-size:0.85rem;">How to export from QuickBooks / other apps Ã¢â€“Â¾</summary>
+						<summary class="text-primary" style="cursor:pointer; font-size:0.85rem;">How to export from QuickBooks / other apps ▾</summary>
 						<div class="mt-2" style="font-size:0.82rem; color:#555;">
-							<strong>QuickBooks:</strong> Customers Ã¢â€ â€™ Export to Excel Ã¢â€ â€™ paste below<br>
-							<strong>iPhone Contacts:</strong> Use a contacts export app Ã¢â€ â€™ vCard or CSV Ã¢â€ â€™ upload<br>
+							<strong>QuickBooks:</strong> Customers → Export to Excel → paste below<br>
+							<strong>iPhone Contacts:</strong> Use a contacts export app → vCard or CSV → upload<br>
 							<strong>Spreadsheet:</strong> Copy &amp; paste name/phone/email columns<br>
-							<strong>Anything else:</strong> Even a messy list works Ã¢â‚¬â€ AI will extract what it can
+							<strong>Anything else:</strong> Even a messy list works — AI will extract what it can
 						</div>
 					</details>
 				</div>
 
 				<div class="mb-3">
-					<label class="form-label fw-bold small">Upload a file <span class="text-muted fw-normal">(CSV, TXT, vCard Ã¢â‚¬â€ any format)</span></label>
+					<label class="form-label fw-bold small">Upload a file <span class="text-muted fw-normal">(CSV, TXT, vCard — any format)</span></label>
 					<input type="file" id="importClientsFile" accept=".csv,.txt,.vcf,.tsv" class="form-control form-control-sm" onchange="previewImportFile('clients')">
 				</div>
 
 				<div class="mb-3">
 					<label class="form-label fw-bold small">Or paste your data here</label>
-					<textarea id="importClientsText" class="form-control" rows="6" placeholder="Paste anything Ã¢â‚¬â€ name &amp; phone, spreadsheet rows, QuickBooks export...
+					<textarea id="importClientsText" class="form-control" rows="6" placeholder="Paste anything — name &amp; phone, spreadsheet rows, QuickBooks export...
 Example:
 John Smith, 416-555-1234, john@email.com
 Sarah Jones, 905-555-5678"></textarea>
@@ -947,7 +947,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			<div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
 				<div>
 					<h5><i class="fas fa-hammer me-2" style="color:#7c3aed"></i>AI Trade Rules</h5>
-					<p class="text-muted small mb-2">Teach QuoteDr reusable contractor math like Ã¢â‚¬Å“case a door = 35 LF per doorÃ¢â‚¬Â.</p>
+					<p class="text-muted small mb-2">Teach QuoteDr reusable contractor math like “case a door = 35 LF per door”.</p>
 				</div>
 				<button class="btn btn-outline-primary btn-sm" onclick="loadAiTradeRulesUI()">
 					<i class="fas fa-sync-alt me-1"></i>Refresh
@@ -1499,7 +1499,7 @@ Sarah Jones, 905-555-5678"></textarea>
 										</div>
 										<span style="display:none;color:#1a2940;font-weight:500;">Client Dashboard</span>
 										<div style="display:none;margin-top:8px;background:white;border-radius:6px;padding:10px;">
-											<small class="text-muted">Quote #1001 Ã¢â‚¬â€ $5,200.00</small>
+											<small class="text-muted">Quote #1001 — $5,200.00</small>
 										</div>
 									</div>
 									</div>
@@ -1805,7 +1805,7 @@ Sarah Jones, 905-555-5678"></textarea>
 						</div>
 						<div id="saveRecoveryIncidentList" class="small text-muted">Open this tab to load incidents.</div>
 					</div>
-				</div><!-- /tab-save-incidents --><div id="tab-chatbot-feedback" style="display:none;"><div class="settings-card"><div class="d-flex justify-content-between align-items-start gap-2 flex-wrap"><div><h5><i class="fas fa-robot me-2" style="color:#7c3aed"></i>AI Chatbot repeats</h5><p class="text-muted small mb-2">Privacy-safe trends from similar topics. No chat messages or user identities are stored.</p></div><button class="btn btn-outline-primary btn-sm" onclick="loadChatbotFeedback()">Refresh</button></div><div id="chatbotFeedbackSummary" class="small text-muted">Open this tab to load trends.</div><div id="chatbotFeedbackList" class="mt-3"></div></div></div><!-- /tab-chatbot-feedback -->
+				</div><!-- /tab-save-incidents -->
 
 				<div id="tab-team" style="display:none;">
 					<div class="settings-card">
@@ -1933,12 +1933,12 @@ Sarah Jones, 905-555-5678"></textarea>
 	<script src="modal-help.js?v=1777741200"></script>
 	<script src="quote-tips.js?v=1783300000"></script>
 	<script>
-		// Ã¢â€â‚¬Ã¢â€â‚¬ Tab Navigation Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+		// ── Tab Navigation ──────────────────────────────────────────────────
 		// === QuickBooks Integration ===
 		const QB_CLIENT_ID = 'ABzLzJgnopNHJpFlQAASaTKS8T2Jmvy43Vo8V3TwUxFtT3cnG1';
 		const QB_REDIRECT_URI = 'https://quotedr.io/qb-callback.html';
 		const QB_SCOPE = 'com.intuit.quickbooks.accounting';
-		// SUPABASE_URL already declared in supabase-v2.js Ã¢â‚¬â€ don't redeclare
+		// SUPABASE_URL already declared in supabase-v2.js — don't redeclare
 		const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso';
 
 		async function getQBAuthHeader() {
@@ -1964,7 +1964,7 @@ Sarah Jones, 905-555-5678"></textarea>
 					var env = data.environment || 'sandbox';
 					var envClass = env === 'production' ? 'bg-danger' : 'bg-info text-dark';
 					var realm = data.realm_id ? '<div class="small text-muted mt-2">Connected company ID: <code>' + data.realm_id + '</code></div>' : '';
-					statusEl.innerHTML = '<span class="badge bg-success"><i class="fas fa-check-circle me-1"></i>Connected' + (data.company_name ? ' Ã¢â‚¬â€ ' + data.company_name : '') + '</span> ' +
+					statusEl.innerHTML = '<span class="badge bg-success"><i class="fas fa-check-circle me-1"></i>Connected' + (data.company_name ? ' — ' + data.company_name : '') + '</span> ' +
 						'<span class="badge ' + envClass + ' ms-1">' + env.toUpperCase() + '</span>' + realm;
 					connectBtn.style.display = 'none';
 					disconnectBtn.style.display = 'inline-block';
@@ -2944,7 +2944,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			? Array.from(window.QuoteDrAdmin.emails)
 			: ['admin@quotedr.io', 'info@alddirect.ca', 'ald.direct.contracting@gmail.com'];
 		const QUOTEDR_ANALYTICS_ADMIN_EMAILS = QUOTEDR_ADMIN_EMAILS;
-		const QUOTEDR_ADMIN_TABS = ['analytics', 'site-traffic', 'user-messages', 'admin-controls', 'save-incidents', 'chatbot-feedback'];
+		const QUOTEDR_ADMIN_TABS = ['analytics', 'site-traffic', 'user-messages', 'admin-controls', 'save-incidents'];
 
 		function isQuoteDrAdminUser(user) {
 			if (window.QuoteDrAdmin) return window.QuoteDrAdmin.isAdminUser(user);
@@ -2960,11 +2960,11 @@ Sarah Jones, 905-555-5678"></textarea>
 				var isAdmin = isQuoteDrAdminUser(user);
 				var adminGroup = document.getElementById('adminSettingsGroup');
 				if (adminGroup) adminGroup.style.display = isAdmin ? '' : 'none';
-				['analyticsBriefTabLink', 'siteTrafficTabLink', 'userMessagesTabLink', 'adminControlsTabLink', 'saveIncidentsTabLink', 'chatbotFeedbackTabLink'].forEach(function(id) {
+				['analyticsBriefTabLink', 'siteTrafficTabLink', 'userMessagesTabLink', 'adminControlsTabLink', 'saveIncidentsTabLink'].forEach(function(id) {
 					var tabLink = document.getElementById(id);
 					if (tabLink) tabLink.style.display = isAdmin ? '' : 'none';
 				});
-				['tab-analytics', 'tab-site-traffic', 'tab-user-messages', 'tab-admin-controls', 'tab-save-incidents', 'tab-chatbot-feedback'].forEach(function(id) {
+				['tab-analytics', 'tab-site-traffic', 'tab-user-messages', 'tab-admin-controls', 'tab-save-incidents'].forEach(function(id) {
 					var tabPanel = document.getElementById(id);
 					if (!isAdmin && tabPanel) tabPanel.style.display = 'none';
 				});
@@ -3046,7 +3046,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			resultEl.className = 'alert alert-light border mb-0';
 			resultEl.innerHTML =
 				'<div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-2">' +
-					'<div><div class="fw-bold">QuoteDr analytics brief</div><div class="small text-muted">Last ' + escapeAnalyticsHtml(metrics.days || '') + ' days' + (generated ? ' Ã‚Â· ' + escapeAnalyticsHtml(generated) : '') + '</div></div>' +
+					'<div><div class="fw-bold">QuoteDr analytics brief</div><div class="small text-muted">Last ' + escapeAnalyticsHtml(metrics.days || '') + ' days' + (generated ? ' · ' + escapeAnalyticsHtml(generated) : '') + '</div></div>' +
 					'<span class="badge ' + (data.summary ? 'bg-success' : 'bg-secondary') + '">' + (data.summary ? 'AI summary' : 'Rule summary') + '</span>' +
 				'</div>' +
 				analyticsMetricCardsHtml(brief, metrics) +
@@ -3609,19 +3609,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			}
 		}
 
-			async function loadChatbotFeedback() {
-			var summary = document.getElementById('chatbotFeedbackSummary'), list = document.getElementById('chatbotFeedbackList');
-			if (!summary || !list || !window.currentUser || typeof getSupabaseFunctionAuthHeaders !== 'function') return;
-			summary.textContent = 'Loading privacy-safe trends...';
-			try {
-				var response = await fetch(SUPABASE_URL + '/functions/v1/chatbot-feedback', { method: 'POST', headers: await getSupabaseFunctionAuthHeaders(), body: JSON.stringify({ action: 'list' }) });
-				var data = await response.json(); if (!response.ok) throw new Error(data.error || 'Could not load trends.');
-				summary.textContent = (data.attentionCount || 0) + ' topic' + (data.attentionCount === 1 ? '' : 's') + ' need attention. Alerts use distinct users over the selected window.';
-				list.innerHTML = (data.themes || []).map(function(theme) { return '<div class="border rounded p-3 mb-2"><div class="fw-semibold">' + escapeHtml((window.QuoteDrChatbotFeedbackTopics && window.QuoteDrChatbotFeedbackTopics.topic(theme.topicKey) || {}).label || theme.topicKey) + '</div><div class="small text-muted">' + theme.windowDistinctUsers + ' distinct users Â· ' + theme.windowQuestionCount + ' questions Â· ' + escapeHtml(theme.state.replace('_', ' ')) + '</div></div>'; }).join('') || '<div class="text-muted small">No classified repeat topics yet.</div>';
-			} catch (error) { summary.textContent = error.message || 'Could not load trends.'; list.innerHTML = ''; }
-		}
-		window.loadChatbotFeedback = loadChatbotFeedback;
-		function showTab(name, el) {
+			function showTab(name, el) {
 				if (QUOTEDR_ADMIN_TABS.indexOf(name) !== -1 && !isQuoteDrAdminUser(window.currentUser)) {
 					name = 'business';
 					el = findSettingsTabLink('business');
@@ -3635,7 +3623,6 @@ Sarah Jones, 905-555-5678"></textarea>
 				if (name === 'user-messages') loadBroadcastAdminMessages();
 				if (name === 'admin-controls') syncRecordingPrivacyControls();
 				if (name === 'save-incidents') loadSaveRecoveryIncidents();
-				if (name === 'chatbot-feedback') loadChatbotFeedback();
 				if (name === 'team') loadTeamSettings();
 				setSiteTrafficPolling(name === 'site-traffic');
 				if (name === 'help') {
@@ -3670,7 +3657,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			}
 		}
 
-		// Ã¢â€â‚¬Ã¢â€â‚¬ Settings Search Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+		// ── Settings Search ──────────────────────────────────────────────────
 		var settingsIndex = [
 			{ tab: 'business', keywords: ['business','company','name','logo','phone','email','address','hst','tagline','owner','city','province','postal'], label: 'Business Profile' },
 			{ tab: 'quotes', keywords: ['quote','prefix','tax','valid','expiry','markup','terms','conditions','heading','number','send','client view','message','deposit','commitment','units','measurement','metric','imperial','feet','inches','meters','divider','wording','room','area','project','phase','section'], label: 'Quote Preferences & Send Settings' },
@@ -3711,7 +3698,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			resultsEl.innerHTML = matches.map(function(m) {
 				return '<div class="alert alert-light border mb-2 py-2" style="cursor:pointer;" onclick="clearSearch(\'' + m.tab + '\')">' +
 					'<i class="fas fa-arrow-right me-2 text-primary"></i><strong>' + m.label + '</strong>' +
-					'<span class="text-muted ms-2 small">Ã¢â‚¬â€ click to open</span></div>';
+					'<span class="text-muted ms-2 small">— click to open</span></div>';
 			}).join('');
 		}
 
@@ -3727,7 +3714,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			}
 		}
 
-		// Ã¢â€â‚¬Ã¢â€â‚¬ Notification Settings Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+		// ── Notification Settings ──────────────────────────────────────────
 		async function saveNotificationSettings() {
 			var settings = {
 				followupMessage: (document.getElementById('followupMessage') || {}).value || '',
@@ -3773,7 +3760,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			} catch(e) {}
 		}
 
-		// Ã¢â€â‚¬Ã¢â€â‚¬ Initialize settings
+		// ── Initialize settings
 		function handleLogoUpload(event) {
 			var file = event.target.files[0];
 			if (!file) return;
@@ -3853,7 +3840,7 @@ Sarah Jones, 905-555-5678"></textarea>
 		}
 
 		document.addEventListener('DOMContentLoaded', async function() {
-			// Auth check Ã¢â‚¬â€ redirect to login if not signed in
+			// Auth check — redirect to login if not signed in
 			const { data: { session } } = await _supabase.auth.getSession();
 			if (!session) { window.location.href = 'login.html'; return; }
 			window.currentUser = session.user;
@@ -3919,7 +3906,7 @@ Sarah Jones, 905-555-5678"></textarea>
 				});
 			}
 
-			// Load saved profile Ã¢â‚¬â€ localStorage first, then Supabase overrides with cloud data
+			// Load saved profile — localStorage first, then Supabase overrides with cloud data
 			var savedProfile = JSON.parse(localStorage.getItem('ald_business_profile') || '{}');
 			applyProfileToForm(savedProfile);
 			var savedHiddenProfileFields = JSON.parse(localStorage.getItem('ald_hidden_profile_fields') || '[]');
@@ -4255,7 +4242,7 @@ Sarah Jones, 905-555-5678"></textarea>
 				<div class="modal-dialog">
 					<div class="modal-content">
 						<div class="modal-header bg-warning">
-							<h5 class="modal-title">Ã¢Å¡Â Ã¯Â¸Â Clear All Items</h5>
+							<h5 class="modal-title">⚠️ Clear All Items</h5>
 							<button type="button" class="btn-close" data-bs-dismiss="modal"></button>
 						</div>
 						<div class="modal-body">
@@ -4458,7 +4445,7 @@ Sarah Jones, 905-555-5678"></textarea>
 				resultEl.innerHTML = '<span class="text-warning"><i class="fas fa-exclamation-triangle me-1"></i>Your feedback was saved, but the email alert could not be delivered. Please also email support@quotedr.io.</span>';
 				return;
 			}
-			resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>Submitted! Thanks for the ' + (isFeature ? 'idea' : 'report') + ' Ã°Å¸â„¢Â</span>';
+			resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>Submitted! Thanks for the ' + (isFeature ? 'idea' : 'report') + ' 🙏</span>';
 			document.getElementById(isFeature ? 'featureDescription' : 'bugDescription').value = '';
 		}
 
@@ -4503,7 +4490,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			window.location.href = 'index.html';
 		}
 
-		// Ã¢â€â‚¬Ã¢â€â‚¬ Import / Export Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+		// ── Import / Export ─────────────────────────────────────────────────
 		const AI_IMPORT_URL = 'https://axmoffknvblluibuitrq.supabase.co/functions/v1/smart-import';
 		const AI_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso';
 
@@ -4546,14 +4533,14 @@ Sarah Jones, 905-555-5678"></textarea>
 			html += '</div>';
 			// Action buttons
 			html += '<div class="d-flex gap-2 flex-wrap mb-2">';
-			html += '<button class="btn btn-sm btn-success" onclick="commitPricingImport()"><i class="fas fa-check me-1"></i>Looks good Ã¢â‚¬â€ Import!</button>';
+			html += '<button class="btn btn-sm btn-success" onclick="commitPricingImport()"><i class="fas fa-check me-1"></i>Looks good — Import!</button>';
 			html += '<button class="btn btn-sm" style="background:#7c3aed;color:white;" onclick="showFixItBox(\'pricing\')"><i class="fas fa-magic me-1"></i>Make Changes</button>';
 			html += '<button class="btn btn-sm btn-outline-secondary" onclick="cancelImport(\'pricing\')">Cancel</button>';
 			html += '</div>';
 			// Fix-it chat box (hidden by default)
 			html += '<div id="fixItBox_pricing" style="display:none; border:2px solid #7c3aed; border-radius:8px; padding:10px; background:#faf8ff;">';
 			html += '<div class="small fw-bold mb-1" style="color:#7c3aed;"><i class="fas fa-magic me-1"></i>Tell the AI what to fix:</div>';
-			html += '<textarea id="fixItText_pricing" class="form-control form-control-sm mb-2" rows="3" placeholder="e.g. The prices look right but the categories are all wrong Ã¢â‚¬â€ tile items should be under Tile, not General. Also the unit for painting should be sqft not ea."></textarea>';
+			html += '<textarea id="fixItText_pricing" class="form-control form-control-sm mb-2" rows="3" placeholder="e.g. The prices look right but the categories are all wrong — tile items should be under Tile, not General. Also the unit for painting should be sqft not ea."></textarea>';
 			html += '<div class="d-flex gap-2">';
 			html += '<button class="btn btn-sm" style="background:#7c3aed;color:white;" onclick="runFixIt(\'pricing\')"><i class="fas fa-magic me-1"></i>Fix It</button>';
 			html += '<button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById(\'fixItBox_pricing\').style.display=\'none\'">Never mind</button>';
@@ -4575,13 +4562,13 @@ Sarah Jones, 905-555-5678"></textarea>
 			if (clients.length > 30) html += '<div class="text-muted small pt-1">...and ' + (clients.length-30) + ' more</div>';
 			html += '</div>';
 			html += '<div class="d-flex gap-2 flex-wrap mb-2">';
-			html += '<button class="btn btn-sm btn-success" onclick="commitClientsImport()"><i class="fas fa-check me-1"></i>Looks good Ã¢â‚¬â€ Import!</button>';
+			html += '<button class="btn btn-sm btn-success" onclick="commitClientsImport()"><i class="fas fa-check me-1"></i>Looks good — Import!</button>';
 			html += '<button class="btn btn-sm" style="background:#1a56a0;color:white;" onclick="showFixItBox(\'clients\')"><i class="fas fa-magic me-1"></i>Make Changes</button>';
 			html += '<button class="btn btn-sm btn-outline-secondary" onclick="cancelImport(\'clients\')">Cancel</button>';
 			html += '</div>';
 			html += '<div id="fixItBox_clients" style="display:none; border:2px solid #1a56a0; border-radius:8px; padding:10px; background:#f0f4ff;">';
 			html += '<div class="small fw-bold mb-1" style="color:#1a56a0;"><i class="fas fa-magic me-1"></i>Tell the AI what to fix:</div>';
-			html += '<textarea id="fixItText_clients" class="form-control form-control-sm mb-2" rows="3" placeholder="e.g. The names and emails got swapped. Also some entries are companies not people Ã¢â‚¬â€ keep them but use the company name."></textarea>';
+			html += '<textarea id="fixItText_clients" class="form-control form-control-sm mb-2" rows="3" placeholder="e.g. The names and emails got swapped. Also some entries are companies not people — keep them but use the company name."></textarea>';
 			html += '<div class="d-flex gap-2">';
 			html += '<button class="btn btn-sm" style="background:#1a56a0;color:white;" onclick="runFixIt(\'clients\')"><i class="fas fa-magic me-1"></i>Fix It</button>';
 			html += '<button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById(\'fixItBox_clients\').style.display=\'none\'">Never mind</button>';
@@ -4614,7 +4601,7 @@ Sarah Jones, 905-555-5678"></textarea>
 				return;
 			}
 			window._originalImportContent = content; // save for fix-it context
-			resultEl.innerHTML = '<div class="alert alert-light py-2 small"><span class="spinner-border spinner-border-sm me-2"></span>AI is reading your dataÃ¢â‚¬Â¦ this takes a few seconds.</div>';
+			resultEl.innerHTML = '<div class="alert alert-light py-2 small"><span class="spinner-border spinner-border-sm me-2"></span>AI is reading your data… this takes a few seconds.</div>';
 			try {
 				var res = await fetch(AI_IMPORT_URL, {
 					method: 'POST',
@@ -4653,7 +4640,7 @@ Sarah Jones, 905-555-5678"></textarea>
 
 			// Show spinner inside the fix-it box
 			var fixBtn = document.querySelector('#fixItBox_' + type + ' button');
-			if (fixBtn) { fixBtn.disabled = true; fixBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>FixingÃ¢â‚¬Â¦'; }
+			if (fixBtn) { fixBtn.disabled = true; fixBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Fixing…'; }
 
 			try {
 				var res = await fetch(AI_IMPORT_URL, {
@@ -4680,11 +4667,11 @@ Sarah Jones, 905-555-5678"></textarea>
 			var cats = window._pendingPricingImport;
 			if (!cats) return;
 			var resultEl = document.getElementById('importPricingResult');
-			resultEl.innerHTML = '<div class="alert alert-light py-2 small"><span class="spinner-border spinner-border-sm me-2"></span>Saving to cloudÃ¢â‚¬Â¦</div>';
+			resultEl.innerHTML = '<div class="alert alert-light py-2 small"><span class="spinner-border spinner-border-sm me-2"></span>Saving to cloud…</div>';
 			try {
 				localStorage.setItem('ald_custom_items', JSON.stringify(cats));
 				if (typeof saveItemsToSupabase === 'function') await saveItemsToSupabase({ customItems: cats, itemOverrides: {} });
-				resultEl.innerHTML = '<div class="alert alert-success py-2 small"><i class="fas fa-check-circle me-1"></i>Done! Items saved and synced to cloud. <a href="quote-builder.html">Go to Quote Builder Ã¢â€ â€™</a></div>';
+				resultEl.innerHTML = '<div class="alert alert-success py-2 small"><i class="fas fa-check-circle me-1"></i>Done! Items saved and synced to cloud. <a href="quote-builder.html">Go to Quote Builder →</a></div>';
 				window._pendingPricingImport = null;
 			} catch(e) {
 				resultEl.innerHTML = '<div class="alert alert-danger py-2 small">Save failed: ' + e.message + '</div>';
@@ -4695,13 +4682,13 @@ Sarah Jones, 905-555-5678"></textarea>
 			var clients = window._pendingClientsImport;
 			if (!clients) return;
 			var resultEl = document.getElementById('importClientsResult');
-			resultEl.innerHTML = '<div class="alert alert-light py-2 small"><span class="spinner-border spinner-border-sm me-2"></span>Saving to cloudÃ¢â‚¬Â¦</div>';
+			resultEl.innerHTML = '<div class="alert alert-light py-2 small"><span class="spinner-border spinner-border-sm me-2"></span>Saving to cloud…</div>';
 			try {
 				var clientsObj = {};
 				clients.forEach(function(c) { if (c.name) clientsObj[c.name] = c; });
 				localStorage.setItem('ald_clients', JSON.stringify(clientsObj));
 				if (typeof saveAllClientsToSupabase === 'function') await saveAllClientsToSupabase(clients);
-				resultEl.innerHTML = '<div class="alert alert-success py-2 small"><i class="fas fa-check-circle me-1"></i>Done! ' + clients.length + ' clients saved and synced to cloud. <a href="quote-builder.html">Go to Quote Builder Ã¢â€ â€™</a></div>';
+				resultEl.innerHTML = '<div class="alert alert-success py-2 small"><i class="fas fa-check-circle me-1"></i>Done! ' + clients.length + ' clients saved and synced to cloud. <a href="quote-builder.html">Go to Quote Builder →</a></div>';
 				window._pendingClientsImport = null;
 			} catch(e) {
 				resultEl.innerHTML = '<div class="alert alert-danger py-2 small">Save failed: ' + e.message + '</div>';
@@ -4745,7 +4732,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'quotedr-items.csv'; a.click();
 		}
 
-		// Legacy functions removed Ã¢â‚¬â€ replaced by AI import above
+		// Legacy functions removed — replaced by AI import above
 		function importClientsFromFileSettings() {
 			var file = document.getElementById('importClientsFileSettings').files[0];
 			var resultEl = document.getElementById('importClientsResultSettings');
@@ -4778,7 +4765,7 @@ Sarah Jones, 905-555-5678"></textarea>
 				if (typeof saveAllClientsToSupabase === 'function') {
 					var clientsArray = Object.values(clients);
 					saveAllClientsToSupabase(clientsArray).then(function() {
-						console.log('Clients synced to Supabase Ã¢Å“â€œ');
+						console.log('Clients synced to Supabase ✓');
 					}).catch(function(e) { console.warn('Clients sync error:', e); });
 				}
 				resultEl.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>' + added + ' clients imported and synced to cloud! Reloading...</span>';
@@ -4847,7 +4834,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			var file = document.getElementById('importMaterialsFileSettings').files[0];
 			var resultEl = document.getElementById('importMaterialsResultSettings');
 			if (!file) { resultEl.innerHTML = '<span class="text-danger">Please select a file first.</span>'; return; }
-			resultEl.innerHTML = '<span class="text-info">Ã°Å¸Â¤â€“ AI is reading your file...</span>';
+			resultEl.innerHTML = '<span class="text-info">🤖 AI is reading your file...</span>';
 			var reader = new FileReader();
 			reader.onload = async function(e) {
 				try {
@@ -4875,7 +4862,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			var file = document.getElementById('importClientsFileSettings').files[0];
 			var resultEl = document.getElementById('importClientsResultSettings');
 			if (!file) { resultEl.innerHTML = '<span class="text-danger">Please select a file first.</span>'; return; }
-			resultEl.innerHTML = '<span class="text-info">Ã°Å¸Â¤â€“ AI is reading your file...</span>';
+			resultEl.innerHTML = '<span class="text-info">🤖 AI is reading your file...</span>';
 			var reader = new FileReader();
 			reader.onload = async function(e) {
 				try {
@@ -4936,7 +4923,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			loadAiLearnedMappingsUI();
 		}
 
-		// Ã¢â€â‚¬Ã¢â€â‚¬ Payment Settings Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+		// ── Payment Settings ──────────────────────────────────────────
 		function getAiTradeItemsForSettings() {
 			var items = {};
 			try { items = JSON.parse(localStorage.getItem('ald_custom_items') || '{}'); } catch(e) { items = {}; }
@@ -4994,7 +4981,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			list.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm me-2"></span>Loading trade rules...</div>';
 			var rules = await getUserAiTradeRules();
 			if (!rules.length) {
-				list.innerHTML = '<div class="alert alert-light border small mb-0">No trade rules yet. Add one above, like Ã¢â‚¬Å“case a doorÃ¢â‚¬Â = 35 LF per door.</div>';
+				list.innerHTML = '<div class="alert alert-light border small mb-0">No trade rules yet. Add one above, like “case a door” = 35 LF per door.</div>';
 				return;
 			}
 			var html = '<div class="table-responsive"><table class="table table-sm align-middle mb-0">';
@@ -5255,7 +5242,7 @@ Sarah Jones, 905-555-5678"></textarea>
 					const active = preset.id === activePortalThemePresetId ? ' active' : '';
 					return '<button type="button" class="portal-theme-preset-item' + active + '" onclick="applyPortalThemePreset(' + JSON.stringify(preset.id).replace(/"/g, '&quot;') + ')">' +
 						'<strong>' + escapeHtml(preset.title || 'Untitled theme') + '</strong>' +
-						'<span>' + escapeHtml(portalLayoutLabel(portalLayoutStyleValue(preset.theme?.layoutStyle))) + ' Ã‚Â· Updated ' + escapeHtml(new Date(preset.updatedAt || preset.createdAt || Date.now()).toLocaleDateString()) + '</span>' +
+						'<span>' + escapeHtml(portalLayoutLabel(portalLayoutStyleValue(preset.theme?.layoutStyle))) + ' · Updated ' + escapeHtml(new Date(preset.updatedAt || preset.createdAt || Date.now()).toLocaleDateString()) + '</span>' +
 						'</button>';
 				}).join('');
 			}
@@ -5801,7 +5788,7 @@ Sarah Jones, 905-555-5678"></textarea>
 	</script>
 
 
-<script src="chatbot-feedback-topics.js?v=2026080501"></script><script src="ai-assistant.js?v=1778194800"></script>
+<script src="ai-assistant.js?v=1778194800"></script>
 
 <!-- Manage Items is handled in quote-builder.html via the Manage Items modal there -->
 
