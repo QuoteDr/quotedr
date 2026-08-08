@@ -23,7 +23,7 @@ assert(
   clientDocument.includes('email_on_viewed') &&
   clientDocument.includes('action === "mark_viewed"') &&
   clientDocument.includes('recordClientActivity(supabase, updatedRow, "viewed"') &&
-  clientDocument.includes('recordClientActivity(supabase, updatedRow, status === "approved" ? "approved" : "accepted"') &&
+  clientDocument.includes('recordClientActivity(supabase, updatedRow, activityStatus === "approved" ? "approved" : "accepted"') &&
   clientDocument.includes('recordClientActivity(supabase, updatedRow, "declined"'),
   'Secure client-document function should record and email viewed/accepted/declined client activity'
 );

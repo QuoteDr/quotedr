@@ -963,14 +963,14 @@ if (location.search.includes('debug')) {
         function getInvoiceQuoteAdjustment() {
             var adjustment = invoiceData && (invoiceData.quoteAdjustment || invoiceData.clientAdjustment);
             adjustment = adjustment || {};
-            var type = adjustment.type === 'markup' ? 'markup' : 'discount';
+            var type = adjustment.type === 'discount' ? 'discount' : 'addition';
             var basis = adjustment.basis === 'amount' || adjustment.mode === 'amount' || (adjustment.amount && !adjustment.percent) ? 'amount' : 'percent';
             var percent = parseFloat(adjustment.percent);
             if (!isFinite(percent) || percent <= 0) percent = 0;
             var amount = parseFloat(adjustment.amount || adjustment.value);
             if (!isFinite(amount) || amount <= 0) amount = 0;
             return {
-                name: String(adjustment.name || (type === 'markup' ? 'Markup' : 'Discount')).trim(),
+                name: String(adjustment.name || (type === 'discount' ? 'Discount' : 'Adjustment')).trim(),
                 type: type,
                 basis: basis,
                 percent: percent,
@@ -1896,17 +1896,14 @@ if (location.search.includes('debug')) {
                 var signatureUrl = await saveInvoiceSignatureToSupabase(invoiceId, signatureDataUrl);
                 var clientTime = new Date().toISOString();
                 var result = await updateSecureClientDocument(invoiceId, token, 'record_signature', {
-                    dataPatch: {
-                        signature_url: signatureUrl,
-                        signature_data_url: signatureUrl ? undefined : signatureDataUrl,
-                        signature_method: 'typed',
-                        signature_text: name,
-                        signed_by: name,
-                        signed_at: clientTime,
-                        terms_accepted: true,
-                        terms_accepted_at: clientTime,
-                        invoice_acknowledged: true,
-                        invoice_acknowledged_at: clientTime
+                    decision: {
+                        signature: {
+                            method: 'typed',
+                            signerName: name,
+                            evidenceUrl: signatureUrl || '',
+                            evidenceDataUrl: signatureUrl ? '' : signatureDataUrl,
+                            termsAccepted: true
+                        }
                     }
                 }, portalAnchorId);
                 if (result && result.error) throw result.error;
@@ -2006,9 +2003,8 @@ if (location.search.includes('debug')) {
                     renderInvoice();
                     renderTerms();
                     initPortalDocumentActivityTracking(supabaseId, shareToken, portalAnchorId);
-                    var contractorId = row.user_id;
                     var invTotal = invoiceData.grandTotal || invoiceData.total || 0;
-                    if (contractorId && invTotal) initInvoicePaymentSection(contractorId, invTotal, supabaseId);
+                    if (invTotal) initInvoicePaymentSection(invTotal, supabaseId);
                     markInvoiceViewed(supabaseId);
                 }).catch(function(e) {
                     console.error('Supabase invoice load error:', e);
@@ -2237,7 +2233,7 @@ if (location.search.includes('debug')) {
         var _invoiceTotalForPayment = 0;
         var _invoiceIdForPayment = null;
 
-        async function loadContractorPaymentSettings(contractorUserId) {
+        async function loadContractorPaymentSettings() {
             if (window._secureInvoicePaymentOptions) return window._secureInvoicePaymentOptions;
             return normalizeInvoicePaymentOptions(invoiceData.paymentSettings || invoiceData.payment_settings || loadLocalPaymentSettingsSnapshot());
         }
@@ -2255,6 +2251,7 @@ if (location.search.includes('debug')) {
         }
 
         function normalizeInvoicePaymentOptions(settings) {
+            if (settings && Number(settings.version || 0) >= 3 && settings.manual && settings.card) return settings;
             if (settings && Number(settings.version || 0) >= 2 && settings.manual && settings.stripe) return settings;
             settings = settings || {};
             var cardPaymentEnabled = window.QuoteDrCardPaymentRules
@@ -2374,13 +2371,13 @@ if (location.search.includes('debug')) {
             var balanceCents = _invoicePaymentState && Number(_invoicePaymentState.balanceDueCents || 0) > 0
                 ? Number(_invoicePaymentState.balanceDueCents)
                 : Math.round(total * 100);
-            var stripe = s.stripe || {};
+            var card = s.card || s.stripe || {};
             var fullPaymentEnabled = !s.invoice || s.invoice.fullPaymentEnabled !== false;
-            if (stripe.ready && fullPaymentEnabled && paymentTargetId) {
+            if ((card.available === true || card.ready === true) && fullPaymentEnabled && paymentTargetId) {
                 buttonHtml += '<button type="button" class="btn btn-success btn-lg px-5 mb-3 w-100" onclick="handleClientInvoicePayment()">';
                 buttonHtml += '<i class="fas fa-credit-card me-2"></i>Pay Invoice - ' + formatMoney(balanceCents / 100, _iCurrency) + '</button>';
                 buttonHtml += '<div class="text-muted small mb-3"><i class="fab fa-stripe me-1"></i>Secure card payment powered by Stripe. The amount shown is your invoice balance.</div>';
-            } else if (stripe.enabled && fullPaymentEnabled) {
+            } else if (card.enabled && fullPaymentEnabled) {
                 buttonHtml += '<div class="alert alert-light border small text-start mb-3"><i class="fas fa-credit-card me-1"></i>Card payment is temporarily unavailable. You can still use a direct payment method below.</div>';
             }
 
@@ -2411,7 +2408,7 @@ if (location.search.includes('debug')) {
             if (section) section.style.display = 'block';
         }
 
-        async function initInvoicePaymentSection(contractorUserId, total, invoiceId) {
+        async function initInvoicePaymentSection(total, invoiceId) {
             if (invoiceIsInvalid()) {
                 renderInvoicePaymentOptions(null, 0, '');
                 return;
@@ -2420,7 +2417,7 @@ if (location.search.includes('debug')) {
             _invoiceTotalForPayment = total || 0;
             _invoiceIdForPayment = invoiceId;
             if (!total) return;
-            _invoicePaymentOptions = await loadContractorPaymentSettings(contractorUserId);
+            _invoicePaymentOptions = await loadContractorPaymentSettings();
             _invoicePaymentSettings = _invoicePaymentOptions || normalizeInvoicePaymentOptions(getInvoicePaymentSettingsFallback());
             if (new URLSearchParams(window.location.search).get('payment') === 'success') {
                 await showPaymentReturnNotice();

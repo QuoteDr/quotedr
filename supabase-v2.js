@@ -782,8 +782,8 @@ async function updateSecureClientDocument(documentId, token, updateAction, paylo
     var businessUpdate = updateAction === 'client_update' || updateAction === 'record_signature' || updateAction === 'decline_change_order';
     if (businessUpdate && window.QuoteDrSave) {
         qdRegisterSecureClientSaveAdapters();
-        var dataPatch = payload && payload.dataPatch || {};
-        var signed = !!(dataPatch.signed_at || dataPatch.signature_url || dataPatch.signature_data_url || (payload && payload.topLevel && payload.topLevel.accepted_at));
+        var decision = payload && payload.decision || {};
+        var signed = !!(decision && decision.signature);
         var entityType = signed ? 'client_signature' : (updateAction === 'decline_change_order' ? 'client_approval' : 'client_note');
         return window.QuoteDrSave.save({
             entityType: entityType,

@@ -158,7 +158,9 @@ assert(viewer.includes('applyViewerItemUpgradeGroups(item)'), 'client viewer cho
 assert(viewer.includes('choice-option-upgrades-wrap'), 'client viewer should render selected choice upgrades in a full-width block below choice cards');
 assert(viewer.includes('choice-group-note'), 'client viewer should show visible notes attached to grouped choice items');
 assert(viewer.includes('_clientChoiceGroups'), 'client viewer should save selected choice group summaries');
-assert(viewer.includes('applyClientChoiceGroupsToRooms'), 'client viewer should apply selected choices on submit or accept');
+assert(viewer.includes('client-document-decisions.js'), 'client viewer should load the minimal decision collector');
+assert(viewer.includes('QuoteDrClientDecisions.collect'), 'client viewer should submit selected choices as a minimal decision payload');
+assert(!viewer.includes('function applyClientChoiceGroupsToRooms'), 'client viewer should not rebuild authoritative rooms from client-loaded data');
 assert(builder.includes('upgrade: item.upgrade ? cloneSavedItemForQuoteSync(item.upgrade) : null'), 'quote-level choice groups should preserve upgrade data from grouped line items');
 assert(items.includes('upgrade: item.upgrade ? JSON.parse(JSON.stringify(item.upgrade)) : null'), 'saved choice group templates should preserve upgrade data from saved items');
 assert(read('quote-storage.js').includes('hydrateChoiceGroupOptionsForSave'), 'quote storage should hydrate missing choice option upgrades before sharing/saving');

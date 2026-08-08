@@ -5,6 +5,16 @@ import {
   AccountAccessError,
   requireAccountPermissionWithDefault,
 } from "../_shared/account-authorization.ts";
+import {
+  applyClientDocumentDecision,
+  calculateClientDocumentTotals,
+  clientDecisionForStorage,
+  ClientDocumentDecisionError,
+  sanitizeClientBusinessProfile,
+  sanitizeClientDocumentRow,
+  sanitizeClientMediaUrl,
+  sanitizeClientDocumentStyle,
+} from "../_shared/client-document-policy.mjs";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "https://axmoffknvblluibuitrq.supabase.co";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso";
@@ -32,6 +42,7 @@ type QuoteRow = {
   updated_at?: string;
   accepted_at?: string | null;
   accepted_by?: string | null;
+  viewed_at?: string | null;
   public_share_token_hash?: string | null;
 };
 
@@ -241,8 +252,8 @@ function escapeHtml(value: unknown) {
     .replace(/'/g, "&#39;");
 }
 
-function clientNoteSummary(dataPatch: Record<string, unknown>) {
-  const roomNotes = dataPatch._roomNotes;
+function clientNoteSummary(decision: Record<string, unknown>) {
+  const roomNotes = decision.roomNotes;
   if (!roomNotes || typeof roomNotes !== "object" || Array.isArray(roomNotes)) return "";
   const snippets = Object.values(roomNotes as Record<string, unknown>)
     .map((value) => String(value || "").trim())
@@ -252,9 +263,9 @@ function clientNoteSummary(dataPatch: Record<string, unknown>) {
   return joined.length > 240 ? joined.slice(0, 237) + "..." : joined;
 }
 
-function detectClientNoteActivity(dataPatch: unknown) {
-  if (!dataPatch || typeof dataPatch !== "object" || Array.isArray(dataPatch)) return "";
-  return clientNoteSummary(dataPatch as Record<string, unknown>);
+function detectClientNoteActivity(decision: unknown) {
+  if (!decision || typeof decision !== "object" || Array.isArray(decision)) return "";
+  return clientNoteSummary(decision as Record<string, unknown>);
 }
 
 async function maybeSendClientActivityEmail(
@@ -425,69 +436,12 @@ function samePortalGroup(anchor: QuoteRow, target: QuoteRow) {
   return target.id === anchor.id;
 }
 
-function sanitizeQuoteRow(row: QuoteRow) {
-  const safeData = { ...rowData(row) };
-  [
-    "portal_pin",
-    "portalPin",
-    "share_token",
-    "shareToken",
-    "portal_token",
-    "portalToken",
-    "portal_share_token",
-    "portalShareToken",
-    "portal_share_anchor_id",
-    "portal_share_created_at",
-    "public_share_token",
-    "public_share_token_hash",
-    "publicShareToken",
-    "publicShareTokenHash",
-    "_saveMeta",
-    "_editorInstanceId",
-    "_serverUpdatedAt",
-    "_remoteUpdatePending",
-  ].forEach((key) => delete safeData[key]);
-  if (safeData.businessProfile) safeData.businessProfile = sanitizePublicBusinessProfile(safeData.businessProfile);
-  return {
-    id: row.id,
-    user_id: row.user_id,
-    quote_number: row.quote_number || "",
-    client_name: row.client_name || "",
-    status: row.status || "",
-    type: row.type || rowData(row).documentType || rowData(row).type || "quote",
-    parent_quote_id: row.parent_quote_id || null,
-    change_order_number: row.change_order_number || null,
-    total: row.total || 0,
-    data: safeData,
-    created_at: row.created_at || null,
-    updated_at: row.updated_at || null,
-  };
+function sanitizeQuoteRow(row: QuoteRow, options: Record<string, unknown> = {}) {
+  return sanitizeClientDocumentRow(row, options) as Record<string, unknown>;
 }
 
-const PUBLIC_BUSINESS_PROFILE_FIELDS = [
-  "business_name", "businessName", "company_name", "companyName",
-  "tagline", "companyTagline", "business_tagline",
-  "owner_name", "ownerName", "name",
-  "address", "streetAddress", "street_address",
-  "city", "province", "state", "postal_code", "postalCode", "postal",
-  "phone", "business_phone", "email", "business_email",
-  "hst_number", "hstNumber", "taxNumber", "tax_number",
-  "website", "url", "hidden_profile_fields", "hiddenProfileFields",
-];
-
 function sanitizePublicBusinessProfile(value: unknown) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-  const source = value as Record<string, unknown>;
-  const result: Record<string, unknown> = {};
-  for (const key of PUBLIC_BUSINESS_PROFILE_FIELDS) {
-    const field = source[key];
-    if (Array.isArray(field) && (key === "hidden_profile_fields" || key === "hiddenProfileFields")) {
-      result[key] = field.map((item) => String(item || "").slice(0, 80)).filter(Boolean).slice(0, 40);
-    } else if (typeof field === "string" || typeof field === "number") {
-      result[key] = String(field).slice(0, 1000);
-    }
-  }
-  return result;
+  return sanitizeClientBusinessProfile(value);
 }
 
 const PUBLIC_PORTAL_THEME_STRING_FIELDS = [
@@ -502,7 +456,8 @@ function sanitizePublicPortalTheme(value: unknown) {
   const source = value as Record<string, unknown>;
   const result: Record<string, unknown> = {};
   for (const key of PUBLIC_PORTAL_THEME_STRING_FIELDS) {
-    if (typeof source[key] === "string") result[key] = source[key];
+    if (typeof source[key] !== "string") continue;
+    result[key] = key === "portalLogo" ? sanitizeClientMediaUrl(source[key]) : source[key];
   }
   for (const key of ["bgStrength", "logoScale"]) {
     const rawValue = source[key];
@@ -531,7 +486,7 @@ async function loadPublicAccountBranding(userId: string, includePortalTheme = fa
       : {};
     return {
       businessProfile: sanitizePublicBusinessProfile(profile),
-      businessLogo: typeof logoRecord.logo === "string" ? logoRecord.logo : "",
+      businessLogo: typeof logoRecord.logo === "string" ? sanitizeClientMediaUrl(logoRecord.logo) : "",
       portalTheme: includePortalTheme ? sanitizePublicPortalTheme(portalTheme) : {},
     };
   } catch (error) {
@@ -587,7 +542,7 @@ async function loadPaymentOptions(row: QuoteRow) {
   const defaultFixedCents = Math.max(0, Math.round(Number(settings.deposit_default_fixed_cents || 0)));
   const defaultKind = settings.deposit_default_kind === "fixed" && defaultFixedCents > 0 ? "fixed" : "percent";
   return {
-    version: 2,
+    version: 3,
     deposit: {
       enabled: settings.accept_deposit !== false,
       defaultKind,
@@ -596,10 +551,9 @@ async function loadPaymentOptions(row: QuoteRow) {
       due: "after_acceptance",
     },
     invoice: { fullPaymentEnabled: settings.accept_full_payment !== false },
-    stripe: {
+    card: {
       enabled: cardPaymentEnabled,
-      ready: cardPaymentEnabled && connectionReady,
-      status: connectionRow?.status || "not_connected",
+      available: cardPaymentEnabled && connectionReady,
     },
     manual: {
       etransfer: {
@@ -901,18 +855,86 @@ async function createLink(req: Request, body: Record<string, unknown>) {
   });
 }
 
+function changeOrderParentId(row: QuoteRow) {
+  const data = rowData(row);
+  return normalizeId(row.parent_quote_id || data.parentQuoteId || data.parent_quote_id);
+}
+
+function changeOrderSequence(row: QuoteRow) {
+  const data = rowData(row);
+  return Number(row.change_order_number ?? data.changeOrderNumber ?? data.change_order_number ?? 0) || 0;
+}
+
+function authoritativeRowTotal(row: QuoteRow | null | undefined) {
+  if (!row) return 0;
+  const data = rowData(row);
+  const value = Number(row.total ?? data.grandTotal ?? data.total ?? 0);
+  return Number.isFinite(value) ? value : 0;
+}
+
+async function loadAuthoritativeChangeOrderContext(row: QuoteRow) {
+  if (documentTypeLabel(row) !== "change order") return null;
+  const parentId = changeOrderParentId(row);
+  if (!parentId) return null;
+  const supabase = adminClient();
+  const [parentResult, siblingResult] = await Promise.all([
+    supabase.from("quotes").select("*").eq("id", parentId).eq("user_id", row.user_id).maybeSingle(),
+    supabase.from("quotes").select("*").eq("parent_quote_id", parentId).eq("user_id", row.user_id),
+  ]);
+  if (parentResult.error) throw parentResult.error;
+  let siblingData = siblingResult.data;
+  if (siblingResult.error) {
+    const fallback = await supabase
+      .from("quotes")
+      .select("*")
+      .eq("user_id", row.user_id)
+      .contains("data", { parentQuoteId: parentId });
+    if (fallback.error) throw fallback.error;
+    siblingData = fallback.data;
+  }
+  const parent = parentResult.data as QuoteRow | null;
+  const siblings = (siblingData as QuoteRow[] || []).filter((candidate) => documentTypeLabel(candidate) === "change order");
+  const currentSequence = changeOrderSequence(row) || Number.MAX_SAFE_INTEGER;
+  const approved = siblings.filter((candidate) => String(candidate.status || rowData(candidate).status || "").toLowerCase() === "approved");
+  const previousApproved = approved.filter((candidate) => candidate.id !== row.id && changeOrderSequence(candidate) < currentSequence);
+  const parentTotal = authoritativeRowTotal(parent);
+  const previousApprovedTotal = previousApproved.reduce((sum, candidate) => sum + authoritativeRowTotal(candidate), 0);
+  const allApprovedTotal = approved.filter((candidate) => candidate.id !== row.id).reduce((sum, candidate) => sum + authoritativeRowTotal(candidate), 0);
+  const parentStyle = parent ? sanitizeClientDocumentStyle(rowData(parent).style) : {};
+  return {
+    parentTotal,
+    previousApprovedTotal,
+    allApprovedTotal,
+    publicContext: {
+      parent: parent ? { id: parent.id, data: { style: parentStyle } } : null,
+      parentTotal,
+      previousApprovedTotal,
+      allApprovedTotal,
+    },
+  };
+}
+
 async function viewDocument(body: Record<string, unknown>) {
   const documentId = normalizeId(body.documentId || body.id);
   const token = String(body.token || "").trim();
   const portalAnchorId = normalizeId(body.portalAnchorId || body.portal_anchor);
   const { target } = await assertTokenAccess(documentId, token, portalAnchorId);
-  const [paymentOptions, branding] = await Promise.all([
+  const [paymentOptions, branding, changeOrderContext] = await Promise.all([
     loadPaymentOptions(target),
     documentNeedsBrandingFallback(target)
       ? loadDocumentBrandingFallback(target.user_id)
       : Promise.resolve(null),
+    loadAuthoritativeChangeOrderContext(target),
   ]);
-  return json({ document: sanitizeQuoteRow(target), paymentOptions, branding });
+  const document = sanitizeQuoteRow(target, {
+    changeOrderContext,
+    parentTotal: changeOrderContext?.parentTotal,
+    previousApprovedTotal: changeOrderContext?.previousApprovedTotal,
+  });
+  if (changeOrderContext?.publicContext && document.data && typeof document.data === "object") {
+    (document.data as Record<string, unknown>).changeOrderContext = changeOrderContext.publicContext;
+  }
+  return json({ document, paymentOptions, branding });
 }
 
 async function portalDocuments(body: Record<string, unknown>) {
@@ -938,7 +960,7 @@ async function portalDocuments(body: Record<string, unknown>) {
   if (error) throw error;
   const docs = (data as QuoteRow[] || [])
     .filter((row) => row.id === anchor.id || (portalVisible(row) && samePortalGroup(anchor, row)))
-    .map(sanitizeQuoteRow);
+    .map((row) => sanitizeQuoteRow(row));
   return json({
     anchor: compactDocumentResult(anchor),
     anchorId: anchor.id,
@@ -1100,9 +1122,66 @@ async function documentActivity(req: Request, body: Record<string, unknown>) {
   return json({ events: ((data as PortalDocumentEventRow[]) || []).map(sanitizePortalDocumentEventRow) });
 }
 
-function mergeSafeData(existing: Record<string, unknown>, patch: unknown) {
-  if (!patch || typeof patch !== "object" || Array.isArray(patch)) return existing;
-  return { ...existing, ...(patch as Record<string, unknown>) };
+function clientDecisionBody(body: Record<string, unknown>) {
+  if (Object.prototype.hasOwnProperty.call(body, "dataPatch") || Object.prototype.hasOwnProperty.call(body, "topLevel")) {
+    throw new ClientDocumentDecisionError(
+      "Legacy full-document client updates are not supported. Refresh the secure document and try again.",
+      "legacy_client_document_patch_rejected",
+    );
+  }
+  return body.decision;
+}
+
+function cloneDocumentData(data: Record<string, unknown>) {
+  return JSON.parse(JSON.stringify(data || {})) as Record<string, unknown>;
+}
+
+function storeClientSelectionSummaries(
+  data: Record<string, unknown>,
+  summaries: Record<string, unknown[]>,
+  submittedAt: string,
+) {
+  data._clientUpgrades = summaries.upgrades || [];
+  data._clientRemovals = summaries.removals || [];
+  data._clientOptionalSelections = summaries.optionalSelections || [];
+  data._clientChoiceGroups = summaries.choiceGroups || [];
+  data._clientEnhancements = summaries.enhancements || [];
+  data._clientItemUpgradeSelections = summaries.itemUpgradeSelections || [];
+  data._clientConsultationRequests = summaries.consultationRequests || [];
+  data._clientSubmittedAt = submittedAt;
+}
+
+function applyTypedSignature(
+  data: Record<string, unknown>,
+  signature: Record<string, unknown>,
+  signerName: string,
+  now: string,
+  invoiceAcknowledgement = false,
+) {
+  const evidenceUrl = String(signature.evidenceUrl || "").trim();
+  const evidenceDataUrl = String(signature.evidenceDataUrl || "").trim();
+  data.signature_method = "typed";
+  data.signature_text = signerName;
+  data.signed_by = signerName;
+  data.signed_at = now;
+  data.accepted_by = signerName;
+  data.accepted_at = now;
+  data.terms_accepted = true;
+  data.terms_accepted_at = now;
+  if (evidenceUrl) {
+    data.signature_url = evidenceUrl;
+    delete data.signature_data_url;
+  } else {
+    data.signature_data_url = evidenceDataUrl;
+    delete data.signature_url;
+  }
+  if (invoiceAcknowledgement) {
+    data.invoice_acknowledged = true;
+    data.invoice_acknowledged_at = now;
+  } else {
+    data.approved_by = signerName;
+    data.approved_at = now;
+  }
 }
 
 async function updateDocument(req: Request, body: Record<string, unknown>) {
@@ -1117,6 +1196,9 @@ async function updateDocument(req: Request, body: Record<string, unknown>) {
   const existingData = rowData(target);
   const now = new Date().toISOString();
   const update: Record<string, unknown> = { updated_at: now };
+  let activityDecision: Record<string, unknown> | null = null;
+  let activitySignerName = "";
+  let activityStatus = "";
 
   if (action === "mark_viewed") {
     if (signedInUser?.id && signedInUser.id === target.user_id) {
@@ -1125,36 +1207,87 @@ async function updateDocument(req: Request, body: Record<string, unknown>) {
     if (!target.status || ["draft", "sent"].includes(String(target.status))) {
       update.status = "viewed";
       update.viewed_at = now;
-      update.data = mergeSafeData(existingData, { status: "viewed", viewed_at: now });
+      update.data = { ...existingData, status: "viewed", viewed_at: now };
     }
   } else if (action === "client_update") {
-    const topLevel = body.topLevel && typeof body.topLevel === "object" ? body.topLevel as Record<string, unknown> : {};
-    const patch = body.dataPatch && typeof body.dataPatch === "object" ? body.dataPatch as Record<string, unknown> : {};
-    const requestedStatus = typeof topLevel.status === "string" ? String(topLevel.status).toLowerCase() : "";
-    if (requestedStatus && !["accepted", "approved"].includes(requestedStatus)) {
-      return json({ error: "Unsupported client document status" }, 400);
-    }
-    const isTypedSignature = String(patch.signature_method || "").toLowerCase() === "typed";
-    const signerName = String(topLevel.accepted_by || patch.signature_text || patch.signed_by || "").trim().slice(0, 200);
-    if (requestedStatus && isTypedSignature) {
+    if (documentTypeLabel(target) === "invoice") return json({ error: "Invoice updates require the invoice signature action" }, 400);
+    const rawDecision = clientDecisionBody(body);
+    const requestedStatusHint = rawDecision && typeof rawDecision === "object" && !Array.isArray(rawDecision)
+      ? String((rawDecision as Record<string, unknown>).status || "").toLowerCase()
+      : "";
+    const applied = applyClientDocumentDecision(existingData, rawDecision, { applySelections: !!requestedStatusHint });
+    const decision = applied.decision as unknown as Record<string, unknown>;
+    const requestedStatus = String(decision.status || "").toLowerCase();
+    const signature = decision.signature && typeof decision.signature === "object"
+      ? decision.signature as Record<string, unknown>
+      : null;
+    const signerName = String(signature?.signerName || "").trim().slice(0, 200);
+    activityDecision = decision;
+    activitySignerName = signerName;
+    activityStatus = requestedStatus;
+
+    if (requestedStatus) {
+      const expectedStatus = documentTypeLabel(target) === "change order" ? "approved" : "accepted";
+      if (requestedStatus !== expectedStatus) return json({ error: `This document must be ${expectedStatus}` }, 400);
+      if (!signature) return json({ error: "Typed signature evidence is required" }, 400);
       const signerValidation = validateTypedSigner(target, signerName);
       if (!signerValidation.hasClientName) return json({ error: "This document does not have a client name to verify" }, 400);
       if (!signerValidation.hasFullName) return json({ error: "Enter the client's full name" }, 400);
       if (!signerValidation.valid) return json({ error: "Signer name does not match the client name on this document" }, 400);
-      if (patch.terms_accepted !== true) return json({ error: "Terms agreement is required before signing" }, 400);
-      if (!patch.signature_url && !patch.signature_data_url) return json({ error: "Typed signature evidence is missing" }, 400);
-    }
-    if (requestedStatus) update.status = requestedStatus;
-    if (typeof topLevel.client_name === "string") update.client_name = topLevel.client_name;
-    if (requestedStatus) update.accepted_at = now;
-    if (signerName) update.accepted_by = signerName;
-    const merged = mergeSafeData(existingData, patch);
-    if (requestedStatus) {
       const documentStatus = String(target.status || existingData.status || "").toLowerCase();
       const validity = String(existingData.document_validity || existingData.documentValidity || "").toLowerCase();
       if (documentStatus === "voided" || ["voided", "invalid", "superseded"].includes(validity)) {
         return json({ error: "This document is no longer valid" }, 409);
       }
+    } else if (signature) {
+      return json({ error: "A signature may only be submitted with an acceptance decision" }, 400);
+    }
+
+    const merged = applied.data as Record<string, unknown>;
+    storeClientSelectionSummaries(merged, applied.summaries as Record<string, unknown[]>, now);
+    if (!requestedStatus) {
+      merged._clientDecision = clientDecisionForStorage(decision);
+      update.data = merged;
+    } else {
+      if (applied.changed && !Array.isArray(merged.original_rooms)) {
+        merged.original_rooms = cloneDocumentData(existingData).rooms || [];
+      }
+      delete merged._clientDecision;
+      merged.client_upgraded = applied.changed === true || existingData.client_upgraded === true;
+      if (merged.client_upgraded) merged.client_upgraded_at = now;
+
+      const changeOrderContext = await loadAuthoritativeChangeOrderContext(target);
+      const totals = calculateClientDocumentTotals(merged, {
+        documentType: target.type,
+        parentTotal: changeOrderContext?.parentTotal,
+        previousApprovedTotal: changeOrderContext?.previousApprovedTotal,
+      });
+      const authoritativeTotal = Number(totals.documentTotal || 0);
+      merged.subtotal = totals.subtotal;
+      merged.taxAmount = totals.tax;
+      merged.grandTotal = authoritativeTotal;
+      merged.total = authoritativeTotal;
+      if (documentTypeLabel(target) === "change order") {
+        merged.parentQuoteTotal = totals.parentTotal;
+        merged.changeOrderPreviousApprovedTotal = totals.previousApprovedTotal;
+        merged.changeOrderPriceSummary = {
+          ...(merged.changeOrderPriceSummary && typeof merged.changeOrderPriceSummary === "object"
+            ? merged.changeOrderPriceSummary as Record<string, unknown>
+            : {}),
+          originalTotal: totals.parentTotal,
+          previousApprovedTotal: totals.previousApprovedTotal,
+          addedSubtotal: totals.addedSubtotal,
+          creditSubtotal: totals.creditSubtotal,
+          netSubtotal: totals.taxableSubtotal,
+          tax: totals.tax,
+          netChange: totals.documentTotal,
+          updatedTotal: totals.updatedTotal,
+          taxLabel: totals.taxLabel,
+          taxRate: totals.taxRate,
+          taxEnabled: totals.taxEnabled,
+        };
+      }
+
       const { data: settingsRow } = await supabase
         .from("user_data")
         .select("value")
@@ -1164,26 +1297,23 @@ async function updateDocument(req: Request, body: Record<string, unknown>) {
       const settings = settingsRow?.value && typeof settingsRow.value === "object"
         ? settingsRow.value as Record<string, unknown>
         : {};
-      const terms = normalizedDocumentPaymentTerms(target, settings);
-      const acceptedTotalCents = acceptedDocumentTotalCents(target);
+      const acceptedRow = { ...target, total: authoritativeTotal, data: merged } as QuoteRow;
+      const terms = normalizedDocumentPaymentTerms(acceptedRow, settings);
+      const acceptedTotalCents = acceptedDocumentTotalCents(acceptedRow);
       merged.status = requestedStatus;
       merged.payment_terms = terms;
       merged.accepted_total_cents = acceptedTotalCents;
       merged.deposit_due_cents = acceptedDepositDueCents(acceptedTotalCents, terms);
       merged.accepted_at = now;
-    }
-    if (requestedStatus && isTypedSignature) {
-      merged.signature_method = "typed";
-      merged.signature_text = signerName;
-      merged.signed_by = signerName;
-      merged.signed_at = now;
-      merged.approved_by = signerName;
-      merged.approved_at = now;
-      merged.terms_accepted = true;
-      merged.terms_accepted_at = now;
       merged.terms_accepted_snapshot = Array.isArray(existingData.terms) ? existingData.terms.slice(0, 100) : [];
+      if (!signature) return json({ error: "Typed signature evidence is required" }, 400);
+      applyTypedSignature(merged, signature, signerName, now, false);
+      update.status = requestedStatus;
+      update.accepted_at = now;
+      update.accepted_by = signerName;
+      update.total = authoritativeTotal;
+      update.data = merged;
     }
-    update.data = merged;
   } else if (action === "record_signature") {
     if (documentTypeLabel(target) !== "invoice") return json({ error: "Invoice signature action requires an invoice" }, 400);
     const documentStatus = String(target.status || existingData.status || "").toLowerCase();
@@ -1197,37 +1327,42 @@ async function updateDocument(req: Request, body: Record<string, unknown>) {
       (existingData.signed_by || existingData.signature_text)
     );
     if (alreadySigned) return json({ result: compactDocumentResult(target), unchanged: true, alreadySigned: true });
-    const patch = body.dataPatch && typeof body.dataPatch === "object" ? body.dataPatch as Record<string, unknown> : {};
-    const signerName = String(patch.signature_text || patch.signed_by || "").trim().slice(0, 200);
+    const applied = applyClientDocumentDecision(existingData, clientDecisionBody(body), { applySelections: false });
+    const decision = applied.decision as unknown as Record<string, unknown>;
+    if (decision.status || (Array.isArray(decision.items) && decision.items.length) || Object.keys(decision.roomNotes || {}).length) {
+      return json({ error: "Invoice signatures may only submit signature evidence" }, 400);
+    }
+    const signature = decision.signature && typeof decision.signature === "object"
+      ? decision.signature as Record<string, unknown>
+      : null;
+    if (!signature) return json({ error: "Typed signature evidence is required" }, 400);
+    const signerName = String(signature.signerName || "").trim().slice(0, 200);
     const signerValidation = validateTypedSigner(target, signerName);
-    if (String(patch.signature_method || "").toLowerCase() !== "typed") return json({ error: "Typed signature evidence is required" }, 400);
     if (!signerValidation.hasClientName) return json({ error: "This invoice does not have a client name to verify" }, 400);
     if (!signerValidation.hasFullName) return json({ error: "Enter the client's full name" }, 400);
     if (!signerValidation.valid) return json({ error: "Signer name does not match the client name on this invoice" }, 400);
-    if (patch.terms_accepted !== true) return json({ error: "Terms agreement is required before signing" }, 400);
-    if (!patch.signature_url && !patch.signature_data_url) return json({ error: "Typed signature evidence is missing" }, 400);
-    const merged = mergeSafeData(existingData, patch);
-    merged.signature_method = "typed";
-    merged.signature_text = signerName;
-    merged.signed_by = signerName;
-    merged.signed_at = now;
-    merged.accepted_by = signerName;
-    merged.accepted_at = now;
-    merged.terms_accepted = true;
-    merged.terms_accepted_at = now;
+    const merged = cloneDocumentData(existingData);
     merged.terms_accepted_snapshot = Array.isArray(existingData.terms) ? existingData.terms.slice(0, 100) : [];
-    merged.invoice_acknowledged = true;
-    merged.invoice_acknowledged_at = now;
+    applyTypedSignature(merged, signature, signerName, now, true);
     update.accepted_at = now;
     update.accepted_by = signerName;
     update.data = merged;
+    activityDecision = decision;
+    activitySignerName = signerName;
   } else if (action === "decline_change_order") {
+    if (documentTypeLabel(target) !== "change order") return json({ error: "Only change orders may be declined" }, 400);
+    const applied = applyClientDocumentDecision(existingData, clientDecisionBody(body), { applySelections: false });
+    const decision = applied.decision as unknown as Record<string, unknown>;
+    if (decision.status || decision.signature || (Array.isArray(decision.items) && decision.items.length) || Object.keys(decision.roomNotes || {}).length) {
+      return json({ error: "A decline decision cannot include document changes" }, 400);
+    }
+    const merged = cloneDocumentData(existingData);
+    merged.status = "declined";
+    merged.declined_at = now;
     update.status = "declined";
-    update.data = mergeSafeData(existingData, {
-      ...(body.dataPatch && typeof body.dataPatch === "object" ? body.dataPatch as Record<string, unknown> : {}),
-      status: "declined",
-      declined_at: now,
-    });
+    update.data = merged;
+    activityDecision = decision;
+    activityStatus = "declined";
   } else {
     return json({ error: "Unsupported client document update" }, 400);
   }
@@ -1256,15 +1391,12 @@ async function updateDocument(req: Request, body: Record<string, unknown>) {
   if (action === "mark_viewed") {
     await recordClientActivity(supabase, updatedRow, "viewed", { metadata: { viewed_at: now } });
   } else if (action === "client_update") {
-    const topLevel = body.topLevel && typeof body.topLevel === "object" ? body.topLevel as Record<string, unknown> : {};
-    const patch = body.dataPatch && typeof body.dataPatch === "object" ? body.dataPatch as Record<string, unknown> : {};
-    const status = String(topLevel.status || patch.status || "").toLowerCase();
-    if (status === "accepted" || status === "approved") {
-      await recordClientActivity(supabase, updatedRow, status === "approved" ? "approved" : "accepted", {
-        metadata: { signed_at: now, accepted_by: topLevel.accepted_by || "" },
+    if (activityStatus === "accepted" || activityStatus === "approved") {
+      await recordClientActivity(supabase, updatedRow, activityStatus === "approved" ? "approved" : "accepted", {
+        metadata: { signed_at: now, accepted_by: activitySignerName },
       });
     }
-    const noteMessage = detectClientNoteActivity(body.dataPatch);
+    const noteMessage = detectClientNoteActivity(activityDecision);
     if (noteMessage) {
       await recordClientActivity(supabase, updatedRow, "note_added", {
         message: noteMessage,
@@ -1272,11 +1404,10 @@ async function updateDocument(req: Request, body: Record<string, unknown>) {
       });
     }
   } else if (action === "record_signature") {
-    const patch = body.dataPatch && typeof body.dataPatch === "object" ? body.dataPatch as Record<string, unknown> : {};
     await recordClientActivity(supabase, updatedRow, "accepted", {
       metadata: {
         signed_at: now,
-        accepted_by: patch.signature_text || patch.signed_by || "",
+        accepted_by: activitySignerName,
         signature_method: "typed",
         signature_action: "invoice_acknowledgement",
       },
@@ -1306,6 +1437,7 @@ serve(async (req) => {
     return json({ error: "Unknown action" }, 400);
   } catch (error) {
     console.error("client-document error:", error);
+    if (error instanceof ClientDocumentDecisionError) return json({ error: error.message, code: error.code }, 400);
     return json({ error: error instanceof Error ? error.message : "Secure document request failed" }, 400);
   }
 });

@@ -6,6 +6,7 @@ function read(path) {
 }
 
 const edgeSource = read('supabase/functions/client-document/index.ts');
+const policySource = read('supabase/functions/_shared/client-document-policy.mjs');
 const supabaseSource = read('supabase-v2.js');
 const quoteStyleSource = read('quote-style.js');
 const quoteBuilderSource = read('quote-builder.html');
@@ -36,7 +37,8 @@ assert((dashboardSource.match(/createSecureClientShareLink\([^\n]+\{ mode: 'port
 assert(edgeSource.includes('if (mode !== "portal")'), 'the Edge Function should reject non-portal link creation');
 assert(edgeSource.includes('code: "portal_assignment_required"'), 'the Edge Function should require portal assignment before minting a token');
 assert(edgeSource.includes('code: "portal_url_required"'), 'the Edge Function should reject a non-portal destination URL');
-assert(edgeSource.includes('"portal_share_token"') && edgeSource.includes('delete safeData[key]'), 'public document payloads should not return persisted portal tokens or PIN metadata');
+assert(edgeSource.includes('sanitizeClientDocumentRow(row, options)'), 'public document payloads should use the dedicated allowlist projection');
+assert(!policySource.includes("'portal_share_token'") && !policySource.includes("'portal_pin'"), 'public document payloads should not allow persisted portal tokens or PIN metadata');
 assert(invoiceViewerSource.includes('loadSecureClientDocument'), 'invoice viewer should load shared invoices through the secure function');
 assert(quoteViewerSource.includes('loadSecureClientDocument'), 'quote viewer should load shared quotes through the secure function');
 assert(!quoteViewerSource.includes('markQuoteViewed(quoteId);'), 'quote viewer should not directly update public quote rows when marking viewed');

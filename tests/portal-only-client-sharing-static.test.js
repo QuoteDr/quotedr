@@ -10,6 +10,7 @@ const quoteStyle = read('quote-style.js');
 const dashboard = read('dashboard.html');
 const supabase = read('supabase-v2.js');
 const clientDocument = read('supabase/functions/client-document/index.ts');
+const clientDocumentPolicy = read('supabase/functions/_shared/client-document-policy.mjs');
 const sendEmail = read('supabase/functions/send-quote-email/index.ts');
 const legacyFollowup = read('supabase/functions/quote-followup/index.ts');
 const documentPayment = read('supabase/functions/document-payment/index.ts');
@@ -39,8 +40,10 @@ assert(clientDocument.includes('code: "portal_assignment_required"'), 'Edge Func
 assert(clientDocument.includes('code: "portal_url_required"'), 'Edge Function should reject non-portal destinations');
 assert(clientDocument.includes('host === "quotedr.io" || host === "www.quotedr.io"'), 'Edge Function should constrain production portal destinations to QuoteDr');
 assert(clientDocument.includes('portal_share_token: token'), 'new portal anchors should persist their stable portal token');
-assert(clientDocument.includes('delete safeData[key]'), 'secure document responses should strip portal secrets and editor metadata');
-assert(clientDocument.includes('"shareToken"') && clientDocument.includes('"portalToken"'), 'secure document responses should strip legacy token aliases too');
+assert(clientDocument.includes('sanitizeClientDocumentRow(row, options)'), 'secure document responses should use the dedicated allowlist projection');
+for (const forbidden of ["'portal_share_token'", "'portal_pin'", "'shareToken'", "'portalToken'", "'_saveMeta'"]) {
+  assert(!clientDocumentPolicy.includes(forbidden), `client projection must not allow portal/editor secret field ${forbidden}`);
+}
 assert(clientDocument.includes('portalVisible(target) && target.public_share_token_hash === tokenHash'), 'removed and non-portal documents should reject old tokens');
 assert(clientDocument.includes('return row && portalVisible(row) ? row : null'), 'short portal links should stop resolving when their anchor is removed');
 assert(documentPayment.includes('portalVisible(target) && target.public_share_token_hash === tokenHash'), 'removed and non-portal documents should reject old payment tokens');

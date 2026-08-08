@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Secure client document round trip</title>
+  <style>
+    body { font: 16px/1.5 system-ui, sans-serif; max-width: 760px; margin: 3rem auto; padding: 0 1rem; }
+    #result { padding: 1rem; border-radius: 0.75rem; background: #f3f4f6; }
+    .pass { color: #166534; background: #dcfce7 !important; }
+    .fail { color: #991b1b; background: #fee2e2 !important; }
+  </style>
+</head>
+<body>
+  <h1>Secure client document round trip</h1>
+  <div id="result">Running…</div>
+  <script src="../client-document-decisions.js"></script>
+  <script type="module">
+    import {
+      applyClientDocumentDecision,
+      calculateClientDocumentTotals,
+      sanitizeClientDocumentRow
+    } from '../supabase/functions/_shared/client-document-policy.mjs';
+
+    const assert = (condition, message) => {
+      if (!condition) throw new Error(message);
+    };
+    const sensitive = (value) => JSON.stringify({
+      roomMarkup: value.rooms[0].markup,
+      itemMarkup: value.rooms[0].items[0].markup,
+      materialCost: value.rooms[0].items[0].materialCost,
+      supplierUrl: value.rooms[0].items[0].supplierUrl,
+      optionCost: value.rooms[0].items[0].upgradeGroups[0].options[0].materialCost,
+      integration: value.integration_metadata
+    });
+
+    const row = {
+      id: 'browser-quote', user_id: 'contractor-private', type: 'quote', status: 'sent',
+      data: {
+        documentType: 'quote', clientName: 'Priya Shah', taxEnabled: false,
+        integration_metadata: { access_token: 'private' },
+        rooms: [{
+          id: 'room-1', name: 'Kitchen', markup: 20, items: [{
+            id: 'item-1', description: 'Cabinet install', quantity: 2, rate: 100, total: 200,
+            markup: 10, materialCost: 55, supplierUrl: 'https://vendor.example/private',
+            _baseRate: 100,
+            upgradeGroups: [{
+              id: 'finish', type: 'single_optional', selectedOptionIds: [],
+              options: [{
+                id: 'premium', name: 'Premium finish', rate: 25, materialCost: 9,
+                supplierUrl: 'https://vendor.example/premium', upgradeType: 'add_on',
+                quantityMode: 'manual', manualQuantity: 1
+              }]
+            }]
+          }]
+        }]
+      }
+    };
+
+    const result = document.getElementById('result');
+    try {
+      const originalJson = JSON.stringify(row.data);
+      const originalSensitive = sensitive(row.data);
+      const view = sanitizeClientDocumentRow(row);
+      const viewJson = JSON.stringify(view);
+      assert(view.user_id === undefined, 'contractor id leaked');
+      for (const forbidden of ['materialCost', 'supplierUrl', 'markup', 'access_token']) {
+        assert(!viewJson.includes(forbidden), `${forbidden} leaked`);
+      }
+      assert(view.data.rooms[0].items[0].rate === 130, 'customer sell rate was not flattened');
+      assert(view.data.grandTotal === 260, 'client total was not preserved');
+
+      const group = view.data.rooms[0].items[0].upgradeGroups[0];
+      group.selectedOptionIds = ['premium'];
+      group.options[0].manualQuantity = 3;
+      const decision = window.QuoteDrClientDecisions.collect(view.data.rooms, {});
+      const decisionJson = JSON.stringify(decision);
+      for (const forbidden of ['rooms', 'rate', 'total', 'materialCost', 'supplierUrl', 'markup']) {
+        assert(!decisionJson.includes(forbidden), `${forbidden} entered the decision payload`);
+      }
+
+      const merged = applyClientDocumentDecision(row.data, decision, { applySelections: true });
+      assert(JSON.stringify(row.data) === originalJson, 'authoritative input object was mutated');
+      assert(sensitive(merged.data) === originalSensitive, 'internal fields changed during merge');
+      assert(merged.data.rooms[0].items[0].upgradeGroups[0].options[0].manualQuantity === 3, 'allowed quantity was not merged');
+      assert(calculateClientDocumentTotals(merged.data, { documentType: 'quote' }).documentTotal === 357.5, 'approved total is incorrect');
+
+      window.__clientDocumentRoundTrip = { ok: true, decision };
+      result.className = 'pass';
+      result.textContent = 'PASS — redacted view, minimal decision, authoritative merge, and totals verified.';
+    } catch (error) {
+      window.__clientDocumentRoundTrip = { ok: false, error: error.message };
+      result.className = 'fail';
+      result.textContent = `FAIL — ${error.message}`;
+      throw error;
+    }
+  </script>
+</body>
+</html>

@@ -1753,6 +1753,7 @@ if (location.search.includes('debug')) {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="quote-dialogs.js?v=2026071501"></script>
     <script src="quote-discounts.js?v=1783218460"></script>
+    <script src="client-document-decisions.js?v=2026080801"></script>
     <script src="typed-signature.js?v=2026080301"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="card-payment-rules.js?v=2026080301"></script>
@@ -2232,10 +2233,9 @@ if (location.search.includes('debug')) {
             if (!quoteId || !shareToken) return;
 
             initPortalDocumentActivityTracking(quoteId, shareToken, portalAnchorId);
-            var contractorId = window._quoteRow && window._quoteRow.user_id;
             var quoteTotal = quoteData.grandTotal || quoteData.total || 0;
-            if (contractorId && quoteTotal) {
-                initPaymentSection(contractorId, quoteTotal);
+            if (quoteTotal) {
+                initPaymentSection(quoteTotal);
             }
 
             Promise.allSettled([
@@ -2270,9 +2270,8 @@ if (location.search.includes('debug')) {
                     quoteData.parentQuoteId = result.data.parent_quote_id || quoteData.parentQuoteId || '';
                     quoteData.changeOrderNumber = result.data.change_order_number || quoteData.changeOrderNumber || null;
                     window._quoteRow = result.data;
-                    if (window.QuoteDrChangeOrders && QuoteDrChangeOrders.isChangeOrder(result.data)) {
-                        quoteData.changeOrderContext = await QuoteDrChangeOrders.fetchContext(window._supabaseClient || window._supabase, result.data);
-                    }
+                    // Secure change-order context is projected by the Edge Function.
+                    // Never follow a public token load with direct full-row reads.
                     showExpiryNotice();
                     return;
                 } else {
@@ -3751,14 +3750,14 @@ if (location.search.includes('debug')) {
         function getViewerQuoteAdjustment() {
             var adjustment = quoteData && (quoteData.quoteAdjustment || quoteData.clientAdjustment);
             adjustment = adjustment || {};
-            var type = adjustment.type === 'markup' ? 'markup' : 'discount';
+            var type = adjustment.type === 'discount' ? 'discount' : 'addition';
             var basis = adjustment.basis === 'amount' || adjustment.mode === 'amount' || (adjustment.amount && !adjustment.percent) ? 'amount' : 'percent';
             var percent = viewerNumber(adjustment.percent);
             if (percent <= 0) percent = 0;
             var amount = viewerNumber(adjustment.amount || adjustment.value);
             if (amount <= 0) amount = 0;
             return {
-                name: String(adjustment.name || (type === 'markup' ? 'Markup' : 'Discount')).trim(),
+                name: String(adjustment.name || (type === 'discount' ? 'Discount' : 'Adjustment')).trim(),
                 type: type,
                 basis: basis,
                 percent: percent,
@@ -3855,7 +3854,9 @@ if (location.search.includes('debug')) {
         function viewerChangeOrderCurrentRawTotal(item) {
             if (!item) return 0;
             if (item._coRemoved) return 0;
-            if (item._coOriginal) return viewerItemQuantity(item) * viewerItemActiveRate(item);
+            if (item._coOriginal) return item._clientDecisionApplied === true
+                ? viewerItemActiveTotal(item)
+                : viewerItemQuantity(item) * viewerItemActiveRate(item);
             return viewerItemActiveTotal(item);
         }
 
@@ -3896,6 +3897,8 @@ if (location.search.includes('debug')) {
             if (item._coOriginal) {
                 if (item._coRemoved) {
                     rawDelta = -Math.abs(viewerChangeOrderOriginalTotal(item));
+                } else if (item._clientDecisionApplied === true) {
+                    rawDelta = viewerItemActiveTotal(item) - viewerChangeOrderOriginalTotal(item);
                 } else if ((item._coChangeStatus || '') === 'unchanged') {
                     rawDelta = 0;
                 } else if (viewerHasExplicitTotal(item)) {
@@ -4243,71 +4246,6 @@ if (location.search.includes('debug')) {
             return _clientItemUpgradeSelections;
         }
 
-        function applyClientChoiceGroupsToRooms(sourceRooms) {
-            return (sourceRooms || []).map(function(room) {
-                var nextItems = [];
-                (room.items || []).forEach(function(item) {
-                    if (!item.choiceGroup) {
-                        if (!item._removed) {
-                            var normalItem = Object.assign({}, item);
-                            if (normalizeViewerItemUpgradeGroups(normalItem).length) applyViewerItemUpgradeGroups(normalItem);
-                            nextItems.push(normalItem);
-                        }
-                        return;
-                    }
-                    if (item._removed) return;
-                    var group = item.choiceGroup;
-                    var selectedEnhancements = getViewerSelectedEnhancementOptions(group);
-                    var replacementEnhancements = selectedEnhancements.filter(function(option) { return option.upgradeType === 'replacement'; });
-                    var replacementEnhancement = replacementEnhancements.length ? replacementEnhancements[replacementEnhancements.length - 1] : null;
-                    var baseOptionsToApply = replacementEnhancement ? [replacementEnhancement] : getViewerChoiceSelectedOptions(group);
-                    baseOptionsToApply.forEach(function(option) {
-                        var qty = option.quantityMode === 'override' ? (parseFloat(option.quantityOverride) || 0) : (parseFloat(item.quantity) || 0);
-                        var nextItem = Object.assign({}, item, {
-                            description: option.name,
-                            serviceName: option.name,
-                            unitType: option.unitType || item.unitType || item.unit || '',
-                            rate: parseFloat(option.rate) || 0,
-                            materialCost: parseFloat(option.materialCost) || 0,
-                            supplierUrl: option.supplierUrl || '',
-                            itemDescription: option.itemDescription || option.description || '',
-                            quantity: qty,
-                            total: qty * (parseFloat(option.rate) || 0),
-                            choiceGroupSelection: replacementEnhancement
-                                ? { groupId: group.id, groupName: group.name, optionId: option.id, optionName: option.name, type: group.type, replacedByEnhancement: true }
-                                : { groupId: group.id, groupName: group.name, optionId: option.id, optionName: option.name, type: group.type },
-                            choiceGroupEnhancement: replacementEnhancement ? { groupId: group.id, groupName: group.name, enhancementGroupId: option.enhancementGroupId, enhancementGroupName: option.enhancementGroupName, optionId: option.id, optionName: option.name, upgradeType: option.upgradeType } : undefined,
-                            choiceGroup: group
-                        });
-                        if (normalizeViewerItemUpgradeGroups(item).length) {
-                            nextItem.upgradeGroups = normalizeViewerItemUpgradeGroups(item);
-                            nextItem.selectedUpgradeOptionIds = getViewerSelectedItemUpgradeIds(item);
-                            resetViewerItemUpgradeBaseState(nextItem);
-                            applyViewerItemUpgradeGroups(nextItem);
-                        }
-                        nextItems.push(nextItem);
-                    });
-                    selectedEnhancements.filter(function(option) { return option.upgradeType !== 'replacement'; }).forEach(function(option) {
-                        var qty = option.quantityMode === 'override' ? (parseFloat(option.quantityOverride) || 0) : (parseFloat(item.quantity) || 0);
-                        nextItems.push(Object.assign({}, item, {
-                            description: option.name,
-                            serviceName: option.name,
-                            unitType: option.unitType || item.unitType || item.unit || '',
-                            rate: parseFloat(option.rate) || 0,
-                            materialCost: parseFloat(option.materialCost) || 0,
-                            supplierUrl: option.supplierUrl || '',
-                            itemDescription: option.itemDescription || option.description || '',
-                            quantity: qty,
-                            total: qty * (parseFloat(option.rate) || 0),
-                            choiceGroupEnhancement: { groupId: group.id, groupName: group.name, enhancementGroupId: option.enhancementGroupId, enhancementGroupName: option.enhancementGroupName, optionId: option.id, optionName: option.name, upgradeType: option.upgradeType },
-                            choiceGroup: group
-                        }));
-                    });
-                });
-                return Object.assign({}, room, { items: nextItems });
-            });
-        }
-
         function defaultCommitmentItems() {
             return [
                 { icon: 'fa-solid fa-shield-halved', image: '', label: '1-Year Warranty', text: 'Workmanship guaranteed for 12 months from project completion' },
@@ -4495,8 +4433,8 @@ if (location.search.includes('debug')) {
             }
 
             // Show upgrade diff banner if quote was modified by client when signing
-            if (quoteData.data && quoteData.data.client_upgraded && quoteData.data.original_rooms) {
-                var signedAtStr = quoteData.data.client_upgraded_at ? new Date(quoteData.data.client_upgraded_at).toLocaleDateString('en-CA', {year:'numeric',month:'short',day:'numeric'}) : '';
+            if (quoteData.client_upgraded && quoteData.original_rooms) {
+                var signedAtStr = quoteData.client_upgraded_at ? new Date(quoteData.client_upgraded_at).toLocaleDateString('en-CA', {year:'numeric',month:'short',day:'numeric'}) : '';
                 html += '<div class="alert mb-4" style="background:#fff8e1;border:2px solid #f0ad4e;border-radius:10px;">' +
                     '<div class="fw-semibold mb-1"><i class="fas fa-bolt text-warning me-2"></i>This accepted quote includes requested changes' + (signedAtStr ? ' from ' + signedAtStr : '') + '</div>' +
                     '<div class="text-muted small">Items marked <span class="badge bg-success">\u2B06 Upgraded</span> were selected as upgrades. Items marked <span class="badge bg-danger">Removed</span> were removed before approval. Original values are shown in grey.</div>' +
@@ -4570,8 +4508,8 @@ if (location.search.includes('debug')) {
                     }
 
                     // Signed diff mode: show read-only diff badges instead of interactive buttons
-                    const isSignedDiff = !!(quoteData.data && quoteData.data.client_upgraded && quoteData.data.original_rooms);
-                    const origRoomsForDiff = isSignedDiff ? (quoteData.data.original_rooms || []) : [];
+                    const isSignedDiff = !!(quoteData.client_upgraded && quoteData.original_rooms);
+                    const origRoomsForDiff = isSignedDiff ? (quoteData.original_rooms || []) : [];
 
                     catEntries.forEach(({ item, itemIndex }) => {
                     // Ensure item has description field
@@ -5491,31 +5429,6 @@ if (location.search.includes('debug')) {
                 document.getElementById('approvalBanner').classList.add('visible');
 
                 if (quoteId) {
-                    const existingData = quoteData || {};
-                    // Snapshot original rooms BEFORE overwriting
-                    var originalRoomsSnapshot = JSON.parse(JSON.stringify(quoteData.rooms || []));
-
-                    // Build updated rooms with client upgrades/removals applied permanently
-                    var choiceAppliedRooms = applyClientChoiceGroupsToRooms(quoteData.rooms || []);
-                    var updatedRooms = choiceAppliedRooms.map(function(room) {
-                        return Object.assign({}, room, {
-                            items: (room.items || []).filter(function(item) { return !item._removed; }).map(function(item) {
-                                if (item.upgraded && item.upgrade) {
-                                    return Object.assign({}, item, {
-                                        description: item.upgrade.name,
-                                        rate: item.upgrade.rate,
-                                        total: qvLineTotal(item),
-                                        upgraded: false,
-                                        upgrade: null,
-                                        _baseRate: null,
-                                        _baseTotal: null
-                                    });
-                                }
-                                return item;
-                            })
-                        });
-                    });
-
                     var _hasUpgrades = hasClientUpgrades();
                     var _hasRemovals = (quoteData.rooms || []).some(function(room) {
                         return (room.items || []).some(function(item) {
@@ -5534,56 +5447,52 @@ if (location.search.includes('debug')) {
                     var _hasClientChanges = _hasUpgrades || _hasRemovals || _hasOptionalChanges || _hasChoiceGroups || _hasEnhancements || _hasItemUpgradeSelections;
 
                     var isChangeOrder = !!(window.QuoteDrChangeOrders && QuoteDrChangeOrders.isChangeOrder(quoteData));
-                    const updateData = {
-                        status: isChangeOrder ? 'approved' : 'accepted',
-                        client_name: existingData.clientName || quoteData.clientName || name,
-                        data: Object.assign({}, existingData, {
-                            status: isChangeOrder ? 'approved' : 'accepted',
-                            rooms: updatedRooms,
-                            signature_url: signatureUrl,
-                            signature_data_url: signatureUrl ? undefined : sigDataUrl,
-                            signature_method: 'typed',
-                            signature_text: name,
-                            signed_by: name,
-                            signed_at: now.toISOString(),
-                            approved_by: name,
-                            approved_at: now.toISOString(),
-                            terms_accepted: true,
-                            terms_accepted_at: now.toISOString(),
-                            terms_accepted_snapshot: Array.isArray(existingData.terms) ? existingData.terms.slice() : [],
-                            client_upgraded: _hasClientChanges,
-                            client_upgraded_at: _hasClientChanges ? now.toISOString() : undefined,
-                            original_rooms: _hasClientChanges ? originalRoomsSnapshot : undefined,
-                            _clientChoiceGroups: _clientChoiceGroups,
-                            _clientEnhancements: _clientEnhancements,
-                            _clientItemUpgradeSelections: _clientItemUpgradeSelections
-                        })
+                    var requestedStatus = isChangeOrder ? 'approved' : 'accepted';
+                    if (!window.QuoteDrClientDecisions) throw new Error('Secure client decision support is unavailable. Please refresh and try again.');
+                    var clientDecision = QuoteDrClientDecisions.collect(quoteData.rooms || [], quoteData._roomNotes || {});
+                    clientDecision.status = requestedStatus;
+                    clientDecision.signature = {
+                        method: 'typed',
+                        signerName: name,
+                        evidenceUrl: signatureUrl || '',
+                        evidenceDataUrl: signatureUrl ? '' : sigDataUrl,
+                        termsAccepted: true
                     };
 
                     if (!shareToken || typeof updateSecureClientDocument !== 'function') {
                         throw new Error('Open this quote from the client portal, or ask the contractor to resend the portal link.');
                     }
                     var secureUpdate = await updateSecureClientDocument(quoteId, shareToken, 'client_update', {
-                        topLevel: { status: updateData.status, client_name: updateData.client_name, accepted_by: name },
-                        dataPatch: updateData.data
+                        decision: clientDecision
                     }, portalAnchorId);
                     if (secureUpdate && secureUpdate.error) throw secureUpdate.error;
                     var secureDocument = secureUpdate && (secureUpdate.data || secureUpdate.result) || {};
                     var authoritativeSignedAt = secureDocument.signed_at || secureDocument.accepted_at || now.toISOString();
-                    updateData.data.signed_at = authoritativeSignedAt;
-                    updateData.data.approved_at = authoritativeSignedAt;
-                    updateData.data.terms_accepted_at = authoritativeSignedAt;
                     document.getElementById('approvedAt').value = authoritativeSignedAt;
                     var signedDate = new Date(authoritativeSignedAt);
                     document.getElementById('approvalMeta').textContent = 'Signed by ' + name + ' on ' + signedDate.toLocaleDateString('en-CA', { year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit' });
                     logPortalDocumentActivity('document_signed', { metadata: { signer_name_present: !!name } });
-                    quoteData = Object.assign({}, quoteData, updateData.data, { status: updateData.status });
+                    quoteData = Object.assign({}, quoteData, {
+                        status: requestedStatus,
+                        signature_url: signatureUrl,
+                        signature_data_url: signatureUrl ? undefined : sigDataUrl,
+                        signature_method: 'typed',
+                        signature_text: name,
+                        signed_by: name,
+                        signed_at: authoritativeSignedAt,
+                        approved_by: name,
+                        approved_at: authoritativeSignedAt,
+                        terms_accepted: true,
+                        terms_accepted_at: authoritativeSignedAt,
+                        client_upgraded: _hasClientChanges,
+                        client_upgraded_at: _hasClientChanges ? authoritativeSignedAt : undefined
+                    });
                     if (typeof qdCaptureEvent === 'function') {
                     qdCaptureEvent('quote_signed', {
                         quote_id: quoteId,
                         document_type: isChangeOrder ? 'change_order' : 'quote',
                             had_client_changes: _hasClientChanges,
-                            room_count: Array.isArray(updatedRooms) ? updatedRooms.length : 0
+                            room_count: Array.isArray(quoteData.rooms) ? quoteData.rooms.length : 0
                         });
                     }
                 }
@@ -5617,54 +5526,16 @@ if (location.search.includes('debug')) {
                 showContractorPreviewSignBlockedMessage();
                 return;
             }
-            // Build upgrade summary for Supabase
-            var _clientUpgrades = [];
-            var _clientRemovals = [];
-            var _clientOptionalSelections = [];
-            var _clientChoiceGroups = collectClientChoiceGroups();
-            var _clientEnhancements = collectClientEnhancements();
-            var _clientItemUpgradeSelections = collectClientItemUpgradeSelections();
-            var _clientConsultationRequests = _clientItemUpgradeSelections.filter(function(selection) {
-                return selection && selection.requiresConsultation;
-            });
-            (quoteData.rooms || []).forEach(function(room) {
-                (room.items || []).forEach(function(item) {
-                    if (item.upgraded && item.upgrade) {
-                        _clientUpgrades.push({ room: room.name, from: item.description, to: item.upgrade.name, diff: qvLineTotal(item) - qvBaseLineTotal(item) });
-                    }
-                    if (item.optional && viewerOptionalItemChangedFromDefault(item)) {
-                        _clientOptionalSelections.push({
-                            room: room.name,
-                            item: item.description,
-                            selected: syncViewerOptionalItemState(item)
-                        });
-                    }
-                    if (item._removed && (!item.optional || viewerOptionalItemChangedFromDefault(item))) {
-                        _clientRemovals.push({ room: room.name, item: item.description });
-                    }
-                });
-            });
-
-            // Save notes + upgrades + updated rooms to Supabase
+            // Submit only stable indexes/IDs, booleans, quantities, and note text.
             var _sqid = new URLSearchParams(window.location.search).get('id');
             if (_sqid) {
                 var params = new URLSearchParams(window.location.search);
                 var shareToken = params.get('token') || '';
                 var portalAnchorId = params.get('portal_anchor') || '';
                 if (shareToken && typeof updateSecureClientDocument === 'function') {
+                    if (!window.QuoteDrClientDecisions) return;
                     updateSecureClientDocument(_sqid, shareToken, 'client_update', {
-                        dataPatch: {
-                            _roomNotes: quoteData._roomNotes || {},
-                            _clientUpgrades: _clientUpgrades,
-                            _clientRemovals: _clientRemovals,
-                            _clientOptionalSelections: _clientOptionalSelections,
-                            _clientChoiceGroups: _clientChoiceGroups,
-                            _clientEnhancements: _clientEnhancements,
-                            _clientItemUpgradeSelections: _clientItemUpgradeSelections,
-                            _clientConsultationRequests: _clientConsultationRequests,
-                            _clientRooms: JSON.parse(JSON.stringify(quoteData.rooms || [])),
-                            _clientSubmittedAt: new Date().toISOString()
-                        }
+                        decision: QuoteDrClientDecisions.collect(quoteData.rooms || [], quoteData._roomNotes || {})
                     }, portalAnchorId).then(function() {});
                 }
             }
@@ -5694,7 +5565,7 @@ if (location.search.includes('debug')) {
                     declined_at: new Date().toISOString()
                 });
                 var result = await updateSecureClientDocument(quoteId, shareToken, 'decline_change_order', {
-                    dataPatch: merged
+                    decision: {}
                 }, portalAnchorId);
                 if (result && result.error) throw result.error;
                 logPortalDocumentActivity('document_rejected', { metadata: { document_type: 'change_order' } });
@@ -5730,7 +5601,7 @@ if (location.search.includes('debug')) {
         var _depositTerms = null;
         var _quoteTotal = 0;
 
-        async function loadContractorPaymentSettings(contractorUserId) {
+        async function loadContractorPaymentSettings() {
             if (window._securePaymentOptions) return window._securePaymentOptions;
             var legacy = quoteData && quoteData.paymentSettings;
             if (!legacy) return null;
@@ -5847,11 +5718,12 @@ if (location.search.includes('debug')) {
             }
             status.innerHTML = '';
 
-            var stripe = _paymentOptions && _paymentOptions.stripe ? _paymentOptions.stripe : {};
-            if (stripe.ready) {
+            var card = _paymentOptions && (_paymentOptions.card || _paymentOptions.stripe) ? (_paymentOptions.card || _paymentOptions.stripe) : {};
+            var cardAvailable = card.available === true || card.ready === true;
+            if (cardAvailable) {
                 stripeActions.innerHTML = '<button id="payDepositBtn" class="btn btn-warning btn-lg w-100 mb-3" onclick="handleDepositPayment()"><i class="fas fa-credit-card me-2"></i><span id="depositBtnLabel">Pay ' + escapeHtml(amountText) + ' securely by card</span></button><div class="small text-muted mb-3"><i class="fab fa-stripe me-1"></i>Secure checkout powered by Stripe. The amount shown is the deposit due.</div>';
             } else {
-                stripeActions.innerHTML = stripe.enabled
+                stripeActions.innerHTML = card.enabled
                     ? '<div class="alert alert-light border small text-start"><i class="fas fa-credit-card me-1"></i>Card payment is temporarily unavailable. You can still use any method below.</div>'
                     : '';
             }
@@ -5875,10 +5747,10 @@ if (location.search.includes('debug')) {
                 : '<div class="alert alert-light border mb-0">Contact your contractor to arrange the deposit.</div>';
         }
 
-        async function initPaymentSection(contractorUserId, total) {
+        async function initPaymentSection(total) {
             _quoteTotal = Number(total || 0);
-            if (!contractorUserId || !_quoteTotal) return;
-            _paymentOptions = await loadContractorPaymentSettings(contractorUserId);
+            if (!_quoteTotal) return;
+            _paymentOptions = await loadContractorPaymentSettings();
             _paymentSettings = _paymentOptions;
             _depositTerms = resolveQuoteDepositTerms();
             renderDepositPaymentSection();
