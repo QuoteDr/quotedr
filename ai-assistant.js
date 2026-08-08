@@ -3,8 +3,29 @@
 var SUPABASE_URL = 'https://axmoffknvblluibuitrq.supabase.co';
 var ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4bW9mZmtudmJsbHVpYnVpdHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NzI0ODAsImV4cCI6MjA5MTQ0ODQ4MH0.SULFrXCwoABe9w4J_MBNQq6HQfzx2Sns-11uxGZYAso';
 var FUNCTION_URL = SUPABASE_URL + '/functions/v1/ai-assistant';
+var CHATBOT_FEEDBACK_URL = SUPABASE_URL + '/functions/v1/chatbot-feedback';
 var messages = [];
 var isOpen = false;
+
+// Classify locally and send controlled enum values only. Telemetry is always best-effort.
+function recordPrivacySafeChatbotTopic(question, answer) {
+  if (!window.QuoteDrChatbotFeedbackTopics || typeof getSupabaseFunctionAuthHeaders !== 'function') return;
+  if (/^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname)) return;
+  var classified = window.QuoteDrChatbotFeedbackTopics.classify(question, answer, getQuoteDrAssistantContext());
+  if (!classified) return;
+  getSupabaseFunctionAuthHeaders().then(function(headers) {
+    return fetch(CHATBOT_FEEDBACK_URL, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify({
+        action: 'record',
+        topicKey: classified.topicKey,
+        intentKey: classified.intentKey,
+        surfaceKey: classified.surfaceKey
+      })
+    });
+  }).catch(function() {});
+}
 
 // Suggested quick questions
 var SUGGESTIONS = [
@@ -479,6 +500,7 @@ window._qdAiSend = async function() {
         localLoadingEl.remove();
       }
       _addMsg(localReply, 'ai');
+      recordPrivacySafeChatbotTopic(text, localReply);
       return;
     }
 
@@ -504,6 +526,7 @@ window._qdAiSend = async function() {
       loadingEl.remove();
     }
     _addMsg(reply, 'ai');
+    recordPrivacySafeChatbotTopic(text, reply);
   } catch(e) {
     var loadingEl = document.getElementById(loadingId);
     if (loadingEl) {

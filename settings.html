@@ -527,6 +527,7 @@ if (location.search.includes('debug')) {
 						<a href="#" id="userMessagesTabLink" data-settings-tab="user-messages" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('user-messages',this);return false;"><i class="fas fa-bullhorn me-2" style="color:#f97316"></i>User Messages</a>
 						<a href="#" id="adminControlsTabLink" data-settings-tab="admin-controls" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('admin-controls',this);return false;"><i class="fas fa-sliders me-2" style="color:#1a56a0"></i>Admin Controls</a>
 						<a href="#" id="saveIncidentsTabLink" data-settings-tab="save-incidents" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('save-incidents',this);return false;"><i class="fas fa-shield-halved me-2" style="color:#dc3545"></i>Save Incidents <span id="saveIncidentsNavBadge" class="badge bg-danger ms-1" style="display:none;">0</span></a>
+						<a href="#" id="chatbotFeedbackTabLink" data-settings-tab="chatbot-feedback" class="list-group-item list-group-item-action fw-semibold" onclick="showTab('chatbot-feedback',this);return false;"><i class="fas fa-robot me-2" style="color:#7c3aed"></i>AI Chatbot <span id="chatbotFeedbackNavBadge" class="badge bg-danger ms-1" style="display:none;" aria-label="AI Chatbot topics needing attention">0</span></a>
 					</div>
 				</div>
 			</div>
@@ -1807,6 +1808,31 @@ Sarah Jones, 905-555-5678"></textarea>
 					</div>
 				</div><!-- /tab-save-incidents -->
 
+				<div id="tab-chatbot-feedback" style="display:none;" aria-labelledby="chatbotFeedbackHeading">
+					<div class="settings-card">
+						<div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+							<div>
+								<h5 id="chatbotFeedbackHeading" class="mb-1"><i class="fas fa-robot me-2" style="color:#7c3aed"></i>AI Chatbot repeat questions &amp; issues</h5>
+								<p class="text-muted small mb-0">See product themes raised by multiple signed-in users without storing chat messages, names, emails, or client details.</p>
+							</div>
+							<button type="button" class="btn btn-outline-primary btn-sm" onclick="loadChatbotFeedback()"><i class="fas fa-rotate me-1"></i>Refresh</button>
+						</div>
+						<div id="chatbotFeedbackSummary" class="alert alert-light border small" role="status" aria-live="polite">Open this tab to load privacy-safe trends.</div>
+						<form class="border rounded p-3 mb-3" onsubmit="saveChatbotFeedbackSettings(event)">
+							<div class="row g-3 align-items-end">
+								<div class="col-12 col-lg-3"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" id="chatbotFeedbackEnabled"><label class="form-check-label fw-semibold" for="chatbotFeedbackEnabled">Collect topic trends</label></div></div>
+								<div class="col-6 col-lg-2"><label class="form-label small fw-semibold" for="chatbotFeedbackThreshold">Distinct users</label><input class="form-control form-control-sm" id="chatbotFeedbackThreshold" type="number" min="2" max="20" required></div>
+								<div class="col-6 col-lg-2"><label class="form-label small fw-semibold" for="chatbotFeedbackWindow">Window</label><select class="form-select form-select-sm" id="chatbotFeedbackWindow"><option value="7">7 days</option><option value="14">14 days</option><option value="30">30 days</option><option value="60">60 days</option><option value="90">90 days</option></select></div>
+								<div class="col-6 col-lg-2"><label class="form-label small fw-semibold" for="chatbotFeedbackCooldown">Re-alert delay</label><select class="form-select form-select-sm" id="chatbotFeedbackCooldown"><option value="7">7 days</option><option value="14">14 days</option><option value="30">30 days</option><option value="60">60 days</option><option value="90">90 days</option></select></div>
+								<div class="col-6 col-lg-3 d-grid"><button class="btn btn-primary btn-sm" type="submit">Save alert settings</button></div>
+							</div>
+							<div class="form-text mt-2">A theme alerts only after the distinct-user threshold is reached inside the window. Reviewed themes wait for the re-alert delay and new repeat activity.</div>
+						</form>
+						<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2"><div class="small text-muted"><i class="fas fa-shield-halved me-1"></i>Examples below are controlled intent and page labels, never excerpts.</div><label class="small" for="chatbotFeedbackFilter">Show <select id="chatbotFeedbackFilter" class="form-select form-select-sm d-inline-block w-auto ms-1" onchange="renderChatbotFeedback()"><option value="attention">Needs attention</option><option value="all">All themes</option><option value="reviewed">Reviewed</option><option value="snoozed">Snoozed</option></select></label></div>
+						<div id="chatbotFeedbackList" aria-live="polite"></div>
+					</div>
+				</div><!-- /tab-chatbot-feedback -->
+
 				<div id="tab-team" style="display:none;">
 					<div class="settings-card">
 						<div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
@@ -2944,7 +2970,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			? Array.from(window.QuoteDrAdmin.emails)
 			: ['admin@quotedr.io', 'info@alddirect.ca', 'ald.direct.contracting@gmail.com'];
 		const QUOTEDR_ANALYTICS_ADMIN_EMAILS = QUOTEDR_ADMIN_EMAILS;
-		const QUOTEDR_ADMIN_TABS = ['analytics', 'site-traffic', 'user-messages', 'admin-controls', 'save-incidents'];
+		const QUOTEDR_ADMIN_TABS = ['analytics', 'site-traffic', 'user-messages', 'admin-controls', 'save-incidents', 'chatbot-feedback'];
 
 		function isQuoteDrAdminUser(user) {
 			if (window.QuoteDrAdmin) return window.QuoteDrAdmin.isAdminUser(user);
@@ -2960,11 +2986,11 @@ Sarah Jones, 905-555-5678"></textarea>
 				var isAdmin = isQuoteDrAdminUser(user);
 				var adminGroup = document.getElementById('adminSettingsGroup');
 				if (adminGroup) adminGroup.style.display = isAdmin ? '' : 'none';
-				['analyticsBriefTabLink', 'siteTrafficTabLink', 'userMessagesTabLink', 'adminControlsTabLink', 'saveIncidentsTabLink'].forEach(function(id) {
+				['analyticsBriefTabLink', 'siteTrafficTabLink', 'userMessagesTabLink', 'adminControlsTabLink', 'saveIncidentsTabLink', 'chatbotFeedbackTabLink'].forEach(function(id) {
 					var tabLink = document.getElementById(id);
 					if (tabLink) tabLink.style.display = isAdmin ? '' : 'none';
 				});
-				['tab-analytics', 'tab-site-traffic', 'tab-user-messages', 'tab-admin-controls', 'tab-save-incidents'].forEach(function(id) {
+				['tab-analytics', 'tab-site-traffic', 'tab-user-messages', 'tab-admin-controls', 'tab-save-incidents', 'tab-chatbot-feedback'].forEach(function(id) {
 					var tabPanel = document.getElementById(id);
 					if (!isAdmin && tabPanel) tabPanel.style.display = 'none';
 				});
@@ -3609,7 +3635,110 @@ Sarah Jones, 905-555-5678"></textarea>
 			}
 		}
 
-			function showTab(name, el) {
+		var chatbotFeedbackOverview = null;
+
+		async function callChatbotFeedback(action, payload) {
+			if (!isQuoteDrAdminUser(window.currentUser)) throw new Error('Administrator access required.');
+			if (typeof getSupabaseFunctionAuthHeaders !== 'function') throw new Error('Please sign in again.');
+			var body = Object.assign({ action: action }, payload || {});
+			var response = await fetch(SUPABASE_URL + '/functions/v1/chatbot-feedback', {
+				method: 'POST',
+				headers: await getSupabaseFunctionAuthHeaders(),
+				body: JSON.stringify(body)
+			});
+			var data = await response.json().catch(function() { return {}; });
+			if (!response.ok) throw new Error(data.error || 'Could not load AI Chatbot trends.');
+			return data;
+		}
+
+		function chatbotFeedbackDate(value) {
+			if (!value) return 'Not yet';
+			var date = new Date(value);
+			return isNaN(date.getTime()) ? 'Not yet' : date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+		}
+
+		function renderChatbotFeedback() {
+			var list = document.getElementById('chatbotFeedbackList');
+			if (!list || !chatbotFeedbackOverview) return;
+			var filter = (document.getElementById('chatbotFeedbackFilter') || {}).value || 'attention';
+			var themes = (chatbotFeedbackOverview.themes || []).filter(function(theme) {
+				if (filter === 'all') return true;
+				if (filter === 'attention') return theme.state === 'needs_attention';
+				return theme.state === filter;
+			});
+			if (!themes.length) {
+				list.innerHTML = '<div class="alert alert-light border small mb-0">No themes match this view.</div>';
+				return;
+			}
+			list.innerHTML = themes.map(function(theme) {
+				var meta = window.QuoteDrChatbotFeedbackTopics && window.QuoteDrChatbotFeedbackTopics.topic(theme.topicKey);
+				var label = (meta && meta.label) || theme.topicKey;
+				var description = (meta && meta.description) || 'A controlled QuoteDr product topic.';
+				var stateLabel = String(theme.state || 'monitoring').replace(/_/g, ' ');
+				var stateClass = theme.state === 'needs_attention' ? 'bg-danger' : theme.state === 'snoozed' ? 'bg-warning text-dark' : theme.state === 'reviewed' ? 'bg-success' : 'bg-secondary';
+				var examples = (theme.safeExamples || []).map(function(example) {
+					var exampleLabel = window.QuoteDrChatbotFeedbackTopics.safeExampleLabel(example.intentKey, example.surfaceKey);
+					return '<li>' + escapeHtml(exampleLabel) + ': ' + Number(example.distinctUsers || 0) + ' user' + (Number(example.distinctUsers || 0) === 1 ? '' : 's') + ', ' + Number(example.questions || 0) + ' question' + (Number(example.questions || 0) === 1 ? '' : 's') + '</li>';
+				}).join('');
+				var actions = '';
+				if (theme.state === 'needs_attention' || theme.state === 'snoozed') actions += '<button type="button" class="btn btn-success btn-sm" onclick="updateChatbotFeedbackTheme(\'review\',\'' + theme.topicKey + '\')">Mark reviewed</button>';
+				if (theme.state === 'needs_attention') actions += '<button type="button" class="btn btn-outline-secondary btn-sm" onclick="updateChatbotFeedbackTheme(\'snooze\',\'' + theme.topicKey + '\',7)">Snooze 7 days</button>';
+				if (theme.state === 'reviewed' || theme.state === 'snoozed') actions += '<button type="button" class="btn btn-outline-secondary btn-sm" onclick="updateChatbotFeedbackTheme(\'reopen\',\'' + theme.topicKey + '\')">Reopen</button>';
+				return '<article class="border rounded p-3 mb-3" aria-label="' + escapeHtml(label) + '">' +
+					'<div class="d-flex justify-content-between align-items-start gap-2 flex-wrap"><div><h6 class="mb-1">' + escapeHtml(label) + '</h6><div class="small text-muted">' + escapeHtml(description) + '</div></div><span class="badge ' + stateClass + '">' + escapeHtml(stateLabel) + '</span></div>' +
+					'<div class="row g-2 my-2"><div class="col-6 col-md-3"><strong>' + Number(theme.windowDistinctUsers || 0) + '</strong><div class="small text-muted">distinct users</div></div><div class="col-6 col-md-3"><strong>' + Number(theme.windowQuestionCount || 0) + '</strong><div class="small text-muted">questions in window</div></div><div class="col-6 col-md-3"><strong>' + chatbotFeedbackDate(theme.lastSeenAt) + '</strong><div class="small text-muted">last seen</div></div><div class="col-6 col-md-3"><strong>' + chatbotFeedbackDate(theme.alertedAt) + '</strong><div class="small text-muted">last alert</div></div></div>' +
+					(examples ? '<div class="small"><span class="fw-semibold">Anonymized evidence:</span><ul class="mb-2 ps-4">' + examples + '</ul></div>' : '<div class="small text-muted mb-2">No controlled examples in the current window.</div>') +
+					(actions ? '<div class="d-flex gap-2 flex-wrap">' + actions + '</div>' : '') + '</article>';
+			}).join('');
+		}
+
+		async function loadChatbotFeedback() {
+			var summary = document.getElementById('chatbotFeedbackSummary');
+			if (!summary || !isQuoteDrAdminUser(window.currentUser)) return;
+			summary.textContent = 'Loading privacy-safe trends...';
+			try {
+				chatbotFeedbackOverview = await callChatbotFeedback('list');
+				var settings = chatbotFeedbackOverview.settings || {};
+				document.getElementById('chatbotFeedbackEnabled').checked = settings.enabled === true;
+				document.getElementById('chatbotFeedbackThreshold').value = settings.distinctUserThreshold || 3;
+				document.getElementById('chatbotFeedbackWindow').value = String(settings.windowDays || 14);
+				document.getElementById('chatbotFeedbackCooldown').value = String(settings.cooldownDays || 14);
+				var attentionCount = Number(chatbotFeedbackOverview.attentionCount || 0);
+				summary.textContent = attentionCount + ' topic' + (attentionCount === 1 ? '' : 's') + ' need attention. Trends use distinct users across ' + (settings.windowDays || 14) + ' days; retained observations expire after ' + (settings.retentionDays || 90) + ' days.';
+				var badge = document.getElementById('chatbotFeedbackNavBadge');
+				if (badge) { badge.textContent = attentionCount; badge.style.display = attentionCount ? '' : 'none'; }
+				renderChatbotFeedback();
+			} catch (error) {
+				summary.textContent = error.message || 'Could not load AI Chatbot trends.';
+			}
+		}
+
+		async function saveChatbotFeedbackSettings(event) {
+			event.preventDefault();
+			try {
+				await callChatbotFeedback('save_settings', {
+					enabled: document.getElementById('chatbotFeedbackEnabled').checked,
+					distinctUserThreshold: Number(document.getElementById('chatbotFeedbackThreshold').value),
+					windowDays: Number(document.getElementById('chatbotFeedbackWindow').value),
+					cooldownDays: Number(document.getElementById('chatbotFeedbackCooldown').value)
+				});
+				await loadChatbotFeedback();
+			} catch (error) { qdAlert(error.message || 'Could not save AI Chatbot settings.'); }
+		}
+
+		async function updateChatbotFeedbackTheme(action, topicKey, days) {
+			try {
+				await callChatbotFeedback(action, { topicKey: topicKey, days: days });
+				await loadChatbotFeedback();
+			} catch (error) { qdAlert(error.message || 'Could not update this theme.'); }
+		}
+
+		window.loadChatbotFeedback = loadChatbotFeedback;
+		window.renderChatbotFeedback = renderChatbotFeedback;
+		window.saveChatbotFeedbackSettings = saveChatbotFeedbackSettings;
+		window.updateChatbotFeedbackTheme = updateChatbotFeedbackTheme;
+
+		function showTab(name, el) {
 				if (QUOTEDR_ADMIN_TABS.indexOf(name) !== -1 && !isQuoteDrAdminUser(window.currentUser)) {
 					name = 'business';
 					el = findSettingsTabLink('business');
@@ -3623,6 +3752,7 @@ Sarah Jones, 905-555-5678"></textarea>
 				if (name === 'user-messages') loadBroadcastAdminMessages();
 				if (name === 'admin-controls') syncRecordingPrivacyControls();
 				if (name === 'save-incidents') loadSaveRecoveryIncidents();
+				if (name === 'chatbot-feedback') loadChatbotFeedback();
 				if (name === 'team') loadTeamSettings();
 				setSiteTrafficPolling(name === 'site-traffic');
 				if (name === 'help') {
@@ -3670,6 +3800,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			{ tab: 'site-traffic', adminOnly: true, keywords: ['site traffic','visitors','live','active','region','country','city','referral','device','posthog','marketing'], label: 'Site Traffic' },
 			{ tab: 'user-messages', adminOnly: true, keywords: ['user messages','broadcast','announcement','maintenance','message users','admin'], label: 'User Messages' },
 			{ tab: 'admin-controls', adminOnly: true, keywords: ['admin','recording','privacy','hide','mask','blur','price','pricing','tutorial','video'], label: 'Admin Controls' },
+			{ tab: 'chatbot-feedback', adminOnly: true, keywords: ['ai chatbot','repeat questions','issues','product trends','similar topics','feedback intelligence'], label: 'AI Chatbot' },
 			{ tab: 'account', keywords: ['account','subscription','billing','plan','upgrade','pro'], label: 'Account' },
 		];
 
@@ -3871,7 +4002,10 @@ Sarah Jones, 905-555-5678"></textarea>
 				}
 			}
 			applyAnalyticsAdminVisibility(window.currentUser);
-			if (isQuoteDrAdminUser(window.currentUser)) loadSaveRecoveryIncidents();
+			if (isQuoteDrAdminUser(window.currentUser)) {
+				loadSaveRecoveryIncidents();
+				loadChatbotFeedback();
+			}
 			// Restore last active tab, unless the URL asks for a specific settings area.
 			var hashTab = (window.location.hash || '').replace(/^#/, '');
 			var allowedHashTabs = ['business', 'quotes', 'pricing', 'notifications', 'payments', 'portal', 'integrations', 'help', 'team', 'analytics', 'site-traffic', 'user-messages', 'admin-controls', 'save-incidents', 'account', 'feedback'];
@@ -5788,6 +5922,7 @@ Sarah Jones, 905-555-5678"></textarea>
 	</script>
 
 
+<script src="chatbot-feedback-topics.js?v=2026080801"></script>
 <script src="ai-assistant.js?v=1778194800"></script>
 
 <!-- Manage Items is handled in quote-builder.html via the Manage Items modal there -->

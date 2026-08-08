@@ -30,7 +30,7 @@ assert(settings.includes('id="adminSettingsTabs"'), 'Administrator group should 
 assert(settings.includes('id="adminControlsTabLink"'), 'Administrator group should link to Admin Controls');
 assert(settings.includes('id="tab-admin-controls"'), 'settings should include the Admin Controls panel');
 assert(settings.includes('id="recordingPrivacyToggle"'), 'Admin Controls should expose a recording privacy toggle');
-assert(settings.includes("QUOTEDR_ADMIN_TABS = ['analytics', 'site-traffic', 'user-messages', 'admin-controls', 'save-incidents']"), 'all admin tabs should share one guard');
+assert(settings.includes("QUOTEDR_ADMIN_TABS = ['analytics', 'site-traffic', 'user-messages', 'admin-controls', 'save-incidents', 'chatbot-feedback']"), 'all admin tabs should share one guard');
 assert(settings.includes('s.adminOnly && !isQuoteDrAdminUser'), 'non-admin search should exclude administrator settings');
 
 assert(privacy.includes("ald_recording_price_privacy_v1"), 'privacy preference should use the planned localStorage key');
