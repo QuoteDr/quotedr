@@ -18,3 +18,10 @@ mobile-companion/android/app/build/
 mobile-companion/android/build/
 mobile-companion/android/keystore.properties
 mobile-companion/android/*.jks
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
