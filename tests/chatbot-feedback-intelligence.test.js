@@ -46,6 +46,7 @@ assert(migration.includes("p_user_id::text || ':' || p_topic_key"), 'fingerprint
 assert(migration.includes('count(distinct observation.user_fingerprint)'), 'alerts must count distinct users');
 assert(migration.includes('v_settings.window_days') && migration.includes('v_settings.cooldown_days'), 'window and debounce must be enforced in the database');
 assert(migration.includes('v_theme.reviewed_at') && migration.includes('v_theme.snoozed_until'), 'review and snooze state must affect alerts');
+assert(migration.includes('greatest(v_count_from, v_theme.reviewed_at)') && !migration.includes('pg_catalog.greatest'), 'review cooldown must use valid PostgreSQL GREATEST syntax');
 assert(migration.includes('retention_days integer not null default 90'), 'minimized observations must have a bounded default retention');
 assert(!/chatbot_feedback_observations[\s\S]{0,1200}\b(question|answer|message|email|client_name)\s+(text|varchar)/i.test(migration), 'observation schema must not contain raw chat or direct identity columns');
 
