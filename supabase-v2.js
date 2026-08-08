@@ -587,9 +587,25 @@ async function saveUserDataValue(key, value, options) {
     });
 }
 
+async function loadUserDataValue(key) {
+    var user = await getCurrentUser();
+    if (!user) return { data: null, error: 'Not authenticated' };
+    if (await qdUsesTeamAccountApi()) {
+        return { data: null, error: { message: 'Only the account owner can load this account backup.', code: 'permission_denied' } };
+    }
+    var result = await _supabase
+        .from('user_data')
+        .select('value')
+        .eq('user_id', user.id)
+        .eq('key', key)
+        .maybeSingle();
+    return { data: result.data ? result.data.value : null, error: result.error || null };
+}
+
 window.qdRegisterAllDurableSaveAdapters = qdRegisterAllDurableSaveAdapters;
 window.qdDurableSupabaseOperation = qdDurableSupabaseOperation;
 window.saveUserDataValue = saveUserDataValue;
+window.loadUserDataValue = loadUserDataValue;
 
 function qdExternalOperationStorageKey(action, entityId) {
     return 'quotedr_external_operation:' + String(action || 'action') + ':' + String(entityId || 'default');
@@ -1644,6 +1660,10 @@ function qdClientCrmForStorage(client) {
     var properties = qdClientPropertiesForStorage(client);
     if (properties.length) crm.quoteDrProperties = properties;
     else delete crm.quoteDrProperties;
+    var quickBooksId = String(client && (client.qb_id || client.quickbooks_id) || crm.quickbooks && crm.quickbooks.id || '').trim();
+    if (quickBooksId) {
+        crm.quickbooks = Object.assign({}, crm.quickbooks || {}, { id: quickBooksId });
+    }
     return crm;
 }
 // Save client to Supabase

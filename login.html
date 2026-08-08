@@ -352,8 +352,9 @@ if (location.search.includes('debug')) {
 
         async function preloadUserData(user) {
             try {
-                if (typeof loadItemsFromSupabase === 'function') {
-                    const r = await loadItemsFromSupabase();
+                if (typeof restoreItemsFromCloud === 'function' || typeof loadItemsFromSupabase === 'function') {
+                    let r = typeof restoreItemsFromCloud === 'function' ? await restoreItemsFromCloud() : { data: null };
+                    if ((!r || !r.data) && typeof loadItemsFromSupabase === 'function') r = await loadItemsFromSupabase();
                     if (r.data && Object.keys(r.data).length > 0) {
                         localStorage.setItem('ald_custom_items', JSON.stringify(r.data));
                         console.log('Items preloaded:', Object.keys(r.data).length, 'categories');

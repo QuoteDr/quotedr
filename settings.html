@@ -464,6 +464,8 @@ if (location.search.includes('debug')) {
 <script src="error-reporter.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-v2.js?v=2026080701"></script>
+    <script src="quickbooks-import.js?v=2026080801"></script>
+    <script src="quickbooks-import-controller.js?v=2026080801"></script>
     <script src="account-access.js?v=2026080701"></script>
     <script src="save-coordinator.js?v=2026080401"></script>
     <script src="analytics.js?v=1778059000"></script>
@@ -1521,7 +1523,7 @@ Sarah Jones, 905-555-5678"></textarea>
 							<i class="fas fa-unlink me-1"></i>Disconnect
 						</button>
 						<div class="mt-3 text-muted small">
-							<i class="fas fa-info-circle me-1"></i>QuoteDr never stores your QuickBooks data Ã¢â‚¬â€ only a secure access token.
+							<i class="fas fa-info-circle me-1"></i>QuoteDr stores the secure connection token and only copies customers or items that you explicitly import.
 						</div>
 						<hr>
 						<div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
@@ -1535,6 +1537,7 @@ Sarah Jones, 905-555-5678"></textarea>
 							</div>
 						</div>
 						<div id="qbSyncResult" class="mt-3"></div>
+						<div id="qbUndoControls" class="mt-2"></div>
 					</div>
 				</div><!-- /tab-integrations -->
 
@@ -2663,74 +2666,91 @@ Sarah Jones, 905-555-5678"></textarea>
 			const isCustomers = type === 'customers';
 			const title = isCustomers ? 'QuickBooks Customers' : 'QuickBooks Products & Services';
 			const importFn = isCustomers ? 'importQBCustomers()' : 'importQBItems()';
-			const existingMap = {};
-			if (isCustomers) {
-				let existingClients = {};
-				try { existingClients = JSON.parse(localStorage.getItem('ald_clients') || '{}'); } catch(e) { existingClients = {}; }
-				Object.values(existingClients).forEach(function(client) {
-					if (client && client.name) existingMap[normalizeMatchName(client.name)] = client;
-					if (client && client.qb_id) existingMap['qb:' + client.qb_id] = client;
-				});
-			} else {
-				let existingItems = {};
-				try { existingItems = JSON.parse(localStorage.getItem('ald_custom_items') || '{}'); } catch(e) { existingItems = {}; }
-				Object.values(existingItems).forEach(function(group) {
-					(Array.isArray(group) ? group : []).forEach(function(item) {
-						if (item && item.name) existingMap[normalizeMatchName(item.name)] = item;
-						if (item && item.qb_id) existingMap['qb:' + item.qb_id] = item;
-					});
-				});
+			const storageType = isCustomers ? 'clients' : 'items';
+			const importer = window.QuoteDrQuickBooksImport;
+			const controller = window.QuoteDrQuickBooksImportController;
+			if (!importer || !controller) {
+				resultEl.innerHTML = '<div class="alert alert-danger py-2 small">QuickBooks import safety checks did not load. Reload QuoteDr before importing.</div>';
+				return;
 			}
-			records.forEach(function(record) {
-				record._existsInQuoteDr = !!(existingMap['qb:' + record.id] || existingMap[normalizeMatchName(record.name)]);
-			});
-			const existingCount = records.filter(function(record) { return record._existsInQuoteDr; }).length;
-			const newCount = records.length - existingCount;
+			const existingData = controller.readData(storageType);
+			const analyses = importer.analyzeRecords(storageType, existingData, records);
+			records.forEach(function(record, index) { record._qdImportAnalysis = analyses[index]; });
+			const newCount = analyses.filter(function(analysis) { return analysis.status === 'new'; }).length;
+			const existingCount = analyses.filter(function(analysis) { return analysis.status === 'existing'; }).length;
+			const duplicateCount = analyses.filter(function(analysis) { return analysis.status === 'duplicate'; }).length;
+			const ambiguousCount = analyses.filter(function(analysis) { return analysis.status === 'ambiguous'; }).length;
 			const empty = '<div class="alert alert-light border small mb-0">No active ' + (isCustomers ? 'customers' : 'items') + ' found in QuickBooks.</div>';
 			if (!records.length) { resultEl.innerHTML = empty; return; }
 			const rows = records.map(function(record, i) {
+				const analysis = analyses[i];
 				const sub = isCustomers
 					? [record.email, record.phone, record.address].filter(Boolean).join(' | ')
 					: [record.type, record.description, record.rate ? '$' + Number(record.rate).toFixed(2) : ''].filter(Boolean).join(' | ');
-				const badge = record._existsInQuoteDr
-					? '<span class="badge bg-secondary ms-2">Already in QuoteDr</span>'
-					: '<span class="badge bg-success ms-2">New</span>';
+				let badge = '<span class="badge bg-success ms-2">New</span>';
+				if (analysis.status === 'existing') badge = '<span class="badge bg-secondary ms-2">Matches QuoteDr</span>';
+				if (analysis.status === 'duplicate') badge = '<span class="badge bg-warning text-dark ms-2">Duplicate cleanup available</span>';
+				if (analysis.status === 'ambiguous') badge = '<span class="badge bg-danger ms-2">Needs review</span>';
+				let detail = '';
+				if (analysis.status === 'duplicate') {
+					detail += '<br><span class="small text-warning-emphasis">Will keep one record and remove ' + analysis.duplicateCount + ' duplicate' + (analysis.duplicateCount === 1 ? '' : 's') + '.</span>';
+				}
+				if (analysis.ambiguous) detail += '<br><span class="small text-danger">' + escapeHtml(analysis.ambiguityReason) + '</span>';
+				if (!isCustomers && analysis.priceConflict) {
+					const quoteDrRates = analysis.quoteDrRates.map(function(rate) { return '$' + Number(rate).toFixed(2); }).join(', ');
+					detail += '<br><span class="small text-warning-emphasis">Rate conflict: QuoteDr ' + escapeHtml(quoteDrRates) + ' | QuickBooks $' + Number(analysis.quickBooksRate).toFixed(2) + '</span>';
+				}
 				return '<label class="list-group-item d-flex gap-2 align-items-start">' +
-					'<input class="form-check-input mt-1 qb-import-check" type="checkbox" ' + (record._existsInQuoteDr ? '' : 'checked ') + 'data-index="' + i + '">' +
+					'<input class="form-check-input mt-1 qb-import-check" type="checkbox" ' + (analysis.status === 'new' ? 'checked ' : '') + (analysis.ambiguous ? 'disabled ' : '') + 'data-status="' + analysis.status + '" data-index="' + i + '">' +
 					'<span class="flex-grow-1"><strong>' + escapeHtml(record.name) + '</strong>' + badge +
 					'<br><span class="text-muted small">' + escapeHtml(sub || 'No extra details') + '</span>' +
-					'<br><span class="text-muted small">QuickBooks ID: <code>' + escapeHtml(record.id) + '</code></span></span>' +
+					'<br><span class="text-muted small">QuickBooks ID: <code>' + escapeHtml(record.id) + '</code></span>' + detail + '</span>' +
 				'</label>';
 			}).join('');
+			const pricePolicy = isCustomers ? '' :
+				'<div class="alert alert-info py-2 small mb-2">' +
+					'<label for="qbItemPricePolicy" class="form-label mb-1 fw-semibold">When a matched rate differs</label>' +
+					'<select id="qbItemPricePolicy" class="form-select form-select-sm">' +
+						'<option value="keep_quotedr" selected>Keep the current QuoteDr rate (recommended)</option>' +
+						'<option value="use_quickbooks">Use the current QuickBooks rate</option>' +
+					'</select>' +
+					'<div class="mt-1">Matched items stay in their current category. Descriptions, photos, upgrades, and other QuoteDr details are preserved.</div>' +
+				'</div>';
 			resultEl.innerHTML =
 				'<div class="border rounded p-3 bg-light">' +
 					'<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">' +
 						'<div><strong>' + title + '</strong> <span class="badge bg-info text-dark ms-1">' + escapeHtml((meta.environment || 'sandbox').toUpperCase()) + '</span>' +
 						'<div class="text-muted small">Company ID: <code>' + escapeHtml(meta.realm_id || '') + '</code></div>' +
-						'<div class="small mt-1"><span class="badge bg-primary">' + records.length + ' found</span> <span class="badge bg-success">' + newCount + ' new</span> <span class="badge bg-secondary">' + existingCount + ' already in QuoteDr</span></div></div>' +
+						'<div class="small mt-1"><span class="badge bg-primary">' + records.length + ' found</span> <span class="badge bg-success">' + newCount + ' new</span> <span class="badge bg-secondary">' + existingCount + ' matched</span> <span class="badge bg-warning text-dark">' + duplicateCount + ' duplicate matches</span>' + (ambiguousCount ? ' <span class="badge bg-danger">' + ambiguousCount + ' need review</span>' : '') + '</div></div>' +
 						'<button class="btn btn-primary btn-sm" onclick="' + importFn + '"><i class="fas fa-download me-1"></i>Import Selected</button>' +
 					'</div>' +
 					'<div class="d-flex gap-2 flex-wrap mb-2">' +
 						'<button type="button" class="btn btn-outline-secondary btn-sm" onclick="setQBImportSelection(true)"><i class="fas fa-check-square me-1"></i>Select all</button>' +
 						'<button type="button" class="btn btn-outline-secondary btn-sm" onclick="setQBImportSelection(false)"><i class="far fa-square me-1"></i>Select none</button>' +
 						'<button type="button" class="btn btn-outline-secondary btn-sm" onclick="selectNewQBImports()"><i class="fas fa-plus-circle me-1"></i>Select new only</button>' +
+						'<button type="button" class="btn btn-outline-warning btn-sm" onclick="selectDuplicateQBImports()"><i class="fas fa-object-group me-1"></i>Select duplicate matches</button>' +
 					'</div>' +
+					pricePolicy +
 					'<div class="list-group" style="max-height:320px; overflow:auto;">' + rows + '</div>' +
-					'<div class="text-muted small mt-2">Existing records are unchecked by default so importing does not overwrite them unless you choose to.</div>' +
+					'<div class="text-muted small mt-2">New records are selected automatically. Matched records are linked in place, and ambiguous matches cannot be imported until reviewed.</div>' +
 				'</div>';
 		}
 
 		function setQBImportSelection(checked) {
 			document.querySelectorAll('#qbSyncResult .qb-import-check').forEach(function(input) {
-				input.checked = !!checked;
+				input.checked = !input.disabled && !!checked;
 			});
 		}
 
 		function selectNewQBImports() {
-			const records = window._activeQBSyncType === 'items' ? (window._pendingQBItems || []) : (window._pendingQBCustomers || []);
 			document.querySelectorAll('#qbSyncResult .qb-import-check').forEach(function(input) {
-				const record = records[parseInt(input.dataset.index, 10)];
-				input.checked = !!record && !record._existsInQuoteDr;
+				input.checked = !input.disabled && input.dataset.status === 'new';
+			});
+		}
+
+		function selectDuplicateQBImports() {
+			document.querySelectorAll('#qbSyncResult .qb-import-check').forEach(function(input) {
+				input.checked = !input.disabled && input.dataset.status === 'duplicate';
 			});
 		}
 
@@ -2740,6 +2760,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			try {
 				const data = await fetchQuickBooksSync('get_customers');
 				window._pendingQBCustomers = (data.customers || []).filter(function(c) { return c.active !== false && c.name; });
+				window._pendingQBMeta = data;
 				window._activeQBSyncType = 'customers';
 				renderQBSyncPreview('customers', window._pendingQBCustomers, data);
 				if (typeof completeProTrialFeature === 'function') completeProTrialFeature('quickbooks', 'QuickBooks sync');
@@ -2754,6 +2775,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			try {
 				const data = await fetchQuickBooksSync('get_items');
 				window._pendingQBItems = (data.items || []).filter(function(item) { return item.active !== false && item.name; });
+				window._pendingQBMeta = data;
 				window._activeQBSyncType = 'items';
 				renderQBSyncPreview('items', window._pendingQBItems, data);
 				if (typeof completeProTrialFeature === 'function') completeProTrialFeature('quickbooks', 'QuickBooks sync');
@@ -2770,54 +2792,107 @@ Sarah Jones, 905-555-5678"></textarea>
 		async function importQBCustomers() {
 			const selected = selectedQBRecords(window._pendingQBCustomers || []);
 			if (!selected.length) { qdAlert('Select at least one customer to import.'); return; }
-			let existing = {};
-			try { existing = JSON.parse(localStorage.getItem('ald_clients') || '{}'); } catch(e) { existing = {}; }
-			selected.forEach(function(c) {
-				existing[c.name] = {
-					name: c.name,
-					phone: c.phone || '',
-					email: c.email || '',
-					address: c.address || '',
-					notes: 'Imported from QuickBooks customer ID ' + c.id,
-					qb_id: c.id,
-					source: 'quickbooks',
-					source_label: 'Imported from QuickBooks'
-				};
-			});
-			localStorage.setItem('ald_clients', JSON.stringify(existing));
-			if (typeof saveAllClientsToSupabase === 'function') await saveAllClientsToSupabase(Object.values(existing));
-			document.getElementById('qbSyncResult').innerHTML = '<div class="alert alert-success py-2 small"><i class="fas fa-check-circle me-1"></i>Imported ' + selected.length + ' QuickBooks customers into QuoteDr.</div>';
+			const resultEl = document.getElementById('qbSyncResult');
+			resultEl.innerHTML = '<div class="alert alert-light py-2 small"><span class="spinner-border spinner-border-sm me-2"></span>Creating a full cloud backup and importing customers...</div>';
+			try {
+				const result = await window.QuoteDrQuickBooksImportController.importRecords('clients', selected, {
+					realmId: window._pendingQBMeta && window._pendingQBMeta.realm_id || ''
+				});
+				resultEl.innerHTML = quickBooksImportSuccessHtml('clients', result);
+				refreshQBImportUndoControls();
+			} catch(e) {
+				resultEl.innerHTML = '<div class="alert alert-danger py-2 small"><i class="fas fa-exclamation-triangle me-1"></i>' + escapeHtml(e.message) + '</div>';
+			}
 		}
 
 		async function importQBItems() {
 			const selected = selectedQBRecords(window._pendingQBItems || []);
 			if (!selected.length) { qdAlert('Select at least one item to import.'); return; }
-			let existing = {};
-			try { existing = JSON.parse(localStorage.getItem('ald_custom_items') || '{}'); } catch(e) { existing = {}; }
-			if (!existing.QuickBooks) existing.QuickBooks = [];
-			selected.forEach(function(item) {
-				const mapped = {
-					name: item.name,
-					description: item.description || '',
-					unitType: item.unitType || 'service',
-					rate: Number(item.rate || 0),
-					materialCost: Number(item.materialCost || 0),
-					qb_id: item.id,
-					source: 'quickbooks',
-					source_label: 'Imported from QuickBooks'
-				};
-				const idx = existing.QuickBooks.findIndex(function(old) { return old.qb_id === item.id || old.name === item.name; });
-				if (idx >= 0) existing.QuickBooks[idx] = Object.assign({}, existing.QuickBooks[idx], mapped);
-				else existing.QuickBooks.push(mapped);
-			});
-			localStorage.setItem('ald_custom_items', JSON.stringify(existing));
-			if (typeof saveItemsToSupabase === 'function') await saveItemsToSupabase(existing);
-			document.getElementById('qbSyncResult').innerHTML = '<div class="alert alert-success py-2 small"><i class="fas fa-check-circle me-1"></i>Imported ' + selected.length + ' QuickBooks items into the QuickBooks category.</div>';
+			const resultEl = document.getElementById('qbSyncResult');
+			const policyEl = document.getElementById('qbItemPricePolicy');
+			const pricePolicy = policyEl && policyEl.value === 'use_quickbooks' ? 'use_quickbooks' : 'keep_quotedr';
+			resultEl.innerHTML = '<div class="alert alert-light py-2 small"><span class="spinner-border spinner-border-sm me-2"></span>Creating a full cloud backup and importing items...</div>';
+			try {
+				const result = await window.QuoteDrQuickBooksImportController.importRecords('items', selected, {
+					pricePolicy: pricePolicy,
+					realmId: window._pendingQBMeta && window._pendingQBMeta.realm_id || ''
+				});
+				customItems = result.data;
+				window.customItems = customItems;
+				resultEl.innerHTML = quickBooksImportSuccessHtml('items', result);
+				refreshQBImportUndoControls();
+			} catch(e) {
+				resultEl.innerHTML = '<div class="alert alert-danger py-2 small"><i class="fas fa-exclamation-triangle me-1"></i>' + escapeHtml(e.message) + '</div>';
+			}
+		}
+
+		function quickBooksImportSuccessHtml(type, result) {
+			const summary = result.summary || {};
+			if (!result.changed) {
+				return '<div class="alert alert-info py-2 small"><i class="fas fa-check-circle me-1"></i>No duplicate or data changes were needed.</div>';
+			}
+			const parts = [];
+			if (summary.added) parts.push('added ' + summary.added + ' new');
+			if (summary.linked) parts.push('linked ' + summary.linked + ' existing');
+			if (summary.duplicatesRemoved) parts.push('removed ' + summary.duplicatesRemoved + ' duplicate' + (summary.duplicatesRemoved === 1 ? '' : 's'));
+			if (type === 'items' && summary.priceConflicts) {
+				parts.push(summary.pricePolicy === 'use_quickbooks' ? 'used QuickBooks rates for conflicts' : 'kept QuoteDr rates for conflicts');
+			}
+			return '<div class="alert alert-success py-2 small"><i class="fas fa-check-circle me-1"></i>QuickBooks import complete: ' + escapeHtml(parts.join(', ') || 'records updated') + '. A full cloud undo backup was created. ' +
+				'<button type="button" class="btn btn-sm btn-outline-success ms-2" onclick="undoLastQuickBooksImport(\'' + type + '\')"><i class="fas fa-undo me-1"></i>Undo this import</button></div>';
+		}
+
+		async function refreshQBImportUndoControls() {
+			const area = document.getElementById('qbUndoControls');
+			if (!area || !window.QuoteDrQuickBooksImportController) return;
+			try {
+				const states = await Promise.all([
+					window.QuoteDrQuickBooksImportController.undoState('clients'),
+					window.QuoteDrQuickBooksImportController.undoState('items')
+				]);
+				const available = states.filter(function(state) { return state.available; });
+				if (!available.length) { area.innerHTML = ''; return; }
+				area.innerHTML = '<div class="small text-muted mb-1">Safe undo backups</div><div class="d-flex gap-2 flex-wrap">' + available.map(function(state) {
+					const label = state.type === 'clients' ? 'Undo last customer import' : 'Undo last item import';
+					return '<button type="button" class="btn btn-outline-secondary btn-sm" onclick="undoLastQuickBooksImport(\'' + state.type + '\')"><i class="fas fa-undo me-1"></i>' + label + '</button>';
+				}).join('') + '</div>';
+			} catch(e) {
+				area.innerHTML = '';
+			}
+		}
+
+		async function undoLastQuickBooksImport(type) {
+			const controller = window.QuoteDrQuickBooksImportController;
+			if (!controller) { qdAlert('QuickBooks undo is unavailable. Reload QuoteDr and try again.'); return; }
+			try {
+				const state = await controller.undoState(type);
+				if (!state.available) {
+					qdAlert('This import cannot be undone automatically because the ' + (type === 'clients' ? 'client list' : 'item library') + ' changed afterward. No data was changed.');
+					return;
+				}
+				const confirmed = await qdConfirm('Restore the complete ' + (type === 'clients' ? 'client list' : 'item library') + ' from immediately before this QuickBooks import?', {
+					title: 'Undo QuickBooks Import',
+					okText: 'Undo Import',
+					okClass: 'btn-warning',
+					type: 'warning'
+				});
+				if (!confirmed) return;
+				const result = await controller.undoLastImport(type);
+				if (type === 'items') {
+					customItems = result.data;
+					window.customItems = customItems;
+				}
+				document.getElementById('qbSyncResult').innerHTML = '<div class="alert alert-success py-2 small"><i class="fas fa-check-circle me-1"></i>The last QuickBooks ' + (type === 'clients' ? 'customer' : 'item') + ' import was undone and restored from the full backup.</div>';
+				refreshQBImportUndoControls();
+			} catch(e) {
+				qdAlert(e.message || 'QuickBooks undo failed. No data was changed.');
+			}
 		}
 
 		// Check QB status when integrations tab is opened
 		document.addEventListener('DOMContentLoaded', function() {
 			setTimeout(checkQBStatus, 1000);
+			setTimeout(refreshQBImportUndoControls, 1200);
 		});
 		// === End QuickBooks ===
 

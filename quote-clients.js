@@ -103,13 +103,15 @@
 
         function normalizeClientCrm(client) {
             const crm = client && typeof client.crm === 'object' && !Array.isArray(client.crm) ? client.crm : {};
+            const quickBooksId = String(client?.qb_id || client?.quickbooks_id || crm.quickbooks?.id || '').trim();
             return {
                 notes: crm.notes || client?.notes || '',
                 birthday: crm.birthday || '',
                 preferredContact: crm.preferredContact || '',
                 tags: crm.tags || '',
                 followUpDate: crm.followUpDate || '',
-                referralSource: crm.referralSource || ''
+                referralSource: crm.referralSource || '',
+                quickbooks: quickBooksId ? Object.assign({}, crm.quickbooks || {}, { id: quickBooksId }) : undefined
             };
         }
 
@@ -166,6 +168,7 @@
             const source = client || {};
             const name = (source.name || fallbackName || '').trim();
             const crm = normalizeClientCrm(source);
+            const quickBooksId = String(source.qb_id || source.quickbooks_id || crm.quickbooks?.id || '').trim();
             const properties = normalizeClientProperties(source);
             const primaryProperty = properties[0] || {};
             return {
@@ -177,7 +180,11 @@
                 city: source.city || primaryProperty.city || '',
                 notes: crm.notes || '',
                 crm,
-                properties
+                properties,
+                qb_id: quickBooksId,
+                quickbooks_id: quickBooksId,
+                source: source.source || (quickBooksId ? 'quickbooks' : ''),
+                source_label: source.source_label || (quickBooksId ? 'Linked to QuickBooks' : '')
             };
         }
 
