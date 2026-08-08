@@ -435,8 +435,8 @@ function getQuoteDrLocalAssistantReply(text) {
       '1. Go to **Settings > Payments**.\n' +
       '2. Enable Stripe Payments when you are ready to accept card payments.\n' +
       '3. Set the default deposit percent.\n' +
-      '4. Turn on the **deposit payment button for quotes in the client portal** if clients should pay deposits.\n' +
-      '5. Turn on the **pay-in-full button for invoices in the client portal** if clients should pay full balances.\n\n' +
+      '4. Turn on the **deposit payment button on quote links** if clients should pay deposits from quotes.\n' +
+      '5. Turn on the **pay-in-full button on invoice links** if clients should pay full invoice balances.\n\n' +
       'You can also keep manual payment instructions for e-transfer, cash, cheque, or other offline methods.';
   }
 
@@ -450,9 +450,9 @@ function getQuoteDrLocalAssistantReply(text) {
   if (q.includes('send') && q.includes('quote')) {
     return '**To send a quote:**\n' +
       '1. Review the client information, rooms, line items, totals, and terms.\n' +
-      '2. Open **Quote Actions** and choose **Share in Client Portal**.\n' +
+      '2. Click **Quote** or open **Send Quote Settings**.\n' +
       '3. Choose style, pricing detail, approval type, expiry, deposit display, and message.\n' +
-      '4. Preview the quote, choose the correct client portal, then copy, open, or email the portal link.';
+      '4. Generate the client link, preview it, then copy or email it to the client.';
   }
 
   if ((q.includes('schedule') && (q.includes('crew') || q.includes('job'))) || q.includes('dispatch') || q.includes('calendar crew')) {

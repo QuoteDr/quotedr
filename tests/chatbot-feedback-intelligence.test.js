@@ -25,7 +25,7 @@ assert.strictEqual(topics.classify('How do I connect QuickBooks?', '', { pagePat
 assert.strictEqual(topics.classify('The client portal link is not working', '', { pagePath: '/dashboard.html' }).topicKey, 'client_portal');
 assert.strictEqual(topics.classify('What is the weather?', '', { pagePath: '/help.html' }), null);
 
-const assistant = read('ai-assistant.js').replace(/\r\n/g, '\n');
+const assistant = read('ai-assistant.js');
 assert(assistant.includes("body: JSON.stringify({\n        action: 'record',\n        topicKey: classified.topicKey,\n        intentKey: classified.intentKey,\n        surfaceKey: classified.surfaceKey"), 'collector payload must contain controlled enums only');
 assert(!/body:\s*JSON\.stringify\(\{[^}]*question:/s.test(assistant), 'collector must not send a raw question');
 assert(assistant.includes('.catch(function() {})'), 'telemetry failure must be swallowed');
