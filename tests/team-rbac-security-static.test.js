@@ -7,6 +7,7 @@ const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 const migration = read('supabase/migrations/20260807022336_team_accounts_rbac.sql');
 const fieldMigration = read('supabase/migrations/20260807110226_custom_role_field_permissions.sql');
+const roleRepairMigration = read('supabase/migrations/20260809024931_repair_account_role_save.sql');
 const indexMigration = read('supabase/migrations/20260808000920_team_rbac_foreign_key_indexes.sql');
 const accountApi = read('supabase/functions/team-account/index.ts');
 const accountAuth = read('supabase/functions/_shared/account-authorization.ts');
@@ -140,6 +141,24 @@ test('custom roles are account-scoped and saved atomically after a live database
   assert.match(fieldMigration, /grant execute on function public\.quotedr_save_account_role[^;]+to authenticated/i);
   assert.match(fieldMigration, /function public\.quotedr_archive_account_role/i);
   assert.match(fieldMigration, /Reassign members before archiving this role/i);
+});
+
+test('role save repair preserves account isolation, owner authorization, and system immutability', () => {
+  assert.match(roleRepairMigration, /a\.id = p_account_id[\s\S]{0,100}a\.owner_user_id = auth\.uid\(\)/i);
+  assert.match(roleRepairMigration, /private\.user_has_account_permission\(auth\.uid\(\), p_account_id, 'roles\.manage'\)/i);
+  assert.match(roleRepairMigration, /r\.id = p_role_id[\s\S]{0,100}r\.account_id = p_account_id[\s\S]{0,100}not r\.is_system/i);
+  assert.match(roleRepairMigration, /r\.account_id is null[\s\S]{0,100}lower\(btrim\(r\.name\)\) = lower\(v_name\)/i);
+  assert.match(roleRepairMigration, /where not p\.assignable_to_custom/i);
+  assert.match(roleRepairMigration, /account_permission_dependencies[\s\S]{0,220}required_permission_key = any\(v_permission_keys\)/i);
+  assert.match(roleRepairMigration, /not f\.supports_write[\s\S]{0,140}f\.write_permission_key is null/i);
+});
+
+test('role save repair prevents duplicate retries and leaves its write set in one RPC transaction', () => {
+  assert.match(roleRepairMigration, /create unique index if not exists account_roles_active_account_name_unique/i);
+  assert.match(roleRepairMigration, /pg_advisory_xact_lock\([\s\S]{0,180}hashtextextended/i);
+  assert.match(roleRepairMigration, /v_existing_permissions = v_permission_keys[\s\S]{0,140}v_existing_fields = v_visible_field_access[\s\S]{0,100}return v_role_id/i);
+  assert.match(roleRepairMigration, /delete from public\.account_role_permissions[\s\S]+insert into public\.account_role_fields[\s\S]+insert into public\.account_audit_events/i);
+  assert.doesNotMatch(roleRepairMigration, /jsonb_object_length\s*\(/i);
 });
 
 test('team responses load role field mappings and enforce them before serialization and writes', () => {

@@ -26,6 +26,7 @@ test('settings exposes a permission-gated, accessible team workflow', () => {
 test('settings provides custom role templates and per-member field privacy controls', () => {
   const settings = read('settings.html');
   assert.match(settings, /id="teamRoleTemplateList"/);
+  assert.match(settings, /data-account-permission="roles\.manage"[^>]+data-account-owner-only/);
   assert.match(settings, /id="teamRoleModal"[^>]+aria-labelledby="teamRoleModalTitle"/);
   assert.match(settings, /id="teamRolePermissionList"/);
   assert.match(settings, /id="teamRoleFieldList"/);
@@ -37,6 +38,9 @@ test('settings provides custom role templates and per-member field privacy contr
   assert.match(settings, /QuoteDrAccount\.api\('roles\.archive'/);
   assert.match(settings, /Customize access/);
   assert.match(settings, /customizeTeamMemberAccess\(member\)/);
+  assert.match(settings, /permission\.customRoleAllowed === false/);
+  assert.match(settings, /Owner only/);
+  assert.match(settings, /QuoteDrAccount\.isOwner\(\)/);
   assert.match(settings, /memberId:\s*quotedrRoleEditor\.member\.id[\s\S]{0,180}roleId:\s*savedRoleId/);
   assert.doesNotMatch(settings, /role\.(?:key|roleKey)\s*={2,3}\s*['"]estimator['"]/i);
 });
@@ -91,4 +95,19 @@ test('browser caches are reset when the signed-in user, account, or permission s
   assert.match(access, /quotedr_pending_invite_token/);
   assert.match(access, /deleteDatabase\('quotedr-durable-saves'\)/);
   assert.match(access, /protectAccountCache\(state\.user, state\.active\)/);
+});
+
+test('role save errors are actionable and remain visible in the mobile scroll modal', () => {
+  const settings = read('settings.html');
+  const access = read('account-access.js');
+  assert.match(access, /invokeError\.context\.json\(\)/);
+  assert.match(access, /role_name_taken/);
+  assert.match(access, /Choose a different name or edit the existing role/);
+  assert.match(settings, /function showTeamRoleSaveError/);
+  assert.match(settings, /No changes were applied\. Try again/);
+  assert.match(settings, /Reference ' \+ reference\.toUpperCase\(\)/);
+  assert.match(settings, /modalBody\.scrollTo\(\{ top: 0, behavior: 'smooth' \}\)/);
+  assert.match(settings, /name\.setAttribute\('aria-invalid', 'true'\)/);
+  assert.match(settings, /name\.focus\(\)/);
+  assert.match(settings, /aria-errormessage="teamRoleEditorMessage"/);
 });

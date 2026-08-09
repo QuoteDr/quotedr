@@ -1896,7 +1896,7 @@ Sarah Jones, 905-555-5678"></textarea>
 							<button type="button" class="btn btn-outline-primary btn-sm" onclick="loadTeamSettings()"><i class="fas fa-rotate me-1"></i>Refresh</button>
 						</div>
 						<div id="teamSettingsMessage" class="alert alert-light border small" role="status">Open this tab to load your team.</div>
-						<section class="border rounded p-3 mb-4" data-account-permission="roles.manage" aria-labelledby="teamRoleTemplatesHeading">
+						<section class="border rounded p-3 mb-4" data-account-permission="roles.manage" data-account-owner-only aria-labelledby="teamRoleTemplatesHeading">
 							<div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-2">
 								<div>
 									<h6 id="teamRoleTemplatesHeading" class="mb-1">Role templates</h6>
@@ -1941,7 +1941,7 @@ Sarah Jones, 905-555-5678"></textarea>
 									<div class="row g-3 mb-4">
 										<div class="col-md-6">
 											<label for="teamRoleName" class="form-label">Role name</label>
-											<input type="text" id="teamRoleName" class="form-control" maxlength="80" required autocomplete="off">
+											<input type="text" id="teamRoleName" class="form-control" maxlength="80" required autocomplete="off" aria-errormessage="teamRoleEditorMessage" oninput="this.removeAttribute('aria-invalid')">
 										</div>
 										<div class="col-md-6">
 											<label for="teamRoleSource" class="form-label">Copy settings from</label>
@@ -2223,6 +2223,25 @@ Sarah Jones, 905-555-5678"></textarea>
 			node.textContent = message;
 		}
 
+		function showTeamRoleSaveError(error) {
+			var code = String(error && error.code || '');
+			var message = error && error.message || 'The role could not be saved.';
+			if (code === 'request_failed' || code === 'account_request_failed') {
+				message = 'The role could not be saved. No changes were applied. Try again.';
+				var reference = String(error && error.supportId || '');
+				if (/^[A-Z0-9-]{4,32}$/i.test(reference)) message += ' Reference ' + reference.toUpperCase() + '.';
+			}
+			teamRoleEditorMessage(message, 'error');
+			var modalBody = document.querySelector('#teamRoleModal .modal-body');
+			if (modalBody && typeof modalBody.scrollTo === 'function') modalBody.scrollTo({ top: 0, behavior: 'smooth' });
+			else if (modalBody) modalBody.scrollTop = 0;
+			if (['invalid_role_name', 'role_name_taken'].includes(code)) {
+				var name = document.getElementById('teamRoleName');
+				name.setAttribute('aria-invalid', 'true');
+				name.focus();
+			}
+		}
+
 		function teamRoleCategoryLabel(value) {
 			return String(value || 'Other').replace(/[_-]+/g, ' ').replace(/\b\w/g, function(letter) { return letter.toUpperCase(); });
 		}
@@ -2242,7 +2261,7 @@ Sarah Jones, 905-555-5678"></textarea>
 		}
 
 		function checkedTeamRolePermissions() {
-			return new Set(teamRolePermissionInputs().filter(function(input) { return input.checked; }).map(function(input) {
+			return new Set(teamRolePermissionInputs().filter(function(input) { return input.checked && !input.disabled; }).map(function(input) {
 				return input.getAttribute('data-permission-key');
 			}));
 		}
@@ -2341,6 +2360,8 @@ Sarah Jones, 905-555-5678"></textarea>
 					input.className = 'form-check-input';
 					input.id = 'teamRolePermission_' + permissionIndex++;
 					input.setAttribute('data-permission-key', permission.key);
+					input.setAttribute('data-custom-role-allowed', permission.customRoleAllowed === false ? 'false' : 'true');
+					input.disabled = permission.customRoleAllowed === false;
 					input.addEventListener('change', function() { handleTeamRolePermissionChange(input); });
 					var label = document.createElement('label');
 					label.className = 'form-check-label';
@@ -2354,6 +2375,12 @@ Sarah Jones, 905-555-5678"></textarea>
 						badge.className = 'badge text-bg-warning ms-2';
 						badge.textContent = 'Sensitive';
 						label.appendChild(badge);
+					}
+					if (permission.customRoleAllowed === false) {
+						var ownerOnly = document.createElement('span');
+						ownerOnly.className = 'badge text-bg-light border ms-2';
+						ownerOnly.textContent = 'Owner only';
+						label.appendChild(ownerOnly);
 					}
 					var description = document.createElement('div');
 					description.className = 'small text-muted';
@@ -2422,7 +2449,8 @@ Sarah Jones, 905-555-5678"></textarea>
 		function setTeamRoleEditorSelections(role) {
 			var permissions = new Set(role && Array.isArray(role.permissions) ? role.permissions : []);
 			teamRolePermissionInputs().forEach(function(input) {
-				input.checked = permissions.has(input.getAttribute('data-permission-key'));
+				input.checked = input.getAttribute('data-custom-role-allowed') !== 'false'
+					&& permissions.has(input.getAttribute('data-permission-key'));
 			});
 			var fields = role && role.fields && typeof role.fields === 'object' ? role.fields : {};
 			teamRoleFieldSelects().forEach(function(select) {
@@ -2463,7 +2491,7 @@ Sarah Jones, 905-555-5678"></textarea>
 		}
 
 		function openTeamRoleEditor(role, member, editExisting) {
-			if (!QuoteDrAccount.can(QuoteDrAccount.PERMISSIONS.ROLES_MANAGE)) return;
+			if (!QuoteDrAccount.can(QuoteDrAccount.PERMISSIONS.ROLES_MANAGE) || !QuoteDrAccount.isOwner()) return;
 			var sourceRole = role || quotedrTeamRoles.find(function(candidate) { return candidate.assignable; }) || null;
 			quotedrRoleEditor = {
 				roleId: editExisting && sourceRole && !sourceRole.system ? sourceRole.id : null,
@@ -2482,6 +2510,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			var subtitle = document.getElementById('teamRoleModalSubtitle');
 			var name = document.getElementById('teamRoleName');
 			var description = document.getElementById('teamRoleDescription');
+			name.removeAttribute('aria-invalid');
 			if (quotedrRoleEditor.roleId) {
 				title.textContent = 'Edit ' + sourceRole.name;
 				subtitle.textContent = 'Changes apply to every member assigned to this role.';
@@ -2553,6 +2582,7 @@ Sarah Jones, 905-555-5678"></textarea>
 			button.disabled = true;
 			teamRoleEditorMessage('Saving role and field rules...');
 			try {
+				document.getElementById('teamRoleName').removeAttribute('aria-invalid');
 				var fieldAccess = {};
 				teamRoleFieldSelects().forEach(function(select) {
 					fieldAccess[select.getAttribute('data-field-key')] = select.value;
@@ -2576,7 +2606,7 @@ Sarah Jones, 905-555-5678"></textarea>
 				teamSettingsMessage(quotedrRoleEditor.member ? 'Custom access saved and assigned.' : 'Role template saved.', 'success');
 				await loadTeamSettings();
 			} catch (error) {
-				teamRoleEditorMessage(error.message || 'The role could not be saved.', 'error');
+				showTeamRoleSaveError(error);
 			} finally {
 				button.disabled = false;
 			}
@@ -2659,7 +2689,7 @@ Sarah Jones, 905-555-5678"></textarea>
 					appendTeamButton(actions, 'Save', 'btn btn-outline-primary btn-sm', function() {
 						updateTeamMember(member.id, roleSelect.value, statusSelect.value);
 					});
-					if (QuoteDrAccount.can(QuoteDrAccount.PERMISSIONS.ROLES_MANAGE)) {
+					if (QuoteDrAccount.can(QuoteDrAccount.PERMISSIONS.ROLES_MANAGE) && QuoteDrAccount.isOwner()) {
 						appendTeamButton(actions, 'Customize access', 'btn btn-outline-secondary btn-sm', function() {
 							customizeTeamMemberAccess(member);
 						});
@@ -2708,14 +2738,14 @@ Sarah Jones, 905-555-5678"></textarea>
 					QuoteDrAccount.api('roles.list'),
 					QuoteDrAccount.api('team.list')
 				];
-				if (QuoteDrAccount.can(QuoteDrAccount.PERMISSIONS.ROLES_MANAGE)) {
+				if (QuoteDrAccount.can(QuoteDrAccount.PERMISSIONS.ROLES_MANAGE) && QuoteDrAccount.isOwner()) {
 					requests.push(QuoteDrAccount.api('roles.catalog'));
 				}
 				var results = await Promise.all(requests);
 				quotedrTeamRoles = results[0].data || [];
 				quotedrRoleCatalog = results[2] && results[2].data || { permissions: [], fields: [] };
 				renderTeamRoles();
-				if (QuoteDrAccount.can(QuoteDrAccount.PERMISSIONS.ROLES_MANAGE)) {
+				if (QuoteDrAccount.can(QuoteDrAccount.PERMISSIONS.ROLES_MANAGE) && QuoteDrAccount.isOwner()) {
 					renderTeamRoleEditorControls();
 					renderTeamRoleTemplates();
 				}

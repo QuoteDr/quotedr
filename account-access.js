@@ -56,6 +56,59 @@
         ald_login_attempts: true,
         quotedr_pending_invite_token: true
     });
+    var ACCOUNT_API_MESSAGES = Object.freeze({
+        invalid_role_request: 'Enter valid role settings and try again.',
+        invalid_role_id: 'This custom role is no longer available. Reload Team settings and try again.',
+        invalid_role_name: 'Enter a role name between 1 and 80 characters.',
+        invalid_role_description: 'Keep the role description under 300 characters.',
+        role_name_taken: 'A role with this name already exists. Choose a different name or edit the existing role.',
+        invalid_role_permissions: 'Review the selected capabilities and try again.',
+        role_permission_dependency: 'A selected capability is missing a requirement. Reload Team settings and try again.',
+        role_owner_only_permission: 'This capability is reserved for the account owner. Remove it and save again.',
+        invalid_role_fields: 'Review the field privacy settings and try again.',
+        role_field_view_required: 'A visible field is missing its matching view capability. Reload Team settings and try again.',
+        role_field_edit_required: 'An editable field is missing its matching edit capability. Reload Team settings and try again.',
+        role_not_found: 'This custom role no longer exists. Reload Team settings and try again.',
+        role_in_use: 'Reassign members before archiving this role.',
+        role_invitation_pending: 'Revoke pending invitations before archiving this role.',
+        permission_denied: 'You do not have permission to complete this account action.',
+        authentication_required: 'Your session has expired. Sign in and try again.',
+        account_required: 'Choose an account and try again.',
+        service_unavailable: 'The account service is temporarily unavailable. Try again shortly.'
+    });
+
+    function accountSupportId(value) {
+        value = String(value || '').trim();
+        return /^[A-Z0-9-]{4,32}$/i.test(value) ? value.toUpperCase() : '';
+    }
+
+    function accountApiMessage(code, supportId) {
+        var message = ACCOUNT_API_MESSAGES[String(code || '')]
+            || 'The account request could not be completed. Please try again.';
+        var reference = accountSupportId(supportId);
+        return reference ? message + ' Reference ' + reference + '.' : message;
+    }
+
+    async function accountApiError(result) {
+        var invokeError = result && result.error;
+        var payload = result && result.data && typeof result.data === 'object' ? result.data : null;
+        if ((!payload || !payload.code) && invokeError && invokeError.context && typeof invokeError.context.json === 'function') {
+            try {
+                var contextPayload = await invokeError.context.json();
+                if (contextPayload && typeof contextPayload === 'object') payload = contextPayload;
+            } catch (_) {}
+        }
+        var code = payload && typeof payload.code === 'string' ? payload.code : '';
+        if (!code && invokeError && /Functions(?:Fetch|Relay)Error/.test(String(invokeError.name || ''))) {
+            code = 'account_network_error';
+        }
+        var error = new Error(code === 'account_network_error'
+            ? 'The account service could not be reached. Check your connection and try again.'
+            : accountApiMessage(code, payload && payload.supportId));
+        error.code = code || 'account_request_failed';
+        error.supportId = accountSupportId(payload && payload.supportId);
+        return error;
+    }
 
     function cachePrincipalUserId(principal) {
         var value = String(principal || '');
@@ -312,6 +365,10 @@
         return state.active && state.active.ownerUserId || state.user && state.user.id || null;
     }
 
+    function isOwner() {
+        return !!(state.user && state.active && state.active.ownerUserId === state.user.id);
+    }
+
     function snapshot() {
         return {
             user: state.user,
@@ -333,15 +390,10 @@
         });
         var result = await client.functions.invoke('team-account', { body: body });
         if (result.error) {
-            var invokeError = new Error(result.error.message || 'Account request failed');
-            invokeError.code = result.error.code || 'account_request_failed';
-            throw invokeError;
+            throw await accountApiError(result);
         }
         if (result.data && result.data.error) {
-            var apiError = new Error(result.data.error);
-            apiError.code = result.data.code || 'account_request_failed';
-            apiError.supportId = result.data.supportId || '';
-            throw apiError;
+            throw await accountApiError(result);
         }
         return result.data || {};
     }
@@ -372,6 +424,16 @@
             } else if (node.getAttribute('data-account-access-hidden') === 'true') {
                 node.hidden = false;
                 node.removeAttribute('data-account-access-hidden');
+            }
+        });
+        var ownerNodes = scope.querySelectorAll ? scope.querySelectorAll('[data-account-owner-only]') : [];
+        Array.prototype.forEach.call(ownerNodes, function(node) {
+            if (!isOwner()) {
+                node.hidden = true;
+                node.setAttribute('data-account-owner-hidden', 'true');
+            } else if (node.getAttribute('data-account-owner-hidden') === 'true') {
+                node.removeAttribute('data-account-owner-hidden');
+                if (node.getAttribute('data-account-access-hidden') !== 'true') node.hidden = false;
             }
         });
         var fieldNodes = scope.querySelectorAll ? scope.querySelectorAll('[data-account-field]') : [];
@@ -411,6 +473,7 @@
             document.body.classList.toggle('qd-no-send-access', !can(PERMISSIONS.QUOTES_SEND));
             document.body.classList.toggle('qd-no-payment-access', !can(PERMISSIONS.PAYMENTS_READ));
             document.body.classList.toggle('qd-no-team-management', !can(PERMISSIONS.TEAM_MANAGE));
+            document.body.classList.toggle('qd-account-owner', isOwner());
         }
     }
 
@@ -454,6 +517,7 @@
         active: activeAccount,
         snapshot: snapshot,
         ownerUserId: ownerUserId,
+        isOwner: isOwner,
         usesTeamApi: usesTeamApi,
         setActiveAccount: setActiveAccount,
         applyDocumentAccess: applyDocumentAccess

@@ -33,6 +33,12 @@ import {
   normalizeAccountingExportDate,
   normalizeAccountingExportFilters
 } from '../_shared/accounting-export.mjs';
+import {
+  AccountRolePolicyError,
+  accountRoleRpcFailure,
+  assertAccountRoleOwner,
+  normalizeAccountRoleSave
+} from '../_shared/account-role-policy.mjs';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -717,13 +723,26 @@ async function listRoles(req: Request, accountId: unknown) {
   });
 }
 
+async function requireRoleManagementOwner(req: Request, accountId: unknown) {
+  const auth = await requireAccountPermission(req, accountId, ACCOUNT_PERMISSION.ROLES_MANAGE);
+  try {
+    assertAccountRoleOwner(auth.user.id, auth.ownerUserId);
+  } catch (error) {
+    if (error instanceof AccountRolePolicyError) {
+      throw new AccountAccessError(error.message, error.status, error.code);
+    }
+    throw error;
+  }
+  return auth;
+}
+
 async function getRoleCatalog(req: Request, accountId: unknown) {
-  await requireAccountPermission(req, accountId, ACCOUNT_PERMISSION.ROLES_MANAGE);
+  await requireRoleManagementOwner(req, accountId);
   const admin = serviceClient();
   const [permissions, dependencies, fields] = await Promise.all([
     admin
       .from('account_permissions')
-      .select('permission_key,name,description,category,sensitive,sort_order')
+      .select('permission_key,name,description,category,sensitive,assignable_to_custom,sort_order')
       .order('sort_order', { ascending: true }),
     admin
       .from('account_permission_dependencies')
@@ -752,6 +771,7 @@ async function getRoleCatalog(req: Request, accountId: unknown) {
         description: permission.description,
         category: permission.category,
         sensitive: permission.sensitive === true,
+        customRoleAllowed: permission.assignable_to_custom !== false,
         requires: requiredByPermission.get(String(permission.permission_key || '')) || []
       })),
       fields: (fields.data || []).map((field: Record<string, unknown>) => ({
@@ -768,54 +788,53 @@ async function getRoleCatalog(req: Request, accountId: unknown) {
   });
 }
 
-function roleRpcError(error: { code?: string; message?: string }, fallback: string) {
-  const status = error.code === '42501' ? 403 : error.code === '23503' ? 409 : 400;
-  const allowedMessages = [
-    'Role name must be', 'Role description is too long', 'Role contains an unknown permission',
-    'Role is missing a required permission', 'Role contains an invalid field rule',
-    'Field access requires its view permission', 'Field edit access requires its edit permission',
-    'Custom role was not found', 'Reassign members before archiving this role',
-    'Revoke pending invitations before archiving this role', 'Permission denied'
-  ];
-  const raw = String(error.message || '');
-  const message = allowedMessages.some((prefix) => raw.startsWith(prefix)) ? raw : fallback;
-  return new AccountAccessError(message, status, status === 403 ? 'permission_denied' : 'role_validation_failed');
+function roleRpcError(error: { code?: string; message?: string }) {
+  const failure = accountRoleRpcFailure(error);
+  return failure
+    ? new AccountAccessError(failure.message, failure.status, failure.code)
+    : null;
 }
 
 async function saveRole(req: Request, accountId: unknown, body: Record<string, unknown>) {
-  const auth = await requireAccountPermission(req, accountId, ACCOUNT_PERMISSION.ROLES_MANAGE);
-  const permissionKeys = Array.isArray(body.permissionKeys)
-    ? [...new Set(body.permissionKeys.map((key) => cleanText(key, 100)).filter(Boolean))].slice(0, 100)
-    : [];
-  const sourceFields = body.fieldAccess && typeof body.fieldAccess === 'object' && !Array.isArray(body.fieldAccess)
-    ? body.fieldAccess as Record<string, unknown>
-    : {};
-  const fieldAccess: Record<string, string> = {};
-  for (const [fieldKey, level] of Object.entries(sourceFields).slice(0, 200)) {
-    fieldAccess[cleanText(fieldKey, 100)] = cleanText(level, 20);
+  const auth = await requireRoleManagementOwner(req, accountId);
+  let role;
+  try {
+    role = normalizeAccountRoleSave(body);
+  } catch (error) {
+    if (error instanceof AccountRolePolicyError) {
+      throw new AccountAccessError(error.message, error.status, error.code);
+    }
+    throw error;
   }
-  const roleId = cleanText(body.roleId, 80) || null;
   const { data, error } = await auth.userClient.rpc('quotedr_save_account_role', {
     p_account_id: auth.accountId,
-    p_role_id: roleId,
-    p_name: cleanText(body.name, 80),
-    p_description: cleanText(body.description, 300),
-    p_permission_keys: permissionKeys,
-    p_field_access: fieldAccess
+    p_role_id: role.roleId,
+    p_name: role.name,
+    p_description: role.description,
+    p_permission_keys: role.permissionKeys,
+    p_field_access: role.fieldAccess
   });
-  if (error) throw roleRpcError(error, 'The role could not be saved.');
+  if (error) {
+    const safeError = roleRpcError(error);
+    if (safeError) throw safeError;
+    throw error;
+  }
   return json({ data: { id: data } });
 }
 
 async function archiveRole(req: Request, accountId: unknown, body: Record<string, unknown>) {
-  const auth = await requireAccountPermission(req, accountId, ACCOUNT_PERMISSION.ROLES_MANAGE);
+  const auth = await requireRoleManagementOwner(req, accountId);
   const roleId = cleanText(body.roleId, 80);
   if (!roleId) throw new AccountAccessError('Role is required', 400, 'role_required');
   const { error } = await auth.userClient.rpc('quotedr_archive_account_role', {
     p_account_id: auth.accountId,
     p_role_id: roleId
   });
-  if (error) throw roleRpcError(error, 'The role could not be archived.');
+  if (error) {
+    const safeError = roleRpcError(error);
+    if (safeError) throw safeError;
+    throw error;
+  }
   return json({ data: { id: roleId, archived: true } });
 }
 
