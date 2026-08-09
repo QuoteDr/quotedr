@@ -10,7 +10,8 @@
     pendingAction: null,
     detail: null,
     newCaseModal: null,
-    actionModal: null
+    actionModal: null,
+    rawMessagesByCase: {}
   };
 
   function byId(id) { return document.getElementById(id); }
@@ -112,6 +113,17 @@
     });
     var data = await response.json().catch(function() { return {}; });
     if (!response.ok) throw new Error(data.error || 'AI Operations request failed.');
+    return data;
+  }
+
+  async function callSupportIntake(action, payload) {
+    var response = await fetch(SUPABASE_URL + '/functions/v1/support-intake', {
+      method: 'POST',
+      headers: await getSupabaseFunctionAuthHeaders(),
+      body: JSON.stringify(Object.assign({ action: action }, payload || {}))
+    });
+    var data = await response.json().catch(function() { return {}; });
+    if (!response.ok) throw new Error(data.error || 'Could not load restricted intake data.');
     return data;
   }
 
@@ -386,14 +398,30 @@
     var deployBody = approval ? '<div>Requested ' + escapeHtml(formatDate(approval.requestedAt)) + '</div>' + (approval.releaseReference ? '<div class="text-muted mt-1">Release: ' + escapeHtml(approval.releaseReference) + '</div>' : '') : 'Created only after verification evidence is recorded.';
     var followupBody = followup ? (followup.draftBody ? '<div class="text-muted">' + escapeHtml(followup.draftBody) + '</div>' : 'Waiting for verified release evidence before live-fix wording can be prepared.') : 'No release follow-up is required yet.';
     var creditBody = goodwill ? '<div>' + escapeHtml(humanize(goodwill.creditType)) + '</div><div class="text-muted mt-1">' + escapeHtml(goodwill.recommendationReason || '') + '</div>' : 'Optional. Recommendation and owner approval do not grant a credit.';
+    var rawMessages = state.rawMessagesByCase[caseId];
+    var originalBody = rawMessages
+      ? rawMessages.map(function(message) {
+        return '<div class="action-card mb-2"><div class="small text-muted mb-2">' + escapeHtml(message.provider || 'Unknown provider') + ' - ' + escapeHtml(formatDate(message.receivedAt)) + ' - retained until ' + escapeHtml(formatDate(message.purgeAfter)) + '</div>' +
+          '<div class="fw-semibold">' + escapeHtml(message.subject || '') + '</div><div class="small text-muted mt-1">From ' + escapeHtml(message.senderDisplayName || message.senderEmail || 'Unknown sender') + ' - Thread ' + escapeHtml(message.providerThreadId || 'none') + '</div>' +
+          '<textarea class="form-control form-control-sm mt-2" rows="8" readonly aria-label="Original customer message">' + escapeHtml(message.bodyPlaintext || '') + '</textarea>' +
+          (message.quotedText ? '<details class="mt-2"><summary class="small">Quoted prior text preserved as evidence</summary><textarea class="form-control form-control-sm mt-2" rows="5" readonly>' + escapeHtml(message.quotedText) + '</textarea></details>' : '') +
+          '<div class="small text-muted mt-2">Attachments are quarantined metadata only (' + escapeHtml((message.attachmentMetadata || []).length) + '); no attachment content is opened here.</div></div>';
+      }).join('')
+      : '<button type="button" class="btn btn-outline-secondary btn-sm" data-load-original-message><i class="fas fa-lock me-1"></i>Load original customer message</button><div class="small text-muted mt-2">Owner/administrator only. Raw message content is not included in the dashboard overview or coordinator inbox.</div>';
+    var agentStatus = supportCase.agentStatus || 'not_requested';
+    var agentNotice = agentStatus === 'unavailable'
+      ? '<div class="alert alert-warning small py-2 mb-2"><i class="fas fa-triangle-exclamation me-1"></i>Support Agent unavailable: no response was invented. Draft the recommendation manually.</div>'
+      : '';
     byId('caseDetailBody').innerHTML =
       '<div class="d-flex flex-wrap gap-2 mb-3">' + improvementTag(supportCase.improvementType) + (supportCase.riskLevel !== 'low' ? '<span class="tag tag-risk">' + escapeHtml(humanize(supportCase.riskLevel)) + '</span>' : '') + flags + '</div>' +
       '<div class="mb-4">' + workflowHtml(supportCase, workItem, approval, followup) + '</div>' +
       assessmentHtml(assessment) +
+      '<div class="mb-3"><div class="detail-label mb-1">Original customer message</div>' + originalBody + '</div>' +
+      '<div class="mb-3"><div class="detail-label mb-1">Recommended response (editable, never auto-sent)</div>' + agentNotice + '<textarea class="form-control form-control-sm" rows="5" readonly>' + escapeHtml(supportCase.immediateResponseDraft || '') + '</textarea><div class="small text-muted mt-1">Support Agent status: ' + escapeHtml(humanize(agentStatus)) + '. Dashboard delivery: never.</div></div>' +
       '<div class="mb-3"><div class="detail-label mb-1">Customer report</div><div>' + escapeHtml(supportCase.summary) + '</div><div class="small text-muted mt-2">' + escapeHtml(supportCase.customerName || 'Customer not named') + (supportCase.customerEmail ? ' · ' + escapeHtml(supportCase.customerEmail) : '') + ' · ' + escapeHtml(humanize(supportCase.source)) + '</div></div>' +
       '<div class="mb-3"><div class="detail-label mb-1">Safe immediate response</div><textarea class="form-control form-control-sm" rows="5" readonly>' + escapeHtml(supportCase.immediateResponseDraft || '') + '</textarea><div class="small text-muted mt-1">Status: ' + escapeHtml(humanize(supportCase.immediateResponseStatus)) + '. Dashboard delivery: never.</div></div>' +
       '<div class="mb-3"><div class="detail-label mb-1">Current workaround</div><div class="action-card small">' + escapeHtml(supportCase.safeWorkaround || 'No safe workaround. Preserve the affected data and route for owner review.') + '</div></div>' +
-      '<div class="d-grid gap-2 mb-4">' + detailStatusCard('Engineering', workItem && workItem.status, workBody) + detailStatusCard('Coordinator inbox', queueHandoffStatus, queueHandoffBody) + detailStatusCard('Deployment', approval && approval.status, deployBody) + detailStatusCard('Customer follow-up', followup && followup.status, followupBody) + detailStatusCard('Goodwill', goodwill && goodwill.status, creditBody) + '</div>' +
+      '<div class="d-grid gap-2 mb-4">' + detailStatusCard('Engineering', workItem && workItem.status, workBody) + detailStatusCard('Engineering handoff (privacy-minimized)', queueHandoffStatus, queueHandoffBody) + detailStatusCard('Deployment', approval && approval.status, deployBody) + detailStatusCard('Customer follow-up', followup && followup.status, followupBody) + detailStatusCard('Goodwill', goodwill && goodwill.status, creditBody) + '</div>' +
       '<div class="detail-label mb-2">Available human actions</div>' + renderActions(supportCase, workItem, approval, followup, goodwill, coordinatorRequest) +
       '<div class="alert alert-light border small mt-4 mb-0"><i class="fas fa-lock me-2"></i>No action in this panel sends, deploys, launches, or grants anything automatically.</div>';
   }
@@ -402,6 +430,12 @@
     renderCaseDetail(caseId);
     if (!state.detail) state.detail = bootstrap.Offcanvas.getOrCreateInstance(byId('caseDetail'));
     state.detail.show();
+  }
+
+  async function loadOriginalMessage(caseId) {
+    var result = await callSupportIntake('raw_detail', { caseId: caseId });
+    state.rawMessagesByCase[caseId] = result.rawMessages || [];
+    renderCaseDetail(caseId);
   }
 
   function fieldHtml(field) {
@@ -777,6 +811,13 @@
     document.addEventListener('click', async function(event) {
       var caseButton = event.target.closest('[data-open-case]');
       if (caseButton) { openCase(caseButton.getAttribute('data-open-case')); return; }
+      var originalButton = event.target.closest('[data-load-original-message]');
+      if (originalButton) {
+        originalButton.disabled = true;
+        originalButton.textContent = 'Loading restricted message...';
+        try { await loadOriginalMessage(state.selectedCaseId); } catch (error) { window.alert(error.message || 'Could not load original message.'); }
+        return;
+      }
       var copyBriefButton = event.target.closest('[data-copy-coordinator-brief]');
       if (copyBriefButton) {
         var maps = caseMaps();

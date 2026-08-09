@@ -71,6 +71,11 @@ verify_jwt = true
 [functions.ai-operations]
 verify_jwt = true
 
+# Signed Gmail bridge requests authenticate with a dedicated HMAC inside the
+# function; authenticated in-app feedback is verified again in the handler.
+[functions.support-intake]
+verify_jwt = false
+
 [functions.ai-operations-coordinator]
 verify_jwt = false
 

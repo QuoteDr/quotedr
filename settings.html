@@ -4986,6 +4986,23 @@ Sarah Jones, 905-555-5678"></textarea>
 				});
 				if (feedbackSave.error) console.warn('Feedback DB deferred:', feedbackSave.error);
 			} catch(e) { console.warn('Feedback DB error:', e); }
+			// This is a second, idempotent, server-only handoff. It never replaces
+			// the saved feedback record or the existing admin email alert below.
+			try {
+				var intakeResponse = await fetch(SUPABASE_URL + '/functions/v1/support-intake', {
+					method: 'POST',
+					headers: await getSupabaseFunctionAuthHeaders(),
+					body: JSON.stringify({
+						action: 'ingest_feedback',
+						feedbackKey: 'feedback:' + payload.created_at,
+						feedbackType: payload.type,
+						description: payload.description,
+						userId: payload.user_id || '',
+						createdAt: payload.created_at
+					})
+				});
+				if (!intakeResponse.ok) console.warn('Support intake handoff deferred:', await intakeResponse.text());
+			} catch(e) { console.warn('Support intake handoff error:', e); }
 			try {
 				var emailResponse = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/send-feedback-email', {
 					method: 'POST',

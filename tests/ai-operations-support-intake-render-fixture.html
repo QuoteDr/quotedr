@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QuoteDr Support Intake Synthetic Render</title>
+  <style>
+    :root { color-scheme: light; font-family: Arial, sans-serif; color: #172033; background: #f5f7fb; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 24px; }
+    .shell { max-width: 1160px; margin: auto; }
+    .banner, .panel, .card { border: 1px solid #d8e0ee; border-radius: 12px; background: #fff; }
+    .banner { padding: 14px 16px; background: #eef4ff; color: #1d4d86; margin-bottom: 16px; }
+    .panel { padding: 20px; }
+    h1 { margin: 0 0 6px; font-size: 1.25rem; }
+    h2, h3 { margin: 0; font-size: 1rem; }
+    p, .help { color: #536277; line-height: 1.45; }
+    .eyebrow { color: #61718b; font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+    .tags { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0; }
+    .tag { padding: 4px 8px; border-radius: 999px; background: #fff3d7; color: #744300; font-size: .78rem; font-weight: 700; }
+    .grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+    .card { padding: 14px; min-width: 0; overflow-wrap: anywhere; }
+    textarea { display: block; width: 100%; margin-top: 10px; min-height: 142px; padding: 10px; resize: vertical; border: 1px solid #aebbd0; border-radius: 7px; font: .86rem/1.4 ui-monospace, monospace; color: #172033; background: #fbfcff; }
+    button { margin-top: 10px; padding: 8px 11px; border: 1px solid #315f9d; border-radius: 7px; background: #fff; color: #214f8a; font-weight: 700; cursor: pointer; }
+    button.primary { background: #215d9c; color: #fff; }
+    button[disabled] { cursor: not-allowed; opacity: .6; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .notice { margin-top: 12px; padding: 10px; border-radius: 8px; background: #fff8e7; color: #754800; font-size: .86rem; }
+    .handoff { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 10px; padding: 10px; border-radius: 7px; background: #f7f9fd; font: .8rem/1.45 ui-monospace, monospace; }
+    .assertions { margin: 18px 0 0; padding-left: 18px; color: #314056; }
+    .assertions li { margin: 6px 0; }
+    body.mobile-preview { width: 390px; max-width: 390px; padding: 10px 0; overflow-x: hidden; }
+    body.mobile-preview .shell { width: 390px; max-width: 390px; }
+    body.mobile-preview .grid { grid-template-columns: 1fr; }
+    body.mobile-preview .panel { border-radius: 0; padding: 14px; }
+    @media (max-width: 767px) { body { padding: 10px; } .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <div class="banner"><strong>Synthetic local fixture.</strong> Uses example.invalid only; no network, storage, customer data, mailbox bridge, or Support Agent call.</div>
+    <section class="panel" aria-labelledby="fixture-title">
+      <div class="eyebrow">QD-AI-SYNTHETIC-0001 · Feedback &amp; missing features</div>
+      <h1 id="fixture-title">Support Email Intake review boundaries</h1>
+      <p>Desktop view by default. Add <code>?viewport=mobile</code> for the fixed 390px review layout.</p>
+      <div class="tags"><span class="tag">Sensitive · privacy</span><span class="tag">Human review required</span><span class="tag">No autosend</span></div>
+      <div class="grid">
+        <article class="card" aria-labelledby="original-title">
+          <div class="eyebrow">Owner / administrator only</div><h2 id="original-title">Original customer message</h2>
+          <p class="help">Loaded only on explicit request. This content is absent from the overview and engineering handoff.</p>
+          <textarea readonly aria-label="Synthetic original customer message">From: Example Customer &lt;customer@example.invalid&gt;
+To: support@quotedr.io
+Subject: Synthetic quote preview issue
+
+This is synthetic evidence only. The quoted reply remains preserved separately.</textarea>
+          <button type="button" disabled>Restricted raw-message view</button>
+        </article>
+        <article class="card" aria-labelledby="response-title">
+          <div class="eyebrow">Human-reviewed only</div><h2 id="response-title">Recommended response</h2>
+          <div class="notice">Support Agent unavailable: no response was invented.</div>
+          <textarea aria-label="Synthetic recommended response">Hi there, thanks for flagging this. I am reviewing the safest verified next step and do not have a release date to promise.</textarea>
+          <button type="button" class="primary">Edit for human review</button>
+          <p class="help">Editable draft only. This fixture has no send action.</p>
+        </article>
+        <article class="card" aria-labelledby="handoff-title">
+          <div class="eyebrow">Privacy-minimized</div><h2 id="handoff-title">Engineering handoff</h2>
+          <p class="help">The original address, raw body, and secure values are excluded.</p>
+          <div class="handoff">Case: QD-AI-SYNTHETIC-0001
+Summary: Quote preview layout needs review.
+Evidence: synthetic local fixture only.
+Requested outcome: Review responsive preview behavior.
+Customer email included: false
+Secure links or tokens included: false</div>
+          <button type="button">Copy reviewed brief</button>
+        </article>
+      </div>
+      <div class="actions" aria-label="Synthetic action controls">
+        <button type="button">Record manual response</button>
+        <button type="button">Queue owner-reviewed handoff</button>
+        <button type="button">Request verification</button>
+      </div>
+      <ul class="assertions">
+        <li>There is no send, deploy, grant-credit, mailbox-poll, or agent-launch control.</li>
+        <li>All visible strings use synthetic data; <code>customer@example.invalid</code> is confined to the raw-message panel.</li>
+        <li>At 390px the three panels stack, action buttons wrap, and long brief text wraps rather than overflowing.</li>
+      </ul>
+    </section>
+  </main>
+  <script>
+    if (new URLSearchParams(location.search).get('viewport') === 'mobile') document.body.classList.add('mobile-preview');
+    document.querySelectorAll('button:not([disabled])').forEach(function(button) {
+      button.addEventListener('click', function() { button.textContent = 'Synthetic control — no action taken'; });
+    });
+  </script>
+</body>
+</html>
