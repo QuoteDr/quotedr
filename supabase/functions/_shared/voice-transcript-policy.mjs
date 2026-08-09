@@ -1,6 +1,12 @@
-export const VOICE_TRANSCRIPT_NOTICE_VERSION = '2026-08-07';
+export const VOICE_TRANSCRIPT_NOTICE_VERSION = '2026-08-09-audio-v1';
+export const VOICE_TRANSCRIPT_LEGACY_NOTICE_VERSIONS = Object.freeze(['2026-08-07']);
 export const MAX_VOICE_TRANSCRIPT_CHARS = 12000;
 export const VOICE_TRANSCRIPT_SUPPORT_PAGE_SIZE = 50;
+
+export function isVoiceTranscriptNoticeAccepted(value) {
+  const version = String(value ?? '').trim();
+  return version === VOICE_TRANSCRIPT_NOTICE_VERSION || VOICE_TRANSCRIPT_LEGACY_NOTICE_VERSIONS.includes(version);
+}
 
 const STATUS_VALUES = new Set([
   'parsing',

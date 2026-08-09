@@ -8,7 +8,10 @@ const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
 (async function run() {
   const policy = await import('../supabase/functions/_shared/voice-transcript-policy.mjs');
-  assert.strictEqual(policy.VOICE_TRANSCRIPT_NOTICE_VERSION, '2026-08-07');
+  assert.strictEqual(policy.VOICE_TRANSCRIPT_NOTICE_VERSION, '2026-08-09-audio-v1');
+  assert.strictEqual(policy.isVoiceTranscriptNoticeAccepted('2026-08-07'), true, 'cached text-only clients should keep working during the coordinated rollout');
+  assert.strictEqual(policy.isVoiceTranscriptNoticeAccepted('2026-08-09-audio-v1'), true);
+  assert.strictEqual(policy.isVoiceTranscriptNoticeAccepted('2026-01-01'), false);
   assert.strictEqual(policy.normalizeVoiceTranscript('  Trim five exterior doors.  '), 'Trim five exterior doors.');
   assert.throws(() => policy.normalizeVoiceTranscript(''), /required/);
   assert.throws(() => policy.normalizeVoiceTranscript('x'.repeat(12001)), /exceeds/);
@@ -38,7 +41,8 @@ const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
   assert(migration.includes("source in ('web_speech_recognition')"), 'the schema should identify the text source without claiming audio capture');
 
   const edge = read('supabase/functions/voice-transcripts/index.ts');
-  assert(edge.includes("preference?.notice_version !== VOICE_TRANSCRIPT_NOTICE_VERSION"), 'capture must require the current notice acknowledgement');
+  assert(edge.includes('isVoiceTranscriptNoticeAccepted(preference?.notice_version)'), 'text capture should accept the prior text-only notice during a cache-safe rollout');
+  assert(edge.includes('notice_version: preference.notice_version'), 'stored transcript metadata should record the notice the user actually acknowledged');
   assert(edge.includes("account_email: String(user.email || '').trim().toLowerCase()"), 'account email must be server-authored');
   assert(edge.includes(".eq('user_id', user.id)"), 'transcript updates must remain owner scoped');
   assert(edge.includes("action === 'support_search'"));
@@ -54,47 +58,50 @@ const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
   assert(!/console\.(?:log|warn|error)/.test(edge), 'the transcript endpoint must not write transcripts or request objects to logs');
 
   const supabase = read('supabase-v2.js');
-  assert(supabase.includes("const QD_AI_VOICE_TRANSCRIPT_NOTICE_VERSION = '2026-08-07'"));
+  assert(supabase.includes("const QD_AI_VOICE_TRANSCRIPT_NOTICE_VERSION = '2026-08-09-audio-v1'"));
   assert(supabase.includes(".from('ai_voice_transcript_preferences')"));
   assert(supabase.includes(".from('ai_voice_transcripts')"));
   assert(supabase.includes("action: 'capture'"));
   assert(supabase.includes("action: 'support_search'"));
-  assert(supabase.includes(".eq('user_id', user.id)"), 'history queries and deletes should be owner scoped in addition to RLS');
+  assert(supabase.includes(".eq('user_id', user.id)"), 'history queries should be owner scoped in addition to RLS');
+  assert(supabase.includes("action: 'delete_transcript'"), 'transcript deletion must coordinate private audio and active holds through the Edge Function');
 
   const builder = read('quote-builder.html');
   assert(builder.includes('id="aiVoiceTranscriptNoticeModal"'));
   assert(builder.includes('id="aiVoiceTranscriptHistoryModal"'));
   assert(builder.includes('AI Voice Transcript History</a>'), 'history should be accessible without starting a new microphone session');
   assert(builder.includes('Other customers cannot access it. It is not sold or used for advertising.'));
-  assert(builder.includes('QuoteDr staff do not routinely view your transcripts.'));
-  assert(builder.includes('possible billing adjustment or other support resolution'));
-  assert(builder.includes('QuoteDr saves the returned text, not the recording.'));
+  assert(builder.includes('QuoteDr staff do not routinely view your records.'));
+  assert(builder.includes('Save private audio for 14 days'));
+  assert(builder.includes('Transcript only'));
+  assert(builder.includes('QuoteDr staff do not routinely access or listen to recordings.'));
   const submitStart = builder.indexOf('async function submitVoiceQuote()');
   const submitEnd = builder.indexOf('async function _addPreparedAiVoiceRoomItems', submitStart);
   const submit = builder.slice(submitStart, submitEnd);
   assert(submit.indexOf('captureAiVoiceTranscript') < submit.indexOf("functions/v1/parse-quote"), 'transcript capture must finish before parsing begins');
+  assert(submit.indexOf('captureAiVoiceTranscript') < submit.indexOf('uploadAiVoiceAudioEvidence'), 'text capture must be confirmed before optional audio upload begins');
   assert(submit.includes("_updateActiveAiVoiceTranscript('parse_failed')"), 'failed parse attempts should remain identifiable in history');
   assert(builder.includes("_updateActiveAiVoiceTranscript('added_to_quote', result)"));
-  assert(builder.includes('Submitted text transcripts are saved to your account. Audio is not saved.'));
+  assert(builder.includes('Submitted text transcripts are always saved to your account. Original audio is saved only when the setting above is on.'));
 
   const settings = read('settings.html');
   assert(settings.includes('id="aiVoiceSupportTabLink"'));
   assert(settings.includes('id="tab-ai-voice-support"'));
   assert(settings.includes("'ai-voice-support'"), 'AI Voice support must be part of the guarded administrator tab set');
-  assert(settings.includes('Every search is recorded'));
+  assert(settings.includes('Every transcript search and recording access is audited'));
   assert(settings.includes('id="aiVoiceSupportMoreBtn"'));
-  assert(settings.includes('findAiVoiceTranscriptsForSupport(aiVoiceSupportAccountEmail, aiVoiceSupportCaseReference, aiVoiceSupportOffset)'));
+  assert(settings.includes('findAiVoiceTranscriptsForSupport(aiVoiceSupportAccountEmail, aiVoiceSupportCaseReference, aiVoiceSupportCaseReason, aiVoiceSupportOffset)'));
   assert(settings.includes('All saved transcripts are available in audited pages'));
 
   const privacy = read('privacy.html');
   const terms = read('terms.html');
   assert(privacy.includes('id="ai-voice-transcripts"'));
-  assert(privacy.includes('No stored microphone audio'));
-  assert(privacy.includes('Support access requires a case or investigation reason and is logged'));
+  assert(privacy.includes('Audio requires an explicit first-use choice'));
+  assert(privacy.includes('Audio cannot be browsed generally'));
   assert(privacy.includes('retained for up to two years for security and accountability'));
   assert(privacy.includes('<strong>OpenAI:</strong> AI processing for features such as Voice To Quote'));
   assert(terms.includes('AI Features and Transcript Records'));
-  assert(terms.includes('possible billing adjustment or other support resolution'));
+  assert(terms.includes('No QuoteDr audio recording begins before that decision'));
   assert(terms.includes('does not automatically guarantee a credit, refund, reimbursement, or other payment'));
 
   for (const [name, html] of [['quote-builder', builder], ['settings', settings]]) {
@@ -110,7 +117,10 @@ const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
   const fixture = read('tests/ai-voice-transcript-history-standalone.html');
   assert(fixture.includes('Trim five exterior doors'));
   assert(fixture.includes('Support access is limited'));
-  assert(fixture.includes('Audio is not saved'));
+  assert(fixture.includes('Save private audio for 14 days'));
+  assert(fixture.includes('Transcript only'));
+  assert(fixture.includes('id="continueBtn" disabled'));
+  assert(fixture.includes("get('viewport') === 'mobile'"), 'the isolated fixture should support a narrow mobile layout check');
 
   console.log('ai voice transcript history tests passed');
 })().catch((error) => {

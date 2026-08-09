@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>AI Voice Audio Evidence Fixture</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background:#edf3f9; color:#17283e; font-family:Segoe UI,sans-serif; }
+    main { max-width:900px; margin:32px auto; padding:0 16px; }
+    .shell { background:#fff; border:1px solid #d7e2ef; border-radius:14px; box-shadow:0 14px 34px rgba(15,52,96,.12); overflow:hidden; }
+    header { background:linear-gradient(135deg,#0f3460,#7c3aed); color:#fff; padding:22px 26px; }
+    .platform-result { min-height:90px; }
+    .live-indicator { display:inline-flex; align-items:center; border:1px solid #d7e2ef; border-radius:999px; padding:.5rem .85rem; background:#f8fafc; color:#334155; }
+    .live-indicator.recording { border-color:#dc3545; background:#fff1f2; color:#9f1239; }
+    .live-indicator.paused { border-color:#f59e0b; background:#fffbeb; color:#92400e; }
+    .live-dot { width:.65rem; height:.65rem; margin-right:.5rem; border-radius:50%; background:#dc3545; box-shadow:0 0 0 4px rgba(220,53,69,.16); }
+    @media (max-width:576px) { main { margin:0; padding:0; } .shell { min-height:100vh; border-radius:0; } }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="shell">
+      <header><h1 class="h4 mb-1">Voice To Quote audio compatibility</h1><div class="opacity-75">Synthetic audio only — no microphone, account, upload, or customer data</div></header>
+      <div class="p-4">
+        <div class="alert alert-light border">This fixture records a quiet generated tone while a fake speech recognizer emits “trim five exterior doors.” It checks that audio capture and transcript collection can run simultaneously without changing either result.</div>
+        <div class="row g-3 mb-4" id="platformGrid"></div>
+        <div class="alert alert-primary py-2 px-3 small"><strong>Current account default:</strong> Private audio for 14 days</div>
+        <div id="fixtureLiveIndicator" class="live-indicator mb-3" role="status" aria-live="polite">Not recording</div>
+        <div class="d-flex gap-2 flex-wrap">
+          <button type="button" class="btn btn-primary" id="runChecks">Run browser encoding measurement</button>
+          <button type="button" class="btn btn-outline-warning" id="pauseCheck" disabled>Pause</button>
+        </div>
+        <div id="measurement" class="border rounded p-3 mt-3 bg-light" aria-live="polite">Not run yet.</div>
+      </div>
+    </section>
+  </main>
+  <script src="../ai-voice-audio-recorder.js?v=2026080902"></script>
+  <script>
+    (function() {
+      var platforms = [
+        { name:'Android / Chrome', supported:['audio/webm;codecs=opus','audio/webm'], expected:'audio/webm;codecs=opus' },
+        { name:'iPhone / Safari', supported:['audio/mp4;codecs=mp4a.40.2','audio/mp4'], expected:'audio/mp4;codecs=mp4a.40.2' },
+        { name:'Desktop fallback', supported:['audio/ogg;codecs=opus'], expected:'audio/ogg;codecs=opus' }
+      ];
+      function FakeRecorder() {}
+      var grid = document.getElementById('platformGrid');
+      var liveIndicator = document.getElementById('fixtureLiveIndicator');
+      var pauseButton = document.getElementById('pauseCheck');
+      var activeSession = null;
+      var fixturePaused = false;
+      grid.innerHTML = platforms.map(function(platform) {
+        FakeRecorder.isTypeSupported = function(type) { return platform.supported.indexOf(type) !== -1; };
+        var selected = QdAiVoiceAudioRecorder.selectRecorderFormat(FakeRecorder);
+        var passes = selected && selected.mimeType === platform.expected;
+        return '<div class="col-md-4"><div class="platform-result border rounded p-3 h-100"><strong>' + platform.name + '</strong><div class="small text-muted mt-2">Selected: ' + (selected && selected.mimeType) + '</div><span class="badge ' + (passes ? 'bg-success' : 'bg-danger') + ' mt-2">' + (passes ? 'Compatible fixture passed' : 'Unexpected format') + '</span></div></div>';
+      }).join('');
+
+      document.getElementById('runChecks').addEventListener('click', async function() {
+        var button = this;
+        var output = document.getElementById('measurement');
+        button.disabled = true;
+        output.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Encoding six seconds of synthetic mono audio...';
+        var context;
+        var oscillator;
+        try {
+          var AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+          if (!AudioContextCtor || !window.MediaRecorder) throw new Error('MediaRecorder or Web Audio is unavailable in this browser.');
+          context = new AudioContextCtor();
+          var destination = context.createMediaStreamDestination();
+          oscillator = context.createOscillator();
+          var gain = context.createGain();
+          gain.gain.value = 0.02;
+          oscillator.frequency.value = 220;
+          oscillator.connect(gain).connect(destination);
+          oscillator.start();
+
+          var transcript = '';
+          var transcriptPromise = new Promise(function(resolve) {
+            setTimeout(function() { transcript = 'trim five exterior doors'; resolve(transcript); }, 450);
+          });
+          var session = new QdAiVoiceAudioRecorder.AudioCaptureSession({
+            mediaDevices: { getUserMedia: async function() { return destination.stream; } },
+            MediaRecorder: window.MediaRecorder,
+            Blob: window.Blob
+          });
+          activeSession = session;
+          var started = await session.start();
+          liveIndicator.className = 'live-indicator recording mb-3';
+          liveIndicator.innerHTML = '<span class="live-dot" aria-hidden="true"></span><strong>Private audio recording</strong><span class="ms-1">and transcript listening</span>';
+          pauseButton.disabled = false;
+          await new Promise(function(resolve) { setTimeout(resolve, 6000); });
+          var capture = await session.stop();
+          await transcriptPromise;
+          var bytesPerSecond = capture.byteSize / (capture.durationMs / 1000);
+          var estimatedMbPerMinute = bytesPerSecond * 60 / 1024 / 1024;
+          window.__voiceAudioFixtureResult = {
+            passed: transcript === 'trim five exterior doors' && capture.byteSize > 0,
+            transcript: transcript,
+            mimeType: capture.mimeType,
+            byteSize: capture.byteSize,
+            durationMs: capture.durationMs,
+            estimatedMbPerMinute: estimatedMbPerMinute,
+            requestedBitsPerSecond: QdAiVoiceAudioRecorder.REQUESTED_BITS_PER_SECOND,
+            browserFormat: started.mimeType
+          };
+          output.innerHTML = '<strong class="text-success">Simultaneous fixture passed.</strong>'
+            + '<div class="mt-2">Transcript: “' + transcript + '”</div>'
+            + '<div>Format: ' + capture.mimeType + '</div>'
+            + '<div>Measured: ' + capture.byteSize.toLocaleString() + ' bytes over ' + (capture.durationMs / 1000).toFixed(1) + ' seconds (' + estimatedMbPerMinute.toFixed(2) + ' MB/minute projected).</div>'
+            + '<div class="small text-muted mt-2">The browser was asked for 48 kbps mono audio, but browsers may choose a different encoder or bitrate. The measured Blob was discarded and was not uploaded or saved.</div>';
+        } catch (error) {
+          window.__voiceAudioFixtureResult = { passed:false, error:error.message, stack:error.stack || '' };
+          output.innerHTML = '<strong class="text-danger">Fixture could not run:</strong> ' + error.message + '<pre class="small mt-2">' + String(error.stack || '') + '</pre>';
+        } finally {
+          activeSession = null;
+          fixturePaused = false;
+          pauseButton.disabled = true;
+          pauseButton.textContent = 'Pause';
+          liveIndicator.className = 'live-indicator mb-3';
+          liveIndicator.textContent = 'Not recording';
+          try { if (oscillator) oscillator.stop(); } catch (error) {}
+          try { if (context) await context.close(); } catch (error) {}
+          button.disabled = false;
+        }
+      });
+      pauseButton.addEventListener('click', function() {
+        if (!activeSession) return;
+        if (fixturePaused) {
+          activeSession.resume();
+          fixturePaused = false;
+          pauseButton.textContent = 'Pause';
+          liveIndicator.className = 'live-indicator recording mb-3';
+          liveIndicator.innerHTML = '<span class="live-dot" aria-hidden="true"></span><strong>Private audio recording</strong><span class="ms-1">and transcript listening</span>';
+        } else {
+          activeSession.pause();
+          fixturePaused = true;
+          pauseButton.textContent = 'Resume';
+          liveIndicator.className = 'live-indicator paused mb-3';
+          liveIndicator.innerHTML = '<strong>Paused</strong><span class="ms-1">— microphone capture is paused</span>';
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

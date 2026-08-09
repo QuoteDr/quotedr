@@ -2562,37 +2562,49 @@ async function saveUserStarterLibraryProfile(profile) {
 window.getUserStarterLibraryProfile = getUserStarterLibraryProfile;
 window.saveUserStarterLibraryProfile = saveUserStarterLibraryProfile;
 
-const QD_AI_VOICE_TRANSCRIPT_NOTICE_VERSION = '2026-08-07';
+const QD_AI_VOICE_TRANSCRIPT_NOTICE_VERSION = '2026-08-09-audio-v1';
 const QD_AI_VOICE_TRANSCRIPT_PAGE_SIZE = 50;
+const QD_AI_VOICE_AUDIO_BUCKET = 'ai-voice-audio-evidence';
+const QD_AI_VOICE_AUDIO_MAX_BYTES = 6 * 1024 * 1024;
+const QD_AI_VOICE_AUDIO_ACCOUNT_CAP_BYTES = 100 * 1024 * 1024;
 
 async function getAiVoiceTranscriptNoticePreference() {
     const user = await getCurrentUser();
     if (!user) throw new Error('Please sign in again before using AI Voice.');
     const { data, error } = await _supabase
         .from('ai_voice_transcript_preferences')
-        .select('notice_version,acknowledged_at')
+        .select('notice_version,acknowledged_at,save_audio_for_support,audio_consent_version,audio_consent_at')
         .eq('user_id', user.id)
         .maybeSingle();
     if (error) throw error;
     return data || null;
 }
 
-async function acknowledgeAiVoiceTranscriptNotice() {
+async function acknowledgeAiVoiceTranscriptNotice(options) {
+    options = options || {};
     const user = await getCurrentUser();
     if (!user) throw new Error('Please sign in again before using AI Voice.');
     const now = new Date().toISOString();
+    const saveAudio = options.saveAudioForSupport === true;
     const { data, error } = await _supabase
         .from('ai_voice_transcript_preferences')
         .upsert({
             user_id: user.id,
             notice_version: QD_AI_VOICE_TRANSCRIPT_NOTICE_VERSION,
             acknowledged_at: now,
+            save_audio_for_support: saveAudio,
+            audio_consent_version: saveAudio ? QD_AI_VOICE_TRANSCRIPT_NOTICE_VERSION : null,
+            audio_consent_at: saveAudio ? now : null,
             updated_at: now
         }, { onConflict: 'user_id' })
-        .select('notice_version,acknowledged_at')
+        .select('notice_version,acknowledged_at,save_audio_for_support,audio_consent_version,audio_consent_at')
         .single();
     if (error) throw error;
     return data;
+}
+
+async function setAiVoiceAudioPreference(enabled) {
+    return acknowledgeAiVoiceTranscriptNotice({ saveAudioForSupport: enabled === true });
 }
 
 async function qdAiVoiceTranscriptFunction(body) {
@@ -2607,6 +2619,134 @@ async function qdAiVoiceTranscriptFunction(body) {
     const data = await response.json().catch(function() { return {}; });
     if (!response.ok) throw new Error(data.error || 'Voice transcript request failed.');
     return data;
+}
+
+async function qdAiVoiceAudioFunction(body) {
+    if (typeof getSupabaseFunctionAuthHeaders !== 'function') {
+        throw new Error('Please sign in again before using AI Voice.');
+    }
+    const response = await fetch(SUPABASE_URL + '/functions/v1/voice-audio', {
+        method: 'POST',
+        headers: await getSupabaseFunctionAuthHeaders(),
+        body: JSON.stringify(body || {})
+    });
+    const data = await response.json().catch(function() { return {}; });
+    if (!response.ok) {
+        const error = new Error(data.error || 'Voice audio request failed.');
+        error.code = data.code || 'voice_audio_request_failed';
+        throw error;
+    }
+    return data;
+}
+
+async function getAiVoiceAudioStatus() {
+    return qdAiVoiceAudioFunction({ action: 'quota' });
+}
+
+function createAiVoiceAudioIdempotencyKey() {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(char) {
+        var random = Math.floor(Math.random() * 16);
+        var value = char === 'x' ? random : ((random & 3) | 8);
+        return value.toString(16);
+    });
+}
+
+async function uploadAiVoiceAudioEvidence(transcriptId, capture, idempotencyKey) {
+    if (!capture || !capture.blob || !capture.mimeType) throw new Error('No completed audio recording is available.');
+    const uploadKey = idempotencyKey || createAiVoiceAudioIdempotencyKey();
+    const prepared = await qdAiVoiceAudioFunction({
+        action: 'prepare_upload',
+        transcriptId: transcriptId,
+        mimeType: capture.mimeType,
+        durationMs: capture.durationMs,
+        byteSize: capture.blob.size,
+        idempotencyKey: uploadKey
+    });
+    if (prepared.alreadyFinalized) {
+        return { recording: prepared.recording, idempotencyKey: uploadKey, alreadyFinalized: true };
+    }
+    if (!prepared.upload || prepared.upload.bucket !== QD_AI_VOICE_AUDIO_BUCKET) {
+        throw new Error('QuoteDr did not return a valid private audio upload destination.');
+    }
+    const uploadResult = await _supabase.storage
+        .from(prepared.upload.bucket)
+        .uploadToSignedUrl(prepared.upload.path, prepared.upload.token, capture.blob, {
+            contentType: String(capture.mimeType || '').split(';')[0].trim().toLowerCase()
+        });
+    if (uploadResult.error) {
+        const uploadError = new Error('The transcript was saved, but the optional audio upload was interrupted. Keep this page open and retry when you are online.');
+        uploadError.code = 'audio_upload_interrupted';
+        uploadError.recordingId = prepared.recording && prepared.recording.id;
+        uploadError.idempotencyKey = uploadKey;
+        throw uploadError;
+    }
+    const finalized = await qdAiVoiceAudioFunction({
+        action: 'finalize_upload',
+        recordingId: prepared.recording.id
+    });
+    return { recording: finalized.recording, idempotencyKey: uploadKey, alreadyFinalized: finalized.alreadyFinalized === true };
+}
+
+async function getOwnerAiVoiceAudioRecordings(transcriptIds) {
+    const result = await qdAiVoiceAudioFunction({ action: 'list_owner', transcriptIds: transcriptIds || [] });
+    return result.recordings || [];
+}
+
+async function getAiVoiceAudioPlayback(recordingId) {
+    return qdAiVoiceAudioFunction({ action: 'owner_playback', recordingId: recordingId });
+}
+
+async function deleteAiVoiceAudioRecording(recordingId) {
+    return qdAiVoiceAudioFunction({ action: 'delete_recording', recordingId: recordingId });
+}
+
+async function preserveAiVoiceAudioForSupport(recordingId, caseReference, caseReason, authorizationConfirmed) {
+    const result = await qdAiVoiceAudioFunction({
+        action: 'preserve_for_support',
+        recordingId: recordingId,
+        caseReference: caseReference,
+        caseReason: caseReason,
+        authorizationConfirmed: authorizationConfirmed === true
+    });
+    return result.recording || null;
+}
+
+async function closeAiVoiceAudioSupportHold(recordingId) {
+    const result = await qdAiVoiceAudioFunction({ action: 'owner_close_hold', recordingId: recordingId });
+    return result.recording || null;
+}
+
+async function findSupportAiVoiceAudio(accountEmail, caseReference, caseReason, transcriptIds) {
+    const result = await qdAiVoiceAudioFunction({
+        action: 'support_list',
+        accountEmail: accountEmail,
+        caseReference: caseReference,
+        caseReason: caseReason,
+        transcriptIds: transcriptIds || []
+    });
+    return result.recordings || [];
+}
+
+async function getSupportAiVoiceAudioPlayback(accountEmail, caseReference, caseReason, recordingId) {
+    return qdAiVoiceAudioFunction({
+        action: 'support_playback',
+        accountEmail: accountEmail,
+        caseReference: caseReference,
+        caseReason: caseReason,
+        recordingId: recordingId
+    });
+}
+
+async function closeSupportAiVoiceAudioCase(accountEmail, caseReference, caseReason, recordingId) {
+    const result = await qdAiVoiceAudioFunction({
+        action: 'support_close_case',
+        accountEmail: accountEmail,
+        caseReference: caseReference,
+        caseReason: caseReason,
+        recordingId: recordingId
+    });
+    return result.recording || null;
 }
 
 async function captureAiVoiceTranscript(transcript, context) {
@@ -2646,30 +2786,57 @@ async function getUserAiVoiceTranscripts(offset, pageSize) {
         .order('created_at', { ascending: false })
         .range(safeOffset, safeOffset + safePageSize - 1);
     if (error) throw error;
-    return data || [];
+    const transcripts = data || [];
+    if (!transcripts.length) return transcripts;
+    try {
+        const recordings = await getOwnerAiVoiceAudioRecordings(transcripts.map(function(row) { return row.id; }));
+        const byTranscript = {};
+        recordings.forEach(function(recording) {
+            if (recording && recording.transcriptId) byTranscript[recording.transcriptId] = recording;
+        });
+        return transcripts.map(function(row) {
+            return Object.assign({}, row, { audioRecording: byTranscript[row.id] || null });
+        });
+    } catch (audioError) {
+        return transcripts.map(function(row) {
+            return Object.assign({}, row, { audioRecording: null, audioEvidenceUnavailable: true });
+        });
+    }
 }
 
 async function deleteAiVoiceTranscript(transcriptId) {
-    const user = await getCurrentUser();
-    if (!user) throw new Error('Please sign in again to delete this transcript.');
-    const { error } = await _supabase
-        .from('ai_voice_transcripts')
-        .delete()
-        .eq('id', transcriptId)
-        .eq('user_id', user.id);
-    if (error) throw error;
-    return { success: true };
+    return qdAiVoiceAudioFunction({ action: 'delete_transcript', transcriptId: transcriptId });
 }
 
-async function findAiVoiceTranscriptsForSupport(accountEmail, caseReference, offset) {
+async function findAiVoiceTranscriptsForSupport(accountEmail, caseReference, caseReason, offset) {
+    const auditReference = String(caseReference || '').trim() + ': ' + String(caseReason || '').trim();
     const result = await qdAiVoiceTranscriptFunction({
         action: 'support_search',
         accountEmail: accountEmail,
-        caseReference: caseReference,
+        caseReference: auditReference,
         offset: Math.max(0, parseInt(offset, 10) || 0)
     });
+    const transcripts = result.transcripts || [];
+    let recordings = [];
+    let audioEvidenceUnavailable = false;
+    if (transcripts.length) {
+        try {
+            recordings = await findSupportAiVoiceAudio(accountEmail, caseReference, caseReason, transcripts.map(function(row) { return row.id; }));
+        } catch (audioError) {
+            audioEvidenceUnavailable = true;
+        }
+    }
+    const audioByTranscript = {};
+    recordings.forEach(function(recording) {
+        if (recording && recording.transcriptId) audioByTranscript[recording.transcriptId] = recording;
+    });
     return {
-        transcripts: result.transcripts || [],
+        transcripts: transcripts.map(function(row) {
+            return Object.assign({}, row, {
+                audioRecording: audioByTranscript[row.id] || null,
+                audioEvidenceUnavailable: audioEvidenceUnavailable
+            });
+        }),
         nextOffset: Math.max(0, parseInt(result.nextOffset, 10) || 0),
         hasMore: result.hasMore === true
     };
@@ -2677,13 +2844,24 @@ async function findAiVoiceTranscriptsForSupport(accountEmail, caseReference, off
 
 window.QD_AI_VOICE_TRANSCRIPT_NOTICE_VERSION = QD_AI_VOICE_TRANSCRIPT_NOTICE_VERSION;
 window.QD_AI_VOICE_TRANSCRIPT_PAGE_SIZE = QD_AI_VOICE_TRANSCRIPT_PAGE_SIZE;
+window.QD_AI_VOICE_AUDIO_MAX_BYTES = QD_AI_VOICE_AUDIO_MAX_BYTES;
+window.QD_AI_VOICE_AUDIO_ACCOUNT_CAP_BYTES = QD_AI_VOICE_AUDIO_ACCOUNT_CAP_BYTES;
 window.getAiVoiceTranscriptNoticePreference = getAiVoiceTranscriptNoticePreference;
 window.acknowledgeAiVoiceTranscriptNotice = acknowledgeAiVoiceTranscriptNotice;
+window.setAiVoiceAudioPreference = setAiVoiceAudioPreference;
 window.captureAiVoiceTranscript = captureAiVoiceTranscript;
 window.updateAiVoiceTranscript = updateAiVoiceTranscript;
 window.getUserAiVoiceTranscripts = getUserAiVoiceTranscripts;
 window.deleteAiVoiceTranscript = deleteAiVoiceTranscript;
 window.findAiVoiceTranscriptsForSupport = findAiVoiceTranscriptsForSupport;
+window.getAiVoiceAudioStatus = getAiVoiceAudioStatus;
+window.uploadAiVoiceAudioEvidence = uploadAiVoiceAudioEvidence;
+window.getAiVoiceAudioPlayback = getAiVoiceAudioPlayback;
+window.deleteAiVoiceAudioRecording = deleteAiVoiceAudioRecording;
+window.preserveAiVoiceAudioForSupport = preserveAiVoiceAudioForSupport;
+window.closeAiVoiceAudioSupportHold = closeAiVoiceAudioSupportHold;
+window.getSupportAiVoiceAudioPlayback = getSupportAiVoiceAudioPlayback;
+window.closeSupportAiVoiceAudioCase = closeSupportAiVoiceAudioCase;
 
 async function getUserLearnedMappings() {
     const user = await getCurrentUser();

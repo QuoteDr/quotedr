@@ -79,3 +79,8 @@ verify_jwt = true
 
 [functions.voice-transcripts]
 verify_jwt = true
+
+[functions.voice-audio]
+# User actions are authenticated again inside the function. Gateway JWT
+# verification is disabled so the dedicated cleanup-token cron request can run.
+verify_jwt = false

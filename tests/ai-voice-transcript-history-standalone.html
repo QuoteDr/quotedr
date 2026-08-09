@@ -11,6 +11,10 @@
     .fixture-shell { max-width:760px; margin:32px auto; padding:0 16px; }
     .fixture-card { background:#fff; border:1px solid #d7e2ef; border-radius:12px; box-shadow:0 14px 34px rgba(15,52,96,.12); overflow:hidden; }
     .fixture-header { background:linear-gradient(135deg,#0f3460,#1a56a0); color:#fff; padding:20px 24px; }
+    .consent-option { display:flex; align-items:flex-start; gap:.75rem; border:2px solid #d7e2ef; border-radius:10px; padding:14px; cursor:pointer; }
+    .consent-option.selected { border-color:#7c3aed; background:#f5f0ff; }
+    body.mobile-preview .fixture-shell { width:390px; max-width:390px; margin:0; padding:0; }
+    body.mobile-preview .fixture-card { min-height:844px; border-radius:0; }
     pre { font-family:inherit; white-space:pre-wrap; }
     @media (max-width:576px) { .fixture-shell { margin:0; padding:0; } .fixture-card { min-height:100vh; border-radius:0; } }
   </style>
@@ -18,26 +22,34 @@
 <body>
   <main class="fixture-shell">
     <section class="fixture-card" id="noticeCard">
-      <div class="fixture-header"><h1 class="h4 mb-0"><i class="fas fa-shield-halved me-2"></i>Your AI Voice transcript history</h1></div>
+      <div class="fixture-header"><h1 class="h4 mb-0"><i class="fas fa-shield-halved me-2"></i>Your AI Voice privacy choices</h1></div>
       <div class="p-4">
-        <p class="fw-semibold">Each transcript you submit with Generate Quote is saved to your QuoteDr account.</p>
+        <p class="fw-semibold">Each text transcript you submit with Generate Quote is saved to your QuoteDr account.</p>
         <ul class="ps-4">
-          <li class="mb-2"><strong>Text transcript only:</strong> The browser or device may process microphone audio. QuoteDr saves the returned text, not the recording.</li>
+          <li class="mb-2"><strong>Text history:</strong> Submitted text remains until the owner deletes it.</li>
           <li class="mb-2"><strong>Private to your account:</strong> Other customers cannot access it.</li>
           <li class="mb-2"><strong>Support access is limited:</strong> QuoteDr staff do not routinely view transcripts. Authorized support may review one only after the customer requests an investigation.</li>
           <li><strong>You stay in control:</strong> View, copy, or delete it from Transcript History.</li>
         </ul>
-        <div class="d-flex justify-content-end gap-2"><button class="btn btn-outline-secondary">Cancel</button><button class="btn btn-primary" id="continueBtn">Continue to AI Voice</button></div>
+        <fieldset class="mb-3">
+          <legend class="h6">Choose your account default before AI Voice can use the microphone</legend>
+          <label class="consent-option mb-2" for="audioConsent"><input class="form-check-input mt-1" type="radio" name="audioChoice" id="audioConsent" value="audio"><span><strong>Save private audio for 14 days <span class="badge bg-primary">Recommended</span></strong><span class="small d-block mt-1">A private backup helps authorized support compare the original recording with the saved transcript and generated draft after a reported rare AI Voice error.</span></span></label>
+          <label class="consent-option" for="transcriptConsent"><input class="form-check-input mt-1" type="radio" name="audioChoice" id="transcriptConsent" value="transcript"><span><strong>Transcript only</strong><span class="small d-block mt-1">QuoteDr saves submitted text but does not retain original microphone audio.</span></span></label>
+        </fieldset>
+        <div class="alert alert-light border small"><strong>Private and case-bound:</strong> Staff do not routinely access or listen. Authorized support may listen only after explicit authorization for a specific case, and access is audited. Avoid access codes or unnecessary sensitive information; pause during private conversation.</div>
+        <div id="choiceError" class="alert alert-danger small" hidden>Choose private 14-day audio or transcript only before continuing.</div>
+        <div class="d-flex justify-content-end gap-2"><button class="btn btn-outline-secondary">Cancel</button><button class="btn btn-primary" id="continueBtn" disabled>Continue to AI Voice</button></div>
       </div>
     </section>
 
     <section class="fixture-card" id="historyCard" hidden>
       <div class="fixture-header d-flex justify-content-between align-items-center"><h1 class="h4 mb-0"><i class="fas fa-clock-rotate-left me-2"></i>AI Voice Transcript History</h1><span class="badge bg-success">Saved</span></div>
       <div class="p-4">
-        <div class="alert alert-light border small">Submitted text remains in the user's account until deleted. Audio is not saved.</div>
+        <div class="alert alert-light border small">Submitted text remains in the user's account until deleted. Optional original audio expires separately.</div>
         <article class="border rounded p-3">
           <div class="d-flex justify-content-between gap-2 flex-wrap mb-2"><div><strong>Aug 7, 2026, 10:42 a.m.</strong><div class="small text-muted">Quote Q-1042</div></div><div><span class="badge bg-primary">Added to quote</span> <span class="badge bg-light text-dark border">Audit: verified</span></div></div>
           <pre class="bg-light border rounded p-3 mb-2" id="fixtureTranscript">Trim five exterior doors in the rear addition. Next room. Paint the kitchen walls.</pre>
+          <section class="border rounded p-3 mb-2" style="background:#f4f8ff"><strong><i class="fas fa-wave-square me-1"></i>Original microphone audio</strong><div class="small text-muted">486 KB · 52s · Expires Aug 22, 2026</div><div class="d-flex justify-content-end gap-2 mt-2"><button class="btn btn-outline-primary btn-sm">Play Privately</button><button class="btn btn-outline-secondary btn-sm">Preserve for Support</button><button class="btn btn-outline-danger btn-sm">Delete Audio</button></div></section>
           <div class="d-flex justify-content-end gap-2"><button class="btn btn-outline-primary btn-sm" id="copyBtn"><i class="fas fa-copy me-1"></i>Copy</button><button class="btn btn-outline-danger btn-sm" id="deleteBtn"><i class="fas fa-trash me-1"></i>Delete</button></div>
         </article>
         <div id="fixtureStatus" class="small text-muted mt-3" aria-live="polite"></div>
@@ -45,7 +57,21 @@
     </section>
   </main>
   <script>
+    if (new URLSearchParams(location.search).get('viewport') === 'mobile') document.body.classList.add('mobile-preview');
+    const choices = Array.from(document.querySelectorAll('input[name="audioChoice"]'));
+    choices.forEach(function(choice) {
+      choice.addEventListener('change', function() {
+        document.querySelectorAll('.consent-option').forEach(function(card) { card.classList.toggle('selected', card.contains(choice)); });
+        document.getElementById('continueBtn').disabled = false;
+        document.getElementById('choiceError').hidden = true;
+      });
+    });
     document.getElementById('continueBtn').addEventListener('click', function() {
+      const selected = choices.find(function(choice) { return choice.checked; });
+      if (!selected) {
+        document.getElementById('choiceError').hidden = false;
+        return;
+      }
       document.getElementById('noticeCard').hidden = true;
       document.getElementById('historyCard').hidden = false;
     });

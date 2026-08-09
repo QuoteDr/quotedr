@@ -2356,9 +2356,10 @@
 </style>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="card-payment-rules.js?v=2026080301"></script>
-    <script src="supabase-v2.js?v=2026080802"></script>
+    <script src="supabase-v2.js?v=2026080901"></script>
     <script src="account-access.js?v=2026080701"></script>
     <script src="ai-voice-rule-matcher.js?v=2026080601"></script>
+    <script src="ai-voice-audio-recorder.js?v=2026080902"></script>
     <script src="save-coordinator.js?v=2026080401"></script>
     <script src="quote-media.js?v=2026071202"></script>
 <!-- Eruda mobile console (only loads with ?debug in URL) -->
@@ -17458,6 +17459,18 @@ Example:
         var _voiceTranscriptFull = '';
         var _voiceOriginalTranscript = '';
         var _voiceTranscriptLogId = null;
+        var _voiceAudioEnabled = false;
+        var _voiceAudioStatus = null;
+        var _voiceAudioSession = null;
+        var _voiceAudioSessionStart = null;
+        var _voiceAudioSegments = [];
+        var _voiceAudioPendingFinish = null;
+        var _voiceAudioCaptureError = '';
+        var _voiceAudioCaptureState = 'idle';
+        var _voiceAudioRetryPayload = null;
+        var _voiceAudioUploadInProgress = false;
+        var _voiceAudioObjectUrls = {};
+        var _aiVoicePreserveRecordingId = '';
         var _aiVoiceTranscriptHistoryOffset = 0;
         var _aiVoiceTranscriptHistoryLoading = false;
         var _voiceLastResultIndex = 0;
@@ -17477,11 +17490,33 @@ Example:
         var _aiVoiceTradeRulesCache = [];
         var _aiVoiceEditingTradeRuleId = null;
 
-        function _showAiVoiceTranscriptNotice() {
+        document.addEventListener('DOMContentLoaded', function() {
+            var voiceModal = document.getElementById('voiceQuoteModal');
+            if (voiceModal) voiceModal.addEventListener('hidden.bs.modal', function() {
+                _voiceRecording = false;
+                _voicePaused = false;
+                if (_voiceRecognition) {
+                    try { _voiceRecognition.abort(); } catch (error) {}
+                    _voiceRecognition = null;
+                }
+                if (!_voiceAudioUploadInProgress) _discardVoiceAudioCapture();
+            });
+            var historyModal = document.getElementById('aiVoiceTranscriptHistoryModal');
+            if (historyModal) historyModal.addEventListener('hidden.bs.modal', function() {
+                Object.keys(_voiceAudioObjectUrls).forEach(function(playerId) {
+                    URL.revokeObjectURL(_voiceAudioObjectUrls[playerId]);
+                    delete _voiceAudioObjectUrls[playerId];
+                });
+            });
+        });
+
+        function _showAiVoiceTranscriptNotice(preference) {
             return new Promise(function(resolve) {
                 var modalEl = document.getElementById('aiVoiceTranscriptNoticeModal');
                 var continueBtn = document.getElementById('aiVoiceTranscriptNoticeContinue');
                 var errorEl = document.getElementById('aiVoiceTranscriptNoticeError');
+                var choiceInputs = Array.prototype.slice.call(document.querySelectorAll('input[name="aiVoiceAudioFirstUseChoice"]'));
+                var choiceCards = Array.prototype.slice.call(document.querySelectorAll('.ai-voice-consent-option'));
                 if (!modalEl || !continueBtn || typeof bootstrap === 'undefined') {
                     resolve(false);
                     return;
@@ -17490,16 +17525,40 @@ Example:
                 var modal = bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: 'static', keyboard: false });
                 errorEl.textContent = '';
                 errorEl.style.display = 'none';
-                continueBtn.disabled = false;
+                choiceInputs.forEach(function(input) { input.checked = false; });
+                choiceCards.forEach(function(card) { card.classList.remove('selected'); });
+                continueBtn.disabled = true;
                 continueBtn.innerHTML = '<i class="fas fa-check me-1"></i>Continue to AI Voice';
+                function syncChoice() {
+                    var selected = choiceInputs.find(function(input) { return input.checked; });
+                    choiceCards.forEach(function(card) {
+                        var input = card.querySelector('input[name="aiVoiceAudioFirstUseChoice"]');
+                        card.classList.toggle('selected', !!(input && input.checked));
+                    });
+                    continueBtn.disabled = !selected;
+                    if (selected) {
+                        errorEl.textContent = '';
+                        errorEl.style.display = 'none';
+                    }
+                }
+                choiceInputs.forEach(function(input) { input.onchange = syncChoice; });
                 continueBtn.onclick = async function() {
+                    var selected = choiceInputs.find(function(input) { return input.checked; });
+                    if (!selected) {
+                        errorEl.textContent = 'Choose private 14-day audio or transcript only before continuing.';
+                        errorEl.style.display = '';
+                        return;
+                    }
                     continueBtn.disabled = true;
                     continueBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
                     try {
                         if (typeof acknowledgeAiVoiceTranscriptNotice !== 'function') {
                             throw new Error('Transcript privacy settings are not available yet.');
                         }
-                        await acknowledgeAiVoiceTranscriptNotice();
+                        var savedPreference = await acknowledgeAiVoiceTranscriptNotice({
+                            saveAudioForSupport: selected.value === 'audio'
+                        });
+                        _voiceAudioEnabled = !!(savedPreference && savedPreference.save_audio_for_support === true);
                         accepted = true;
                         modal.hide();
                     } catch (error) {
@@ -17511,6 +17570,7 @@ Example:
                 };
                 modalEl.addEventListener('hidden.bs.modal', function onHidden() {
                     continueBtn.onclick = null;
+                    choiceInputs.forEach(function(input) { input.onchange = null; });
                     resolve(accepted);
                 }, { once: true });
                 modal.show();
@@ -17524,11 +17584,118 @@ Example:
             }
             try {
                 var preference = await getAiVoiceTranscriptNoticePreference();
-                if (preference && preference.notice_version === window.QD_AI_VOICE_TRANSCRIPT_NOTICE_VERSION) return true;
-                return await _showAiVoiceTranscriptNotice();
+                if (preference && preference.notice_version === window.QD_AI_VOICE_TRANSCRIPT_NOTICE_VERSION) {
+                    _voiceAudioEnabled = preference.save_audio_for_support === true
+                        && preference.audio_consent_version === window.QD_AI_VOICE_TRANSCRIPT_NOTICE_VERSION;
+                    return true;
+                }
+                return await _showAiVoiceTranscriptNotice(preference);
             } catch (error) {
                 qdAlert('QuoteDr could not verify your transcript storage notice: ' + (error.message || 'please try again.'));
                 return false;
+            }
+        }
+
+        function _formatAiVoiceAudioBytes(value) {
+            var bytes = Math.max(0, Number(value) || 0);
+            if (bytes < 1024) return Math.round(bytes) + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(bytes < 10240 ? 1 : 0) + ' KB';
+            return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+        }
+
+        function _renderAiVoiceAudioStatus() {
+            var toggle = document.getElementById('voiceSaveAudioToggle');
+            var currentChoiceEl = document.getElementById('voiceAudioCurrentChoice');
+            var liveIndicatorEl = document.getElementById('voiceAudioLiveIndicator');
+            var statusEl = document.getElementById('voiceAudioStorageStatus');
+            var warningEl = document.getElementById('voiceAudioWarning');
+            if (toggle) {
+                toggle.checked = _voiceAudioEnabled;
+                toggle.disabled = _voiceRecording;
+            }
+            if (currentChoiceEl) {
+                currentChoiceEl.innerHTML = _voiceAudioEnabled
+                    ? '<i class="fas fa-shield-halved me-1"></i>Current account default: <strong>Private audio for 14 days</strong>'
+                    : '<i class="fas fa-file-lines me-1"></i>Current account default: <strong>Transcript only</strong>';
+                currentChoiceEl.className = _voiceAudioEnabled
+                    ? 'alert alert-primary py-2 px-3 mb-2 small'
+                    : 'alert alert-light border py-2 px-3 mb-2 small';
+            }
+            if (liveIndicatorEl) {
+                if (_voiceRecording && _voiceAudioEnabled && _voiceAudioCaptureState === 'recording') {
+                    liveIndicatorEl.innerHTML = '<span class="voice-live-dot" aria-hidden="true"></span><strong>Private audio recording</strong> <span class="ms-1">and transcript listening</span>';
+                    liveIndicatorEl.className = 'voice-audio-live-indicator is-recording mb-3';
+                } else if (_voiceRecording && _voiceAudioEnabled && _voiceAudioCaptureState === 'starting') {
+                    liveIndicatorEl.innerHTML = '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span><strong>Starting private audio...</strong>';
+                    liveIndicatorEl.className = 'voice-audio-live-indicator is-starting mb-3';
+                } else if (_voiceRecording && !_voiceAudioEnabled) {
+                    liveIndicatorEl.innerHTML = '<i class="fas fa-file-lines me-2" aria-hidden="true"></i><strong>Transcript listening only</strong> <span class="ms-1">— QuoteDr is not retaining original audio</span>';
+                    liveIndicatorEl.className = 'voice-audio-live-indicator is-transcript-only mb-3';
+                } else if (_voiceRecording && _voiceAudioEnabled) {
+                    liveIndicatorEl.innerHTML = '<i class="fas fa-triangle-exclamation me-2" aria-hidden="true"></i><strong>Transcript listening</strong> <span class="ms-1">— private audio is not being retained</span>';
+                    liveIndicatorEl.className = 'voice-audio-live-indicator is-warning mb-3';
+                } else if (_voicePaused) {
+                    liveIndicatorEl.innerHTML = '<i class="fas fa-pause me-2" aria-hidden="true"></i><strong>Paused</strong> <span class="ms-1">— microphone capture is paused</span>';
+                    liveIndicatorEl.className = 'voice-audio-live-indicator is-paused mb-3';
+                } else {
+                    liveIndicatorEl.innerHTML = '<i class="fas fa-microphone-slash me-2" aria-hidden="true"></i>Not recording';
+                    liveIndicatorEl.className = 'voice-audio-live-indicator is-idle mb-3';
+                }
+            }
+            if (!statusEl) return;
+            if (!_voiceAudioEnabled) {
+                statusEl.textContent = 'Original audio is off. Text transcripts are still saved.';
+            } else if (_voiceAudioStatus && _voiceAudioStatus.quota) {
+                var quota = _voiceAudioStatus.quota;
+                statusEl.textContent = _formatAiVoiceAudioBytes(quota.usedBytes) + ' of ' + _formatAiVoiceAudioBytes(quota.capBytes) + ' used. Recordings normally expire after 14 days.';
+            } else {
+                statusEl.textContent = 'Original audio is on. Recordings normally expire after 14 days.';
+            }
+            if (warningEl) {
+                var quotaWarning = _voiceAudioEnabled && _voiceAudioStatus && _voiceAudioStatus.quota && _voiceAudioStatus.quota.nearLimit;
+                var warningMessage = _voiceAudioCaptureError || (quotaWarning
+                    ? 'Audio storage is nearly full. Delete an older recording or wait for expiry before making a long recording.'
+                    : '');
+                warningEl.style.display = warningMessage ? '' : 'none';
+                warningEl.textContent = warningMessage;
+            }
+        }
+
+        async function _refreshAiVoiceAudioStatus() {
+            if (typeof getAiVoiceAudioStatus !== 'function') {
+                _voiceAudioStatus = null;
+                _renderAiVoiceAudioStatus();
+                return;
+            }
+            try {
+                _voiceAudioStatus = await getAiVoiceAudioStatus();
+                var preference = _voiceAudioStatus && _voiceAudioStatus.preference;
+                _voiceAudioEnabled = !!(preference && preference.save_audio_for_support === true
+                    && preference.audio_consent_version === window.QD_AI_VOICE_TRANSCRIPT_NOTICE_VERSION);
+            } catch (error) {
+                _voiceAudioStatus = null;
+            }
+            _renderAiVoiceAudioStatus();
+        }
+
+        async function changeAiVoiceAudioPreference(enabled) {
+            var toggle = document.getElementById('voiceSaveAudioToggle');
+            if (toggle) toggle.disabled = true;
+            try {
+                if (typeof setAiVoiceAudioPreference !== 'function') throw new Error('Audio privacy settings are not available yet.');
+                var preference = await setAiVoiceAudioPreference(enabled === true);
+                _voiceAudioEnabled = preference && preference.save_audio_for_support === true;
+                if (!_voiceAudioEnabled) {
+                    await _discardVoiceAudioCapture();
+                    _voiceAudioRetryPayload = null;
+                    _showVoiceAudioCaptureWarning('');
+                }
+                await _refreshAiVoiceAudioStatus();
+            } catch (error) {
+                if (toggle) toggle.checked = _voiceAudioEnabled;
+                qdAlert(error.message || 'Could not update the audio setting.');
+            } finally {
+                if (toggle) toggle.disabled = false;
             }
         }
 
@@ -17542,9 +17709,13 @@ Example:
                 return;
             }
             if (!await ensureAiVoiceTranscriptNotice()) return;
+            await _refreshAiVoiceAudioStatus();
             _voiceTranscriptFull = '';
             _voiceOriginalTranscript = '';
             _voiceTranscriptLogId = null;
+            await _discardVoiceAudioCapture();
+            _voiceAudioCaptureError = '';
+            _voiceAudioCaptureState = 'idle';
             document.getElementById('voiceTranscript').textContent = 'Your words will appear here...';
             document.getElementById('voiceStatus').textContent = 'Tap the mic and describe the job';
             document.getElementById('voiceActions').style.display = 'none';
@@ -17623,19 +17794,186 @@ Example:
             return r;
         }
 
+        function _voiceAudioCapturedTotals() {
+            return _voiceAudioSegments.reduce(function(total, segment) {
+                total.durationMs += Math.max(0, Number(segment.durationMs) || 0);
+                total.byteSize += Math.max(0, Number(segment.byteSize) || (segment.blob && segment.blob.size) || 0);
+                return total;
+            }, { durationMs: 0, byteSize: 0 });
+        }
+
+        function _showVoiceAudioCaptureWarning(message) {
+            _voiceAudioCaptureError = String(message || '');
+            var warningEl = document.getElementById('voiceAudioWarning');
+            if (!warningEl) return;
+            warningEl.style.display = _voiceAudioCaptureError ? '' : 'none';
+            warningEl.textContent = _voiceAudioCaptureError;
+        }
+
+        function _beginVoiceAudioCapture() {
+            if (!_voiceAudioEnabled) {
+                _voiceAudioCaptureState = 'transcript_only';
+                _renderAiVoiceAudioStatus();
+                return;
+            }
+            if (!window.QdAiVoiceAudioRecorder) {
+                _voiceAudioCaptureState = 'unavailable';
+                _showVoiceAudioCaptureWarning('Private audio recording is unavailable in this browser. Text transcription can still continue.');
+                _renderAiVoiceAudioStatus();
+                return;
+            }
+            if (_voiceAudioSession && _voiceAudioSession.recorder) {
+                if (_voiceAudioSession.recorder.state === 'paused') _voiceAudioSession.resume();
+                _voiceAudioCaptureState = 'recording';
+                _renderAiVoiceAudioStatus();
+                return;
+            }
+            var totals = _voiceAudioCapturedTotals();
+            var remainingDuration = window.QdAiVoiceAudioRecorder.MAX_DURATION_MS - totals.durationMs;
+            var remainingBytes = window.QdAiVoiceAudioRecorder.MAX_BYTES - totals.byteSize;
+            if (remainingDuration < 1000 || remainingBytes < 1024) {
+                _voiceAudioCaptureState = 'unavailable';
+                _showVoiceAudioCaptureWarning('The optional audio evidence limit was reached. Your text transcript can still be submitted.');
+                _renderAiVoiceAudioStatus();
+                return;
+            }
+            var session = new window.QdAiVoiceAudioRecorder.AudioCaptureSession({
+                maxDurationMs: remainingDuration,
+                maxBytes: remainingBytes,
+                onLimit: function(event) {
+                    _voiceAudioCaptureState = 'unavailable';
+                    _showVoiceAudioCaptureWarning(event && event.reason === 'size'
+                        ? 'Audio evidence reached the 6 MB limit and stopped. Your text transcript is still safe.'
+                        : 'Audio evidence reached the five-minute limit and stopped. Your text transcript is still safe.');
+                    _renderAiVoiceAudioStatus();
+                }
+            });
+            _voiceAudioSession = session;
+            _voiceAudioCaptureState = 'starting';
+            _renderAiVoiceAudioStatus();
+            _voiceAudioSessionStart = session.start().then(function() {
+                if (_voiceAudioSession !== session) return;
+                if (_voicePaused) {
+                    session.pause();
+                    _voiceAudioCaptureState = 'paused';
+                } else if (!_voiceRecording) {
+                    _voiceAudioCaptureState = 'stopped';
+                    _finishCurrentVoiceAudioSegment();
+                } else {
+                    _voiceAudioCaptureState = 'recording';
+                }
+                _renderAiVoiceAudioStatus();
+            }).catch(function(error) {
+                if (_voiceAudioSession === session) {
+                    _voiceAudioSession = null;
+                    _voiceAudioSessionStart = null;
+                }
+                _voiceAudioCaptureState = 'unavailable';
+                _showVoiceAudioCaptureWarning((error && error.message) || 'Original audio could not be recorded. Text transcription can still continue.');
+                _renderAiVoiceAudioStatus();
+            });
+        }
+
+        function _pauseVoiceAudioCapture() {
+            var session = _voiceAudioSession;
+            if (!session) return;
+            Promise.resolve(_voiceAudioSessionStart).then(function() {
+                if (_voiceAudioSession !== session) return;
+                _voiceAudioCaptureState = 'paused';
+                if (!session.pause()) _finishCurrentVoiceAudioSegment();
+                _renderAiVoiceAudioStatus();
+            }).catch(function() {});
+        }
+
+        function _finishCurrentVoiceAudioSegment() {
+            if (_voiceAudioPendingFinish) return _voiceAudioPendingFinish;
+            var session = _voiceAudioSession;
+            if (!session) return Promise.resolve(null);
+            _voiceAudioPendingFinish = Promise.resolve(_voiceAudioSessionStart).then(function() {
+                return session.stop();
+            }).then(function(capture) {
+                if (capture && capture.blob && capture.blob.size) _voiceAudioSegments.push(capture);
+                return capture;
+            }).catch(function(error) {
+                _showVoiceAudioCaptureWarning((error && error.message) || 'Original audio could not be completed. The text transcript is still safe.');
+                return null;
+            }).finally(function() {
+                if (_voiceAudioSession === session) {
+                    _voiceAudioSession = null;
+                    _voiceAudioSessionStart = null;
+                }
+                _voiceAudioPendingFinish = null;
+            });
+            return _voiceAudioPendingFinish;
+        }
+
+        async function _buildVoiceAudioCapture() {
+            await _finishCurrentVoiceAudioSegment();
+            if (!_voiceAudioSegments.length) return null;
+            var firstMime = window.QdAiVoiceAudioRecorder.baseMimeType(_voiceAudioSegments[0].mimeType);
+            var mismatched = _voiceAudioSegments.some(function(segment) {
+                return window.QdAiVoiceAudioRecorder.baseMimeType(segment.mimeType) !== firstMime;
+            });
+            if (mismatched) {
+                _showVoiceAudioCaptureWarning('This browser changed recording formats between segments, so QuoteDr kept the transcript but will not upload mixed audio.');
+                return null;
+            }
+            var totals = _voiceAudioCapturedTotals();
+            var mimeType = _voiceAudioSegments[0].mimeType;
+            var blob = new Blob(_voiceAudioSegments.map(function(segment) { return segment.blob; }), { type: mimeType });
+            if (totals.durationMs < 250) {
+                _showVoiceAudioCaptureWarning('The optional recording was too short to save. The text transcript is still safe.');
+                return null;
+            }
+            if (blob.size > window.QdAiVoiceAudioRecorder.MAX_BYTES || totals.durationMs > window.QdAiVoiceAudioRecorder.MAX_DURATION_MS) {
+                _showVoiceAudioCaptureWarning('The optional recording exceeded its private storage limit. The text transcript is still safe.');
+                return null;
+            }
+            return {
+                blob: blob,
+                mimeType: mimeType,
+                durationMs: totals.durationMs,
+                byteSize: blob.size
+            };
+        }
+
+        async function _discardVoiceAudioCapture() {
+            var session = _voiceAudioSession;
+            if (session) {
+                try { await Promise.resolve(_voiceAudioSessionStart); } catch (error) {}
+                try { await session.discard(); } catch (error) {}
+            }
+            if (_voiceAudioPendingFinish) {
+                try { await _voiceAudioPendingFinish; } catch (error) {}
+            }
+            _voiceAudioSession = null;
+            _voiceAudioSessionStart = null;
+            _voiceAudioPendingFinish = null;
+            _voiceAudioSegments = [];
+            _voiceAudioCaptureState = 'idle';
+            _renderAiVoiceAudioStatus();
+        }
+
         function startVoiceRecording(resetTranscript) {
             if (resetTranscript !== false && !_voiceTranscriptFull.trim()) {
                 _voiceTranscriptFull = '';
             }
+            _voiceRecording = true;
+            _voicePaused = false;
+            _voiceAudioCaptureState = _voiceAudioEnabled ? 'starting' : 'transcript_only';
+            _renderAiVoiceAudioStatus();
+            _beginVoiceAudioCapture();
             _voiceRecognition = _createRecognition();
             try {
                 _voiceRecognition.start();
             } catch(e) {
+                _voiceRecording = false;
+                _voiceAudioCaptureState = 'stopped';
+                _finishCurrentVoiceAudioSegment();
                 document.getElementById('voiceStatus').textContent = 'Could not start microphone: ' + e.message;
+                _renderAiVoiceAudioStatus();
                 return;
             }
-            _voiceRecording = true;
-            _voicePaused = false;
             var micBtn = document.getElementById('voiceMicBtn');
             micBtn.style.background = '#dc3545';
             micBtn.innerHTML = '<i class="fas fa-stop"></i>';
@@ -17652,10 +17990,13 @@ Example:
             }
             _voicePaused = true;
             _voiceRecording = false;
+            _voiceAudioCaptureState = 'paused';
+            _renderAiVoiceAudioStatus();
             if (_voiceRecognition) {
                 try { _voiceRecognition.abort(); } catch(e) {}
                 _voiceRecognition = null;
             }
+            _pauseVoiceAudioCapture();
             document.getElementById('voiceStatus').textContent = _voiceTranscriptFull.trim() ? 'Paused. Resume when ready, or generate from what you have.' : 'Paused. Resume when ready.';
             document.getElementById('voiceActions').style.display = _voiceTranscriptFull.trim() ? 'block' : 'none';
             var micBtn = document.getElementById('voiceMicBtn');
@@ -17667,10 +18008,13 @@ Example:
         function stopVoiceRecording() {
             _voiceRecording = false;
             _voicePaused = false;
+            _voiceAudioCaptureState = 'stopped';
+            _renderAiVoiceAudioStatus();
             if (_voiceRecognition) {
                 try { _voiceRecognition.abort(); } catch(e) {}
                 _voiceRecognition = null;
             }
+            _finishCurrentVoiceAudioSegment();
             var micBtn = document.getElementById('voiceMicBtn');
             micBtn.style.background = '#7c3aed';
             micBtn.innerHTML = '<i class="fas fa-microphone"></i>';
@@ -17683,7 +18027,7 @@ Example:
             _setVoicePauseButton(false);
         }
 
-        function clearVoiceTranscript() {
+        async function clearVoiceTranscript() {
             _voiceTranscriptFull = '';
             _voiceOriginalTranscript = '';
             _voicePaused = false;
@@ -17692,6 +18036,8 @@ Example:
                 try { _voiceRecognition.abort(); } catch(e) {}
                 _voiceRecognition = null;
             }
+            await _discardVoiceAudioCapture();
+            _showVoiceAudioCaptureWarning('');
             document.getElementById('voiceTranscript').textContent = 'Your words will appear here...';
             document.getElementById('voiceStatus').textContent = 'Tap the mic and describe the job';
             document.getElementById('voiceActions').style.display = 'none';
@@ -17725,6 +18071,51 @@ Example:
             return date.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
         }
 
+        function _aiVoiceAudioDate(value) {
+            var date = new Date(value || '');
+            return isFinite(date.getTime()) ? date.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'unknown';
+        }
+
+        function _aiVoiceAudioDuration(value) {
+            var seconds = Math.max(0, Math.round((Number(value) || 0) / 1000));
+            var minutes = Math.floor(seconds / 60);
+            return minutes ? minutes + 'm ' + (seconds % 60) + 's' : seconds + 's';
+        }
+
+        function _renderAiVoiceAudioHistory(recording) {
+            if (!recording) return '';
+            var id = _escapeHtml(recording.id);
+            if (recording.deletedAt || ['deleted', 'expired', 'failed'].indexOf(recording.uploadStatus) !== -1) {
+                return '<div class="border rounded p-2 mb-2 bg-light text-muted small"><i class="fas fa-volume-xmark me-1"></i>Original audio is no longer stored. The text transcript remains available.</div>';
+            }
+            if (recording.uploadStatus !== 'ready') {
+                return '<div class="border rounded p-2 mb-2 bg-light text-muted small"><i class="fas fa-cloud-arrow-up me-1"></i>Original audio upload is not complete. It will be removed automatically if it is not finalized.</div>';
+            }
+            var activeHold = recording.supportHoldState === 'active';
+            var closedHold = recording.supportHoldState === 'closed';
+            var expiryText = activeHold
+                ? 'Expiry paused for active support case ' + _escapeHtml(recording.supportCaseReference || '')
+                : (closedHold ? 'Deletes after case retention: ' : 'Expires: ') + _escapeHtml(_aiVoiceAudioDate(recording.effectiveExpiresAt));
+            var holdNote = activeHold
+                ? '<div class="alert alert-warning py-2 px-3 mt-2 mb-2"><i class="fas fa-lock me-1"></i>This recording is temporarily held for the active case you authorized. End the hold before deleting it.</div>'
+                : '';
+            var preserveButton = activeHold
+                ? '<button type="button" class="btn btn-outline-warning btn-sm" onclick="closeAiVoiceAudioHoldFromHistory(\'' + id + '\')"><i class="fas fa-lock-open me-1"></i>End Support Hold</button>'
+                : '<button type="button" class="btn btn-outline-secondary btn-sm" onclick="openAiVoicePreserveModal(\'' + id + '\')"><i class="fas fa-shield me-1"></i>Preserve for Support</button>';
+            var deleteButton = activeHold ? ''
+                : '<button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteAiVoiceAudioFromHistory(\'' + id + '\')"><i class="fas fa-trash me-1"></i>Delete Audio</button>';
+            return '<section class="border rounded p-3 mb-2" style="background:#f4f8ff">'
+                + '<div class="d-flex justify-content-between gap-2 flex-wrap align-items-start">'
+                + '<div><div class="fw-semibold"><i class="fas fa-wave-square me-1"></i>Original microphone audio</div>'
+                + '<div class="small text-muted">' + _escapeHtml(_formatAiVoiceAudioBytes(recording.byteSize)) + ' · ' + _escapeHtml(_aiVoiceAudioDuration(recording.durationMs)) + ' · ' + expiryText + '</div></div>'
+                + (activeHold ? '<span class="badge bg-warning text-dark">Authorized support hold</span>' : '<span class="badge bg-info text-dark">Private</span>')
+                + '</div>' + holdNote
+                + '<audio id="aiVoiceAudioPlayer' + id + '" controls preload="none" class="w-100 my-2" style="display:none"></audio>'
+                + '<div class="d-flex justify-content-end gap-2 flex-wrap">'
+                + '<button type="button" class="btn btn-outline-primary btn-sm" onclick="playAiVoiceAudioFromHistory(\'' + id + '\')"><i class="fas fa-play me-1"></i>Play Privately</button>'
+                + preserveButton + deleteButton + '</div></section>';
+        }
+
         function _renderAiVoiceTranscriptHistoryRows(rows, append) {
             var list = document.getElementById('aiVoiceTranscriptHistoryList');
             if (!list) return;
@@ -17736,12 +18127,16 @@ Example:
                 var quote = row.quote_number
                     ? '<span class="small text-muted"><i class="fas fa-file-invoice me-1"></i>Quote ' + _escapeHtml(row.quote_number) + '</span>'
                     : '<span class="small text-muted">Not linked to a saved quote</span>';
+                var audio = row.audioRecording
+                    ? _renderAiVoiceAudioHistory(row.audioRecording)
+                    : (row.audioEvidenceUnavailable ? '<div class="alert alert-warning py-2 px-3 small">Audio controls are temporarily unavailable. Your text transcript is still safe.</div>' : '');
                 return '<article class="border rounded p-3 mb-3 bg-white" data-ai-voice-transcript-id="' + _escapeHtml(row.id) + '">'
                     + '<div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-2">'
                     + '<div><div class="fw-semibold">' + _escapeHtml(_aiVoiceTranscriptDate(row.created_at)) + '</div>' + quote + '</div>'
                     + '<div class="d-flex gap-1 flex-wrap"><span class="badge bg-primary">' + _escapeHtml(status) + '</span>' + audit + '</div>'
                     + '</div>'
                     + '<pre id="aiVoiceTranscriptText' + _escapeHtml(row.id) + '" class="bg-light border rounded p-2 mb-2" style="white-space:pre-wrap;font-family:inherit;max-height:260px;overflow:auto">' + _escapeHtml(row.transcript) + '</pre>'
+                    + audio
                     + '<div class="d-flex justify-content-end gap-2">'
                     + '<button type="button" class="btn btn-outline-primary btn-sm" onclick="copyAiVoiceTranscriptHistoryEntry(\'' + _escapeHtml(row.id) + '\')"><i class="fas fa-copy me-1"></i>Copy</button>'
                     + '<button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteAiVoiceTranscriptHistoryEntry(\'' + _escapeHtml(row.id) + '\')"><i class="fas fa-trash me-1"></i>Delete</button>'
@@ -17758,6 +18153,10 @@ Example:
             if (!list || typeof getUserAiVoiceTranscripts !== 'function') return;
             _aiVoiceTranscriptHistoryLoading = true;
             if (!append) {
+                Object.keys(_voiceAudioObjectUrls).forEach(function(playerId) {
+                    URL.revokeObjectURL(_voiceAudioObjectUrls[playerId]);
+                    delete _voiceAudioObjectUrls[playerId];
+                });
                 _aiVoiceTranscriptHistoryOffset = 0;
                 list.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm me-2"></span>Loading transcript history...</div>';
             }
@@ -17783,6 +18182,11 @@ Example:
         async function openAiVoiceTranscriptHistory() {
             var modalEl = document.getElementById('aiVoiceTranscriptHistoryModal');
             if (!modalEl) return;
+            var retryBanner = document.getElementById('aiVoiceAudioRetryBanner');
+            if (retryBanner) {
+                retryBanner.style.display = _voiceAudioRetryPayload ? '' : 'none';
+                if (_voiceAudioRetryPayload) retryBanner.innerHTML = '<i class="fas fa-triangle-exclamation me-1"></i>Your text transcript is safe, but the optional audio upload was interrupted. <button type="button" class="btn btn-sm btn-warning ms-2" onclick="retryPendingAiVoiceAudioUpload()">Retry Audio</button>';
+            }
             bootstrap.Modal.getOrCreateInstance(modalEl).show();
             await loadAiVoiceTranscriptHistory(false);
         }
@@ -17804,9 +18208,123 @@ Example:
             }
         }
 
+        async function _playPrivateAiVoiceAudio(player, signedAccess) {
+            if (!player || !signedAccess || !signedAccess.signedUrl) throw new Error('Private playback access was not created.');
+            var response = await fetch(signedAccess.signedUrl, { cache: 'no-store', credentials: 'omit' });
+            if (!response.ok) throw new Error('The private recording could not be loaded before its access link expired.');
+            var blob = await response.blob();
+            if (!blob || !blob.size) throw new Error('The private recording was empty.');
+            if (_voiceAudioObjectUrls[player.id]) URL.revokeObjectURL(_voiceAudioObjectUrls[player.id]);
+            var objectUrl = URL.createObjectURL(blob);
+            _voiceAudioObjectUrls[player.id] = objectUrl;
+            player.src = objectUrl;
+            player.style.display = '';
+            player.onended = function() {
+                if (_voiceAudioObjectUrls[player.id] === objectUrl) {
+                    URL.revokeObjectURL(objectUrl);
+                    delete _voiceAudioObjectUrls[player.id];
+                    player.removeAttribute('src');
+                    player.load();
+                }
+            };
+            await player.play();
+        }
+
+        async function playAiVoiceAudioFromHistory(recordingId) {
+            var player = document.getElementById('aiVoiceAudioPlayer' + recordingId);
+            try {
+                if (typeof getAiVoiceAudioPlayback !== 'function') throw new Error('Private playback is not available yet.');
+                await _playPrivateAiVoiceAudio(player, await getAiVoiceAudioPlayback(recordingId));
+            } catch (error) {
+                qdAlert(error.message || 'Could not play this private recording.');
+            }
+        }
+
+        async function deleteAiVoiceAudioFromHistory(recordingId) {
+            if (!await qdConfirm('Delete this original audio now? The text transcript will remain in your account.', {
+                title: 'Delete Original Audio', okText: 'Delete Audio', cancelText: 'Keep It', type: 'danger'
+            })) return;
+            try {
+                if (typeof deleteAiVoiceAudioRecording !== 'function') throw new Error('Audio deletion is not available yet.');
+                await deleteAiVoiceAudioRecording(recordingId);
+                showToast('Original audio deleted. The text transcript remains.', 'success');
+                await loadAiVoiceTranscriptHistory(false);
+                await _refreshAiVoiceAudioStatus();
+            } catch (error) {
+                qdAlert(error.message || 'Could not delete this recording.');
+            }
+        }
+
+        function openAiVoicePreserveModal(recordingId) {
+            _aiVoicePreserveRecordingId = recordingId || '';
+            var form = document.getElementById('aiVoicePreserveForm');
+            if (form) form.reset();
+            var errorEl = document.getElementById('aiVoicePreserveError');
+            if (errorEl) errorEl.style.display = 'none';
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('aiVoicePreserveModal')).show();
+        }
+
+        async function submitAiVoicePreserve(event) {
+            event.preventDefault();
+            var caseReference = (document.getElementById('aiVoicePreserveCase') || {}).value || '';
+            var caseReason = (document.getElementById('aiVoicePreserveReason') || {}).value || '';
+            var authorized = !!((document.getElementById('aiVoicePreserveAuthorize') || {}).checked);
+            var button = document.getElementById('aiVoicePreserveSubmit');
+            var errorEl = document.getElementById('aiVoicePreserveError');
+            if (!authorized) {
+                errorEl.textContent = 'Check the authorization box to submit this recording to the specific support case.';
+                errorEl.style.display = '';
+                return;
+            }
+            button.disabled = true;
+            errorEl.style.display = 'none';
+            try {
+                if (typeof preserveAiVoiceAudioForSupport !== 'function') throw new Error('Support preservation is not available yet.');
+                await preserveAiVoiceAudioForSupport(_aiVoicePreserveRecordingId, caseReference, caseReason, true);
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('aiVoicePreserveModal')).hide();
+                showToast('Recording preserved for that authorized support case.', 'success');
+                await loadAiVoiceTranscriptHistory(false);
+            } catch (error) {
+                errorEl.textContent = error.message || 'Could not preserve this recording.';
+                errorEl.style.display = '';
+            } finally {
+                button.disabled = false;
+            }
+        }
+
+        async function closeAiVoiceAudioHoldFromHistory(recordingId) {
+            if (!await qdConfirm('End this support hold? The recording will be scheduled for deletion 30 days from today, and you can still delete it immediately.', {
+                title: 'End Support Hold', okText: 'End Hold', cancelText: 'Keep Hold', type: 'warning'
+            })) return;
+            try {
+                await closeAiVoiceAudioSupportHold(recordingId);
+                showToast('Support hold ended. The 30-day post-case deletion period has started.', 'success');
+                await loadAiVoiceTranscriptHistory(false);
+            } catch (error) {
+                qdAlert(error.message || 'Could not end the support hold.');
+            }
+        }
+
+        async function retryPendingAiVoiceAudioUpload() {
+            var banner = document.getElementById('aiVoiceAudioRetryBanner');
+            if (!_voiceAudioRetryPayload || typeof uploadAiVoiceAudioEvidence !== 'function') return;
+            if (banner) banner.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Retrying the private audio upload...';
+            try {
+                await uploadAiVoiceAudioEvidence(_voiceAudioRetryPayload.transcriptId, _voiceAudioRetryPayload.capture, _voiceAudioRetryPayload.idempotencyKey);
+                _voiceAudioRetryPayload = null;
+                _voiceAudioSegments = [];
+                showToast('Original audio saved privately.', 'success');
+                await loadAiVoiceTranscriptHistory(false);
+                await _refreshAiVoiceAudioStatus();
+            } catch (error) {
+                if (banner) banner.innerHTML = '<i class="fas fa-triangle-exclamation me-1"></i>The transcript is safe, but audio still needs a retry. <button type="button" class="btn btn-sm btn-warning ms-2" onclick="retryPendingAiVoiceAudioUpload()">Retry Audio</button>';
+                qdAlert(error.message || 'The optional audio upload is still unavailable.');
+            }
+        }
+
         async function deleteAiVoiceTranscriptHistoryEntry(transcriptId) {
             if (typeof deleteAiVoiceTranscript !== 'function') return;
-            if (!await qdConfirm('Delete this transcript from your QuoteDr account?', {
+            if (!await qdConfirm('Delete this transcript from your QuoteDr account? Any attached audio will also be deleted unless it is temporarily held for an active support case.', {
                 title: 'Delete AI Voice Transcript',
                 okText: 'Delete Transcript',
                 cancelText: 'Keep It',
@@ -20122,6 +20640,8 @@ Example:
                 try { _voiceRecognition.abort(); } catch(e) {}
                 _voiceRecognition = null;
             }
+            var pendingAudioCapture = _voiceAudioEnabled ? _buildVoiceAudioCapture() : Promise.resolve(null);
+            _voiceAudioUploadInProgress = true;
             _setVoicePauseButton(false);
             document.getElementById('voiceActions').style.display = 'none';
             document.getElementById('voiceLoading').style.display = 'block';
@@ -20139,6 +20659,30 @@ Example:
                     throw new Error('QuoteDr could not confirm that your transcript was saved. Please try again.');
                 }
                 _voiceTranscriptLogId = capturedTranscript.id;
+                var audioCapture = await pendingAudioCapture;
+                if (_voiceAudioEnabled && audioCapture && typeof uploadAiVoiceAudioEvidence === 'function') {
+                    document.getElementById('voiceStatus').textContent = 'Saving your optional private audio recording...';
+                    var audioIdempotencyKey = (window.crypto && typeof window.crypto.randomUUID === 'function')
+                        ? window.crypto.randomUUID()
+                        : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(char) {
+                            var random = Math.floor(Math.random() * 16);
+                            return (char === 'x' ? random : ((random & 3) | 8)).toString(16);
+                        });
+                    try {
+                        await uploadAiVoiceAudioEvidence(capturedTranscript.id, audioCapture, audioIdempotencyKey);
+                        _voiceAudioRetryPayload = null;
+                        _voiceAudioSegments = [];
+                    } catch (audioError) {
+                        _voiceAudioRetryPayload = {
+                            transcriptId: capturedTranscript.id,
+                            capture: audioCapture,
+                            idempotencyKey: audioIdempotencyKey
+                        };
+                        if (typeof showToast === 'function') {
+                            showToast('Your transcript was saved. Optional audio needs a retry; quote parsing will continue.', 'warning');
+                        }
+                    }
+                }
                 document.getElementById('voiceStatus').textContent = 'AI is parsing and independently checking every spoken item...';
                 const learnedMappings = (typeof getUserLearnedMappings === 'function') ? await getUserLearnedMappings() : [];
                 const response = await fetch('https://axmoffknvblluibuitrq.supabase.co/functions/v1/parse-quote', {
@@ -20173,6 +20717,8 @@ Example:
                 if (!document.getElementById('voiceQuoteModal')?.classList.contains('show')) {
                     qdAlert('AI Voice could not open the review step: ' + err.message);
                 }
+            } finally {
+                _voiceAudioUploadInProgress = false;
             }
         }
 
@@ -21331,6 +21877,67 @@ Example:
     </div>
 
     <style>
+        .ai-voice-consent-option {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            border: 2px solid #d7e2ef;
+            border-radius: 10px;
+            padding: 0.9rem;
+            cursor: pointer;
+            background: #fff;
+            transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+        }
+        .ai-voice-consent-option:hover,
+        .ai-voice-consent-option:focus-within {
+            border-color: #7c3aed;
+        }
+        .ai-voice-consent-option.selected {
+            border-color: #7c3aed;
+            background: #f5f0ff;
+            box-shadow: 0 0 0 2px rgba(124, 58, 237, .12);
+        }
+        .voice-audio-live-indicator {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            border: 1px solid #d7e2ef;
+            border-radius: 999px;
+            padding: 0.5rem 0.85rem;
+            font-size: 0.88rem;
+            background: #f8fafc;
+            color: #334155;
+        }
+        .voice-audio-live-indicator.is-recording {
+            border-color: #dc3545;
+            background: #fff1f2;
+            color: #9f1239;
+        }
+        .voice-audio-live-indicator.is-starting,
+        .voice-audio-live-indicator.is-paused {
+            border-color: #f59e0b;
+            background: #fffbeb;
+            color: #92400e;
+        }
+        .voice-audio-live-indicator.is-transcript-only {
+            border-color: #2563eb;
+            background: #eff6ff;
+            color: #1e40af;
+        }
+        .voice-audio-live-indicator.is-warning {
+            border-color: #f59e0b;
+            background: #fff7ed;
+            color: #9a3412;
+        }
+        .voice-live-dot {
+            width: 0.65rem;
+            height: 0.65rem;
+            margin-right: 0.5rem;
+            border-radius: 50%;
+            background: #dc3545;
+            box-shadow: 0 0 0 4px rgba(220, 53, 69, .16);
+        }
         @media (max-width: 576px) {
             #aiVoiceReviewModal .modal-dialog,
             #aiVoiceTemplatesModal .modal-dialog,
@@ -21362,29 +21969,56 @@ Example:
         }
     </style>
 
-    <!-- First-use disclosure for account-retained Voice To Quote transcripts -->
+    <!-- First-use disclosure for account-retained Voice To Quote text and optional audio -->
     <div class="modal fade" id="aiVoiceTranscriptNoticeModal" tabindex="-1" aria-labelledby="aiVoiceTranscriptNoticeTitle" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header" style="background:#0f3460;color:white;">
-                    <h5 class="modal-title" id="aiVoiceTranscriptNoticeTitle"><i class="fas fa-shield-halved me-2"></i>Your AI Voice transcript history</h5>
+                    <h5 class="modal-title" id="aiVoiceTranscriptNoticeTitle"><i class="fas fa-shield-halved me-2"></i>Your AI Voice privacy choices</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cancel"></button>
                 </div>
                 <div class="modal-body">
-                    <p class="fw-semibold mb-2">Each transcript you submit with Generate Quote is saved to your QuoteDr account.</p>
+                    <p class="fw-semibold mb-2">Each text transcript you submit with Generate Quote is saved to your QuoteDr account.</p>
                     <ul class="mb-3 ps-4">
-                        <li class="mb-2"><strong>Text transcript only:</strong> Your browser or device may process microphone audio to create the transcript. QuoteDr saves the returned text, not the recording.</li>
+                        <li class="mb-2"><strong>Text history:</strong> The submitted text remains in your account until you delete it or your account is removed.</li>
                         <li class="mb-2"><strong>Private to your account:</strong> Other customers cannot access it. It is not sold or used for advertising.</li>
-                        <li class="mb-2"><strong>Support access is limited:</strong> QuoteDr staff do not routinely view your transcripts. Authorized support may review one only when you ask us to investigate a reported AI Voice error, billing dispute, or possible billing adjustment or other support resolution.</li>
+                        <li class="mb-2"><strong>Support access is limited:</strong> QuoteDr staff do not routinely view your records. Support transcript access requires a real investigation reason and is audited.</li>
                         <li><strong>You stay in control:</strong> You can view, copy, or delete saved transcripts from Transcript History.</li>
                     </ul>
+                    <fieldset class="mb-3">
+                        <legend class="h6 mb-2">Choose your account default before AI Voice can use the microphone</legend>
+                        <label class="ai-voice-consent-option mb-2" for="aiVoiceConsentSaveAudio">
+                            <input class="form-check-input mt-1" type="radio" name="aiVoiceAudioFirstUseChoice" id="aiVoiceConsentSaveAudio" value="audio">
+                            <span>
+                                <span class="fw-semibold d-block">Save private audio for 14 days <span class="badge bg-primary ms-1">Recommended</span></span>
+                                <span class="small d-block mt-1">A private audio backup lets QuoteDr accurately compare the original recording with the saved transcript and generated draft if you later report a rare AI Voice error.</span>
+                            </span>
+                        </label>
+                        <label class="ai-voice-consent-option" for="aiVoiceConsentTranscriptOnly">
+                            <input class="form-check-input mt-1" type="radio" name="aiVoiceAudioFirstUseChoice" id="aiVoiceConsentTranscriptOnly" value="transcript">
+                            <span>
+                                <span class="fw-semibold d-block">Transcript only</span>
+                                <span class="small d-block mt-1">QuoteDr saves the submitted text transcript but does not retain the original microphone audio.</span>
+                            </span>
+                        </label>
+                    </fieldset>
+                    <div class="border rounded p-3 mb-3" style="background:#f4f8ff">
+                        <ul class="small mb-0 ps-4">
+                            <li class="mb-1">QuoteDr staff do not routinely access or listen to recordings.</li>
+                            <li class="mb-1">Authorized support may listen only after you explicitly authorize that recording for a specific customer-support investigation and case. Access is case-bound and audited.</li>
+                            <li class="mb-1">Audio is private to your account and automatically deleted after 14 days unless you preserve it for an active support case. After case closure, it is deleted after the existing 30-day post-case period unless you delete it sooner.</li>
+                            <li class="mb-1">Avoid dictating access codes or unnecessary sensitive information. You can pause recording during a private conversation.</li>
+                            <li>Audio is investigation evidence for human review, not automatic proof or a guarantee of compensation.</li>
+                        </ul>
+                    </div>
+                    <p class="small text-muted mb-2">Your choice is saved as your account default and is shown whenever you open Voice To Quote. You can change it later.</p>
                     <p class="small text-muted mb-2">The submitted text is also processed by QuoteDr's AI provider to create the quote draft.</p>
                     <a href="privacy.html#ai-voice-transcripts" target="_blank" rel="noopener" class="small"><i class="fas fa-external-link-alt me-1"></i>Read the Privacy Policy</a>
                     <div id="aiVoiceTranscriptNoticeError" class="alert alert-danger mt-3 mb-0" role="alert" style="display:none;"></div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="aiVoiceTranscriptNoticeContinue"><i class="fas fa-check me-1"></i>Continue to AI Voice</button>
+                    <button type="button" class="btn btn-primary" id="aiVoiceTranscriptNoticeContinue" disabled><i class="fas fa-check me-1"></i>Continue to AI Voice</button>
                 </div>
             </div>
         </div>
@@ -21407,8 +22041,19 @@ Example:
                         <button id="voicePauseBtn" onclick="toggleVoicePause()" class="btn btn-outline-warning me-2" disabled><i class="fas fa-pause me-1"></i>Pause</button>
                         <button type="button" id="voiceNextRoomBtn" onclick="addVoiceNextRoomMarker()" class="btn btn-outline-primary"><i class="fas fa-door-open me-1"></i>Next Room</button>
                     </div>
+                    <div id="voiceAudioLiveIndicator" class="voice-audio-live-indicator is-idle mb-3" role="status" aria-live="polite"><i class="fas fa-microphone-slash me-2" aria-hidden="true"></i>Not recording</div>
                     <div id="voiceTranscript" class="text-muted" style="min-height:60px; font-style:italic; padding:10px; background:#f8f9fa; border-radius:8px; text-align:left; margin-bottom:16px;">Your words will appear here...</div>
-                    <div class="small text-muted mb-2"><i class="fas fa-lock me-1"></i>Submitted text transcripts are saved to your account. Audio is not saved.</div>
+                    <div class="border rounded text-start p-3 mb-3" style="background:#f4f8ff">
+                        <div id="voiceAudioCurrentChoice" class="alert alert-light border py-2 px-3 mb-2 small">Checking your account default...</div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch" id="voiceSaveAudioToggle" onchange="changeAiVoiceAudioPreference(this.checked)">
+                            <label class="form-check-label fw-semibold" for="voiceSaveAudioToggle">Change account default: save private audio for 14 days</label>
+                        </div>
+                        <div id="voiceAudioStorageStatus" class="small text-muted mt-1">Checking private audio setting...</div>
+                        <div class="small text-muted mt-1">Audio is compressed by your browser and often uses about 0.3–1 MB per minute, but formats and sizes vary by device. Maximum: 5 minutes, 6 MB per recording, 100 MB per account.</div>
+                        <div id="voiceAudioWarning" class="alert alert-warning py-2 px-3 mt-2 mb-0" style="display:none"></div>
+                    </div>
+                    <div class="small text-muted mb-2"><i class="fas fa-lock me-1"></i>Submitted text transcripts are always saved to your account. Original audio is saved only when the setting above is on. Pause before any private conversation.</div>
                     <div id="voiceActions" style="display:none;">
                         <button id="voiceGenerateQuoteBtn" onclick="submitVoiceQuote()" class="btn btn-success me-2"><i class="fas fa-magic me-1"></i>Generate Quote</button>
                         <button onclick="clearVoiceTranscript()" class="btn btn-outline-secondary"><i class="fas fa-redo me-1"></i>Try Again</button>
@@ -21438,8 +22083,9 @@ Example:
                 </div>
                 <div class="modal-body bg-light">
                     <div class="alert alert-light border small">
-                        These are the text transcripts you submitted with Generate Quote. They remain in your account until you delete them or your account is removed. Microphone audio is not stored.
+                        Text transcripts remain in your account until you delete them or your account is removed. Optional original audio normally expires after 14 days and never replaces or shortens text history.
                     </div>
+                    <div id="aiVoiceAudioRetryBanner" class="alert alert-warning" style="display:none"></div>
                     <div id="aiVoiceTranscriptHistoryList" aria-live="polite"></div>
                     <div class="text-center">
                         <button type="button" id="aiVoiceTranscriptHistoryMore" class="btn btn-outline-primary btn-sm" style="display:none;" onclick="loadAiVoiceTranscriptHistory(true)"><i class="fas fa-chevron-down me-1"></i>Load Older</button>
@@ -21450,6 +22096,38 @@ Example:
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Explicit case-specific authorization for temporary support preservation -->
+    <div class="modal fade" id="aiVoicePreserveModal" tabindex="-1" aria-labelledby="aiVoicePreserveTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <form class="modal-content" id="aiVoicePreserveForm" onsubmit="submitAiVoicePreserve(event)">
+                <div class="modal-header" style="background:#0f3460;color:white">
+                    <h5 class="modal-title" id="aiVoicePreserveTitle"><i class="fas fa-shield me-2"></i>Preserve Audio for Support</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cancel"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small">This pauses the 14-day expiry only for the exact case below. Authorized support must enter your account email, this case ID, and a reason; each lookup and playback is audited.</p>
+                    <div class="mb-3">
+                        <label for="aiVoicePreserveCase" class="form-label fw-semibold">Support case ID or reference</label>
+                        <input id="aiVoicePreserveCase" class="form-control" required minlength="5" maxlength="120" autocomplete="off" placeholder="Example: QD-1042">
+                    </div>
+                    <div class="mb-3">
+                        <label for="aiVoicePreserveReason" class="form-label fw-semibold">Why support needs this recording</label>
+                        <textarea id="aiVoicePreserveReason" class="form-control" rows="3" required minlength="10" maxlength="500" placeholder="Example: Compare the original spoken door count with the saved transcript."></textarea>
+                    </div>
+                    <div class="form-check border rounded p-3 ps-5 bg-light">
+                        <input class="form-check-input" type="checkbox" id="aiVoicePreserveAuthorize" required>
+                        <label class="form-check-label" for="aiVoicePreserveAuthorize">I authorize QuoteDr support to access this specific recording for this case. I understand it is investigation evidence requiring human review and does not automatically guarantee compensation.</label>
+                    </div>
+                    <div id="aiVoicePreserveError" class="alert alert-danger mt-3 mb-0" role="alert" style="display:none"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="aiVoicePreserveSubmit"><i class="fas fa-lock me-1"></i>Authorize and Preserve</button>
+                </div>
+            </form>
         </div>
     </div>
 

@@ -2,6 +2,7 @@ import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 import {
   VOICE_TRANSCRIPT_NOTICE_VERSION,
+  isVoiceTranscriptNoticeAccepted,
   VOICE_TRANSCRIPT_SUPPORT_PAGE_SIZE,
   normalizeVoiceQuoteId,
   normalizeVoiceQuoteNumber,
@@ -104,7 +105,7 @@ serve(async (req) => {
         .eq('user_id', user.id)
         .maybeSingle();
       if (preferenceError) throw preferenceError;
-      if (preference?.notice_version !== VOICE_TRANSCRIPT_NOTICE_VERSION) {
+      if (!isVoiceTranscriptNoticeAccepted(preference?.notice_version)) {
         return json({ error: 'Please acknowledge the current transcript storage notice first' }, 409);
       }
       const quoteId = await ownedQuoteId(service, user.id, body.quoteId);
@@ -113,7 +114,7 @@ serve(async (req) => {
         account_email: String(user.email || '').trim().toLowerCase(),
         transcript,
         source: 'web_speech_recognition',
-        notice_version: VOICE_TRANSCRIPT_NOTICE_VERSION,
+        notice_version: preference.notice_version,
         status: 'parsing',
         parser_audit_status: 'pending',
         parser_audit_passes: 0,
