@@ -4299,7 +4299,9 @@ if (location.search.includes('debug')) {
             if (!hidden.includes('cityRow') && profile.city) lines.push(escapeHtml(profile.city + (profile.province ? ', ' + profile.province : '') + (profile.postal_code ? ' ' + profile.postal_code : '')));
             if (!hidden.includes('phone') && profile.phone) lines.push('Phone: ' + escapeHtml(profile.phone));
             if (!hidden.includes('email') && profile.email) lines.push(escapeHtml(profile.email));
-            if (!hidden.includes('hst') && profile.hst_number) lines.push('HST: ' + escapeHtml(profile.hst_number));
+            var taxIdKey = ['hst_number', 'hstNumber', 'gst_number', 'gstNumber', 'tax_number', 'taxNumber'].find(function(key) { return profile[key] !== undefined; });
+            var taxId = taxIdKey === undefined ? '' : profile[taxIdKey];
+            if (!hidden.includes('hst') && taxId) lines.push('GST/HST or Tax ID: ' + escapeHtml(taxId));
             bizEl.innerHTML = lines.map(function(line) { return '<div>' + line + '</div>'; }).join('');
             bizEl.style.display = lines.length ? '' : 'none';
         }

@@ -3448,13 +3448,14 @@
       const businessEmail = profile.email || profile.business_email || profile.company_email || '';
       const phone = profile.phone || profile.business_phone || profile.company_phone || '';
       const website = profile.website || profile.url || '';
-      const hst = profile.hst_number || profile.hst || '';
+      const taxIdKey = ['hst_number', 'hstNumber', 'gst_number', 'gstNumber', 'tax_number', 'taxNumber', 'hst'].find(key => profile[key] !== undefined);
+      const taxId = taxIdKey === undefined ? '' : profile[taxIdKey];
       const items = [
         address ? { icon: 'fa-location-dot', text: address } : null,
         phone ? { icon: 'fa-phone', text: phone } : null,
         businessEmail ? { icon: 'fa-envelope', text: businessEmail } : null,
         website ? { icon: 'fa-globe', text: website } : null,
-        hst ? { icon: 'fa-receipt', text: 'HST: ' + hst } : null
+        taxId ? { icon: 'fa-receipt', text: 'GST/HST or Tax ID: ' + taxId } : null
       ].filter(Boolean);
 
       infoEl.innerHTML = items.map(function(item) {

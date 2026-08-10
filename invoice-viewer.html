@@ -1488,7 +1488,8 @@ if (location.search.includes('debug')) {
             var postal = getProfileValue(profile, ['postal_code', 'postalCode', 'postal']);
             var phone = getProfileValue(profile, ['phone', 'business_phone']);
             var email = getProfileValue(profile, ['email', 'business_email']);
-            var hst = getProfileValue(profile, ['hst_number', 'hstNumber', 'taxNumber', 'tax_number']);
+            var taxIdKey = ['hst_number', 'hstNumber', 'gst_number', 'gstNumber', 'tax_number', 'taxNumber'].find(function(key) { return profile[key] !== undefined; });
+            var taxId = taxIdKey === undefined ? '' : String(profile[taxIdKey]);
             var visibleName = hidden.indexOf('businessName') === -1 ? name : '';
 
             var nameEl = document.getElementById('companyNameDisplay');
@@ -1512,7 +1513,7 @@ if (location.search.includes('debug')) {
             }
             if (hidden.indexOf('phone') === -1 && phone) lines.push('Phone: ' + phone);
             if (hidden.indexOf('email') === -1 && email) lines.push('Email: ' + email);
-            if (hidden.indexOf('hst') === -1 && hst) lines.push('HST: ' + hst);
+            if (hidden.indexOf('hst') === -1 && taxId) lines.push('GST/HST or Tax ID: ' + taxId);
 
             var bizEl = document.getElementById('businessInfoDisplay');
             if (bizEl) {

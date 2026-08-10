@@ -698,13 +698,14 @@ if (location.search.includes('debug')) {
 				</div>
 				<div class="col-12">
 					<div class="d-flex justify-content-between align-items-center mb-1">
-						<label class="form-label mb-0">HST Number</label>
+						<label class="form-label mb-0" for="bizHst">GST/HST or Tax ID</label>
 						<div class="form-check form-check-inline mb-0">
 							<input class="form-check-input" type="checkbox" id="hide_hst">
 							<label class="form-check-label text-muted small" for="hide_hst">Hide from client</label>
 						</div>
 					</div>
-					<input type="text" class="form-control" id="bizHst" placeholder="123456789 RC0001">
+					<input type="text" class="form-control" id="bizHst" placeholder="e.g., 123456789 RT0001 (Canada)">
+					<div class="form-text">Canadian GST/HST example shown. VAT and other tax IDs are also accepted. QuoteDr displays the value as entered and does not verify registration status.</div>
 				</div>
 			</div>
 			<div class="mt-3 d-flex align-items-center gap-3">
@@ -4367,7 +4368,9 @@ Sarah Jones, 905-555-5678"></textarea>
 			if (p.postal_code !== undefined) document.getElementById('bizPostal').value = p.postal_code;
 			if (p.phone !== undefined) document.getElementById('bizPhone').value = p.phone;
 			if (p.email !== undefined) document.getElementById('bizEmail').value = p.email;
-			if (p.hst_number !== undefined) document.getElementById('bizHst').value = p.hst_number;
+			var taxIdKeys = ['hst_number', 'hstNumber', 'gst_number', 'gstNumber', 'tax_number', 'taxNumber'];
+			var taxIdKey = taxIdKeys.find(function(key) { return p[key] !== undefined; });
+			if (taxIdKey !== undefined) document.getElementById('bizHst').value = p[taxIdKey];
 			if (p.tagline !== undefined) document.getElementById('bizTagline').value = p.tagline;
 		}
 
@@ -4502,7 +4505,7 @@ Sarah Jones, 905-555-5678"></textarea>
 				postal_code: document.getElementById('bizPostal').value.trim(),
 				phone: document.getElementById('bizPhone').value.trim(),
 				email: document.getElementById('bizEmail').value.trim(),
-				hst_number: document.getElementById('bizHst').value.trim(),
+				hst_number: document.getElementById('bizHst').value,
 				tagline: document.getElementById('bizTagline').value.trim(),
 				hidden_profile_fields: getHiddenProfileFieldsFromForm()
 			};

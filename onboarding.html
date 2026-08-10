@@ -117,8 +117,9 @@
                             </div>
                             
                             <div class="mb-3">
-                                <label for="hstNumber" class="form-label">HST Number</label>
-                                <input type="text" class="form-control" id="hstNumber" placeholder="e.g., 123456789 RT0001">
+                                <label for="hstNumber" class="form-label">GST/HST or Tax ID</label>
+                                <input type="text" class="form-control" id="hstNumber" placeholder="e.g., 123456789 RT0001 (Canada)">
+                                <div class="form-text">Canadian GST/HST example shown. VAT and other tax IDs are also accepted. QuoteDr displays the value as entered and does not verify registration status.</div>
                             </div>
 
                             <div class="border rounded p-3 mb-3 bg-light">
@@ -521,6 +522,10 @@
 			if (document.getElementById('companyTagline')) document.getElementById('companyTagline').value = business.tagline || '';
 			if (document.getElementById('ownerName')) document.getElementById('ownerName').value = business.ownerName || business.owner_name || '';
 			if (document.getElementById('email')) document.getElementById('email').value = business.email || '';
+			if (document.getElementById('hstNumber')) {
+				var savedTaxIdKey = ['hst_number', 'hstNumber', 'gst_number', 'gstNumber', 'tax_number', 'taxNumber'].find(function(key) { return business[key] !== undefined; });
+				document.getElementById('hstNumber').value = savedTaxIdKey === undefined ? '' : business[savedTaxIdKey];
+			}
 			if (document.getElementById('onboardingDepositPct')) document.getElementById('onboardingDepositPct').value = settings.deposit_default_pct || 50;
 			if (document.getElementById('onboardingAcceptDeposit')) document.getElementById('onboardingAcceptDeposit').checked = settings.accept_deposit !== false;
 			if (document.getElementById('onboardingAcceptEtransfer')) document.getElementById('onboardingAcceptEtransfer').checked = settings.accept_etransfer !== false;
