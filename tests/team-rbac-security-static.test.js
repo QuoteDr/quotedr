@@ -8,7 +8,11 @@ const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 const migration = read('supabase/migrations/20260807022336_team_accounts_rbac.sql');
 const fieldMigration = read('supabase/migrations/20260807110226_custom_role_field_permissions.sql');
 const roleRepairMigration = read('supabase/migrations/20260809024931_repair_account_role_save.sql');
+const invitationRepairMigration = read('supabase/migrations/20260810230104_repair_team_invitation_acceptance.sql');
 const indexMigration = read('supabase/migrations/20260808000920_team_rbac_foreign_key_indexes.sql');
+const invitationFixture = read('supabase/tests/team_invitation_acceptance.sql');
+const invitationConcurrencyFixture = read('supabase/tests/team_invitation_acceptance_concurrency.sql');
+const invitationApiFixture = read('tests/team-invitation-disposable-api.integration.mjs');
 const accountApi = read('supabase/functions/team-account/index.ts');
 const accountAuth = read('supabase/functions/_shared/account-authorization.ts');
 const accountClient = read('account-access.js');
@@ -89,6 +93,36 @@ test('invitations are hashed, expiring, confirmed-email bound, and API-only', ()
   assert.match(migration, /i\.normalized_email = lower\(btrim\(new\.email\)\)/i);
   assert.match(migration, /i\.expires_at > now\(\)/i);
   assert.doesNotMatch(migration, /grant\s+select\s+on\s+table\s+public\.account_invitations\s+to\s+authenticated/i);
+});
+
+test('invitation acceptance repair is unambiguous, transactional, and retry safe', () => {
+  assert.match(invitationRepairMigration, /security definer\s+set search_path = ''/i);
+  assert.match(invitationRepairMigration, /for update;/i);
+  assert.match(invitationRepairMigration, /private\.account_role_is_valid\(/i);
+  assert.match(invitationRepairMigration, /on conflict on constraint account_memberships_account_id_user_id_key/i);
+  assert.doesNotMatch(invitationRepairMigration, /on conflict\s*\(\s*account_id\s*,\s*user_id\s*\)/i);
+  assert.match(invitationRepairMigration, /v_invitation\.accepted_by_user_id is distinct from v_user_id/i);
+  assert.match(invitationRepairMigration, /m\.role_id = v_invitation\.role_id[\s\S]{0,100}m\.status = 'active'/i);
+  assert.match(invitationRepairMigration, /update public\.account_invitations[\s\S]+insert into public\.account_audit_events/i);
+  assert.match(invitationRepairMigration, /revoke all on function public\.quotedr_accept_team_invitation\(text\)[\s\S]{0,100}public, anon, authenticated, service_role/i);
+  assert.match(invitationRepairMigration, /grant execute on function public\.quotedr_accept_team_invitation\(text\)[\s\S]{0,50}to authenticated/i);
+  assert.doesNotMatch(invitationRepairMigration, /role_key\s*=\s*'estimator'/i);
+  assert.match(accountApi, /async function inviteMember[\s\S]{0,220}requireAccountPermission\(req, accountId, ACCOUNT_PERMISSION\.TEAM_MANAGE\)/i);
+  assert.match(accountApi, /async function acceptInvitation[\s\S]{0,180}authenticatedClient\(req\)/i);
+});
+
+test('invitation fixtures cover failure rollback, identity boundaries, and concurrent retry', () => {
+  assert.match(invitationFixture, /post-write failure left a partial membership/i);
+  assert.match(invitationApiFixture, /anon invitation acceptance must fail/i);
+  assert.match(invitationApiFixture, /response\.status === 401 \|\| response\.status === 403 \|\| response\.status === 404/i);
+  assert.match(invitationFixture, /invitation-expired@example\.invalid/i);
+  assert.match(invitationFixture, /invitation-revoked@example\.invalid/i);
+  assert.match(invitationFixture, /invitation-role-mismatch@example\.invalid/i);
+  assert.match(invitationFixture, /same-invitee retry did not return the original result/i);
+  assert.match(invitationFixture, /accepted-token retry changed a suspended membership/i);
+  assert.match(invitationConcurrencyFixture, /pg_advisory_xact_lock/i);
+  assert.match(invitationConcurrencyFixture, /dblink_send_query/i);
+  assert.match(invitationConcurrencyFixture, /concurrent acceptance wrote more than one audit event/i);
 });
 
 test('estimator seed contains quote-building capabilities but no sensitive capabilities', () => {
