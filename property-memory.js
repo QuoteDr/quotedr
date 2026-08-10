@@ -10,6 +10,13 @@
     var currentNormalizedAddress = '';
     var activeAutomaticMarkupRule = null;
     var additionalContactSequence = 0;
+    var reminderSequence = 0;
+    var editingDisplayAddress = '';
+    var editingNormalizedAddress = '';
+    var editingReminders = [];
+    var managerRecords = [];
+    var managerCloudConfirmed = false;
+    var pendingDeleteKey = '';
 
     function normalizePropertyAddress(value) {
         var normalized = String(value || '').trim().toLowerCase();
@@ -42,6 +49,14 @@
 
     function propertyMemoryLocalKey(normalizedAddress) {
         return PROPERTY_MEMORY_LOCAL_PREFIX + encodeURIComponent(normalizedAddress || '');
+    }
+
+    function propertyMemoryScopedLocalPrefix(userId) {
+        return PROPERTY_MEMORY_LOCAL_PREFIX + encodeURIComponent(userId || '') + ':';
+    }
+
+    function propertyMemoryScopedLocalKey(userId, normalizedAddress) {
+        return propertyMemoryScopedLocalPrefix(userId) + encodeURIComponent(normalizedAddress || '');
     }
 
     function cleanText(value) {
@@ -84,6 +99,58 @@
         return Math.max(0, Math.min(100, percent));
     }
 
+    function normalizeMatchText(value) {
+        return cleanText(value).toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+
+    function createPropertyReminderId() {
+        if (window.crypto && typeof window.crypto.randomUUID === 'function') return 'property-reminder-' + window.crypto.randomUUID();
+        reminderSequence += 1;
+        return 'property-reminder-' + Date.now().toString(36) + '-' + reminderSequence.toString(36);
+    }
+
+    function legacyPropertyReminderId(raw) {
+        raw = raw || {};
+        var target = raw.target || {};
+        var source = [raw.label || raw.title, raw.message || raw.note, raw.targetType || raw.mode || target.type, raw.category || target.category, raw.itemReference || raw.reference || target.itemReference || target.reference, raw.itemLabel || target.itemLabel || target.name]
+            .map(cleanText)
+            .join('|');
+        var hash = 0;
+        for (var index = 0; index < source.length; index += 1) hash = ((hash << 5) - hash + source.charCodeAt(index)) | 0;
+        return 'property-reminder-legacy-' + Math.abs(hash);
+    }
+
+    function normalizePropertyReminder(raw) {
+        raw = raw || {};
+        var target = raw.target || {};
+        var targetType = cleanText(raw.targetType || raw.mode || target.type).toLowerCase() === 'item' ? 'item' : 'category';
+        return {
+            id: cleanText(raw.id) || legacyPropertyReminderId(raw),
+            label: cleanText(raw.label || raw.title),
+            message: cleanText(raw.message || raw.note),
+            targetType: targetType,
+            category: cleanText(raw.category || target.category),
+            itemReference: cleanText(raw.itemReference || raw.reference || target.itemReference || target.reference),
+            itemLabel: cleanText(raw.itemLabel || target.itemLabel || target.name)
+        };
+    }
+
+    function propertyReminderHasData(reminder) {
+        reminder = normalizePropertyReminder(reminder);
+        if (!reminder.message) return false;
+        return reminder.targetType === 'item' ? !!reminder.itemReference : !!reminder.category;
+    }
+
+    function normalizePropertyReminders(reminders) {
+        if (!Array.isArray(reminders)) return [];
+        var seen = {};
+        return reminders.map(normalizePropertyReminder).filter(function(reminder) {
+            if (!propertyReminderHasData(reminder) || seen[reminder.id]) return false;
+            seen[reminder.id] = true;
+            return true;
+        });
+    }
+
     function normalizePropertyMemoryRecord(raw, displayAddress, normalizedAddress) {
         raw = raw || {};
         var access = raw.accessLogistics || {};
@@ -124,6 +191,7 @@
                 note: cleanText(markupRule.note),
                 alwaysApply: markupRule.alwaysApply === true
             },
+            reminders: normalizePropertyReminders(raw.reminders || raw.warningTriggers),
             updatedAt: raw.updatedAt || null
         };
     }
@@ -154,7 +222,7 @@
             return !!(contact.name || contact.phone || contact.email);
         });
         contactValues = contactValues || normalized.propertyContacts.additional.some(additionalContactHasData);
-        return textValues.some(Boolean) || contactValues || normalized.markupRule.percent !== null || normalized.markupRule.alwaysApply;
+        return textValues.some(Boolean) || contactValues || normalized.markupRule.percent !== null || normalized.markupRule.alwaysApply || normalized.reminders.length > 0;
     }
 
     function getAddressInput() {
@@ -166,10 +234,11 @@
         return input ? cleanText(input.value) : '';
     }
 
-    function readLocalRecord(normalizedAddress) {
+    function readLocalRecord(normalizedAddress, userId) {
         if (!normalizedAddress) return null;
         try {
-            var raw = localStorage.getItem(propertyMemoryLocalKey(normalizedAddress));
+            var key = userId ? propertyMemoryScopedLocalKey(userId, normalizedAddress) : propertyMemoryLocalKey(normalizedAddress);
+            var raw = localStorage.getItem(key);
             if (!raw) return null;
             var parsed = JSON.parse(raw);
             if (normalizePropertyAddress(parsed.normalizedAddress) !== normalizedAddress) return null;
@@ -179,22 +248,45 @@
         }
     }
 
-    function writeLocalRecord(record) {
+    function writeLocalRecord(record, userId) {
         try {
-            localStorage.setItem(propertyMemoryLocalKey(record.normalizedAddress), JSON.stringify(record));
+            var key = userId
+                ? propertyMemoryScopedLocalKey(userId, record.normalizedAddress)
+                : propertyMemoryLocalKey(record.normalizedAddress);
+            localStorage.setItem(key, JSON.stringify(record));
         } catch (error) {
             console.warn('Property memory local save failed:', error);
+        }
+    }
+
+    function removeLocalRecord(normalizedAddress, userId) {
+        if (!normalizedAddress) return;
+        try {
+            if (userId) localStorage.removeItem(propertyMemoryScopedLocalKey(userId, normalizedAddress));
+            else localStorage.removeItem(propertyMemoryLocalKey(normalizedAddress));
+        } catch (error) {
+            console.warn('Property memory local removal failed:', error);
+        }
+    }
+
+    async function getPropertyMemoryUser() {
+        if (typeof getCurrentUser !== 'function') return null;
+        try {
+            return await getCurrentUser();
+        } catch (error) {
+            return null;
         }
     }
 
     async function loadPropertyMemoryRecord(displayAddress) {
         var normalizedAddress = normalizePropertyAddress(displayAddress);
         if (!normalizedAddress) return null;
-        var localRecord = readLocalRecord(normalizedAddress);
-        if (typeof getCurrentUser !== 'function' || typeof _supabase === 'undefined') return localRecord;
+        var hasAuthLookup = typeof getCurrentUser === 'function';
+        var user = await getPropertyMemoryUser();
+        if (hasAuthLookup && !user) return null;
+        var localRecord = readLocalRecord(normalizedAddress, user && user.id);
+        if (!user || typeof _supabase === 'undefined') return localRecord;
         try {
-            var user = await getCurrentUser();
-            if (!user) return localRecord;
             var result = await _supabase
                 .from('user_data')
                 .select('value')
@@ -205,7 +297,7 @@
             var cloudRecord = result.data && result.data.value;
             if (!cloudRecord || normalizePropertyAddress(cloudRecord.normalizedAddress) !== normalizedAddress) return localRecord;
             var normalizedRecord = normalizePropertyMemoryRecord(cloudRecord, cloudRecord.displayAddress || displayAddress, normalizedAddress);
-            writeLocalRecord(normalizedRecord);
+            writeLocalRecord(normalizedRecord, user.id);
             return normalizedRecord;
         } catch (error) {
             console.warn('Property memory cloud load failed:', error);
@@ -218,7 +310,7 @@
         var badge = document.getElementById('propertyMemorySavedBadge');
         var status = document.getElementById('propertyMemoryAddressStatus');
         var hasAddress = !!normalizedAddress;
-        var hasSaved = propertyMemoryHasMeaningfulData(record);
+        var hasSaved = !!record;
         if (button) {
             button.disabled = !hasAddress || loading === true;
             button.setAttribute('aria-label', hasSaved ? 'Open saved property memory for this address' : 'Add property memory for this address');
@@ -251,6 +343,7 @@
         currentNormalizedAddress = normalizedAddress;
         setEntryState(record, normalizedAddress, false);
         activateAutomaticMarkupRule(record, normalizedAddress, { applyNow: true });
+        evaluatePropertyReminders();
         return record;
     }
 
@@ -264,13 +357,14 @@
             '    <div class="modal-content">',
             '      <div class="modal-header bg-primary text-white">',
             '        <div>',
-            '          <h2 class="modal-title fs-5" id="propertyMemoryModalLabel"><i class="fas fa-house-circle-check me-2" aria-hidden="true"></i>Property memory</h2>',
+            '          <h2 class="modal-title fs-5" id="propertyMemoryModalLabel"><i class="fas fa-house-circle-check me-2" aria-hidden="true"></i><span id="propertyMemoryModalTitleText">Property memory</span> <span class="badge bg-light text-primary ms-1" id="propertyMemoryModalSavedBadge" hidden>Saved</span></h2>',
             '          <div class="small opacity-75" id="propertyMemoryModalAddress"></div>',
             '        </div>',
             '        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>',
             '      </div>',
             '      <div class="modal-body">',
             '        <div class="alert alert-info py-2 small" role="note"><i class="fas fa-location-dot me-1" aria-hidden="true"></i>This information is saved to this property address. Property contacts stay separate from the quote client and personal client preferences.</div>',
+            '        <p class="small fw-semibold text-muted" id="propertyMemoryModalStateMessage"></p>',
             '        <div id="propertyMemoryFormStatus" class="alert d-none" role="status" aria-live="polite"></div>',
             '        <fieldset class="property-memory-section">',
             '          <legend>General site notes</legend>',
@@ -321,6 +415,24 @@
             '          <label class="form-label" for="propertyWorkHistory">Previous work and outcomes at this property</label>',
             '          <textarea class="form-control" id="propertyWorkHistory" rows="4" placeholder="Dates, completed work, contractors, warranties, follow-up items..."></textarea>',
             '        </fieldset>',
+            '        <fieldset class="property-memory-section">',
+            '          <legend>Property work reminders</legend>',
+            '          <div class="alert alert-light border py-2 small" role="note">Reminders appear only when this property and matching quote work are present. They never add items or change quantities, pricing, client details, or document status.</div>',
+            '          <div id="propertyReminderList" class="d-grid gap-2 mb-3" aria-live="polite"></div>',
+            '          <div class="property-memory-reminder-editor border rounded p-3" id="propertyReminderEditor">',
+            '            <input type="hidden" id="propertyReminderDraftId">',
+            '            <div class="row g-3">',
+            '              <div class="col-md-4"><label class="form-label" for="propertyReminderLabel">Reminder label</label><input class="form-control" id="propertyReminderLabel" placeholder="Protect stone countertop"></div>',
+            '              <div class="col-md-8"><label class="form-label" for="propertyReminderMessage">Reminder message</label><input class="form-control" id="propertyReminderMessage" placeholder="Confirm protection plan before demolition."></div>',
+            '              <div class="col-md-4"><label class="form-label" for="propertyReminderTargetType">Show when the quote includes</label><select class="form-select" id="propertyReminderTargetType"><option value="category">A trade or category</option><option value="item">A specific saved item or reference</option></select></div>',
+            '              <div class="col-md-4"><label class="form-label" for="propertyReminderCategory">Trade or category</label><input class="form-control" id="propertyReminderCategory" list="propertyReminderCategoryOptions" placeholder="Electrical"><datalist id="propertyReminderCategoryOptions"></datalist></div>',
+            '              <div class="col-md-4" id="propertyReminderItemField" hidden><label class="form-label" for="propertyReminderItemReference">Saved item or reference</label><input class="form-control" id="propertyReminderItemReference" list="propertyReminderItemOptions" placeholder="Vanity Installation"><datalist id="propertyReminderItemOptions"></datalist></div>',
+            '            </div>',
+            '            <div class="small text-muted mt-2" id="propertyReminderTargetHelp">The reminder matches any line item in the exact category, ignoring case and spacing.</div>',
+            '            <div class="small mt-2" id="propertyReminderEditorStatus" role="status" aria-live="polite"></div>',
+            '            <div class="d-flex flex-wrap gap-2 mt-3"><button type="button" class="btn btn-sm btn-outline-primary" id="propertyReminderSaveBtn"><i class="fas fa-plus me-1" aria-hidden="true"></i>Add reminder</button><button type="button" class="btn btn-sm btn-outline-secondary" id="propertyReminderCancelBtn" hidden>Cancel edit</button></div>',
+            '          </div>',
+            '        </fieldset>',
             '        <fieldset class="property-memory-section property-memory-markup-section">',
             '          <legend>Optional markup rule</legend>',
             '          <div class="alert alert-warning py-2 small">Saving this rule does not change this quote. You can review and apply it to this quote separately.</div>',
@@ -343,7 +455,9 @@
             '          <div class="small fw-semibold" id="propertyMarkupAutomaticState" aria-live="polite"></div>',
             '        </fieldset>',
             '      </div>',
-            '      <div class="modal-footer">',
+            '      <div class="modal-footer justify-content-between gap-2">',
+            '        <button type="button" class="btn btn-outline-secondary me-auto" id="propertyMemoryManageAllBtn"><i class="fas fa-list me-1" aria-hidden="true"></i>Manage all saved properties</button>',
+            '        <button type="button" class="btn btn-outline-danger" id="propertyMemoryDeleteBtn" hidden><i class="fas fa-trash me-1" aria-hidden="true"></i>Remove this property memory</button>',
             '        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>',
             '        <button type="button" class="btn btn-primary" id="propertyMemorySaveBtn"><i class="fas fa-floppy-disk me-1" aria-hidden="true"></i>Save property memory</button>',
             '      </div>',
@@ -364,6 +478,15 @@
         });
         document.getElementById('propertyMarkupAlwaysApply').addEventListener('change', updatePropertyMarkupAutomaticState);
         document.getElementById('propertyMarkupApplyBtn').addEventListener('click', applyPropertyMarkupToQuote);
+        document.getElementById('propertyReminderTargetType').addEventListener('change', updateReminderTargetFields);
+        document.getElementById('propertyReminderSaveBtn').addEventListener('click', saveReminderDraft);
+        document.getElementById('propertyReminderCancelBtn').addEventListener('click', clearReminderDraft);
+        document.getElementById('propertyMemoryDeleteBtn').addEventListener('click', deleteEditingPropertyMemory);
+        document.getElementById('propertyMemoryManageAllBtn').addEventListener('click', openPropertyMemoryManager);
+        modal.addEventListener('shown.bs.modal', function() {
+            var firstField = document.getElementById('propertyGeneralSiteNotes');
+            if (firstField) firstField.focus();
+        });
         return modal;
     }
 
@@ -375,6 +498,221 @@
     function setFieldValue(id, value) {
         var field = document.getElementById(id);
         if (field) field.value = value === null || value === undefined ? '' : value;
+    }
+
+    function propertyReminderTargetDescription(reminder) {
+        reminder = normalizePropertyReminder(reminder);
+        if (reminder.targetType === 'item') {
+            return 'Saved item/reference: ' + (reminder.category ? reminder.category + ' - ' : '') + (reminder.itemLabel || reminder.itemReference);
+        }
+        return 'Trade/category: ' + reminder.category;
+    }
+
+    function propertyReminderCatalogEntries() {
+        var entries = [];
+        var seen = {};
+        [typeof pricingDatabase !== 'undefined' ? pricingDatabase : null, typeof customItems !== 'undefined' ? customItems : null].forEach(function(source) {
+            if (!source || typeof source !== 'object') return;
+            Object.keys(source).forEach(function(category) {
+                if (category.indexOf('__') === 0 || !Array.isArray(source[category])) return;
+                source[category].forEach(function(item) {
+                    var name = cleanText(item && (item.name || item.description || item.serviceName));
+                    if (!name) return;
+                    var key = normalizeMatchText(category) + '::' + normalizeMatchText(name);
+                    if (seen[key]) return;
+                    seen[key] = true;
+                    entries.push({ category: cleanText(category), name: name, reference: key });
+                });
+            });
+        });
+        return entries;
+    }
+
+    function populateReminderTargetOptions() {
+        var categoryList = document.getElementById('propertyReminderCategoryOptions');
+        var itemList = document.getElementById('propertyReminderItemOptions');
+        if (!categoryList || !itemList) return;
+        categoryList.textContent = '';
+        itemList.textContent = '';
+        var categories = {};
+        propertyReminderCatalogEntries().forEach(function(entry) {
+            if (!categories[entry.category]) {
+                categories[entry.category] = true;
+                var categoryOption = document.createElement('option');
+                categoryOption.value = entry.category;
+                categoryList.appendChild(categoryOption);
+            }
+            var itemOption = document.createElement('option');
+            itemOption.value = entry.name;
+            itemOption.label = entry.category;
+            itemList.appendChild(itemOption);
+        });
+    }
+
+    function updateReminderTargetFields() {
+        var typeField = document.getElementById('propertyReminderTargetType');
+        var itemField = document.getElementById('propertyReminderItemField');
+        var help = document.getElementById('propertyReminderTargetHelp');
+        var isItem = !!typeField && typeField.value === 'item';
+        if (itemField) itemField.hidden = !isItem;
+        if (help) help.textContent = isItem
+            ? 'The reminder matches only the saved item/reference in the selected category. It never adds the item.'
+            : 'The reminder matches any line item in the exact category, ignoring case and spacing.';
+    }
+
+    function setReminderEditorStatus(message, type) {
+        var status = document.getElementById('propertyReminderEditorStatus');
+        if (!status) return;
+        status.className = 'small mt-2 ' + (type === 'danger' ? 'text-danger' : (type === 'success' ? 'text-success' : 'text-muted'));
+        status.textContent = message || '';
+    }
+
+    function clearReminderDraft(options) {
+        options = options || {};
+        setFieldValue('propertyReminderDraftId', '');
+        setFieldValue('propertyReminderLabel', '');
+        setFieldValue('propertyReminderMessage', '');
+        setFieldValue('propertyReminderCategory', '');
+        setFieldValue('propertyReminderItemReference', '');
+        setFieldValue('propertyReminderTargetType', 'category');
+        var saveButton = document.getElementById('propertyReminderSaveBtn');
+        var cancelButton = document.getElementById('propertyReminderCancelBtn');
+        if (saveButton) saveButton.innerHTML = '<i class="fas fa-plus me-1" aria-hidden="true"></i>Add reminder';
+        if (cancelButton) cancelButton.hidden = true;
+        updateReminderTargetFields();
+        if (!options.keepStatus) setReminderEditorStatus('');
+    }
+
+    function resolveReminderCatalogEntry(category, itemReference) {
+        var categoryKey = normalizeMatchText(category);
+        var referenceKey = normalizeMatchText(itemReference);
+        if (!referenceKey) return null;
+        var entries = propertyReminderCatalogEntries();
+        return entries.find(function(entry) {
+            return normalizeMatchText(entry.name) === referenceKey && (!categoryKey || normalizeMatchText(entry.category) === categoryKey);
+        }) || null;
+    }
+
+    function saveReminderDraft() {
+        var id = fieldValue('propertyReminderDraftId');
+        var targetType = fieldValue('propertyReminderTargetType') === 'item' ? 'item' : 'category';
+        var category = fieldValue('propertyReminderCategory');
+        var itemReference = fieldValue('propertyReminderItemReference');
+        var catalogEntry = targetType === 'item' ? resolveReminderCatalogEntry(category, itemReference) : null;
+        if (catalogEntry) category = category || catalogEntry.category;
+        var reminder = normalizePropertyReminder({
+            id: id || createPropertyReminderId(),
+            label: fieldValue('propertyReminderLabel'),
+            message: fieldValue('propertyReminderMessage'),
+            targetType: targetType,
+            category: category,
+            itemReference: catalogEntry ? catalogEntry.reference : itemReference,
+            itemLabel: catalogEntry ? catalogEntry.name : itemReference
+        });
+        if (!reminder.message) {
+            setReminderEditorStatus('Enter the reminder message.', 'danger');
+            var messageField = document.getElementById('propertyReminderMessage');
+            if (messageField) messageField.focus();
+            return;
+        }
+        if (reminder.targetType === 'category' && !reminder.category) {
+            setReminderEditorStatus('Choose or enter the trade/category.', 'danger');
+            var categoryField = document.getElementById('propertyReminderCategory');
+            if (categoryField) categoryField.focus();
+            return;
+        }
+        if (reminder.targetType === 'item' && !reminder.itemReference) {
+            setReminderEditorStatus('Choose or enter the saved item/reference.', 'danger');
+            var itemField = document.getElementById('propertyReminderItemReference');
+            if (itemField) itemField.focus();
+            return;
+        }
+        var existingIndex = editingReminders.findIndex(function(existing) { return existing.id === reminder.id; });
+        if (existingIndex >= 0) editingReminders[existingIndex] = reminder;
+        else editingReminders.push(reminder);
+        renderReminderList();
+        clearReminderDraft({ keepStatus: true });
+        setReminderEditorStatus(existingIndex >= 0 ? 'Reminder updated in this draft. Save property memory to finish.' : 'Reminder added to this draft. Save property memory to finish.', 'success');
+    }
+
+    function editReminderDraft(reminderId) {
+        var reminder = editingReminders.find(function(candidate) { return candidate.id === reminderId; });
+        if (!reminder) return;
+        setFieldValue('propertyReminderDraftId', reminder.id);
+        setFieldValue('propertyReminderLabel', reminder.label);
+        setFieldValue('propertyReminderMessage', reminder.message);
+        setFieldValue('propertyReminderTargetType', reminder.targetType);
+        setFieldValue('propertyReminderCategory', reminder.category);
+        setFieldValue('propertyReminderItemReference', reminder.itemLabel || reminder.itemReference);
+        var saveButton = document.getElementById('propertyReminderSaveBtn');
+        var cancelButton = document.getElementById('propertyReminderCancelBtn');
+        if (saveButton) saveButton.innerHTML = '<i class="fas fa-check me-1" aria-hidden="true"></i>Update reminder';
+        if (cancelButton) cancelButton.hidden = false;
+        updateReminderTargetFields();
+        setReminderEditorStatus('Editing ' + (reminder.label || 'property reminder') + '. Choose Update reminder to apply this draft.');
+        var labelField = document.getElementById('propertyReminderLabel');
+        if (labelField) labelField.focus();
+    }
+
+    async function removeReminderDraft(reminderId) {
+        var reminder = editingReminders.find(function(candidate) { return candidate.id === reminderId; });
+        if (!reminder) return;
+        var name = reminder.label || reminder.message;
+        var message = 'Remove the reminder "' + name + '" from this property memory draft? Existing quote pricing and data will not change.';
+        var confirmed = typeof qdConfirm === 'function'
+            ? await qdConfirm(message, { title: 'Remove Property Reminder?', okText: 'Remove Reminder', cancelText: 'Cancel', okClass: 'btn-danger', type: 'danger' })
+            : window.confirm(message);
+        if (!confirmed) return;
+        editingReminders = editingReminders.filter(function(candidate) { return candidate.id !== reminderId; });
+        renderReminderList();
+        clearReminderDraft({ keepStatus: true });
+        setReminderEditorStatus('Reminder removed from this draft. Save property memory to finish.', 'success');
+    }
+
+    function renderReminderList() {
+        var list = document.getElementById('propertyReminderList');
+        if (!list) return;
+        list.textContent = '';
+        if (!editingReminders.length) {
+            var empty = document.createElement('div');
+            empty.className = 'text-muted small border rounded p-3';
+            empty.textContent = 'No property reminders saved.';
+            list.appendChild(empty);
+            return;
+        }
+        editingReminders.forEach(function(reminder) {
+            var card = document.createElement('div');
+            card.className = 'property-memory-reminder-card border rounded p-3';
+            var heading = document.createElement('div');
+            heading.className = 'fw-bold';
+            heading.textContent = reminder.label || 'Property reminder';
+            var message = document.createElement('div');
+            message.className = 'mt-1';
+            message.textContent = reminder.message;
+            var target = document.createElement('div');
+            target.className = 'small text-muted mt-1';
+            target.textContent = propertyReminderTargetDescription(reminder);
+            var actions = document.createElement('div');
+            actions.className = 'd-flex flex-wrap gap-2 mt-2';
+            var edit = document.createElement('button');
+            edit.type = 'button';
+            edit.className = 'btn btn-sm btn-outline-primary';
+            edit.textContent = 'Edit reminder';
+            edit.addEventListener('click', function() { editReminderDraft(reminder.id); });
+            var remove = document.createElement('button');
+            remove.type = 'button';
+            remove.className = 'btn btn-sm btn-outline-danger';
+            remove.textContent = 'Remove reminder';
+            remove.setAttribute('aria-label', 'Remove ' + (reminder.label || 'property reminder'));
+            remove.addEventListener('click', function() { removeReminderDraft(reminder.id); });
+            actions.appendChild(edit);
+            actions.appendChild(remove);
+            card.appendChild(heading);
+            card.appendChild(message);
+            card.appendChild(target);
+            card.appendChild(actions);
+            list.appendChild(card);
+        });
     }
 
     function setAdditionalContactStatus(message) {
@@ -499,6 +837,10 @@
         setFieldValue('propertySuperintendentEmail', record.propertyContacts.superintendent.email);
         renderAdditionalPropertyContacts(record.propertyContacts.additional);
         setFieldValue('propertyWorkHistory', record.workHistory);
+        editingReminders = normalizePropertyReminders(record.reminders);
+        populateReminderTargetOptions();
+        renderReminderList();
+        clearReminderDraft();
         setFieldValue('propertyMarkupPercent', record.markupRule.percent);
         setFieldValue('propertyMarkupNote', record.markupRule.note);
         var checkbox = document.getElementById('propertyMarkupApplyConfirm');
@@ -537,6 +879,7 @@
                 additional: readAdditionalPropertyContacts()
             },
             workHistory: fieldValue('propertyWorkHistory'),
+            reminders: editingReminders,
             markupRule: {
                 percent: fieldValue('propertyMarkupPercent'),
                 note: fieldValue('propertyMarkupNote'),
@@ -544,6 +887,22 @@
             },
             updatedAt: new Date().toISOString()
         }, displayAddress, normalizedAddress);
+    }
+
+    function updatePropertyMemoryModalState(record) {
+        var hasSaved = !!record;
+        var title = document.getElementById('propertyMemoryModalTitleText');
+        var badge = document.getElementById('propertyMemoryModalSavedBadge');
+        var state = document.getElementById('propertyMemoryModalStateMessage');
+        var deleteButton = document.getElementById('propertyMemoryDeleteBtn');
+        var saveButton = document.getElementById('propertyMemorySaveBtn');
+        if (title) title.textContent = hasSaved ? 'Review property memory' : 'Add property memory';
+        if (badge) badge.hidden = !hasSaved;
+        if (deleteButton) deleteButton.hidden = !hasSaved;
+        if (saveButton) saveButton.innerHTML = '<i class="fas fa-floppy-disk me-1" aria-hidden="true"></i>' + (hasSaved ? 'Save changes' : 'Save property memory');
+        if (state) state.textContent = hasSaved
+            ? 'Review or edit this exact normalized-address record.'
+            : 'No Property Memory is saved for this normalized address yet.';
     }
 
     function showFormStatus(message, type) {
@@ -560,9 +919,380 @@
         status.textContent = '';
     }
 
-    async function openPropertyMemory() {
+    function ensureManagerModal() {
+        var existing = document.getElementById('propertyMemoryManagerModal');
+        if (existing) return existing;
+        var wrapper = document.createElement('div');
+        wrapper.innerHTML = [
+            '<div class="modal fade" id="propertyMemoryManagerModal" tabindex="-1" aria-labelledby="propertyMemoryManagerTitle" aria-hidden="true">',
+            '  <div class="modal-dialog modal-lg modal-dialog-scrollable">',
+            '    <div class="modal-content">',
+            '      <div class="modal-header bg-primary text-white">',
+            '        <div><h2 class="modal-title fs-5" id="propertyMemoryManagerTitle"><i class="fas fa-house-circle-check me-2" aria-hidden="true"></i>Manage Property Memory</h2><div class="small opacity-75">Private, address-isolated records for your signed-in account</div></div>',
+            '        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>',
+            '      </div>',
+            '      <div class="modal-body">',
+            '        <div class="alert alert-light border small" id="propertyMemoryManagerCurrentState" role="status" aria-live="polite"></div>',
+            '        <label class="form-label fw-semibold" for="propertyMemoryManagerSearch">Search saved addresses or property notes</label>',
+            '        <input class="form-control" type="search" id="propertyMemoryManagerSearch" placeholder="Search address, notes, contacts, or reminders" autocomplete="off">',
+            '        <div class="small text-muted mt-2" id="propertyMemoryManagerStatus" role="status" aria-live="polite">Loading saved properties...</div>',
+            '        <div id="propertyMemoryManagerList" class="d-grid gap-2 mt-3"></div>',
+            '      </div>',
+            '      <div class="modal-footer"><button type="button" class="btn btn-outline-primary" id="propertyMemoryManagerRefreshBtn"><i class="fas fa-rotate me-1" aria-hidden="true"></i>Refresh</button><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>',
+            '    </div>',
+            '  </div>',
+            '</div>'
+        ].join('');
+        var modal = wrapper.firstElementChild;
+        document.body.appendChild(modal);
+        document.getElementById('propertyMemoryManagerSearch').addEventListener('input', renderPropertyMemoryManagerList);
+        document.getElementById('propertyMemoryManagerRefreshBtn').addEventListener('click', loadPropertyMemoryManagerRecords);
+        modal.addEventListener('shown.bs.modal', function() {
+            var search = document.getElementById('propertyMemoryManagerSearch');
+            if (search) search.focus();
+        });
+        return modal;
+    }
+
+    function localPropertyMemoryRecordsForUser(userId) {
+        var records = [];
+        if (!userId) return records;
+        try {
+            if (typeof localStorage.length !== 'number' || typeof localStorage.key !== 'function') return records;
+            var prefix = propertyMemoryScopedLocalPrefix(userId);
+            for (var index = 0; index < localStorage.length; index += 1) {
+                var key = localStorage.key(index);
+                if (!key || key.indexOf(prefix) !== 0) continue;
+                try {
+                    var parsed = JSON.parse(localStorage.getItem(key));
+                    var normalizedAddress = normalizePropertyAddress(parsed && parsed.normalizedAddress);
+                    if (!normalizedAddress || key !== propertyMemoryScopedLocalKey(userId, normalizedAddress)) continue;
+                    records.push(normalizePropertyMemoryRecord(parsed, parsed.displayAddress, normalizedAddress));
+                } catch (recordError) {
+                    console.warn('Skipped an unreadable local property memory record:', recordError);
+                }
+            }
+        } catch (error) {
+            console.warn('Property memory device records could not be listed:', error);
+        }
+        return records;
+    }
+
+    function propertyMemorySearchText(record) {
+        record = normalizePropertyMemoryRecord(record, record && record.displayAddress, record && record.normalizedAddress);
+        var contacts = ['manager', 'tenant', 'superintendent'].map(function(role) {
+            var contact = record.propertyContacts[role];
+            return [contact.name, contact.phone, contact.email].join(' ');
+        });
+        record.propertyContacts.additional.forEach(function(contact) {
+            contacts.push([contact.role, contact.name, contact.phone, contact.email].join(' '));
+        });
+        return normalizeMatchText([
+            record.displayAddress,
+            record.normalizedAddress,
+            record.generalSiteNotes,
+            record.workHistory,
+            record.measurements,
+            contacts.join(' '),
+            record.reminders.map(function(reminder) { return [reminder.label, reminder.message, reminder.category, reminder.itemLabel, reminder.itemReference].join(' '); }).join(' ')
+        ].join(' '));
+    }
+
+    async function fetchCloudPropertyMemoryRecords(user) {
+        if (!user || typeof _supabase === 'undefined') throw new Error('Account sync is unavailable.');
+        var result = await _supabase
+            .from('user_data')
+            .select('key,value,updated_at')
+            .eq('user_id', user.id)
+            .like('key', PROPERTY_MEMORY_KEY_PREFIX + '%');
+        if (result.error) throw result.error;
+        return (result.data || []).map(function(row) {
+            var raw = row && row.value;
+            var normalizedAddress = normalizePropertyAddress(raw && raw.normalizedAddress);
+            if (!normalizedAddress || row.key !== propertyMemoryStorageKey(normalizedAddress)) return null;
+            var record = normalizePropertyMemoryRecord(raw, raw.displayAddress, normalizedAddress);
+            if (!record.updatedAt && row.updated_at) record.updatedAt = row.updated_at;
+            return record;
+        }).filter(Boolean);
+    }
+
+    function mergePropertyMemoryRecords(localRecords, cloudRecords) {
+        var merged = {};
+        (localRecords || []).forEach(function(record) {
+            merged[record.normalizedAddress] = { record: record, hasLocal: true, hasCloud: false };
+        });
+        (cloudRecords || []).forEach(function(record) {
+            var existing = merged[record.normalizedAddress] || { hasLocal: false };
+            merged[record.normalizedAddress] = { record: record, hasLocal: existing.hasLocal === true, hasCloud: true };
+        });
+        return Object.keys(merged).map(function(key) { return merged[key]; }).sort(function(left, right) {
+            return left.record.displayAddress.localeCompare(right.record.displayAddress);
+        });
+    }
+
+    function setManagerStatus(message, type) {
+        var status = document.getElementById('propertyMemoryManagerStatus');
+        if (!status) return;
+        status.className = 'small mt-2 ' + (type === 'danger' ? 'text-danger' : (type === 'warning' ? 'text-warning-emphasis' : 'text-muted'));
+        status.textContent = message || '';
+    }
+
+    function currentAddressManagerState() {
+        var state = document.getElementById('propertyMemoryManagerCurrentState');
+        if (!state) return;
         var displayAddress = getCurrentDisplayAddress();
         var normalizedAddress = normalizePropertyAddress(displayAddress);
+        if (!normalizedAddress) {
+            state.textContent = 'The current quote has no project address. You can still search and manage saved properties below.';
+            return;
+        }
+        var match = managerRecords.find(function(entry) { return entry.record.normalizedAddress === normalizedAddress; });
+        if (!managerCloudConfirmed) {
+            state.textContent = match
+                ? 'A device copy exists for the current quote address, but account sync could not be checked: ' + match.record.displayAddress + ' (normalized: ' + normalizedAddress + ').'
+                : 'No device copy was found for the current quote address, and account sync could not be checked: ' + displayAddress + ' (normalized: ' + normalizedAddress + ').';
+            return;
+        }
+        state.textContent = match
+            ? 'Current quote address is saved: ' + match.record.displayAddress + ' (normalized: ' + normalizedAddress + ').'
+            : 'Current quote address is not saved: ' + displayAddress + ' (normalized: ' + normalizedAddress + ').';
+    }
+
+    function renderPropertyMemoryManagerList() {
+        var list = document.getElementById('propertyMemoryManagerList');
+        var search = document.getElementById('propertyMemoryManagerSearch');
+        if (!list) return;
+        var query = normalizeMatchText(search && search.value);
+        var filtered = managerRecords.filter(function(entry) {
+            return !query || propertyMemorySearchText(entry.record).indexOf(query) !== -1;
+        });
+        list.textContent = '';
+        if (!filtered.length) {
+            var empty = document.createElement('div');
+            empty.className = 'border rounded p-4 text-center text-muted';
+            empty.textContent = managerRecords.length ? 'No saved properties match this search.' : 'No saved Property Memory records were found for this account.';
+            list.appendChild(empty);
+            return;
+        }
+        filtered.forEach(function(entry) {
+            var record = entry.record;
+            var card = document.createElement('article');
+            card.className = 'property-memory-manager-card border rounded p-3';
+            var headingRow = document.createElement('div');
+            headingRow.className = 'd-flex flex-wrap align-items-start justify-content-between gap-2';
+            var heading = document.createElement('div');
+            var title = document.createElement('h3');
+            title.className = 'h6 mb-1';
+            title.textContent = record.displayAddress || record.normalizedAddress;
+            var normalized = document.createElement('div');
+            normalized.className = 'small text-muted';
+            normalized.textContent = 'Normalized address: ' + record.normalizedAddress;
+            heading.appendChild(title);
+            heading.appendChild(normalized);
+            var badge = document.createElement('span');
+            badge.className = 'badge ' + (entry.hasCloud ? 'bg-success' : 'bg-warning text-dark');
+            badge.textContent = entry.hasCloud ? 'Account synced' : 'This device only';
+            headingRow.appendChild(heading);
+            headingRow.appendChild(badge);
+            var summary = document.createElement('div');
+            summary.className = 'small mt-2';
+            summary.textContent = record.generalSiteNotes || record.workHistory || (record.reminders.length ? record.reminders.length + ' reminder' + (record.reminders.length === 1 ? '' : 's') : 'Saved property details');
+            var actions = document.createElement('div');
+            actions.className = 'd-flex flex-wrap gap-2 mt-3';
+            var review = document.createElement('button');
+            review.type = 'button';
+            review.className = 'btn btn-sm btn-primary';
+            review.textContent = 'Review or edit';
+            review.setAttribute('aria-label', 'Review or edit Property Memory for ' + (record.displayAddress || record.normalizedAddress));
+            review.addEventListener('click', function() {
+                var manager = document.getElementById('propertyMemoryManagerModal');
+                if (manager) bootstrap.Modal.getOrCreateInstance(manager).hide();
+                openPropertyMemory({ record: record, displayAddress: record.displayAddress, normalizedAddress: record.normalizedAddress });
+            });
+            actions.appendChild(review);
+            if (!entry.hasCloud) {
+                var retry = document.createElement('button');
+                retry.type = 'button';
+                retry.className = 'btn btn-sm btn-outline-primary';
+                retry.textContent = 'Retry account sync';
+                retry.addEventListener('click', function() { retryPropertyMemorySync(record, retry); });
+                actions.appendChild(retry);
+            }
+            card.appendChild(headingRow);
+            card.appendChild(summary);
+            card.appendChild(actions);
+            list.appendChild(card);
+        });
+    }
+
+    async function loadPropertyMemoryManagerRecords() {
+        var user = await getPropertyMemoryUser();
+        if (!user) {
+            managerRecords = [];
+            managerCloudConfirmed = false;
+            setManagerStatus('Sign in to list and manage account-scoped Property Memory.', 'danger');
+            renderPropertyMemoryManagerList();
+            currentAddressManagerState();
+            return managerRecords;
+        }
+        var localRecords = localPropertyMemoryRecordsForUser(user.id);
+        setManagerStatus('Loading saved properties...');
+        try {
+            var cloudRecords = await fetchCloudPropertyMemoryRecords(user);
+            cloudRecords.forEach(function(record) { writeLocalRecord(record, user.id); });
+            managerRecords = mergePropertyMemoryRecords(localPropertyMemoryRecordsForUser(user.id), cloudRecords);
+            managerCloudConfirmed = true;
+            setManagerStatus(managerRecords.length + ' saved propert' + (managerRecords.length === 1 ? 'y' : 'ies') + ' loaded for this account.');
+        } catch (error) {
+            console.warn('Property memory manager cloud load failed:', error);
+            managerRecords = mergePropertyMemoryRecords(localRecords, []);
+            managerCloudConfirmed = false;
+            setManagerStatus('Account sync could not be checked. Showing only this account\'s saved records on this device.', 'warning');
+        }
+        renderPropertyMemoryManagerList();
+        currentAddressManagerState();
+        return managerRecords;
+    }
+
+    async function openPropertyMemoryManager() {
+        var user = await getPropertyMemoryUser();
+        if (!user) {
+            var message = 'Sign in before managing account-scoped Property Memory.';
+            if (typeof qdAlert === 'function') await qdAlert(message, { title: 'Sign-in Needed', type: 'info' });
+            else window.alert(message);
+            return;
+        }
+        var editor = document.getElementById('propertyMemoryModal');
+        if (editor) bootstrap.Modal.getOrCreateInstance(editor).hide();
+        var modal = ensureManagerModal();
+        var search = document.getElementById('propertyMemoryManagerSearch');
+        if (search) search.value = '';
+        bootstrap.Modal.getOrCreateInstance(modal).show();
+        await loadPropertyMemoryManagerRecords();
+        if (search) search.focus();
+    }
+
+    async function retryPropertyMemorySync(record, button) {
+        if (!record || typeof saveUserDataValue !== 'function') return;
+        if (button) button.disabled = true;
+        setManagerStatus('Retrying account sync for ' + (record.displayAddress || record.normalizedAddress) + '...');
+        try {
+            var result = await saveUserDataValue(propertyMemoryStorageKey(record.normalizedAddress), record, {
+                entityType: 'user_data',
+                entityLabel: 'Property memory - ' + (record.displayAddress || record.normalizedAddress)
+            });
+            if (!result || result.state !== 'cloud_saved' || result.error) throw (result && result.error) || new Error('Account sync is still pending.');
+            await loadPropertyMemoryManagerRecords();
+        } catch (error) {
+            console.warn('Property memory retry failed:', error);
+            setManagerStatus('Account sync is still not confirmed. The device copy is retained for another retry.', 'warning');
+        } finally {
+            if (button) button.disabled = false;
+        }
+    }
+
+    function buildPropertyMemoryDeleteTarget(normalizedAddress) {
+        return {
+            table: 'user_data',
+            action: 'delete',
+            filters: [{ column: 'key', value: propertyMemoryStorageKey(normalizedAddress) }],
+            select: false,
+            expectRows: false
+        };
+    }
+
+    async function removePropertyMemoryCloudRecord(normalizedAddress, displayAddress, user) {
+        user = user || await getPropertyMemoryUser();
+        if (!user) throw new Error('Sign in before removing account-scoped Property Memory.');
+        var target = buildPropertyMemoryDeleteTarget(normalizedAddress);
+        if (typeof qdDurableSupabaseOperation === 'function') {
+            var durableResult = await qdDurableSupabaseOperation({
+                entityType: 'user_data',
+                entityId: propertyMemoryStorageKey(normalizedAddress),
+                entityLabel: 'Property memory - ' + displayAddress,
+                action: 'delete',
+                payload: { normalizedAddress: normalizedAddress },
+                target: target
+            });
+            if (!durableResult || durableResult.state !== 'cloud_saved' || durableResult.error) {
+                throw (durableResult && durableResult.error) || new Error('Account deletion is pending.');
+            }
+            return true;
+        }
+        throw new Error('Durable account deletion is unavailable. The device fallback was retained.');
+    }
+
+    function finishPropertyMemoryDeletion(normalizedAddress, displayAddress, userId) {
+        removeLocalRecord(normalizedAddress, userId);
+        pendingDeleteKey = '';
+        if (currentNormalizedAddress === normalizedAddress) {
+            currentRecord = null;
+            activeAutomaticMarkupRule = null;
+            setEntryState(null, normalizedAddress, false);
+            evaluatePropertyReminders();
+        }
+        if (editingNormalizedAddress === normalizedAddress) {
+            setFormRecord(null, displayAddress, normalizedAddress);
+            updatePropertyMemoryModalState(null);
+        }
+        var deleteButton = document.getElementById('propertyMemoryDeleteBtn');
+        if (deleteButton) deleteButton.innerHTML = '<i class="fas fa-trash me-1" aria-hidden="true"></i>Remove this property memory';
+    }
+
+    async function deleteEditingPropertyMemory() {
+        var normalizedAddress = editingNormalizedAddress;
+        var displayAddress = editingDisplayAddress || (currentRecord && currentRecord.displayAddress) || getCurrentDisplayAddress();
+        if (!normalizedAddress) return;
+        var message = 'Remove only the saved Property Memory for "' + displayAddress + '" (normalized address: ' + normalizedAddress + ')? Site notes, property contacts, reminders, work history, and the saved markup rule for this address will be removed. Client CRM records, quote ownership, and this quote\'s current pricing will not change.';
+        var confirmed = typeof qdConfirm === 'function'
+            ? await qdConfirm(message, { title: 'Remove Exact Property Memory?', okText: 'Remove This Address', cancelText: 'Cancel', okClass: 'btn-danger', type: 'danger' })
+            : window.confirm(message);
+        if (!confirmed) return;
+        var user = await getPropertyMemoryUser();
+        var deleteButton = document.getElementById('propertyMemoryDeleteBtn');
+        var saveButton = document.getElementById('propertyMemorySaveBtn');
+        if (deleteButton) deleteButton.disabled = true;
+        if (saveButton) saveButton.disabled = true;
+        showFormStatus('Waiting for account confirmation before removing the device fallback...', 'info');
+        try {
+            await removePropertyMemoryCloudRecord(normalizedAddress, displayAddress, user);
+            finishPropertyMemoryDeletion(normalizedAddress, displayAddress, user && user.id);
+            showFormStatus('Property Memory removed from your account and this device. Current quote pricing and client data were not changed.', 'success');
+        } catch (error) {
+            pendingDeleteKey = propertyMemoryStorageKey(normalizedAddress);
+            console.warn('Property memory removal was not confirmed:', error);
+            showFormStatus('Property Memory was not removed. The account deletion is unconfirmed, so the device fallback is retained. Retry when online.', 'danger');
+            if (deleteButton) deleteButton.innerHTML = '<i class="fas fa-rotate me-1" aria-hidden="true"></i>Retry removal for this address';
+        } finally {
+            if (deleteButton) deleteButton.disabled = false;
+            if (saveButton) saveButton.disabled = false;
+        }
+    }
+
+    async function handlePropertyMemoryDeleteAcknowledgement(event) {
+        var detail = event && event.detail || {};
+        var operation = detail.operation || {};
+        if (operation.entityType !== 'user_data' || operation.action !== 'delete') return;
+        var entityId = cleanText(operation.entityId);
+        if (!entityId || entityId.indexOf(PROPERTY_MEMORY_KEY_PREFIX) !== 0) return;
+        var normalizedAddress = '';
+        try {
+            normalizedAddress = decodeURIComponent(entityId.slice(PROPERTY_MEMORY_KEY_PREFIX.length));
+        } catch (error) {
+            return;
+        }
+        if (entityId !== propertyMemoryStorageKey(normalizedAddress)) return;
+        var user = await getPropertyMemoryUser();
+        var record = editingNormalizedAddress === normalizedAddress ? readFormRecord(editingDisplayAddress, editingNormalizedAddress) : currentRecord;
+        finishPropertyMemoryDeletion(normalizedAddress, record && record.displayAddress || editingDisplayAddress || normalizedAddress, user && user.id);
+        showFormStatus('Property Memory deletion is now confirmed for this account and the device fallback was removed.', 'success');
+        if (document.getElementById('propertyMemoryManagerModal') && document.getElementById('propertyMemoryManagerModal').classList.contains('show')) loadPropertyMemoryManagerRecords();
+    }
+
+    async function openPropertyMemory(options) {
+        options = options || {};
+        var displayAddress = cleanText(options.displayAddress || getCurrentDisplayAddress());
+        var normalizedAddress = normalizePropertyAddress(options.normalizedAddress || displayAddress);
         if (!normalizedAddress) {
             var message = 'Enter the project address before opening Property Memory.';
             if (typeof qdAlert === 'function') await qdAlert(message, { title: 'Project Address Needed', type: 'info' });
@@ -570,21 +1300,28 @@
             if (getAddressInput()) getAddressInput().focus();
             return;
         }
-        var record = await loadPropertyMemoryRecord(displayAddress);
-        if (normalizePropertyAddress(getCurrentDisplayAddress()) !== normalizedAddress) return;
+        var record = options.record
+            ? normalizePropertyMemoryRecord(options.record, displayAddress, normalizedAddress)
+            : await loadPropertyMemoryRecord(displayAddress);
+        if (!options.record && normalizePropertyAddress(getCurrentDisplayAddress()) !== normalizedAddress) return;
         var modal = ensureModal();
         clearFormStatus();
         document.getElementById('propertyMemoryModalAddress').textContent = displayAddress;
-        currentRecord = record;
-        currentNormalizedAddress = normalizedAddress;
-        setEntryState(record, normalizedAddress, false);
+        editingDisplayAddress = displayAddress;
+        editingNormalizedAddress = normalizedAddress;
+        if (normalizePropertyAddress(getCurrentDisplayAddress()) === normalizedAddress) {
+            currentRecord = record;
+            currentNormalizedAddress = normalizedAddress;
+            setEntryState(record, normalizedAddress, false);
+        }
         setFormRecord(record, displayAddress, normalizedAddress);
+        updatePropertyMemoryModalState(record);
         bootstrap.Modal.getOrCreateInstance(modal).show();
     }
 
     async function savePropertyMemoryFromForm() {
-        var displayAddress = getCurrentDisplayAddress();
-        var normalizedAddress = normalizePropertyAddress(displayAddress);
+        var displayAddress = editingDisplayAddress || getCurrentDisplayAddress();
+        var normalizedAddress = editingNormalizedAddress || normalizePropertyAddress(displayAddress);
         if (!normalizedAddress) return;
         var saveButton = document.getElementById('propertyMemorySaveBtn');
         var alwaysApplyCheckbox = document.getElementById('propertyMarkupAlwaysApply');
@@ -597,29 +1334,38 @@
             return;
         }
         var record = readFormRecord(displayAddress, normalizedAddress);
-        writeLocalRecord(record);
-        currentRecord = record;
-        currentNormalizedAddress = normalizedAddress;
-        activateAutomaticMarkupRule(record, normalizedAddress, { applyNow: false });
-        setEntryState(record, normalizedAddress, false);
+        var user = await getPropertyMemoryUser();
+        if (!user && typeof getCurrentUser === 'function') {
+            showFormStatus('Sign in before saving account-scoped Property Memory.', 'warning');
+            return;
+        }
+        writeLocalRecord(record, user && user.id);
+        if (normalizePropertyAddress(getCurrentDisplayAddress()) === normalizedAddress) {
+            currentRecord = record;
+            currentNormalizedAddress = normalizedAddress;
+            activateAutomaticMarkupRule(record, normalizedAddress, { applyNow: false });
+            setEntryState(record, normalizedAddress, false);
+            evaluatePropertyReminders();
+        }
+        updatePropertyMemoryModalState(record);
         if (saveButton) {
             saveButton.disabled = true;
             saveButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1" aria-hidden="true"></i>Saving...';
         }
         var cloudSaved = false;
         try {
-            if (typeof saveUserDataValue === 'function') {
+            if (user && typeof saveUserDataValue === 'function') {
                 var result = await saveUserDataValue(propertyMemoryStorageKey(normalizedAddress), record, {
                     entityType: 'user_data',
                     entityLabel: 'Property memory - ' + displayAddress
                 });
-                if (result && result.error) throw result.error;
-                cloudSaved = true;
+                if (result && result.state === 'cloud_saved' && !result.error) cloudSaved = true;
+                else if (result && result.error) throw result.error;
             }
-            showFormStatus(cloudSaved ? 'Property memory saved to your account.' : 'Property memory saved on this device.', cloudSaved ? 'success' : 'warning');
+            showFormStatus(cloudSaved ? 'Property memory saved to your account.' : 'Property memory is saved on this device. Account sync is pending; retry from Manage Property Memory when you are online.', cloudSaved ? 'success' : 'warning');
         } catch (error) {
             console.warn('Property memory cloud save failed:', error);
-            showFormStatus('Property memory is saved on this device, but cloud sync is not available right now.', 'warning');
+            showFormStatus('Property memory is saved on this device, but account sync is not confirmed. Open Manage Property Memory to retry when you are online.', 'warning');
         } finally {
             if (saveButton) {
                 saveButton.disabled = false;
@@ -754,9 +1500,142 @@
         showFormStatus(percent + '% room markup applied to this quote. Property notes were not changed.', 'success');
     }
 
+    function normalizeReminderAcknowledgements(values) {
+        if (!Array.isArray(values)) return [];
+        return values.map(cleanText).filter(function(value, index, list) {
+            return value && list.indexOf(value) === index;
+        });
+    }
+
+    function propertyReminderAcknowledgementKey(normalizedAddress, reminder) {
+        reminder = normalizePropertyReminder(reminder);
+        return normalizedAddress + '::' + reminder.id;
+    }
+
+    function propertyReminderMatchesItem(reminder, item) {
+        reminder = normalizePropertyReminder(reminder);
+        item = item || {};
+        var source = item.savedItemSource || {};
+        var itemCategory = normalizeMatchText(item.category || source.category);
+        var targetCategory = normalizeMatchText(reminder.category);
+        if (reminder.targetType === 'category') return !!targetCategory && itemCategory === targetCategory;
+        if (targetCategory && itemCategory !== targetCategory) return false;
+        var targetReference = normalizeMatchText(reminder.itemReference || reminder.itemLabel);
+        if (!targetReference) return false;
+        var names = [item.serviceName, item.description, item.name, source.name, item.itemReference, item.reference, source.key, source.reference, source.id]
+            .map(normalizeMatchText)
+            .filter(Boolean);
+        var combined = names.map(function(name) { return normalizeMatchText(itemCategory + ' ' + name); });
+        return names.indexOf(targetReference) !== -1 || combined.indexOf(targetReference) !== -1;
+    }
+
+    function findMatchingPropertyReminders(record, displayAddress, quoteItems, acknowledgements) {
+        var normalizedAddress = normalizePropertyAddress(displayAddress);
+        var normalizedRecord = normalizePropertyMemoryRecord(record, record && record.displayAddress, record && record.normalizedAddress);
+        if (!normalizedAddress || normalizedRecord.normalizedAddress !== normalizedAddress) return [];
+        quoteItems = Array.isArray(quoteItems) ? quoteItems : [];
+        acknowledgements = normalizeReminderAcknowledgements(acknowledgements);
+        return normalizedRecord.reminders.filter(function(reminder) {
+            var key = propertyReminderAcknowledgementKey(normalizedAddress, reminder);
+            return acknowledgements.indexOf(key) === -1 && quoteItems.some(function(item) {
+                return propertyReminderMatchesItem(reminder, item);
+            });
+        });
+    }
+
+    function currentQuoteLineItems() {
+        if (typeof rooms === 'undefined' || !Array.isArray(rooms)) return [];
+        var items = [];
+        rooms.forEach(function(room) {
+            (room && Array.isArray(room.items) ? room.items : []).forEach(function(item) {
+                if (item && item._coRemoved !== true) items.push(item);
+            });
+        });
+        return items;
+    }
+
+    function setReminderAcknowledgements(values) {
+        window._propertyMemoryReminderAcknowledgements = normalizeReminderAcknowledgements(values);
+        if (window._loadedQuoteData) window._loadedQuoteData.propertyMemoryReminderAcknowledgements = window._propertyMemoryReminderAcknowledgements.slice();
+        if (window._currentQuoteData) window._currentQuoteData.propertyMemoryReminderAcknowledgements = window._propertyMemoryReminderAcknowledgements.slice();
+    }
+
+    function getReminderAcknowledgements() {
+        return normalizeReminderAcknowledgements(window._propertyMemoryReminderAcknowledgements);
+    }
+
+    function acknowledgePropertyReminder(key) {
+        var acknowledgements = getReminderAcknowledgements();
+        if (acknowledgements.indexOf(key) === -1) acknowledgements.push(key);
+        setReminderAcknowledgements(acknowledgements);
+        evaluatePropertyReminders();
+        if (typeof saveSessionQuote === 'function') saveSessionQuote();
+        if (typeof markUnsaved === 'function') markUnsaved();
+    }
+
+    function clearPropertyReminderArea() {
+        var area = document.getElementById('propertyMemoryReminderArea');
+        if (!area) return;
+        area.textContent = '';
+        area.hidden = true;
+    }
+
+    function evaluatePropertyReminders() {
+        var area = document.getElementById('propertyMemoryReminderArea');
+        if (!area) return [];
+        var displayAddress = getCurrentDisplayAddress();
+        var normalizedAddress = normalizePropertyAddress(displayAddress);
+        var record = currentRecord;
+        if (!record || record.normalizedAddress !== normalizedAddress) {
+            clearPropertyReminderArea();
+            return [];
+        }
+        var matches = findMatchingPropertyReminders(record, displayAddress, currentQuoteLineItems(), getReminderAcknowledgements());
+        area.textContent = '';
+        area.hidden = !matches.length;
+        matches.forEach(function(reminder) {
+            var key = propertyReminderAcknowledgementKey(normalizedAddress, reminder);
+            var alertNode = document.createElement('div');
+            alertNode.className = 'alert alert-warning property-memory-reminder-alert mt-2 mb-0';
+            alertNode.setAttribute('role', 'status');
+            alertNode.setAttribute('data-property-reminder-key', key);
+            var heading = document.createElement('div');
+            heading.className = 'fw-bold';
+            heading.textContent = reminder.label || 'Property reminder';
+            var message = document.createElement('div');
+            message.className = 'mt-1';
+            message.textContent = reminder.message;
+            var target = document.createElement('div');
+            target.className = 'small text-muted mt-1';
+            target.textContent = 'Matched ' + propertyReminderTargetDescription(reminder) + '. No quote values were changed.';
+            var actions = document.createElement('div');
+            actions.className = 'd-flex flex-wrap gap-2 mt-2';
+            var dismiss = document.createElement('button');
+            dismiss.type = 'button';
+            dismiss.className = 'btn btn-sm btn-warning';
+            dismiss.textContent = 'Dismiss for this quote';
+            dismiss.addEventListener('click', function() { acknowledgePropertyReminder(key); });
+            var review = document.createElement('button');
+            review.type = 'button';
+            review.className = 'btn btn-sm btn-outline-secondary';
+            review.textContent = 'Review Property Memory';
+            review.addEventListener('click', function() { openPropertyMemory(); });
+            actions.appendChild(dismiss);
+            actions.appendChild(review);
+            alertNode.appendChild(heading);
+            alertNode.appendChild(message);
+            alertNode.appendChild(target);
+            alertNode.appendChild(actions);
+            area.appendChild(alertNode);
+        });
+        return matches;
+    }
+
     function onAddressInput() {
         clearTimeout(addressInputTimer);
         activeAutomaticMarkupRule = null;
+        currentRecord = null;
+        clearPropertyReminderArea();
         setEntryState(null, normalizePropertyAddress(getCurrentDisplayAddress()), true);
         addressInputTimer = setTimeout(function() { refreshForCurrentAddress(); }, 350);
     }
@@ -769,24 +1648,42 @@
         addressInput.addEventListener('change', refreshForCurrentAddress);
         var button = document.getElementById('propertyMemoryBtn');
         if (button) button.addEventListener('click', openPropertyMemory);
+        var manageButton = document.getElementById('managePropertyMemoryBtn');
+        if (manageButton) manageButton.addEventListener('click', openPropertyMemoryManager);
+        window.addEventListener('quotedr-save-acknowledged', handlePropertyMemoryDeleteAcknowledgement);
         refreshForCurrentAddress();
     }
 
     window.QuoteDrPropertyMemory = {
         open: openPropertyMemory,
+        openManager: openPropertyMemoryManager,
+        removeCurrent: deleteEditingPropertyMemory,
         normalizeAddress: normalizePropertyAddress,
         refreshForCurrentAddress: refreshForCurrentAddress,
         applyMarkupToQuote: applyPropertyMarkupToQuote,
         applyAutomaticMarkupToUnmarkedRooms: applyAutomaticMarkupToUnmarkedRooms,
+        evaluateReminders: evaluatePropertyReminders,
+        setQuoteReminderAcknowledgements: setReminderAcknowledgements,
         __test: {
             normalizeAddress: normalizePropertyAddress,
             storageKey: propertyMemoryStorageKey,
             localKey: propertyMemoryLocalKey,
+            scopedLocalKey: propertyMemoryScopedLocalKey,
             normalizeRecord: normalizePropertyMemoryRecord,
             hasMeaningfulData: propertyMemoryHasMeaningfulData,
             normalizeAdditionalContacts: normalizeAdditionalContacts,
             additionalContactHasData: additionalContactHasData,
             normalizeMarkupPercent: normalizeMarkupPercent,
+            normalizeReminder: normalizePropertyReminder,
+            normalizeReminders: normalizePropertyReminders,
+            reminderMatchesItem: propertyReminderMatchesItem,
+            findMatchingReminders: findMatchingPropertyReminders,
+            reminderAcknowledgementKey: propertyReminderAcknowledgementKey,
+            mergeRecords: mergePropertyMemoryRecords,
+            searchText: propertyMemorySearchText,
+            buildDeleteTarget: buildPropertyMemoryDeleteTarget,
+            removeCloudRecord: removePropertyMemoryCloudRecord,
+            finishDeletion: finishPropertyMemoryDeletion,
             activateAutomaticMarkupRule: activateAutomaticMarkupRule,
             roomHasManualRoomMarkup: roomHasManualRoomMarkup
         }

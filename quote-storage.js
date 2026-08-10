@@ -963,6 +963,9 @@
                 clientName:     document.getElementById('clientName')?.value     || '',
                 quoteNumber:    document.getElementById('quoteNumber')?.value    || '',
                 projectAddress: document.getElementById('projectAddress')?.value || '',
+                propertyMemoryReminderAcknowledgements: Array.isArray(window._propertyMemoryReminderAcknowledgements)
+                    ? window._propertyMemoryReminderAcknowledgements.slice()
+                    : [],
                 clientPhone:    document.getElementById('clientPhone')?.value    || '',
                 clientEmail:    document.getElementById('clientEmail')?.value    || '',
                 terms: getSelectedTerms(),
@@ -1100,6 +1103,12 @@
             if (document.getElementById('quoteNumber'))    document.getElementById('quoteNumber').value    = data.quoteNumber || data.quote_number || '';
             if (document.getElementById('quoteStatus'))    document.getElementById('quoteStatus').value    = data.status || 'draft';
             if (document.getElementById('projectAddress')) document.getElementById('projectAddress').value = data.projectAddress || data.project_address || '';
+            window._propertyMemoryReminderAcknowledgements = Array.isArray(data.propertyMemoryReminderAcknowledgements)
+                ? data.propertyMemoryReminderAcknowledgements.slice()
+                : [];
+            if (window.QuoteDrPropertyMemory && typeof window.QuoteDrPropertyMemory.setQuoteReminderAcknowledgements === 'function') {
+                window.QuoteDrPropertyMemory.setQuoteReminderAcknowledgements(window._propertyMemoryReminderAcknowledgements);
+            }
             if (window.QuoteDrPropertyMemory) window.QuoteDrPropertyMemory.refreshForCurrentAddress();
             if (document.getElementById('clientPhone'))    document.getElementById('clientPhone').value    = data.clientPhone || data.phone || '';
             if (document.getElementById('clientEmail'))    document.getElementById('clientEmail').value    = data.clientEmail || data.email || '';
@@ -1214,6 +1223,10 @@
             });
             rooms = [];
             window._quoteReviewProfile = null;
+            window._propertyMemoryReminderAcknowledgements = [];
+            if (window.QuoteDrPropertyMemory && typeof window.QuoteDrPropertyMemory.setQuoteReminderAcknowledgements === 'function') {
+                window.QuoteDrPropertyMemory.setQuoteReminderAcknowledgements([]);
+            }
             renderRooms();
             document.getElementById('quoteNumber').value = nextQuoteNumberValue();
             checkQuoteNumberDuplicate();

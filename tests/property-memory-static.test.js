@@ -11,7 +11,7 @@ const clients = fs.readFileSync(path.join(root, 'quote-clients.js'), 'utf8');
 assert(builder.includes('id="propertyMemoryBtn"'), 'the quote address needs a Property Memory entry point');
 assert(builder.includes('id="propertyMemorySavedBadge"'), 'the address entry needs a saved-data badge');
 assert(builder.includes('aria-haspopup="dialog"') && builder.includes('aria-live="polite"'), 'the entry point should expose accessible dialog and status semantics');
-assert(builder.includes('property-memory.js?v=2026080303'), 'the Quote Builder should load the current Property Memory module');
+assert(builder.includes('property-memory.js?v=2026081001'), 'the Quote Builder should load the current Property Memory module');
 assert(builder.includes('@media (max-width: 767.98px)') && builder.includes('.property-memory-contact-grid'), 'property contacts should reflow on mobile');
 assert(builder.includes('.property-memory-additional-contact') && builder.includes('.property-memory-contact-remove'), 'additional property contacts need responsive row and removal styles');
 assert(propertyMemory.includes('id="propertyAdditionalContacts"'), 'Property Memory needs a container for custom contacts');
