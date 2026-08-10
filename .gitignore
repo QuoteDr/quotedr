@@ -18,3 +18,5 @@ mobile-companion/android/app/build/
 mobile-companion/android/build/
 mobile-companion/android/keystore.properties
 mobile-companion/android/*.jks
+# QDA-001: generated Cloudflare Pages candidate. Only this directory is deployable.
+dist/

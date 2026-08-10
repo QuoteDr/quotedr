@@ -1,0 +1,10 @@
+{
+  "name": "quotedr-static-site",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build-public-artifact.mjs",
+    "build:public": "node scripts/build-public-artifact.mjs",
+    "test:artifact": "node tests/public-artifact.test.mjs",
+    "test:artifact:smoke": "node tests/public-artifact-smoke.test.mjs"
+  }
+}

@@ -1,0 +1,524 @@
+{
+  "schemaVersion": 1,
+  "outputDirectory": "dist",
+  "fileCount": 103,
+  "totalBytes": 22558250,
+  "treeSha256": "dd9ba7a836221feb007da15205cb89b04b14f1bad805665431a58aa2faae9d17",
+  "files": [
+    {
+      "path": "_headers",
+      "bytes": 1525,
+      "sha256": "3980ef9c2c2c4e50830c4cec8864c5dd27a1bf111e07dcc6dc0bf798662329d1"
+    },
+    {
+      "path": "_redirects",
+      "bytes": 122,
+      "sha256": "38e550e3ecdf9d3d376e45c2a0d080cc39717f64f86da9e78be641c27ed686a1"
+    },
+    {
+      "path": "about.html",
+      "bytes": 7607,
+      "sha256": "b13730ab83d56070ee3350260044eda97d62cc05cda08909c780e2bf60b17b1f"
+    },
+    {
+      "path": "account-access.js",
+      "bytes": 23966,
+      "sha256": "7c582bf1a19e960f3769c8a77b865afcbdc368ba88508d2c9498fcbaa768cc35"
+    },
+    {
+      "path": "accounting-export-ui.js",
+      "bytes": 14394,
+      "sha256": "ec7d4a6d029bb04d1d47b932dbdef88881d0aef83b4e787fdb3ce5a467206a2d"
+    },
+    {
+      "path": "admin-access.js",
+      "bytes": 723,
+      "sha256": "ff2cc97ecc14c235a2fa9e4db9a817b5e2af74ddf026b319cced5e395c2cdd03"
+    },
+    {
+      "path": "ai-assistant.js",
+      "bytes": 18891,
+      "sha256": "85fe615aac2fb56c44f82934c41dafc5c68aebab8078e0cbddce8b91b3a2b72e"
+    },
+    {
+      "path": "ai-operations-core.js",
+      "bytes": 49443,
+      "sha256": "cc9710c65a8792b4ed594ae5952f06914a5bd4afb735828fe10f8e63582a329e"
+    },
+    {
+      "path": "ai-operations.html",
+      "bytes": 26789,
+      "sha256": "037776049c27b2aa2208f230502e941f021f1d5401c97abe0e897d1b3c88dc5b"
+    },
+    {
+      "path": "ai-operations.js",
+      "bytes": 65793,
+      "sha256": "0d095e2a4401ed5815d625dd9f91c91011ba0e5f4a75c68348350e94f0e323f7"
+    },
+    {
+      "path": "ai-voice-audio-recorder.js",
+      "bytes": 13677,
+      "sha256": "1e5fd26c7b297b44c8ccc934c8b73fb28076d61320ac90b5a5399c6f59dd8645"
+    },
+    {
+      "path": "ai-voice-rule-matcher.js",
+      "bytes": 10440,
+      "sha256": "28e816601853ce1bccf7a94804838bf982b287b059a4928e0318522088838c4e"
+    },
+    {
+      "path": "ald-logo.svg",
+      "bytes": 31285,
+      "sha256": "838af8ed4a60af83eccc82153d9942fd4733f3a88d6bd016d09eb3203a4b951a"
+    },
+    {
+      "path": "analytics.js",
+      "bytes": 14207,
+      "sha256": "58e52ecf79a6604da117d32e98888aff1078c48d4795ab1adb5b18112f5339eb"
+    },
+    {
+      "path": "app-broadcasts.js",
+      "bytes": 9156,
+      "sha256": "3fb98f3092c88206e10c6cd821b0ccc487905fe33b67b5032e3c0e3469e186ea"
+    },
+    {
+      "path": "blog/how-to-price-upgrades-without-awkward-sales.html",
+      "bytes": 4484,
+      "sha256": "8443cb51bf8a02daa52b415b96c7ac5972facd5699bb86e7e02e587b1cd2f277"
+    },
+    {
+      "path": "blog/index.html",
+      "bytes": 8013,
+      "sha256": "27aa10dbff3c5e5ab8e1b4e3c7d9126d41cf59d8c4dd469b5d19f5bbb82677e4"
+    },
+    {
+      "path": "blog/interactive-quotes-vs-pdfs.html",
+      "bytes": 4619,
+      "sha256": "f8a2ff17ea8f92abd07cd8b1e19b883f03768dbcd32db37d70b24645fff3fc2e"
+    },
+    {
+      "path": "blog/know-what-your-last-job-cost.html",
+      "bytes": 4884,
+      "sha256": "483bff9a0cd0f8753291c4f5a3b144a56fec77405f82b6e54dbf1766f4cb6e12"
+    },
+    {
+      "path": "blog/turn-your-excel-quote-into-a-system.html",
+      "bytes": 4612,
+      "sha256": "8f81b569c55f15991598968265472d5eeb90e11b23394c469848d4f1e2d1c732"
+    },
+    {
+      "path": "blog/why-contractors-should-stop-quoting-from-scratch.html",
+      "bytes": 5029,
+      "sha256": "0114b5bd04258ce0dc91d2d47e3eae8e18f5293cddafe6a7e9fd562cb5a81839"
+    },
+    {
+      "path": "brand-theme.css",
+      "bytes": 5033,
+      "sha256": "8b36125b0bd6d381da303c06004c2f87e218e000b4a0bffc7716a2a5dc735719"
+    },
+    {
+      "path": "card-payment-rules.js",
+      "bytes": 5502,
+      "sha256": "cfa31ad25bcd30517dfd940db69f614487fe4375ec6b5cdc18e2389c3e489220"
+    },
+    {
+      "path": "change-orders.js",
+      "bytes": 4785,
+      "sha256": "4ebeb3a88fbdaf0269b8bb6cde1e093e49868ed7b05f942ea27666ed44a13dea"
+    },
+    {
+      "path": "chatbot-feedback-topics.js",
+      "bytes": 12206,
+      "sha256": "8da71a800cf1240d6835093747f496f854323718b6cf573e34b7954eb5d8a233"
+    },
+    {
+      "path": "client-document-decisions.js",
+      "bytes": 5362,
+      "sha256": "57bcb7f0e4ff06364db601a89784dec63c39fa7d5e84f0a9568beeac10a31ea1"
+    },
+    {
+      "path": "client-portal.html",
+      "bytes": 227889,
+      "sha256": "252b4922a4607b30123f69d6614afba44cc167de6fc92924f854e05ffed16bd7"
+    },
+    {
+      "path": "contact.html",
+      "bytes": 4865,
+      "sha256": "9e706b3f328437165919fdf8acfe738bae027010896c6ecdc6e50391563de6ca"
+    },
+    {
+      "path": "dashboard.html",
+      "bytes": 351365,
+      "sha256": "0fe6189e6612436fd373cc1fd4c5ac001521d09009033dd5e1dc3b19e7cbffa0"
+    },
+    {
+      "path": "data/whats-new.json",
+      "bytes": 6663,
+      "sha256": "089b22020f39394c13d90c34357240e12b026657e50c9b4233c50edc42bc6450"
+    },
+    {
+      "path": "enhanced-material-calculator.html",
+      "bytes": 20115,
+      "sha256": "23edba0a3b7bd2a99407fcdf990d4ad4837cb63a5f5a0233b8196a0cc2ee4011"
+    },
+    {
+      "path": "error-reporter.js",
+      "bytes": 2598,
+      "sha256": "dbe635d8c3accf997677b8a233afcd6231edf871438a8c50d0dc342de3082c84"
+    },
+    {
+      "path": "floor-plan-scanner.js",
+      "bytes": 127667,
+      "sha256": "87e8185adf7ead1eb94443293682ac4f39c4f661c559ea13254f017c9dab61b1"
+    },
+    {
+      "path": "help-content.js",
+      "bytes": 44525,
+      "sha256": "f73c052d7648bc8bd95229623c937d40b1ad47b4f253be9ca94eb684c248bafb"
+    },
+    {
+      "path": "help.html",
+      "bytes": 31075,
+      "sha256": "de7fa1cf02df2415ffed4e6edeead3ca162265b54988e9d0d90c6ceb19389773"
+    },
+    {
+      "path": "home-depot-price-sync.html",
+      "bytes": 22871,
+      "sha256": "e8bc153e603c774f78fa4156520fbd79d629bc4e73615223bcb48fef865d60db"
+    },
+    {
+      "path": "home-depot-tracker.html",
+      "bytes": 68863,
+      "sha256": "14cded468d06c9cad9a8e3fd93b239f7e8ab9cf268470f66defc99fb0d7963b2"
+    },
+    {
+      "path": "icons/icon-192.png",
+      "bytes": 26917,
+      "sha256": "67c84c50cdc5eb589b2e5a8c515342900bd03990d2e76e0388b66edf3337eb4c"
+    },
+    {
+      "path": "icons/icon-512.png",
+      "bytes": 76580,
+      "sha256": "13d8403a05e611855ee486452346e00d1ef7adb89faf30cf376610ad94450e1a"
+    },
+    {
+      "path": "ikea-quote.js",
+      "bytes": 33103,
+      "sha256": "537729ab6228c554f6b727832b915e42cf43686d8cd6f572a1badeddb2a24f4f"
+    },
+    {
+      "path": "index.html",
+      "bytes": 337,
+      "sha256": "e0a55f6f6afdba612d355b31439523f1b07c0a361d13e231f05ed97bbd391269"
+    },
+    {
+      "path": "interactive-quote-viewer.html",
+      "bytes": 326092,
+      "sha256": "0f7092d9832b8d512b0c9fe8208f4e691a6ff853613d38d96b83a7951ea55989"
+    },
+    {
+      "path": "invoice-viewer.html",
+      "bytes": 138399,
+      "sha256": "648613a88e3f111d5184f169af9e2cbb90f46e5cfa99554ec2c365f37fb5378f"
+    },
+    {
+      "path": "labor-tracker.html",
+      "bytes": 54402,
+      "sha256": "e42ecbedc0a7e0edfea3ea53a78cd6aab8263eba4730d1f7f8d0e290b0e59154"
+    },
+    {
+      "path": "landing.html",
+      "bytes": 89075,
+      "sha256": "7ee49523ceef162b358c5f418242a084bf2ba57853a3d3ca45404ab06c7fc406"
+    },
+    {
+      "path": "login.html",
+      "bytes": 20985,
+      "sha256": "dd8738fd8b54fea34b67bbcab15a1204ec8b4789c0cf43ff3b80602cc3284a72"
+    },
+    {
+      "path": "manifest.json",
+      "bytes": 799,
+      "sha256": "e4757f1c9ee964ef7835c27eda8c265869c02d23d7dc1e869332f3e567c3c7c4"
+    },
+    {
+      "path": "marketing-pages.css",
+      "bytes": 5730,
+      "sha256": "15abb67538c2cb3444bad4ade25357434fcd9c49cee7b526671aa7e8e568c880"
+    },
+    {
+      "path": "material-calculator.html",
+      "bytes": 17520,
+      "sha256": "1773d0b9c9d9552f235a6a0f4503d5b87b8b6dfe56a800e11a070ff40bca4fb0"
+    },
+    {
+      "path": "modal-help.js",
+      "bytes": 13125,
+      "sha256": "11a6a1f80dedd9ef60c2d8939bb35d9500a05b79ba0f620297047548fff91ed3"
+    },
+    {
+      "path": "newsletter-signup.js",
+      "bytes": 2928,
+      "sha256": "5e5665dff00fac1d899fc3cff80b207225a6164f3d4efd5c8645caab176575e6"
+    },
+    {
+      "path": "onboarding.html",
+      "bytes": 72336,
+      "sha256": "b40837290358e885e036b44062e413c43758aeff90fc037088d873065073fde2"
+    },
+    {
+      "path": "portal-theme-studio.html",
+      "bytes": 41013,
+      "sha256": "5a10899aeea3b02a30efd70014795c9cc42c5cf30404d1db354b93dec511cd64"
+    },
+    {
+      "path": "pricing.html",
+      "bytes": 25429,
+      "sha256": "97d9fc5019aefa54aba3ad01276e1be0da699a664f3b233b3602ed2b75c65d12"
+    },
+    {
+      "path": "privacy.html",
+      "bytes": 15787,
+      "sha256": "45dd7423f5b4a4cc218c0e06b4cc78260dc60aa1a7c5e227961de6ae2df3a06a"
+    },
+    {
+      "path": "property-memory.js",
+      "bytes": 49247,
+      "sha256": "be8906ed223efeb9e3b1bb5d0496f8917b073e5b82b0b1f5e83e9fda851d2717"
+    },
+    {
+      "path": "qb-callback.html",
+      "bytes": 6142,
+      "sha256": "b82b57c9d8fd2f5567ab3cc4d471e8bece8f3d1d685eb14ccfe550d98d9b1a93"
+    },
+    {
+      "path": "qbo-invoice-export-ui.js",
+      "bytes": 14638,
+      "sha256": "8ffd02e1cd231192f034f7a16ccc5712e5fdb05f1d5ac5761a59c2e85313a7d4"
+    },
+    {
+      "path": "quickbooks-import-controller.js",
+      "bytes": 8543,
+      "sha256": "6273f71dd42bb918e42251df7a366df19b3e50e39bd551e28f981e86b412678c"
+    },
+    {
+      "path": "quickbooks-import.js",
+      "bytes": 23617,
+      "sha256": "44aea7cfc42315067dba4b42035dd6e9b05c28378e539a03f6a3f644bffc0fac"
+    },
+    {
+      "path": "quote-builder.html",
+      "bytes": 1381557,
+      "sha256": "ff746e5de3cd3c1816cb638ee2031f694e7d5f3645d4008a6e9694b8b71f2983"
+    },
+    {
+      "path": "quote-calculators.js",
+      "bytes": 74664,
+      "sha256": "afe14ee99f84b4d148e677a9768e06260a6fb54a1300abc27be73ee83d66600b"
+    },
+    {
+      "path": "quote-clients.js",
+      "bytes": 24117,
+      "sha256": "0a313f1f18e6444457af6d76299560e972707df9e27b58dd2c5786d08b58dbae"
+    },
+    {
+      "path": "quote-completeness-review.js",
+      "bytes": 160904,
+      "sha256": "3d4fff5a32c03cd6ff1d14ced56aebf27ee367e25a24cf31694628ac9d88d864"
+    },
+    {
+      "path": "quote-contact-property-lookup.js",
+      "bytes": 14095,
+      "sha256": "ab128916ef4c12c79400e18280c201821c7ed520333553da7555b5e73a4ba096"
+    },
+    {
+      "path": "quote-dialogs.js",
+      "bytes": 15307,
+      "sha256": "cc5f233818e85dc706c99fcc5e99e2620aefb9d9e7ce0fe6bfd13330a59679b0"
+    },
+    {
+      "path": "quote-discounts.js",
+      "bytes": 3895,
+      "sha256": "b00be8e3291430ebfa017d54ff3b694c1a566642ba27b04af36173c5bb453000"
+    },
+    {
+      "path": "quote-import.js",
+      "bytes": 63876,
+      "sha256": "bd4e1356559852a76a4f6672911b36a59a9c54e6aa435ff7b9ecb7cc74307e9c"
+    },
+    {
+      "path": "quote-items.js",
+      "bytes": 389687,
+      "sha256": "61ec744a61ab6504bc613d9785b14c6c192c1bbf5d2f47ddcb8fd0eb169d64fb"
+    },
+    {
+      "path": "quote-media.js",
+      "bytes": 12955,
+      "sha256": "aa2928c0676a5674f1d90e0bda1dfe8320c802a7d6e5d4b60db09bf368a8f8ba"
+    },
+    {
+      "path": "quote-review-construction-knowledge.js",
+      "bytes": 77616,
+      "sha256": "17048df4bb77ad04f2bd2c8ed745ebd8e9ea022ed459bb62d22e7a728bbc6faa"
+    },
+    {
+      "path": "quote-spellcheck.js",
+      "bytes": 33876,
+      "sha256": "105d8c6b277c4f169b626a12a9478122c3c1dd1e41a3320e30dec3e3060b8bf7"
+    },
+    {
+      "path": "quote-starter-item-library.js",
+      "bytes": 61564,
+      "sha256": "82ee270104a06a7c469c92516dec68a25bfc56a18b4641316d3f666f4194e004"
+    },
+    {
+      "path": "quote-storage.js",
+      "bytes": 135947,
+      "sha256": "8637a0bdf574548758ecc436e6831c0e98f116f0890c85fc6077edd6948c81e2"
+    },
+    {
+      "path": "quote-style.js",
+      "bytes": 98285,
+      "sha256": "481a16eeec618272c2aea2e2c342f997e5913f0a7102330781b330dc25e86ad6"
+    },
+    {
+      "path": "quote-template-files.js",
+      "bytes": 7798,
+      "sha256": "1f16bb35e2cd48c34c418d251c52f4e614ac1736e44c43effa042071760c60c2"
+    },
+    {
+      "path": "quote-tips.js",
+      "bytes": 21424,
+      "sha256": "d2c54aca31bd9cfe4b9ca35150495e11a20df52fea1671c2a9965586e6f58576"
+    },
+    {
+      "path": "quotedr-logo.svg",
+      "bytes": 12970,
+      "sha256": "0043ffcc5b019d67a9c706940df3e871c834f8093f04ac552f1cc8e13b3e4705"
+    },
+    {
+      "path": "recording-privacy.js",
+      "bytes": 8324,
+      "sha256": "9761151baa5c5b4c24b9769671d54a3b6fc4773088a68c0c2db6fbfb78164d37"
+    },
+    {
+      "path": "renovation-cost-estimator.html",
+      "bytes": 17729,
+      "sha256": "fda2665b5ec3cb86b6b0abb8a5e7c71344546cb23f30d4ba816a7406b35fdb4c"
+    },
+    {
+      "path": "save-coordinator.js",
+      "bytes": 98119,
+      "sha256": "abda97031c1efb5a451b5278ade18164bae6162f36ae904957981916d5892f7c"
+    },
+    {
+      "path": "settings.html",
+      "bytes": 355668,
+      "sha256": "6cb3f4792e648b315094e36d1e5674c4997d93f32efbc62562824caf23e16966"
+    },
+    {
+      "path": "signup-gate.css",
+      "bytes": 3848,
+      "sha256": "fb53a8ff67a43b507f9570f78bd350dc67abe0d51628e5ce1be2e8cf963b1eac"
+    },
+    {
+      "path": "signup-gate.js",
+      "bytes": 6479,
+      "sha256": "15dc7ad69148ff7124487c56ac65f12c2365bf8f58764317aba4f9ee8cf0fb77"
+    },
+    {
+      "path": "supabase-v2.js",
+      "bytes": 180299,
+      "sha256": "29117b71381213c1ff372370dab95a29f02262c5114ad78f8cd831265a3b6600"
+    },
+    {
+      "path": "sw.js",
+      "bytes": 1683,
+      "sha256": "6462738eda11d4f657343e733db8e92ce50a2847d983bea3a150a38fc2a62443"
+    },
+    {
+      "path": "team-invite.html",
+      "bytes": 9343,
+      "sha256": "88b130a0db12495850e3f4afa10072cb5d953c6063a6c5f7f21b434e274c3f62"
+    },
+    {
+      "path": "terms.html",
+      "bytes": 9893,
+      "sha256": "ef3ff568a6a3b4c1fe8adbfe4b04e5987c8420ec166dbdf6f0cc7abf93542ab3"
+    },
+    {
+      "path": "tutorials.html",
+      "bytes": 6272,
+      "sha256": "107aee8ff531ead21f27d8dea4c169b0b77444d4d64be8e8229fddd375e47d64"
+    },
+    {
+      "path": "typed-signature.js",
+      "bytes": 5458,
+      "sha256": "96b8498f9baadab35077cb633138a9fb61a95e0265f387638bd0bc4bcb30cb17"
+    },
+    {
+      "path": "videos/tutorials/ai-voice-quote.mp4",
+      "bytes": 1176103,
+      "sha256": "b79627ca434e53e9ce7b1bc38f899e11f3c20a9838db9b62d473a55be246ecac"
+    },
+    {
+      "path": "videos/tutorials/customize-brand.mp4",
+      "bytes": 4018660,
+      "sha256": "200e00d2ec0f3be21b5a2350281e3c4bd5c8557a5f1a1917bc34896df45eea6a"
+    },
+    {
+      "path": "videos/tutorials/floor-plan-scanner.mp4",
+      "bytes": 1146458,
+      "sha256": "f8b1247f2d8bf630db1919b2b6650cae0d98aa73a3f5c10334cbc9395df15452"
+    },
+    {
+      "path": "videos/tutorials/ikea-quick-quote.mp4",
+      "bytes": 1142101,
+      "sha256": "3b4a29de4fd078003c64cb98a5ad2c2bf923881b16aeb72feea5ecef05c3f1df"
+    },
+    {
+      "path": "videos/tutorials/invoice-payments.mp4",
+      "bytes": 1164607,
+      "sha256": "83f632bae2bc0b110a6162158c34ff1e0693a99c88bc06077a136e48d4b353ce"
+    },
+    {
+      "path": "videos/tutorials/landing-overview.mp4",
+      "bytes": 1202743,
+      "sha256": "04e08f49604ed62fa59919171b2e2f01d03767bbf9ef2b907f4b56c17eac22fb"
+    },
+    {
+      "path": "videos/tutorials/line-items-pricing.mp4",
+      "bytes": 1209666,
+      "sha256": "cdabca52257e9fb2d6e21d4471ad57880ef9a0283559caef68a91f7c68db62a6"
+    },
+    {
+      "path": "videos/tutorials/material-calculators.mp4",
+      "bytes": 1171475,
+      "sha256": "31e3693b8e0414d588c1d75775bf727a3bcf1394797eb8193b4eae991b98e324"
+    },
+    {
+      "path": "videos/tutorials/quickbooks-settings.mp4",
+      "bytes": 1136865,
+      "sha256": "029fc7da6dba5451c500dad3f3cffbc2c072ddb09e1c61a3c8fb652dca443b10"
+    },
+    {
+      "path": "videos/tutorials/quote-builder-overview.mp4",
+      "bytes": 1221219,
+      "sha256": "fd66b1c5a0656165f2ccc1b47fc331070a8d6cb3605468c02aa87e3a0bdceaef"
+    },
+    {
+      "path": "videos/tutorials/satellite-measure.mp4",
+      "bytes": 1194775,
+      "sha256": "fe23da818b1e3abce702558d43840c5c9565417328f0b311250a37ebabdc8bed"
+    },
+    {
+      "path": "videos/tutorials/send-client-quote.mp4",
+      "bytes": 1148640,
+      "sha256": "1b3c3ea59185e9b802ff3388159e2b5788c6b1680215d6573b2fed3205b7fdbb"
+    },
+    {
+      "path": "whats-new.html",
+      "bytes": 7499,
+      "sha256": "7e04f9f4b441e10c402ad3dd5b53fdda2ac73c9744508cf5daecb7d848b7d4df"
+    }
+  ]
+}
