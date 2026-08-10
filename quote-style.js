@@ -896,35 +896,6 @@
             return luminance > 0.62 ? '#102033' : '#ffffff';
         }
 
-        function quoteHeaderBackgroundForEffect(accent, headerStyle, headerOpacity, effect) {
-            var safeAccent = accent && accent !== '#ffffff' ? accent : '#1a56a0';
-            var opacity = Math.max(20, Math.min(parseInt(headerOpacity || 100, 10), 100));
-            var base = headerStyle === 'dark'
-                ? colorWithOpacity('#172033', opacity)
-                : (headerStyle === 'light' ? '#ffffff' : colorWithOpacity(safeAccent, opacity));
-            var soft = headerStyle === 'dark' ? colorWithOpacity('#274567', Math.max(35, opacity - 18)) : colorWithOpacity(safeAccent, Math.max(28, opacity - 26));
-            var pale = headerStyle === 'dark' ? colorWithOpacity('#425a78', 35) : blendColorWithWhite(safeAccent, 26);
-            var selected = effect || 'soft-gradient';
-
-            if (selected === 'solid') return base;
-            if (headerStyle === 'light') {
-                if (selected === 'subtle-texture') {
-                    return 'linear-gradient(90deg, rgba(15,52,96,0.035) 1px, transparent 1px), linear-gradient(0deg, rgba(15,52,96,0.035) 1px, transparent 1px), linear-gradient(135deg, #ffffff 0%, ' + pale + ' 100%)';
-                }
-                return 'radial-gradient(circle at 18% 12%, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0) 34%), linear-gradient(135deg, #ffffff 0%, ' + pale + ' 100%)';
-            }
-            if (selected === 'spotlight') {
-                return 'radial-gradient(circle at 22% 18%, rgba(255,255,255,0.34) 0%, rgba(255,255,255,0) 34%), linear-gradient(135deg, ' + base + ' 0%, ' + soft + ' 58%, rgba(16,32,51,0.28) 100%)';
-            }
-            if (selected === 'premium-sheen') {
-                return 'linear-gradient(118deg, rgba(255,255,255,0.34) 0%, rgba(255,255,255,0.14) 22%, rgba(255,255,255,0) 23%), linear-gradient(135deg, ' + base + ' 0%, ' + soft + ' 100%)';
-            }
-            if (selected === 'subtle-texture') {
-                return 'linear-gradient(90deg, rgba(255,255,255,0.055) 1px, transparent 1px), linear-gradient(0deg, rgba(255,255,255,0.045) 1px, transparent 1px), linear-gradient(135deg, ' + base + ' 0%, ' + soft + ' 100%)';
-            }
-            return 'linear-gradient(135deg, ' + base + ' 0%, ' + soft + ' 56%, ' + pale + ' 100%)';
-        }
-
         function blendColorWithWhite(hex, opacityPercent) {
             var rgb = hexToRgb(hex);
             if (!rgb) return hex || '#ffffff';

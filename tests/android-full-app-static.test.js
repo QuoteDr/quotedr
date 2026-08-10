@@ -11,8 +11,7 @@ function assert(condition, message) {
 const packageJson = JSON.parse(fs.readFileSync(path.join(appDir, 'package.json'), 'utf8'));
 const capConfig = JSON.parse(fs.readFileSync(path.join(appDir, 'capacitor.config.json'), 'utf8'));
 const prepareReleaseScript = fs.readFileSync(path.join(appDir, 'scripts/prepare-release-webdir.js'), 'utf8');
-const launcherHtml = fs.readFileSync(path.join(appDir, 'www/index.html'), 'utf8');
-const launcherJs = fs.readFileSync(path.join(appDir, 'www/app.js'), 'utf8');
+const gitignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');
 const appBuildGradle = fs.readFileSync(path.join(appDir, 'android/app/build.gradle'), 'utf8');
 const mainActivity = fs.readFileSync(path.join(appDir, 'android/app/src/main/java/io/quotedr/app/MainActivity.java'), 'utf8');
 const invoiceViewer = fs.readFileSync(path.join(root, 'invoice-viewer.html'), 'utf8');
@@ -24,7 +23,7 @@ assert(packageJson.scripts.sync === 'npx cap sync android', 'package should expo
 assert(packageJson.scripts['prepare:release'] === 'node scripts/prepare-release-webdir.js', 'package should prepare bundled QuoteDr web assets for release');
 assert(packageJson.scripts['sync:release'].includes('prepare:release'), 'release sync should prepare web assets before Capacitor sync');
 assert(packageJson.scripts['build:aab'].includes('bundleRelease'), 'package should expose an Android App Bundle build script');
-assert(packageJson.scripts.check === 'node --check www/app.js', 'package should validate launcher JavaScript');
+assert(packageJson.scripts.check === 'node --check scripts/prepare-release-webdir.js', 'clean checkouts should validate the tracked release generator without requiring generated www output');
 assert(capConfig.appId === 'io.quotedr.app', 'full app should use the QuoteDr Android app id');
 assert(capConfig.appName === 'QuoteDr', 'full app should use the QuoteDr app name');
 assert(capConfig.webDir === 'www', 'full app should serve the launcher from www');
@@ -33,13 +32,14 @@ assert(capConfig.server.androidScheme === 'https', 'bundled app should use Capac
 assert(prepareReleaseScript.includes('dashboard.html'), 'release web assets should open the QuoteDr dashboard');
 assert(prepareReleaseScript.includes('copyDirectories'), 'release preparation should copy app asset directories');
 assert(prepareReleaseScript.includes("'.env.local'"), 'release preparation should exclude local environment files');
+assert(gitignore.split(/\r?\n/).includes('android-app/www/'), 'generated Android www output should remain ignored');
 assert(appBuildGradle.includes('keystore.properties'), 'release build should support an ignored local signing config');
 assert(appBuildGradle.includes('signingConfigs'), 'release build should define a signing config');
 assert(appBuildGradle.includes('bundleRelease') === false, 'Gradle file should not hard-code bundle task names');
-assert(launcherHtml.includes('QuoteDr is opening'), 'launcher should show a loading state');
-assert(launcherJs.includes('@capacitor/app'), 'launcher should use Capacitor App plugin');
-assert(launcherJs.includes('App.addListener('), 'launcher should wire native app events');
-assert(launcherJs.includes("window.location.replace('dashboard.html')"), 'launcher should open the bundled QuoteDr dashboard');
+assert(prepareReleaseScript.includes('QuoteDr is opening'), 'generated launcher should show a loading state');
+assert(prepareReleaseScript.includes('@capacitor/app'), 'generated launcher should use Capacitor App plugin');
+assert(prepareReleaseScript.includes('App.addListener('), 'generated launcher should wire native app events');
+assert(prepareReleaseScript.includes("window.location.replace('dashboard.html')"), 'generated launcher should open the bundled QuoteDr dashboard');
 assert(mainActivity.includes('enableImmersiveMode'), 'Android app should hide the navigation bar in immersive mode');
 assert(mainActivity.includes('WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars()'), 'Android app should hide status and navigation bars together');
 assert(mainActivity.includes('BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE'), 'Android app should reveal hidden bars with a swipe');

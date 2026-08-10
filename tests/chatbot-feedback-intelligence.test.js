@@ -26,7 +26,7 @@ assert.strictEqual(topics.classify('The client portal link is not working', '', 
 assert.strictEqual(topics.classify('What is the weather?', '', { pagePath: '/help.html' }), null);
 
 const assistant = read('ai-assistant.js');
-assert(assistant.includes("body: JSON.stringify({\n        action: 'record',\n        topicKey: classified.topicKey,\n        intentKey: classified.intentKey,\n        surfaceKey: classified.surfaceKey"), 'collector payload must contain controlled enums only');
+assert(/body:\s*JSON\.stringify\(\{\s*action:\s*'record',\s*topicKey:\s*classified\.topicKey,\s*intentKey:\s*classified\.intentKey,\s*surfaceKey:\s*classified\.surfaceKey\s*\}\)/.test(assistant), 'collector payload must contain controlled enums only');
 assert(!/body:\s*JSON\.stringify\(\{[^}]*question:/s.test(assistant), 'collector must not send a raw question');
 assert(assistant.includes('.catch(function() {})'), 'telemetry failure must be swallowed');
 assert(assistant.includes('recordPrivacySafeChatbotTopic(text, localReply)') && assistant.includes('recordPrivacySafeChatbotTopic(text, reply)'), 'local and remote answers should both classify after normal use succeeds');

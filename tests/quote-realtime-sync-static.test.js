@@ -45,8 +45,8 @@ assert(
     coordinator.includes('async function discardPending(entityType, entityId, options)') &&
     coordinator.includes('incomingEditorInstance === existingEditorInstance') &&
     coordinator.includes('operationId: sameEditorChain ? existing.operationId : randomId()') &&
-    coordinator.includes("if (operation.state === 'conflict') continue;") &&
-    coordinator.includes("if (pending.state === 'conflict')"),
+    /if\s*\(\s*operation\.state\s*===\s*'conflict'[^)]*\)\s*continue;/.test(coordinator) &&
+    /if\s*\(\s*pending\.state\s*===\s*'conflict'[^)]*\)/.test(coordinator),
   'true concurrent-edit conflicts should remain durable without automatic background retries'
 );
 

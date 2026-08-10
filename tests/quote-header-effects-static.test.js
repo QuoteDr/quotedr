@@ -18,11 +18,15 @@ assert(builder.includes('value="subtle-texture"'), 'quote settings should includ
 assert(builder.includes('value="solid"'), 'quote settings should allow the old solid colour style');
 
 assert(quoteStyle.includes("headerEffect: 'soft-gradient'"), 'quote style defaults should include a premium soft-gradient header effect');
-assert(quoteStyle.includes('function quoteHeaderBackgroundForEffect'), 'quote style module should centralize header effect backgrounds');
 assert(quoteStyle.includes("style.headerEffect = document.getElementById('quoteHeaderEffect')?.value"), 'quote style should read quoteHeaderEffect from controls');
 assert(quoteStyle.includes("setFieldValue('quoteHeaderEffect'"), 'quote style should apply quoteHeaderEffect to controls');
 assert(quoteStyle.includes("'quoteHeaderEffect'"), 'quote style modal should bind quoteHeaderEffect changes');
-assert(quoteStyle.includes('quoteHeaderBackgroundForEffect(accent, _quoteStyle.headerStyle'), 'style preview should use the header effect background helper');
+assert(
+  quoteStyle.includes("type: 'quotedr-quote-studio-style'") &&
+    quoteStyle.includes('style: quoteStudioClone(_quoteStyle)'),
+  'style preview should send the selected header effect to the real client viewer'
+);
+assert(!quoteStyle.includes('function quoteHeaderBackgroundForEffect'), 'builder should not retain an unused duplicate of the viewer renderer');
 
 assert(viewer.includes('function quoteHeaderBackgroundForEffect'), 'client quote viewer should include the header effect background helper');
 assert(viewer.includes("viewerStyle.headerEffect || 'soft-gradient'"), 'client quote viewer should read saved header effects with a soft-gradient fallback');

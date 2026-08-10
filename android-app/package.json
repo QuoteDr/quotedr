@@ -4,7 +4,7 @@
   "private": true,
   "description": "QuoteDr Android app wrapper",
   "scripts": {
-    "check": "node --check www/app.js",
+    "check": "node --check scripts/prepare-release-webdir.js",
     "prepare:release": "node scripts/prepare-release-webdir.js",
     "sync": "npx cap sync android",
     "sync:release": "npm run prepare:release && npx cap sync android",

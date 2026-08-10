@@ -2,6 +2,9 @@ const fs = require('fs');
 const assert = require('assert');
 
 const html = fs.readFileSync('quote-builder.html', 'utf8');
+const addLineStart = html.indexOf('function addLine(roomId)');
+const addLineEnd = html.indexOf('\n        function ', addLineStart + 1);
+const addLineSource = html.slice(addLineStart, addLineEnd);
 
 assert(
   html.includes('function resetLineItemEditState()') &&
@@ -12,7 +15,9 @@ assert(
 );
 
 assert(
-  /function addLine\(roomId\)\s*{\s*resetLineItemEditState\(\);/.test(html),
+  addLineStart >= 0 &&
+    addLineSource.indexOf('resetLineItemEditState();') >= 0 &&
+    addLineSource.indexOf('resetLineItemEditState();') < addLineSource.indexOf('modal.show();'),
   'Opening Add Item should clear any previous edit mode before the modal is shown'
 );
 

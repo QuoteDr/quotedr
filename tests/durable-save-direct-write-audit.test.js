@@ -3,7 +3,10 @@ const path = require('path');
 const assert = require('assert');
 
 const root = path.resolve(__dirname, '..');
-const ignoredDirectories = new Set(['.git', 'node_modules', 'tests', 'mobile-companion', 'supabase']);
+// dist/ is rebuilt from the audited source tree and verified separately by the
+// public-artifact suites. Ignoring that generated copy keeps this audit
+// deterministic regardless of test order without exempting any source file.
+const ignoredDirectories = new Set(['.git', 'dist', 'node_modules', 'tests', 'mobile-companion', 'supabase']);
 const ignoredFiles = new Set(['supabase.js']); // Retired compatibility file; no page loads it.
 
 function walk(directory, output = []) {

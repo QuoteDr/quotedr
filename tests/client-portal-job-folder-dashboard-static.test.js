@@ -117,7 +117,8 @@ assert(
 assert(
   portal.includes('function portalJobFileIsVideo(') &&
     portal.includes('Video files are not stored in QuoteDr yet') &&
-    portal.includes('Video link - hosted outside QuoteDr'),
+    portal.includes('Add video link') &&
+    portal.includes('Google Photos, Drive, YouTube, Vimeo, or Loom'),
   'Video files should be rejected while video links remain supported'
 );
 
