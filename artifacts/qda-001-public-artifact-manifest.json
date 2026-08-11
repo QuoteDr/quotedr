@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "outputDirectory": "dist",
   "fileCount": 104,
-  "totalBytes": 22559274,
-  "treeSha256": "3b3d0370118a68ccac38b87b5efc84fe60897f95fa12f096fa88a66c1d05c590",
+  "totalBytes": 22461919,
+  "treeSha256": "2d5e1c5aa2a97e76f35c18a016ef6fcb3fbccb903aaf689b3470271792760f80",
   "files": [
     {
       "path": "404.html",
@@ -12,63 +12,63 @@
     },
     {
       "path": "_headers",
-      "bytes": 1525,
-      "sha256": "3980ef9c2c2c4e50830c4cec8864c5dd27a1bf111e07dcc6dc0bf798662329d1"
+      "bytes": 1502,
+      "sha256": "54192085c1e601f1b303f718bc1fb74509a03b4a1a2e54277c08ee1bd2abb4be"
     },
     {
       "path": "_redirects",
-      "bytes": 122,
-      "sha256": "38e550e3ecdf9d3d376e45c2a0d080cc39717f64f86da9e78be641c27ed686a1"
+      "bytes": 120,
+      "sha256": "f93eb7e83df518b277159eb13dc44a7ce45b44cb48d2c3aa406f255616839f15"
     },
     {
       "path": "about.html",
-      "bytes": 7607,
-      "sha256": "b13730ab83d56070ee3350260044eda97d62cc05cda08909c780e2bf60b17b1f"
+      "bytes": 7501,
+      "sha256": "c45b5cc5513bdb4d5a3f681ba820ef5115f45715cb4a45a1874970d9eb9508a5"
     },
     {
       "path": "account-access.js",
-      "bytes": 23966,
-      "sha256": "7c582bf1a19e960f3769c8a77b865afcbdc368ba88508d2c9498fcbaa768cc35"
+      "bytes": 23429,
+      "sha256": "6b5689b23c037adf020bb0619092b7c51db1c632926c776e39fbf4283e6152f0"
     },
     {
       "path": "accounting-export-ui.js",
-      "bytes": 14394,
-      "sha256": "ec7d4a6d029bb04d1d47b932dbdef88881d0aef83b4e787fdb3ce5a467206a2d"
+      "bytes": 14064,
+      "sha256": "45c9dbde9f299bae603e7676a2b499af833e4d17c79407bcf011fc9b200b4b1b"
     },
     {
       "path": "admin-access.js",
-      "bytes": 723,
-      "sha256": "ff2cc97ecc14c235a2fa9e4db9a817b5e2af74ddf026b319cced5e395c2cdd03"
+      "bytes": 697,
+      "sha256": "abab549bab5682fdaa309814f3f8cfc924a0486bdfc182ead1479582933eba5d"
     },
     {
       "path": "ai-assistant.js",
-      "bytes": 18891,
-      "sha256": "85fe615aac2fb56c44f82934c41dafc5c68aebab8078e0cbddce8b91b3a2b72e"
+      "bytes": 18332,
+      "sha256": "d74eaafb938e6c8a6f6c627be76bb40f5cfb0fd96632c82f5028c508010a35cf"
     },
     {
       "path": "ai-operations-core.js",
-      "bytes": 49443,
-      "sha256": "cc9710c65a8792b4ed594ae5952f06914a5bd4afb735828fe10f8e63582a329e"
+      "bytes": 48635,
+      "sha256": "b44716907869c9ff52bf86cc834a99580a716e313f89df43159e31bf01ab41a4"
     },
     {
       "path": "ai-operations.html",
-      "bytes": 26789,
-      "sha256": "037776049c27b2aa2208f230502e941f021f1d5401c97abe0e897d1b3c88dc5b"
+      "bytes": 26336,
+      "sha256": "5356349c62c44aeb5b6b988fce1036e8d51106b5bf62c8d45263f8655d11a61e"
     },
     {
       "path": "ai-operations.js",
-      "bytes": 65793,
-      "sha256": "0d095e2a4401ed5815d625dd9f91c91011ba0e5f4a75c68348350e94f0e323f7"
+      "bytes": 64954,
+      "sha256": "05d428437edb31862b35d8d9cb953b2529832f1cf450010d1b45c318ca329edd"
     },
     {
       "path": "ai-voice-audio-recorder.js",
-      "bytes": 13677,
-      "sha256": "1e5fd26c7b297b44c8ccc934c8b73fb28076d61320ac90b5a5399c6f59dd8645"
+      "bytes": 13373,
+      "sha256": "45380fae32f85ae7210bfda158910cf4fd6e6b84d54a70acebbdba8645098881"
     },
     {
       "path": "ai-voice-rule-matcher.js",
-      "bytes": 10440,
-      "sha256": "28e816601853ce1bccf7a94804838bf982b287b059a4928e0318522088838c4e"
+      "bytes": 10213,
+      "sha256": "8fed25558f08462e65e18b0b31e3b24236055f64e84de60b0d6299470bf9f7cf"
     },
     {
       "path": "ald-logo.svg",
@@ -77,123 +77,123 @@
     },
     {
       "path": "analytics.js",
-      "bytes": 14207,
-      "sha256": "58e52ecf79a6604da117d32e98888aff1078c48d4795ab1adb5b18112f5339eb"
+      "bytes": 13868,
+      "sha256": "4ff18b14e0aaca5d2f65427c0172e8b0843b3a6ec8c18795f4ba533079732d76"
     },
     {
       "path": "app-broadcasts.js",
-      "bytes": 9156,
-      "sha256": "3fb98f3092c88206e10c6cd821b0ccc487905fe33b67b5032e3c0e3469e186ea"
+      "bytes": 8949,
+      "sha256": "02cf5b6a4e603686ab58b670a432099353cf2d3d3cb99f342c6451804c934b0c"
     },
     {
       "path": "blog/how-to-price-upgrades-without-awkward-sales.html",
-      "bytes": 4484,
-      "sha256": "8443cb51bf8a02daa52b415b96c7ac5972facd5699bb86e7e02e587b1cd2f277"
+      "bytes": 4416,
+      "sha256": "8ce43e0e7efa216839026b2a8734baf2401cf28a135ba99c73a9894ac7f2ae83"
     },
     {
       "path": "blog/index.html",
-      "bytes": 8013,
-      "sha256": "27aa10dbff3c5e5ab8e1b4e3c7d9126d41cf59d8c4dd469b5d19f5bbb82677e4"
+      "bytes": 7875,
+      "sha256": "6bfc3a8b899dfbd8b5dd90a3ceafcf7925015a0d243f25154847a8f3f499dc07"
     },
     {
       "path": "blog/interactive-quotes-vs-pdfs.html",
-      "bytes": 4619,
-      "sha256": "f8a2ff17ea8f92abd07cd8b1e19b883f03768dbcd32db37d70b24645fff3fc2e"
+      "bytes": 4551,
+      "sha256": "319157e0637d661461925070c6528b50522e672564fb6da743bf40305ee28b5d"
     },
     {
       "path": "blog/know-what-your-last-job-cost.html",
-      "bytes": 4884,
-      "sha256": "483bff9a0cd0f8753291c4f5a3b144a56fec77405f82b6e54dbf1766f4cb6e12"
+      "bytes": 4814,
+      "sha256": "dce03d43f6cd4d73ab0c8d54c5ef5f1f050dd59b7dfd592757d07bdc3aa80a7c"
     },
     {
       "path": "blog/turn-your-excel-quote-into-a-system.html",
-      "bytes": 4612,
-      "sha256": "8f81b569c55f15991598968265472d5eeb90e11b23394c469848d4f1e2d1c732"
+      "bytes": 4544,
+      "sha256": "3aa3ce990a6dbbff3275405fc06a8240549db777e8f648ff65989b04f0a5163f"
     },
     {
       "path": "blog/why-contractors-should-stop-quoting-from-scratch.html",
-      "bytes": 5029,
-      "sha256": "0114b5bd04258ce0dc91d2d47e3eae8e18f5293cddafe6a7e9fd562cb5a81839"
+      "bytes": 4960,
+      "sha256": "11d8437b8f27e8a0c7d767b7e199e62e7c35b3939d4f73b3c00f6981d6163168"
     },
     {
       "path": "brand-theme.css",
-      "bytes": 5033,
-      "sha256": "8b36125b0bd6d381da303c06004c2f87e218e000b4a0bffc7716a2a5dc735719"
+      "bytes": 4831,
+      "sha256": "7ced391e5e97812191c6fecb83ed44511f53255f8729169abf1455084875cb88"
     },
     {
       "path": "card-payment-rules.js",
-      "bytes": 5502,
-      "sha256": "cfa31ad25bcd30517dfd940db69f614487fe4375ec6b5cdc18e2389c3e489220"
+      "bytes": 5362,
+      "sha256": "41ab827652c88b6b3b6362759a3e71cce77af585a7c406cc0456bcf5d36ebe95"
     },
     {
       "path": "change-orders.js",
-      "bytes": 4785,
-      "sha256": "4ebeb3a88fbdaf0269b8bb6cde1e093e49868ed7b05f942ea27666ed44a13dea"
+      "bytes": 4662,
+      "sha256": "3c31cb7d916b46de5027d8879feb4054dc068e73924eacf1984059a57663c409"
     },
     {
       "path": "chatbot-feedback-topics.js",
-      "bytes": 12206,
-      "sha256": "8da71a800cf1240d6835093747f496f854323718b6cf573e34b7954eb5d8a233"
+      "bytes": 11893,
+      "sha256": "63e737260fb647a826de19959b6241ecef0fc27443894b57d789ed5d5261624b"
     },
     {
       "path": "client-document-decisions.js",
-      "bytes": 5362,
-      "sha256": "57bcb7f0e4ff06364db601a89784dec63c39fa7d5e84f0a9568beeac10a31ea1"
+      "bytes": 5230,
+      "sha256": "a8af8a2b232b49596335ed5fe1b03da2d9cd8aa263eb2ac41b46c8c3245f62c7"
     },
     {
       "path": "client-portal.html",
-      "bytes": 227889,
-      "sha256": "252b4922a4607b30123f69d6614afba44cc167de6fc92924f854e05ffed16bd7"
+      "bytes": 222261,
+      "sha256": "63087d760f4bbd6a9ca7a1369963d478855bd7595020683f6e9a1fa335551aef"
     },
     {
       "path": "contact.html",
-      "bytes": 4865,
-      "sha256": "9e706b3f328437165919fdf8acfe738bae027010896c6ecdc6e50391563de6ca"
+      "bytes": 4775,
+      "sha256": "bee2b05e880eeeac854508821a8093f9fc57736f04835c5e42f1c0e854db80be"
     },
     {
       "path": "dashboard.html",
-      "bytes": 351365,
-      "sha256": "0fe6189e6612436fd373cc1fd4c5ac001521d09009033dd5e1dc3b19e7cbffa0"
+      "bytes": 345788,
+      "sha256": "ef03eb66741b06baf9bfa8cc9d5c4d69c2c8d6eba0746bda5ece6335a264fb9f"
     },
     {
       "path": "data/whats-new.json",
-      "bytes": 6663,
-      "sha256": "089b22020f39394c13d90c34357240e12b026657e50c9b4233c50edc42bc6450"
+      "bytes": 6569,
+      "sha256": "56fcbab199ad63e887926e9cf07239e6068ebe5d150415844cfe62527f99df56"
     },
     {
       "path": "enhanced-material-calculator.html",
-      "bytes": 20115,
-      "sha256": "23edba0a3b7bd2a99407fcdf990d4ad4837cb63a5f5a0233b8196a0cc2ee4011"
+      "bytes": 19744,
+      "sha256": "fcc97958d905ee48f33083e57fec3c96109e4e4bf15567a3b36feeb6aed67674"
     },
     {
       "path": "error-reporter.js",
-      "bytes": 2598,
-      "sha256": "dbe635d8c3accf997677b8a233afcd6231edf871438a8c50d0dc342de3082c84"
+      "bytes": 2543,
+      "sha256": "a745feb11ff34bf38fcdc23beef20a526c578662041cc6366e44d92575da7a38"
     },
     {
       "path": "floor-plan-scanner.js",
-      "bytes": 127667,
-      "sha256": "87e8185adf7ead1eb94443293682ac4f39c4f661c559ea13254f017c9dab61b1"
+      "bytes": 125552,
+      "sha256": "2fccc01042eeef8ff4030631769f5b1aeaab79a0367528a47009b12365009a99"
     },
     {
       "path": "help-content.js",
-      "bytes": 44525,
-      "sha256": "f73c052d7648bc8bd95229623c937d40b1ad47b4f253be9ca94eb684c248bafb"
+      "bytes": 43709,
+      "sha256": "7fc98ac95fcdfa5968afb2fbc9817830ef982f617720f19bd707d79692698409"
     },
     {
       "path": "help.html",
-      "bytes": 31075,
-      "sha256": "de7fa1cf02df2415ffed4e6edeead3ca162265b54988e9d0d90c6ceb19389773"
+      "bytes": 30502,
+      "sha256": "fde831b76320625350932f64c05b252981e19a91f655a2bd2a9fb243570db743"
     },
     {
       "path": "home-depot-price-sync.html",
-      "bytes": 22871,
-      "sha256": "e8bc153e603c774f78fa4156520fbd79d629bc4e73615223bcb48fef865d60db"
+      "bytes": 22454,
+      "sha256": "aec517f0faef94b60903d10f4ea2abf83f4f777f22de54d276391c1526281a41"
     },
     {
       "path": "home-depot-tracker.html",
-      "bytes": 68863,
-      "sha256": "14cded468d06c9cad9a8e3fd93b239f7e8ab9cf268470f66defc99fb0d7963b2"
+      "bytes": 67618,
+      "sha256": "8c2c92931716f594b633333cf914e33acb440290ef9c9b7b68857b0b85bb9117"
     },
     {
       "path": "icons/icon-192.png",
@@ -207,258 +207,258 @@
     },
     {
       "path": "ikea-quote.js",
-      "bytes": 33103,
-      "sha256": "537729ab6228c554f6b727832b915e42cf43686d8cd6f572a1badeddb2a24f4f"
+      "bytes": 32648,
+      "sha256": "48a30dd243c936e77888232963ac7ed4fb0cc76a07262c5c54f952a4a7636789"
     },
     {
       "path": "index.html",
-      "bytes": 337,
-      "sha256": "e0a55f6f6afdba612d355b31439523f1b07c0a361d13e231f05ed97bbd391269"
+      "bytes": 325,
+      "sha256": "0e2aaf93b8ce6bc5107016a6d1ad6e1973158dd91fa0036d77c1e2ad4c6f72e8"
     },
     {
       "path": "interactive-quote-viewer.html",
-      "bytes": 326092,
-      "sha256": "0f7092d9832b8d512b0c9fe8208f4e691a6ff853613d38d96b83a7951ea55989"
+      "bytes": 320245,
+      "sha256": "e358a415c4473870b684fe0290b958ad53b1eca4c8908e7b49b2ca428a516a95"
     },
     {
       "path": "invoice-viewer.html",
-      "bytes": 138399,
-      "sha256": "648613a88e3f111d5184f169af9e2cbb90f46e5cfa99554ec2c365f37fb5378f"
+      "bytes": 135809,
+      "sha256": "d996a680192e646b4a05697b17efd0103e09163ec8ce5dc1edcc867e6199560a"
     },
     {
       "path": "labor-tracker.html",
-      "bytes": 54402,
-      "sha256": "e42ecbedc0a7e0edfea3ea53a78cd6aab8263eba4730d1f7f8d0e290b0e59154"
+      "bytes": 53407,
+      "sha256": "8db9d2bd3bf540beb18478079ed073b1acbfc388e83427bff71e391e88bdaec6"
     },
     {
       "path": "landing.html",
-      "bytes": 89075,
-      "sha256": "7ee49523ceef162b358c5f418242a084bf2ba57853a3d3ca45404ab06c7fc406"
+      "bytes": 87363,
+      "sha256": "60b44b72d48ee629be8f5d03b971274560b8daf75a606d5a16f9bb704d9cade9"
     },
     {
       "path": "login.html",
-      "bytes": 20985,
-      "sha256": "dd8738fd8b54fea34b67bbcab15a1204ec8b4789c0cf43ff3b80602cc3284a72"
+      "bytes": 20573,
+      "sha256": "7364c55d78cc5cae8c6a08fd6fc8acb66f523ce6d3c9a75f68b8beba018e3b6a"
     },
     {
       "path": "manifest.json",
-      "bytes": 799,
-      "sha256": "e4757f1c9ee964ef7835c27eda8c265869c02d23d7dc1e869332f3e567c3c7c4"
+      "bytes": 765,
+      "sha256": "faee20ffd7b7b7fb2bd6e2f8f7ac3a4fec5f7fd94ee637fc38e3aad3554c9b80"
     },
     {
       "path": "marketing-pages.css",
-      "bytes": 5730,
-      "sha256": "15abb67538c2cb3444bad4ade25357434fcd9c49cee7b526671aa7e8e568c880"
+      "bytes": 5405,
+      "sha256": "0af451779fca7199fa717d9160ec29261da94502489359949ff90cba946182e8"
     },
     {
       "path": "material-calculator.html",
-      "bytes": 17520,
-      "sha256": "1773d0b9c9d9552f235a6a0f4503d5b87b8b6dfe56a800e11a070ff40bca4fb0"
+      "bytes": 17183,
+      "sha256": "4e2bb9a6ff4a4e195f6ed50d69d92e930f4cde4fcc8913999089411a38e9ab7e"
     },
     {
       "path": "modal-help.js",
-      "bytes": 13125,
-      "sha256": "11a6a1f80dedd9ef60c2d8939bb35d9500a05b79ba0f620297047548fff91ed3"
+      "bytes": 12817,
+      "sha256": "9d04f1cf367d64326098aa150a9a706dd9632eba7d219217644c9bd60427084c"
     },
     {
       "path": "newsletter-signup.js",
-      "bytes": 2928,
-      "sha256": "5e5665dff00fac1d899fc3cff80b207225a6164f3d4efd5c8645caab176575e6"
+      "bytes": 2855,
+      "sha256": "d4499689ba1134f2d1a802e1650c18097065cd4a5c2618f8cb17a83f15a35b69"
     },
     {
       "path": "onboarding.html",
-      "bytes": 72336,
-      "sha256": "b40837290358e885e036b44062e413c43758aeff90fc037088d873065073fde2"
+      "bytes": 71233,
+      "sha256": "d9954ed37bcce7f636b0b26fd5f267a625530f19198c3a95ed19143c258419d5"
     },
     {
       "path": "portal-theme-studio.html",
-      "bytes": 41013,
-      "sha256": "5a10899aeea3b02a30efd70014795c9cc42c5cf30404d1db354b93dec511cd64"
+      "bytes": 40198,
+      "sha256": "1d9e101f5061243b621a9b7b3a19f0442ddbfdcb2a8e0a8253c1c37290276f5b"
     },
     {
       "path": "pricing.html",
-      "bytes": 25429,
-      "sha256": "97d9fc5019aefa54aba3ad01276e1be0da699a664f3b233b3602ed2b75c65d12"
+      "bytes": 25005,
+      "sha256": "8d6c5dc8acb5af854cbe93154e837bdc53e27e1d48751e1b6daffa36c6302835"
     },
     {
       "path": "privacy.html",
-      "bytes": 15787,
-      "sha256": "45dd7423f5b4a4cc218c0e06b4cc78260dc60aa1a7c5e227961de6ae2df3a06a"
+      "bytes": 15571,
+      "sha256": "2c6290a164f4395e2fb9e635a12d0ce9446db8754c6c677e142b9a00aa50c85d"
     },
     {
       "path": "property-memory.js",
-      "bytes": 49247,
-      "sha256": "be8906ed223efeb9e3b1bb5d0496f8917b073e5b82b0b1f5e83e9fda851d2717"
+      "bytes": 48450,
+      "sha256": "f480c2dcc891e5bdace7a4568b904918539f7cf5704e068ce9e8604a33cbe2fd"
     },
     {
       "path": "qb-callback.html",
-      "bytes": 6142,
-      "sha256": "b82b57c9d8fd2f5567ab3cc4d471e8bece8f3d1d685eb14ccfe550d98d9b1a93"
+      "bytes": 6017,
+      "sha256": "b69c979bac0268ead1a0cdbd7eaabcf00d52c75db661da283910cda7daeda401"
     },
     {
       "path": "qbo-invoice-export-ui.js",
-      "bytes": 14638,
-      "sha256": "8ffd02e1cd231192f034f7a16ccc5712e5fdb05f1d5ac5761a59c2e85313a7d4"
+      "bytes": 14355,
+      "sha256": "85fefa787a3c4a1839afd49d56bbaf9e59ce90505b063424cf58cec67c588471"
     },
     {
       "path": "quickbooks-import-controller.js",
-      "bytes": 8543,
-      "sha256": "6273f71dd42bb918e42251df7a366df19b3e50e39bd551e28f981e86b412678c"
+      "bytes": 8350,
+      "sha256": "776e8e16fd20936fcd6dd09bd1a81a179a369c133e5c2290ac0fd3c9d77ac1dc"
     },
     {
       "path": "quickbooks-import.js",
-      "bytes": 23617,
-      "sha256": "44aea7cfc42315067dba4b42035dd6e9b05c28378e539a03f6a3f644bffc0fac"
+      "bytes": 23050,
+      "sha256": "65d41f0d24df44562b641ac287b4efc47b8e10d37f647a56cf1fd5bb0118293d"
     },
     {
       "path": "quote-builder.html",
-      "bytes": 1381557,
-      "sha256": "ff746e5de3cd3c1816cb638ee2031f694e7d5f3645d4008a6e9694b8b71f2983"
+      "bytes": 1358710,
+      "sha256": "7661c5f876ad2609ec88bc907a7c4a3075afa15ddb2dfe7a43889ddff873702f"
     },
     {
       "path": "quote-calculators.js",
-      "bytes": 74664,
-      "sha256": "afe14ee99f84b4d148e677a9768e06260a6fb54a1300abc27be73ee83d66600b"
+      "bytes": 73296,
+      "sha256": "14719f1ed4c6d88d785a4e0820927558004f7ca8473d06a8600fe41e756155c0"
     },
     {
       "path": "quote-clients.js",
-      "bytes": 24117,
-      "sha256": "0a313f1f18e6444457af6d76299560e972707df9e27b58dd2c5786d08b58dbae"
+      "bytes": 23648,
+      "sha256": "756c96f544713db93a474330bc9d0ef91df631e2995fd31de62f89c9d6000404"
     },
     {
       "path": "quote-completeness-review.js",
-      "bytes": 160904,
-      "sha256": "3d4fff5a32c03cd6ff1d14ced56aebf27ee367e25a24cf31694628ac9d88d864"
+      "bytes": 158035,
+      "sha256": "6fef7b12f7957c31627813415bc095851388273c6cb5bb9cc913d6f74c4fd8e2"
     },
     {
       "path": "quote-contact-property-lookup.js",
-      "bytes": 14095,
-      "sha256": "ab128916ef4c12c79400e18280c201821c7ed520333553da7555b5e73a4ba096"
+      "bytes": 13764,
+      "sha256": "2977ee7e2344b23a0a22759a0724fea6e7509f07dd28ca4cccc1a76e367d25ff"
     },
     {
       "path": "quote-dialogs.js",
-      "bytes": 15307,
-      "sha256": "cc5f233818e85dc706c99fcc5e99e2620aefb9d9e7ce0fe6bfd13330a59679b0"
+      "bytes": 15021,
+      "sha256": "bc001e620d55a67b9ac479bee126a725d95907fee56d2d84e8584b44d60e8943"
     },
     {
       "path": "quote-discounts.js",
-      "bytes": 3895,
-      "sha256": "b00be8e3291430ebfa017d54ff3b694c1a566642ba27b04af36173c5bb453000"
+      "bytes": 3786,
+      "sha256": "96ed60c8cdc286710713eb34401f0e6e6b6f90383ec6d9748bf693bc18c906e0"
     },
     {
       "path": "quote-import.js",
-      "bytes": 63876,
-      "sha256": "bd4e1356559852a76a4f6672911b36a59a9c54e6aa435ff7b9ecb7cc74307e9c"
+      "bytes": 62608,
+      "sha256": "778400bdcd4b51c2a96f07f3b4f3895fac11dedf3e5dbc265c1700f3a291f4ba"
     },
     {
       "path": "quote-items.js",
-      "bytes": 389687,
-      "sha256": "61ec744a61ab6504bc613d9785b14c6c192c1bbf5d2f47ddcb8fd0eb169d64fb"
+      "bytes": 383596,
+      "sha256": "4d632b28848d7c405e07021ee3768a7ee726be97d7f1c886b1a6986921a3c013"
     },
     {
       "path": "quote-media.js",
-      "bytes": 12955,
-      "sha256": "aa2928c0676a5674f1d90e0bda1dfe8320c802a7d6e5d4b60db09bf368a8f8ba"
+      "bytes": 12670,
+      "sha256": "cf7d54a0bec68c2ca5b7b1398aa82660eb5915b24f7bda6f3a41b6d04a3054d7"
     },
     {
       "path": "quote-review-construction-knowledge.js",
-      "bytes": 77616,
-      "sha256": "17048df4bb77ad04f2bd2c8ed745ebd8e9ea022ed459bb62d22e7a728bbc6faa"
+      "bytes": 76885,
+      "sha256": "429718e0b59444d1571517a59536d0b29a0159bbb5a17a540ec5824800ea8f02"
     },
     {
       "path": "quote-spellcheck.js",
-      "bytes": 33876,
-      "sha256": "105d8c6b277c4f169b626a12a9478122c3c1dd1e41a3320e30dec3e3060b8bf7"
+      "bytes": 33228,
+      "sha256": "9b9abf845caee5d0a1bc516a5c31b5e695125daf8ef3b6c9f4e8a01eb1f9a52d"
     },
     {
       "path": "quote-starter-item-library.js",
-      "bytes": 61564,
-      "sha256": "82ee270104a06a7c469c92516dec68a25bfc56a18b4641316d3f666f4194e004"
+      "bytes": 60968,
+      "sha256": "60afc694f98c4c1f91fd6872b860e00d7c7c9f1e48f55a9083c41ca4c55287c5"
     },
     {
       "path": "quote-storage.js",
-      "bytes": 135947,
-      "sha256": "8637a0bdf574548758ecc436e6831c0e98f116f0890c85fc6077edd6948c81e2"
+      "bytes": 133626,
+      "sha256": "b0d9e496b4555e13143cf6eaca0acb2e77d284c23b18deaf35ab10ffbcc09cf1"
     },
     {
       "path": "quote-style.js",
-      "bytes": 98285,
-      "sha256": "481a16eeec618272c2aea2e2c342f997e5913f0a7102330781b330dc25e86ad6"
+      "bytes": 96662,
+      "sha256": "bb7106933c3eb997c02000db22cb61c4ff17d83bf3589f3f53aee01d1751e8fe"
     },
     {
       "path": "quote-template-files.js",
-      "bytes": 7798,
-      "sha256": "1f16bb35e2cd48c34c418d251c52f4e614ac1736e44c43effa042071760c60c2"
+      "bytes": 7616,
+      "sha256": "b120e0fc3fbb65984ce14abd18c9a8825e73cb54c6fbf365ac17b4eeb10be136"
     },
     {
       "path": "quote-tips.js",
-      "bytes": 21424,
-      "sha256": "d2c54aca31bd9cfe4b9ca35150495e11a20df52fea1671c2a9965586e6f58576"
+      "bytes": 20906,
+      "sha256": "d1e3db4b7b3450ce04d9e18fc6c5d0c31cd25bf16f62f741a26be23bc9ac30d1"
     },
     {
       "path": "quotedr-logo.svg",
-      "bytes": 12970,
-      "sha256": "0043ffcc5b019d67a9c706940df3e871c834f8093f04ac552f1cc8e13b3e4705"
+      "bytes": 12693,
+      "sha256": "ef621ecf906d7a39605f89e4d0684898100fccdd14bec486d9b1206743d9172c"
     },
     {
       "path": "recording-privacy.js",
-      "bytes": 8324,
-      "sha256": "9761151baa5c5b4c24b9769671d54a3b6fc4773088a68c0c2db6fbfb78164d37"
+      "bytes": 8133,
+      "sha256": "168dc54c35ef8be716f6a232642d1f84d9a24da66c8d1aa8789fa412384e7b49"
     },
     {
       "path": "renovation-cost-estimator.html",
-      "bytes": 17729,
-      "sha256": "fda2665b5ec3cb86b6b0abb8a5e7c71344546cb23f30d4ba816a7406b35fdb4c"
+      "bytes": 17364,
+      "sha256": "d6c21b57fd7a44a06142e9ddd940d724d383eb91fbd3efa4ca5514d2f8d30079"
     },
     {
       "path": "save-coordinator.js",
-      "bytes": 98119,
-      "sha256": "abda97031c1efb5a451b5278ade18164bae6162f36ae904957981916d5892f7c"
+      "bytes": 96357,
+      "sha256": "341a7f36d3f9873dd9f0ff79ddd930e72e0796488a3d7da630470d5cab26ce1e"
     },
     {
       "path": "settings.html",
-      "bytes": 355668,
-      "sha256": "6cb3f4792e648b315094e36d1e5674c4997d93f32efbc62562824caf23e16966"
+      "bytes": 349318,
+      "sha256": "0970ddbaae56af6ccad8acba810b793e1e2531963d6dd8ad79a378439ea3da5c"
     },
     {
       "path": "signup-gate.css",
-      "bytes": 3848,
-      "sha256": "fb53a8ff67a43b507f9570f78bd350dc67abe0d51628e5ce1be2e8cf963b1eac"
+      "bytes": 3663,
+      "sha256": "b21d1ecacf2b909e17a16ef11e32f46eb0521bee4863c2b9207c039ced345bc0"
     },
     {
       "path": "signup-gate.js",
-      "bytes": 6479,
-      "sha256": "15dc7ad69148ff7124487c56ac65f12c2365bf8f58764317aba4f9ee8cf0fb77"
+      "bytes": 6343,
+      "sha256": "8433d90f2dea46ac830c527b67d63c2d11aca952f2b95931fefb9659d8432625"
     },
     {
       "path": "supabase-v2.js",
-      "bytes": 180299,
-      "sha256": "29117b71381213c1ff372370dab95a29f02262c5114ad78f8cd831265a3b6600"
+      "bytes": 176236,
+      "sha256": "6801a5fdce4515acd563b1d25fa0add5c29d559f889befce6dbe36e3e77bc125"
     },
     {
       "path": "sw.js",
-      "bytes": 1683,
-      "sha256": "6462738eda11d4f657343e733db8e92ce50a2847d983bea3a150a38fc2a62443"
+      "bytes": 1625,
+      "sha256": "4d66a3dcf8d10a16129e228db530121e6e25911e4ca33f69388be09769cdbaba"
     },
     {
       "path": "team-invite.html",
-      "bytes": 9343,
-      "sha256": "88b130a0db12495850e3f4afa10072cb5d953c6063a6c5f7f21b434e274c3f62"
+      "bytes": 9193,
+      "sha256": "04abe71b5cb717ac7ba20b1460932c38fce512172fdc8bc48e908a10d210f22c"
     },
     {
       "path": "terms.html",
-      "bytes": 9893,
-      "sha256": "ef3ff568a6a3b4c1fe8adbfe4b04e5987c8420ec166dbdf6f0cc7abf93542ab3"
+      "bytes": 9755,
+      "sha256": "6117ae53c98fd56a583c3b750fc9b4d3f9a9ad5b54ec8a54163d8d455f61065d"
     },
     {
       "path": "tutorials.html",
-      "bytes": 6272,
-      "sha256": "107aee8ff531ead21f27d8dea4c169b0b77444d4d64be8e8229fddd375e47d64"
+      "bytes": 6159,
+      "sha256": "ce4d9e53fc54dba7881aa5b45daf8e87867cb0070cc341d1b67f16c28d44860a"
     },
     {
       "path": "typed-signature.js",
-      "bytes": 5458,
-      "sha256": "96b8498f9baadab35077cb633138a9fb61a95e0265f387638bd0bc4bcb30cb17"
+      "bytes": 5326,
+      "sha256": "69c1d1491bee9ea4a457cf6e077105714ad21c4191f7c06afe9088a198ab554f"
     },
     {
       "path": "videos/tutorials/ai-voice-quote.mp4",
@@ -522,8 +522,8 @@
     },
     {
       "path": "whats-new.html",
-      "bytes": 7499,
-      "sha256": "7e04f9f4b441e10c402ad3dd5b53fdda2ac73c9744508cf5daecb7d848b7d4df"
+      "bytes": 7361,
+      "sha256": "e7a01de90f259eaba4597ac8de4d610095cf43017da3a411e3013dbddf282e41"
     }
   ]
 }

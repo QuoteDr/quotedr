@@ -29,6 +29,11 @@ for (const file of actual) {
     assert(!pattern.test(file), `Forbidden artifact path category present: ${file}`);
   }
 }
+const deterministicTextExtensions = new Set(['', '.css', '.html', '.js', '.json', '.svg', '.txt', '.xml']);
+for (const file of actual.filter((item) => deterministicTextExtensions.has(path.extname(item).toLowerCase()))) {
+  const contents = await fs.readFile(resolveInside(outputRoot, file), 'utf8');
+  assert(!contents.includes('\r\n'), `Artifact text file contains platform-dependent CRLF bytes: ${file}`);
+}
 for (const forbiddenPath of publicArtifactConfig.knownForbiddenPaths) {
   const relative = forbiddenPath.replace(/^\//, '');
   assert(!actual.includes(relative), `Known exposed repository path is still in the artifact: ${forbiddenPath}`);

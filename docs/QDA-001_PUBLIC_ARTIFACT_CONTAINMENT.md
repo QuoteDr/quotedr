@@ -23,13 +23,14 @@ The builder:
 2. Verifies that the only directory it may clean is this repository's exact `dist/` child.
 3. copies only the explicit files in `config/public-artifact.mjs`;
 4. verifies the output contains no extra files; and
-5. writes a deterministic SHA-256 manifest to `artifacts/qda-001-public-artifact-manifest.json` (outside `dist/`).
+5. normalizes text output to LF so Windows and Cloudflare builds are byte-identical; and
+6. writes a deterministic SHA-256 manifest to `artifacts/qda-001-public-artifact-manifest.json` (outside `dist/`).
 
 No directory globs are accepted. A future file added under `blog/`, `icons/`, `videos/`, or any other location remains private until its exact path is reviewed and added. The allowlisted top-level `404.html` makes missing Pages origin paths genuine 404 responses instead of invoking Pages' default single-page application fallback.
 
 ## Candidate artifact
 
-The authoritative exact allowlist is `config/public-artifact.mjs`. The candidate manifest records every output path, byte count, and SHA-256 without exposing key values. Rebuilt from `8214120`, it contains 104 files, 22,559,274 bytes, no source maps, and tree SHA-256 `3b3d0370118a68ccac38b87b5efc84fe60897f95fa12f096fa88a66c1d05c590`.
+The authoritative exact allowlist is `config/public-artifact.mjs`. The candidate manifest records every output path, byte count, and SHA-256 without exposing key values. It contains 104 files, 22,461,919 bytes, no source maps, and tree SHA-256 `2d5e1c5aa2a97e76f35c18a016ef6fcb3fbccb903aaf689b3470271792760f80`. These values match the Cloudflare build log for deployment `54bb6ecc-0ccf-4191-be64-64c213576bd8`.
 
 Included categories:
 

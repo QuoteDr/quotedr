@@ -9,6 +9,16 @@ import {
   resolveInside
 } from './public-artifact-lib.mjs';
 
+const textArtifactExtensions = new Set(['', '.css', '.html', '.js', '.json', '.svg', '.txt', '.xml']);
+
+async function copyArtifactFile(source, destination, artifactPath) {
+  const contents = await fs.readFile(source);
+  const output = textArtifactExtensions.has(path.extname(artifactPath).toLowerCase())
+    ? Buffer.from(contents.toString('utf8').replaceAll('\r\n', '\n'), 'utf8')
+    : contents;
+  await fs.writeFile(destination, output);
+}
+
 export async function buildPublicArtifact() {
   const { files, manifestPath, outputDirectory } = publicArtifactConfig;
   if (new Set(files).size !== files.length) throw new Error('The public artifact allowlist contains duplicate paths.');
@@ -30,7 +40,7 @@ export async function buildPublicArtifact() {
     const source = resolveInside(repositoryRoot, file);
     const destination = resolveInside(outputRoot, file);
     await fs.mkdir(path.dirname(destination), { recursive: true });
-    await fs.copyFile(source, destination);
+    await copyArtifactFile(source, destination, file);
   }
 
   const actualFiles = await listFiles(outputRoot);
