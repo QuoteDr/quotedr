@@ -7,8 +7,9 @@
   <style>
     :root { color-scheme: light; font-family: Arial, sans-serif; color: #172033; background: #f5f7fb; }
     * { box-sizing: border-box; }
+    html, body { max-width: 100%; overflow-x: clip; }
     body { margin: 0; padding: 24px; }
-    .shell { max-width: 1160px; margin: auto; }
+    .shell { max-width: 1160px; min-width: 0; margin: auto; }
     .banner, .panel, .card { border: 1px solid #d8e0ee; border-radius: 12px; background: #fff; }
     .banner { padding: 14px 16px; background: #eef4ff; color: #1d4d86; margin-bottom: 16px; }
     .panel { padding: 20px; }
@@ -21,7 +22,7 @@
     .grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
     .card { padding: 14px; min-width: 0; overflow-wrap: anywhere; }
     textarea { display: block; width: 100%; margin-top: 10px; min-height: 142px; padding: 10px; resize: vertical; border: 1px solid #aebbd0; border-radius: 7px; font: .86rem/1.4 ui-monospace, monospace; color: #172033; background: #fbfcff; }
-    button { margin-top: 10px; padding: 8px 11px; border: 1px solid #315f9d; border-radius: 7px; background: #fff; color: #214f8a; font-weight: 700; cursor: pointer; }
+    button { align-items: center; display: inline-flex; justify-content: center; margin-top: 10px; min-height: 44px; padding: 8px 11px; border: 1px solid #315f9d; border-radius: 7px; background: #fff; color: #214f8a; font-weight: 700; cursor: pointer; }
     button.primary { background: #215d9c; color: #fff; }
     button[disabled] { cursor: not-allowed; opacity: .6; }
     .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
@@ -29,8 +30,8 @@
     .handoff { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 10px; padding: 10px; border-radius: 7px; background: #f7f9fd; font: .8rem/1.45 ui-monospace, monospace; }
     .assertions { margin: 18px 0 0; padding-left: 18px; color: #314056; }
     .assertions li { margin: 6px 0; }
-    body.mobile-preview { width: 390px; max-width: 390px; padding: 10px 0; overflow-x: hidden; }
-    body.mobile-preview .shell { width: 390px; max-width: 390px; }
+    body.mobile-preview { width: 390px; max-width: 100%; min-width: 0; margin: 0 auto; padding: 10px; overflow-x: clip; }
+    body.mobile-preview .shell { width: 100%; max-width: 100%; min-width: 0; }
     body.mobile-preview .grid { grid-template-columns: 1fr; }
     body.mobile-preview .panel { border-radius: 0; padding: 14px; }
     @media (max-width: 767px) { body { padding: 10px; } .grid { grid-template-columns: 1fr; } }
@@ -81,7 +82,7 @@ Secure links or tokens included: false</div>
       </div>
       <ul class="assertions">
         <li>There is no send, deploy, grant-credit, mailbox-poll, or agent-launch control.</li>
-        <li>All visible strings use synthetic data; <code>customer@example.invalid</code> is confined to the raw-message panel.</li>
+        <li>All visible strings use synthetic data; sender identity is confined to the raw-message panel.</li>
         <li>At 390px the three panels stack, action buttons wrap, and long brief text wraps rather than overflowing.</li>
       </ul>
     </section>

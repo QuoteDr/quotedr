@@ -300,7 +300,7 @@
   }
 
   function actionButton(action, label, icon, style) {
-    return '<button type="button" class="btn ' + (style || 'btn-outline-primary') + ' btn-sm" data-workflow-action="' + escapeHtml(action) + '"><i class="fas ' + icon + ' me-1"></i>' + escapeHtml(label) + '</button>';
+    return '<button type="button" class="btn ' + (style || 'btn-outline-primary') + ' btn-sm ops-action-button" data-workflow-action="' + escapeHtml(action) + '"><i class="fas ' + icon + ' me-1"></i>' + escapeHtml(label) + '</button>';
   }
 
   function renderActions(supportCase, workItem, approval, followup, goodwill, coordinatorRequest) {
@@ -379,7 +379,7 @@
     var workBody = workItem ? '<div class="fw-semibold">' + escapeHtml(workItem.title) + '</div><div class="text-muted mt-1">' + escapeHtml(workItem.proposedSolution || '') + '</div>' : 'No engineering item. Likely bugs need a possible solution before automatic creation.';
     var handoffStatus = workItem && workItem.coordinatorHandoffStatus || 'not_sent';
     var handoffBody = handoffStatus === 'handed_off'
-      ? '<div>Recorded ' + escapeHtml(formatDate(workItem.coordinatorHandoffAt)) + ' · brief ' + escapeHtml(String(workItem.coordinatorHandoffCount || 1)) + '</div><div class="text-muted mt-1">Audit event recorded. Manual coordinator handoff only; no agent or external action was launched.</div><button type="button" class="btn btn-outline-primary btn-sm mt-2" data-copy-coordinator-brief><i class="fas fa-copy me-1"></i>Copy latest brief</button>'
+      ? '<div>Recorded ' + escapeHtml(formatDate(workItem.coordinatorHandoffAt)) + ' · brief ' + escapeHtml(String(workItem.coordinatorHandoffCount || 1)) + '</div><div class="text-muted mt-1">Audit event recorded. Manual coordinator handoff only; no agent or external action was launched.</div><button type="button" class="btn btn-outline-primary btn-sm ops-action-button mt-2" data-copy-coordinator-brief><i class="fas fa-copy me-1"></i>Copy latest brief</button>'
       : 'No coordinator handoff is recorded. Use the reviewed brief action to prepare and copy one manually.';
     var queueHandoffStatus = coordinatorRequest ? coordinatorRequest.state : handoffStatus;
     var queueError = coordinatorRequest && coordinatorRequest.lastErrorMessage
@@ -391,7 +391,7 @@
         queueError +
         '<div class="small text-muted mt-2">The stored brief is privacy-minimized and immutable for this revision. Queue state changes have append-only audit events.</div>' +
         '<textarea class="form-control brief-preview mt-2" rows="12" readonly aria-label="Exact privacy-minimized structured task brief">' + escapeHtml(coordinatorRequest.taskBrief || workItem.coordinatorBrief || '') + '</textarea>' +
-        '<button type="button" class="btn btn-outline-primary btn-sm mt-2" data-copy-coordinator-brief><i class="fas fa-copy me-1"></i>Copy exact queued brief</button>'
+        '<button type="button" class="btn btn-outline-primary btn-sm ops-action-button mt-2" data-copy-coordinator-brief><i class="fas fa-copy me-1"></i>Copy exact queued brief</button>'
       : handoffStatus === 'handed_off'
         ? '<div>A legacy manual handoff was recorded, but no durable inbox request exists. An owner can review and queue a new privacy-minimized revision.</div>'
         : 'No internal coordinator request is recorded. Only an owner can review and queue a privacy-minimized engineering brief.';
@@ -407,7 +407,7 @@
           (message.quotedText ? '<details class="mt-2"><summary class="small">Quoted prior text preserved as evidence</summary><textarea class="form-control form-control-sm mt-2" rows="5" readonly>' + escapeHtml(message.quotedText) + '</textarea></details>' : '') +
           '<div class="small text-muted mt-2">Attachments are quarantined metadata only (' + escapeHtml((message.attachmentMetadata || []).length) + '); no attachment content is opened here.</div></div>';
       }).join('')
-      : '<button type="button" class="btn btn-outline-secondary btn-sm" data-load-original-message><i class="fas fa-lock me-1"></i>Load original customer message</button><div class="small text-muted mt-2">Owner/administrator only. Raw message content is not included in the dashboard overview or coordinator inbox.</div>';
+      : '<button type="button" class="btn btn-outline-secondary btn-sm ops-action-button" data-load-original-message><i class="fas fa-lock me-1"></i>Load original customer message</button><div class="small text-muted mt-2">Owner/administrator only. Raw message content is not included in the dashboard overview or coordinator inbox.</div>';
     var agentStatus = supportCase.agentStatus || 'not_requested';
     var agentNotice = agentStatus === 'unavailable'
       ? '<div class="alert alert-warning small py-2 mb-2"><i class="fas fa-triangle-exclamation me-1"></i>Support Agent unavailable: no response was invented. Draft the recommendation manually.</div>'
@@ -418,7 +418,7 @@
       assessmentHtml(assessment) +
       '<div class="mb-3"><div class="detail-label mb-1">Original customer message</div>' + originalBody + '</div>' +
       '<div class="mb-3"><div class="detail-label mb-1">Recommended response (editable, never auto-sent)</div>' + agentNotice + '<textarea class="form-control form-control-sm" rows="5" readonly>' + escapeHtml(supportCase.immediateResponseDraft || '') + '</textarea><div class="small text-muted mt-1">Support Agent status: ' + escapeHtml(humanize(agentStatus)) + '. Dashboard delivery: never.</div></div>' +
-      '<div class="mb-3"><div class="detail-label mb-1">Customer report</div><div>' + escapeHtml(supportCase.summary) + '</div><div class="small text-muted mt-2">' + escapeHtml(supportCase.customerName || 'Customer not named') + (supportCase.customerEmail ? ' · ' + escapeHtml(supportCase.customerEmail) : '') + ' · ' + escapeHtml(humanize(supportCase.source)) + '</div></div>' +
+      '<div class="mb-3"><div class="detail-label mb-1">Customer report</div><div>' + escapeHtml(supportCase.summary) + '</div><div class="small text-muted mt-2">' + (['email', 'in_app_feedback'].indexOf(supportCase.source) !== -1 ? 'Restricted intake identity held in the original-message record' : escapeHtml(supportCase.customerName || 'Customer not named') + (supportCase.customerEmail ? ' · ' + escapeHtml(supportCase.customerEmail) : '')) + ' · ' + escapeHtml(humanize(supportCase.source)) + '</div></div>' +
       '<div class="mb-3"><div class="detail-label mb-1">Safe immediate response</div><textarea class="form-control form-control-sm" rows="5" readonly>' + escapeHtml(supportCase.immediateResponseDraft || '') + '</textarea><div class="small text-muted mt-1">Status: ' + escapeHtml(humanize(supportCase.immediateResponseStatus)) + '. Dashboard delivery: never.</div></div>' +
       '<div class="mb-3"><div class="detail-label mb-1">Current workaround</div><div class="action-card small">' + escapeHtml(supportCase.safeWorkaround || 'No safe workaround. Preserve the affected data and route for owner review.') + '</div></div>' +
       '<div class="d-grid gap-2 mb-4">' + detailStatusCard('Engineering', workItem && workItem.status, workBody) + detailStatusCard('Engineering handoff (privacy-minimized)', queueHandoffStatus, queueHandoffBody) + detailStatusCard('Deployment', approval && approval.status, deployBody) + detailStatusCard('Customer follow-up', followup && followup.status, followupBody) + detailStatusCard('Goodwill', goodwill && goodwill.status, creditBody) + '</div>' +

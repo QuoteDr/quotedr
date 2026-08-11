@@ -180,6 +180,16 @@
     .policy-row i { color: #198754; margin-top: 0.1rem; }
     .access-gate { max-width: 580px; margin: 12vh auto; }
     .offcanvas.ops-detail { width: min(620px, 100vw); }
+    .ops-detail .offcanvas-body { overflow-x: clip; }
+    .ops-detail .action-card,
+    .ops-detail .brief-preview,
+    .ops-detail textarea { max-width: 100%; min-width: 0; overflow-wrap: anywhere; }
+    .ops-action-button {
+      align-items: center;
+      display: inline-flex;
+      justify-content: center;
+      min-height: 44px;
+    }
     .action-card {
       background: #f7faff;
       border: 1px solid #dbe6f2;
@@ -242,6 +252,7 @@
       .workflow-rail { grid-template-columns: repeat(4, minmax(0, 1fr)); }
       .topic-row { grid-template-columns: minmax(120px, 1.4fr) 2fr 26px; }
       .confidence-grid, .coordinator-inbox-grid { grid-template-columns: 1fr; }
+      .ops-detail .d-flex { min-width: 0; }
     }
   </style>
   <script>
