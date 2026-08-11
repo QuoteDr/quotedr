@@ -4,6 +4,7 @@ import {
   VOICE_TRANSCRIPT_NOTICE_VERSION,
   isVoiceTranscriptNoticeAccepted,
   VOICE_TRANSCRIPT_SUPPORT_PAGE_SIZE,
+  normalizeVoiceTranscriptAudioPreference,
   normalizeVoiceQuoteId,
   normalizeVoiceQuoteNumber,
   normalizeVoiceTranscript,
@@ -96,6 +97,29 @@ serve(async (req) => {
     }
     const action = String(body.action || '').trim().toLowerCase();
     const service = serviceClient();
+
+    if (action === 'save_preference') {
+      const saveAudioForSupport = normalizeVoiceTranscriptAudioPreference(body.saveAudioForSupport);
+      const now = new Date().toISOString();
+      // This is an account preference state replacement, not an append-only
+      // side effect. Retrying the same choice converges on the same owner row.
+      const { data, error } = await service
+        .from('ai_voice_transcript_preferences')
+        .upsert({
+          user_id: user.id,
+          notice_version: VOICE_TRANSCRIPT_NOTICE_VERSION,
+          acknowledged_at: now,
+          save_audio_for_support: saveAudioForSupport,
+          audio_consent_version: saveAudioForSupport ? VOICE_TRANSCRIPT_NOTICE_VERSION : null,
+          audio_consent_at: saveAudioForSupport ? now : null,
+          updated_at: now,
+        }, { onConflict: 'user_id' })
+        .select('user_id,notice_version,acknowledged_at,save_audio_for_support,audio_consent_version,audio_consent_at')
+        .single();
+      if (error) throw error;
+      if (!data) throw new Error('Voice preference acknowledgement was not saved');
+      return json({ success: true, preference: data });
+    }
 
     if (action === 'capture') {
       const transcript = normalizeVoiceTranscript(body.transcript);

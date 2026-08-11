@@ -2584,23 +2584,28 @@ async function acknowledgeAiVoiceTranscriptNotice(options) {
     options = options || {};
     const user = await getCurrentUser();
     if (!user) throw new Error('Please sign in again before using AI Voice.');
-    const now = new Date().toISOString();
     const saveAudio = options.saveAudioForSupport === true;
-    const { data, error } = await _supabase
-        .from('ai_voice_transcript_preferences')
-        .upsert({
-            user_id: user.id,
-            notice_version: QD_AI_VOICE_TRANSCRIPT_NOTICE_VERSION,
-            acknowledged_at: now,
-            save_audio_for_support: saveAudio,
-            audio_consent_version: saveAudio ? QD_AI_VOICE_TRANSCRIPT_NOTICE_VERSION : null,
-            audio_consent_at: saveAudio ? now : null,
-            updated_at: now
-        }, { onConflict: 'user_id' })
-        .select('notice_version,acknowledged_at,save_audio_for_support,audio_consent_version,audio_consent_at')
-        .single();
-    if (error) throw error;
-    return data;
+    // Consent is saved synchronously by the authenticated server endpoint.
+    // Do not enqueue it for background replay: microphone access stays blocked
+    // until this exact account choice is durably acknowledged by the server.
+    const result = await qdAiVoiceTranscriptFunction({
+        action: 'save_preference',
+        saveAudioForSupport: saveAudio
+    });
+    const preference = result && result.preference;
+    const ownerConfirmed = !!(preference && preference.user_id === user.id);
+    const noticeConfirmed = !!(preference
+        && preference.notice_version === QD_AI_VOICE_TRANSCRIPT_NOTICE_VERSION
+        && preference.acknowledged_at);
+    const audioConfirmed = !!(preference
+        && preference.save_audio_for_support === saveAudio
+        && (saveAudio
+            ? preference.audio_consent_version === QD_AI_VOICE_TRANSCRIPT_NOTICE_VERSION && !!preference.audio_consent_at
+            : preference.audio_consent_version == null && preference.audio_consent_at == null));
+    if (!ownerConfirmed || !noticeConfirmed || !audioConfirmed) {
+        throw new Error('QuoteDr could not confirm your AI Voice privacy choice. Please try again.');
+    }
+    return preference;
 }
 
 async function setAiVoiceAudioPreference(enabled) {

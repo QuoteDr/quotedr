@@ -8,6 +8,13 @@ export function isVoiceTranscriptNoticeAccepted(value) {
   return version === VOICE_TRANSCRIPT_NOTICE_VERSION || VOICE_TRANSCRIPT_LEGACY_NOTICE_VERSIONS.includes(version);
 }
 
+export function normalizeVoiceTranscriptAudioPreference(value) {
+  if (value !== true && value !== false) {
+    throw new Error('An explicit Voice audio preference is required');
+  }
+  return value;
+}
+
 const STATUS_VALUES = new Set([
   'parsing',
   'review_ready',
