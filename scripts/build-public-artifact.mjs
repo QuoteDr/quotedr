@@ -34,7 +34,7 @@ export async function buildPublicArtifact() {
   }
 
   const actualFiles = await listFiles(outputRoot);
-  const expectedFiles = [...files].sort();
+  const expectedFiles = [...files].sort((a, b) => a.localeCompare(b));
   if (JSON.stringify(actualFiles) !== JSON.stringify(expectedFiles)) {
     throw new Error('Built artifact does not exactly match the production allowlist.');
   }

@@ -6,6 +6,7 @@ export const publicArtifactConfig = Object.freeze({
   files: Object.freeze([
     '_headers',
     '_redirects',
+    '404.html',
 
     // Public, authenticated, client-document, integration, legal, and marketing routes.
     'about.html',
@@ -159,7 +160,11 @@ export const publicArtifactConfig = Object.freeze({
   // These paths were publicly reachable or are equivalent high-risk repository samples.
   knownForbiddenPaths: Object.freeze([
     '/.env.local',
+    '/.github/workflows/deploy.yml',
     '/.git/config',
+    '/artifacts/qda-001-public-artifact-manifest.json',
+    '/config/public-artifact.mjs',
+    '/docs/QDA-001_PUBLIC_ARTIFACT_CONTAINMENT.md',
     '/MODULE_SPLIT_CHECKLIST.md',
     '/OVERNIGHT_TASKS.md',
     '/SESSION_HANDOFF.md',
@@ -172,11 +177,14 @@ export const publicArtifactConfig = Object.freeze({
     '/demo-data/README.md',
     '/mobile-companion/package.json',
     '/onboarding.html.backup',
+    '/package.json',
     '/quote-builder-backup',
     '/quote-builder-backup.html',
     '/quote-builder.html.backup',
     '/quote-builder.html.tmp',
     '/scripts/generate-newsletter-draft.js',
+    '/scripts/build-public-artifact.mjs',
+    '/sw.js.map',
     '/supabase.js.backup',
     '/supabase/functions/ai-assistant/index.ts',
     '/supabase/migrations/20260808152738_ai_operations_dashboard.sql',

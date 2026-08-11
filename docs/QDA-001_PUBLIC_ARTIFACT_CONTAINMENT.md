@@ -1,14 +1,15 @@
 # QDA-001 Public Artifact Containment
 
-Status: local release candidate only. Nothing in this task authorizes a push, merge, Cloudflare change, deployment, cache purge, credential use, key rotation, or production probe.
+Status: owner-approved QDA-001 production correction in progress. The authorization is limited to this artifact-only change, the existing QuoteDr Pages project, production verification, and one temporary host-exact cache-bypass rule described below. It does not authorize Supabase changes, key rotation, customer-data access, or another release.
 
 ## Release boundary
 
-- Source baseline for the production candidate: `3c5a9e3` (`origin/main` at release integration).
+- Source baseline for this follow-up candidate: `8214120fc1c6222c2c4dcef19f80036c5c659254` (exact `origin/main` after the approved QDA-001 artifact deployment).
 - Dedicated branch: `codex/qda-001-public-artifact-containment`.
+- Verified pre-follow-up Pages production: deployment `9c7a6e19-5c19-404e-98de-4f53c8045abf`, source `8214120`.
 - The Save & Recovery commit/branch is not integrated or modified.
-- The QBO and Canadian Tax ID compatibility code already present in `3c5a9e3` is preserved byte-for-byte relative to current main. QDA-001 changes only artifact build/verification behaviour.
-- No database, Supabase Function, migration, scheduler, Cloudflare setting, customer record, or provider configuration is changed.
+- The QBO and Canadian Tax ID compatibility code already present in `8214120` is preserved byte-for-byte. This follow-up changes only the allowlisted 404 document, artifact verification, deterministic manifest ordering, and release evidence.
+- No database, Supabase Function, migration, scheduler, DNS record, Worker/route, customer record, key, or unrelated provider configuration is changed. The only approved Cloudflare configuration change is the reversible, host-exact temporary Cache Rule below.
 
 ## Current deployment mechanism and failure mode
 
@@ -24,17 +25,17 @@ The builder:
 4. verifies the output contains no extra files; and
 5. writes a deterministic SHA-256 manifest to `artifacts/qda-001-public-artifact-manifest.json` (outside `dist/`).
 
-No directory globs are accepted. A future file added under `blog/`, `icons/`, `videos/`, or any other location remains private until its exact path is reviewed and added.
+No directory globs are accepted. A future file added under `blog/`, `icons/`, `videos/`, or any other location remains private until its exact path is reviewed and added. The allowlisted top-level `404.html` makes missing Pages origin paths genuine 404 responses instead of invoking Pages' default single-page application fallback.
 
 ## Candidate artifact
 
-The authoritative exact allowlist is `config/public-artifact.mjs`. The candidate manifest records every output path, byte count, and SHA-256 without exposing key values. Rebuilt from `3c5a9e3`, it contains 103 files, 22,558,250 bytes, no source maps, and tree SHA-256 `dd9ba7a836221feb007da15205cb89b04b14f1bad805665431a58aa2faae9d17`.
+The authoritative exact allowlist is `config/public-artifact.mjs`. The candidate manifest records every output path, byte count, and SHA-256 without exposing key values. Rebuilt from `8214120`, it contains 104 files, 22,559,274 bytes, no source maps, and tree SHA-256 `3b3d0370118a68ccac38b87b5efc84fe60897f95fa12f096fa88a66c1d05c590`.
 
 Included categories:
 
 - active public, authenticated, portal, document-viewer, integration callback, legal, help, and marketing HTML routes;
 - browser JavaScript and CSS referenced by those routes;
-- `_headers` and `_redirects` so CSP, cache, service-worker, and `/p/*` behaviour remain available to Pages;
+- `_headers`, `_redirects`, and `404.html` so CSP, cache, service-worker, `/p/*`, and genuine not-found behaviour remain available to Pages;
 - PWA manifest, service worker, approved icons/logos, product update JSON, blog pages, and tutorial videos.
 
 Excluded categories:
@@ -88,14 +89,15 @@ npm run test:artifact:smoke
 - secret/service-role/private-key patterns are absent without printing matched values; and
 - every allowed client-visible key occurrence is explicitly recorded by category and file.
 
-`test:artifact:smoke` serves only `dist/` on an ephemeral loopback port and proves normal routes/assets return 200, existing `.html` files canonicalize with query strings, `/p/*` redirects, and forbidden/missing paths return a true plain 404 rather than an app fallback.
+`test:artifact:smoke` serves only `dist/` on an ephemeral loopback port and proves normal routes/assets return 200, existing `.html` files canonicalize with query strings, `/p/*` redirects, and forbidden/missing paths return the exact allowlisted `404.html` body with HTTP 404 rather than an app fallback.
 
 Local verification completed for this candidate:
 
-- artifact test: 103 exact files, 575 internal references resolved, 12 reviewed public-client key occurrences, zero forbidden credential patterns;
-- static-server smoke: 20 required routes and 26 forbidden probes passed;
-- focused existing route regressions: portal short links, portal CSP, interactive viewer URL, invoice portal links, secure client viewer, site traffic, and closed-signup tests passed;
-- rendered public pages: Landing, Login, Pricing, Privacy, Terms, Tutorials, About, and Blog rendered at 1280 px and 390 px with expected headings/content, no horizontal overflow, and no captured browser errors.
+- artifact test: 104 exact files, 576 internal references resolved, 12 reviewed public-client key occurrences, zero forbidden credential patterns;
+- static-server smoke: 20 required routes, 33 forbidden repository probes, and two arbitrary absent-path probes passed with exact 404-body matching;
+- focused existing route regressions: 81 assertions covering portal/viewer routes, QBO import/export, Canadian Tax ID, Voice, RBAC/account policy, site traffic, and closed signup passed;
+- syntax checks: all 46 allowlisted browser JavaScript files plus five artifact modules/tests passed `node --check`;
+- rendered public pages: Landing, Login, Pricing, Privacy, Terms, Tutorials, About, Blog, and the new 404 document rendered at 1280 px and 390 px with expected headings/content and no horizontal overflow. Pages extensionless routing remains separately proven by the HTTP smoke test because the plain local file server does not emulate it.
 
 Protected/account-specific pages were not rendered past their authenticated boundary. That is an explicit limitation, not a pass: this task forbids credentials and customer-data access. Their HTML/assets/references and route presence are proven statically; an approved preview plus synthetic account remains an owner release gate.
 
@@ -129,22 +131,25 @@ No source or history is deleted by QDA-001. Baseline repository reference checks
 
 The last two are customer-reference development artifacts. Any removal/history decision needs a separate privacy and retention review; do not open, copy, or rewrite their contents during release work. Other excluded prototypes/tooling may have repository relationships and are not asserted to be unused.
 
-## Owner deployment procedure (stop unless every gate is satisfied)
+## Production procedure (stop unless every gate is satisfied)
 
-1. Make the active QBO release terminal first, as required by the serialized release plan. Do not deploy QDA-001 while UI/server state is split.
-2. Obtain explicit owner approval for this exact allowlist and provider-check record.
-3. From the then-current `main`, integrate only the QDA-001 commit, audit the exact diff, and rerun all three commands above. Confirm the candidate manifest/tree hash matches the reviewed source.
-4. Create a Cloudflare Pages preview using build command `npm run build:public`, root directory `/`, and build output directory `dist`. No build secrets are required. Do not select repository root as the output.
-5. On the preview, run the required/forbidden URL probe matrix below and render the critical route matrix at desktop and 390 px. Use only synthetic, non-customer references; protected journey checks require an approved synthetic account.
-6. Confirm `_headers` and `_redirects` were parsed, CSP/cache headers remain, the service worker/manifest load, and every forbidden probe returns 404/403 with no index/login fallback body.
-7. Only after terminal preview evidence and a new explicit production approval, promote/deploy the reviewed candidate. QDA-001 must not be combined with migrations, Functions, storage, Save & Recovery, QBO changes, or feature work.
-8. Repeat the probes against the custom domain, record cache headers and the exact deployment/source SHA, and stop the release if any internal path returns content or any required route/asset fails.
+1. Confirm `origin/main` still equals the reviewed source, audit the exact diff, rebuild `dist/`, and rerun all artifact, smoke, regression, syntax, and render gates.
+2. Fast-forward only the dedicated follow-up commit to `main`; do not integrate another branch or force-push.
+3. Confirm the existing `quotedr` Pages project built `npm run build:public` and deployed `dist/`, and record the exact source SHA and Pages deployment ID. Never upload the repository root.
+4. Create one temporary Cache Rule with name `QDA-001 temporary seven-day cache bypass`, description `Temporary seven-day containment for stale public repository artifacts. Remove after 2026-08-17 production recheck.`, expression `(http.host eq "quotedr.io")`, and cache action `Bypass cache`. Do not include `www`, another hostname, another zone, DNS, Workers, or routes.
+5. Re-probe all seven historical exposures and the broader forbidden matrix. Every result must be a genuine 404 serving the allowlisted 404 document, not an application fallback or historical body.
+6. Verify required routes/assets, canonical redirects, headers, service worker, QBO/Tax assets, protected synthetic-account boundary, and desktop/390 px rendering. Stop on any mismatch or privacy concern.
+7. Keep the rule active only if all verification passes. If verification fails, remove only the newly created rule and stop; do not roll back to the broad repository deployment.
+
+## Temporary cache-rule removal and recheck (2026-08-17)
+
+The seven-day removal task must use the recorded exact Cache Rule ID from the production release report. It must first verify that current Pages production still contains top-level `404.html`, that the exact source/deployment is healthy, and that required routes work. Then disable or delete only `QDA-001 temporary seven-day cache bypass`; do not edit adjacent rules. Re-probe the seven known stale URLs and the broader forbidden matrix twice, once immediately and once after a fresh cache-busting request. Require genuine 404 responses with the allowlisted 404 body. If any stale body returns, restore only the same host-exact bypass rule and stop for owner review. If all probes remain clean, record removal time, final statuses, current deployment ID/source SHA, and leave the rule removed.
 
 ## Rollback plan
 
-Cloudflare Pages can instantly roll back to a previously successful production deployment: [Pages rollbacks](https://developers.cloudflare.com/pages/configuration/rollbacks/). However, the pre-QDA-001 production artifact is known to expose repository material, so rolling directly back to it reopens the security finding.
+Cloudflare Pages can instantly roll back to a previously successful production deployment: [Pages rollbacks](https://developers.cloudflare.com/pages/configuration/rollbacks/). However, the pre-QDA-001 broad-repository production artifact is known to expose repository material and is not an acceptable rollback.
 
-Before production approval, prepare and retain a rollback candidate that uses this same allowlist builder with the last known-good application source. If application behaviour regresses, deploy/promote that containment-safe candidate. Use a legacy root-published deployment only as an owner-approved emergency action with temporary deny controls for all sampled internal categories and immediate re-containment; document that exposure window. Never “fix” rollback by deleting source/history or production assets.
+If the temporary Cache Rule itself causes a problem, remove only that exact new rule. If application behaviour regresses, deploy/promote a containment-safe candidate that uses the same allowlist and top-level 404 with the last known-good application source. Never use the legacy root-published deployment, and never "fix" rollback by deleting source/history or production assets.
 
 ## Post-deploy probe matrix
 
@@ -189,6 +194,10 @@ Forbidden samples (expected true 404/403, never 200/redirect-to-app/fallback HTM
 ```text
 /.env.local
 /.git/config
+/.github/workflows/deploy.yml
+/artifacts/qda-001-public-artifact-manifest.json
+/config/public-artifact.mjs
+/docs/QDA-001_PUBLIC_ARTIFACT_CONTAINMENT.md
 /SESSION_HANDOFF.md
 /OVERNIGHT_TASKS.md
 /tests/ai-operations-core.test.js
@@ -196,6 +205,7 @@ Forbidden samples (expected true 404/403, never 200/redirect-to-app/fallback HTM
 /supabase/migrations/20260808152738_ai_operations_dashboard.sql
 /android-app/package.json
 /mobile-companion/package.json
+/package.json
 /client_data.json
 /client_autocomplete.js
 /onboarding.html.backup
@@ -206,6 +216,8 @@ Forbidden samples (expected true 404/403, never 200/redirect-to-app/fallback HTM
 /supabase.js.backup
 /temp_settings_end.html
 /scripts/generate-newsletter-draft.js
+/scripts/build-public-artifact.mjs
+/sw.js.map
 /templates/index.html
 ```
 

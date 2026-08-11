@@ -17,6 +17,7 @@ const contentTypes = new Map([
 ]);
 
 const { outputRoot } = await buildPublicArtifact();
+const notFoundBody = await fs.readFile(resolveInside(outputRoot, '404.html'));
 const server = http.createServer(async (request, response) => {
   try {
     const url = new URL(request.url, 'http://127.0.0.1');
@@ -54,8 +55,12 @@ const server = http.createServer(async (request, response) => {
     });
     response.end(contents);
   } catch {
-    response.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8', 'X-Content-Type-Options': 'nosniff' });
-    response.end('Not Found');
+    response.writeHead(404, {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'X-Content-Type-Options': 'nosniff'
+    });
+    response.end(notFoundBody);
   }
 });
 
@@ -93,7 +98,15 @@ try {
   for (const forbiddenPath of publicArtifactConfig.knownForbiddenPaths) {
     const response = await fetch(`${origin}${forbiddenPath}`, { redirect: 'manual' });
     assert.equal(response.status, 404, `Forbidden repository path did not return a true 404: ${forbiddenPath}`);
-    assert.equal(await response.text(), 'Not Found', `Forbidden path received an application fallback body: ${forbiddenPath}`);
+    assert.equal(response.headers.get('content-type'), 'text/html; charset=utf-8');
+    assert.equal(response.headers.get('cache-control'), 'no-cache, no-store, must-revalidate');
+    assert.deepEqual(Buffer.from(await response.arrayBuffer()), notFoundBody, `Forbidden path did not receive the exact allowlisted 404 document: ${forbiddenPath}`);
+  }
+
+  for (const absentPath of ['/not-a-real-quotedr-route', '/nested/not-a-real-quotedr-route.json']) {
+    const response = await fetch(`${origin}${absentPath}`, { redirect: 'manual' });
+    assert.equal(response.status, 404, `Absent origin path did not return a genuine 404: ${absentPath}`);
+    assert.deepEqual(Buffer.from(await response.arrayBuffer()), notFoundBody, `Absent origin path received an application fallback body: ${absentPath}`);
   }
 
   console.log(`Local static-server smoke checks passed on desktop-independent HTTP routes (${publicArtifactConfig.requiredRoutes.length} routes, ${publicArtifactConfig.knownForbiddenPaths.length} forbidden probes).`);

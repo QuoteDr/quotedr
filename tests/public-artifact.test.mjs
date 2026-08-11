@@ -13,9 +13,10 @@ import {
 } from '../scripts/public-artifact-lib.mjs';
 
 const { manifest, outputRoot } = await buildPublicArtifact();
-const expected = [...publicArtifactConfig.files].sort();
+const expected = [...publicArtifactConfig.files].sort((a, b) => a.localeCompare(b));
 const actual = await listFiles(outputRoot);
 assert.deepEqual(actual, expected, 'dist/ must contain exactly the file-exact production allowlist');
+assert(actual.includes('404.html'), 'The allowlisted top-level Pages 404 document must be present');
 
 const forbiddenPathPatterns = [
   /(^|\/)(?:\.git|android-app|backups|docs|mobile-companion|node_modules|scripts|supabase|templates|tests|TODO|tutorial-videos)(\/|$)/i,
@@ -77,5 +78,8 @@ assert(headers.includes('Content-Security-Policy:'), 'Cloudflare CSP must remain
 assert(headers.includes('/sw.js') && headers.includes('Service-Worker-Allowed: /'), 'Service-worker headers must remain in the artifact');
 const redirects = await fs.readFile(resolveInside(outputRoot, '_redirects'), 'utf8');
 assert(redirects.includes('/p/* /client-portal.html?p=:splat 302'), 'Clean client portal redirect must remain in the artifact');
+const notFoundDocument = await fs.readFile(resolveInside(outputRoot, '404.html'), 'utf8');
+assert(notFoundDocument.includes('<meta name="robots" content="noindex">'), 'The public 404 document must remain excluded from indexing');
+assert(!notFoundDocument.includes('window.location') && !notFoundDocument.includes('http-equiv="refresh"'), 'The public 404 document must not redirect into the application');
 
 console.log(`Public artifact checks passed: ${manifest.fileCount} files, ${references.length} internal references, ${credentialFindings.length} public-client key occurrences classified without printing values.`);

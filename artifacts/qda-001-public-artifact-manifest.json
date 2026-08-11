@@ -1,10 +1,15 @@
 {
   "schemaVersion": 1,
   "outputDirectory": "dist",
-  "fileCount": 103,
-  "totalBytes": 22558250,
-  "treeSha256": "dd9ba7a836221feb007da15205cb89b04b14f1bad805665431a58aa2faae9d17",
+  "fileCount": 104,
+  "totalBytes": 22559274,
+  "treeSha256": "3b3d0370118a68ccac38b87b5efc84fe60897f95fa12f096fa88a66c1d05c590",
   "files": [
+    {
+      "path": "404.html",
+      "bytes": 1024,
+      "sha256": "9389d3bd7897c4d8711366d255e629aeea2e5ae3faf5ba31ab1f094901625aba"
+    },
     {
       "path": "_headers",
       "bytes": 1525,
