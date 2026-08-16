@@ -71,6 +71,12 @@ assert(
 assert(items.includes('function bindManageItemsCloseGuard'), 'Manage Items should guard every modal close path against unsaved changes');
 assert(items.includes('You have unsaved changes, are you sure you want to exit?'), 'Manage Items close warning should use the clear unsaved changes message');
 assert(items.includes("modalEl.addEventListener('hide.bs.modal'"), 'Manage Items close guard should catch header X, backdrop, and ESC closes');
+assert(items.includes('function bindManageUpgradeWizardCloseGuard'), 'Upgrade Wizard should bind its own unsaved-work close guard');
+assert((items.match(/modalEl\.addEventListener\('hide\.bs\.modal'/g) || []).length >= 2, 'Manage Items and Upgrade Wizard should each guard X, backdrop, and ESC dismissals');
+assert(items.includes('You have unsaved work. Are you sure you want to leave this Upgrade Wizard?'), 'Upgrade Wizard should clearly warn before discarding unsaved work');
+assert(items.includes("['input', 'change'].forEach"), 'Upgrade Wizard should mark typed and selected changes as unsaved');
+assert(items.includes('manageUpgradeWizardState.dirty = true'), 'Creating or changing an upgrade setup should mark the wizard dirty');
+assert(items.includes('manageUpgradeWizardCloseConfirmed || !manageUpgradeWizardState?.dirty'), 'Saved or unchanged wizard sessions should close without a warning');
 
 assert(html.includes('openManageNewItemUpgradeWizard'), 'New item form should include an Upgrade Wizard button');
 assert(html.includes('Upgrade Wizard'), 'Quote builder markup should contain the Upgrade Wizard label');

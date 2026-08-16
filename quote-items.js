@@ -19,6 +19,8 @@
         var manageCategorySortable = null;
         var manageNewItemWizardUpgradeGroups = [];
         var manageUpgradeWizardState = null;
+        var manageUpgradeWizardCloseConfirmed = false;
+        var manageUpgradeWizardClosePromptOpen = false;
         var MANAGE_ITEM_PHOTO_LIMIT = 3;
         var MANAGE_FULL_RES_PHOTO_BUCKET = 'item-full-res-photos';
         var MANAGE_FULL_RES_PHOTO_FEATURE = 'full_resolution_photos';
@@ -1124,14 +1126,57 @@
 
         function ensureManageUpgradeWizardModal() {
             let modalEl = document.getElementById('manageUpgradeWizardModal');
-            if (modalEl) return modalEl;
+            if (modalEl) {
+                bindManageUpgradeWizardCloseGuard(modalEl);
+                return modalEl;
+            }
             modalEl = document.createElement('div');
             modalEl.className = 'modal fade';
             modalEl.id = 'manageUpgradeWizardModal';
             modalEl.tabIndex = -1;
             modalEl.setAttribute('aria-hidden', 'true');
             document.body.appendChild(modalEl);
+            bindManageUpgradeWizardCloseGuard(modalEl);
             return modalEl;
+        }
+
+        function markManageUpgradeWizardDirty() {
+            if (manageUpgradeWizardState) manageUpgradeWizardState.dirty = true;
+        }
+
+        function bindManageUpgradeWizardCloseGuard(modalEl) {
+            if (!modalEl || modalEl.dataset.upgradeCloseGuardBound === '1') return;
+            modalEl.dataset.upgradeCloseGuardBound = '1';
+            ['input', 'change'].forEach(function(eventName) {
+                modalEl.addEventListener(eventName, function(event) {
+                    if (event.target.closest('#manageUpgradeWizardModal')) markManageUpgradeWizardDirty();
+                });
+            });
+            modalEl.addEventListener('hide.bs.modal', function(event) {
+                if (manageUpgradeWizardCloseConfirmed || !manageUpgradeWizardState?.dirty) return;
+                event.preventDefault();
+                if (manageUpgradeWizardClosePromptOpen) return;
+                manageUpgradeWizardClosePromptOpen = true;
+                qdConfirm('You have unsaved work. Are you sure you want to leave this Upgrade Wizard?', {
+                    title: 'Unsaved Upgrade',
+                    okText: 'Exit Without Saving',
+                    cancelText: 'Keep Editing',
+                    okClass: 'btn-warning',
+                    type: 'warning'
+                }).then(function(shouldExit) {
+                    manageUpgradeWizardClosePromptOpen = false;
+                    if (!shouldExit) return;
+                    manageUpgradeWizardCloseConfirmed = true;
+                    bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+                }).catch(function() {
+                    manageUpgradeWizardClosePromptOpen = false;
+                });
+            });
+            modalEl.addEventListener('hidden.bs.modal', function() {
+                manageUpgradeWizardState = null;
+                manageUpgradeWizardCloseConfirmed = false;
+                manageUpgradeWizardClosePromptOpen = false;
+            });
         }
 
         function renderManageUpgradeWizardTypeCards() {
@@ -1401,7 +1446,8 @@
                 editingGroupId: '',
                 setupType: '',
                 step: 'setup',
-                group: null
+                group: null,
+                dirty: false
             };
             const action = button?.getAttribute('data-upgrade-wizard-action') || '';
             const groupId = button?.getAttribute('data-upgrade-group-id') || '';
@@ -1421,7 +1467,8 @@
                 editingGroupId: '',
                 setupType: '',
                 step: 'setup',
-                group: null
+                group: null,
+                dirty: false
             };
             showManageUpgradeWizard();
         }
@@ -1433,6 +1480,7 @@
             manageUpgradeWizardState.editingGroupId = groupId;
             manageUpgradeWizardState.setupType = inferManageUpgradeWizardSetupType(manageUpgradeWizardState.group);
             manageUpgradeWizardState.step = 'options';
+            manageUpgradeWizardState.dirty = false;
             showManageUpgradeWizard();
         }
 
@@ -1442,6 +1490,7 @@
             manageUpgradeWizardState.group = buildManageUpgradeWizardGroup(manageUpgradeWizardState.setupType, manageUpgradeWizardState.baseUnitType);
             manageUpgradeWizardState.editingGroupId = '';
             manageUpgradeWizardState.step = 'options';
+            manageUpgradeWizardState.dirty = true;
             showManageUpgradeWizard();
         }
 
@@ -1519,6 +1568,7 @@
             if (action === 'add-option') {
                 collectManageUpgradeWizardForm();
                 manageUpgradeWizardState.group.options.push(getManageUpgradeWizardOptionTemplate(manageUpgradeWizardState.baseUnitType, manageUpgradeWizardState.group.options.length));
+                markManageUpgradeWizardDirty();
                 showManageUpgradeWizard();
                 return;
             }
@@ -1539,6 +1589,7 @@
                     option.blockedByOptionIds = (option.blockedByOptionIds || []).filter(function(id) { return id !== optionId; });
                     return option;
                 });
+                markManageUpgradeWizardDirty();
                 showManageUpgradeWizard();
                 return;
             }
