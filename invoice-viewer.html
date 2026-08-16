@@ -865,7 +865,7 @@ if (location.search.includes('debug')) {
     <script src="card-payment-rules.js?v=2026080301"></script>
     <script src="supabase-v2.js?v=2026080801"></script>
     <script src="save-coordinator.js?v=2026080401"></script>
-    <script src="quote-discounts.js?v=1783218460"></script>
+    <script src="quote-discounts.js?v=2026081602"></script>
     <script src="typed-signature.js?v=2026080301"></script>
     <script>
         const ROOM_COLORS = [
@@ -1062,7 +1062,7 @@ if (location.search.includes('debug')) {
             var original = invoiceMarkedAmount(room, item, discounts.originalTotal(item));
             var amount = invoiceMarkedAmount(room, item, discounts.discountAmount(item));
             return '<div class="small text-muted"><span>Was </span><s>' + formatMoney(original, currency) + '</s></div>' +
-                '<div class="small text-success">' + escapeHtml(discounts.discountLabel(item)) + ' -' + formatMoney(amount, currency) + '</div>' +
+                '<div class="small text-success">' + escapeHtml(discounts.discountLabel(item)) + (discounts.appliesToUpgrades && !discounts.appliesToUpgrades(item) ? ' (base item only)' : '') + ' -' + formatMoney(amount, currency) + '</div>' +
                 '<div class="small text-muted">Now ' + formatMoney(invoiceLineTotal(item, room), currency) + '</div>';
         }
 

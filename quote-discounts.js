@@ -43,10 +43,39 @@
 
     function originalTotal(item) {
         if (!item) return 0;
+        if (item._undiscountedTotal !== undefined && item._undiscountedTotal !== null && item._undiscountedTotal !== '') {
+            return roundMoney(Math.max(0, number(item._undiscountedTotal, 0)));
+        }
+        if (item.upgraded && item._itemUpgradeBaseCaptured === true && Array.isArray(item.upgradeGroups) && item.upgradeGroups.length) {
+            var upgradedGroupTotal = explicitTotal(item);
+            if (upgradedGroupTotal !== null) return Math.max(0, upgradedGroupTotal);
+        }
         if (item.upgraded && item.upgrade && !hasMutatedUpgradeRate(item) && item.upgrade.total !== undefined && item.upgrade.total !== null && item.upgrade.total !== '') {
             return roundMoney(Math.max(0, number(item.upgrade.total, 0)));
         }
         return roundMoney(quantity(item) * activeRate(item));
+    }
+
+    function baseTotal(item) {
+        if (!item) return 0;
+        if (item._basePriceTbd === true) return 0;
+        var baseQuantity = item._baseQuantity !== undefined && item._baseQuantity !== null
+            ? Math.max(0, number(item._baseQuantity, 0))
+            : quantity(item);
+        var baseRate = item._baseRate !== undefined && item._baseRate !== null
+            ? Math.max(0, number(item._baseRate, 0))
+            : Math.max(0, number(item.rate, 0));
+        return roundMoney(baseQuantity * baseRate);
+    }
+
+    function appliesToUpgrades(item) {
+        return !item || item.discountAppliesToUpgrades !== false;
+    }
+
+    function discountableTotal(item) {
+        var total = originalTotal(item);
+        if (appliesToUpgrades(item)) return total;
+        return roundMoney(Math.min(total, baseTotal(item)));
     }
 
     function discountAmount(item) {
@@ -55,15 +84,16 @@
 
         var type = String(item.discountType || 'none').toLowerCase();
         var value = Math.max(0, number(item.discountValue, 0));
+        var eligibleTotal = discountableTotal(item);
         var discount = 0;
 
         if (type === 'amount') {
             discount = value;
         } else if (type === 'percent') {
-            discount = total * (value / 100);
+            discount = eligibleTotal * (value / 100);
         }
 
-        return roundMoney(Math.min(total, Math.max(0, discount)));
+        return roundMoney(Math.min(total, eligibleTotal, Math.max(0, discount)));
     }
 
     function explicitTotal(item) {
@@ -93,6 +123,7 @@
         item.discountType = 'percent';
         item.discountValue = 100;
         item.discountLabel = label || item.discountLabel || 'Courtesy discount';
+        item.discountAppliesToUpgrades = true;
         item.total = chargedTotal(item);
         return item;
     }
@@ -100,6 +131,9 @@
     global.QuoteDrDiscounts = {
         activeRate: activeRate,
         originalTotal: originalTotal,
+        baseTotal: baseTotal,
+        discountableTotal: discountableTotal,
+        appliesToUpgrades: appliesToUpgrades,
         discountAmount: discountAmount,
         chargedTotal: chargedTotal,
         hasDiscount: hasDiscount,

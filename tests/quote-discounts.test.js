@@ -99,12 +99,49 @@ assert(money(discounts.activeRate(mutatedUpgradeItem)) === 275, 'mutated upgrade
 assert(money(discounts.originalTotal(mutatedUpgradeItem)) === 550, 'mutated upgrade original total should not double-count add-ons');
 assert(money(discounts.chargedTotal(mutatedUpgradeItem)) === 500, 'mutated upgrade discount should apply to current total');
 
+const baseOnlyUpgradeItem = {
+  quantity: 2,
+  rate: 275,
+  total: 550,
+  _undiscountedTotal: 550,
+  _baseRate: 175,
+  _baseQuantity: 2,
+  _itemUpgradeBaseCaptured: true,
+  upgraded: true,
+  upgradeGroups: [{ id: 'finish-options' }],
+  discountType: 'percent',
+  discountValue: 50,
+  discountAppliesToUpgrades: false
+};
+
+assert(money(discounts.originalTotal(baseOnlyUpgradeItem)) === 550, 'wizard upgrades should retain their undiscounted gross total');
+assert(money(discounts.baseTotal(baseOnlyUpgradeItem)) === 350, 'base total should exclude selected add-ons');
+assert(money(discounts.discountableTotal(baseOnlyUpgradeItem)) === 350, 'base-only discount should use only the base item total');
+assert(money(discounts.discountAmount(baseOnlyUpgradeItem)) === 175, 'base-only percent discount should not discount add-ons');
+assert(money(discounts.chargedTotal(baseOnlyUpgradeItem)) === 375, 'add-ons should remain full price when excluded from discount');
+
+const allUpgradeDiscountItem = Object.assign({}, baseOnlyUpgradeItem, { discountAppliesToUpgrades: true });
+assert(money(discounts.discountAmount(allUpgradeDiscountItem)) === 275, 'opted-in percent discount should include selected add-ons');
+assert(money(discounts.chargedTotal(allUpgradeDiscountItem)) === 275, 'opted-in add-ons should use the full-line discount');
+
+const baseOnlyAmountItem = Object.assign({}, baseOnlyUpgradeItem, {
+  discountType: 'amount',
+  discountValue: 999
+});
+assert(money(discounts.discountAmount(baseOnlyAmountItem)) === 350, 'base-only amount discount should not exceed the base item total');
+assert(money(discounts.chargedTotal(baseOnlyAmountItem)) === 200, 'fixed add-on value should remain after a full base-item discount');
+
+const reopenedUpgradeItem = Object.assign({}, baseOnlyUpgradeItem, { total: 375 });
+assert(money(discounts.originalTotal(reopenedUpgradeItem)) === 550, 'reopened quote should use persisted gross total instead of discounting a charged total twice');
+assert(money(discounts.chargedTotal(reopenedUpgradeItem)) === 375, 'reopened quote should preserve the charged total');
+
 const freeItem = { quantity: 2, rate: 425 };
 discounts.applyMakeFree(freeItem, 'Courtesy upgrade');
 
 assert(freeItem.discountType === 'percent', 'make free should set percent discount type');
 assert(Number(freeItem.discountValue) === 100, 'make free should set 100 percent discount');
 assert(freeItem.discountLabel === 'Courtesy upgrade', 'make free should store custom label');
+assert(freeItem.discountAppliesToUpgrades === true, 'make free should include selected upgrades');
 assert(money(discounts.chargedTotal(freeItem)) === 0, 'make free should charge zero');
 
 console.log('quote discount helper test passed');
