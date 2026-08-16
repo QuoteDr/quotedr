@@ -3484,10 +3484,17 @@ Example:
                             </select>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label><strong>Service:</strong></label>
+                            <label id="lineServiceLabel" for="lineService"><strong>Service:</strong></label>
                             <select id="lineService" class="form-select" onchange="autoFillPricing()">
                                 <!-- Options will populate based on category -->
                             </select>
+                            <div id="lineNewServiceEditor" class="input-group" style="display:none;">
+                                <input type="text" id="lineNewServiceName" class="form-control" placeholder="Enter service name" autocomplete="off" aria-labelledby="lineServiceLabel" oninput="syncNewLineServiceName()">
+                                <button type="button" class="btn btn-outline-secondary" onclick="showSavedLineServiceOptions()" title="Choose a saved service">
+                                    <i class="fas fa-list me-1"></i>Saved
+                                </button>
+                            </div>
+                            <div id="lineNewServiceHelp" class="form-text" style="display:none;">This name stays editable and is not added to your database unless you choose to save it.</div>
                         </div>
                     </div>
 
@@ -3589,6 +3596,29 @@ Example:
                         <i class="fas fa-database me-1"></i>Save To Database
                     </button>
                     <button type="button" class="btn btn-primary" id="addLineItemBtn" onclick="confirmAddLine()">Add Line Item</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="saveNewLineItemPromptModal" tabindex="-1" aria-labelledby="saveNewLineItemPromptTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="saveNewLineItemPromptTitle"><i class="fas fa-database me-2"></i>Save New Item?</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">This item was added to the quote, but it is not in your saved item database.</p>
+                    <p class="fw-bold mb-3" id="saveNewLineItemPromptName"></p>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="saveNewLineItemDontAskAgain">
+                        <label class="form-check-label" for="saveNewLineItemDontAskAgain">Don't ask again. New items will stay on the quote only unless I use Save To Database.</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" id="saveNewLineItemNotNowBtn">Not Now</button>
+                    <button type="button" class="btn btn-primary" id="saveNewLineItemConfirmBtn"><i class="fas fa-database me-1"></i>Save to Database</button>
                 </div>
             </div>
         </div>
@@ -7257,6 +7287,71 @@ Example:
             checkIfNewItem();
         }
 
+        function resetNewLineServiceEditor() {
+            const serviceSelect = document.getElementById('lineService');
+            const editor = document.getElementById('lineNewServiceEditor');
+            const help = document.getElementById('lineNewServiceHelp');
+            const input = document.getElementById('lineNewServiceName');
+            if (serviceSelect) {
+                serviceSelect.style.display = '';
+                delete serviceSelect.dataset.unsavedService;
+                Array.from(serviceSelect.options).forEach(function(option) {
+                    if (option.dataset && option.dataset.transientNewService === '1') option.remove();
+                });
+            }
+            if (editor) editor.style.display = 'none';
+            if (help) help.style.display = 'none';
+            if (input) input.value = '';
+        }
+
+        function startNewLineServiceEditor(initialName) {
+            const serviceSelect = document.getElementById('lineService');
+            const editor = document.getElementById('lineNewServiceEditor');
+            const help = document.getElementById('lineNewServiceHelp');
+            const input = document.getElementById('lineNewServiceName');
+            if (!serviceSelect || !editor || !input) return;
+            serviceSelect.dataset.unsavedService = '1';
+            serviceSelect.style.display = 'none';
+            editor.style.display = '';
+            if (help) help.style.display = '';
+            input.value = String(initialName || '').trim();
+            syncNewLineServiceName();
+            setTimeout(function() { input.focus(); input.select(); }, 0);
+        }
+
+        function syncNewLineServiceName() {
+            const serviceSelect = document.getElementById('lineService');
+            const input = document.getElementById('lineNewServiceName');
+            const description = document.getElementById('lineDescription');
+            const quickSearch = document.getElementById('itemQuickSearch');
+            if (!serviceSelect || !input) return;
+            const name = input.value.trim();
+            let option = Array.from(serviceSelect.options).find(function(candidate) {
+                return candidate.dataset && candidate.dataset.transientNewService === '1';
+            });
+            if (!option) {
+                option = document.createElement('option');
+                option.dataset.transientNewService = '1';
+                serviceSelect.appendChild(option);
+            }
+            option.value = name;
+            option.text = name || 'New Service';
+            serviceSelect.value = name;
+            if (description) description.value = name;
+            if (quickSearch) quickSearch.value = name;
+            clearAddLineItemValidationField('lineDescription');
+            checkIfNewItem();
+        }
+
+        function showSavedLineServiceOptions() {
+            const serviceSelect = document.getElementById('lineService');
+            resetNewLineServiceEditor();
+            if (serviceSelect) {
+                serviceSelect.selectedIndex = 0;
+                serviceSelect.focus();
+            }
+        }
+
         function isLikelyTruncatedServiceName(itemName, serviceName) {
             const currentName = String(itemName || '').trim();
             const fullName = String(serviceName || '').trim();
@@ -7755,6 +7850,8 @@ Example:
             const category = document.getElementById('lineCategory').value;
             const serviceSelect = document.getElementById('lineService');
 
+            resetNewLineServiceEditor();
+
             // Clear existing options
             serviceSelect.innerHTML = '';
 
@@ -7771,22 +7868,7 @@ Example:
             serviceSelect.appendChild(addSvcOpt);
             serviceSelect.onchange = async function() {
                 if (serviceSelect.value === '__add_new_service__') {
-                    const newSvc = await qdPrompt('Enter new service name:', '', { title: 'New Service' });
-                    if (newSvc && newSvc.trim()) {
-                        const cat = document.getElementById('lineCategory').value;
-                        if (!pricingDatabase[cat]) pricingDatabase[cat] = [];
-                        pricingDatabase[cat].push({ name: newSvc.trim(), unitType: '', rate: 0 });
-                        const items = JSON.parse(localStorage.getItem('ald_custom_items') || '{}');
-                        if (!items[cat]) items[cat] = [];
-                        items[cat].push({ name: newSvc.trim(), unitType: '', rate: 0 });
-                        localStorage.setItem('ald_custom_items', JSON.stringify(items));
-                        updatePricingOptions();
-                        serviceSelect.value = newSvc.trim();
-                        // Replace any partial search text with the complete new service name.
-                        setLineItemNameFromService(newSvc);
-                        const saveBtn = document.getElementById('saveNewItemBtn');
-                        if (saveBtn) saveBtn.style.display = 'inline-block';
-                    } else { serviceSelect.selectedIndex = 1; }
+                    startNewLineServiceEditor(document.getElementById('itemQuickSearch')?.value || '');
                 } else { autoFillPricing(); }
             };
 
@@ -8758,14 +8840,18 @@ Example:
 
             // Find and select matching service
             const services = pricingDatabase[item.category];
+            let matchedService = null;
             if (services) {
-                const matchedService = services.find(s => s.name === item.serviceName);
+                matchedService = services.find(s => s.name === item.serviceName);
                 if (matchedService) {
                     document.getElementById('lineService').value = matchedService.name;
                     if (isLikelyTruncatedServiceName(item.description, matchedService.name)) {
                         setLineItemNameFromService(matchedService.name);
                     }
                 }
+            }
+            if (!matchedService) {
+                startNewLineServiceEditor(item.serviceName || item.description || '');
             }
 
             populateLineUnitTypeDropdown(item.unitType);
@@ -9152,9 +9238,64 @@ Example:
             return { category: nextCategory, item: nextItem };
         }
 
+        const LINE_ITEM_DATABASE_PROMPT_PREF_KEY = 'ald_new_line_item_database_prompt';
+
+        function shouldPromptToSaveNewLineItem(isNewDatabaseItem) {
+            if (!isNewDatabaseItem) return false;
+            try {
+                return localStorage.getItem(LINE_ITEM_DATABASE_PROMPT_PREF_KEY) !== 'quote_only';
+            } catch(e) {
+                return true;
+            }
+        }
+
+        function promptToSaveNewLineItemToDatabase(description) {
+            return new Promise(function(resolve) {
+                const modalEl = document.getElementById('saveNewLineItemPromptModal');
+                const nameEl = document.getElementById('saveNewLineItemPromptName');
+                const rememberEl = document.getElementById('saveNewLineItemDontAskAgain');
+                const saveBtn = document.getElementById('saveNewLineItemConfirmBtn');
+                const notNowBtn = document.getElementById('saveNewLineItemNotNowBtn');
+                if (!modalEl || !saveBtn || !notNowBtn) {
+                    resolve(false);
+                    return;
+                }
+                if (nameEl) nameEl.textContent = description || 'New line item';
+                if (rememberEl) rememberEl.checked = false;
+                let settled = false;
+                const modal = new bootstrap.Modal(modalEl);
+                function rememberPreference() {
+                    if (rememberEl && rememberEl.checked) {
+                        try { localStorage.setItem(LINE_ITEM_DATABASE_PROMPT_PREF_KEY, 'quote_only'); } catch(e) {}
+                    }
+                }
+                function finish(shouldSave) {
+                    if (settled) return;
+                    settled = true;
+                    rememberPreference();
+                    modal.hide();
+                    resolve(shouldSave);
+                }
+                saveBtn.onclick = function() { finish(true); };
+                notNowBtn.onclick = function() { finish(false); };
+                modalEl.addEventListener('hidden.bs.modal', function onHidden() {
+                    modalEl.removeEventListener('hidden.bs.modal', onHidden);
+                    if (!settled) {
+                        settled = true;
+                        rememberPreference();
+                        resolve(false);
+                    }
+                });
+                modal.show();
+            });
+        }
+
         async function confirmAddLine() {
             const roomId = parseInt(document.getElementById('currentRoomId').value);
             if (!validateAddLineItemRequiredFields()) return;
+            const savNewItemBtn = document.getElementById('saveNewItemBtn');
+            const isNewDatabaseItem = editingItemIndex === null && !isLineItemOneTimeCategory() && savNewItemBtn && savNewItemBtn.dataset.databaseState === 'new';
+            const shouldAskToSaveNewLineItem = shouldPromptToSaveNewLineItem(isNewDatabaseItem);
             const copilotContext = typeof quoteReviewLineItemContext !== 'undefined' ? quoteReviewLineItemContext : null;
             const description = document.getElementById('lineDescription').value.trim();
             const itemDescription = document.getElementById('lineItemDescription').value.trim();
@@ -9176,21 +9317,6 @@ Example:
                     previousSavedItemSource = cloneSavedItemForQuoteSync(item.savedItemSource || savedItemQuoteSource(item.category, { name: item.serviceName || item.description, unitType: item.unitType, rate: item.rate, materialCost: item.materialCost, priceTbd: item.priceTbd, pricingMode: item.pricingMode, supplierUrl: item.supplierUrl, itemDescription: item.itemDescription, photo: item.photo, photos: item.photos, photoFull: item.photoFull, photosFull: item.photosFull, laborTime: item.laborTime, upgrade: item.upgrade }));
                     editedQuoteItem = item;
                 }
-                const savNewItemBtn = document.getElementById('saveNewItemBtn');
-                const shouldAskToSaveNewItem = editingItemIndex === null && !isLineItemOneTimeCategory() && savNewItemBtn && savNewItemBtn.dataset.databaseState === 'new';
-                if (shouldAskToSaveNewItem) {
-                    const saveChoice = await qdConfirm('Save "' + description + '" to your item database for next time?', {
-                        title: 'Save New Item',
-                        okText: 'Yes',
-                        secondaryText: 'No',
-                        secondaryValue: 'no',
-                        cancelText: 'Cancel',
-                        type: 'warning'
-                    });
-                    if (saveChoice === false) return;
-                    if (saveChoice === true) saveLineItemToDatabase();
-                }
-
                 _pushUndo(); // snapshot before save
                 // If editing existing item, update it; otherwise add new
                 if (editingItemIndex !== null && rooms[roomIndex].items[editingItemIndex]) {
@@ -9293,6 +9419,10 @@ Example:
                 // Commit and display the quote edit before asking about the reusable database item.
                 // This keeps a nested Bootstrap dialog from blocking the primary quote save.
                 await _hideBootstrapModalAndWait('addLineModal');
+
+                if (shouldAskToSaveNewLineItem && await promptToSaveNewLineItemToDatabase(description)) {
+                    await saveLineItemToDatabase();
+                }
 
                 if (editedQuoteItem && editedSavedItemData) {
                     const savedDbChoice = await maybeConfirmSavedItemDatabaseUpdate(editedQuoteItem, editedSavedItemData);
@@ -21264,7 +21394,7 @@ Example:
     <script src="quote-contact-property-lookup.js?v=2026080301"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
     <script src="ikea-quote.js?v=1778059000"></script>
-<script src="quote-style.js?v=2026080801"></script>
+<script src="quote-style.js?v=2026081602"></script>
 
     <!-- Quote Style Modal -->
     <div class="modal fade" id="quoteStyleModal" tabindex="-1">
@@ -21540,7 +21670,7 @@ Example:
                                             <input class="form-check-input" type="checkbox" id="quoteAlwaysShowFullDescriptions">
                                             <label class="form-check-label fw-semibold" for="quoteAlwaysShowFullDescriptions">Always show full descriptions</label>
                                         </div>
-                                        <div class="text-muted small mt-2">Controls when clients see the Show more button on line item and selected upgrade descriptions.</div>
+                                        <div class="text-muted small mt-2">Controls when clients see the Show more button on line item descriptions. The full-description switch also applies to upgrade descriptions.</div>
                                     </div>
                                 </div>
                                 <div class="col-12">
@@ -21555,6 +21685,25 @@ Example:
                                             <span>Longer</span>
                                         </div>
                                         <div class="text-muted small mt-2">Controls when clients see the Show more button on room scope notes.</div>
+                                    </div>
+                                </div>
+                                <div class="col-12">
+                                    <div class="send-settings-card">
+                                        <label class="form-label fw-bold" for="quoteUpgradeDetailsDefault">Upgrade option details</label>
+                                        <select class="form-select form-select-sm mb-3" id="quoteUpgradeDetailsDefault">
+                                            <option value="collapsed">Collapsed by default</option>
+                                            <option value="expanded">Expanded by default</option>
+                                        </select>
+                                        <div class="d-flex justify-content-between align-items-center gap-3 mb-2">
+                                            <label class="form-label fw-bold mb-0" for="quoteUpgradeDescriptionPreviewLength">Upgrade description preview length</label>
+                                            <span id="quoteUpgradeDescriptionPreviewLengthValue" class="badge bg-light text-dark border">260 characters</span>
+                                        </div>
+                                        <input type="range" class="form-range" id="quoteUpgradeDescriptionPreviewLength" min="120" max="600" step="20" value="260">
+                                        <div class="d-flex justify-content-between text-muted small">
+                                            <span>Shorter</span>
+                                            <span>Longer</span>
+                                        </div>
+                                        <div class="text-muted small mt-2">Choose whether upgrade details start open, and how much text clients see before Show more.</div>
                                     </div>
                                 </div>
                                 <div class="col-12">

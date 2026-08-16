@@ -46,8 +46,9 @@ assert(
 );
 
 assert(
-  builder.includes("const shouldAskToSaveNewItem = editingItemIndex === null") &&
-    builder.includes("savNewItemBtn.dataset.databaseState === 'new'"),
+  builder.includes("const isNewDatabaseItem = editingItemIndex === null") &&
+    builder.includes("savNewItemBtn.dataset.databaseState === 'new'") &&
+    builder.includes('const shouldAskToSaveNewLineItem = shouldPromptToSaveNewLineItem(isNewDatabaseItem);'),
   'The automatic new-item prompt should remain available without firing for existing database items'
 );
 

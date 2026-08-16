@@ -2532,6 +2532,24 @@ if (location.search.includes('debug')) {
                 '</div>';
         }
 
+        function renderExpandableUpgradeDescription(text, id) {
+            var raw = String(text || '').trim();
+            if (!raw) return '';
+            var viewerStyle = resolveViewerDocumentStyle();
+            var fallbackLimit = parseInt(viewerStyle.descriptionPreviewLength, 10);
+            if (!isFinite(fallbackLimit)) fallbackLimit = 260;
+            var limit = parseInt(viewerStyle.upgradeDescriptionPreviewLength, 10);
+            if (!isFinite(limit)) limit = fallbackLimit;
+            limit = Math.max(120, Math.min(limit, 600));
+            if (viewerStyle.alwaysShowFullDescriptions === true || raw.length <= limit) {
+                return formatDescriptionText(raw);
+            }
+            var preview = raw.slice(0, limit).replace(/\s+\S*$/, '');
+            return '<span id="' + id + '_short">' + formatDescriptionText(preview) + '...</span>' +
+                '<span id="' + id + '_full" style="display:none;">' + formatDescriptionText(raw) + '</span>' +
+                '<button type="button" class="item-desc-toggle" onclick="toggleViewerDescription(\'' + id + '\', this)">Show more</button>';
+        }
+
         function viewerDescriptionKey(value) {
             return String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
         }
@@ -3649,6 +3667,8 @@ if (location.search.includes('debug')) {
                     var optionArg = JSON.stringify(option.id || '').replace(/"/g, '&quot;');
                     var description = getViewerUpgradeOptionDescription(option);
                     var panelId = viewerUpgradeDescriptionPanelId(roomIdx, itemIndex, group.id || '', option.id || '');
+                    var descriptionContentId = panelId + '_content';
+                    var descriptionsExpanded = resolveViewerDocumentStyle().upgradeDescriptionsExpanded === true;
                     var checkedIcon = group.type === 'multiple' ? 'fa-square-check' : 'fa-circle-check';
                     var uncheckedIcon = group.type === 'multiple' ? 'fa-square' : 'fa-circle';
                     var optionPriceHtml = requiresConsultation ? '<span class="opacity-75">Consultation required</span>' : (priceTbd ? '<span class="opacity-75">' + viewerPriceTbdLabel() + '</span>' : '<span class="opacity-75">' + viewerMoney(optionTotal, { forceSign: option.upgradeType !== 'replacement' }) + '</span>');
@@ -3664,8 +3684,8 @@ if (location.search.includes('debug')) {
                         if (quantitySummary) html += '<div class="quote-upgrade-quantity-note small">' + escapeHtml(quantitySummary) + '</div>';
                     }
                     if (description) {
-                        html += '<button type="button" class="btn btn-link btn-sm text-muted p-0 viewer-upgrade-description-toggle quote-upgrade-description-toggle" aria-expanded="false" aria-controls="' + escapeHtml(panelId) + '" onclick="toggleViewerUpgradeDescription(event, ' + roomIdx + ', ' + itemIndex + ', ' + groupArg + ', ' + optionArg + ')"><i class="fas fa-chevron-down me-1"></i><span data-upgrade-desc-label>Details</span></button>';
-                        html += '<div id="' + escapeHtml(panelId) + '" class="viewer-upgrade-option-description quote-upgrade-option-description d-none small text-muted border rounded bg-white px-2 py-1">' + formatDescriptionText(description) + '</div>';
+                        html += '<button type="button" class="btn btn-link btn-sm text-muted p-0 viewer-upgrade-description-toggle quote-upgrade-description-toggle" aria-expanded="' + (descriptionsExpanded ? 'true' : 'false') + '" aria-controls="' + escapeHtml(panelId) + '" onclick="toggleViewerUpgradeDescription(event, ' + roomIdx + ', ' + itemIndex + ', ' + groupArg + ', ' + optionArg + ')"><i class="fas ' + (descriptionsExpanded ? 'fa-chevron-up' : 'fa-chevron-down') + ' me-1"></i><span data-upgrade-desc-label>' + (descriptionsExpanded ? 'Hide' : 'Details') + '</span></button>';
+                        html += '<div id="' + escapeHtml(panelId) + '" class="viewer-upgrade-option-description quote-upgrade-option-description ' + (descriptionsExpanded ? '' : 'd-none ') + 'small text-muted border rounded bg-white px-2 py-1">' + renderExpandableUpgradeDescription(description, descriptionContentId) + '</div>';
                     }
                     html += '</div>';
                 });

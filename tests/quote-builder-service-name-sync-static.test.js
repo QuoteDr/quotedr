@@ -9,8 +9,8 @@ function assert(condition, message) {
 
 assert(source.includes('function setLineItemNameFromService'), 'quote builder should synchronize selected service names');
 assert(
-  /Enter new service name:[\s\S]*?setLineItemNameFromService\(newSvc\)/.test(source),
-  'creating a service should replace partial Quick Search text with the complete service name'
+  /function syncNewLineServiceName[\s\S]*?quickSearch\.value = name/.test(source),
+  'editing a new service should keep Quick Search synchronized with the complete service name'
 );
 assert(
   /function autoFillPricing[\s\S]*?setLineItemNameFromService\(selectedOption\.text\)/.test(source),

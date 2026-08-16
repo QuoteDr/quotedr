@@ -55,6 +55,9 @@ const context = {
   normalizeLineItemCategoryValue: field => field.value,
   normalizeLineUnitTypeValue: field => field.value,
   isLineItemOneTimeCategory: () => false,
+  shouldPromptToSaveNewLineItem: () => false,
+  promptToSaveNewLineItemToDatabase: async () => false,
+  saveLineItemToDatabase: async () => false,
   buildSavedItemFromEditedLineItem: () => ({
     name: 'Saved framing item',
     category: 'Deck Construction',

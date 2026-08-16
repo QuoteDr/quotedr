@@ -4134,6 +4134,15 @@
             updatePricingDirtyIndicator();
         }
 
+        function isManageCustomItem(category, item) {
+            if (item && item._custom) return true;
+            var savedItems = customItems && Array.isArray(customItems[category]) ? customItems[category] : [];
+            var name = String(item && item.name || '').trim().toLowerCase();
+            return !!name && savedItems.some(function(saved) {
+                return String(saved && saved.name || '').trim().toLowerCase() === name;
+            });
+        }
+
         function renderAllItemsList() {
             const container = document.getElementById('customItemsList');
             let html = '';
@@ -4169,7 +4178,7 @@
                 items.forEach(item => {
                     if (!item || !item.name) return; // skip malformed items
                     const safeId = (cat + '_' + item.name).replace(/[^a-z0-9]/gi,'_');
-                    const isCustom = !!item._custom;
+                    const isCustom = isManageCustomItem(cat, item);
                     const rate = parseFloat(item.rate || 0).toFixed(2);
                     const matCost = parseFloat(item.materialCost || 0).toFixed(2);
                     const supplier = (item.supplierUrl || '').replace(/"/g,'&quot;');
@@ -4424,7 +4433,7 @@
                     if (!item || !item.name) return;
                     const safeId = manageItemsSafeId(cat, item.name);
                     const rowKey = manageItemsRowKey(cat, item.name);
-                    const isCustom = !!item._custom;
+                    const isCustom = isManageCustomItem(cat, item);
                     const itemPriceTbd = isManagePriceTbd(item);
                     const rate = parseFloat(item.rate || 0).toFixed(2);
                     const matCost = parseFloat(item.materialCost || 0).toFixed(2);
@@ -6091,7 +6100,7 @@
             if (customItems[category].length === 0) delete customItems[category];
             saveCustomItems();
             if (pricingDatabase[category]) {
-                pricingDatabase[category] = pricingDatabase[category].filter(i => !(i._custom && i.name === name));
+                pricingDatabase[category] = pricingDatabase[category].filter(i => i && i.name !== name);
             }
             renderAllItemsList();
         }
