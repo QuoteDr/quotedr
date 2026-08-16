@@ -949,6 +949,30 @@
             margin-bottom: 1rem;
         }
         .approval-banner.visible { display: block; }
+        .viewer-line-summary {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(140px, max-content);
+            align-items: start;
+            column-gap: 1rem;
+            margin-bottom: 0.25rem;
+        }
+        .viewer-line-copy {
+            min-width: 0;
+        }
+        .viewer-line-title {
+            min-width: 0;
+        }
+        .viewer-line-price {
+            min-width: 140px;
+            text-align: right;
+        }
+        .viewer-line-description {
+            min-width: 0;
+            margin-top: 0.2rem;
+        }
+        .viewer-line-description .item-description {
+            margin-bottom: 0 !important;
+        }
         .item-description {
             font-size: 0.88rem;
             line-height: 1.45;
@@ -963,6 +987,15 @@
             cursor: pointer;
         }
         .item-desc-toggle:hover { text-decoration: underline; }
+        @media (max-width: 575.98px) {
+            .viewer-line-summary {
+                grid-template-columns: minmax(0, 1fr);
+                row-gap: 0.35rem;
+            }
+            .viewer-line-price {
+                min-width: 0;
+            }
+        }
         .pdf-print-tip-visual {
             background: #26272b;
             color: #f8fafc;
@@ -4625,19 +4658,24 @@ if (location.search.includes('debug')) {
                         const lineItemPhotoButton = !isSignedDiff ? renderViewerPhotoButton(getViewerItemPhotoList(item), 'Picture', 'btn-outline-secondary', getViewerItemPhotoFullList(item)) : '';
                         html += `
                         <div class="${itemClasses.join(' ')}" id="item_${roomIdx}_${itemIndex}" ${itemStyles.length ? `style="${itemStyles.join('; ')}"` : ''}>
-                            <div class="d-flex justify-content-between align-items-baseline mb-1">
-                                <div style="flex:1;">
-                                    <strong>${item.description || item.name || 'Item'}</strong>
-                                    ${isChangeOrder && coStatus === 'changed' ? '<span class="badge bg-warning text-dark ms-2">Changed</span>' : ''}
-                                    ${isChangeOrder && coStatus === 'added' ? '<span class="badge bg-success ms-2">Added</span>' : ''}
-                                    ${isChangeOrder && coStatus === 'removed' ? '<span class="badge bg-danger ms-2">Removed</span>' : ''}
-                                    ${wasOptionalAdded ? '<span class="badge bg-success ms-2">Added by client</span>' : ''}
-                                    ${isOptional && !isSignedDiff ? (optionalSelected
-                                        ? '<span class="badge bg-success ms-2" style="font-size:0.65em;"><i class="fas fa-check-circle me-1"></i>Included in quote</span>'
-                                        : '<span class="badge bg-info ms-2" style="font-size:0.65em;">Optional Add-on &middot; Not selected</span>') : ''}
-                                    ${lineItemPhotoButton ? `<div class="viewer-line-photo-actions viewer-line-title-actions">${lineItemPhotoButton}</div>` : ''}
+                            <div class="viewer-line-summary">
+                                <div class="viewer-line-copy">
+                                    <div class="viewer-line-title">
+                                        <strong>${item.description || item.name || 'Item'}</strong>
+                                        ${isChangeOrder && coStatus === 'changed' ? '<span class="badge bg-warning text-dark ms-2">Changed</span>' : ''}
+                                        ${isChangeOrder && coStatus === 'added' ? '<span class="badge bg-success ms-2">Added</span>' : ''}
+                                        ${isChangeOrder && coStatus === 'removed' ? '<span class="badge bg-danger ms-2">Removed</span>' : ''}
+                                        ${wasOptionalAdded ? '<span class="badge bg-success ms-2">Added by client</span>' : ''}
+                                        ${isOptional && !isSignedDiff ? (optionalSelected
+                                            ? '<span class="badge bg-success ms-2" style="font-size:0.65em;"><i class="fas fa-check-circle me-1"></i>Included in quote</span>'
+                                            : '<span class="badge bg-info ms-2" style="font-size:0.65em;">Optional Add-on &middot; Not selected</span>') : ''}
+                                        ${lineItemPhotoButton ? `<div class="viewer-line-photo-actions viewer-line-title-actions">${lineItemPhotoButton}</div>` : ''}
+                                    </div>
+                                    <div class="viewer-line-description">
+                                        ${renderExpandableDescription(displayDesc, `itemdesc_${roomIdx}_${itemIndex}`)}
+                                    </div>
                                 </div>
-                                <div class="${isOptional && !isSignedDiff ? `viewer-optional-price ${optionalSelected ? 'is-selected' : 'is-unselected'}` : ''}" style="text-align:right; min-width:140px; padding-left:16px;">
+                                <div class="viewer-line-price ${isOptional && !isSignedDiff ? `viewer-optional-price ${optionalSelected ? 'is-selected' : 'is-unselected'}` : ''}">
                                     <div>${coCanExplain ? `<button type="button" class="viewer-change-order-total-btn" onclick="toggleViewerChangeOrderExplanation(${roomIdx}, ${itemIndex})">${displayedItemTotalText}</button>` : `<strong>${displayedItemTotalText}</strong>`}</div>
                                     ${isOptional && !isSignedDiff ? `<div class="viewer-optional-price-state">${optionalSelected ? 'Included in quote total' : 'Not included in quote total'}</div>` : ''}
                                     <small class="text-muted">${typeof qdFormatQuantity === 'function' ? qdFormatQuantity(item.quantity, item.unitType || item.unit || '') : (item.quantity + ' ' + (item.unitType || ''))} @ ${activeRateText}</small>
@@ -4645,7 +4683,6 @@ if (location.search.includes('debug')) {
                                 </div>
                             </div>
                             ${coCanExplain ? `<div class="viewer-change-order-note" id="co_note_${roomIdx}_${itemIndex}"><i class="fas fa-circle-info me-1"></i>${escapeHtml(coExplanation)}</div>` : ''}
-                            ${renderExpandableDescription(displayDesc, `itemdesc_${roomIdx}_${itemIndex}`)}
                             ${hasUpgradeGroups ? renderViewerItemUpgradeGroups(roomIdx, itemIndex, item, isSignedDiff) : ''}
                             ${visibleNotes ? `<div class="text-muted mb-1"><small><i class="fas fa-info-circle"></i> ${visibleNotes}</small></div>` : ''}
                             ${isSignedDiff ? `
