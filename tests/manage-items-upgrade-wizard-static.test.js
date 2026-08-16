@@ -70,5 +70,10 @@ assert(html.includes('Upgrade Wizard'), 'Quote builder markup should contain the
 assert(html.includes('#manageUpgradeWizardModal .manage-upgrade-wizard-option-card'), 'Upgrade Wizard option cards should have visible separation styling inside the wizard modal');
 assert(items.includes("renderManageUnitSelect(option.unitType || state.baseUnitType || '', 'upgrade-unit-type')"), 'Upgrade Wizard option units should use the shared Manage Items unit select');
 assert(items.includes("renderManageUnitSelect(option.unitType || baseUnitType || '', 'upgrade-unit-type')"), 'Manual upgrade group option units should use the shared Manage Items unit select');
+assert(items.includes('<option value="">Select Existing Item</option>'), 'Saved-item selectors should clearly prompt users to select an existing item');
+assert(!items.includes('Type custom upgrade'), 'Saved-item selectors should not imply that custom upgrades are entered in the dropdown');
+assert(items.includes('Select an existing saved item or create a new upgrade.'), 'Upgrade Wizard helper text should explain the two available paths');
+assert((items.match(/manage-upgrade-choice-divider/g) || []).length >= 2, 'Wizard and manual upgrade editors should show a clear OR divider between existing and new items');
+assert((items.match(/Create New Upgrade Name/g) || []).length >= 2, 'Wizard and manual upgrade editors should label the new-upgrade field clearly');
 
 console.log('manage-items upgrade wizard static checks passed');
