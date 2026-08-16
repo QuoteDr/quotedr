@@ -82,6 +82,8 @@ assert(!items.includes('Type custom upgrade'), 'Saved-item selectors should not 
 assert(items.includes('Select an existing saved item or create a new upgrade.'), 'Upgrade Wizard helper text should explain the two available paths');
 assert((items.match(/manage-upgrade-choice-divider/g) || []).length >= 2, 'Wizard and manual upgrade editors should show a clear OR divider between existing and new items');
 assert((items.match(/Create New Upgrade Name/g) || []).length >= 2, 'Wizard and manual upgrade editors should label the new-upgrade field clearly');
+assert((items.match(/manage-upgrade-primary-row-break/g) || []).length >= 2, 'Wizard and manual upgrade editors should reserve the first row for selecting or naming an upgrade');
+assert((items.match(/manage-upgrade-pricing-row-break/g) || []).length >= 2, 'Wizard and manual upgrade editors should keep supplier controls on a separate row from unit and pricing');
 assert(items.includes('data-upgrade-group-action="toggle-option"'), 'Manage Items should provide a per-upgrade details toggle');
 assert(items.includes('manage-upgrade-option-body d-none'), 'Saved upgrade details should start collapsed in Manage Items');
 assert(items.includes('function setManageUpgradeOptionExpanded'), 'Manage Items should expand and collapse upgrade details without re-rendering their inputs');
