@@ -36,6 +36,13 @@ assert(items.includes("filterManageUpgradeRuleOptionIds"), 'Upgrade Wizard shoul
 assert(items.includes('manage-upgrade-rule-checkboxes'), 'Upgrade Wizard path rules should render checkbox groups instead of multi-select boxes');
 assert(items.includes('type="checkbox"'), 'Upgrade Wizard path rule options should be selectable with checkboxes');
 assert(items.includes('collectManageUpgradeRuleCheckboxIds'), 'Upgrade Wizard should collect multiple checked path rule options or none');
+assert(items.includes('function manageUpgradeWizardNeedsRulesStep'), 'Upgrade Wizard should decide whether Rules are useful from the current option group');
+assert(items.includes('options.length > 1 || options.some'), 'Groups with multiple options should pass through Rules regardless of their setup card');
+assert(items.includes("manageUpgradeWizardNeedsRulesStep() ? 'next-rules' : 'next-review'"), 'Options should route multi-option groups through Rules before Review');
+assert(items.includes("manageUpgradeWizardState.step = manageUpgradeWizardNeedsRulesStep() ? 'rules' : 'options'"), 'Review Back should return multi-option groups to Rules');
+assert(!items.includes("state.setupType === 'path' ? 'next-rules' : 'next-review'"), 'Rule routing should not be limited to Upgrade Path setup');
+assert(items.includes('priceTbdInput ? priceTbdInput.checked === true : isManagePriceTbd(previous)'), 'Rules step collection should preserve Price TBD when pricing controls are not rendered');
+assert(wizardCollector.includes('...previous,'), 'Wizard collection should preserve option metadata such as existing photos that its current step does not render');
 assert(items.includes('data-upgrade-wizard-action="toggle-note"'), 'Upgrade Wizard should let users add a note to an upgrade group');
 assert(items.includes('upgrade-group-note'), 'Upgrade Wizard and manual editor should persist upgrade group notes');
 assert(items.includes('manage-upgrade-unit-warning'), 'Upgrade setup should warn when base item and upgrade units differ');
@@ -75,5 +82,11 @@ assert(!items.includes('Type custom upgrade'), 'Saved-item selectors should not 
 assert(items.includes('Select an existing saved item or create a new upgrade.'), 'Upgrade Wizard helper text should explain the two available paths');
 assert((items.match(/manage-upgrade-choice-divider/g) || []).length >= 2, 'Wizard and manual upgrade editors should show a clear OR divider between existing and new items');
 assert((items.match(/Create New Upgrade Name/g) || []).length >= 2, 'Wizard and manual upgrade editors should label the new-upgrade field clearly');
+assert(items.includes('data-upgrade-group-action="toggle-option"'), 'Manage Items should provide a per-upgrade details toggle');
+assert(items.includes('manage-upgrade-option-body d-none'), 'Saved upgrade details should start collapsed in Manage Items');
+assert(items.includes('function setManageUpgradeOptionExpanded'), 'Manage Items should expand and collapse upgrade details without re-rendering their inputs');
+assert(html.includes('#manageItemsModal .manage-upgrade-option-toggle'), 'Manage Items should keep the per-upgrade toggle dimensions stable');
+assert(items.includes('Available after \' + availableAfterCount'), 'Collapsed upgrade summaries should surface dependency rule counts');
+assert(items.includes('Blocked by \' + blockedByCount'), 'Collapsed upgrade summaries should surface incompatibility rule counts');
 
 console.log('manage-items upgrade wizard static checks passed');

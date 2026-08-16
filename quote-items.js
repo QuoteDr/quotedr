@@ -778,6 +778,24 @@
             syncManageUpgradeWizardOptionQuantityState(selectEl.closest('.manage-upgrade-wizard-option'));
         }
 
+        function setManageUpgradeOptionExpanded(target, expanded) {
+            const optionEl = target?.classList?.contains('manage-upgrade-option') ? target : target?.closest('.manage-upgrade-option');
+            if (!optionEl) return;
+            const body = optionEl.querySelector('.manage-upgrade-option-body');
+            const toggle = optionEl.querySelector('[data-upgrade-group-action="toggle-option"]');
+            if (!body || !toggle) return;
+            const shouldExpand = expanded === undefined ? body.classList.contains('d-none') : expanded === true;
+            body.classList.toggle('d-none', !shouldExpand);
+            toggle.setAttribute('aria-expanded', shouldExpand ? 'true' : 'false');
+            toggle.setAttribute('aria-label', shouldExpand ? 'Collapse upgrade details' : 'Expand upgrade details');
+            toggle.setAttribute('title', shouldExpand ? 'Collapse upgrade details' : 'Expand upgrade details');
+            const icon = toggle.querySelector('i');
+            if (icon) {
+                icon.classList.toggle('fa-chevron-down', !shouldExpand);
+                icon.classList.toggle('fa-chevron-up', shouldExpand);
+            }
+        }
+
         function renderManageItemUpgradeGroupsEditor(item, baseUnitType) {
             const groups = normalizeManageItemUpgradeGroups(item);
             const flatOptions = [];
@@ -822,11 +840,28 @@
                     const optionPriceTbd = isManagePriceTbd(option);
                     const optionPhotos = normalizeManageUpgradePhotos(option);
                     const optionPhotosFull = normalizeManageUpgradePhotosFull(option);
+                    const optionDetailsId = manageUpgradeGroupId('upgrade_details');
+                    const availableAfterCount = Array.isArray(option.availableAfterOptionIds) ? option.availableAfterOptionIds.length : 0;
+                    const blockedByCount = Array.isArray(option.blockedByOptionIds) ? option.blockedByOptionIds.length : 0;
+                    const optionTypeLabel = optionRequiresConsultation ? 'Requires consultation' : (option.upgradeType === 'replacement' ? 'Replacement' : 'Add-on');
+                    const optionPriceLabel = optionRequiresConsultation ? '' : (optionPriceTbd ? 'Price TBD' : ('$' + option.rate.toFixed(2) + '/' + (option.unitType || 'unit')));
                     html += '<div class="manage-upgrade-option border rounded p-2 mt-2" data-upgrade-option-id="' + manageItemsAttr(option.id) + '">' +
                         '<input type="hidden" class="upgrade-photo-value" value="' + manageItemsAttr(optionPhotos[0] || '') + '">' +
                         '<input type="hidden" class="upgrade-photo-full-value" value="' + manageItemsAttr(JSON.stringify(optionPhotosFull[0] || null)) + '">' +
                         '<input type="hidden" class="upgrade-photos-value" value="' + manageItemsAttr(JSON.stringify(optionPhotos)) + '">' +
                         '<input type="hidden" class="upgrade-photos-full-value" value="' + manageItemsAttr(JSON.stringify(optionPhotos.map(function(_photo, index) { return normalizeManageFullResPhotoMeta(optionPhotosFull[index]); }))) + '">' +
+                        '<div class="manage-upgrade-option-summary d-flex justify-content-between align-items-center gap-2 flex-wrap">' +
+                        '<div class="d-flex align-items-center gap-2">' +
+                        '<button type="button" class="btn btn-sm btn-outline-secondary manage-upgrade-option-toggle" data-upgrade-group-action="toggle-option" aria-expanded="false" aria-controls="' + manageItemsAttr(optionDetailsId) + '" aria-label="Expand upgrade details" title="Expand upgrade details"><i class="fas fa-chevron-down"></i></button>' +
+                        '<div><div class="fw-bold">' + manageItemsEscape(option.name || ('Upgrade ' + (optionIndex + 1))) + '</div>' +
+                        '<div class="small text-muted">' + manageItemsEscape(optionTypeLabel) + (optionPriceLabel ? ' &middot; ' + manageItemsEscape(optionPriceLabel) : '') + '</div></div>' +
+                        '</div>' +
+                        '<div class="d-flex gap-1 flex-wrap">' +
+                        (availableAfterCount ? '<span class="badge bg-light text-primary border">Available after ' + availableAfterCount + '</span>' : '') +
+                        (blockedByCount ? '<span class="badge bg-light text-danger border">Blocked by ' + blockedByCount + '</span>' : '') +
+                        '</div>' +
+                        '</div>' +
+                        '<div class="manage-upgrade-option-body d-none mt-2" id="' + manageItemsAttr(optionDetailsId) + '">' +
                         '<div class="row g-2 align-items-end">' +
                         '<div class="col-md-4"><label class="form-label" style="font-size:0.75em">Copy From Saved Item</label>' + renderManageUpgradeSourceSelect(option.sourceItemName, option.category) + '</div>' +
                         '<div class="col-md-auto d-flex align-items-center justify-content-center pt-md-4 manage-upgrade-choice-divider"><span class="small fw-bold text-muted">OR</span></div>' +
@@ -842,6 +877,7 @@
                         '<div class="col-md-1 d-flex align-items-end"><button type="button" class="btn btn-sm btn-outline-danger w-100" data-upgrade-group-action="remove-option" title="Remove option"><i class="fas fa-trash"></i></button></div>' +
                         renderManageUpgradeQuantityControls(option, baseUnitType) +
                         '</div><div class="mt-2">' + renderManageMarginPill(option.rate, option.materialCost) + '</div>' +
+                        '</div>' +
                         '</div>';
                 });
                 html += '</div>';
@@ -929,6 +965,10 @@
             const detailsRow = button.closest('.item-details-row');
             if (!detailsRow) return;
             const action = button.getAttribute('data-upgrade-group-action');
+            if (action === 'toggle-option') {
+                setManageUpgradeOptionExpanded(button);
+                return;
+            }
             const groups = collectManageItemUpgradeGroups(detailsRow, true);
             const groupEl = button.closest('.manage-upgrade-group');
             const optionEl = button.closest('.manage-upgrade-option');
@@ -1124,16 +1164,21 @@
         }
 
         function renderManageUpgradeWizardStepNav(activeStep) {
-            const steps = [
-                ['setup', 'Setup'],
-                ['options', 'Options'],
-                ['rules', 'Rules'],
-                ['review', 'Review']
-            ];
+            const steps = [['setup', 'Setup'], ['options', 'Options']];
+            if (manageUpgradeWizardNeedsRulesStep()) steps.push(['rules', 'Rules']);
+            steps.push(['review', 'Review']);
             return '<div class="d-flex flex-wrap gap-1 mb-3">' + steps.map(function(step) {
                 const active = step[0] === activeStep;
                 return '<span class="badge ' + (active ? 'bg-primary' : 'bg-light text-dark border') + '">' + manageItemsEscape(step[1]) + '</span>';
             }).join('') + '</div>';
+        }
+
+        function manageUpgradeWizardNeedsRulesStep() {
+            const options = Array.isArray(manageUpgradeWizardState?.group?.options) ? manageUpgradeWizardState.group.options : [];
+            return options.length > 1 || options.some(function(option) {
+                return (Array.isArray(option.availableAfterOptionIds) && option.availableAfterOptionIds.length) ||
+                    (Array.isArray(option.blockedByOptionIds) && option.blockedByOptionIds.length);
+            });
         }
 
         function renderManageUpgradeWizardOptionsStep() {
@@ -1181,7 +1226,7 @@
             const options = Array.isArray(group.options) ? group.options : [];
             return '<div data-upgrade-wizard-step="rules">' +
                 renderManageUpgradeWizardStepNav('rules') +
-                '<div class="alert alert-light border small">Use rules only when an upgrade depends on another upgrade. Example: <strong>Lighted post caps</strong> can be Available after <strong>Post-to-post drink rail</strong> and Blocked by <strong>Continuous drink rail</strong>.</div>' +
+                '<div class="alert alert-light border small">Use <strong>Available after</strong> for dependencies and <strong>Blocked by</strong> for incompatible upgrades. For a two-way conflict, block each option by the other.</div>' +
                 options.map(function(option, optionIndex) {
                     option = normalizeManageUpgradeOption(option, 'wizard_rule_' + optionIndex);
                     return '<div class="manage-upgrade-wizard-option manage-upgrade-wizard-option-card" data-upgrade-option-id="' + manageItemsAttr(option.id) + '">' +
@@ -1240,7 +1285,7 @@
             } else if (step === 'options') {
                 body = renderManageUpgradeWizardOptionsStep();
                 footer = '<button type="button" class="btn btn-outline-secondary" data-upgrade-wizard-action="back">Back</button>' +
-                    '<button type="button" class="btn btn-primary" data-upgrade-wizard-action="' + (state.setupType === 'path' ? 'next-rules' : 'next-review') + '">Continue</button>';
+                    '<button type="button" class="btn btn-primary" data-upgrade-wizard-action="' + (manageUpgradeWizardNeedsRulesStep() ? 'next-rules' : 'next-review') + '">Continue</button>';
             } else if (step === 'rules') {
                 body = renderManageUpgradeWizardRulesStep();
                 footer = '<button type="button" class="btn btn-outline-secondary" data-upgrade-wizard-action="back">Back</button>' +
@@ -1293,8 +1338,10 @@
                 };
                 const optionType = normalizeManageUpgradeType(optionEl.querySelector('.upgrade-type')?.value || previous.upgradeType);
                 const requiresConsultation = group.type === 'consultation' || optionType === 'consultation' || previous.requiresConsultation === true;
-                const priceTbd = optionEl.querySelector('.upgrade-price-tbd')?.checked === true;
+                const priceTbdInput = optionEl.querySelector('.upgrade-price-tbd');
+                const priceTbd = priceTbdInput ? priceTbdInput.checked === true : isManagePriceTbd(previous);
                 return {
+                    ...previous,
                     id: optionId,
                     name: getValue('.upgrade-name', previous.name),
                     unitType: getValue('.upgrade-unit-type', previous.unitType || manageUpgradeWizardState.baseUnitType),
@@ -1500,7 +1547,7 @@
             if (action === 'back') {
                 collectManageUpgradeWizardForm();
                 if (manageUpgradeWizardState.step === 'review') {
-                    manageUpgradeWizardState.step = manageUpgradeWizardState.setupType === 'path' ? 'rules' : 'options';
+                    manageUpgradeWizardState.step = manageUpgradeWizardNeedsRulesStep() ? 'rules' : 'options';
                 } else if (manageUpgradeWizardState.step === 'rules') {
                     manageUpgradeWizardState.step = 'options';
                 } else {
