@@ -60,6 +60,10 @@ assert(dashboard.includes("emailKind: 'portal_followup'"), 'follow-up email shou
 assert(legacyFollowup.includes('portal_followup_required') && !legacyFollowup.includes('api.resend.com'), 'legacy automatic direct-link follow-up should be retired without sending');
 
 assert(dashboard.includes('shareDocumentThroughPortal'), 'dashboard cards should route sharing through portal assignment');
+assert(
+  dashboard.includes("${portalVisible ? 'Client Portal' : 'Share via Client Portal'}"),
+  'dashboard cards should say Share via Client Portal before assignment and Client Portal after assignment'
+);
 assert(dashboard.includes('dashboardPortalUrlForDocument'), 'dashboard follow-up should resolve a portal URL');
 assert(builder.includes('findBuilderPortalStableShare'), 'builder portal sharing should reuse an existing stable portal anchor');
 assert(builder.includes('builderPortalUrlFromStableShare'), 'builder should reconstruct only a portal URL from a stable anchor');
