@@ -73,7 +73,7 @@ async function portalLinkBelongsToAccount(service: any, ownerUserId: string, val
     .maybeSingle();
   if (result.error) throw result.error;
   const row = result.data;
-  if (!row || !row.data || row.data.portal_visible !== true) return false;
+  if (!row || !row.data || (row.data.portal_visible !== true && row.data.portal_anchor_only !== true)) return false;
   const url = new URL(String(value));
   const requestedAnchor = String(url.searchParams.get("portal_anchor") || url.searchParams.get("id") || "").trim();
   return !requestedAnchor || requestedAnchor === String(row.id);

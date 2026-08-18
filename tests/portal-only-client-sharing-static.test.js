@@ -45,7 +45,8 @@ for (const forbidden of ["'portal_share_token'", "'portal_pin'", "'shareToken'",
   assert(!clientDocumentPolicy.includes(forbidden), `client projection must not allow portal/editor secret field ${forbidden}`);
 }
 assert(clientDocument.includes('portalVisible(target) && target.public_share_token_hash === tokenHash'), 'removed and non-portal documents should reject old tokens');
-assert(clientDocument.includes('return row && portalVisible(row) ? row : null'), 'short portal links should stop resolving when their anchor is removed');
+assert(clientDocument.includes('return row && portalAnchorAvailable(row) ? row : null'), 'short portal links should keep resolving through a retained private portal anchor');
+assert(clientDocument.includes('.filter((row) => portalVisible(row) && samePortalGroup(anchor, row))'), 'private portal anchors must never be returned as client documents');
 assert(documentPayment.includes('portalVisible(target) && target.public_share_token_hash === tokenHash'), 'removed and non-portal documents should reject old payment tokens');
 assert(clientDocument.includes('async function assertTokenAccess'), 'token reads should remain available for portal-internal document, signature, and payment access');
 

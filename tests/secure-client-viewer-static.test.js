@@ -18,6 +18,8 @@ assert(edgeSource.includes('sha256Hex'), 'client-document edge function should h
 assert(edgeSource.includes('public_share_token_hash'), 'client-document should validate against hashed tokens stored on quote rows');
 assert(edgeSource.includes('portalAnchorId'), 'client-document should support token-scoped portal sibling document access');
 assert(edgeSource.includes('portalVisible(target) && target.public_share_token_hash === tokenHash'), 'secure tokens should stop working after a document leaves its portal');
+assert(edgeSource.includes('async function assertPortalAnchorAccess'), 'portal-shell access should use a separate anchor-only authorization path');
+assert(edgeSource.includes('.filter((row) => portalVisible(row) && samePortalGroup(anchor, row))'), 'anchor-only rows should be excluded from portal documents');
 assert(edgeSource.includes('signedInUser?.id && signedInUser.id === target.user_id'), 'client-document should not mark owner preview sessions as client viewed');
 assert(edgeSource.includes('skipped: "owner_view"'), 'client-document should report owner view skips as unchanged');
 assert(!/select\\('\\*'\\).*eq\\('id', documentId\\).*single\\(\\)/s.test(edgeSource), 'client-document should avoid unbounded public row reads without token validation');

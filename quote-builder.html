@@ -14629,10 +14629,16 @@ Example:
         }
 
         function findBuilderPortalStableShare(documentData, portal) {
-            var portalRows = portal && Array.isArray(portal.rows) ? portal.rows : [];
+            var portalRows = (portal && Array.isArray(portal.rows) ? portal.rows : []).concat(portal && Array.isArray(portal.anchorRows) ? portal.anchorRows : []);
             var sources = portalRows.map(function(row) { return row && row.data || {}; });
+            sources.push({
+                portal_share_token: portal && portal.secureToken,
+                portal_share_anchor_id: portal && portal.secureAnchorId,
+                portal_share_created_at: portal && portal.secureCreatedAt
+            });
             sources.push(documentData || {});
             var portalRowIds = new Set(portalRows.map(function(row) { return row && row.id; }).filter(Boolean));
+            if (portal && portal.secureAnchorId) portalRowIds.add(portal.secureAnchorId);
             for (var i = 0; i < sources.length; i++) {
                 var source = sources[i] || {};
                 var token = String(source.portal_share_token || '').trim();
@@ -15134,11 +15140,31 @@ Example:
             return 'legacy-' + (email || name || (row && row.id) || 'portal');
         }
 
-        function buildInvoicePortalRegistry(rows) {
+        function buildInvoicePortalRegistry(rows, registryRecords) {
             var map = {};
+            (registryRecords || []).forEach(function(record) {
+                var id = String(record && record.id || '').trim();
+                var name = String(record && record.name || '').trim();
+                if (!id || !name) return;
+                map[id] = {
+                    id: id,
+                    legacy: false,
+                    name: name,
+                    clientName: String(record.clientName || name).trim() || name,
+                    clientEmail: String(record.clientEmail || '').trim(),
+                    pin: String(record.pin || '').trim(),
+                    secureToken: String(record.secureToken || '').trim(),
+                    secureAnchorId: String(record.secureAnchorId || '').trim(),
+                    secureCreatedAt: String(record.secureCreatedAt || '').trim(),
+                    quoteIds: [],
+                    rows: [],
+                    anchorRows: []
+                };
+            });
             (rows || []).forEach(function(row) {
                 var d = row && row.data || {};
-                if (d.portal_visible !== true) return;
+                var anchorOnly = d.portal_anchor_only === true && d.portal_visible !== true && !!String(d.portal_id || '').trim();
+                if (d.portal_visible !== true && !anchorOnly) return;
                 var key = invoicePortalRowKey(row);
                 var clientName = d.portal_client_name || invoicePortalRowClientName(row);
                 var clientEmail = d.portal_client_email || invoicePortalRowClientEmail(row);
@@ -15151,12 +15177,20 @@ Example:
                         clientEmail: clientEmail,
                         pin: d.portal_pin || '',
                         quoteIds: [],
-                        rows: []
+                        rows: [],
+                        anchorRows: []
                     };
                 }
-                map[key].quoteIds.push(row.id);
-                map[key].rows.push(row);
+                if (anchorOnly) {
+                    map[key].anchorRows.push(row);
+                } else {
+                    map[key].quoteIds.push(row.id);
+                    map[key].rows.push(row);
+                }
                 if (!map[key].pin && d.portal_pin) map[key].pin = d.portal_pin;
+                if (!map[key].secureToken && d.portal_share_token) map[key].secureToken = String(d.portal_share_token).trim();
+                if (!map[key].secureAnchorId && d.portal_share_anchor_id) map[key].secureAnchorId = String(d.portal_share_anchor_id).trim();
+                if (!map[key].secureCreatedAt && d.portal_share_created_at) map[key].secureCreatedAt = String(d.portal_share_created_at).trim();
             });
             return Object.values(map).sort(function(a, b) {
                 return (a.name || '').localeCompare(b.name || '') || (a.clientName || '').localeCompare(b.clientName || '');
@@ -15187,6 +15221,7 @@ Example:
             invoiceData.portal_client_email = clientEmail;
             invoiceData.portal_pin = portal.pin || invoiceData.portal_pin || Math.floor(1000 + Math.random() * 9000).toString();
             invoiceData.portal_added_at = invoiceData.portal_added_at || new Date().toISOString();
+            delete invoiceData.portal_anchor_only;
             return invoiceData;
         }
 
@@ -15257,7 +15292,17 @@ Example:
             var result = await listQuoteSummariesFromSupabase();
             if (result && result.error) throw new Error(result.error.message || result.error || 'Could not load client portals.');
             window._invoicePortalRows = result && result.data || [];
-            window._invoicePortalRegistry = buildInvoicePortalRegistry(window._invoicePortalRows);
+            var registryRecords = [];
+            if (typeof _supabase !== 'undefined') {
+                var sessionResult = await _supabase.auth.getSession();
+                var userId = sessionResult && sessionResult.data && sessionResult.data.session && sessionResult.data.session.user && sessionResult.data.session.user.id;
+                if (userId) {
+                    var registryResult = await _supabase.from('user_data').select('value').eq('user_id', userId).eq('key', 'client_portals').maybeSingle();
+                    if (registryResult.error) throw registryResult.error;
+                    registryRecords = Array.isArray(registryResult.data && registryResult.data.value) ? registryResult.data.value : [];
+                }
+            }
+            window._invoicePortalRegistry = buildInvoicePortalRegistry(window._invoicePortalRows, registryRecords);
             return window._invoicePortalRegistry;
         }
 
@@ -16832,6 +16877,7 @@ Example:
             quoteData.portal_client_email = portal.clientEmail || quoteData.portal_client_email || quoteData.clientEmail || quoteData.email || '';
             quoteData.portal_pin = portal.pin || quoteData.portal_pin || Math.floor(1000 + Math.random() * 9000).toString();
             quoteData.portal_added_at = quoteData.portal_added_at || new Date().toISOString();
+            delete quoteData.portal_anchor_only;
             if (!quoteData.status || quoteData.status === 'draft') {
                 quoteData.status = quoteData.documentType === 'change_order' ? 'pending_approval' : 'sent';
             }

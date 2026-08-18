@@ -1021,7 +1021,11 @@
                 portal_client_email: isChangeOrder ? '' : loadedData.portal_client_email || loadedData.clientEmail || loadedData.email || '',
                 portal_pin: isChangeOrder ? '' : loadedData.portal_pin || '',
                 portal_added_at: isChangeOrder ? null : loadedData.portal_added_at || null,
-                portal_theme: isChangeOrder ? null : loadedData.portal_theme || null
+                portal_theme: isChangeOrder ? null : loadedData.portal_theme || null,
+                portal_anchor_only: isChangeOrder ? false : loadedData.portal_anchor_only === true,
+                portal_share_token: isChangeOrder ? '' : loadedData.portal_share_token || '',
+                portal_share_anchor_id: isChangeOrder ? '' : loadedData.portal_share_anchor_id || '',
+                portal_share_created_at: isChangeOrder ? '' : loadedData.portal_share_created_at || ''
             };
         }
 

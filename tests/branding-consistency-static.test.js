@@ -191,7 +191,7 @@ assert(clientDocument.includes('sanitizePublicPortalTheme'), 'Portal default-the
 const portalDocumentsStart = clientDocument.indexOf('async function portalDocuments(');
 const portalDocumentsEnd = clientDocument.indexOf('async function signedStorageUrl', portalDocumentsStart);
 const portalDocumentsSource = clientDocument.slice(portalDocumentsStart, portalDocumentsEnd);
-assert(portalDocumentsSource.indexOf('assertTokenAccess') < portalDocumentsSource.indexOf('loadPortalBranding'), 'Portal branding reads must happen only after token validation');
+assert(portalDocumentsSource.indexOf('assertPortalAnchorAccess') < portalDocumentsSource.indexOf('loadPortalBranding'), 'Portal branding reads must happen only after portal-anchor token validation');
 const needsBrandingStart = clientDocument.indexOf('function documentNeedsBrandingFallback(');
 const needsBrandingEnd = clientDocument.indexOf('function cardPaymentEnabledForDocument', needsBrandingStart);
 assert(!clientDocument.slice(needsBrandingStart, needsBrandingEnd).includes('documentTypeLabel'), 'Missing-branding fallback should cover public quotes and change orders as well as invoices');

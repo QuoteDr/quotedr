@@ -398,6 +398,11 @@ function portalVisible(row: QuoteRow) {
   return data.portal_visible === true;
 }
 
+function portalAnchorAvailable(row: QuoteRow) {
+  const data = rowData(row);
+  return portalVisible(row) || (data.portal_anchor_only === true && !!portalId(row));
+}
+
 function isPortalShareBaseUrl(value: unknown) {
     const raw = String(value || "").trim();
     if (!raw) return true;
@@ -744,7 +749,15 @@ async function fetchQuoteByShareToken(token: string) {
     .maybeSingle();
   if (error) throw error;
   const row = data as QuoteRow | null;
-  return row && portalVisible(row) ? row : null;
+  return row && portalAnchorAvailable(row) ? row : null;
+}
+
+async function assertPortalAnchorAccess(documentId: string, token: string) {
+  if (!documentId || !token) throw new Error("Missing secure portal token");
+  const anchor = await fetchQuoteById(documentId);
+  const tokenHash = await sha256Hex(token);
+  if (anchor && portalAnchorAvailable(anchor) && anchor.public_share_token_hash === tokenHash) return anchor;
+  throw new Error("Invalid or expired secure portal token");
 }
 
 async function assertTokenAccess(documentId: string, token: string, portalAnchorId?: string) {
@@ -762,7 +775,7 @@ async function assertTokenAccess(documentId: string, token: string, portalAnchor
     const anchor = await fetchQuoteById(anchorId);
     if (
       anchor &&
-      portalVisible(anchor) &&
+      portalAnchorAvailable(anchor) &&
       anchor.public_share_token_hash === tokenHash &&
       samePortalGroup(anchor, target) &&
       (target.id === anchor.id || portalVisible(target))
@@ -941,7 +954,7 @@ async function portalDocuments(body: Record<string, unknown>) {
   const documentId = normalizeId(body.documentId || body.id);
   const token = String(body.token || "").trim();
   const anchor = documentId
-    ? (await assertTokenAccess(documentId, token, documentId)).target
+    ? await assertPortalAnchorAccess(documentId, token)
     : await fetchQuoteByShareToken(token);
   if (!anchor) throw new Error("Invalid or expired secure portal token");
   const supabase = adminClient();
@@ -959,13 +972,19 @@ async function portalDocuments(body: Record<string, unknown>) {
   ]);
   if (error) throw error;
   const docs = (data as QuoteRow[] || [])
-    .filter((row) => row.id === anchor.id || (portalVisible(row) && samePortalGroup(anchor, row)))
+    .filter((row) => portalVisible(row) && samePortalGroup(anchor, row))
     .map((row) => sanitizeQuoteRow(row));
+  const anchorData = rowData(anchor);
   return json({
-    anchor: compactDocumentResult(anchor),
+    anchor: portalVisible(anchor) ? compactDocumentResult(anchor) : { id: anchor.id },
     anchorId: anchor.id,
     contractorId: anchor.user_id,
     portalId: activePortalId,
+    portal: {
+      name: String(anchorData.portal_name || displayQuoteName(anchor) || "Client Portal").trim().slice(0, 200),
+      clientName: displayQuoteName(anchor).slice(0, 200),
+      theme: sanitizePublicPortalTheme(anchorData.portal_theme),
+    },
     documents: docs,
     branding,
   });
@@ -989,7 +1008,7 @@ async function isOwnerRequest(req: Request, userId: string) {
 async function portalAssets(req: Request, body: Record<string, unknown>) {
   const documentId = normalizeId(body.documentId || body.id);
   const token = String(body.token || "").trim();
-  const { target: anchor } = await assertTokenAccess(documentId, token, documentId);
+  const anchor = await assertPortalAnchorAccess(documentId, token);
   const anchorPortalId = portalId(anchor);
   if (!anchorPortalId) return json({ assets: [] });
 
@@ -1028,7 +1047,7 @@ async function portalAssetUrl(req: Request, body: Record<string, unknown>) {
   const preferThumbnail = body.thumbnail === true;
   if (!assetId) return json({ error: "Missing asset id" }, 400);
 
-  const { target: anchor } = await assertTokenAccess(documentId, token, documentId);
+  const anchor = await assertPortalAnchorAccess(documentId, token);
   const includePrivate = await isOwnerRequest(req, anchor.user_id);
   const supabase = adminClient();
   const { data, error } = await supabase

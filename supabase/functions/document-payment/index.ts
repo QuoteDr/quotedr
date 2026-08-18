@@ -83,6 +83,10 @@ function portalVisible(row: QuoteRow) {
   return rowData(row).portal_visible === true;
 }
 
+function portalAnchorAvailable(row: QuoteRow) {
+  return portalVisible(row) || (rowData(row).portal_anchor_only === true && !!portalId(row));
+}
+
 function samePortalGroup(anchor: QuoteRow, target: QuoteRow) {
   if (!anchor || !target || anchor.user_id !== target.user_id) return false;
   const anchorPortalId = portalId(anchor);
@@ -122,7 +126,7 @@ async function assertDocumentAccess(admin: any, body: Record<string, any>) {
     const anchor = await fetchQuote(admin, portalAnchorId);
     if (
       anchor &&
-      portalVisible(anchor) &&
+      portalAnchorAvailable(anchor) &&
       anchor.public_share_token_hash === tokenHash &&
       samePortalGroup(anchor, target) &&
       (target.id === anchor.id || portalVisible(target))

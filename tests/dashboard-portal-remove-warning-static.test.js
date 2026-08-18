@@ -6,13 +6,14 @@ const dashboard = fs.readFileSync('dashboard.html', 'utf8');
 assert(
   dashboard.includes('async function confirmRemoveDocumentFromPortal(') &&
     dashboard.includes('Are you sure you want to remove this document from the client portal?') &&
-    dashboard.includes('If you add it back later, the portal will show the new date it was added.'),
+    dashboard.includes('The portal and its existing client link will stay active.') &&
+    dashboard.includes('If you add the document back later, the portal will show the new date it was added.'),
   'Dashboard should define a clear warning before removing a document from the client portal'
 );
 
 assert(
-  /async function removeQuoteFromPortal\(\) \{[\s\S]*?var confirmed = await confirmRemoveDocumentFromPortal\(target\);[\s\S]*?if \(!confirmed\) return;[\s\S]*?var data = clearPortalAssignmentForEdit\(target\.data \|\| \{\}\);/.test(dashboard),
-  'Remove This Document From Portal should ask for confirmation before clearing portal assignment'
+  /async function removeQuoteFromPortal\(\) \{[\s\S]*?var confirmed = await confirmRemoveDocumentFromPortal\(target\);[\s\S]*?if \(!confirmed\) return;[\s\S]*?var data = await preparePortalDocumentRemoval\(target, portal\);/.test(dashboard),
+  'Remove This Document From Portal should ask for confirmation before preserving or clearing portal assignment'
 );
 
 assert(

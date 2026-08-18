@@ -128,7 +128,8 @@ const legacyPlaceholder = {
   const registryContext = {
     dashboardEmptyPortals: [{
       id: 'portal-empty', name: 'Rosa and Doug Carrick', clientName: 'Rosa and Doug Carrick',
-      clientEmail: 'rosa@example.com', pin: '2468', theme: { layoutStyle: 'client-os' }
+      clientEmail: 'rosa@example.com', pin: '2468', theme: { layoutStyle: 'client-os' },
+      secureToken: 'stable-token', secureAnchorId: 'anchor-1', secureCreatedAt: '2026-08-18T12:00:00Z'
     }],
     dashboardPortalPlaceholderRows: [flaggedPlaceholder],
     quotePortalKey(row) { return row.data.portal_id; },
@@ -140,7 +141,7 @@ const legacyPlaceholder = {
   };
   vm.createContext(registryContext);
   vm.runInContext(
-    sourceFunction('buildPortalRegistry') + '\n' + sourceFunction('portalDocumentCount'),
+    sourceFunction('quoteIsPortalAnchorOnly') + '\n' + sourceFunction('buildPortalRegistry') + '\n' + sourceFunction('portalDocumentCount'),
     registryContext
   );
   const emptyRegistry = registryContext.buildPortalRegistry([]);
@@ -149,6 +150,8 @@ const legacyPlaceholder = {
   assert(newPortal, 'A portal with no documents should remain visible in Manage Portals');
   assert.strictEqual(newPortal.quoteIds.length, 0, 'An empty portal should have no synthetic quote ids');
   assert.strictEqual(registryContext.portalDocumentCount(newPortal), 0);
+  assert.strictEqual(newPortal.secureToken, 'stable-token', 'Empty portal registry should retain its existing client link');
+  assert.strictEqual(newPortal.secureAnchorId, 'anchor-1');
   assert(legacyPortal, 'Existing placeholder-backed portals should remain manageable');
   assert.strictEqual(registryContext.portalDocumentCount(legacyPortal), 0);
 

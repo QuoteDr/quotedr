@@ -2528,7 +2528,7 @@
         </div>
         <div id="no-quotes" class="no-quotes d-none">
           <i class="fas fa-file-contract fa-3x mb-3"></i>
-          <p>No quotes found for this email. Contact your contractor if you think this is an error.</p>
+          <p>This portal is active, but there are no documents in it right now. Your existing portal link will continue to work.</p>
         </div>
       </div>
     </div>
@@ -2883,7 +2883,7 @@
       contractorId = String(result.contractorId || '').trim();
       portalAnchorId = String(result.anchorId || result.anchor?.id || '').trim();
       portalId = String(result.portalId || documents[0]?.data?.portal_id || '').trim();
-      portalResolvedClientName = documents[0]?.client_name || documents[0]?.data?.clientName || documents[0]?.data?.client_name || '';
+      portalResolvedClientName = result.portal?.clientName || documents[0]?.client_name || documents[0]?.data?.clientName || documents[0]?.data?.client_name || '';
       if (!contractorId || !portalAnchorId) throw new Error('Short portal link could not be resolved');
       restorePortalUnlockState();
     }
@@ -3474,11 +3474,18 @@
           });
           portalBootstrapResult = null;
           const quotes = dedupePortalDocuments(portalResult.documents || []);
+          const portalMeta = portalResult.portal || {};
+          portalResolvedClientName = portalMeta.clientName || portalResolvedClientName;
+          clientNameEl.textContent = titleCase(portalResolvedClientName || clientEmail || 'Client');
           if (quotes.length > 0) {
             portalResolvedClientName = quotes[0].client_name || quotes[0].data?.clientName || quotes[0].data?.client_name || '';
             clientNameEl.textContent = titleCase(portalResolvedClientName || clientEmail || 'Client');
           }
           if (!quotes.length) {
+            portalQuotesCache = [];
+            refreshPortalJobFolders();
+            await loadPortalJobAssets();
+            applyPortalTheme(mergePortalTheme(portalDefaultTheme, portalMeta.theme || {}));
             noQuotesEl.classList.remove('d-none');
             return;
           }

@@ -1501,7 +1501,8 @@
             if (!quote) return;
             try {
                 quote = await loadDashboardFullQuote(quote);
-                var data = clearPortalAssignmentForEdit(quote.data || {});
+                var portal = dashboardPortalForDocument(quote);
+                var data = await preparePortalDocumentRemoval(quote, portal);
                 var result = await qdDurableQuoteRowUpdate(quoteId, { data: data }, 'Remove document from portal');
                 if (result.error) throw result.error;
                 quote.data = data;
@@ -1711,6 +1712,11 @@
             return !!(q && q.data && q.data.portal_visible === true);
         }
 
+        function quoteIsPortalAnchorOnly(q) {
+            var data = q && q.data || {};
+            return data.portal_anchor_only === true && data.portal_visible !== true && !!String(data.portal_id || '').trim();
+        }
+
         function stampPortalAddedAt(data) {
             data = data || {};
             if (data.portal_visible === true && !data.portal_added_at) {
@@ -1765,10 +1771,20 @@
             delete data.portal_pin;
             delete data.portal_added_at;
             delete data.portal_placeholder;
+            delete data.portal_anchor_only;
             delete data.portal_theme;
             delete data.portal_share_token;
             delete data.portal_share_anchor_id;
             delete data.portal_share_created_at;
+            return data;
+        }
+
+        function preservePortalAnchorForEdit(data) {
+            data = Object.assign({}, data || {});
+            data.portal_visible = false;
+            data.portal_anchor_only = true;
+            delete data.portal_added_at;
+            delete data.portal_placeholder;
             return data;
         }
 
@@ -1819,6 +1835,9 @@
                 clientEmail: String(record.clientEmail || '').trim(),
                 pin: String(record.pin || '').trim(),
                 theme: record.theme && typeof record.theme === 'object' ? Object.assign({}, record.theme) : {},
+                secureToken: String(record.secureToken || '').trim(),
+                secureAnchorId: String(record.secureAnchorId || '').trim(),
+                secureCreatedAt: String(record.secureCreatedAt || '').trim(),
                 createdAt: String(record.createdAt || '').trim() || new Date().toISOString(),
                 updatedAt: String(record.updatedAt || '').trim()
             };
@@ -1891,13 +1910,14 @@
                     clientName: record.clientName,
                     clientEmail: record.clientEmail,
                     pin: record.pin,
-                    secureToken: '',
-                    secureAnchorId: '',
-                    secureCreatedAt: '',
+                    secureToken: record.secureToken || '',
+                    secureAnchorId: record.secureAnchorId || '',
+                    secureCreatedAt: record.secureCreatedAt || '',
                     registryRecord: record,
                     registryTheme: record.theme || {},
                     quoteIds: [],
-                    quotes: []
+                    quotes: [],
+                    anchorRows: []
                 };
             });
             var seenRows = {};
@@ -1905,7 +1925,8 @@
                 if (!q || !q.id || seenRows[q.id]) return;
                 seenRows[q.id] = true;
                 var d = q.data || {};
-                if (!d.portal_visible) return;
+                var anchorOnly = quoteIsPortalAnchorOnly(q);
+                if (!d.portal_visible && !anchorOnly) return;
                 var key = quotePortalKey(q);
                 var clientName = d.portal_client_name || quoteClientName(q);
                 var clientEmail = d.portal_client_email || quoteClientEmail(q);
@@ -1923,11 +1944,16 @@
                         registryRecord: null,
                         registryTheme: {},
                         quoteIds: [],
-                        quotes: []
+                        quotes: [],
+                        anchorRows: []
                     };
                 }
-                map[key].quoteIds.push(q.id);
-                map[key].quotes.push(q);
+                if (anchorOnly) {
+                    map[key].anchorRows.push(q);
+                } else {
+                    map[key].quoteIds.push(q.id);
+                    map[key].quotes.push(q);
+                }
                 if (!map[key].pin && d.portal_pin) map[key].pin = d.portal_pin;
                 if (!map[key].secureToken && d.portal_share_token) map[key].secureToken = String(d.portal_share_token).trim();
                 if (!map[key].secureAnchorId && d.portal_share_anchor_id) map[key].secureAnchorId = String(d.portal_share_anchor_id).trim();
@@ -1942,6 +1968,10 @@
             return (portal && portal.quotes || []).filter(function(q) {
                 return !quoteIsPortalPlaceholder(q);
             }).length;
+        }
+
+        function portalRowsForDashboard(portal) {
+            return (portal && portal.quotes || []).concat(portal && portal.anchorRows || []);
         }
 
         function portalThemeForDashboard(portal) {
@@ -2176,6 +2206,33 @@
             }) || null;
         }
 
+        async function preparePortalDocumentRemoval(quote, portal) {
+            var original = Object.assign({}, quote && quote.data || {});
+            if (!portal || !original.portal_id) return clearPortalAssignmentForEdit(original);
+            var share = findPortalStableShare(portalRowsForDashboard(portal));
+            var removingActiveAnchor = !!share.anchorId && String(share.anchorId) === String(quote.id);
+            var lastDocument = portalDocumentCount(portal) <= 1;
+
+            if (lastDocument) {
+                await upsertDashboardEmptyPortal({
+                    id: portal.id,
+                    name: portal.name,
+                    clientName: portal.clientName,
+                    clientEmail: portal.clientEmail,
+                    pin: portal.pin,
+                    theme: portalThemeForDashboard(portal),
+                    secureToken: share.token,
+                    secureAnchorId: share.anchorId,
+                    secureCreatedAt: share.createdAt,
+                    createdAt: portal.registryRecord && portal.registryRecord.createdAt || new Date().toISOString()
+                }, 'Preserve empty client portal');
+            }
+
+            return removingActiveAnchor
+                ? preservePortalAnchorForEdit(original)
+                : clearPortalAssignmentForEdit(original);
+        }
+
         async function dashboardPortalUrlForDocument(quote) {
             if (!quote || !quote.data || quote.data.portal_visible !== true) {
                 throw new Error('Add this document to the correct client portal first.');
@@ -2278,8 +2335,9 @@
                 if (registryRecord) {
                     await upsertDashboardEmptyPortal(Object.assign({}, registryRecord, { pin: newPin }), 'Portal PIN');
                 }
-                for (var i = 0; i < portal.quoteIds.length; i++) {
-                    var row = dashboardQuoteRowById(portal.quoteIds[i]);
+                var portalRows = portalRowsForDashboard(portal);
+                for (var i = 0; i < portalRows.length; i++) {
+                    var row = portalRows[i];
                     if (!row) continue;
                     row = await loadDashboardFullQuote(row);
                     var data = Object.assign({}, row.data || {}, { portal_pin: newPin });
@@ -2570,8 +2628,9 @@
                 if (registryRecord) {
                     await upsertDashboardEmptyPortal(Object.assign({}, registryRecord, { theme: theme || {} }), 'Portal theme');
                 }
-                for (var i = 0; i < portal.quoteIds.length; i++) {
-                    var row = dashboardQuoteRowById(portal.quoteIds[i]);
+                var portalRows = portalRowsForDashboard(portal);
+                for (var i = 0; i < portalRows.length; i++) {
+                    var row = portalRows[i];
                     if (!row) continue;
                     row = await loadDashboardFullQuote(row);
                     var data = Object.assign({}, row.data || {});
@@ -2670,11 +2729,11 @@
             var targetTheme = portalThemeForDashboard(targetPortal);
             var hasTargetTheme = !!(targetTheme.headerColor || targetTheme.bgColor || targetTheme.bgColor2 || targetTheme.textColor || targetTheme.bgStyle || targetTheme.bgStrength !== undefined || targetTheme.portalLogo || targetTheme.layoutStyle);
             var targetShare = findPortalStableShare(selectedPortals.reduce(function(rows, portal) {
-                return rows.concat(portal.quotes || []);
+                return rows.concat(portalRowsForDashboard(portal));
             }, []));
             var rowsById = {};
             selectedPortals.forEach(function(portal) {
-                portal.quotes.forEach(function(row) {
+                portalRowsForDashboard(portal).forEach(function(row) {
                     rowsById[row.id] = { row: row, sourcePortalId: portal.id };
                 });
             });
@@ -2689,16 +2748,23 @@
                         continue;
                     }
                     var originalData = row.data || {};
+                    var anchorOnly = quoteIsPortalAnchorOnly(row);
                     var data = Object.assign({}, originalData, {
-                        portal_visible: true,
+                        portal_visible: !anchorOnly,
                         portal_id: durablePortalId,
                         portal_name: targetPortal.name,
                         portal_client_name: targetPortal.clientName || targetPortal.name,
                         portal_client_email: targetPortal.clientEmail || '',
                         portal_pin: targetPin
                     });
-                    stampPortalAddedAt(data);
-                    data = applyPortalStableShareToData(data, targetShare);
+                    if (anchorOnly) {
+                        data.portal_anchor_only = true;
+                        delete data.portal_added_at;
+                    } else {
+                        delete data.portal_anchor_only;
+                        stampPortalAddedAt(data);
+                        data = applyPortalStableShareToData(data, targetShare);
+                    }
                     if (hasTargetTheme) {
                         data.portal_theme = targetTheme;
                     } else {
@@ -2737,7 +2803,7 @@
             var pin = portal.pin || Math.floor(1000 + Math.random() * 9000).toString();
             var portalTheme = portalThemeForDashboard(portal);
             var hasPortalTheme = !!(portalTheme.headerColor || portalTheme.bgColor || portalTheme.bgColor2 || portalTheme.textColor || portalTheme.bgStyle || portalTheme.bgStrength !== undefined || portalTheme.portalLogo || portalTheme.layoutStyle);
-            var portalShare = findPortalStableShare(portal.quotes || []);
+            var portalShare = findPortalStableShare(portalRowsForDashboard(portal));
             var duplicateInPortal = findPortalInvoiceDuplicate(target, portal);
             var idsToUpdate = portal.quoteIds.slice();
             if (duplicateInPortal) idsToUpdate = idsToUpdate.filter(function(id) { return id !== duplicateInPortal.id; });
@@ -2768,6 +2834,7 @@
                         portal_client_email: portal.clientEmail || quoteClientEmail(target),
                         portal_pin: pin
                     });
+                    delete data.portal_anchor_only;
                     stampPortalAddedAt(data);
                     data = applyPortalStableShareToData(data, portalShare);
                     if (hasPortalTheme) {
@@ -2843,7 +2910,7 @@
 
         async function confirmRemoveDocumentFromPortal(quote) {
             var title = quote ? getQuoteDisplayTitle(quote) : 'this document';
-            var message = 'Are you sure you want to remove this document from the client portal? If you add it back later, the portal will show the new date it was added.';
+            var message = 'Are you sure you want to remove this document from the client portal? The portal and its existing client link will stay active. If you add the document back later, the portal will show the new date it was added.';
             if (title) message += '\n\nDocument: ' + title;
             if (typeof qdConfirm === 'function') {
                 return await qdConfirm(message, {
@@ -2865,7 +2932,8 @@
             if (!confirmed) return;
             try {
                 target = await loadDashboardFullQuote(target);
-                var data = clearPortalAssignmentForEdit(target.data || {});
+                var portal = dashboardPortalForDocument(target);
+                var data = await preparePortalDocumentRemoval(target, portal);
                 var result = await qdDurableQuoteRowUpdate(quoteId, { data: data }, 'Remove document from portal');
                 if (result.error) throw result.error;
                 await refreshQuotes();
@@ -2886,8 +2954,9 @@
                 if (registryRecord) {
                     await upsertDashboardEmptyPortal(Object.assign({}, registryRecord, { name: newName }), 'Rename portal');
                 }
-                for (var i = 0; i < portal.quoteIds.length; i++) {
-                    var row = dashboardQuoteRowById(portal.quoteIds[i]);
+                var portalRows = portalRowsForDashboard(portal);
+                for (var i = 0; i < portalRows.length; i++) {
+                    var row = portalRows[i];
                     if (!row) continue;
                     row = await loadDashboardFullQuote(row);
                     var data = Object.assign({}, row.data || {}, { portal_name: newName });
@@ -2908,8 +2977,9 @@
             if (!(await qdConfirm('Remove this portal from ' + docCount + ' document' + (docCount === 1 ? '' : 's') + '?'))) return;
             try {
                 await removeDashboardEmptyPortal(portalId, 'Delete client portal');
-                for (var i = 0; i < portal.quoteIds.length; i++) {
-                    var row = dashboardQuoteRowById(portal.quoteIds[i]);
+                var portalRows = portalRowsForDashboard(portal);
+                for (var i = 0; i < portalRows.length; i++) {
+                    var row = portalRows[i];
                     if (!row) continue;
                     row = await loadDashboardFullQuote(row);
                     if (quoteIsPortalPlaceholder(row)) {
