@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Accepted upgrade summary browser fixture</title>
+  <style>html,body,iframe{width:100%;height:100%;margin:0;border:0}</style>
+</head>
+<body>
+  <iframe id="viewer" title="Synthetic accepted quote" src="../interactive-quote-viewer.html?quote_studio=1"></iframe>
+  <script>
+    const viewer = document.getElementById('viewer');
+    const baseItem = {
+      id: 'patio-door', name: 'Sliding Patio Door Manufacture and Supply',
+      description: 'Sliding Patio Door Manufacture and Supply', quantity: 1, unitType: 'Flatrate',
+      rate: 3306.10, total: 3306.10, itemDescription: 'Manufacture, supply, and install the patio door.'
+    };
+    const acceptedItem = Object.assign({}, baseItem, {
+      rate: 1653.05, total: 1653.05, upgraded: true,
+      upgrade: {
+        id: 'pet-screen', name: 'Heavy-Duty Pet Screen Upgrade', type: 'replacement', rate: 1653.05,
+        description: 'Upgrade the standard fiberglass screen mesh to an ultra-durable, heavy-duty vinyl-coated polyester insect screen engineered to resist tears, punctures, and pet damage.'
+      }
+    });
+    const quote = {
+      id: 'synthetic-accepted-upgrades', quoteNumber: 'SYNTHETIC-UPGRADES', status: 'accepted',
+      clientName: 'Synthetic Client', projectAddress: 'Synthetic Project',
+      rooms: [{ name: 'Doors & Trim', items: [acceptedItem] }],
+      original_rooms: [{ name: 'Doors & Trim', items: [baseItem] }],
+      client_upgraded: true, client_upgraded_at: '2026-08-18T12:00:00.000Z',
+      taxEnabled: true, taxRate: 0.13, taxLabel: 'HST', currency: 'CAD',
+      grandTotal: 1866.95, total: 1866.95,
+      payment_terms: { version: 2, deposit_required: false, kind: 'none' },
+      signed_by: 'Synthetic Client', signed_at: '2026-08-18T12:00:00.000Z',
+      style: { showUpgrades: true, approvalMode: 'accept' }, terms: ['Synthetic browser fixture only.']
+    };
+    window.addEventListener('message', event => {
+      if (event.origin === window.location.origin && event.data && event.data.type === 'quotedr-quote-studio-ready') {
+        viewer.contentWindow.postMessage({ type: 'quotedr-quote-studio-document', version: 1, quote, style: quote.style }, window.location.origin);
+      }
+    });
+  </script>
+</body>
+</html>

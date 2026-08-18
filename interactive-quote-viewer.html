@@ -973,6 +973,112 @@
         .viewer-line-description .item-description {
             margin-bottom: 0 !important;
         }
+        .selected-upgrades-summary {
+            margin-bottom: 1.5rem;
+            border: 1px solid rgba(22, 101, 52, 0.24);
+            border-left: 5px solid #198754;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #f3fff8, #ffffff);
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.07);
+            overflow: hidden;
+        }
+        .selected-upgrades-summary-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 1rem 1.1rem 0.85rem;
+            border-bottom: 1px solid rgba(22, 101, 52, 0.14);
+        }
+        .selected-upgrades-summary-title {
+            margin: 0;
+            color: #14532d;
+            font-size: 1.05rem;
+            font-weight: 850;
+        }
+        .selected-upgrades-count {
+            flex: 0 0 auto;
+            border-radius: 999px;
+            background: #198754;
+            color: #fff;
+            padding: 0.2rem 0.65rem;
+            font-size: 0.75rem;
+            font-weight: 800;
+        }
+        .selected-upgrades-list {
+            padding: 0.25rem 1.1rem 0.6rem;
+        }
+        .selected-upgrade-item {
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .selected-upgrade-item:last-child { border-bottom: 0; }
+        .selected-upgrade-item summary {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.7rem;
+            padding: 0.8rem 0;
+            cursor: pointer;
+            list-style: none;
+        }
+        .selected-upgrade-item summary::-webkit-details-marker { display: none; }
+        .selected-upgrade-check {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.65rem;
+            height: 1.65rem;
+            flex: 0 0 1.65rem;
+            border-radius: 50%;
+            background: #dcfce7;
+            color: #15803d;
+            margin-top: 0.05rem;
+        }
+        .selected-upgrade-copy { min-width: 0; flex: 1 1 auto; }
+        .selected-upgrade-name {
+            display: block;
+            color: #111827;
+            font-weight: 850;
+            line-height: 1.3;
+        }
+        .selected-upgrade-context {
+            display: block;
+            margin-top: 0.2rem;
+            color: #64748b;
+            font-size: 0.78rem;
+            line-height: 1.35;
+        }
+        .selected-upgrade-type {
+            display: inline-block;
+            margin-left: 0.35rem;
+            border-radius: 999px;
+            background: #ecfdf5;
+            color: #166534;
+            padding: 0.08rem 0.45rem;
+            font-size: 0.68rem;
+            font-weight: 800;
+            vertical-align: 0.1rem;
+        }
+        .selected-upgrade-chevron {
+            color: #64748b;
+            margin-top: 0.3rem;
+            transition: transform 0.16s ease;
+        }
+        .selected-upgrade-item[open] .selected-upgrade-chevron { transform: rotate(180deg); }
+        .selected-upgrade-description {
+            margin: -0.15rem 0 0.85rem 2.35rem;
+            padding: 0.75rem 0.85rem;
+            border-radius: 8px;
+            background: #f8fafc;
+            color: #475569;
+            font-size: 0.86rem;
+            line-height: 1.5;
+        }
+        .selected-upgrade-item-static {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.7rem;
+            padding: 0.8rem 0;
+        }
         .item-description {
             font-size: 0.88rem;
             line-height: 1.45;
@@ -995,6 +1101,18 @@
             .viewer-line-price {
                 min-width: 0;
             }
+            .selected-upgrades-summary-header,
+            .selected-upgrades-list {
+                padding-left: 0.85rem;
+                padding-right: 0.85rem;
+            }
+            .selected-upgrade-description {
+                margin-left: 0;
+            }
+        }
+        @media print {
+            .selected-upgrade-description { display: block !important; }
+            .selected-upgrade-chevron { display: none; }
         }
         .pdf-print-tip-visual {
             background: #26272b;
@@ -3406,6 +3524,69 @@ if (location.search.includes('debug')) {
             return String(option.description || option.itemDescription || option.notes || option.user_note || '').trim();
         }
 
+        function collectViewerSelectedUpgradeSummaryEntries() {
+            var entries = [];
+            var seen = {};
+            (quoteData.rooms || []).forEach(function(room, roomIdx) {
+                (room.items || []).forEach(function(item, itemIndex) {
+                    if (!item || item._removed) return;
+                    var originalItem = quoteData.original_rooms && quoteData.original_rooms[roomIdx]
+                        && quoteData.original_rooms[roomIdx].items && quoteData.original_rooms[roomIdx].items[itemIndex];
+                    var baseTitle = String(
+                        (originalItem && (originalItem.description || originalItem.name))
+                        || item._baseDescription
+                        || item.name
+                        || item.description
+                        || ''
+                    ).trim();
+                    var selected = getViewerSelectedItemUpgradeOptions(item);
+                    if (item.choiceGroup) {
+                        selected = selected.concat(getViewerSelectedEnhancementOptions(item.choiceGroup));
+                    }
+                    selected.forEach(function(option) {
+                        var name = String(option.name || option.sourceItemName || 'Upgrade').trim();
+                        var identity = [roomIdx, itemIndex, option.id || viewerUpgradeRuntimeTextKey(name)].join(':');
+                        if (seen[identity]) return;
+                        seen[identity] = true;
+                        var groupName = String(option.upgradeGroupName || option.enhancementGroupName || '').trim();
+                        var context = [String(room.name || '').trim()];
+                        if (baseTitle && viewerUpgradeRuntimeTextKey(baseTitle) !== viewerUpgradeRuntimeTextKey(name)) context.push(baseTitle);
+                        if (groupName && !['upgrade options', 'enhancements'].includes(viewerUpgradeRuntimeTextKey(groupName))) context.push(groupName);
+                        entries.push({
+                            name: name,
+                            description: getViewerUpgradeOptionDescription(option),
+                            context: context.filter(Boolean).join(' · '),
+                            typeLabel: isViewerConsultationUpgradeOption(option)
+                                ? 'Consultation'
+                                : (option.upgradeType === 'replacement' ? 'Replacement' : 'Add-on')
+                        });
+                    });
+                });
+            });
+            return entries;
+        }
+
+        function renderViewerSelectedUpgradeSummary() {
+            if (!quoteIsAccepted()) return '';
+            var entries = collectViewerSelectedUpgradeSummaryEntries();
+            if (!entries.length) return '';
+            var html = '<section class="selected-upgrades-summary" aria-labelledby="selectedUpgradesHeading">';
+            html += '<div class="selected-upgrades-summary-header"><div><h3 class="selected-upgrades-summary-title" id="selectedUpgradesHeading"><i class="fas fa-circle-check me-2"></i>Selected upgrades</h3>';
+            html += '<div class="text-muted small mt-1">Chosen on this accepted quote. Tap an upgrade to view its description.</div></div>';
+            html += '<span class="selected-upgrades-count">' + entries.length + ' selected</span></div><div class="selected-upgrades-list">';
+            entries.forEach(function(entry) {
+                var title = '<span class="selected-upgrade-check"><i class="fas fa-check"></i></span><span class="selected-upgrade-copy"><span class="selected-upgrade-name">' + escapeHtml(entry.name) + ' <span class="selected-upgrade-type">' + escapeHtml(entry.typeLabel) + '</span></span>' + (entry.context ? '<span class="selected-upgrade-context">' + escapeHtml(entry.context) + '</span>' : '') + '</span>';
+                if (entry.description) {
+                    html += '<details class="selected-upgrade-item"><summary>' + title + '<i class="fas fa-chevron-down selected-upgrade-chevron" aria-hidden="true"></i></summary>';
+                    html += '<div class="selected-upgrade-description">' + formatDescriptionText(entry.description) + '</div></details>';
+                } else {
+                    html += '<div class="selected-upgrade-item selected-upgrade-item-static">' + title + '</div>';
+                }
+            });
+            html += '</div></section>';
+            return html;
+        }
+
         function viewerUpgradeDescriptionPanelId(roomIdx, itemIndex, groupId, optionId) {
             return 'viewer-upgrade-desc-' + viewerUpgradeDomIdPart(roomIdx) + '-' + viewerUpgradeDomIdPart(itemIndex) + '-' + viewerUpgradeDomIdPart(groupId) + '-' + viewerUpgradeDomIdPart(optionId);
         }
@@ -4499,6 +4680,8 @@ if (location.search.includes('debug')) {
                     '<div class="text-muted small">Items marked <span class="badge bg-success">\u2B06 Upgraded</span> were selected as upgrades. Items marked <span class="badge bg-danger">Removed</span> were removed before approval. Original values are shown in grey.</div>' +
                     '</div>';
             }
+
+            html += renderViewerSelectedUpgradeSummary();
 
             // Match color presets from quote builder
             const ROOM_COLORS = [
