@@ -36,7 +36,7 @@ assert(
 assert(
   viewer.includes('var _vTaxEnabled = quoteData.taxEnabled !== false;') &&
     viewer.includes('taxEnabled: _vTaxEnabled') &&
-    viewer.includes('updateQuoteTotalBreakdown(subtotal, tax, total, _vTaxLabel, _vTaxRate, paymentReceivedAmount, _vTaxEnabled)'),
+    viewer.includes('updateQuoteTotalBreakdown(baseSubtotal, tax, total, _vTaxLabel, _vTaxRate, paymentReceivedAmount, _vTaxEnabled)'),
   'interactive quote viewer should respect quoteData.taxEnabled without using settings to re-enable tax'
 );
 

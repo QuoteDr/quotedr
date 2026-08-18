@@ -32,6 +32,26 @@ test('selected add-ons change the same total used by the payment request', () =>
   assert.equal(withAddon.requiredDepositCents + withAddon.remainingAfterDepositCents, withAddon.payableTotalCents);
 });
 
+test('accepted quote breakdown separates base subtotal while room and payment totals include upgrades', () => {
+  const baseSubtotalCents = 320305;
+  const selectedUpgradeCents = 63779;
+  const roomTotalCents = baseSubtotalCents + selectedUpgradeCents;
+  const result = payable.calculate({
+    subtotal: roomTotalCents / 100,
+    taxRate: 0.13,
+    taxEnabled: true,
+    terms: { deposit_required: true, kind: 'percent', percent: 50 }
+  });
+  assert.equal(roomTotalCents, 384084, 'room total includes the selected upgrades');
+  assert.equal(result.subtotalCents, roomTotalCents, 'taxable subtotal is base plus selected upgrades');
+  assert.equal(result.taxCents, 49931);
+  assert.equal(result.payableTotalCents, 434015);
+  assert.equal(result.requiredDepositCents, 217008);
+  assert.equal(result.remainingAfterDepositCents, 217007);
+  assert.equal(baseSubtotalCents + selectedUpgradeCents + result.taxCents, result.payableTotalCents);
+  assert.equal(result.requiredDepositCents + result.remainingAfterDepositCents, result.payableTotalCents);
+});
+
 test('tax, tax-exempt, percentage, fixed, paid, and odd-cent contracts are deterministic', () => {
   const taxExempt = payable.calculate({ subtotal: 100.01, taxEnabled: false, terms: { deposit_required: true, kind: 'percent', percent: 50 } });
   assert.equal(taxExempt.taxCents, 0);
@@ -65,7 +85,10 @@ test('builder, viewer, invoice, save, and cross-quote paths use the canonical co
     assert(source.includes('QuoteDrPayableTotal.calculate({'));
   }
   assert(viewer.includes('<span>Subtotal</span>'));
-  assert(viewer.includes('Selected upgrades (included above)'));
+  assert(viewer.includes('<span>Selected upgrades</span>'));
+  assert(!viewer.includes('Selected upgrades (included above)'));
+  assert(viewer.includes('item._undiscountedTotal = lineTotal;'));
+  assert(viewer.includes('function viewerRoomPayableComponents(room)'));
   assert(viewer.includes('var liveTotalCents = Math.max(0, Math.round(Number(_quoteTotalCents'));
   assert(!viewer.includes('quoteData.accepted_total_cents || quoteData.quoted_total_cents || _quoteTotal'));
   assert(storage.includes('quoted_total_cents: payableTotalCents'));

@@ -12,15 +12,16 @@ assert(
   'marked-up room pricing should multiply raw values by the room markup factor'
 );
 assert(
-  source.includes('const itemMarkupFactor = viewerItemMarkupFactor(room, item);'),
-  'live quote totals should calculate the effective markup factor for each item'
+  source.includes('function viewerRoomPayableComponents(room)'),
+  'live quote totals should centralize the room payable components'
 );
 assert(
-  source.includes('subtotal += activeTotal * itemMarkupFactor;'),
+  source.includes('var totalCents = Math.round(viewerItemMarkedAmount(room, item, qvLineTotal(item)) * 100);'),
   'live quote subtotals should include combined room and item markup'
 );
 assert(
-  source.includes('upgradesTotal += (activeTotal - baseTotal) * itemMarkupFactor;'),
+  source.includes('var baseCents = Math.round(viewerItemMarkedAmount(room, item, qvBaseLineTotal(item)) * 100);') &&
+    source.includes('components.upgradeCents += totalCents - baseCents;'),
   'selected upgrade summaries should include effective item markup'
 );
 assert(

@@ -135,6 +135,28 @@ const reopenedUpgradeItem = Object.assign({}, baseOnlyUpgradeItem, { total: 375 
 assert(money(discounts.originalTotal(reopenedUpgradeItem)) === 550, 'reopened quote should use persisted gross total instead of discounting a charged total twice');
 assert(money(discounts.chargedTotal(reopenedUpgradeItem)) === 375, 'reopened quote should preserve the charged total');
 
+const acceptedGroupedUpgrade = {
+  quantity: 1,
+  rate: 3495.59,
+  total: 3943.89,
+  upgraded: true,
+  _baseQuantity: 1,
+  _baseRate: 3306.10,
+  _undiscountedTotal: 3943.89,
+  discountType: 'percent',
+  discountValue: 50,
+  discountAppliesToUpgrades: false
+};
+assert(money(discounts.chargedTotal(acceptedGroupedUpgrade)) === 2290.84, 'accepted grouped upgrades should remain payable after a base-only discount');
+const acceptedGroupedBase = Object.assign({}, acceptedGroupedUpgrade, {
+  upgraded: false,
+  rate: 3306.10,
+  total: undefined,
+  _undiscountedTotal: 3306.10
+});
+assert(money(discounts.chargedTotal(acceptedGroupedBase)) === 1653.05, 'the corresponding pre-upgrade base should retain its own discounted amount');
+assert(money(discounts.chargedTotal(acceptedGroupedUpgrade) - discounts.chargedTotal(acceptedGroupedBase)) === 637.79, 'the screenshot-class selected upgrades should reconcile exactly');
+
 const freeItem = { quantity: 2, rate: 425 };
 discounts.applyMakeFree(freeItem, 'Courtesy upgrade');
 

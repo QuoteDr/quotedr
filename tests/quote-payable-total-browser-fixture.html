@@ -6,8 +6,8 @@
   <title>Quote payable total browser fixture</title>
   <style>
     html, body { margin: 0; min-height: 100%; font-family: system-ui, sans-serif; }
-    .controls { position: sticky; top: 0; z-index: 2; display: flex; gap: .5rem; padding: .5rem; background: #fff; border-bottom: 1px solid #ddd; }
-    iframe { width: 100%; height: calc(100vh - 50px); border: 0; }
+    .controls { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: .5rem; max-width: 390px; padding: .5rem; background: #fff; border-bottom: 1px solid #ddd; }
+    iframe { display: block; width: min(100%, 390px); height: calc(100vh - 82px); border: 0; }
   </style>
 </head>
 <body>
@@ -46,7 +46,16 @@
     };
     const acceptedRefresh = {
       quoteNumber: 'SYNTHETIC-REFRESH', clientName: 'Synthetic Client', quoteTitle: 'Accepted refresh regression',
-      rooms: [{ name: 'Project', items: [{ id: 'line-refresh', name: 'Original base scope', quantity: 1, rate: 3203.05, total: 3203.05 }] }],
+      rooms: [{ name: 'Project', items: [{
+        id: 'line-refresh', name: 'Sliding patio door', description: 'Sliding patio door',
+        quantity: 1, rate: 3306.10, total: 3306.10, _undiscountedTotal: 3306.10,
+        discountType: 'percent', discountValue: 50, discountAppliesToUpgrades: false,
+        upgradeGroups: [{
+          id: 'door-addons', name: 'Selected upgrades', type: 'multiple',
+          selectedOptionIds: ['door-upgrade'],
+          options: [{ id: 'door-upgrade', name: 'Pet screen and security lock', rate: 637.79, upgradeType: 'add_on', quantityMode: 'parent' }]
+        }]
+      }, { id: 'line-refresh-2', name: 'Remaining base scope', quantity: 1, rate: 1550, total: 1550 }] }],
       status: 'accepted', signed_at: '2026-08-18T12:00:00.000Z', client_upgraded: true,
       taxEnabled: true, taxRate: 0.13, taxLabel: 'HST', currency: 'CAD',
       grandTotal: 4340.15, total: 4340.15, accepted_total_cents: 361945,

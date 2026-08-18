@@ -2541,10 +2541,18 @@ if (location.search.includes('debug')) {
 
         function qvBaseLineTotal(item) {
             if (!item || !item.upgraded) return qvLineTotal(item);
+            var baseQuantity = item._baseQuantity !== undefined && item._baseQuantity !== null
+                ? Math.max(0, viewerNumber(item._baseQuantity))
+                : Math.max(0, viewerNumber(item.quantity));
+            var baseRate = item._baseRate !== undefined && item._baseRate !== null
+                ? Math.max(0, viewerNumber(item._baseRate))
+                : Math.max(0, viewerNumber(item.rate));
             var baseItem = Object.assign({}, item, {
                 upgraded: false,
-                rate: item._baseRate !== undefined && item._baseRate !== null ? item._baseRate : item.rate,
-                total: item._baseTotal !== undefined && item._baseTotal !== null ? item._baseTotal : undefined
+                rate: baseRate,
+                quantity: baseQuantity,
+                total: item._baseTotal !== undefined && item._baseTotal !== null ? item._baseTotal : undefined,
+                _undiscountedTotal: baseQuantity * baseRate
             });
             return qvLineTotal(baseItem);
         }
@@ -3504,9 +3512,28 @@ if (location.search.includes('debug')) {
                 return isViewerPriceTbd(option) && option.upgradeType === 'replacement';
             }) || basePriceTbd;
             item.pricingMode = item.priceTbd ? 'tbd' : 'fixed';
+            // Discount math needs the current gross line total. Accepted quotes can
+            // carry a stale base-only _undiscountedTotal from before client upgrades.
+            item._undiscountedTotal = lineTotal;
             item.total = lineTotal;
             item.selectedUpgradeOptionIds = selectedOptions.map(function(option) { return option.id; });
             return item;
+        }
+
+        function viewerRoomPayableComponents(room) {
+            var components = { baseCents: 0, upgradeCents: 0, totalCents: 0 };
+            (room && room.items || []).forEach(function(item) {
+                applyViewerChoiceGroupToItem(item);
+                if (!item.choiceGroup) applyViewerItemUpgradeGroups(item);
+                syncViewerOptionalItemState(item);
+                if (item._removed) return;
+                var totalCents = Math.round(viewerItemMarkedAmount(room, item, qvLineTotal(item)) * 100);
+                var baseCents = Math.round(viewerItemMarkedAmount(room, item, qvBaseLineTotal(item)) * 100);
+                components.baseCents += baseCents;
+                components.upgradeCents += totalCents - baseCents;
+                components.totalCents += totalCents;
+            });
+            return components;
         }
 
         function resetViewerItemUpgradeBaseState(item) {
@@ -4704,11 +4731,10 @@ if (location.search.includes('debug')) {
             ];
 
             quoteData.rooms.forEach((room, roomIdx) => {
-                (room.items || []).forEach(function(item) {
-                    syncViewerOptionalItemState(item);
-                    applyViewerChoiceGroupToItem(item);
-                });
-                const roomTotal = room.items.reduce((sum, item) => item._removed ? sum : sum + (isChangeOrder ? viewerChangeOrderLineDisplayTotal(item, room) : viewerItemMarkedAmount(room, item, qvLineTotal(item))), 0);
+                const roomComponents = viewerRoomPayableComponents(room);
+                const roomTotal = isChangeOrder
+                    ? room.items.reduce((sum, item) => item._removed ? sum : sum + viewerChangeOrderLineDisplayTotal(item, room), 0)
+                    : roomComponents.totalCents / 100;
                 const headerBg = roomHeaderBackground(room, ROOM_COLORS[room.colorIndex ?? 0] || ROOM_COLORS[0]);
 
                 html += `
@@ -5137,22 +5163,18 @@ if (location.search.includes('debug')) {
             var heroLabel = document.getElementById('heroTotalLabel');
             if (heroLabel) heroLabel.textContent = isChangeOrder ? 'Current Adjustments' : 'Current Total';
             // Recalculate from live quoteData (respects upgrades)
-            let subtotal = 0;
-            let upgradesTotal = 0;
+            let subtotalCents = 0;
+            let baseSubtotalCents = 0;
             if (quoteData.rooms) {
                 quoteData.rooms.forEach(room => {
-                    room.items.forEach(item => {
-                        applyViewerChoiceGroupToItem(item);
-                        syncViewerOptionalItemState(item);
-                        if (item._removed) return; // skip removed items
-                        const baseTotal = qvBaseLineTotal(item);
-                        const activeTotal = qvLineTotal(item);
-                        const itemMarkupFactor = viewerItemMarkupFactor(room, item);
-                        subtotal += activeTotal * itemMarkupFactor;
-                        if (item.upgraded) upgradesTotal += (activeTotal - baseTotal) * itemMarkupFactor;
-                    });
+                    var roomComponents = viewerRoomPayableComponents(room);
+                    subtotalCents += roomComponents.totalCents;
+                    baseSubtotalCents += roomComponents.baseCents;
                 });
             }
+            let subtotal = QuoteDrPayableTotal.fromCents(subtotalCents);
+            let baseSubtotal = QuoteDrPayableTotal.fromCents(baseSubtotalCents);
+            let upgradesTotal = QuoteDrPayableTotal.fromCents(subtotalCents - baseSubtotalCents);
             var _vqp = {}; try { _vqp = JSON.parse(localStorage.getItem('ald_quote_prefs')||'{}'); } catch(e) {}
             var _vTaxRate = (quoteData.taxRate !== undefined && quoteData.taxRate !== '')
                 ? parseFloat(quoteData.taxRate)
@@ -5160,7 +5182,7 @@ if (location.search.includes('debug')) {
             if (!isFinite(_vTaxRate) || _vTaxRate < 0) _vTaxRate = quoteData.taxRate || 0.13;
             var _vTaxLabel = quoteData.taxLabel || _vqp.taxLabel || 'HST';
             var _vTaxEnabled = quoteData.taxEnabled !== false;
-            var liveSubtotal = subtotal;
+            var liveBaseSubtotal = baseSubtotal;
             var adjustmentAmount = calculateViewerQuoteAdjustmentAmount(subtotal);
             var payable = QuoteDrPayableTotal.calculate({
                 subtotal: subtotal,
@@ -5180,21 +5202,23 @@ if (location.search.includes('debug')) {
                     paidCents: lockedPaidCents,
                     balanceDueCents: Math.max(0, lockedSnapshot.totalCents - lockedPaidCents)
                 };
-                var recoveredSelectionAmount = subtotal - liveSubtotal;
-                if (recoveredSelectionAmount > upgradesTotal) upgradesTotal = recoveredSelectionAmount;
+                // The accepted snapshot stores the complete pre-tax subtotal. Keep
+                // the live base amount and allocate its residual to signed upgrades.
+                upgradesTotal = subtotal - liveBaseSubtotal;
+                baseSubtotal = liveBaseSubtotal;
             }
             var tax = QuoteDrPayableTotal.fromCents(payable.taxCents);
             var total = QuoteDrPayableTotal.fromCents(payable.payableTotalCents);
             var paymentReceivedAmount = QuoteDrPayableTotal.fromCents(payable.paidCents);
             var balanceDue = QuoteDrPayableTotal.fromCents(payable.balanceDueCents);
-            updateQuoteTotalBreakdown(subtotal, tax, total, _vTaxLabel, _vTaxRate, paymentReceivedAmount, _vTaxEnabled);
+            updateQuoteTotalBreakdown(baseSubtotal, tax, total, _vTaxLabel, _vTaxRate, paymentReceivedAmount, _vTaxEnabled);
             updateViewerTbdDisplay(countViewerTbdSelections());
 
             var upgradesEl = document.getElementById('upgradesTotalDisplay');
             if (upgradesEl) {
-                upgradesEl.style.display = upgradesTotal > 0 ? 'flex' : 'none';
-                upgradesEl.innerHTML = upgradesTotal > 0
-                    ? `<span>Selected upgrades (included above)</span><strong>${viewerMoney(upgradesTotal, { forceSign: true })}</strong>`
+                upgradesEl.style.display = Math.abs(upgradesTotal) > 0.0001 ? 'flex' : 'none';
+                upgradesEl.innerHTML = Math.abs(upgradesTotal) > 0.0001
+                    ? `<span>Selected upgrades</span><strong>${viewerMoney(upgradesTotal, { forceSign: true })}</strong>`
                     : '';
             }
             var adjustmentEl = document.getElementById('quoteAdjustmentTotalDisplay');
