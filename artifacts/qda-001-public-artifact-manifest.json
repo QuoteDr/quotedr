@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "outputDirectory": "dist",
-  "fileCount": 105,
-  "totalBytes": 22598533,
-  "treeSha256": "85e50a2a62adb2757a81c41ec03795c514bafa5d1219e1968ff8fe0c15410847",
+  "fileCount": 106,
+  "totalBytes": 22607743,
+  "treeSha256": "9b00e87d1891bba9240e378ff32a22daa6ef8115681c08d1abe3ac37fc37ed7c",
   "files": [
     {
       "path": "404.html",
@@ -222,13 +222,13 @@
     },
     {
       "path": "interactive-quote-viewer.html",
-      "bytes": 321879,
-      "sha256": "db2f2f8c7322115fb3015b771063a10dbb59dec8ea881c84772bcb74c707c415"
+      "bytes": 324391,
+      "sha256": "6506ae51f0103f08519f6d580051074524566caad6e0c790bf3d5f4db46510b7"
     },
     {
       "path": "invoice-viewer.html",
-      "bytes": 135906,
-      "sha256": "816c0686b851062e898041278094f43035cb9d7d6c57a91d8e405a0202039631"
+      "bytes": 136469,
+      "sha256": "821c80e74946493335b59d4f36576b6d44179551d291ddff2b588edb20daae52"
     },
     {
       "path": "labor-tracker.html",
@@ -317,8 +317,8 @@
     },
     {
       "path": "quote-builder.html",
-      "bytes": 1379431,
-      "sha256": "536303530202208b34771df853299deb762da0b96bc57057ff26ed80f874d2c2"
+      "bytes": 1381492,
+      "sha256": "fbc9721dd8d68a24484d631b75f01a92197e81d5038b66eff18d2d6fd786fd97"
     },
     {
       "path": "quote-calculators.js",
@@ -366,6 +366,11 @@
       "sha256": "cf7d54a0bec68c2ca5b7b1398aa82660eb5915b24f7bda6f3a41b6d04a3054d7"
     },
     {
+      "path": "quote-payable-total.js",
+      "bytes": 2557,
+      "sha256": "70a715fff0c8c2c781d4f1722d6d85d27220093de2e29fe516ad84c8f7864ea0"
+    },
+    {
       "path": "quote-review-construction-knowledge.js",
       "bytes": 76885,
       "sha256": "429718e0b59444d1571517a59536d0b29a0159bbb5a17a540ec5824800ea8f02"
@@ -382,8 +387,8 @@
     },
     {
       "path": "quote-storage.js",
-      "bytes": 134632,
-      "sha256": "312911b66c3f92e78f1b87560796af5fb2cb05614dd228523365a4140cc5aa3f"
+      "bytes": 135797,
+      "sha256": "9760155c4d418b98cc640671d9a2d91489ad5ee0122d9faadc7f13ed6e52dbbf"
     },
     {
       "path": "quote-style.js",
@@ -437,8 +442,8 @@
     },
     {
       "path": "supabase-v2.js",
-      "bytes": 176715,
-      "sha256": "fec910e01bbe0519dd4a70cbbcaeab018ae26465c6ccf02a12e2e28649a76a73"
+      "bytes": 177067,
+      "sha256": "f28af3d6bc526829ebb038db4b36cbc8ef9bbdefa0863baa6ef8f7c901e54769"
     },
     {
       "path": "sw.js",

@@ -1484,7 +1484,7 @@ if (location.search.includes('debug')) {
                 <div class="total-status">Client-ready total</div>
             </div>
             <div class="total-row">
-                <span>Subtotal</span>
+                <span>Items subtotal (includes selections)</span>
                 <strong id="quoteSubtotalDisplay">$0.00</strong>
             </div>
             <div class="total-row" id="upgradesTotalDisplay" style="display:none;"></div>
@@ -1786,6 +1786,7 @@ if (location.search.includes('debug')) {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="quote-dialogs.js?v=2026071501"></script>
     <script src="quote-discounts.js?v=2026081602"></script>
+    <script src="quote-payable-total.js?v=2026081801"></script>
     <script src="client-document-decisions.js?v=2026080801"></script>
     <script src="typed-signature.js?v=2026080301"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -2281,6 +2282,9 @@ if (location.search.includes('debug')) {
         }
 
         async function loadQuoteFromURL() {
+            _documentPaymentState = null;
+            _quoteTotal = 0;
+            _quoteTotalCents = 0;
             const params = new URLSearchParams(window.location.search);
             const quoteId = params.get('id');
             const shareToken = params.get('token') || '';
@@ -4905,16 +4909,25 @@ if (location.search.includes('debug')) {
                 });
             }
             var _vqp = {}; try { _vqp = JSON.parse(localStorage.getItem('ald_quote_prefs')||'{}'); } catch(e) {}
-            var _vTaxRate = (_vqp.taxRate !== undefined && _vqp.taxRate !== '') ? parseFloat(_vqp.taxRate)/100 : (quoteData.taxRate || 0.13);
+            var _vTaxRate = (quoteData.taxRate !== undefined && quoteData.taxRate !== '')
+                ? parseFloat(quoteData.taxRate)
+                : ((_vqp.taxRate !== undefined && _vqp.taxRate !== '') ? parseFloat(_vqp.taxRate) / 100 : 0.13);
             if (!isFinite(_vTaxRate) || _vTaxRate < 0) _vTaxRate = quoteData.taxRate || 0.13;
             var _vTaxLabel = quoteData.taxLabel || _vqp.taxLabel || 'HST';
             var _vTaxEnabled = quoteData.taxEnabled !== false;
             const adjustmentAmount = calculateViewerQuoteAdjustmentAmount(subtotal);
             const taxableSubtotal = subtotal + adjustmentAmount;
-            const tax = _vTaxEnabled ? taxableSubtotal * _vTaxRate : 0;
-            const total = taxableSubtotal + tax;
-            const paymentReceivedAmount = calculateViewerPaymentsReceivedAmount(total);
-            const balanceDue = Math.max(total - paymentReceivedAmount, 0);
+            var payable = QuoteDrPayableTotal.calculate({
+                subtotal: subtotal,
+                adjustment: adjustmentAmount,
+                taxRate: _vTaxRate,
+                taxEnabled: _vTaxEnabled,
+                paid: getViewerPaymentsReceived().amount || 0
+            });
+            const tax = QuoteDrPayableTotal.fromCents(payable.taxCents);
+            const total = QuoteDrPayableTotal.fromCents(payable.payableTotalCents);
+            const paymentReceivedAmount = QuoteDrPayableTotal.fromCents(payable.paidCents);
+            const balanceDue = QuoteDrPayableTotal.fromCents(payable.balanceDueCents);
             updateQuoteTotalBreakdown(subtotal, tax, total, _vTaxLabel, _vTaxRate, paymentReceivedAmount, _vTaxEnabled);
             updateViewerTbdDisplay(countViewerTbdSelections());
 
@@ -4922,7 +4935,7 @@ if (location.search.includes('debug')) {
             if (upgradesEl) {
                 upgradesEl.style.display = upgradesTotal > 0 ? 'flex' : 'none';
                 upgradesEl.innerHTML = upgradesTotal > 0
-                    ? `<span>Selected upgrades</span><strong>${viewerMoney(upgradesTotal, { forceSign: true })}</strong>`
+                    ? `<span>Selected upgrades (included above)</span><strong>${viewerMoney(upgradesTotal, { forceSign: true })}</strong>`
                     : '';
             }
             var adjustmentEl = document.getElementById('quoteAdjustmentTotalDisplay');
@@ -4936,15 +4949,17 @@ if (location.search.includes('debug')) {
             }
 
             var depositSummary = document.getElementById('depositSummary');
-            _quoteTotal = balanceDue;
+            _quoteTotal = total;
+            _quoteTotalCents = payable.payableTotalCents;
             _depositTerms = resolveQuoteDepositTerms();
             if (depositSummary) {
                 var showDeposit = _depositTerms.deposit_required === true;
                 depositSummary.style.display = showDeposit ? 'block' : 'none';
                 if (showDeposit) {
-                    var depositBasis = balanceDue;
-                    var depositAmt = currentDepositAmountCents() / 100;
-                    var remaining = Math.max(depositBasis - depositAmt, 0);
+                    var requiredDepositCents = quoteRequiredDepositAmountCents();
+                    var depositAmt = requiredDepositCents / 100;
+                    // Percentage deposits receive the rounded cent; the remaining balance receives the residual cent.
+                    var remaining = (payable.payableTotalCents - requiredDepositCents) / 100;
                     var labelEl = document.getElementById('depositLabel');
                     var amountEl = document.getElementById('depositAmountDisplay');
                     var remainingEl = document.getElementById('remainingBalanceDisplay');
@@ -5533,6 +5548,8 @@ if (location.search.includes('debug')) {
                     logPortalDocumentActivity('document_signed', { metadata: { signer_name_present: !!name } });
                     quoteData = Object.assign({}, quoteData, {
                         status: requestedStatus,
+                        grandTotal: secureDocument.total !== undefined ? secureDocument.total : quoteData.grandTotal,
+                        total: secureDocument.total !== undefined ? secureDocument.total : quoteData.total,
                         signature_url: signatureUrl,
                         signature_data_url: signatureUrl ? undefined : sigDataUrl,
                         signature_method: 'typed',
@@ -5659,6 +5676,7 @@ if (location.search.includes('debug')) {
         var _paymentOptions = null;
         var _depositTerms = null;
         var _quoteTotal = 0;
+        var _quoteTotalCents = 0;
 
         async function loadContractorPaymentSettings() {
             if (window._securePaymentOptions) return window._securePaymentOptions;
@@ -5717,15 +5735,24 @@ if (location.search.includes('debug')) {
             };
         }
 
-        function currentDepositAmountCents() {
-            if (_documentPaymentState && Number(_documentPaymentState.depositDueCents || 0) > 0) {
-                return Math.round(Number(_documentPaymentState.depositDueCents));
-            }
-            var totalCents = Math.max(0, Math.round(Number(quoteData.accepted_total_cents || quoteData.quoted_total_cents || _quoteTotal * 100 || 0)));
+        function quoteRequiredDepositAmountCents() {
+            var totalCents = Math.max(0, Math.round(Number(_quoteTotalCents || _quoteTotal * 100 || 0)));
             var terms = _depositTerms || resolveQuoteDepositTerms();
-            if (!terms.deposit_required || !totalCents) return 0;
-            if (terms.kind === 'fixed') return Math.min(totalCents, Math.max(0, Math.round(Number(terms.fixed_cents || 0))));
-            return Math.min(totalCents, Math.max(1, Math.round(totalCents * Number(terms.percent || 50) / 100)));
+            return QuoteDrPayableTotal.depositCents(totalCents, terms);
+        }
+
+        function currentDepositAmountCents() {
+            var liveTotalCents = Math.max(0, Math.round(Number(_quoteTotalCents || _quoteTotal * 100 || 0)));
+            if (
+                quoteIsAccepted() &&
+                _documentPaymentState &&
+                Number(_documentPaymentState.totalCents || 0) === liveTotalCents
+            ) {
+                return Math.max(0, Math.round(Number(_documentPaymentState.depositDueCents || 0)));
+            }
+            var required = quoteRequiredDepositAmountCents();
+            var paidCents = QuoteDrPayableTotal.toCents(getViewerPaymentsReceived().amount || 0);
+            return Math.max(0, required - paidCents);
         }
 
         function depositManualMethodMarkup(method, title, details, icon) {

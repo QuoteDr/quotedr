@@ -16,7 +16,7 @@ assert(
 assert(
   builder.includes('function getQuoteTaxEnabledDefault') &&
     builder.includes('function setQuoteTaxEnabled') &&
-    builder.includes('const tax = taxEnabled ? taxableSubtotal * _taxRate : 0;'),
+    builder.includes('taxEnabled: taxEnabled'),
   'quote builder should calculate zero tax when tax is disabled'
 );
 
@@ -35,14 +35,14 @@ assert(
 
 assert(
   viewer.includes('var _vTaxEnabled = quoteData.taxEnabled !== false;') &&
-    viewer.includes('const tax = _vTaxEnabled ? taxableSubtotal * _vTaxRate : 0;') &&
+    viewer.includes('taxEnabled: _vTaxEnabled') &&
     viewer.includes('updateQuoteTotalBreakdown(subtotal, tax, total, _vTaxLabel, _vTaxRate, paymentReceivedAmount, _vTaxEnabled)'),
   'interactive quote viewer should respect quoteData.taxEnabled without using settings to re-enable tax'
 );
 
 assert(
   invoice.includes('var _iTaxEnabled = invoiceData.taxEnabled !== false;') &&
-    invoice.includes('const tax = _iTaxEnabled ? taxableSubtotal * _iTaxRate : 0;'),
+    invoice.includes('taxEnabled: _iTaxEnabled'),
   'invoice viewer should respect invoiceData.taxEnabled'
 );
 

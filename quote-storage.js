@@ -927,7 +927,10 @@
         }
 
         function collectQuoteData() {
-            var grandTotal = parseQuoteMoney(document.getElementById('grandTotalDisplay')?.textContent || '0');
+            var payableTotalCents = Number.isInteger(window._quotePayableTotalCents)
+                ? Math.max(0, window._quotePayableTotalCents)
+                : Math.max(0, Math.round(parseQuoteMoney(document.getElementById('grandTotalDisplay')?.textContent || '0') * 100));
+            var grandTotal = payableTotalCents / 100;
             var isChangeOrder = window._quoteDocumentType === 'change_order';
             var statusEl = document.getElementById('quoteStatus');
             var status = statusEl ? statusEl.value : (isChangeOrder ? 'draft' : 'draft');
@@ -988,9 +991,14 @@
                 total: grandTotal,
                 style: loadedData.style || window._quoteStyle || {},
                 payment_terms: loadedData.payment_terms || loadedData.paymentTerms || null,
-                quoted_total_cents: loadedData.quoted_total_cents || Math.max(0, Math.round(grandTotal * 100)),
-                accepted_total_cents: loadedData.accepted_total_cents || null,
-                deposit_due_cents: loadedData.deposit_due_cents || null,
+                quoted_total_cents: payableTotalCents,
+                accepted_total_cents: ['accepted', 'approved', 'invoiced', 'paid'].includes(String(status || '').toLowerCase())
+                    ? (loadedData.accepted_total_cents || payableTotalCents)
+                    : null,
+                deposit_due_cents: ['accepted', 'approved', 'invoiced', 'paid'].includes(String(status || '').toLowerCase())
+                    ? (loadedData.deposit_due_cents || null)
+                    : null,
+                balance_due_cents: Number.isInteger(window._quoteBalanceDueCents) ? window._quoteBalanceDueCents : payableTotalCents,
                 supabaseId: supabaseId,
                 _serverUpdatedAt: window._quoteServerUpdatedAt || loadedData._serverUpdatedAt || loadedData.updated_at || null,
                 currency: (function(){ try { return JSON.parse(localStorage.getItem('ald_quote_prefs')||'{}').currency||'CAD'; } catch(e){return 'CAD';} })(),
@@ -1231,6 +1239,18 @@
             document.getElementById('quoteNumber').value = nextQuoteNumberValue();
             checkQuoteNumberDuplicate();
             currentQuoteId = null;
+            window._supabaseQuoteId = null;
+            window._loadedQuoteData = {};
+            window._currentQuoteData = {};
+            window._quoteServerUpdatedAt = null;
+            window._quoteLocalEditAt = null;
+            window._quotePayableTotalCents = 0;
+            window._quoteBalanceDueCents = 0;
+            window._quotePaymentFallbackBalanceDue = null;
+            setQuoteClientAdjustment(null);
+            setQuotePaymentsReceived(null);
+            try { localStorage.removeItem('ald_active_quote_id'); } catch (e) {}
+            renderRooms();
             window._quoteDocumentType = 'quote';
             window._parentQuoteId = '';
             window._parentQuoteNumber = '';

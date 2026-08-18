@@ -25,8 +25,8 @@ assert(
 );
 
 assert(
-  builder.includes('paymentReceivedAmount = calculateQuotePaymentsReceivedAmount(total);') &&
-  builder.includes('const balanceDue = Math.max(total - paymentReceivedAmount, 0);') &&
+  builder.includes('paid: getQuotePaymentsReceived().amount || 0') &&
+  builder.includes('const balanceDue = QuoteDrPayableTotal.fromCents(payable.balanceDueCents);') &&
   builder.includes("finalLabelEl.textContent = paymentReceivedAmount > 0 ? 'Balance Due' : 'Total';"),
   'Builder should subtract payments after tax and relabel the final total as Balance Due'
 );
@@ -57,8 +57,8 @@ assert(
 assert(
   viewer.includes('function getViewerPaymentsReceived()') &&
   viewer.includes('id="quotePaymentTotalDisplay"') &&
-  viewer.includes('const paymentReceivedAmount = calculateViewerPaymentsReceivedAmount(total);') &&
-  viewer.includes('const balanceDue = Math.max(total - paymentReceivedAmount, 0);'),
+  viewer.includes('paid: getViewerPaymentsReceived().amount || 0') &&
+  viewer.includes('const balanceDue = QuoteDrPayableTotal.fromCents(payable.balanceDueCents);'),
   'Interactive quote viewer should render payments received and show balance due'
 );
 
@@ -66,7 +66,7 @@ assert(
   invoice.includes('function getInvoicePaymentsReceived()') &&
   invoice.includes('id="invoicePaymentReceivedRow"') &&
   invoice.includes('id="invoiceBalanceLabel"') &&
-  invoice.includes('const paymentReceivedAmount = calculateInvoicePaymentsReceivedAmount(total);') &&
-  invoice.includes('const balanceDue = Math.max(total - paymentReceivedAmount, 0);'),
+  invoice.includes('paid: getInvoicePaymentsReceived().amount || 0') &&
+  invoice.includes('const balanceDue = QuoteDrPayableTotal.fromCents(payable.balanceDueCents);'),
   'Invoice viewer should render payments received and use balance due for final/payment helpers'
 );

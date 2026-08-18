@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quote payable total browser fixture</title>
+  <style>
+    html, body { margin: 0; min-height: 100%; font-family: system-ui, sans-serif; }
+    .controls { position: sticky; top: 0; z-index: 2; display: flex; gap: .5rem; padding: .5rem; background: #fff; border-bottom: 1px solid #ddd; }
+    iframe { width: 100%; height: calc(100vh - 50px); border: 0; }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <button id="showScreenshotCase" type="button">Screenshot case</button>
+    <button id="showSecondQuote" type="button">Second quote</button>
+  </div>
+  <iframe id="viewer" title="Synthetic quote viewer" src="../interactive-quote-viewer.html?quote_studio=1"></iframe>
+  <script>
+    const viewer = document.getElementById('viewer');
+    const terms = { version: 2, deposit_required: true, kind: 'percent', percent: 50, fixed_cents: null };
+    const screenshotCase = {
+      quoteNumber: 'SYNTHETIC-1', clientName: 'Synthetic Client', quoteTitle: 'Screenshot regression',
+      rooms: [{ name: 'Project', items: [{
+        id: 'line-1', name: 'Selected-upgrade line', description: 'Selected-upgrade line',
+        quantity: 1, rate: 1265.27, total: 1265.27, _baseRate: 833.13, _baseTotal: 833.13,
+        upgraded: true, upgrade: { name: 'Upgraded package', rate: 1265.27, total: 1265.27, type: 'replacement' }
+      }] }],
+      taxEnabled: true, taxRate: 0.13, taxLabel: 'HST', currency: 'CAD',
+      grandTotal: 1429.76, total: 1429.76, quoted_total_cents: 230190,
+      accepted_total_cents: 230190, deposit_due_cents: 115095, payment_terms: terms,
+      terms: ['Synthetic browser fixture only.'], style: { showUpgrades: true, approvalMode: 'accept' }
+    };
+    const secondQuote = {
+      quoteNumber: 'SYNTHETIC-2', clientName: 'Synthetic Client', quoteTitle: 'Same-session second quote',
+      rooms: [{ name: 'Project', items: [{ id: 'line-2', name: 'Base work', quantity: 1, rate: 1000, total: 1000 }, {
+        id: 'addon-2', name: 'Selected add-on', quantity: 1, rate: 200, total: 200,
+        optional: true, optionalSelectedByDefault: false, _optionalSelected: true, _removed: false
+      }] }],
+      taxEnabled: true, taxRate: 0.13, taxLabel: 'HST', currency: 'CAD',
+      grandTotal: 1356, total: 1356, quoted_total_cents: 113000,
+      accepted_total_cents: 113000, deposit_due_cents: 56500, payment_terms: terms,
+      terms: ['Synthetic browser fixture only.'], style: { showUpgrades: true, approvalMode: 'accept' }
+    };
+    function render(quote) {
+      viewer.contentWindow.postMessage({
+        type: 'quotedr-quote-studio-document', version: 1, quote, style: quote.style
+      }, window.location.origin);
+    }
+    window.addEventListener('message', event => {
+      if (event.origin === window.location.origin && event.data && event.data.type === 'quotedr-quote-studio-ready') render(screenshotCase);
+    });
+    document.getElementById('showScreenshotCase').addEventListener('click', () => render(screenshotCase));
+    document.getElementById('showSecondQuote').addEventListener('click', () => render(secondQuote));
+  </script>
+</body>
+</html>

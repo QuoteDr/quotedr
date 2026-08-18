@@ -39,7 +39,8 @@ assert(
 
 assert(
   builder.includes('const taxableSubtotal = subtotal + adjustmentAmount;') &&
-  builder.includes('const tax = taxEnabled ? taxableSubtotal * _taxRate : 0;'),
+  builder.includes('adjustment: adjustmentAmount') &&
+  builder.includes('taxRate: _taxRate'),
   'Builder should calculate enabled tax after the client-visible adjustment'
 );
 

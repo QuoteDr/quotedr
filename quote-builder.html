@@ -3981,6 +3981,7 @@ Example:
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="quote-dialogs.js?v=2026071501"></script>
     <script src="quote-discounts.js?v=2026081602"></script>
+    <script src="quote-payable-total.js?v=2026081801"></script>
     <script src="app-broadcasts.js?v=1779131000"></script>
     <script src="quote-template-files.js?v=1778012600"></script>
     <script src="community-starter-templates.js?v=1785751200"></script>
@@ -11866,9 +11867,25 @@ Example:
             var taxEnabled = getQuoteTaxEnabled();
             const adjustmentAmount = calculateQuoteAdjustmentAmount(subtotal);
             const taxableSubtotal = subtotal + adjustmentAmount;
-            const tax = taxEnabled ? taxableSubtotal * _taxRate : 0;
-            const total = taxableSubtotal + tax;
-            var paymentReceivedAmount = calculateQuotePaymentsReceivedAmount(total);
+            var payable = window._quoteDocumentType === 'change_order'
+                ? {
+                    taxCents: Math.round((taxEnabled ? taxableSubtotal * _taxRate : 0) * 100),
+                    payableTotalCents: Math.round((taxableSubtotal + (taxEnabled ? taxableSubtotal * _taxRate : 0)) * 100),
+                    paidCents: QuoteDrPayableTotal.toCents(getQuotePaymentsReceived().amount || 0)
+                }
+                : QuoteDrPayableTotal.calculate({
+                    subtotal: subtotal,
+                    adjustment: adjustmentAmount,
+                    taxRate: _taxRate,
+                    taxEnabled: taxEnabled,
+                    paid: getQuotePaymentsReceived().amount || 0
+                });
+            if (window._quoteDocumentType === 'change_order') {
+                payable.balanceDueCents = payable.payableTotalCents - payable.paidCents;
+            }
+            const tax = QuoteDrPayableTotal.fromCents(payable.taxCents);
+            const total = QuoteDrPayableTotal.fromCents(payable.payableTotalCents);
+            var paymentReceivedAmount = QuoteDrPayableTotal.fromCents(payable.paidCents);
             if (paymentReceivedAmount <= 0.0001 && window._quotePaymentFallbackBalanceDue !== null && window._quotePaymentFallbackBalanceDue !== undefined) {
                 var fallbackBalanceDue = parseFloat(window._quotePaymentFallbackBalanceDue) || 0;
                 window._quotePaymentFallbackBalanceDue = null;
@@ -11880,7 +11897,22 @@ Example:
                     paymentReceivedAmount = calculateQuotePaymentsReceivedAmount(total);
                 }
             }
-            const balanceDue = Math.max(total - paymentReceivedAmount, 0);
+            payable = window._quoteDocumentType === 'change_order'
+                ? Object.assign({}, payable, {
+                    paidCents: QuoteDrPayableTotal.toCents(paymentReceivedAmount),
+                    balanceDueCents: payable.payableTotalCents - QuoteDrPayableTotal.toCents(paymentReceivedAmount)
+                })
+                : QuoteDrPayableTotal.calculate({
+                    subtotal: subtotal,
+                    adjustment: adjustmentAmount,
+                    taxRate: _taxRate,
+                    taxEnabled: taxEnabled,
+                    paid: paymentReceivedAmount
+                });
+            paymentReceivedAmount = QuoteDrPayableTotal.fromCents(payable.paidCents);
+            const balanceDue = QuoteDrPayableTotal.fromCents(payable.balanceDueCents);
+            window._quotePayableTotalCents = payable.payableTotalCents;
+            window._quoteBalanceDueCents = payable.balanceDueCents;
             updateQuoteTbdNotice(countQuoteTbdSelections());
 
             document.getElementById('subtotalDisplay').textContent = window._quoteDocumentType === 'change_order'
@@ -11930,8 +11962,10 @@ Example:
             // Update deposit calculator
             const depositBtn = document.getElementById('depositToggleBtn');
             if (depositBtn) depositBtn.style.display = balanceDue > 0 ? 'inline-block' : 'none';
-            const depositAmt = balanceDue * (depositPercentage / 100);
-            const remaining = balanceDue - depositAmt;
+            const depositCents = Math.round(payable.payableTotalCents * depositPercentage / 100);
+            const depositAmt = QuoteDrPayableTotal.fromCents(depositCents);
+            // Percentage deposits receive the rounded cent; the remaining balance receives the residual cent.
+            const remaining = QuoteDrPayableTotal.fromCents(payable.payableTotalCents - depositCents);
             const depositAmtEl = document.getElementById('depositAmountDisplay');
             const remainingEl = document.getElementById('remainingBalanceDisplay');
             if (depositAmtEl) depositAmtEl.textContent = qdFormatMoney(depositAmt, '').trim();
@@ -14650,9 +14684,9 @@ Example:
         }
 
         function builderDocumentTotalCents() {
+            if (Number.isInteger(window._quotePayableTotalCents)) return Math.max(0, window._quotePayableTotalCents);
             var totalText = document.getElementById('grandTotalDisplay')?.textContent || '0';
-            var total = parseFloat(String(totalText).replace(/[^0-9.-]/g, '')) || 0;
-            return Math.max(0, Math.round(total * 100));
+            return QuoteDrPayableTotal.toCents(parseFloat(String(totalText).replace(/[^0-9.-]/g, '')) || 0);
         }
 
         function builderCardPaymentDocumentData(context) {
@@ -14875,7 +14909,7 @@ Example:
                 quoteAdjustment: getQuoteClientAdjustment(),
                 paymentsReceived: getQuotePaymentsReceived(),
                 priceTbdSelectionCount: countQuoteTbdSelections(),
-                grandTotal: parseFloat(document.getElementById('grandTotalDisplay')?.textContent.replace(/[^0-9.]/g, '')) || 0,
+                grandTotal: QuoteDrPayableTotal.fromCents(builderDocumentTotalCents()),
                 dividerSingular: dividerLabels.singular,
                 dividerPlural: dividerLabels.plural,
                 quoteDividerLabels: { singular: dividerLabels.singular, plural: dividerLabels.plural },
@@ -15645,8 +15679,8 @@ Example:
                 paymentsReceived: getQuotePaymentsReceived(),
                 taxEnabled: getQuoteTaxEnabled(),
                 priceTbdSelectionCount: countQuoteTbdSelections(),
-                grandTotal: parseFloat(document.getElementById('grandTotalDisplay').textContent.replace(/[^0-9.]/g, '')) || 0,
-                total: parseFloat(document.getElementById('grandTotalDisplay').textContent.replace(/[^0-9.]/g, '')) || 0,
+                grandTotal: QuoteDrPayableTotal.fromCents(builderDocumentTotalCents()),
+                total: QuoteDrPayableTotal.fromCents(builderDocumentTotalCents()),
                 status: 'draft',
                 savedAt: new Date().toISOString()
             };
@@ -15825,7 +15859,7 @@ Example:
                 paymentsReceived: getQuotePaymentsReceived(),
                 taxEnabled: getQuoteTaxEnabled(),
                 priceTbdSelectionCount: countQuoteTbdSelections(),
-                grandTotal: parseFloat(document.getElementById('grandTotalDisplay').textContent.replace(/[^0-9.]/g, '')) || 0,
+                grandTotal: QuoteDrPayableTotal.fromCents(builderDocumentTotalCents()),
                 savedAt: new Date().toISOString()
             };
 

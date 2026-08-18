@@ -866,6 +866,7 @@ if (location.search.includes('debug')) {
     <script src="supabase-v2.js?v=2026080801"></script>
     <script src="save-coordinator.js?v=2026080401"></script>
     <script src="quote-discounts.js?v=2026081602"></script>
+    <script src="quote-payable-total.js?v=2026081801"></script>
     <script src="typed-signature.js?v=2026080301"></script>
     <script>
         const ROOM_COLORS = [
@@ -2166,10 +2167,17 @@ if (location.search.includes('debug')) {
             var _iTaxEnabled = invoiceData.taxEnabled !== false;
             const adjustmentAmount = calculateInvoiceQuoteAdjustmentAmount(subtotal);
             const taxableSubtotal = subtotal + adjustmentAmount;
-            const tax = _iTaxEnabled ? taxableSubtotal * _iTaxRate : 0;
-            const total = taxableSubtotal + tax;
-            const paymentReceivedAmount = calculateInvoicePaymentsReceivedAmount(total);
-            const balanceDue = Math.max(total - paymentReceivedAmount, 0);
+            var payable = QuoteDrPayableTotal.calculate({
+                subtotal: subtotal,
+                adjustment: adjustmentAmount,
+                taxRate: _iTaxRate,
+                taxEnabled: _iTaxEnabled,
+                paid: getInvoicePaymentsReceived().amount || 0
+            });
+            const tax = QuoteDrPayableTotal.fromCents(payable.taxCents);
+            const total = QuoteDrPayableTotal.fromCents(payable.payableTotalCents);
+            const paymentReceivedAmount = QuoteDrPayableTotal.fromCents(payable.paidCents);
+            const balanceDue = QuoteDrPayableTotal.fromCents(payable.balanceDueCents);
             document.getElementById('subtotalDisplay').textContent = formatMoney(subtotal, _iCurrency);
             var adjustment = getInvoiceQuoteAdjustment();
             var adjustmentRow = document.getElementById('invoiceAdjustmentRow');
@@ -2201,7 +2209,9 @@ if (location.search.includes('debug')) {
             if (noteEl) noteEl.textContent = settings.note || '';
             if (termsEl) termsEl.textContent = settings.paymentTerms ? 'Payment terms: ' + settings.paymentTerms : '';
             // Store total for payment helpers
+            window._invoicePayableTotal = invoiceIsInvalid() ? 0 : total;
             window._invoiceTotal = invoiceIsInvalid() ? 0 : balanceDue;
+            window._invoiceBalanceDue = invoiceIsInvalid() ? 0 : balanceDue;
             renderInvoiceSignatureState();
         }
 

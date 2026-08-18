@@ -1444,9 +1444,13 @@ async function saveQuote(quoteData) {
             terms: quoteData.terms || [],
             style: quoteData.style || {},
             payment_terms: quoteData.payment_terms || quoteData.paymentTerms || null,
-            quoted_total_cents: quoteData.quoted_total_cents || Math.max(0, Math.round(Number(quoteData.grandTotal || 0) * 100)),
-            accepted_total_cents: quoteData.accepted_total_cents || null,
-            deposit_due_cents: quoteData.deposit_due_cents || null,
+            quoted_total_cents: Math.max(0, Math.round(Number(quoteData.grandTotal || quoteData.total || 0) * 100)),
+            accepted_total_cents: ['accepted', 'approved', 'invoiced', 'paid'].includes(String(quoteData.status || '').toLowerCase())
+                ? (quoteData.accepted_total_cents || Math.max(0, Math.round(Number(quoteData.grandTotal || quoteData.total || 0) * 100)))
+                : null,
+            deposit_due_cents: ['accepted', 'approved', 'invoiced', 'paid'].includes(String(quoteData.status || '').toLowerCase())
+                ? (quoteData.deposit_due_cents || null)
+                : null,
             notes: quoteData.notes || '',
             currency: quoteData.currency || 'CAD',
             quoteAdjustment: quoteData.quoteAdjustment || quoteData.clientAdjustment || null,
