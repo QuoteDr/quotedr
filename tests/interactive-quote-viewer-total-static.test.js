@@ -8,7 +8,8 @@ assert(source.includes('function viewerItemBaseTotal'), 'interactive viewer shou
 assert(source.includes('viewerItemActiveTotal(item)'), 'interactive viewer should use saved line totals for live total calculation');
 assert(source.includes('function viewerMoney'), 'interactive viewer should centralize money formatting');
 assert(source.includes("toLocaleString('en-CA'"), 'interactive viewer money should include thousands separators');
-assert(source.includes('viewerMoney(originalTotal)'), 'hero and original totals should use comma-formatted money');
+assert(source.includes('heroTotal.textContent = viewerMoney(balanceDue)'), 'hero total should use the recalculated comma-formatted balance');
+assert(source.includes('viewerMoney(coTotals.originalTotal)'), 'change-order original totals should use comma-formatted money');
 assert(source.includes('viewerMoney(total)'), 'updated quote totals should use comma-formatted money');
 assert(!source.includes("heroTotal.textContent = '$' + originalTotal.toFixed(2)"), 'hero total should not render ungrouped fixed decimals');
 assert(!source.includes("document.getElementById('newGrandTotal').textContent = `$${total.toFixed(2)}`"), 'bottom total should not render ungrouped fixed decimals');

@@ -1602,7 +1602,7 @@ if (location.search.includes('debug')) {
                 <div class="total-status">Client-ready total</div>
             </div>
             <div class="total-row">
-                <span>Items subtotal (includes selections)</span>
+                <span>Subtotal</span>
                 <strong id="quoteSubtotalDisplay">$0.00</strong>
             </div>
             <div class="total-row" id="upgradesTotalDisplay" style="display:none;"></div>
@@ -4616,13 +4616,6 @@ if (location.search.includes('debug')) {
                 return;
             }
 
-            // Show original total
-            const originalTotal = quoteData.grandTotal || 0;
-            document.getElementById('quoteSubtotalDisplay').textContent = viewerMoney(originalTotal);
-            document.getElementById('newGrandTotal').textContent = viewerMoney(originalTotal);
-            var heroTotal = document.getElementById('heroGrandTotal');
-            if (heroTotal) heroTotal.textContent = viewerMoney(originalTotal);
-
             // Set hidden form fields
             document.getElementById('quoteId').value = quoteData.id || '';
 
@@ -4637,6 +4630,7 @@ if (location.search.includes('debug')) {
             }
 
             const coTotals = isChangeOrder ? computeViewerChangeOrderTotals() : null;
+            var heroTotal = document.getElementById('heroGrandTotal');
             var heroLabel = document.getElementById('heroTotalLabel');
             if (heroLabel) heroLabel.textContent = isChangeOrder ? 'Current Adjustments' : 'Current Total';
 

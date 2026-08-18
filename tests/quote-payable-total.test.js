@@ -64,7 +64,7 @@ test('builder, viewer, invoice, save, and cross-quote paths use the canonical co
     assert(source.includes('quote-payable-total.js?v=2026081801'));
     assert(source.includes('QuoteDrPayableTotal.calculate({'));
   }
-  assert(viewer.includes('Items subtotal (includes selections)'));
+  assert(viewer.includes('<span>Subtotal</span>'));
   assert(viewer.includes('Selected upgrades (included above)'));
   assert(viewer.includes('var liveTotalCents = Math.max(0, Math.round(Number(_quoteTotalCents'));
   assert(!viewer.includes('quoteData.accepted_total_cents || quoteData.quoted_total_cents || _quoteTotal'));
