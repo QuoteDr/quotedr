@@ -21,7 +21,7 @@ assert(onboarding.includes('Payment &amp; Deposit Setup') && onboarding.includes
 
 assert(quoteViewer.includes('reportManualDeposit') && quoteViewer.includes('Payment reported.') && quoteViewer.includes('renderDepositPaymentSection'), 'accepted quotes must show reportable manual deposit methods and a pending state');
 assert(invoiceViewer.includes('reportManualInvoicePayment') && invoiceViewer.includes('copyInvoicePaymentText'), 'invoice links must expose selected direct payment methods and reporting');
-assert(dashboard.includes('refreshDashboardManualPaymentReports') && dashboard.includes('decideDashboardManualPayment') && dashboard.includes('Confirm received'), 'dashboard cards must let contractors confirm client-reported manual payments');
+assert(dashboard.includes('refreshDashboardManualPaymentReports') && dashboard.includes('decideDashboardManualPayment') && dashboard.includes('Enter amount received') && dashboard.includes('Save amount received'), 'dashboard cards must let contractors enter the exact client-reported manual payment amount before saving it');
 
 assert(builder.includes('id="quoteDepositMode"') && builder.includes('id="quoteDepositKind"') && builder.includes('id="quoteDepositFixedAmount"'), 'each quote must support default, custom, or no-deposit terms');
 assert(style.includes('buildQuotePaymentTerms') && style.includes('quoteDepositDueCents'), 'quote sharing must create a versioned payment-term snapshot');

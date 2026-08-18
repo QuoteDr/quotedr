@@ -51,6 +51,7 @@ const elements = {
   viewerTotalFinalSubLabel: {}
 };
 const context = {
+  window: { _quoteRow: null },
   document: { getElementById(id) { return elements[id] || null; } },
   viewerMoney(value) { return '$' + Number(value || 0).toFixed(2); },
   getViewerPaymentsReceived() { return { amount: 0, name: 'Deposit paid' }; },
@@ -84,6 +85,14 @@ require('node:vm').runInContext(sourceFunction('resolveViewerLockedTotalSnapshot
 assert.deepEqual(
   JSON.parse(JSON.stringify(context.resolveViewerLockedTotalSnapshot(0.13, true))),
   { subtotalCents: 384084, adjustmentCents: 0, taxCents: 49931, totalCents: 434015 }
+);
+
+context.quoteData = { status: 'accepted' };
+context.window._quoteRow = { total: 4340.15 };
+assert.deepEqual(
+  JSON.parse(JSON.stringify(context.resolveViewerLockedTotalSnapshot(0.13, true))),
+  { subtotalCents: 384084, adjustmentCents: 0, taxCents: 49931, totalCents: 434015 },
+  'Dashboard Client View should use the accepted owner-row total when secure client snapshot fields are unavailable'
 );
 
 console.log('quote viewer total breakdown static test passed');

@@ -72,6 +72,10 @@ test('dashboard, payment API, and client viewer share the correction contract', 
   const viewer = fs.readFileSync('interactive-quote-viewer.html', 'utf8');
 
   assert(dashboard.includes('Enter the amount that actually arrived'));
+  assert(dashboard.includes('Enter amount received'));
+  assert(dashboard.includes("title: isCorrection ? 'Correct Payment Amount' : 'Enter Amount Received'"));
+  assert(dashboard.includes("okText: isCorrection ? 'Update amount' : 'Save amount received'"));
+  assert(!dashboard.includes('Confirm received amount'));
   assert(dashboard.includes('confirmedAmountCents'));
   assert(dashboard.includes('Edit received amount'));
   assert(dashboard.includes('Requested amount:'));

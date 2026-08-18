@@ -5055,9 +5055,16 @@ if (location.search.includes('debug')) {
 
         function resolveViewerLockedTotalSnapshot(taxRate, taxEnabled) {
             if (!quoteIsAccepted()) return null;
+            // Secure client links receive accepted_payable_total_cents from client-document.
+            // Dashboard Client View loads the owner row directly, so its immutable accepted
+            // total is the quote row total instead. Both paths must render the same signed total.
+            var ownerAcceptedTotalCents = window._quoteRow
+                ? Math.max(0, Math.round(Number(window._quoteRow.total || 0) * 100))
+                : 0;
             var totalCents = Math.max(0, Math.round(Number(
                 (_documentPaymentState && _documentPaymentState.totalCents)
                 || quoteData.accepted_payable_total_cents
+                || ownerAcceptedTotalCents
                 || 0
             )));
             if (!totalCents) return null;
