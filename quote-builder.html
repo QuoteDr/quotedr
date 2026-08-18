@@ -909,25 +909,35 @@
                 padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
             }
         }
-        .drag-handle {
-            cursor: grab;
-            font-size: 1.2rem;
-            padding: 0 8px 0 0;
-            opacity: 0.7;
-            user-select: none;
-            flex-shrink: 0;
-        }
-        .drag-handle:hover { opacity: 1; }
         .room-reorder-open-btn {
+            align-items: center;
             appearance: none;
             background: transparent;
             border: 0;
             color: inherit;
+            cursor: pointer;
+            display: inline-flex;
+            flex-shrink: 0;
+            font-size: 1.2rem;
+            height: 40px;
+            justify-content: center;
             line-height: 1;
-            margin: 0;
+            margin: -6px 2px -6px -6px;
+            opacity: 0.78;
+            padding: 0;
+            touch-action: manipulation;
+            user-select: none;
             vertical-align: middle;
+            width: 40px;
         }
-        .room-card.sortable-ghost { opacity: 0.4; }
+        .room-reorder-open-btn:hover,
+        .room-reorder-open-btn:focus-visible {
+            background: rgba(255, 255, 255, 0.16);
+            border-radius: 8px;
+            opacity: 1;
+            outline: 2px solid rgba(255, 255, 255, 0.8);
+            outline-offset: -2px;
+        }
         .room-card.room-jump-highlight {
             outline: 3px solid #ff7a1a;
             box-shadow: 0 0 0 6px rgba(255,122,26,0.18), 0 14px 34px rgba(13, 63, 117, 0.18);
@@ -13416,7 +13426,6 @@ Example:
 
         function openQuoteBuilderRoomReorder(event) {
             if (event && event.stopPropagation) event.stopPropagation();
-            if (window._quoteBuilderRoomCardDragging) return false;
             renderQuoteBuilderRoomReorderList();
             if (!Array.isArray(rooms) || rooms.length < 2) {
                 var labels = getQuoteDividerLabels();
@@ -13890,7 +13899,7 @@ Example:
                 html += '<div class="d-flex justify-content-between align-items-start">';
                 html += '<div>';
                 var roomIcon = room.icon || 'fa-door-open';
-                html += '<h3><button type="button" class="drag-handle room-reorder-open-btn" onclick="openQuoteBuilderRoomReorder(event)" title="Drag this room, or click to reorder all rooms" aria-label="Reorder rooms">&#8801;</button><i class="fas ' + roomIcon + ' room-icon-btn" data-room-id="' + room.id + '" onclick="openIconPicker(' + room.id + ', this)" title="Click to change icon" style="cursor:pointer;"></i> ' + renderRoomNameWithSpellcheck(room) + '</h3>';
+                html += '<h3><button type="button" class="room-reorder-open-btn" onclick="openQuoteBuilderRoomReorder(event)" title="Open room organizer" aria-label="Open room organizer">&#8801;</button><i class="fas ' + roomIcon + ' room-icon-btn" data-room-id="' + room.id + '" onclick="openIconPicker(' + room.id + ', this)" title="Click to change icon" style="cursor:pointer;"></i> ' + renderRoomNameWithSpellcheck(room) + '</h3>';
                 html += '<p class="mb-0">' + room.items.length + ' items | Total: ' + qdFormatMoney(roomTotal) + '</p>';
                 html += '</div>';
                 // Color swatches
@@ -14398,28 +14407,6 @@ Example:
 
         function initSortable() {
             if (typeof Sortable === 'undefined') return;
-
-            // Room-level drag
-            const container = document.getElementById('roomsContainer');
-            if (container) {
-                Sortable.create(container, {
-                    handle: '.drag-handle',
-                    animation: 150,
-                    ghostClass: 'sortable-ghost',
-                    onStart: function() {
-                        window._quoteBuilderRoomCardDragging = true;
-                    },
-                    onEnd: function(evt) {
-                        const cards = container.querySelectorAll('.room-card');
-                        const newOrder = Array.from(cards).map(el => parseInt(el.dataset.roomId));
-                        rooms = newOrder.map(id => rooms.find(r => r.id === id));
-                        renderRooms();
-                        window.setTimeout(function() {
-                            window._quoteBuilderRoomCardDragging = false;
-                        }, 0);
-                    }
-                });
-            }
 
             // Category-level drag - one Sortable per room's cat-groups-container
             document.querySelectorAll('.cat-groups-container').forEach(catContainer => {

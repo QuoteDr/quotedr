@@ -21,8 +21,16 @@ assert(
   'room header move control should open the reorder modal'
 );
 assert(
+  source.includes('class="room-reorder-open-btn"') &&
+    source.includes('title="Open room organizer"') &&
+    source.includes('aria-label="Open room organizer"'),
+  'room header move control should be a clearly labelled click-only organizer button'
+);
+assert(!source.includes("handle: '.drag-handle'"), 'full room cards should no longer be draggable in the builder');
+assert(!source.includes('_quoteBuilderRoomCardDragging'), 'room organizer clicks should not be suppressed by full-card drag state');
+assert(
   source.includes('quote-builder-room-reorder-handle'),
-  'compact list should have its own drag handle separate from the full room-card drag handle'
+  'compact room organizer should retain its drag handle'
 );
 assert(
   /rooms\s*=\s*newOrder\s*\.map\(function\(roomId\)/.test(source),
