@@ -685,6 +685,84 @@ function sanitizeQuoteAdjustment(data, totals) {
   };
 }
 
+function cents(value) {
+  return Math.max(0, Math.round(finiteNumber(value, 0) * 100));
+}
+
+function acceptedLike(row, data) {
+  const status = cleanString(row && row.status || data && data.status, 80).toLowerCase();
+  return ['accepted', 'approved', 'invoiced', 'paid'].includes(status) || !!(
+    data && (data.signed_at || data.approved_at || data.accepted_at)
+  );
+}
+
+function taxableCentsForPayableTotal(totalCents, rate, taxEnabled) {
+  if (!taxEnabled || !rate) return totalCents;
+  const estimate = Math.max(0, Math.round(totalCents / (1 + rate)));
+  let best = estimate;
+  let bestDelta = Number.POSITIVE_INFINITY;
+  for (let candidate = Math.max(0, estimate - 4); candidate <= estimate + 4; candidate += 1) {
+    const delta = Math.abs(candidate + Math.round(candidate * rate) - totalCents);
+    if (delta < bestDelta) {
+      best = candidate;
+      bestDelta = delta;
+    }
+  }
+  return best;
+}
+
+function adjustmentCentsForTaxableTotal(data, taxableCents) {
+  const source = isRecord(data && data.quoteAdjustment)
+    ? data.quoteAdjustment
+    : (isRecord(data && data.clientAdjustment) ? data.clientAdjustment : null);
+  if (!source) return 0;
+  const sign = cleanString(source.type, 30).toLowerCase() === 'discount' ? -1 : 1;
+  const basis = source.basis === 'amount' || source.mode === 'amount' || (source.amount && !source.percent)
+    ? 'amount'
+    : 'percent';
+  if (basis === 'amount') return sign * cents(source.amount ?? source.value);
+  const percent = Math.max(0, finiteNumber(source.percent, 0)) / 100;
+  const factor = 1 + (sign * percent);
+  if (factor <= 0) return 0;
+  const subtotalCents = Math.max(0, Math.round(taxableCents / factor));
+  return taxableCents - subtotalCents;
+}
+
+export function acceptedClientTotalSnapshot(row) {
+  row = isRecord(row) ? row : {};
+  const source = isRecord(row.data) ? row.data : {};
+  if (!acceptedLike(row, source)) return null;
+  const authoritativeTotalCents = cents(row.total ?? row.grand_total ?? source.grandTotal ?? source.total);
+  if (!authoritativeTotalCents) return null;
+
+  const tax = taxSettings(source, null);
+  const storedSubtotalCents = cents(source.subtotal);
+  const storedAdjustmentCents = Math.round(quoteAdjustment(source, storedSubtotalCents / 100).amount * 100);
+  const storedTaxCents = cents(source.taxAmount ?? source.tax_amount);
+  const storedTotalCents = storedSubtotalCents + storedAdjustmentCents + storedTaxCents;
+
+  let subtotalCents = storedSubtotalCents;
+  let adjustmentCents = storedAdjustmentCents;
+  let taxCents = storedTaxCents;
+  if (Math.abs(storedTotalCents - authoritativeTotalCents) > 1) {
+    const taxableCents = taxableCentsForPayableTotal(authoritativeTotalCents, tax.rate, tax.enabled);
+    adjustmentCents = adjustmentCentsForTaxableTotal(source, taxableCents);
+    subtotalCents = taxableCents - adjustmentCents;
+    if (subtotalCents < 0) {
+      subtotalCents = taxableCents;
+      adjustmentCents = 0;
+    }
+    taxCents = authoritativeTotalCents - taxableCents;
+  }
+
+  return {
+    subtotalCents,
+    adjustmentCents,
+    taxCents,
+    totalCents: authoritativeTotalCents,
+  };
+}
+
 export function projectClientDocumentData(data, options = {}) {
   let source = isRecord(data) ? clone(data) : {};
   if (isRecord(source._clientDecision)) {
@@ -764,6 +842,19 @@ export function projectClientDocumentData(data, options = {}) {
 export function sanitizeClientDocumentRow(row, options = {}) {
   row = isRecord(row) ? row : {};
   const data = projectClientDocumentData(row.data, { ...options, documentType: row.type });
+  const acceptedSnapshot = acceptedClientTotalSnapshot(row);
+  if (acceptedSnapshot) {
+    data.subtotal = acceptedSnapshot.subtotalCents / 100;
+    data.taxAmount = acceptedSnapshot.taxCents / 100;
+    data.grandTotal = acceptedSnapshot.totalCents / 100;
+    data.total = acceptedSnapshot.totalCents / 100;
+    data.accepted_total_cents = acceptedSnapshot.totalCents;
+    data.accepted_payable_total_cents = acceptedSnapshot.totalCents;
+    data.accepted_subtotal_cents = acceptedSnapshot.subtotalCents;
+    data.accepted_adjustment_cents = acceptedSnapshot.adjustmentCents;
+    data.accepted_tax_cents = acceptedSnapshot.taxCents;
+    if (isRecord(data.quoteAdjustment)) data.quoteAdjustment.amount = acceptedSnapshot.adjustmentCents / 100;
+  }
   return {
     id: cleanId(row.id),
     quote_number: cleanString(row.quote_number, 200),

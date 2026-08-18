@@ -5038,6 +5038,57 @@ if (location.search.includes('debug')) {
             if (totalEl) totalEl.textContent = paymentAmount > 0 ? viewerMoney(balanceDue) : viewerMoney(total);
         }
 
+        function viewerLockedTaxableCents(totalCents, taxRate, taxEnabled) {
+            if (taxEnabled === false || !taxRate) return totalCents;
+            var estimate = Math.max(0, Math.round(totalCents / (1 + taxRate)));
+            var best = estimate;
+            var bestDelta = Infinity;
+            for (var candidate = Math.max(0, estimate - 4); candidate <= estimate + 4; candidate += 1) {
+                var delta = Math.abs(candidate + Math.round(candidate * taxRate) - totalCents);
+                if (delta < bestDelta) {
+                    best = candidate;
+                    bestDelta = delta;
+                }
+            }
+            return best;
+        }
+
+        function resolveViewerLockedTotalSnapshot(taxRate, taxEnabled) {
+            if (!quoteIsAccepted()) return null;
+            var totalCents = Math.max(0, Math.round(Number(
+                (_documentPaymentState && _documentPaymentState.totalCents)
+                || quoteData.accepted_payable_total_cents
+                || 0
+            )));
+            if (!totalCents) return null;
+            var subtotalCents = Math.round(Number(quoteData.accepted_subtotal_cents));
+            var adjustmentCents = Math.round(Number(quoteData.accepted_adjustment_cents));
+            var taxCents = Math.round(Number(quoteData.accepted_tax_cents));
+            var componentsValid = Number.isFinite(subtotalCents)
+                && Number.isFinite(adjustmentCents)
+                && Number.isFinite(taxCents)
+                && subtotalCents + adjustmentCents + taxCents === totalCents;
+            if (!componentsValid) {
+                var taxableCents = viewerLockedTaxableCents(totalCents, taxRate, taxEnabled);
+                var adjustment = getViewerQuoteAdjustment();
+                if (adjustment.basis === 'amount') {
+                    adjustmentCents = Math.round(adjustment.amount * 100) * (adjustment.type === 'discount' ? -1 : 1);
+                    subtotalCents = taxableCents - adjustmentCents;
+                } else {
+                    var signedPercent = (adjustment.type === 'discount' ? -1 : 1) * adjustment.percent / 100;
+                    var factor = 1 + signedPercent;
+                    subtotalCents = factor > 0 ? Math.max(0, Math.round(taxableCents / factor)) : taxableCents;
+                    adjustmentCents = taxableCents - subtotalCents;
+                }
+                if (subtotalCents < 0) {
+                    subtotalCents = taxableCents;
+                    adjustmentCents = 0;
+                }
+                taxCents = totalCents - taxableCents;
+            }
+            return { subtotalCents, adjustmentCents, taxCents, totalCents };
+        }
+
         function countViewerTbdSelections() {
             var count = viewerNumber(quoteData && quoteData.priceTbdSelectionCount);
             var liveCount = 0;
@@ -5102,8 +5153,8 @@ if (location.search.includes('debug')) {
             if (!isFinite(_vTaxRate) || _vTaxRate < 0) _vTaxRate = quoteData.taxRate || 0.13;
             var _vTaxLabel = quoteData.taxLabel || _vqp.taxLabel || 'HST';
             var _vTaxEnabled = quoteData.taxEnabled !== false;
-            const adjustmentAmount = calculateViewerQuoteAdjustmentAmount(subtotal);
-            const taxableSubtotal = subtotal + adjustmentAmount;
+            var liveSubtotal = subtotal;
+            var adjustmentAmount = calculateViewerQuoteAdjustmentAmount(subtotal);
             var payable = QuoteDrPayableTotal.calculate({
                 subtotal: subtotal,
                 adjustment: adjustmentAmount,
@@ -5111,10 +5162,24 @@ if (location.search.includes('debug')) {
                 taxEnabled: _vTaxEnabled,
                 paid: getViewerPaymentsReceived().amount || 0
             });
-            const tax = QuoteDrPayableTotal.fromCents(payable.taxCents);
-            const total = QuoteDrPayableTotal.fromCents(payable.payableTotalCents);
-            const paymentReceivedAmount = QuoteDrPayableTotal.fromCents(payable.paidCents);
-            const balanceDue = QuoteDrPayableTotal.fromCents(payable.balanceDueCents);
+            var lockedSnapshot = resolveViewerLockedTotalSnapshot(_vTaxRate, _vTaxEnabled);
+            if (lockedSnapshot) {
+                var lockedPaidCents = Math.min(lockedSnapshot.totalCents, Math.max(0, Math.round((getViewerPaymentsReceived().amount || 0) * 100)));
+                subtotal = lockedSnapshot.subtotalCents / 100;
+                adjustmentAmount = lockedSnapshot.adjustmentCents / 100;
+                payable = {
+                    taxCents: lockedSnapshot.taxCents,
+                    payableTotalCents: lockedSnapshot.totalCents,
+                    paidCents: lockedPaidCents,
+                    balanceDueCents: Math.max(0, lockedSnapshot.totalCents - lockedPaidCents)
+                };
+                var recoveredSelectionAmount = subtotal - liveSubtotal;
+                if (recoveredSelectionAmount > upgradesTotal) upgradesTotal = recoveredSelectionAmount;
+            }
+            var tax = QuoteDrPayableTotal.fromCents(payable.taxCents);
+            var total = QuoteDrPayableTotal.fromCents(payable.payableTotalCents);
+            var paymentReceivedAmount = QuoteDrPayableTotal.fromCents(payable.paidCents);
+            var balanceDue = QuoteDrPayableTotal.fromCents(payable.balanceDueCents);
             updateQuoteTotalBreakdown(subtotal, tax, total, _vTaxLabel, _vTaxRate, paymentReceivedAmount, _vTaxEnabled);
             updateViewerTbdDisplay(countViewerTbdSelections());
 

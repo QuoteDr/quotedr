@@ -58,7 +58,7 @@ assert(
   viewer.includes('function getViewerPaymentsReceived()') &&
   viewer.includes('id="quotePaymentTotalDisplay"') &&
   viewer.includes('paid: getViewerPaymentsReceived().amount || 0') &&
-  viewer.includes('const balanceDue = QuoteDrPayableTotal.fromCents(payable.balanceDueCents);'),
+  viewer.includes('var balanceDue = QuoteDrPayableTotal.fromCents(payable.balanceDueCents);'),
   'Interactive quote viewer should render payments received and show balance due'
 );
 

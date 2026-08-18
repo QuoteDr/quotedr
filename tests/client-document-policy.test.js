@@ -449,3 +449,61 @@ test('change-order projection redacts original snapshots while preserving net an
   const clientChangedProjection = api.sanitizeClientDocumentRow(clientChangedRow);
   assert.equal(api.calculateClientDocumentTotals(clientChangedProjection.data, { documentType: 'change_order' }).documentTotal, clientChangedTotals.documentTotal);
 });
+
+test('accepted legacy quote projects the authoritative signed total instead of stale pre-upgrade rooms', async () => {
+  const api = await policy();
+  const row = {
+    id: 'accepted-legacy-upgrade',
+    type: 'quote',
+    status: 'accepted',
+    total: 4340.15,
+    data: {
+      status: 'accepted',
+      signed_at: '2026-08-18T12:00:00.000Z',
+      client_upgraded: true,
+      accepted_total_cents: 361945,
+      subtotal: 3203.05,
+      taxAmount: 416.40,
+      taxRate: 0.13,
+      taxEnabled: true,
+      rooms: [{ id: 'room-legacy', name: 'Project', items: [{ id: 'line-legacy', name: 'Base scope', quantity: 1, rate: 3203.05, total: 3203.05 }] }]
+    }
+  };
+  const snapshot = api.acceptedClientTotalSnapshot(row);
+  assert.deepEqual(snapshot, {
+    subtotalCents: 384084,
+    adjustmentCents: 0,
+    taxCents: 49931,
+    totalCents: 434015
+  });
+  const projected = api.sanitizeClientDocumentRow(row);
+  assert.equal(projected.total, 4340.15);
+  assert.equal(projected.data.subtotal, 3840.84);
+  assert.equal(projected.data.taxAmount, 499.31);
+  assert.equal(projected.data.grandTotal, 4340.15);
+  assert.equal(projected.data.accepted_total_cents, 434015);
+  assert.equal(projected.data.accepted_payable_total_cents, 434015);
+  assert.equal(projected.data.accepted_subtotal_cents + projected.data.accepted_tax_cents, 434015);
+
+  const taxExempt = api.acceptedClientTotalSnapshot({
+    ...row,
+    id: 'accepted-tax-exempt',
+    total: 100.01,
+    data: { ...row.data, taxEnabled: false, subtotal: 80, taxAmount: 0, rooms: [] }
+  });
+  assert.deepEqual(taxExempt, { subtotalCents: 10001, adjustmentCents: 0, taxCents: 0, totalCents: 10001 });
+
+  const percentDiscount = api.acceptedClientTotalSnapshot({
+    ...row,
+    id: 'accepted-percent-discount',
+    total: 1017,
+    data: {
+      ...row.data,
+      subtotal: 800,
+      taxAmount: 93.6,
+      quoteAdjustment: { name: 'Courtesy discount', type: 'discount', basis: 'percent', percent: 10 },
+      rooms: []
+    }
+  });
+  assert.deepEqual(percentDiscount, { subtotalCents: 100000, adjustmentCents: -10000, taxCents: 11700, totalCents: 101700 });
+});

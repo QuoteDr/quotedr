@@ -58,7 +58,8 @@ assert(
 assert(
   viewer.includes('function getViewerQuoteAdjustment()') &&
   viewer.includes('id="quoteAdjustmentTotalDisplay"') &&
-  viewer.includes('const taxableSubtotal = subtotal + adjustmentAmount;') &&
+  viewer.includes('var adjustmentAmount = calculateViewerQuoteAdjustmentAmount(subtotal);') &&
+  viewer.includes('adjustment: adjustmentAmount') &&
   viewer.includes("adjustment.basis === 'amount'"),
   'Interactive quote viewer should render and total percent or amount quote adjustments'
 );

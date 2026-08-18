@@ -13,6 +13,7 @@
 <body>
   <div class="controls">
     <button id="showScreenshotCase" type="button">Screenshot case</button>
+    <button id="showAcceptedRefresh" type="button">Accepted refresh regression</button>
     <button id="showConfirmedPartial" type="button">Confirmed partial deposit</button>
     <button id="showSecondQuote" type="button">Second quote</button>
   </div>
@@ -43,6 +44,17 @@
       accepted_total_cents: 113000, deposit_due_cents: 56500, payment_terms: terms,
       terms: ['Synthetic browser fixture only.'], style: { showUpgrades: true, approvalMode: 'accept' }
     };
+    const acceptedRefresh = {
+      quoteNumber: 'SYNTHETIC-REFRESH', clientName: 'Synthetic Client', quoteTitle: 'Accepted refresh regression',
+      rooms: [{ name: 'Project', items: [{ id: 'line-refresh', name: 'Original base scope', quantity: 1, rate: 3203.05, total: 3203.05 }] }],
+      status: 'accepted', signed_at: '2026-08-18T12:00:00.000Z', client_upgraded: true,
+      taxEnabled: true, taxRate: 0.13, taxLabel: 'HST', currency: 'CAD',
+      grandTotal: 4340.15, total: 4340.15, accepted_total_cents: 361945,
+      accepted_payable_total_cents: 434015, accepted_subtotal_cents: 384084,
+      accepted_adjustment_cents: 0, accepted_tax_cents: 49931,
+      deposit_due_cents: 217008, payment_terms: terms,
+      terms: ['Synthetic browser fixture only.'], style: { showUpgrades: true, approvalMode: 'accept' }
+    };
     const confirmedPartial = {
       quoteNumber: 'SYNTHETIC-PAID', clientName: 'Synthetic Client', quoteTitle: 'Corrected received amount',
       rooms: [{ name: 'Project', items: [{ id: 'line-paid', name: 'Signed project with selections', quantity: 1, rate: 3840.84, total: 3840.84 }] }],
@@ -61,6 +73,7 @@
       if (event.origin === window.location.origin && event.data && event.data.type === 'quotedr-quote-studio-ready') render(screenshotCase);
     });
     document.getElementById('showScreenshotCase').addEventListener('click', () => render(screenshotCase));
+    document.getElementById('showAcceptedRefresh').addEventListener('click', () => render(acceptedRefresh));
     document.getElementById('showConfirmedPartial').addEventListener('click', () => render(confirmedPartial));
     document.getElementById('showSecondQuote').addEventListener('click', () => render(secondQuote));
   </script>

@@ -9,6 +9,9 @@ assert(source.includes('id="quoteTaxDisplay"'), 'quote viewer total card should 
 assert(source.includes('<span>Subtotal</span>'), 'quote viewer should use the same subtotal label as the client invoice viewer');
 assert(source.includes('function updateQuoteTotalBreakdown'), 'quote viewer should centralize subtotal/tax/total rendering');
 assert(source.includes('updateQuoteTotalBreakdown(subtotal, tax, total'), 'regular quote totals should update subtotal, tax, and total together');
+assert(source.includes('resolveViewerLockedTotalSnapshot(_vTaxRate, _vTaxEnabled)'), 'accepted quotes should use the server-projected signed total snapshot after refresh');
+assert(source.includes('quoteData.accepted_payable_total_cents'), 'accepted quote refresh must not fall back to stale pre-upgrade room totals');
+assert(source.includes('if (recoveredSelectionAmount > upgradesTotal) upgradesTotal = recoveredSelectionAmount;'), 'legacy accepted quotes should expose the recovered selected-upgrade amount');
 assert(source.includes('quoteData.taxLabel || _vqp.taxLabel || \'HST\''), 'quote viewer should prefer the quote tax label and fall back to settings/default HST');
 assert(!source.includes('<span>Base quote</span>'), 'quote viewer bottom card should not show a single base quote row instead of subtotal and tax');
 assert(!source.includes('<span>Selected options</span>'), 'quote viewer bottom card should not show a selected options count row');
@@ -63,5 +66,24 @@ assert.equal(elements.quoteSubtotalDisplay.textContent, '$1265.27', 'subtotal mu
 assert.equal(elements.quoteTaxLabel.textContent, 'HST (13%)');
 assert.equal(elements.quoteTaxDisplay.textContent, '$164.49');
 assert.equal(elements.newGrandTotal.textContent, '$1429.76');
+
+Object.assign(context, {
+  quoteData: {
+    status: 'accepted',
+    accepted_payable_total_cents: 434015,
+    accepted_subtotal_cents: 384084,
+    accepted_adjustment_cents: 0,
+    accepted_tax_cents: 49931
+  },
+  _documentPaymentState: null,
+  getViewerQuoteAdjustment() { return { type: 'addition', basis: 'amount', amount: 0, percent: 0 }; }
+});
+require('node:vm').runInContext(sourceFunction('quoteIsAccepted'), context);
+require('node:vm').runInContext(sourceFunction('viewerLockedTaxableCents'), context);
+require('node:vm').runInContext(sourceFunction('resolveViewerLockedTotalSnapshot'), context);
+assert.deepEqual(
+  JSON.parse(JSON.stringify(context.resolveViewerLockedTotalSnapshot(0.13, true))),
+  { subtotalCents: 384084, adjustmentCents: 0, taxCents: 49931, totalCents: 434015 }
+);
 
 console.log('quote viewer total breakdown static test passed');
