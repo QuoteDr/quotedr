@@ -2321,16 +2321,26 @@ if (location.search.includes('debug')) {
         function applyClientDocumentPaymentState(payment) {
             if (!payment) return false;
             _documentPaymentState = payment;
-            if (payment.depositSecured || payment.fullPaid) {
-                quoteData.paymentStatus = payment.fullPaid ? 'paid' : 'partially_paid';
-                quoteData.deposit_paid = payment.depositSecured === true;
-                quoteData.deposit_paid_at = quoteData.deposit_paid_at || new Date().toISOString();
-            }
+            var paidCents = Math.max(0, Math.round(Number(payment.paidCents || 0)));
+            quoteData.paymentStatus = payment.fullPaid ? 'paid' : (paidCents > 0 ? 'partially_paid' : 'unpaid');
+            quoteData.deposit_paid = payment.depositSecured === true;
+            if (payment.depositSecured) quoteData.deposit_paid_at = quoteData.deposit_paid_at || new Date().toISOString();
+            else quoteData.deposit_paid_at = null;
+            quoteData.paymentsReceived = {
+                name: quoteData.paymentsReceived && quoteData.paymentsReceived.name || 'Deposit paid',
+                amount: paidCents / 100
+            };
+            if (Number.isFinite(Number(payment.balanceDueCents))) quoteData.balance_due_cents = Math.max(0, Math.round(Number(payment.balanceDueCents)));
+            if (Number.isFinite(Number(payment.depositDueCents))) quoteData.deposit_due_cents = Math.max(0, Math.round(Number(payment.depositDueCents)));
             quoteData.manual_payment_reported = payment.status === 'client_reported';
             if (payment.report) {
                 quoteData.manual_payment_report_id = payment.report.id || '';
                 quoteData.manual_payment_method = payment.report.method || '';
                 quoteData.manual_payment_reported_at = payment.report.reportedAt || '';
+            } else {
+                quoteData.manual_payment_report_id = '';
+                quoteData.manual_payment_method = '';
+                quoteData.manual_payment_reported_at = '';
             }
             return payment.depositSecured === true || payment.fullPaid === true;
         }
@@ -5315,8 +5325,8 @@ if (location.search.includes('debug')) {
 
         function quoteDepositIsPaid() {
             var payments = Array.isArray(quoteData.payments) ? quoteData.payments : [];
-            return !!(_documentPaymentState && (_documentPaymentState.depositSecured || _documentPaymentState.fullPaid))
-                || quoteData.deposit_paid === true
+            if (_documentPaymentState) return !!(_documentPaymentState.depositSecured || _documentPaymentState.fullPaid);
+            return quoteData.deposit_paid === true
                 || ['partially_paid', 'paid'].includes(String(quoteData.paymentStatus || '').toLowerCase())
                 || payments.some(function(payment) { return ['deposit', 'invoice_deposit'].includes(payment.type) && payment.paid_at; });
         }

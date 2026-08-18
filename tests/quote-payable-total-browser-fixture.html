@@ -13,6 +13,7 @@
 <body>
   <div class="controls">
     <button id="showScreenshotCase" type="button">Screenshot case</button>
+    <button id="showConfirmedPartial" type="button">Confirmed partial deposit</button>
     <button id="showSecondQuote" type="button">Second quote</button>
   </div>
   <iframe id="viewer" title="Synthetic quote viewer" src="../interactive-quote-viewer.html?quote_studio=1"></iframe>
@@ -42,6 +43,15 @@
       accepted_total_cents: 113000, deposit_due_cents: 56500, payment_terms: terms,
       terms: ['Synthetic browser fixture only.'], style: { showUpgrades: true, approvalMode: 'accept' }
     };
+    const confirmedPartial = {
+      quoteNumber: 'SYNTHETIC-PAID', clientName: 'Synthetic Client', quoteTitle: 'Corrected received amount',
+      rooms: [{ name: 'Project', items: [{ id: 'line-paid', name: 'Signed project with selections', quantity: 1, rate: 3840.84, total: 3840.84 }] }],
+      taxEnabled: true, taxRate: 0.13, taxLabel: 'HST', currency: 'CAD',
+      status: 'accepted', signed_at: '2026-08-18T12:00:00.000Z',
+      grandTotal: 4340.15, total: 4340.15, accepted_total_cents: 361945, deposit_due_cents: 36035,
+      paymentsReceived: { name: 'Deposit paid', amount: 1809.73 }, paymentStatus: 'partially_paid', deposit_paid: false,
+      payment_terms: terms, terms: ['Synthetic browser fixture only.'], style: { showUpgrades: true, approvalMode: 'accept' }
+    };
     function render(quote) {
       viewer.contentWindow.postMessage({
         type: 'quotedr-quote-studio-document', version: 1, quote, style: quote.style
@@ -51,6 +61,7 @@
       if (event.origin === window.location.origin && event.data && event.data.type === 'quotedr-quote-studio-ready') render(screenshotCase);
     });
     document.getElementById('showScreenshotCase').addEventListener('click', () => render(screenshotCase));
+    document.getElementById('showConfirmedPartial').addEventListener('click', () => render(confirmedPartial));
     document.getElementById('showSecondQuote').addEventListener('click', () => render(secondQuote));
   </script>
 </body>

@@ -1,5 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import {
+  calculateRecordedPaymentState,
+  canonicalDocumentTotalCents,
+  legacyUnlinkedPaidCents,
+} from "../_shared/document-payment-accounting.mjs";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "https://axmoffknvblluibuitrq.supabase.co";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
@@ -187,11 +192,7 @@ function isAccepted(row: QuoteRow) {
 }
 
 function documentTotalCents(row: QuoteRow) {
-  const data = rowData(row);
-  const explicitAccepted = Number(data.accepted_total_cents || 0);
-  if (Number.isInteger(explicitAccepted) && explicitAccepted > 0) return explicitAccepted;
-  const raw = Number(row.total ?? row.grand_total ?? data.grandTotal ?? data.total ?? 0);
-  return Math.max(0, Math.round((Number.isFinite(raw) ? raw : 0) * 100));
+  return canonicalDocumentTotalCents(row);
 }
 
 function currencyFor(row: QuoteRow) {
@@ -268,31 +269,20 @@ async function recordsForDocument(admin: any, documentId: string) {
   return data || [];
 }
 
-function existingPaidCents(row: QuoteRow) {
-  const data = rowData(row);
-  const received = data.paymentsReceived || data.paymentReceived || {};
-  const amount = Number(received.amount || received.value || 0);
-  return Math.max(0, Math.round((Number.isFinite(amount) ? amount : 0) * 100));
-}
-
 async function documentPaymentState(admin: any, row: QuoteRow, settings: Record<string, any>) {
   const records = await recordsForDocument(admin, row.id);
-  const secured = records.filter((record: any) => ["paid", "confirmed"].includes(record.status));
-  const recordPaidCents = secured.reduce((sum: number, record: any) => sum + Math.max(0, Number(record.amount_cents || 0)), 0);
-  const paidCents = Math.max(recordPaidCents, existingPaidCents(row));
-  const totalCents = documentTotalCents(row);
   const terms = resolveDepositTerms(row, settings);
-  const requestedDepositCents = depositAmountCents(totalCents, terms);
-  const depositSecured = secured.some((record: any) => ["deposit", "invoice_deposit"].includes(record.payment_type));
-  const fullPaid = secured.some((record: any) => record.payment_type === "invoice_full") || paidCents >= totalCents && totalCents > 0;
+  const requestedDepositCents = depositAmountCents(documentTotalCents(row), terms);
+  const paymentState = calculateRecordedPaymentState(row, records, requestedDepositCents);
+  const { secured, totalCents, paidCents, balanceDueCents, depositDueCents, depositSecured, fullPaid } = paymentState;
   const reported = records.find((record: any) => record.status === "client_reported");
   return {
     records,
     totalCents,
     paidCents,
-    balanceDueCents: Math.max(0, totalCents - paidCents),
+    balanceDueCents,
     terms,
-    depositDueCents: depositSecured ? 0 : requestedDepositCents,
+    depositDueCents,
     depositSecured,
     fullPaid,
     reported: reported ? {
@@ -310,6 +300,7 @@ function publicStatus(row: QuoteRow, state: any) {
   if (state.fullPaid) status = "paid";
   else if (state.depositSecured) status = "secured";
   else if (state.reported) status = "client_reported";
+  else if (state.paidCents > 0) status = "partially_paid";
   return {
     documentId: row.id,
     status,
@@ -370,7 +361,6 @@ function idempotencyKey(value: unknown) {
 async function updateQuotePaymentState(admin: any, row: QuoteRow, record: any, paidAt: string) {
   const data = rowData(row);
   const payments = Array.isArray(data.payments) ? data.payments : [];
-  const alreadyRecorded = payments.some((payment: any) => payment.payment_record_id === record.id || (record.stripe_checkout_session_id && payment.stripe_checkout_session_id === record.stripe_checkout_session_id));
   const paymentEntry = {
     payment_record_id: record.id,
     type: record.payment_type,
@@ -382,24 +372,33 @@ async function updateQuotePaymentState(admin: any, row: QuoteRow, record: any, p
     stripe_payment_intent_id: record.stripe_payment_intent_id || "",
     paid_at: paidAt,
   };
-  const received = data.paymentsReceived || data.paymentReceived || {};
-  const previousReceived = Math.max(0, Number(received.amount || received.value || 0));
-  const nextReceived = alreadyRecorded ? previousReceived : previousReceived + Number(record.amount_cents || 0) / 100;
+  const existingPaymentIndex = payments.findIndex((payment: any) => payment.payment_record_id === record.id || (record.stripe_checkout_session_id && payment.stripe_checkout_session_id === record.stripe_checkout_session_id));
+  const nextPayments = payments.slice();
+  if (existingPaymentIndex >= 0) nextPayments[existingPaymentIndex] = paymentEntry;
+  else nextPayments.push(paymentEntry);
+
+  const { settings } = await paymentSettings(admin, row.user_id);
+  const state = await documentPaymentState(admin, row, settings);
+  const nextReceived = state.paidCents / 100;
   const nextData = {
     ...data,
-    paymentStatus: record.payment_type === "invoice_full" ? "paid" : "partially_paid",
-    deposit_paid: ["deposit", "invoice_deposit"].includes(record.payment_type) ? true : data.deposit_paid,
-    deposit_paid_at: ["deposit", "invoice_deposit"].includes(record.payment_type) ? (data.deposit_paid_at || paidAt) : data.deposit_paid_at,
+    paymentStatus: state.fullPaid ? "paid" : (state.paidCents > 0 ? "partially_paid" : "unpaid"),
+    deposit_paid: state.depositSecured,
+    deposit_paid_at: state.depositSecured ? (data.deposit_paid_at || paidAt) : null,
+    accepted_total_cents: state.totalCents,
+    deposit_due_cents: state.depositDueCents,
+    balance_due_cents: state.balanceDueCents,
     lastPaymentAt: paidAt,
     manual_payment_reported: false,
     paymentsReceived: {
       name: ["deposit", "invoice_deposit"].includes(record.payment_type) ? "Deposit paid" : "Payment received",
       amount: Math.round(nextReceived * 100) / 100,
     },
-    payments: alreadyRecorded ? payments : payments.concat([paymentEntry]),
+    payments: nextPayments,
   };
   const update: Record<string, any> = { data: nextData, updated_at: paidAt };
-  if (record.payment_type === "invoice_full") update.status = "paid";
+  if (state.fullPaid) update.status = "paid";
+  else if (isInvoice(row) && String(row.status || "").toLowerCase() === "paid") update.status = "invoiced";
   const { error } = await admin.from("quotes").update(update).eq("id", row.id).eq("user_id", row.user_id);
   if (error) throw error;
 }
@@ -606,10 +605,10 @@ async function confirmManual(req: Request, admin: any, body: Record<string, any>
   const { data: record, error } = await admin.from("payment_records").select("*").eq("id", recordId).maybeSingle();
   if (error) throw error;
   if (!record || record.user_id !== user.id || record.provider !== "manual") throw new PaymentError("Payment report not found", 404, "payment_report_not_found");
-  if (record.status !== "client_reported") return { record: { id: record.id, status: record.status }, unchanged: true };
   const decision = String(body.decision || "confirmed").toLowerCase();
   const now = new Date().toISOString();
   if (decision === "rejected") {
+    if (record.status !== "client_reported") return { record: { id: record.id, status: record.status }, unchanged: true };
     const rejected = await admin.from("payment_records").update({
       status: "rejected",
       confirmed_at: now,
@@ -635,18 +634,45 @@ async function confirmManual(req: Request, admin: any, body: Record<string, any>
     return { record: { id: rejected.data.id, status: rejected.data.status } };
   }
 
+  const amountWasProvided = Object.prototype.hasOwnProperty.call(body, "confirmedAmountCents");
+  if (!["client_reported", "confirmed"].includes(record.status) || (record.status === "confirmed" && !amountWasProvided)) {
+    return { record: { id: record.id, status: record.status }, unchanged: true };
+  }
+  const documentId = record.quote_id || record.invoice_id;
+  const row = documentId ? await fetchQuote(admin, documentId) : null;
+  if (!row || row.user_id !== user.id) throw new PaymentError("Payment document not found", 404, "payment_document_not_found");
+
+  const confirmedAmountCents = amountWasProvided ? Number(body.confirmedAmountCents) : Number(record.amount_cents || 0);
+  if (!Number.isInteger(confirmedAmountCents) || confirmedAmountCents <= 0) {
+    throw new PaymentError("Enter the amount actually received, to the cent.", 400, "confirmed_amount_invalid");
+  }
+  const records = await recordsForDocument(admin, row.id);
+  const otherPaidCents = records
+    .filter((candidate: any) => candidate.id !== record.id && ["paid", "confirmed"].includes(candidate.status))
+    .reduce((sum: number, candidate: any) => sum + Math.max(0, Number(candidate.amount_cents || 0)), 0)
+    + legacyUnlinkedPaidCents(row);
+  const maximumAmountCents = Math.max(0, documentTotalCents(row) - otherPaidCents);
+  if (confirmedAmountCents > maximumAmountCents) {
+    throw new PaymentError("The confirmed amount cannot exceed the document balance.", 409, "confirmed_amount_exceeds_balance");
+  }
+
   const confirmed = await admin.from("payment_records").update({
     status: "confirmed",
+    amount_cents: confirmedAmountCents,
     confirmed_at: now,
     confirmed_by: user.id,
     paid_at: now,
     updated_at: now,
+    metadata: {
+      ...(record.metadata || {}),
+      client_reported_amount_cents: Number(record.metadata?.client_reported_amount_cents || record.amount_cents || 0),
+      owner_confirmed_amount_cents: confirmedAmountCents,
+      amount_corrected_by_owner: confirmedAmountCents !== Number(record.amount_cents || 0),
+    },
   }).eq("id", record.id).select().single();
   if (confirmed.error) throw confirmed.error;
-  const documentId = confirmed.data.quote_id || confirmed.data.invoice_id;
-  const row = documentId ? await fetchQuote(admin, documentId) : null;
-  if (row) await updateQuotePaymentState(admin, row, confirmed.data, now);
-  return { record: { id: confirmed.data.id, status: confirmed.data.status, confirmedAt: now } };
+  await updateQuotePaymentState(admin, row, confirmed.data, now);
+  return { record: { id: confirmed.data.id, status: confirmed.data.status, amountCents: confirmedAmountCents, confirmedAt: now } };
 }
 
 Deno.serve(async (req) => {

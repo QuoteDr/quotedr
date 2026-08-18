@@ -919,19 +919,47 @@
             return 'manual payment';
         }
 
-        async function decideDashboardManualPayment(recordId, decision) {
-            var verb = decision === 'rejected' ? 'mark this payment as not received' : 'confirm that this payment arrived';
-            if (!await qdConfirm('Are you sure you want to ' + verb + '?', {
-                title: decision === 'rejected' ? 'Payment Not Received' : 'Confirm Payment',
-                okText: decision === 'rejected' ? 'Not received' : 'Confirm payment',
-                okClass: decision === 'rejected' ? 'btn-outline-danger' : 'btn-success',
-                type: decision === 'rejected' ? 'warning' : 'success'
+        function dashboardPaymentAmountToCents(value) {
+            var normalized = String(value == null ? '' : value).trim().replace(/[$,\s]/g, '');
+            if (!/^\d+(?:\.\d{1,2})?$/.test(normalized)) return null;
+            var cents = Math.round(Number(normalized) * 100);
+            return Number.isSafeInteger(cents) && cents > 0 ? cents : null;
+        }
+
+        async function decideDashboardManualPayment(recordId, decision, defaultAmountCents, isCorrection) {
+            var confirmedAmountCents = null;
+            if (decision === 'confirmed') {
+                var defaultAmount = (Math.max(0, Number(defaultAmountCents || 0)) / 100).toFixed(2);
+                var enteredAmount = await qdPrompt(
+                    isCorrection
+                        ? 'Enter the corrected amount you actually received. This updates the client-visible balance without changing the signed quote total.'
+                        : 'Enter the amount that actually arrived. Do not confirm the requested amount unless that is what you received.',
+                    defaultAmount,
+                    {
+                        title: isCorrection ? 'Correct Payment Amount' : 'Confirm Amount Received',
+                        okText: isCorrection ? 'Update amount' : 'Confirm received',
+                        okClass: 'btn-success'
+                    }
+                );
+                if (enteredAmount === null) return;
+                confirmedAmountCents = dashboardPaymentAmountToCents(enteredAmount);
+                if (!confirmedAmountCents) {
+                    await qdAlert('Enter a valid amount greater than $0, with no more than two decimal places.', { title: 'Check Payment Amount', type: 'warning' });
+                    return;
+                }
+            } else if (!await qdConfirm('Are you sure you want to mark this payment as not received?', {
+                title: 'Payment Not Received',
+                okText: 'Not received',
+                okClass: 'btn-outline-danger',
+                type: 'warning'
             })) return;
             try {
-                await callDocumentPaymentFunction({ action: 'confirm_manual', recordId: recordId, decision: decision }, true);
+                var payload = { action: 'confirm_manual', recordId: recordId, decision: decision };
+                if (confirmedAmountCents !== null) payload.confirmedAmountCents = confirmedAmountCents;
+                await callDocumentPaymentFunction(payload, true);
                 if (typeof qdToast === 'function') qdToast({
                     title: decision === 'rejected' ? 'Report cleared' : 'Payment confirmed',
-                    message: decision === 'rejected' ? 'The client can report the payment again when it is sent.' : 'The document payment status has been updated.',
+                    message: decision === 'rejected' ? 'The client can report the payment again when it is sent.' : 'The confirmed amount and client-visible balance have been updated.',
                     type: decision === 'rejected' ? 'warning' : 'success'
                 });
                 await refreshQuotes();
@@ -1055,6 +1083,7 @@
                 var depositPaid = !!(q.data && (q.data.deposit_paid === true || q.data.paymentStatus === 'partially_paid' || q.data.paymentStatus === 'paid' || payments.some(function(payment) { return ['deposit', 'invoice_deposit'].includes(payment.type) && payment.paid_at; })));
                 var depositPayment = payments.slice().reverse().find(function(payment) { return ['deposit', 'invoice_deposit'].includes(payment.type) && payment.paid_at; });
                 var depositAmount = depositPayment && depositPayment.amount_cents ? '$' + (depositPayment.amount_cents / 100).toFixed(2) : 'Deposit';
+                var editableManualDeposit = depositPayment && depositPayment.provider === 'manual' && depositPayment.payment_record_id ? depositPayment : null;
                 var manualPaymentReport = dashboardManualPaymentReports[q.id] || null;
                 var manualPaymentAmount = manualPaymentReport ? '$' + (Number(manualPaymentReport.amount_cents || 0) / 100).toFixed(2) : '';
                 var manualPaymentPurpose = manualPaymentReport && manualPaymentReport.payment_type === 'invoice_full' ? 'invoice payment' : 'deposit';
@@ -1104,8 +1133,8 @@
                     ${isInvalid ? `<div class="alert alert-danger py-2 px-2 mt-2 mb-0 small"><i class="fas fa-ban me-1"></i><strong>No longer valid.</strong> This invoice remains in the client portal for reference only and cannot be paid.</div>` : ''}
                     ${status === 'accepted' && q.data && q.data.client_upgraded ? `<div class="alert alert-warning py-1 px-2 mt-2 mb-0 small"><i class="fas fa-bolt me-1"></i><strong>Client made upgrades</strong> when signing - <a href="interactive-quote-viewer.html?id=${encodeURIComponent(q.id)}&preview=1&admin_preview=1" class="alert-link">review quote</a></div>` : ''}
                     ${portalVisible ? `<div class="portal-locked-note mt-2"><i class="fas fa-shield-halved me-1"></i>This document is locked while it is in the client portal. Remove from portal or duplicate as a revision to edit.</div>` : ''}
-                    ${depositPaid ? `<div class="alert alert-success py-1 px-2 mt-2 mb-0 small"><i class="fas fa-credit-card me-1"></i><strong>${escapeHtml(depositAmount)} paid</strong>${depositPayment && depositPayment.paid_at ? ' on ' + escapeHtml(formatDate(depositPayment.paid_at)) : ''}</div>` : ''}
-                    ${manualPaymentReport ? `<div class="alert alert-warning py-2 px-2 mt-2 mb-0 small"><div><i class="fas fa-clock me-1"></i><strong>Client reports ${escapeHtml(manualPaymentAmount)} ${escapeHtml(manualPaymentPurpose)} by ${escapeHtml(dashboardManualPaymentLabel(manualPaymentReport))}.</strong> Confirm only after you receive it.</div><div class="d-flex gap-1 mt-2 flex-wrap"><button class="btn btn-success btn-sm" onclick="decideDashboardManualPayment(${jsAttr(manualPaymentReport.id)}, 'confirmed')"><i class="fas fa-check me-1"></i>Confirm received</button><button class="btn btn-outline-danger btn-sm" onclick="decideDashboardManualPayment(${jsAttr(manualPaymentReport.id)}, 'rejected')"><i class="fas fa-xmark me-1"></i>Not received</button></div></div>` : ''}
+                    ${depositPaid ? `<div class="alert alert-success py-1 px-2 mt-2 mb-0 small"><div><i class="fas fa-credit-card me-1"></i><strong>${escapeHtml(depositAmount)} received</strong>${depositPayment && depositPayment.paid_at ? ' on ' + escapeHtml(formatDate(depositPayment.paid_at)) : ''}</div>${editableManualDeposit ? `<button class="btn btn-link btn-sm p-0 mt-1" onclick="event.stopPropagation();decideDashboardManualPayment(${jsAttr(editableManualDeposit.payment_record_id)}, 'confirmed', ${Number(editableManualDeposit.amount_cents || 0)}, true)"><i class="fas fa-pencil-alt me-1"></i>Edit received amount</button>` : ''}</div>` : ''}
+                    ${manualPaymentReport ? `<div class="alert alert-warning py-2 px-2 mt-2 mb-0 small"><div><i class="fas fa-clock me-1"></i><strong>Client reports sending a ${escapeHtml(manualPaymentPurpose)} by ${escapeHtml(dashboardManualPaymentLabel(manualPaymentReport))}.</strong> Requested amount: ${escapeHtml(manualPaymentAmount)}. Confirm the amount that actually arrived.</div><div class="d-flex gap-1 mt-2 flex-wrap"><button class="btn btn-success btn-sm" onclick="event.stopPropagation();decideDashboardManualPayment(${jsAttr(manualPaymentReport.id)}, 'confirmed', ${Number(manualPaymentReport.amount_cents || 0)}, false)"><i class="fas fa-check me-1"></i>Confirm received amount</button><button class="btn btn-outline-danger btn-sm" onclick="event.stopPropagation();decideDashboardManualPayment(${jsAttr(manualPaymentReport.id)}, 'rejected')"><i class="fas fa-xmark me-1"></i>Not received</button></div></div>` : ''}
                     ${reviewSentAt ? `<div class="alert alert-success py-1 px-2 mt-2 mb-0 small"><i class="fab fa-google me-1"></i><strong>Review requested</strong> on ${escapeHtml(formatDate(reviewSentAt))}</div>` : ''}
                     ${reviewNudge ? `<div class="alert alert-warning py-2 px-2 mt-2 mb-0 small d-flex justify-content-between align-items-center gap-2 flex-wrap"><span><i class="fas fa-star me-1"></i>You haven't asked ${escapeHtml(clientName)} for a Google review yet. Click while the job is still fresh in their mind.</span><span class="d-flex gap-1"><button class="btn btn-sm btn-warning" onclick="sendGoogleReviewRequest(${jsAttr(q.id)}, ${jsAttr(clientName)}, ${jsAttr(clientEmail)})"><i class="fab fa-google me-1"></i>Request now</button><button class="btn btn-sm btn-outline-secondary" onclick="dismissGoogleReviewNudge(${jsAttr(q.id)})">Never show again</button></span></div>` : ''}
                     ${pendingCos ? `<div class="alert alert-info py-1 px-2 mt-2 mb-0 small"><i class="fas fa-file-circle-plus me-1"></i><strong>${pendingCos} pending change order${pendingCos === 1 ? '' : 's'}</strong></div>` : ''}
