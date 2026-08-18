@@ -566,6 +566,7 @@
 
         let allQuotes = []; // Store all quotes for client-side filtering
         var dashboardManualPaymentReports = {};
+        var dashboardPaymentEvidenceByRecord = {};
         var selectedClientFilesFilter = null;
         let junkQuotes = []; // Recently deleted quotes/invoices, retained temporarily
         let dashboardPortalPlaceholderRows = []; // Legacy metadata rows stay out of quote views
@@ -911,6 +912,147 @@
             return dashboardManualPaymentReports;
         }
 
+        async function refreshDashboardPaymentEvidence() {
+            dashboardPaymentEvidenceByRecord = {};
+            try {
+                var result = await callDocumentPaymentFunction({ action: 'owner_list_evidence' }, true);
+                (result.evidence || []).forEach(function(evidence) {
+                    if (!evidence.paymentRecordId) return;
+                    if (!dashboardPaymentEvidenceByRecord[evidence.paymentRecordId]) dashboardPaymentEvidenceByRecord[evidence.paymentRecordId] = [];
+                    dashboardPaymentEvidenceByRecord[evidence.paymentRecordId].push(evidence);
+                });
+            } catch(error) {
+                if (error && error.code !== 'permission_denied') console.warn('Could not load payment evidence:', error.message || error);
+            }
+            return dashboardPaymentEvidenceByRecord;
+        }
+
+        function dashboardPaymentEvidenceMarkup(recordId) {
+            var records = dashboardPaymentEvidenceByRecord[recordId] || [];
+            return records.map(function(evidence) {
+                var visibilityLabel = evidence.portalVisible ? 'Shown in client portal' : 'Contractor-only';
+                return `<div class="border rounded bg-white p-2 mt-2 payment-evidence-summary">
+                <div class="fw-semibold"><i class="fas fa-paperclip me-1"></i>Payment proof: ${escapeHtml(evidence.fileName || 'Attached file')}</div>
+                <div class="small text-muted mb-1">${escapeHtml(evidence.uploadedBy === 'client' ? ('Client uploaded · ' + (evidence.portalVisible ? 'Shown in client portal' : 'Hidden after payment rejection')) : visibilityLabel)}</div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button data-account-permission="payments.read" class="btn btn-link btn-sm p-0" onclick="event.stopPropagation();viewDashboardPaymentEvidence(${jsAttr(evidence.id)})"><i class="fas fa-eye me-1"></i>View proof</button>
+                    ${evidence.uploadedBy === 'contractor' ? `<button data-account-permission="payments.manage" class="btn btn-link btn-sm p-0" onclick="event.stopPropagation();setDashboardPaymentEvidenceVisibility(${jsAttr(evidence.id)}, ${evidence.portalVisible ? 'false' : 'true'})"><i class="fas fa-${evidence.portalVisible ? 'eye-slash' : 'share'} me-1"></i>${evidence.portalVisible ? 'Hide from portal' : 'Show in portal'}</button>` : ''}
+                    <button data-account-permission="payments.manage" class="btn btn-link btn-sm p-0 text-danger" onclick="event.stopPropagation();removeDashboardPaymentEvidence(${jsAttr(evidence.id)})"><i class="fas fa-trash me-1"></i>Remove proof</button>
+                </div>
+            </div>`;
+            }).join('');
+        }
+
+        async function viewDashboardPaymentEvidence(evidenceId) {
+            var proofWindow = window.open('about:blank', '_blank');
+            if (proofWindow) proofWindow.opener = null;
+            try {
+                var result = await callDocumentPaymentFunction({ action: 'owner_view_evidence', evidenceId: evidenceId }, true);
+                if (!result.url) throw new Error('The proof link could not be opened.');
+                if (!proofWindow) throw new Error('Allow pop-ups for QuoteDr, then try again.');
+                proofWindow.location.replace(result.url);
+            } catch(error) {
+                if (proofWindow) proofWindow.close();
+                qdAlert('Payment proof could not be opened: ' + (error.message || 'Please try again.'));
+            }
+        }
+
+        async function setDashboardPaymentEvidenceVisibility(evidenceId, portalVisible) {
+            try {
+                await callDocumentPaymentFunction({
+                    action: 'owner_set_evidence_visibility',
+                    evidenceId: evidenceId,
+                    portalVisible: portalVisible === true
+                }, true);
+                if (typeof qdToast === 'function') qdToast({
+                    title: portalVisible ? 'Visible in client portal' : 'Proof is private',
+                    message: portalVisible ? 'The client can now view this payment proof.' : 'Only authorized account members can view this proof.',
+                    type: 'success'
+                });
+                await refreshQuotes();
+            } catch(error) {
+                qdAlert('Payment proof visibility could not be updated: ' + (error.message || 'Please try again.'));
+            }
+        }
+
+        async function removeDashboardPaymentEvidence(evidenceId) {
+            if (!await qdConfirm('Remove this payment proof? The accounting amount and payment record will not change.', {
+                title: 'Remove Payment Proof', okText: 'Remove proof', okClass: 'btn-danger', type: 'warning'
+            })) return;
+            try {
+                await callDocumentPaymentFunction({ action: 'owner_delete_evidence', evidenceId: evidenceId }, true);
+                await refreshQuotes();
+            } catch(error) {
+                qdAlert('Payment proof could not be removed: ' + (error.message || 'Please try again.'));
+            }
+        }
+
+        function ensureDashboardPaymentEvidenceModal() {
+            if (document.getElementById('dashboardPaymentEvidenceModal')) return;
+            document.body.insertAdjacentHTML('beforeend', `
+                <div class="modal fade" id="dashboardPaymentEvidenceModal" tabindex="-1" aria-labelledby="dashboardPaymentEvidenceTitle" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+                        <div class="modal-header"><h5 class="modal-title" id="dashboardPaymentEvidenceTitle"><i class="fas fa-paperclip me-2"></i>Add Payment Proof</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                        <div class="modal-body">
+                            <p class="mb-2">Attach an optional JPG, PNG, or PDF (maximum 8 MB).</p>
+                            <div class="alert alert-warning small"><strong>Check before uploading:</strong> Crop or cover bank and card numbers, confirmation or reference numbers, email addresses, and unrelated personal information. Only upload what is needed to document this payment.</div>
+                            <input class="form-control mb-3" type="file" id="dashboardPaymentEvidenceFile" accept="image/jpeg,image/png,application/pdf">
+                            <div class="form-check mb-3"><input class="form-check-input" type="checkbox" id="dashboardPaymentEvidencePrivacy"><label class="form-check-label" for="dashboardPaymentEvidencePrivacy">I checked this file for sensitive information.</label></div>
+                            <div class="form-check"><input class="form-check-input" type="checkbox" id="dashboardPaymentEvidencePortal"><label class="form-check-label" for="dashboardPaymentEvidencePortal"><strong>Show this proof in the client portal</strong> <span class="text-muted">(off by default)</span></label></div>
+                            <div class="small text-muted mt-2">The proof is optional and never changes the amount recorded as received.</div>
+                            <div id="dashboardPaymentEvidenceError" class="alert alert-danger mt-3 mb-0" style="display:none;"></div>
+                        </div>
+                        <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-success" id="dashboardPaymentEvidenceSave" onclick="submitDashboardPaymentEvidence()"><i class="fas fa-upload me-1"></i>Upload proof</button></div>
+                    </div></div>
+                </div>`);
+        }
+
+        function addDashboardPaymentEvidence(recordId) {
+            ensureDashboardPaymentEvidenceModal();
+            var modalEl = document.getElementById('dashboardPaymentEvidenceModal');
+            modalEl.dataset.recordId = recordId;
+            document.getElementById('dashboardPaymentEvidenceFile').value = '';
+            document.getElementById('dashboardPaymentEvidencePrivacy').checked = false;
+            document.getElementById('dashboardPaymentEvidencePortal').checked = false;
+            document.getElementById('dashboardPaymentEvidenceError').style.display = 'none';
+            (bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl)).show();
+        }
+
+        async function submitDashboardPaymentEvidence() {
+            var modalEl = document.getElementById('dashboardPaymentEvidenceModal');
+            var file = document.getElementById('dashboardPaymentEvidenceFile').files[0];
+            var privacyChecked = document.getElementById('dashboardPaymentEvidencePrivacy').checked;
+            var portalVisible = document.getElementById('dashboardPaymentEvidencePortal').checked;
+            var errorEl = document.getElementById('dashboardPaymentEvidenceError');
+            var saveBtn = document.getElementById('dashboardPaymentEvidenceSave');
+            try {
+                validatePaymentEvidenceFile(file);
+                if (!privacyChecked) throw new Error('Confirm that you checked the file for sensitive information.');
+                saveBtn.disabled = true;
+                saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Uploading...';
+                await uploadPaymentEvidence({
+                    actor: 'contractor',
+                    recordId: modalEl.dataset.recordId,
+                    file: file,
+                    privacyChecked: true,
+                    portalVisible: portalVisible
+                });
+                (bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl)).hide();
+                if (typeof qdToast === 'function') qdToast({
+                    title: 'Payment proof attached',
+                    message: portalVisible ? 'The proof is visible in the client portal.' : 'The proof is contractor-only.',
+                    type: 'success'
+                });
+                await refreshQuotes();
+            } catch(error) {
+                errorEl.textContent = error.message || 'Payment proof could not be uploaded.';
+                errorEl.style.display = 'block';
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="fas fa-upload me-1"></i>Upload proof';
+            }
+        }
+
         function dashboardManualPaymentLabel(report) {
             if (!report) return '';
             if (report.method === 'etransfer') return 'e-transfer';
@@ -1057,13 +1199,13 @@
 
         async function refreshQuotes() {
             try {
-                const [{ data, error }] = await Promise.all([listQuoteSummariesFromSupabase(), refreshDashboardManualPaymentReports(), loadDashboardEmptyPortals()]);
+                const [{ data, error }] = await Promise.all([listQuoteSummariesFromSupabase(), refreshDashboardManualPaymentReports(), refreshDashboardPaymentEvidence(), loadDashboardEmptyPortals()]);
                 if (error === 'Not authenticated') {
                     // Retry after delay - session may not be ready yet
                     setTimeout(async function() {
                         const retry = await listQuoteSummariesFromSupabase();
                         if (!retry.error) {
-                            await Promise.all([refreshDashboardManualPaymentReports(), loadDashboardEmptyPortals()]);
+                            await Promise.all([refreshDashboardManualPaymentReports(), refreshDashboardPaymentEvidence(), loadDashboardEmptyPortals()]);
                             await setDashboardQuotesFromCloud(retry.data || []);
                             renderDashboardResults();
                             updateStats(allQuotes);
@@ -1183,7 +1325,9 @@
                     ? 'Lower deposit accepted — project secured'
                     : (depositSecured ? 'Deposit requirement satisfied' : (dashboardPaymentMoney(depositDueCents) + ' still needed to satisfy deposit'));
                 var editableManualDeposit = depositPayment && depositPayment.provider === 'manual' && depositPayment.payment_record_id ? depositPayment : null;
+                var depositPaymentEvidence = editableManualDeposit ? (dashboardPaymentEvidenceByRecord[editableManualDeposit.payment_record_id] || []).find(function(evidence) { return evidence.uploadedBy === 'contractor'; }) : null;
                 var manualPaymentReport = dashboardManualPaymentReports[q.id] || null;
+                var manualPaymentEvidence = manualPaymentReport ? (dashboardPaymentEvidenceByRecord[manualPaymentReport.id] || []).find(function(evidence) { return evidence.uploadedBy === 'contractor'; }) : null;
                 var manualPaymentAmount = manualPaymentReport ? '$' + (Number(manualPaymentReport.amount_cents || 0) / 100).toFixed(2) : '';
                 var manualPaymentPurpose = manualPaymentReport && manualPaymentReport.payment_type === 'invoice_full' ? 'invoice payment' : 'deposit';
                 var reviewReady = !isInvalid && dashboardIsPaidForReviewRequest(q);
@@ -1232,8 +1376,8 @@
                     ${isInvalid ? `<div class="alert alert-danger py-2 px-2 mt-2 mb-0 small"><i class="fas fa-ban me-1"></i><strong>No longer valid.</strong> This invoice remains in the client portal for reference only and cannot be paid.</div>` : ''}
                     ${status === 'accepted' && q.data && q.data.client_upgraded ? `<div class="alert alert-warning py-1 px-2 mt-2 mb-0 small"><i class="fas fa-bolt me-1"></i><strong>Client made upgrades</strong> when signing - <a href="interactive-quote-viewer.html?id=${encodeURIComponent(q.id)}&preview=1&admin_preview=1" class="alert-link">review quote</a></div>` : ''}
                     ${portalVisible ? `<div class="portal-locked-note mt-2"><i class="fas fa-shield-halved me-1"></i>This document is locked while it is in the client portal. Remove from portal or duplicate as a revision to edit.</div>` : ''}
-                    ${depositReceived ? `<div class="alert ${depositSecured ? 'alert-success' : 'alert-warning'} py-2 px-2 mt-2 mb-0 small"><div><i class="fas fa-credit-card me-1"></i><strong>${escapeHtml(depositAmount)} received</strong>${depositPayment && depositPayment.paid_at ? ' on ' + escapeHtml(formatDate(depositPayment.paid_at)) : ''}</div><div class="mt-1">${escapeHtml(depositStatusText)}</div><div class="d-flex gap-2 flex-wrap mt-1">${editableManualDeposit ? `<button class="btn btn-link btn-sm p-0" onclick="event.stopPropagation();decideDashboardManualPayment(${jsAttr(editableManualDeposit.payment_record_id)}, 'confirmed', ${Number(editableManualDeposit.amount_cents || 0)}, true)"><i class="fas fa-pencil-alt me-1"></i>Edit received amount</button>` : ''}${(!depositSecured || depositShortfallAccepted) ? `<button class="btn btn-link btn-sm p-0" onclick="event.stopPropagation();reviewDashboardDepositDecision(${jsAttr(q.id)})"><i class="fas fa-scale-balanced me-1"></i>Review deposit decision</button>` : ''}</div></div>` : ''}
-                    ${manualPaymentReport ? `<div class="alert alert-warning py-2 px-2 mt-2 mb-0 small"><div><i class="fas fa-clock me-1"></i><strong>Client reports sending a ${escapeHtml(manualPaymentPurpose)} by ${escapeHtml(dashboardManualPaymentLabel(manualPaymentReport))}.</strong> Requested amount: ${escapeHtml(manualPaymentAmount)}. Enter the amount that actually arrived.</div><div class="d-flex gap-1 mt-2 flex-wrap"><button class="btn btn-success btn-sm" onclick="event.stopPropagation();decideDashboardManualPayment(${jsAttr(manualPaymentReport.id)}, 'confirmed', ${Number(manualPaymentReport.amount_cents || 0)}, false)"><i class="fas fa-keyboard me-1"></i>Enter amount received</button><button class="btn btn-outline-danger btn-sm" onclick="event.stopPropagation();decideDashboardManualPayment(${jsAttr(manualPaymentReport.id)}, 'rejected')"><i class="fas fa-xmark me-1"></i>Not received</button></div></div>` : ''}
+                    ${depositReceived ? `<div class="alert ${depositSecured ? 'alert-success' : 'alert-warning'} py-2 px-2 mt-2 mb-0 small"><div><i class="fas fa-credit-card me-1"></i><strong>${escapeHtml(depositAmount)} received</strong>${depositPayment && depositPayment.paid_at ? ' on ' + escapeHtml(formatDate(depositPayment.paid_at)) : ''}</div><div class="mt-1">${escapeHtml(depositStatusText)}</div><div class="d-flex gap-2 flex-wrap mt-1">${editableManualDeposit ? `<button class="btn btn-link btn-sm p-0" onclick="event.stopPropagation();decideDashboardManualPayment(${jsAttr(editableManualDeposit.payment_record_id)}, 'confirmed', ${Number(editableManualDeposit.amount_cents || 0)}, true)"><i class="fas fa-pencil-alt me-1"></i>Edit received amount</button>${!depositPaymentEvidence ? `<button data-account-permission="payments.manage" class="btn btn-link btn-sm p-0" onclick="event.stopPropagation();addDashboardPaymentEvidence(${jsAttr(editableManualDeposit.payment_record_id)})"><i class="fas fa-paperclip me-1"></i>Add payment proof</button>` : ''}` : ''}${(!depositSecured || depositShortfallAccepted) ? `<button class="btn btn-link btn-sm p-0" onclick="event.stopPropagation();reviewDashboardDepositDecision(${jsAttr(q.id)})"><i class="fas fa-scale-balanced me-1"></i>Review deposit decision</button>` : ''}</div>${editableManualDeposit ? dashboardPaymentEvidenceMarkup(editableManualDeposit.payment_record_id) : ''}</div>` : ''}
+                    ${manualPaymentReport ? `<div class="alert alert-warning py-2 px-2 mt-2 mb-0 small"><div><i class="fas fa-clock me-1"></i><strong>Client reports sending a ${escapeHtml(manualPaymentPurpose)} by ${escapeHtml(dashboardManualPaymentLabel(manualPaymentReport))}.</strong> Requested amount: ${escapeHtml(manualPaymentAmount)}. Enter the amount that actually arrived.</div><div class="d-flex gap-1 mt-2 flex-wrap"><button class="btn btn-success btn-sm" onclick="event.stopPropagation();decideDashboardManualPayment(${jsAttr(manualPaymentReport.id)}, 'confirmed', ${Number(manualPaymentReport.amount_cents || 0)}, false)"><i class="fas fa-keyboard me-1"></i>Enter amount received</button><button class="btn btn-outline-danger btn-sm" onclick="event.stopPropagation();decideDashboardManualPayment(${jsAttr(manualPaymentReport.id)}, 'rejected')"><i class="fas fa-xmark me-1"></i>Not received</button>${!manualPaymentEvidence ? `<button data-account-permission="payments.manage" class="btn btn-outline-secondary btn-sm" onclick="event.stopPropagation();addDashboardPaymentEvidence(${jsAttr(manualPaymentReport.id)})"><i class="fas fa-paperclip me-1"></i>Add payment proof</button>` : ''}</div>${dashboardPaymentEvidenceMarkup(manualPaymentReport.id)}</div>` : ''}
                     ${reviewSentAt ? `<div class="alert alert-success py-1 px-2 mt-2 mb-0 small"><i class="fab fa-google me-1"></i><strong>Review requested</strong> on ${escapeHtml(formatDate(reviewSentAt))}</div>` : ''}
                     ${reviewNudge ? `<div class="alert alert-warning py-2 px-2 mt-2 mb-0 small d-flex justify-content-between align-items-center gap-2 flex-wrap"><span><i class="fas fa-star me-1"></i>You haven't asked ${escapeHtml(clientName)} for a Google review yet. Click while the job is still fresh in their mind.</span><span class="d-flex gap-1"><button class="btn btn-sm btn-warning" onclick="sendGoogleReviewRequest(${jsAttr(q.id)}, ${jsAttr(clientName)}, ${jsAttr(clientEmail)})"><i class="fab fa-google me-1"></i>Request now</button><button class="btn btn-sm btn-outline-secondary" onclick="dismissGoogleReviewNudge(${jsAttr(q.id)})">Never show again</button></span></div>` : ''}
                     ${pendingCos ? `<div class="alert alert-info py-1 px-2 mt-2 mb-0 small"><i class="fas fa-file-circle-plus me-1"></i><strong>${pendingCos} pending change order${pendingCos === 1 ? '' : 's'}</strong></div>` : ''}
@@ -3858,7 +4002,7 @@
                 if (result.error === 'Not authenticated' && attempts < 3) {
                     setTimeout(loadWithRetry, 800 * attempts);
                 } else if (!result.error) {
-                    await Promise.all([refreshDashboardManualPaymentReports(), loadDashboardEmptyPortals()]);
+                    await Promise.all([refreshDashboardManualPaymentReports(), refreshDashboardPaymentEvidence(), loadDashboardEmptyPortals()]);
                     await setDashboardQuotesFromCloud(result.data || []);
                     renderDashboardResults();
                     updateStats(allQuotes);

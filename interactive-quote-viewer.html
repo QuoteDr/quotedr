@@ -1331,6 +1331,16 @@
             background: #fff;
         }
         .deposit-method-item .btn { margin-top: 0.65rem; }
+        .payment-evidence-panel {
+            margin-top: 1rem;
+            padding: 1rem;
+            border: 1px solid #d9e2ec;
+            border-radius: 12px;
+            background: #f8fbff;
+            text-align: left;
+        }
+        .payment-evidence-warning { font-size: 0.84rem; }
+        .payment-evidence-file { overflow-wrap: anywhere; }
         .deposit-next-step {
             display: inline-flex;
             align-items: center;
@@ -6053,6 +6063,89 @@ if (location.search.includes('debug')) {
             return Math.max(0, required - paidCents);
         }
 
+        function currentClientPaymentEvidence() {
+            return _documentPaymentState && Array.isArray(_documentPaymentState.evidence)
+                ? _documentPaymentState.evidence
+                : [];
+        }
+
+        function clientPaymentEvidenceMarkup() {
+            return currentClientPaymentEvidence().map(function(evidence) {
+                return '<div class="payment-evidence-panel payment-evidence-file">' +
+                '<div class="fw-semibold"><i class="fas fa-paperclip me-1"></i>Payment proof attached</div>' +
+                '<div class="small text-muted mb-2">' + escapeHtml(evidence.fileName || 'Attached proof') + '</div>' +
+                '<button type="button" class="btn btn-sm btn-outline-primary me-2" onclick="viewClientPaymentEvidence(\'' + escapeHtml(evidence.id) + '\')"><i class="fas fa-eye me-1"></i>View proof</button>' +
+                (evidence.uploadedBy === 'client' ? '<button type="button" class="btn btn-sm btn-outline-danger" onclick="removeClientPaymentEvidence(\'' + escapeHtml(evidence.id) + '\')"><i class="fas fa-trash me-1"></i>Remove</button>' : '') +
+                '</div>';
+            }).join('');
+        }
+
+        function clientPaymentEvidenceUploadMarkup(recordId) {
+            var attachedMarkup = clientPaymentEvidenceMarkup();
+            var clientAlreadyUploaded = currentClientPaymentEvidence().some(function(evidence) { return evidence.uploadedBy === 'client'; });
+            if (clientAlreadyUploaded) return attachedMarkup;
+            var actionButton = recordId
+                ? '<button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="uploadClientPaymentEvidence(\'' + escapeHtml(recordId) + '\')"><i class="fas fa-upload me-1"></i>Upload optional proof</button>'
+                : '';
+            return attachedMarkup + '<div class="payment-evidence-panel">' +
+                '<div class="fw-semibold"><i class="fas fa-paperclip me-1"></i>Optional payment proof</div>' +
+                '<div class="alert alert-warning payment-evidence-warning mt-2 mb-2"><strong>Check before uploading:</strong> Crop or cover bank and card numbers, confirmation or reference numbers, email addresses, and unrelated personal information.</div>' +
+                '<input class="form-control form-control-sm" type="file" id="clientPaymentEvidenceFile" accept="image/jpeg,image/png,application/pdf" aria-label="Optional payment proof">' +
+                '<div class="form-check mt-2"><input class="form-check-input" type="checkbox" id="clientPaymentEvidencePrivacy"><label class="form-check-label small" for="clientPaymentEvidencePrivacy">I checked this file for sensitive information.</label></div>' +
+                '<div class="small text-muted mt-2">JPG, PNG, or PDF; maximum 8 MB. This does not change the amount reported or received.</div>' + actionButton +
+                '</div>';
+        }
+
+        async function viewClientPaymentEvidence(evidenceId) {
+            var proofWindow = window.open('about:blank', '_blank');
+            if (proofWindow) proofWindow.opener = null;
+            try {
+                var result = await callDocumentPaymentFunction(secureDocumentPaymentPayload('view_evidence', { evidenceId: evidenceId }), false);
+                if (!result.url) throw new Error('The proof link could not be opened.');
+                if (!proofWindow) throw new Error('Allow pop-ups for QuoteDr, then try again.');
+                proofWindow.location.replace(result.url);
+            } catch(error) {
+                if (proofWindow) proofWindow.close();
+                qdAlert('Payment proof could not be opened: ' + (error.message || 'Please try again.'));
+            }
+        }
+
+        async function uploadClientPaymentEvidence(recordId) {
+            var input = document.getElementById('clientPaymentEvidenceFile');
+            var privacy = document.getElementById('clientPaymentEvidencePrivacy');
+            try {
+                var file = input && input.files && input.files[0];
+                validatePaymentEvidenceFile(file);
+                if (!privacy || privacy.checked !== true) throw new Error('Confirm that you checked the file for sensitive information.');
+                await uploadPaymentEvidence({
+                    actor: 'client',
+                    recordId: recordId,
+                    file: file,
+                    privacyChecked: true,
+                    securePayload: secureDocumentPaymentPayload('')
+                });
+                await reconcileQuotePaymentState(quoteId);
+                renderDepositPaymentSection();
+                qdToast({ title: 'Payment proof attached', message: 'Your contractor can now view the proof with this payment report.', type: 'success' });
+            } catch(error) {
+                qdAlert('Payment proof could not be uploaded: ' + (error.message || 'Please try again.'));
+            }
+        }
+
+        async function removeClientPaymentEvidence(evidenceId) {
+            var confirmed = typeof qdConfirm === 'function'
+                ? await qdConfirm('Remove this payment proof? Your payment report will stay in place.', { title: 'Remove Payment Proof', okText: 'Remove proof', okClass: 'btn-danger', type: 'warning' })
+                : window.confirm('Remove this payment proof?');
+            if (!confirmed) return;
+            try {
+                await callDocumentPaymentFunction(secureDocumentPaymentPayload('delete_evidence', { evidenceId: evidenceId }), false);
+                await reconcileQuotePaymentState(quoteId);
+                renderDepositPaymentSection();
+            } catch(error) {
+                qdAlert('Payment proof could not be removed: ' + (error.message || 'Please try again.'));
+            }
+        }
+
         function depositManualMethodMarkup(method, title, details, icon) {
             var actionText = method === 'etransfer' ? "I've sent the e-transfer" : (method === 'cheque' ? "I've arranged the cheque" : "I've arranged the cash payment");
             var copyButton = method === 'etransfer' || method === 'cheque'
@@ -6085,13 +6178,14 @@ if (location.search.includes('debug')) {
 
             if (quoteDepositIsPaid()) {
                 title.textContent = 'Project Secured';
+                var paymentEvidenceMarkup = clientPaymentEvidenceUploadMarkup(_documentPaymentState && _documentPaymentState.evidencePaymentRecordId || '');
                 if (quoteDepositShortfallAccepted()) {
                     var acceptedCents = quotePaidAmountCents();
                     prompt.textContent = 'Your contractor accepted the ' + viewerMoney(acceptedCents / 100) + ' received as the deposit for this project.';
-                    status.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle me-1"></i><strong>Lower deposit accepted.</strong> No additional deposit is required before scheduling. Your remaining project balance is unchanged.</div>';
+                    status.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle me-1"></i><strong>Lower deposit accepted.</strong> No additional deposit is required before scheduling. Your remaining project balance is unchanged.</div>' + paymentEvidenceMarkup;
                 } else {
                     prompt.textContent = 'Your deposit has been received and confirmed.';
-                    status.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle me-1"></i><strong>Deposit received.</strong> Your contractor can now move ahead with scheduling.</div>';
+                    status.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle me-1"></i><strong>Deposit received.</strong> Your contractor can now move ahead with scheduling.</div>' + paymentEvidenceMarkup;
                 }
                 stripeActions.innerHTML = '';
                 manualMethods.innerHTML = '';
@@ -6109,7 +6203,7 @@ if (location.search.includes('debug')) {
                 status.innerHTML = '';
             }
             if (_documentPaymentState && _documentPaymentState.status === 'client_reported') {
-                status.innerHTML = '<div class="alert alert-warning"><i class="fas fa-clock me-1"></i><strong>Payment reported.</strong> Your contractor will confirm it after it arrives.</div>';
+                status.innerHTML = '<div class="alert alert-warning"><i class="fas fa-clock me-1"></i><strong>Payment reported.</strong> Your contractor will confirm it after it arrives.</div>' + clientPaymentEvidenceUploadMarkup(_documentPaymentState.report && _documentPaymentState.report.id || '');
                 stripeActions.innerHTML = '';
                 manualMethods.innerHTML = '';
                 return;
@@ -6140,7 +6234,7 @@ if (location.search.includes('debug')) {
             }
             var instructions = String(manual.instructions || '').trim();
             manualMethods.innerHTML = methods.length
-                ? '<div class="small fw-semibold text-muted mb-2">Or pay directly</div><div class="deposit-method-list">' + methods.join('') + '</div>' + (instructions ? '<div class="small text-muted text-start mt-3"><strong>Payment instructions:</strong> ' + escapeHtml(instructions).replace(/\n/g, '<br>') + '</div>' : '')
+                ? '<div class="small fw-semibold text-muted mb-2">Or pay directly</div><div class="deposit-method-list">' + methods.join('') + '</div>' + (instructions ? '<div class="small text-muted text-start mt-3"><strong>Payment instructions:</strong> ' + escapeHtml(instructions).replace(/\n/g, '<br>') + '</div>' : '') + clientPaymentEvidenceUploadMarkup('')
                 : '<div class="alert alert-light border mb-0">Contact your contractor to arrange the deposit.</div>';
         }
 
@@ -6190,6 +6284,18 @@ if (location.search.includes('debug')) {
 
         async function reportManualDeposit(method) {
             if (isContractorPreviewView() || typeof callDocumentPaymentFunction !== 'function') return;
+            var evidenceInput = document.getElementById('clientPaymentEvidenceFile');
+            var evidenceFile = evidenceInput && evidenceInput.files && evidenceInput.files[0];
+            var evidencePrivacy = document.getElementById('clientPaymentEvidencePrivacy');
+            if (evidenceFile) {
+                try {
+                    validatePaymentEvidenceFile(evidenceFile);
+                    if (!evidencePrivacy || evidencePrivacy.checked !== true) throw new Error('Confirm that you checked the file for sensitive information.');
+                } catch(error) {
+                    qdAlert(error.message || 'Check the optional payment proof before continuing.');
+                    return;
+                }
+            }
             var label = method === 'etransfer' ? 'e-transfer' : method;
             var confirmed = typeof qdConfirm === 'function'
                 ? await qdConfirm('Report that you have sent or arranged this ' + label + ' deposit? Your contractor will verify it before the project is marked secured.', { title: 'Report Deposit', okText: 'Report payment', okClass: 'btn-primary' })
@@ -6207,6 +6313,22 @@ if (location.search.includes('debug')) {
                 applyClientDocumentPaymentState(result.payment);
                 qdCompleteExternalOperation('manual_payment_report', operationEntity);
                 logPortalDocumentActivity('payment_reported', { metadata: { payment_type: 'deposit', method: method } });
+                if (evidenceFile && result.payment && result.payment.report && result.payment.report.id) {
+                    try {
+                        await uploadPaymentEvidence({
+                            actor: 'client',
+                            recordId: result.payment.report.id,
+                            file: evidenceFile,
+                            privacyChecked: true,
+                            securePayload: secureDocumentPaymentPayload('')
+                        });
+                        await reconcileQuotePaymentState(quoteId);
+                    } catch(uploadError) {
+                        renderDepositPaymentSection();
+                        qdAlert('Your payment was reported, but the optional proof did not upload: ' + (uploadError.message || 'Please attach it again.'));
+                        return;
+                    }
+                }
                 renderDepositPaymentSection();
             } catch(error) {
                 qdAlert('Could not report the deposit: ' + (error.message || 'Please try again.'));

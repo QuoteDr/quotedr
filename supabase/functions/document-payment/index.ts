@@ -5,6 +5,22 @@ import {
   canonicalDocumentTotalCents,
   legacyUnlinkedPaidCents,
 } from "../_shared/document-payment-accounting.mjs";
+import {
+  PAYMENT_EVIDENCE_BUCKET,
+  PAYMENT_EVIDENCE_NOTICE_VERSION,
+  PAYMENT_EVIDENCE_SIGNED_URL_SECONDS,
+  paymentEvidenceByteSize,
+  paymentEvidenceContentMatches,
+  paymentEvidenceExtension,
+  paymentEvidenceFilename,
+  paymentEvidenceMimeType,
+  safePaymentEvidence,
+} from "../_shared/payment-evidence-policy.mjs";
+import {
+  ACCOUNT_PERMISSION,
+  AccountAccessError,
+  requireAccountPermissionWithDefault,
+} from "../_shared/account-authorization.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "https://axmoffknvblluibuitrq.supabase.co";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
@@ -269,8 +285,23 @@ async function recordsForDocument(admin: any, documentId: string) {
   return data || [];
 }
 
+async function evidenceForDocument(admin: any, documentId: string) {
+  const { data, error } = await admin
+    .from("payment_evidence")
+    .select("*")
+    .or(`quote_id.eq.${documentId},invoice_id.eq.${documentId}`)
+    .eq("upload_status", "ready")
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
 async function documentPaymentState(admin: any, row: QuoteRow, settings: Record<string, any>) {
-  const records = await recordsForDocument(admin, row.id);
+  const [records, evidence] = await Promise.all([
+    recordsForDocument(admin, row.id),
+    evidenceForDocument(admin, row.id),
+  ]);
   const terms = resolveDepositTerms(row, settings);
   const requestedDepositCents = depositAmountCents(documentTotalCents(row), terms);
   const paymentState = calculateRecordedPaymentState(row, records, requestedDepositCents);
@@ -287,6 +318,7 @@ async function documentPaymentState(admin: any, row: QuoteRow, settings: Record<
     fullPaid,
   } = paymentState;
   const reported = records.find((record: any) => record.status === "client_reported");
+  const evidencePaymentRecord = records.find((record: any) => record.provider === "manual" && ["client_reported", "confirmed"].includes(record.status));
   return {
     records,
     totalCents,
@@ -299,6 +331,8 @@ async function documentPaymentState(admin: any, row: QuoteRow, settings: Record<
     depositShortfallAccepted,
     acceptedDepositCents,
     fullPaid,
+    evidence,
+    evidencePaymentRecordId: evidencePaymentRecord?.id || null,
     reported: reported ? {
       id: reported.id,
       method: reported.method,
@@ -329,6 +363,10 @@ function publicStatus(row: QuoteRow, state: any) {
     acceptedDepositCents: state.acceptedDepositCents,
     fullPaid: state.fullPaid,
     report: state.reported,
+    evidencePaymentRecordId: state.evidencePaymentRecordId,
+    evidence: (state.evidence || [])
+      .filter((record: any) => record.portal_visible === true)
+      .map(safePaymentEvidence),
   };
 }
 
@@ -653,6 +691,11 @@ async function confirmManual(req: Request, admin: any, body: Record<string, any>
       metadata: { ...(record.metadata || {}), rejection_reason: cleanText(body.note, 300) },
     }).eq("id", record.id).select().single();
     if (rejected.error) throw rejected.error;
+    const hiddenEvidence = await admin.from("payment_evidence").update({
+      portal_visible: false,
+      updated_at: now,
+    }).eq("payment_record_id", record.id).is("deleted_at", null);
+    if (hiddenEvidence.error) throw hiddenEvidence.error;
     const rejectedDocumentId = rejected.data.quote_id || rejected.data.invoice_id;
     const rejectedRow = rejectedDocumentId ? await fetchQuote(admin, rejectedDocumentId) : null;
     if (rejectedRow) {
@@ -774,6 +817,242 @@ async function resolveDepositShortfall(req: Request, admin: any, body: Record<st
   };
 }
 
+async function accountPaymentAccess(req: Request, body: Record<string, any>, permission: string) {
+  const access = await requireAccountPermissionWithDefault(req, body.accountId, permission);
+  return { access, ownerUserId: access.ownerUserId, actorUserId: access.user.id };
+}
+
+async function manualEvidencePayment(admin: any, recordIdValue: unknown, ownerUserId: string, documentId = "") {
+  const recordId = normalizeId(recordIdValue);
+  if (!recordId) throw new PaymentError("Payment record not found", 404, "payment_record_not_found");
+  const { data: record, error } = await admin.from("payment_records").select("*").eq("id", recordId).maybeSingle();
+  if (error) throw error;
+  const recordDocumentId = record?.invoice_id || record?.quote_id || "";
+  if (
+    !record || record.user_id !== ownerUserId || record.provider !== "manual" ||
+    !["client_reported", "confirmed"].includes(record.status) ||
+    (documentId && recordDocumentId !== documentId)
+  ) throw new PaymentError("Payment record not found", 404, "payment_record_not_found");
+  return record;
+}
+
+async function evidenceRecord(admin: any, evidenceIdValue: unknown) {
+  const evidenceId = normalizeId(evidenceIdValue);
+  if (!evidenceId) throw new PaymentError("Payment proof not found", 404, "payment_evidence_not_found");
+  const { data, error } = await admin.from("payment_evidence").select("*").eq("id", evidenceId).maybeSingle();
+  if (error) throw error;
+  if (!data || data.deleted_at) throw new PaymentError("Payment proof not found", 404, "payment_evidence_not_found");
+  return data;
+}
+
+function evidenceDocumentId(record: any) {
+  return String(record?.invoice_id || record?.quote_id || "");
+}
+
+async function removeEvidenceObject(admin: any, record: any) {
+  const removed = await admin.storage.from(PAYMENT_EVIDENCE_BUCKET).remove([record.object_path]);
+  if (removed.error && !String(removed.error.message || "").toLowerCase().includes("not found")) throw removed.error;
+}
+
+async function prepareEvidenceUpload(
+  admin: any,
+  body: Record<string, any>,
+  row: QuoteRow,
+  actorRole: "client" | "contractor",
+  actorUserId: string | null,
+) {
+  if (body.privacyChecked !== true) {
+    throw new PaymentError("Check the file for sensitive information before uploading.", 400, "privacy_check_required");
+  }
+  let mimeType: string;
+  let byteSize: number;
+  try {
+    mimeType = paymentEvidenceMimeType(body.mimeType);
+    byteSize = paymentEvidenceByteSize(body.byteSize);
+  } catch (error) {
+    throw new PaymentError((error as Error).message, 415, "payment_evidence_file_invalid");
+  }
+  const idempotencyKey = normalizeId(body.idempotencyKey);
+  if (!idempotencyKey) throw new PaymentError("This upload request expired. Choose the file again.", 400, "idempotency_key_invalid");
+  const payment = await manualEvidencePayment(admin, body.recordId, row.user_id, row.id);
+  const existingResult = await admin
+    .from("payment_evidence")
+    .select("*")
+    .eq("payment_record_id", payment.id)
+    .eq("uploaded_by_role", actorRole)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (existingResult.error) throw existingResult.error;
+  let record = existingResult.data;
+  if (record?.upload_status === "ready" && !record.deleted_at) {
+    throw new PaymentError("A payment proof is already attached to this payment.", 409, "payment_evidence_exists");
+  }
+  const now = new Date();
+  if (record) {
+    const deadline = new Date(record.upload_deadline || 0);
+    const sameAttempt = record.upload_status === "upload_pending"
+      && record.idempotency_key === idempotencyKey
+      && deadline > now
+      && !record.deleted_at;
+    if (!sameAttempt) {
+      await removeEvidenceObject(admin, record);
+      const retired = await admin.from("payment_evidence").update({
+        upload_status: "deleted",
+        deleted_at: now.toISOString(),
+        updated_at: now.toISOString(),
+      }).eq("id", record.id);
+      if (retired.error) throw retired.error;
+      record = null;
+    }
+  }
+  const fileName = paymentEvidenceFilename(body.fileName);
+  const portalVisible = actorRole === "client" ? true : body.portalVisible === true;
+  if (!record) {
+    const evidenceId = crypto.randomUUID();
+    const documentColumns = payment.invoice_id
+      ? { invoice_id: payment.invoice_id, quote_id: null }
+      : { quote_id: payment.quote_id, invoice_id: null };
+    const inserted = await admin.from("payment_evidence").insert({
+      id: evidenceId,
+      user_id: row.user_id,
+      payment_record_id: payment.id,
+      ...documentColumns,
+      object_path: `${row.user_id}/${payment.id}/${evidenceId}.${paymentEvidenceExtension(mimeType)}`,
+      original_filename: fileName,
+      mime_type: mimeType,
+      byte_size: byteSize,
+      upload_status: "upload_pending",
+      uploaded_by_role: actorRole,
+      uploaded_by_user_id: actorUserId,
+      portal_visible: portalVisible,
+      privacy_notice_version: PAYMENT_EVIDENCE_NOTICE_VERSION,
+      privacy_checked_at: now.toISOString(),
+      idempotency_key: idempotencyKey,
+      upload_deadline: new Date(now.getTime() + 2 * 60 * 60 * 1000).toISOString(),
+    }).select().single();
+    if (inserted.error) throw inserted.error;
+    record = inserted.data;
+  } else {
+    if (
+      record.user_id !== row.user_id || record.uploaded_by_role !== actorRole ||
+      record.mime_type !== mimeType || Number(record.byte_size) !== byteSize
+    ) throw new PaymentError("This upload request conflicts with an earlier attempt.", 409, "payment_evidence_conflict");
+  }
+  const { data: upload, error: uploadError } = await admin.storage
+    .from(PAYMENT_EVIDENCE_BUCKET)
+    .createSignedUploadUrl(record.object_path, { upsert: true });
+  if (uploadError || !upload?.token) throw uploadError || new Error("Signed upload token was not created");
+  return {
+    evidence: safePaymentEvidence(record),
+    upload: {
+      bucket: PAYMENT_EVIDENCE_BUCKET,
+      path: record.object_path,
+      token: upload.token,
+      expiresAt: record.upload_deadline,
+    },
+  };
+}
+
+async function finalizeEvidenceUpload(admin: any, body: Record<string, any>, row: QuoteRow, actorRole: "client" | "contractor") {
+  const record = await evidenceRecord(admin, body.evidenceId);
+  if (record.user_id !== row.user_id || evidenceDocumentId(record) !== row.id || record.uploaded_by_role !== actorRole) {
+    throw new PaymentError("Payment proof not found", 404, "payment_evidence_not_found");
+  }
+  if (record.upload_status === "ready") return { evidence: safePaymentEvidence(record), alreadyFinalized: true };
+  if (record.upload_status !== "upload_pending" || new Date(record.upload_deadline) <= new Date()) {
+    throw new PaymentError("This proof upload expired. Remove it and try again.", 409, "payment_evidence_upload_expired");
+  }
+  const parts = String(record.object_path || "").split("/");
+  const fileName = parts.pop() || "";
+  const folder = parts.join("/");
+  const listed = await admin.storage.from(PAYMENT_EVIDENCE_BUCKET).list(folder, { limit: 10, search: fileName });
+  if (listed.error) throw listed.error;
+  const object = (listed.data || []).find((candidate: any) => candidate.name === fileName);
+  if (!object) throw new PaymentError("The proof upload has not completed yet.", 409, "payment_evidence_upload_incomplete");
+  const downloaded = await admin.storage.from(PAYMENT_EVIDENCE_BUCKET).download(record.object_path);
+  if (downloaded.error || !downloaded.data) throw downloaded.error || new Error("Payment proof could not be verified");
+  const actualBytes = new Uint8Array(await downloaded.data.arrayBuffer());
+  const actualSize = actualBytes.byteLength;
+  const actualMime = String(object.metadata?.mimetype ?? object.metadata?.contentType ?? "").split(";")[0].trim().toLowerCase();
+  let verified = false;
+  try {
+    verified = paymentEvidenceByteSize(actualSize) === Number(record.byte_size)
+      && paymentEvidenceMimeType(actualMime) === record.mime_type
+      && paymentEvidenceContentMatches(actualBytes, record.mime_type);
+  } catch (_) {}
+  if (!verified) {
+    await removeEvidenceObject(admin, record);
+    await admin.from("payment_evidence").update({ upload_status: "failed", updated_at: new Date().toISOString() }).eq("id", record.id);
+    throw new PaymentError("The uploaded proof did not match the approved file and was removed.", 422, "payment_evidence_upload_mismatch");
+  }
+  const finalized = await admin.from("payment_evidence").update({
+    upload_status: "ready",
+    finalized_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }).eq("id", record.id).select().single();
+  if (finalized.error) throw finalized.error;
+  return { evidence: safePaymentEvidence(finalized.data), alreadyFinalized: false };
+}
+
+async function evidenceSignedUrl(admin: any, record: any) {
+  if (record.upload_status !== "ready") throw new PaymentError("Payment proof is not ready", 409, "payment_evidence_not_ready");
+  const { data, error } = await admin.storage
+    .from(PAYMENT_EVIDENCE_BUCKET)
+    .createSignedUrl(record.object_path, PAYMENT_EVIDENCE_SIGNED_URL_SECONDS);
+  if (error || !data?.signedUrl) throw error || new Error("Signed proof URL was not created");
+  return { evidence: safePaymentEvidence(record), url: data.signedUrl, expiresIn: PAYMENT_EVIDENCE_SIGNED_URL_SECONDS };
+}
+
+async function deleteEvidence(admin: any, record: any) {
+  await removeEvidenceObject(admin, record);
+  const deleted = await admin.from("payment_evidence").update({
+    upload_status: "deleted",
+    deleted_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }).eq("id", record.id);
+  if (deleted.error) throw deleted.error;
+  return { deleted: true, evidenceId: record.id };
+}
+
+async function ownerEvidenceAction(req: Request, admin: any, body: Record<string, any>, action: string) {
+  const permission = ["owner_list_evidence", "owner_view_evidence"].includes(action)
+    ? ACCOUNT_PERMISSION.PAYMENTS_READ
+    : ACCOUNT_PERMISSION.PAYMENTS_MANAGE;
+  const { ownerUserId, actorUserId } = await accountPaymentAccess(req, body, permission);
+  if (action === "owner_list_evidence") {
+    const { data, error } = await admin.from("payment_evidence").select("*")
+      .eq("user_id", ownerUserId).eq("upload_status", "ready").is("deleted_at", null)
+      .order("created_at", { ascending: false }).limit(500);
+    if (error) throw error;
+    return { evidence: (data || []).map(safePaymentEvidence) };
+  }
+  if (action === "owner_prepare_evidence_upload") {
+    const payment = await manualEvidencePayment(admin, body.recordId, ownerUserId);
+    const row = await fetchQuote(admin, payment.invoice_id || payment.quote_id);
+    if (!row || row.user_id !== ownerUserId) throw new PaymentError("Payment document not found", 404, "payment_document_not_found");
+    return prepareEvidenceUpload(admin, body, row, "contractor", actorUserId);
+  }
+  const record = await evidenceRecord(admin, body.evidenceId);
+  if (record.user_id !== ownerUserId) throw new PaymentError("Payment proof not found", 404, "payment_evidence_not_found");
+  const row = await fetchQuote(admin, evidenceDocumentId(record));
+  if (!row || row.user_id !== ownerUserId) throw new PaymentError("Payment document not found", 404, "payment_document_not_found");
+  if (action === "owner_finalize_evidence_upload") return finalizeEvidenceUpload(admin, body, row, "contractor");
+  if (action === "owner_view_evidence") return evidenceSignedUrl(admin, record);
+  if (action === "owner_delete_evidence") return deleteEvidence(admin, record);
+  if (action === "owner_set_evidence_visibility") {
+    if (record.uploaded_by_role !== "contractor") {
+      throw new PaymentError("Client-provided proof remains visible to that client.", 409, "payment_evidence_visibility_locked");
+    }
+    const updated = await admin.from("payment_evidence").update({
+      portal_visible: body.portalVisible === true,
+      updated_at: new Date().toISOString(),
+    }).eq("id", record.id).select().single();
+    if (updated.error) throw updated.error;
+    return { evidence: safePaymentEvidence(updated.data) };
+  }
+  throw new PaymentError("Unknown payment proof action", 400, "unknown_action");
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -784,6 +1063,9 @@ Deno.serve(async (req) => {
 
   try {
     const admin = adminClient();
+    if (action.startsWith("owner_") && action.includes("evidence")) {
+      return json(await ownerEvidenceAction(req, admin, body, action));
+    }
     if (action === "confirm_manual") return json(await confirmManual(req, admin, body));
     if (action === "resolve_deposit_shortfall") return json(await resolveDepositShortfall(req, admin, body));
 
@@ -794,6 +1076,27 @@ Deno.serve(async (req) => {
     const state = await documentPaymentState(admin, target, settings);
 
     if (action === "status") return json({ payment: publicStatus(target, state) });
+    if (action === "prepare_evidence_upload") {
+      return json(await prepareEvidenceUpload(admin, body, target, "client", null));
+    }
+    if (action === "finalize_evidence_upload") {
+      return json(await finalizeEvidenceUpload(admin, body, target, "client"));
+    }
+    if (action === "view_evidence") {
+      const record = await evidenceRecord(admin, body.evidenceId);
+      if (record.user_id !== target.user_id || evidenceDocumentId(record) !== target.id || record.portal_visible !== true) {
+        throw new PaymentError("Payment proof not found", 404, "payment_evidence_not_found");
+      }
+      return json(await evidenceSignedUrl(admin, record));
+    }
+    if (action === "delete_evidence") {
+      const record = await evidenceRecord(admin, body.evidenceId);
+      if (
+        record.user_id !== target.user_id || evidenceDocumentId(record) !== target.id ||
+        record.uploaded_by_role !== "client"
+      ) throw new PaymentError("Payment proof not found", 404, "payment_evidence_not_found");
+      return json(await deleteEvidence(admin, record));
+    }
     if (action === "create_checkout") {
       const result = await createCheckout(admin, body, target, token, portalAnchorId, settings, connection, state);
       return json(result);
@@ -817,6 +1120,7 @@ Deno.serve(async (req) => {
     throw new PaymentError("Unknown payment action", 400, "unknown_action");
   } catch (error) {
     if (error instanceof PaymentError) return json({ error: error.message, code: error.code }, error.status);
+    if (error instanceof AccountAccessError) return json({ error: error.message, code: error.code }, error.status);
     const id = supportId();
     console.error("document-payment error", { supportId: id, action, documentId: activeDocumentId, message: (error as Error).message });
     return json({

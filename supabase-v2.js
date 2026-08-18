@@ -751,10 +751,12 @@ async function loadSecureClientDocument(documentId, token, portalAnchorId) {
 
 async function callDocumentPaymentFunction(body, requireUser) {
     const headers = requireUser ? await getSupabaseFunctionAuthHeaders() : getSupabasePublicFunctionHeaders();
+    var requestBody = Object.assign({}, body || {});
+    if (requireUser && !requestBody.accountId) requestBody.accountId = qdActiveAccountId();
     const response = await fetch(DOCUMENT_PAYMENT_FUNCTION_URL, {
         method: 'POST',
         headers: headers,
-        body: JSON.stringify(body || {})
+        body: JSON.stringify(requestBody)
     });
     const data = await response.json().catch(function() { return {}; });
     if (!response.ok || data.error) {
@@ -765,6 +767,55 @@ async function callDocumentPaymentFunction(body, requireUser) {
     }
     return data;
 }
+
+const QD_PAYMENT_EVIDENCE_MAX_BYTES = 8 * 1024 * 1024;
+const QD_PAYMENT_EVIDENCE_MIME_TYPES = ['image/jpeg', 'image/png', 'application/pdf'];
+
+function validatePaymentEvidenceFile(file) {
+    if (!file) throw new Error('Choose a JPG, PNG, or PDF file.');
+    var mimeType = String(file.type || '').split(';')[0].trim().toLowerCase();
+    if (QD_PAYMENT_EVIDENCE_MIME_TYPES.indexOf(mimeType) === -1) {
+        throw new Error('Choose a JPG, PNG, or PDF file.');
+    }
+    if (!Number.isFinite(Number(file.size)) || Number(file.size) < 1 || Number(file.size) > QD_PAYMENT_EVIDENCE_MAX_BYTES) {
+        throw new Error('Payment proof must be 8 MB or smaller.');
+    }
+    return { mimeType: mimeType, byteSize: Number(file.size) };
+}
+
+async function uploadPaymentEvidence(options) {
+    options = options || {};
+    var checked = validatePaymentEvidenceFile(options.file);
+    if (options.privacyChecked !== true) throw new Error('Check the file for sensitive information before uploading.');
+    var ownerUpload = options.actor === 'contractor';
+    var prepareAction = ownerUpload ? 'owner_prepare_evidence_upload' : 'prepare_evidence_upload';
+    var finalizeAction = ownerUpload ? 'owner_finalize_evidence_upload' : 'finalize_evidence_upload';
+    var basePayload = Object.assign({}, options.securePayload || {}, {
+        recordId: options.recordId,
+        fileName: String(options.file.name || 'payment-proof').slice(0, 120),
+        mimeType: checked.mimeType,
+        byteSize: checked.byteSize,
+        privacyChecked: true,
+        portalVisible: ownerUpload && options.portalVisible === true,
+        idempotencyKey: crypto.randomUUID()
+    });
+    var prepared = await callDocumentPaymentFunction(Object.assign({}, basePayload, { action: prepareAction }), ownerUpload);
+    if (!prepared.upload || !prepared.evidence) throw new Error('Payment proof upload could not be prepared.');
+    var uploaded = await _supabase.storage
+        .from(prepared.upload.bucket)
+        .uploadToSignedUrl(prepared.upload.path, prepared.upload.token, options.file, {
+            contentType: checked.mimeType,
+            upsert: true
+        });
+    if (uploaded.error) throw uploaded.error;
+    return callDocumentPaymentFunction(Object.assign({}, options.securePayload || {}, {
+        evidenceId: prepared.evidence.id,
+        action: finalizeAction
+    }), ownerUpload);
+}
+
+window.validatePaymentEvidenceFile = validatePaymentEvidenceFile;
+window.uploadPaymentEvidence = uploadPaymentEvidence;
 
 async function callStripeConnectFunction(action, payload) {
     const headers = await getSupabaseFunctionAuthHeaders();
