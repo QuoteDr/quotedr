@@ -181,11 +181,15 @@ function sourceBetween(source, startMarker, endMarker) {
   assert(startFlow.indexOf('ensureAiVoiceTranscriptNotice') < startFlow.indexOf("new bootstrap.Modal(document.getElementById('voiceQuoteModal'))"), 'the consent decision must finish before the recording UI opens');
   assert(builder.includes('Save private audio for 14 days'));
   assert(builder.includes('Transcript only'));
-  assert(builder.includes('QuoteDr staff do not routinely access or listen to recordings.'));
-  assert(builder.includes('Access is case-bound and audited.'));
+  assert(builder.includes('QuoteDr Support cannot listen unless you explicitly authorize that specific recording for a specific customer-support case.'));
+  assert(builder.includes('Every authorized support lookup and playback is case-bound and audited.'));
   assert(builder.includes('Avoid dictating access codes or unnecessary sensitive information.'));
   assert(builder.includes('id="voiceAudioCurrentChoice"'));
   assert(builder.includes('id="voiceAudioLiveIndicator"'));
+  assert(builder.includes('id="voiceRecordingPrivacyPanel"'));
+  assert(builder.includes('data-bs-target="#voiceRecordingPrivacyPanel"'), 'detailed audio controls should be collapsed behind a compact privacy button');
+  assert(/class="collapse mt-2" id="voiceRecordingPrivacyPanel"/.test(builder), 'recording details should be closed by default');
+  assert(startFlow.includes("bootstrap.Collapse.getOrCreateInstance(privacyPanel, { toggle: false }).hide()"), 'privacy details should reset to collapsed each time AI Voice opens');
   assert(builder.includes('Private audio recording'));
   assert(builder.includes('Transcript listening only'));
   assert(builder.includes('Pause before any private conversation.'));
@@ -193,6 +197,63 @@ function sourceBetween(source, startMarker, endMarker) {
   assert(builder.includes('id="aiVoicePreserveAuthorize" required'));
   assert(builder.includes('End Support Hold'));
   assert(builder.includes('Play Privately'));
+  const recordingStart = sourceBetween(builder, 'async function startVoiceRecording', 'function toggleVoicePause');
+  assert(recordingStart.indexOf('await _beginVoiceAudioCapture()') < recordingStart.indexOf('_startVoiceRecognitionInstance'), 'the shared microphone track must be ready before browser speech recognition starts');
+  const recognitionStart = sourceBetween(builder, 'function _startVoiceRecognitionInstance', 'function _voiceAudioCapturedTotals');
+  assert(recognitionStart.includes('recognition.start(track)'), 'speech recognition should consume the same live audio track used by the optional recording when supported');
+  assert(recognitionStart.includes('recognition.start();'), 'older browsers need a serialized microphone fallback');
+  const startRecognition = new Function(`${recognitionStart}\nreturn _startVoiceRecognitionInstance;`)();
+  const sharedTrack = { kind: 'audio', readyState: 'live' };
+  const sharedCalls = [];
+  assert.strictEqual(startRecognition({ start(track) { sharedCalls.push(track); } }, sharedTrack), true);
+  assert.deepStrictEqual(sharedCalls, [sharedTrack], 'supported mobile browsers must receive the exact track already opened for private audio');
+  const fallbackCalls = [];
+  const originalWarn = console.warn;
+  console.warn = () => {};
+  try {
+    assert.strictEqual(startRecognition({
+      start(...args) {
+        fallbackCalls.push(args);
+        if (args.length) throw new TypeError('track input unavailable');
+      },
+    }, sharedTrack), false);
+  } finally {
+    console.warn = originalWarn;
+  }
+  assert.deepStrictEqual(fallbackCalls, [[sharedTrack], []], 'older browsers must retry only after the shared-track attempt, avoiding simultaneous microphone acquisition');
+  assert(recognitionStart.includes('function _recoverVoiceRecognitionWithoutSavedAudio'), 'mobile recognition must recover when a browser cannot share the microphone track');
+  assert(recognitionStart.includes('_voiceAudioSuppressedForSession = true'), 'recovery must stop retrying optional audio during the affected session');
+  assert(recognitionStart.includes('Live transcription is continuing.'), 'the fallback must explain that the transcript remains available');
+  const recoverySource = sourceBetween(builder, 'function _recoverVoiceRecognitionWithoutSavedAudio', 'function _voiceAudioCapturedTotals');
+  const recoveryStatus = { textContent: '' };
+  const recoveryContext = vm.createContext({
+    _voiceRecording: true,
+    _voicePaused: false,
+    _voiceAudioEnabled: true,
+    _voiceAudioSuppressedForSession: false,
+    _voiceRecognitionRecoveryPending: false,
+    _voiceAudioSession: {},
+    _voiceAudioCaptureState: 'recording',
+    _voiceStartSequence: 4,
+    _voiceRecognition: null,
+    warning: '',
+    discarded: false,
+    restarted: false,
+    _showVoiceAudioCaptureWarning(message) { recoveryContext.warning = message; },
+    async _discardVoiceAudioCapture() { recoveryContext.discarded = true; },
+    _renderAiVoiceAudioStatus() {},
+    _createRecognition() { return { synthetic: true }; },
+    _startVoiceRecognitionInstance() { recoveryContext.restarted = true; },
+    stopVoiceRecording() { throw new Error('synthetic recovery should not stop transcription'); },
+    document: { getElementById() { return recoveryStatus; } },
+  });
+  vm.runInContext(recoverySource, recoveryContext);
+  assert.strictEqual(recoveryContext._recoverVoiceRecognitionWithoutSavedAudio(), true);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.strictEqual(recoveryContext._voiceAudioSuppressedForSession, true);
+  assert.strictEqual(recoveryContext.discarded, true, 'conflicting optional audio capture should be discarded before transcript-only retry');
+  assert.strictEqual(recoveryContext.restarted, true, 'speech recognition should restart automatically without the conflicting recorder');
+  assert.match(recoveryContext.warning, /Live transcription is continuing/);
 
   const settings = read('settings.html');
   assert(settings.includes('id="aiVoiceSupportEmail"'));
@@ -210,12 +271,12 @@ function sourceBetween(source, startMarker, endMarker) {
   assert(privacy.includes('30-day post-case period'));
   assert(privacy.includes('Audio cannot be browsed generally'));
   assert(privacy.includes('staff do not routinely view transcripts'));
-  assert(privacy.includes('staff do not routinely access or listen to recordings'));
+  assert(privacy.includes('QuoteDr Support cannot listen to original audio unless you explicitly authorize the exact recording'));
   assert(privacy.includes('Avoid dictating access codes or unnecessary sensitive information'));
   assert(privacy.includes('not represented as legal proof'));
   assert(!privacy.includes('No stored microphone audio'));
   assert(terms.includes('No QuoteDr audio recording begins before that decision'));
-  assert(terms.includes('Access is case-bound and audited'));
+  assert(terms.includes('Audio access is case-bound and audited'));
 
   const browserFixture = read('tests/ai-voice-audio-evidence-browser-fixture.html');
   assert(browserFixture.includes('Synthetic audio only'));
@@ -223,6 +284,7 @@ function sourceBetween(source, startMarker, endMarker) {
   assert(browserFixture.includes('iPhone / Safari'));
   assert(browserFixture.includes('Desktop fallback'));
   assert(browserFixture.includes('Current account default:'));
+  assert(browserFixture.includes('fakeRecognition.start(session.getAudioTrack())'), 'the browser fixture must give recognition the same synthetic track used by MediaRecorder');
   assert(browserFixture.includes('id="fixtureLiveIndicator"'));
   assert(browserFixture.includes('Private audio recording'));
   assert(browserFixture.includes('id="pauseCheck" disabled'));

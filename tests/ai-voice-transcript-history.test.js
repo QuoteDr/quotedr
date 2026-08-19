@@ -74,7 +74,7 @@ const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
   assert(builder.includes('QuoteDr staff do not routinely view your records.'));
   assert(builder.includes('Save private audio for 14 days'));
   assert(builder.includes('Transcript only'));
-  assert(builder.includes('QuoteDr staff do not routinely access or listen to recordings.'));
+  assert(builder.includes('QuoteDr Support cannot listen unless you explicitly authorize that specific recording for a specific customer-support case.'));
   const submitStart = builder.indexOf('async function submitVoiceQuote()');
   const submitEnd = builder.indexOf('async function _addPreparedAiVoiceRoomItems', submitStart);
   const submit = builder.slice(submitStart, submitEnd);
@@ -82,7 +82,7 @@ const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
   assert(submit.indexOf('captureAiVoiceTranscript') < submit.indexOf('uploadAiVoiceAudioEvidence'), 'text capture must be confirmed before optional audio upload begins');
   assert(submit.includes("_updateActiveAiVoiceTranscript('parse_failed')"), 'failed parse attempts should remain identifiable in history');
   assert(builder.includes("_updateActiveAiVoiceTranscript('added_to_quote', result)"));
-  assert(builder.includes('Submitted text transcripts are always saved to your account. Original audio is saved only when the setting above is on.'));
+  assert(builder.includes('Submitted transcripts stay private to your account. Open Recording privacy &amp; backup for audio settings.'));
 
   const settings = read('settings.html');
   assert(settings.includes('id="aiVoiceSupportTabLink"'));

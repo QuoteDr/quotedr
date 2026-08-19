@@ -35,7 +35,7 @@
       </div>
     </section>
   </main>
-  <script src="../ai-voice-audio-recorder.js?v=2026080902"></script>
+  <script src="../ai-voice-audio-recorder.js?v=2026081901"></script>
   <script>
     (function() {
       var platforms = [
@@ -76,9 +76,19 @@
           oscillator.start();
 
           var transcript = '';
-          var transcriptPromise = new Promise(function(resolve) {
-            setTimeout(function() { transcript = 'trim five exterior doors'; resolve(transcript); }, 450);
-          });
+          var resolveTranscript;
+          var transcriptPromise = new Promise(function(resolve) { resolveTranscript = resolve; });
+          var fakeRecognition = {
+            start: function(track) {
+              if (!track || track !== destination.stream.getAudioTracks()[0] || track.readyState !== 'live') {
+                throw new Error('Speech recognition did not receive the recorder\'s live audio track.');
+              }
+              setTimeout(function() {
+                transcript = 'trim five exterior doors';
+                resolveTranscript(transcript);
+              }, 450);
+            }
+          };
           var session = new QdAiVoiceAudioRecorder.AudioCaptureSession({
             mediaDevices: { getUserMedia: async function() { return destination.stream; } },
             MediaRecorder: window.MediaRecorder,
@@ -86,6 +96,7 @@
           });
           activeSession = session;
           var started = await session.start();
+          fakeRecognition.start(session.getAudioTrack());
           liveIndicator.className = 'live-indicator recording mb-3';
           liveIndicator.innerHTML = '<span class="live-dot" aria-hidden="true"></span><strong>Private audio recording</strong><span class="ms-1">and transcript listening</span>';
           pauseButton.disabled = false;

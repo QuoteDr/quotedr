@@ -2,8 +2,8 @@ const assert = require('assert');
 const recorderApi = require('../ai-voice-audio-recorder.js');
 
 function fakeStream() {
-  const track = { stopped: false, stop() { this.stopped = true; } };
-  return { track, getTracks() { return [track]; } };
+  const track = { kind: 'audio', readyState: 'live', stopped: false, stop() { this.stopped = true; this.readyState = 'ended'; } };
+  return { track, getTracks() { return [track]; }, getAudioTracks() { return [track]; } };
 }
 
 function createRecorderClass(supported, defaultMime) {
@@ -77,6 +77,7 @@ function createRecorderClass(supported, defaultMime) {
   const started = await session.start();
   assert.strictEqual(started.mimeType, 'audio/webm;codecs=opus');
   assert.strictEqual(session.recorder.options.audioBitsPerSecond, recorderApi.REQUESTED_BITS_PER_SECOND, 'the browser should be asked for compressed audio without assuming it will honor the bitrate');
+  assert.strictEqual(session.getAudioTrack(), stream.track, 'speech recognition and evidence recording must be able to share the same live microphone track');
   session.recorder.emit(new Blob([new Uint8Array(1200)], { type: 'audio/webm;codecs=opus' }));
   now = 1100;
   assert.strictEqual(session.pause(), true);

@@ -108,6 +108,19 @@
         this.stream = null;
     };
 
+    AudioCaptureSession.prototype.getAudioTrack = function() {
+        if (!this.stream) return null;
+        if (typeof this.stream.getAudioTracks === 'function') {
+            return this.stream.getAudioTracks()[0] || null;
+        }
+        if (typeof this.stream.getTracks === 'function') {
+            return this.stream.getTracks().find(function(track) {
+                return track && (!track.kind || track.kind === 'audio');
+            }) || null;
+        }
+        return null;
+    };
+
     AudioCaptureSession.prototype._scheduleDurationLimit = function() {
         if (this._maxTimer) this.clearTimer(this._maxTimer);
         this._maxTimer = null;
