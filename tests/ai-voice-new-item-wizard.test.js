@@ -34,6 +34,8 @@ test('verified unmatched rows run one batch wizard before the quote is applied',
   assert.ok(confirm.indexOf('await createCustomItemsFromVoice') < confirm.indexOf('applyAIQuote(reviewed)'));
   assert.match(confirm, /wizardResult\.cancelled[\s\S]*_forceOpenAiVoiceReviewModal\(\)/);
   assert.match(confirm, /saveLearnedMapping\(row\.phrase \|\| row\.item\.description, decision\.newItem/);
+  assert.match(confirm, /decision\.newItem\.saveToLibrary !== false && remember/);
+  assert.match(confirm, /decision\.newItem\.saveToLibrary !== false && !_voiceReviewItems\.some/);
   assert.match(confirm, /row\.item\.pricingMode = row\.item\.priceTbd \? 'tbd' : 'fixed'/);
 });
 
@@ -45,6 +47,9 @@ test('new pricing items are validated and persisted in one cloud backup batch', 
   assert.match(source, /pendingKeys/);
   assert.match(source, /already exists in/);
   assert.match(source, /normalized\.forEach\(function saveVoiceDraft/);
+  assert.match(source, /if \(item\.saveToLibrary === false\) return/);
+  assert.match(source, /var savedCount = normalized\.filter/);
+  assert.match(source, /if \(savedCount\) \{[\s\S]*await saveCustomItems\(false\)/);
   assert.equal((source.match(/await saveCustomItems\(false\)/g) || []).length, 1);
   assert.match(items, /return _doBackupItemsToCloud\(customItems\)\.then/);
   assert.match(items, /window\.createCustomItemsFromVoice = createCustomItemsFromVoice/);
@@ -88,6 +93,12 @@ test('wizard keeps voice input and contractor-controlled price requirements', ()
   assert.match(wizardSource, /Speak task details/);
   assert.match(wizardSource, /AI never sets your price/);
   assert.match(wizardSource, /Enter your rate or select Price TBD/);
+  assert.match(wizardSource, /Save to My Items for future quotes/);
+  assert.match(wizardSource, /This one-off item will only be added to the current quote/);
+  assert.match(wizardSource, /saveToLibrary: document\.getElementById\('aiVoiceNewItemSaveToLibrary'\)\.checked/);
+  assert.match(wizardSource, /Save all new items to My Items/);
+  assert.match(wizardSource, /Add one-off item to quote/);
+  assert.match(wizardSource, /Add one-off items to quote/);
   assert.match(wizardSource, /feature: 'voice_item_wizard'/);
   assert.match(wizardSource, /requireProFeature\('ai_refine'/);
 });

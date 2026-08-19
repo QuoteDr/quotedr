@@ -21065,17 +21065,17 @@ Example:
                     }
                     var createdResult = await createCustomItemsFromVoice(wizardResult.drafts);
                     if (!createdResult || !Array.isArray(createdResult.items) || createdResult.items.length !== newItemIndexes.length) {
-                        throw new Error('QuoteDr could not save every new pricing item.');
+                        throw new Error('QuoteDr could not prepare every new pricing item.');
                     }
                     newItemIndexes.forEach(function(rowIndex, draftIndex) {
                         decisions[rowIndex].newItem = createdResult.items[draftIndex];
                     });
-                    if (createdResult.error) {
+                    if (createdResult.error && createdResult.savedCount > 0) {
                         qdAlert('The new items were saved on this device, but cloud backup did not finish. Use Save & Recovery before leaving this device, then retry the cloud save.');
                     }
                 } catch (error) {
                     console.error('[QuoteDr AI Voice] New item wizard failed:', error);
-                    qdAlert((error && error.message ? error.message : 'The new items could not be saved.') + ' Your quote has not been updated.');
+                    qdAlert((error && error.message ? error.message : 'The new items could not be added.') + ' Your quote has not been updated.');
                     _renderAiVoiceReviewModal();
                     _forceOpenAiVoiceReviewModal();
                     return;
@@ -21123,10 +21123,10 @@ Example:
                     _applyAiVoiceReviewQuantityEdit(row, index);
                     row.suggestCreateNew = false;
                     row.selected = decision.newItem;
-                    if (!_voiceReviewItems.some(function(item) { return _voiceItemDisplay(item) === _voiceItemDisplay(decision.newItem); })) {
+                    if (decision.newItem.saveToLibrary !== false && !_voiceReviewItems.some(function(item) { return _voiceItemDisplay(item) === _voiceItemDisplay(decision.newItem); })) {
                         _voiceReviewItems.push(decision.newItem);
                     }
-                    if (remember && remember.checked && typeof saveLearnedMapping === 'function') {
+                    if (decision.newItem.saveToLibrary !== false && remember && remember.checked && typeof saveLearnedMapping === 'function') {
                         saveTasks.push(function() { return saveLearnedMapping(row.phrase || row.item.description, decision.newItem, note ? note.value.trim() : '').catch(function(error) {
                             console.warn('Could not remember new AI voice item phrase:', error);
                         }); });

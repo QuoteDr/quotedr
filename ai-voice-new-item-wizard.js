@@ -76,6 +76,7 @@
             + '</div>'
             + '<div class="modal-body">'
             + '<div class="alert alert-light border d-flex gap-2 align-items-start"><i class="fas fa-microphone text-primary mt-1" aria-hidden="true"></i><div><strong>What you said</strong><div id="aiVoiceNewItemPhrase"></div><div class="small text-muted" id="aiVoiceNewItemRoom"></div></div></div>'
+            + '<div class="form-check form-switch mb-3 d-none" id="aiVoiceNewItemSaveAllWrap"><input class="form-check-input" type="checkbox" role="switch" id="aiVoiceNewItemSaveAll" checked><label class="form-check-label fw-semibold" for="aiVoiceNewItemSaveAll">Save all new items to My Items</label><div class="small text-muted">Turn this off when every item in this batch is only for the current quote.</div></div>'
             + '<div class="row g-4">'
             + '<div class="col-12 col-lg-5">'
             + '<div class="card h-100 border-primary-subtle"><div class="card-body">'
@@ -89,8 +90,9 @@
             + '</div></div></div>'
             + '<div class="col-12 col-lg-7">'
             + '<div class="card h-100"><div class="card-body">'
-            + '<h6 class="fw-bold"><i class="fas fa-database me-2 text-success" aria-hidden="true"></i>Review the saved item</h6>'
+            + '<h6 class="fw-bold"><i class="fas fa-file-circle-plus me-2 text-success" aria-hidden="true"></i>Review the pricing item</h6>'
             + '<div class="alert alert-warning py-2 small">AI never sets your price. Review the scope, choose the unit, and enter your own rate before saving.</div>'
+            + '<div class="form-check form-switch border rounded p-3 ps-5 mb-3 bg-light"><input class="form-check-input" type="checkbox" role="switch" id="aiVoiceNewItemSaveToLibrary" checked><label class="form-check-label fw-semibold" for="aiVoiceNewItemSaveToLibrary">Save to My Items for future quotes</label><div class="small text-muted" id="aiVoiceNewItemSaveHelp">Recommended. QuoteDr will reuse this pricing item and can remember the spoken wording.</div></div>'
             + '<div class="row g-3">'
             + '<div class="col-12 col-md-7"><label class="form-label fw-semibold" for="aiVoiceNewItemName">Item name</label><input class="form-control" id="aiVoiceNewItemName" maxlength="140"></div>'
             + '<div class="col-12 col-md-5"><label class="form-label fw-semibold" for="aiVoiceNewItemCategory">Category</label><input class="form-control" id="aiVoiceNewItemCategory" list="aiVoiceNewItemCategoryOptions" maxlength="100"><datalist id="aiVoiceNewItemCategoryOptions"></datalist></div>'
@@ -278,7 +280,8 @@
             priceTbd: priceTbd,
             pricingMode: priceTbd ? 'tbd' : 'fixed',
             itemDescription: readValue('aiVoiceNewItemDescription'),
-            phrase: compactText(entry.phrase, 280)
+            phrase: compactText(entry.phrase, 280),
+            saveToLibrary: document.getElementById('aiVoiceNewItemSaveToLibrary').checked
         };
         if (!allowIncomplete) {
             if (!draft.name) throw new Error('Enter a name for this saved item.');
@@ -300,11 +303,40 @@
             var modalEl = document.getElementById('aiVoiceNewItemWizardModal');
             var modal = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: false });
             var drafts = new Array(entries.length);
+            var savePreferences = entries.map(function() { return true; });
             var states = entries.map(function(entry) {
                 return { round: 0, questions: [], answers: {}, taskNotes: compactText(entry.phrase || entry.parsedName, 1200), categories: options.categories || [] };
             });
             var currentIndex = 0;
             var settled = false;
+
+            function updateSaveControls() {
+                var saveToLibrary = document.getElementById('aiVoiceNewItemSaveToLibrary');
+                var saveHelp = document.getElementById('aiVoiceNewItemSaveHelp');
+                var saveAll = document.getElementById('aiVoiceNewItemSaveAll');
+                if (saveToLibrary) saveToLibrary.checked = savePreferences[currentIndex] !== false;
+                if (saveHelp) saveHelp.textContent = savePreferences[currentIndex] !== false
+                    ? 'Recommended. QuoteDr will reuse this pricing item and can remember the spoken wording.'
+                    : 'This one-off item will only be added to the current quote.';
+                if (saveAll) {
+                    var savedCount = savePreferences.filter(function(value) { return value !== false; }).length;
+                    saveAll.checked = savedCount === savePreferences.length;
+                    saveAll.indeterminate = savedCount > 0 && savedCount < savePreferences.length;
+                }
+                var next = document.getElementById('aiVoiceNewItemNext');
+                if (!next) return;
+                if (currentIndex < entries.length - 1) {
+                    next.querySelector('span').textContent = savePreferences[currentIndex] !== false ? 'Save item & continue' : 'Add one-off & continue';
+                    return;
+                }
+                var allSaved = savePreferences.every(function(value) { return value !== false; });
+                var noneSaved = savePreferences.every(function(value) { return value === false; });
+                next.querySelector('span').textContent = allSaved
+                    ? (entries.length === 1 ? 'Save item & add to quote' : 'Save items & add to quote')
+                    : (noneSaved
+                        ? (entries.length === 1 ? 'Add one-off item to quote' : 'Add one-off items to quote')
+                        : 'Add items to quote');
+            }
 
             function finish(result) {
                 if (settled) return;
@@ -333,11 +365,11 @@
                 document.getElementById('aiVoiceNewItemPriceTbd').checked = draft.priceTbd === true;
                 document.getElementById('aiVoiceNewItemRate').disabled = draft.priceTbd === true;
                 setValue('aiVoiceNewItemDescription', draft.itemDescription || '');
+                savePreferences[currentIndex] = draft.saveToLibrary !== undefined ? draft.saveToLibrary !== false : savePreferences[currentIndex] !== false;
                 var categoryOptions = document.getElementById('aiVoiceNewItemCategoryOptions');
                 categoryOptions.innerHTML = (options.categories || []).map(function(category) { return '<option value="' + escapeHtml(category) + '"></option>'; }).join('');
                 document.getElementById('aiVoiceNewItemPrevious').classList.toggle('d-none', currentIndex === 0);
-                var next = document.getElementById('aiVoiceNewItemNext');
-                next.querySelector('span').textContent = currentIndex === entries.length - 1 ? 'Review & save all items' : 'Save item & continue';
+                updateSaveControls();
                 document.getElementById('aiVoiceNewItemValidation').classList.add('d-none');
                 renderQuestions(state);
                 document.getElementById('aiVoiceNewItemAiStatus').textContent = '';
@@ -384,6 +416,21 @@
             document.getElementById('aiVoiceNewItemCancelTop').addEventListener('click', function() { finish({ cancelled: true, drafts: [] }); });
             document.getElementById('aiVoiceNewItemPriceTbd').addEventListener('change', function() {
                 document.getElementById('aiVoiceNewItemRate').disabled = this.checked;
+            });
+            document.getElementById('aiVoiceNewItemSaveToLibrary').addEventListener('change', function() {
+                savePreferences[currentIndex] = this.checked;
+                updateSaveControls();
+            });
+            var saveAllWrap = document.getElementById('aiVoiceNewItemSaveAllWrap');
+            var saveAll = document.getElementById('aiVoiceNewItemSaveAll');
+            if (entries.length > 1 && saveAllWrap) saveAllWrap.classList.remove('d-none');
+            if (saveAll) saveAll.addEventListener('change', function() {
+                var checked = this.checked;
+                savePreferences = savePreferences.map(function() { return checked; });
+                drafts.forEach(function(draft) {
+                    if (draft) draft.saveToLibrary = checked;
+                });
+                updateSaveControls();
             });
             modalEl.addEventListener('shown.bs.modal', function() {
                 renderEntry(true);

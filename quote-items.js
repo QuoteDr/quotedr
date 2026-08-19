@@ -2726,15 +2726,18 @@
                 var category = String(draft.category || 'Miscellaneous').trim().slice(0, 100) || 'Miscellaneous';
                 var name = String(draft.name || '').trim().slice(0, 140);
                 var unitType = String(draft.unitType || draft.unit || 'ls').trim().slice(0, 40) || 'ls';
+                var saveToLibrary = draft.saveToLibrary !== false;
                 if (!name) throw new Error('Every new item needs a name.');
                 var key = (category + '|' + name).toLowerCase();
-                var existing = (Array.isArray(customItems[category]) ? customItems[category] : [])
-                    .concat(Array.isArray(pricingDatabase[category]) ? pricingDatabase[category] : [])
-                    .find(function(item) { return item && String(item.name || '').trim().toLowerCase() === name.toLowerCase(); });
-                if (existing || pendingKeys[key]) {
-                    throw new Error('An item named "' + name + '" already exists in ' + category + '. Choose that saved item or use a different name.');
+                if (saveToLibrary) {
+                    var existing = (Array.isArray(customItems[category]) ? customItems[category] : [])
+                        .concat(Array.isArray(pricingDatabase[category]) ? pricingDatabase[category] : [])
+                        .find(function(item) { return item && String(item.name || '').trim().toLowerCase() === name.toLowerCase(); });
+                    if (existing || pendingKeys[key]) {
+                        throw new Error('An item named "' + name + '" already exists in ' + category + '. Choose that saved item, make this a one-off, or use a different name.');
+                    }
+                    pendingKeys[key] = true;
                 }
-                pendingKeys[key] = true;
                 var priceTbd = draft.priceTbd === true || draft.pricingMode === 'tbd';
                 return {
                     name: name,
@@ -2746,13 +2749,16 @@
                     pricingMode: priceTbd ? 'tbd' : 'fixed',
                     supplierUrl: String(draft.supplierUrl || '').trim().slice(0, 1000),
                     itemDescription: String(draft.itemDescription || draft.description || '').trim().slice(0, 4000),
-                    laborTime: normalizeManageLaborTime(draft.laborTime || {})
+                    laborTime: normalizeManageLaborTime(draft.laborTime || {}),
+                    saveToLibrary: saveToLibrary
                 };
             });
             normalized.forEach(function saveVoiceDraft(item) {
+                if (item.saveToLibrary === false) return;
                 var category = item.category;
                 var savedItem = Object.assign({}, item);
                 delete savedItem.category;
+                delete savedItem.saveToLibrary;
                 if (!customItems[category]) customItems[category] = [];
                 customItems[category].push(savedItem);
                 if (!pricingDatabase[category]) pricingDatabase[category] = [];
@@ -2760,14 +2766,19 @@
                 rememberManageUnitType(savedItem.unitType);
             });
             var backupResult = null;
-            try {
-                backupResult = await saveCustomItems(false);
-            } catch (error) {
-                backupResult = { error: error };
+            var savedCount = normalized.filter(function(item) { return item.saveToLibrary !== false; }).length;
+            if (savedCount) {
+                try {
+                    backupResult = await saveCustomItems(false);
+                } catch (error) {
+                    backupResult = { error: error };
+                }
             }
             return {
                 items: normalized.map(function publicVoiceItem(item) { return Object.assign({}, item); }),
-                error: backupResult && backupResult.error ? backupResult.error : null
+                error: backupResult && backupResult.error ? backupResult.error : null,
+                savedCount: savedCount,
+                oneOffCount: normalized.length - savedCount
             };
         }
 
