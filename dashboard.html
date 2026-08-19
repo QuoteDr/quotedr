@@ -2334,27 +2334,45 @@
             }) || null;
         }
 
+        async function preserveDashboardEmptyPortalIfLastDocument(quote, portal) {
+            if (!quote || !portal || portalDocumentCount(portal) > 1) return false;
+            var share = findPortalStableShare(portalRowsForDashboard(portal));
+            await upsertDashboardEmptyPortal({
+                id: portal.id,
+                name: portal.name,
+                clientName: portal.clientName,
+                clientEmail: portal.clientEmail,
+                pin: portal.pin,
+                theme: portalThemeForDashboard(portal),
+                secureToken: share.token,
+                secureAnchorId: share.anchorId,
+                secureCreatedAt: share.createdAt,
+                createdAt: portal.registryRecord && portal.registryRecord.createdAt || new Date().toISOString()
+            }, 'Preserve empty client portal');
+            return true;
+        }
+
+        async function preparePortalDocumentForJunk(quote, portal) {
+            var data = Object.assign({}, quote && quote.data || {});
+            if (!portal || data.portal_visible !== true) {
+                data.portal_visible = false;
+                return data;
+            }
+            var share = findPortalStableShare(portalRowsForDashboard(portal));
+            await preserveDashboardEmptyPortalIfLastDocument(quote, portal);
+            data.portal_visible = false;
+            if (share.anchorId && String(share.anchorId) === String(quote.id)) {
+                data.portal_anchor_only = true;
+            }
+            return data;
+        }
+
         async function preparePortalDocumentRemoval(quote, portal) {
             var original = Object.assign({}, quote && quote.data || {});
             if (!portal || !original.portal_id) return clearPortalAssignmentForEdit(original);
             var share = findPortalStableShare(portalRowsForDashboard(portal));
             var removingActiveAnchor = !!share.anchorId && String(share.anchorId) === String(quote.id);
-            var lastDocument = portalDocumentCount(portal) <= 1;
-
-            if (lastDocument) {
-                await upsertDashboardEmptyPortal({
-                    id: portal.id,
-                    name: portal.name,
-                    clientName: portal.clientName,
-                    clientEmail: portal.clientEmail,
-                    pin: portal.pin,
-                    theme: portalThemeForDashboard(portal),
-                    secureToken: share.token,
-                    secureAnchorId: share.anchorId,
-                    secureCreatedAt: share.createdAt,
-                    createdAt: portal.registryRecord && portal.registryRecord.createdAt || new Date().toISOString()
-                }, 'Preserve empty client portal');
-            }
+            await preserveDashboardEmptyPortalIfLastDocument(quote, portal);
 
             return removingActiveAnchor
                 ? preservePortalAnchorForEdit(original)
@@ -3705,11 +3723,17 @@
 
             quote = await loadDashboardFullQuote(quote);
             var now = new Date();
-            var data = Object.assign({}, quote.data || {});
+            var data;
+            try {
+                data = await preparePortalDocumentForJunk(quote, dashboardPortalForDocument(quote));
+            } catch (portalError) {
+                console.error('Could not preserve client portal before moving document to junk:', portalError);
+                qdAlert('This document was not moved to Junk because its client portal could not be preserved. Refresh and try again.');
+                return;
+            }
             data.junk_deleted_at = now.toISOString();
             data.junk_delete_after = new Date(now.getTime() + JUNK_RETENTION_MS).toISOString();
-            data.junk_was_portal_visible = data.portal_visible === true;
-            data.portal_visible = false;
+            data.junk_was_portal_visible = quote.data && quote.data.portal_visible === true;
 
             const { error } = await qdDurableQuoteRowUpdate(quoteId, { data: data, updated_at: now.toISOString() }, 'Move document to Junk');
             if (error) {
@@ -3764,6 +3788,7 @@
             delete data.junk_delete_after;
             delete data.junk_was_portal_visible;
             data.portal_visible = wasPortalVisible;
+            if (wasPortalVisible) delete data.portal_anchor_only;
             const { error } = await qdDurableQuoteRowUpdate(quoteId, { data: data }, 'Restore document from Junk');
             if (error) {
                 qdAlert('Could not restore document: ' + (error.message || error));

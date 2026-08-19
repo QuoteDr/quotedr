@@ -28,8 +28,8 @@ assert(
 assert(
   dashboard.includes('data.junk_deleted_at = now.toISOString()') &&
   dashboard.includes('data.junk_delete_after = new Date(now.getTime() + JUNK_RETENTION_MS).toISOString()') &&
-  dashboard.includes('data.portal_visible = false'),
-  'Dashboard delete should soft-delete documents and hide them from portals'
+  dashboard.includes('data = await preparePortalDocumentForJunk(quote, dashboardPortalForDocument(quote))'),
+  'Dashboard delete should preserve the portal before soft-deleting its document'
 );
 
 assert(

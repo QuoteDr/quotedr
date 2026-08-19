@@ -57,7 +57,12 @@ const context = {
   }
 };
 vm.createContext(context);
-vm.runInContext(sourceFunction('preparePortalDocumentRemoval'), context);
+vm.runInContext(
+  sourceFunction('preserveDashboardEmptyPortalIfLastDocument') + '\n' +
+    sourceFunction('preparePortalDocumentForJunk') + '\n' +
+    sourceFunction('preparePortalDocumentRemoval'),
+  context
+);
 
 (async () => {
   const quote = {
@@ -90,6 +95,63 @@ vm.runInContext(sourceFunction('preparePortalDocumentRemoval'), context);
   assert.strictEqual(removedNonAnchor.portal_visible, false);
   assert.strictEqual(removedNonAnchor.portal_id, undefined, 'a non-anchor document should fully leave a non-empty portal');
   assert.strictEqual(saved.length, 1, 'removing one of several documents should not create an empty registry entry');
+
+  const junkSaved = [];
+  context.upsertDashboardEmptyPortal = async (record) => junkSaved.push(record);
+  portal.quotes = [quote];
+  const junkedAnchor = await context.preparePortalDocumentForJunk(quote, portal);
+  assert.strictEqual(junkSaved.length, 1, 'junking the last portal document should persist the portal registry first');
+  assert.strictEqual(junkSaved[0].id, 'portal-1');
+  assert.strictEqual(junkedAnchor.portal_visible, false);
+  assert.strictEqual(junkedAnchor.portal_id, 'portal-1', 'junk metadata should retain the portal assignment for restore');
+  assert.strictEqual(junkedAnchor.portal_anchor_only, true, 'junking the stable link anchor should keep the empty portal link active');
+
+  portal.quotes = [quote, nonAnchor];
+  junkSaved.length = 0;
+  const junkedNonAnchor = await context.preparePortalDocumentForJunk(nonAnchor, portal);
+  assert.strictEqual(junkSaved.length, 0, 'junking one of several portal documents should not create an empty registry entry');
+  assert.strictEqual(junkedNonAnchor.portal_visible, false);
+  assert.strictEqual(junkedNonAnchor.portal_id, 'portal-1', 'a junked document should remember its portal for restoration');
+
+  const deleteSource = sourceFunction('deleteQuote');
+  assert(
+    deleteSource.indexOf('await preparePortalDocumentForJunk') < deleteSource.indexOf('await qdDurableQuoteRowUpdate'),
+    'moving a quote to Junk must preserve its portal before hiding the document'
+  );
+  assert(
+    deleteSource.includes('This document was not moved to Junk because its client portal could not be preserved.'),
+    'portal persistence failure must stop the delete instead of silently erasing the portal'
+  );
+  assert(
+    sourceFunction('restoreQuoteFromJunk').includes('if (wasPortalVisible) delete data.portal_anchor_only'),
+    'restoring a junked portal anchor should make it a normal visible document again'
+  );
+
+  const blockedAlerts = [];
+  let blockedUpdates = 0;
+  const blockedDeleteContext = {
+    allQuotes: [quote],
+    JUNK_RETENTION_DAYS: 30,
+    JUNK_RETENTION_MS: 30 * 24 * 60 * 60 * 1000,
+    async qdConfirm() { return true; },
+    async loadDashboardFullQuote(row) { return row; },
+    dashboardPortalForDocument() { return portal; },
+    async preparePortalDocumentForJunk() { throw new Error('registry unavailable'); },
+    async qdDurableQuoteRowUpdate() { blockedUpdates += 1; return { error: null }; },
+    qdAlert(message) { blockedAlerts.push(message); },
+    renderDashboardResults() {},
+    updateStats() {},
+    updateJunkBadge() {},
+    junkQuotes: [],
+    console: { error() {} },
+    Date
+  };
+  vm.createContext(blockedDeleteContext);
+  vm.runInContext(sourceFunction('deleteQuote'), blockedDeleteContext);
+  await blockedDeleteContext.deleteQuote('quote-anchor');
+  assert.strictEqual(blockedUpdates, 0, 'a portal registry failure must prevent the quote update');
+  assert.strictEqual(blockedDeleteContext.allQuotes.length, 1, 'a blocked delete must leave the quote on the dashboard');
+  assert.match(blockedAlerts[0], /portal could not be preserved/i);
 
   const builderContext = {
     Object, String, Array, Set,
